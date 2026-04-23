@@ -6,6 +6,7 @@ import { formatTelegramPost, sendTelegramMessage } from './telegram.js';
 import { loadPublishedItems, savePublishedItem } from './storage.js';
 
 const RUN_MODE = process.env.RUN_MODE || 'cron';
+const SEND_HEARTBEAT = String(process.env.SEND_HEARTBEAT || '').toLowerCase() === 'true';
 
 function getNewsKey(item) {
   return item.link || `${item.title}-${item.date}`;
@@ -21,6 +22,18 @@ async function publishDaily() {
   const news = await getLatestNews(10);
   if (!news.length) {
     console.log('No relevant news found, skipping run');
+
+    if (SEND_HEARTBEAT) {
+      const heartbeatText = [
+        '📰 Новини Чайки',
+        'Сьогодні релевантних новин не знайдено. Бот і Telegram-зв’язок працюють коректно.',
+        `Джерело: ${process.env.SITE_URL || 'ChaikaUA'}`,
+      ].join('\n\n');
+
+      await sendTelegramMessage(heartbeatText);
+      console.log('Sent heartbeat message');
+    }
+
     return;
   }
 
