@@ -10,8 +10,8 @@ export function formatTelegramPost({ title, summary, source, link }) {
   return [
     `📰 ${normalizeText(title)}`,
     normalizeText(summary),
-    `Источник: ${normalizeText(source)}`,
-    link ? `Ссылка: ${normalizeText(link)}` : '',
+    `Джерело: ${normalizeText(source)}`,
+    link ? `Посилання: ${normalizeText(link)}` : '',
   ].filter(Boolean).join('\n\n');
 }
 
