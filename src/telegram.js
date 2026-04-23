@@ -15,6 +15,7 @@ export function formatTelegramPost({ title, summary, source, link }) {
     link ? `Посилання: ${normalizeText(link)}` : '',
     'Дякуємо, що користуєтеся додатком ЖК Чайка.',
     'Розкажіть свої новини та події в чаті у мобільному додатку.',
+    `Скачати додаток: ${process.env.SITE_URL || 'https://chaika-ua.netlify.app'}`,
   ].filter(Boolean).join('\n\n');
 }
 

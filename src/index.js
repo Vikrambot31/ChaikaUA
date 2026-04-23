@@ -5,7 +5,7 @@ import { summarizeNewsItem, isEmptySummary } from './ai.js';
 import { formatTelegramPost, sendTelegramMessage } from './telegram.js';
 import { loadPublishedItems, savePublishedItem } from './storage.js';
 import { buildOffersDigest } from './offers.js';
-import { getCoffeeSpotOfDay } from './cafes.js';
+import { getCoffeeSpotWithImage } from './cafes.js';
 
 const RUN_MODE = process.env.RUN_MODE || 'cron';
 const SEND_HEARTBEAT = String(process.env.SEND_HEARTBEAT || '').toLowerCase() === 'true';
@@ -23,7 +23,7 @@ function alreadyPublished(item) {
 async function publishDaily() {
   const news = await getLatestNews(10);
   const offer = buildOffersDigest();
-  const coffee = getCoffeeSpotOfDay();
+  const coffee = getCoffeeSpotWithImage();
 
   const pendingPosts = [];
 
@@ -115,6 +115,7 @@ async function publishDaily() {
         `Джерело: ${process.env.SITE_URL || 'ChaikaUA'}`,
         'Дякуємо, що користуєтеся додатком ЖК Чайка.',
         'Розкажіть свої новини та події в чаті у мобільному додатку.',
+        `Скачати додаток: ${process.env.SITE_URL || 'https://chaika-ua.netlify.app'}`,
       ].join('\n\n'),
       meta: coffee,
     });

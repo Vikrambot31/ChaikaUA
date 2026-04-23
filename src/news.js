@@ -47,9 +47,42 @@ const KEYWORDS = [
   'Житомирская',
 ];
 
+const BLOCKED_KEYWORDS = [
+  'одес',
+  'львів',
+  'харків',
+  'дніпр',
+  'запоріж',
+  'терноп',
+  'полтав',
+  'чернів',
+  'черніг',
+  'суми',
+  'кибер',
+  'кібер',
+  'cyber',
+  'security',
+  'штучний інтелект',
+  'ai',
+  'віртуал',
+  'фінанс',
+  'економік',
+  'прем’єр',
+  'президент',
+  'вибор',
+  'парламент',
+  'міноборон',
+];
+
 export function scoreNewsItem(item) {
   const text = `${item.title || ''} ${item.contentSnippet || ''} ${item.content || ''} ${item.link || ''}`.toLowerCase();
   let score = 0;
+
+  for (const blocked of BLOCKED_KEYWORDS) {
+    if (text.includes(blocked)) {
+      return 0;
+    }
+  }
 
   if (/чайк|жк чайк|осбб чайк/i.test(text)) score += 40;
   if (/бучан|буча/i.test(text)) score += 26;
@@ -68,7 +101,7 @@ export function scoreNewsItem(item) {
 }
 
 export function isRelevantNews(item) {
-  return scoreNewsItem(item) >= 10;
+  return scoreNewsItem(item) >= 18;
 }
 
 export async function getLatestNews(limit = 10) {
