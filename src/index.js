@@ -27,7 +27,17 @@ async function publishDaily() {
   for (const item of news) {
     if (alreadyPublished(item)) continue;
 
-    const summary = await summarizeNewsItem(item);
+    let summary = '';
+    try {
+      summary = await Promise.race([
+        summarizeNewsItem(item),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('AI timeout')), 15000)),
+      ]);
+    } catch (error) {
+      console.log(`AI skip for ${item.title}: ${error.message}`);
+      continue;
+    }
+
     if (isEmptySummary(summary)) {
       console.log(`Skipped empty summary for: ${item.title}`);
       continue;

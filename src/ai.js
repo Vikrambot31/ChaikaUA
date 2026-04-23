@@ -28,6 +28,7 @@ async function callAnthropic(item) {
       'anthropic-version': '2023-06-01',
       'content-type': 'application/json',
     },
+    timeout: 15000,
   });
 
   const text = res.data?.content?.[0]?.text || '';
