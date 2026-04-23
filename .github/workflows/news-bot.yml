@@ -17,14 +17,12 @@ jobs:
         with:
           node-version: '18'
           cache: 'npm'
-          cache-dependency-path: chaika-server-bot/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: chaika-server-bot
         run: npm ci
 
       - name: Run once
-        working-directory: chaika-server-bot
         env:
           RUN_MODE: once
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
