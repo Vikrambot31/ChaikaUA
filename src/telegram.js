@@ -1,0 +1,30 @@
+import axios from 'axios';
+
+const BASE = () => `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}`;
+
+function normalizeText(text = '') {
+  return String(text).replace(/\s+/g, ' ').trim();
+}
+
+export function formatTelegramPost({ title, summary, source, link }) {
+  return [
+    `📰 ${normalizeText(title)}`,
+    normalizeText(summary),
+    `Источник: ${normalizeText(source)}`,
+    link ? `Ссылка: ${normalizeText(link)}` : '',
+  ].filter(Boolean).join('\n\n');
+}
+
+export async function sendTelegramMessage(text) {
+  if (!process.env.TELEGRAM_BOT_TOKEN || !process.env.TELEGRAM_CHAT_ID) {
+    throw new Error('Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID');
+  }
+
+  const res = await axios.post(`${BASE()}/sendMessage`, {
+    chat_id: process.env.TELEGRAM_CHAT_ID,
+    text,
+    disable_web_page_preview: true,
+  });
+
+  return res.data;
+}
