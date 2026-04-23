@@ -1,11 +1,17 @@
-const CAFE_SPOTS = [
-  { name: 'BALCONE COFFEE', address: 'вулиця Валерія Лобановського, 26 к2', score: 9.6, imageUrl: 'https://chaika-ua.netlify.app/kaffee3.jpeg' },
-  { name: '#МОЖЕКАВИ?', address: 'вулиця Валерія Лобановського, 29', score: 9.5, imageUrl: 'https://chaika-ua.netlify.app/kaffee3.jpeg' },
-  { name: 'Coffee ART', address: 'вулиця Валерія Лобановського, 25', score: 9.4, imageUrl: 'https://chaika-ua.netlify.app/kaffee3.jpeg' },
-  { name: 'ANMI SOUL', address: 'вулиця Валерія Лобановського, 18', score: 9.3, imageUrl: 'https://chaika-ua.netlify.app/kaffee3.jpeg' },
-  { name: 'OBRIY cafe&bakery', address: 'вулиця Валерія Лобановського, 28', score: 9.2, imageUrl: 'https://chaika-ua.netlify.app/kaffee3.jpeg' },
-  { name: 'Chaykava', address: 'вулиця Українського Відродження', score: 9.1, imageUrl: 'https://chaika-ua.netlify.app/kaffee3.jpeg' },
-  { name: 'White Rabbit Coffee and Friends', address: 'вулиця Валерія Лобановського, 26 к2', score: 9.0, imageUrl: 'https://chaika-ua.netlify.app/kaffee3.jpeg' },
+// Source: synced from mobile app data in src/services/chaykaPlacesData.ts
+const PLACE_SPOTS = [
+  { name: 'Fora', address: 'вулиця Грушевського, 12', type: 'shop', score: 9.8, imageUrl: 'https://chaika-ua.netlify.app/shop3.jpeg' },
+  { name: 'Кав\'ярня-кондитерська "Гамак"', address: 'вулиця Валерія Лобановського', type: 'cafe', score: 9.7, imageUrl: 'https://chaika-ua.netlify.app/kaffee3.jpeg' },
+  { name: 'BALCONE COFFEE', address: 'вулиця Валерія Лобановського, 26 к2', type: 'cafe', score: 9.6, imageUrl: 'https://chaika-ua.netlify.app/kaffee3.jpeg' },
+  { name: 'Coffee ART', address: 'вулиця Валерія Лобановського, 25', type: 'cafe', score: 9.5, imageUrl: 'https://chaika-ua.netlify.app/kaffee3.jpeg' },
+  { name: 'ANMI SOUL', address: 'вулиця Валерія Лобановського, 18', type: 'cafe', score: 9.4, imageUrl: 'https://chaika-ua.netlify.app/kaffee3.jpeg' },
+  { name: 'White Rabbit Coffee and Friends', address: 'вулиця Валерія Лобановського, 26 к2', type: 'cafe', score: 9.3, imageUrl: 'https://chaika-ua.netlify.app/kaffee3.jpeg' },
+  { name: 'Chaykava', address: 'вулиця Українського Відродження', type: 'cafe', score: 9.2, imageUrl: 'https://chaika-ua.netlify.app/kaffee3.jpeg' },
+  { name: 'NOVUS', address: 'вулиця Авіаконструктора Антонова', type: 'shop', score: 9.1, imageUrl: 'https://chaika-ua.netlify.app/shop3.jpeg' },
+  { name: 'Grano Bakery', address: 'вулиця Валерія Лобановського, 35', type: 'shop', score: 9.0, imageUrl: 'https://chaika-ua.netlify.app/shop3.jpeg' },
+  { name: 'Кав\'ярня ХЛІБ та КАВА', address: 'вулиця Валерія Лобановського, 18', type: 'cafe', score: 8.9, imageUrl: 'https://chaika-ua.netlify.app/kaffee3.jpeg' },
+  { name: 'Мозаїка Espresso bar', address: 'вулиця Валерія Лобановського', type: 'cafe', score: 8.8, imageUrl: 'https://chaika-ua.netlify.app/kaffee3.jpeg' },
+  { name: '#МОЖЕКАВИ?', address: 'вулиця Валерія Лобановського, 29', type: 'cafe', score: 8.7, imageUrl: 'https://chaika-ua.netlify.app/kaffee3.jpeg' },
 ];
 
 function rotateByDay(items) {
@@ -16,7 +22,7 @@ function rotateByDay(items) {
 }
 
 export function getCoffeeSpotOfDay() {
-  const ordered = rotateByDay([...CAFE_SPOTS].sort((a, b) => b.score - a.score));
+  const ordered = rotateByDay([...PLACE_SPOTS.filter((item) => item.type === 'cafe')].sort((a, b) => b.score - a.score));
   return ordered[0] || null;
 }
 
@@ -27,7 +33,7 @@ export function getCoffeeSpotWithImage() {
 }
 
 export function getPlacesPostOfDay() {
-  const ordered = rotateByDay([...CAFE_SPOTS].sort((a, b) => b.score - a.score));
+  const ordered = rotateByDay([...PLACE_SPOTS].sort((a, b) => b.score - a.score));
   const items = ordered.slice(0, 2);
   if (items.length < 2) return null;
 
