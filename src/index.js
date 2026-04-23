@@ -10,6 +10,16 @@ import { getCoffeeSpotWithImage } from './cafes.js';
 const RUN_MODE = process.env.RUN_MODE || 'cron';
 const SEND_HEARTBEAT = String(process.env.SEND_HEARTBEAT || '').toLowerCase() === 'true';
 
+function getTodayKey(prefix) {
+  const date = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Kyiv',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+  return `${prefix}-${date}`;
+}
+
 function getNewsKey(item) {
   return item.link || `${item.title}-${item.date}`;
 }
@@ -29,19 +39,6 @@ async function publishDaily() {
 
   if (!news.length) {
     console.log('No relevant news found, skipping run');
-
-    if (SEND_HEARTBEAT) {
-      const heartbeatText = [
-        '📰 Новини від додатку ChaikaUA',
-        'Бот і Telegram-зв’язок працюють коректно. Сьогодні релевантних новин не знайдено.',
-        `Джерело: ${process.env.SITE_URL || 'ChaikaUA'}`,
-        'Дякуємо, що користуєтеся додатком ЖК Чайка.',
-      ].join('\n\n');
-
-      await sendTelegramMessage(heartbeatText);
-      console.log('Sent heartbeat message');
-    }
-
   } else {
     for (const item of news.slice(0, 3)) {
       if (alreadyPublished(item)) continue;
@@ -90,9 +87,11 @@ async function publishDaily() {
   }
 
   if (offer) {
+    const offerKey = getTodayKey('offer-digest');
+    if (!alreadyPublished({ link: offerKey, title: offer.title, date: new Date().toISOString() })) {
     pendingPosts.push({
       type: 'offer',
-      key: 'offer-digest',
+      key: offerKey,
       text: formatTelegramPost({
         title: offer.title,
         summary: offer.summary,
@@ -101,12 +100,15 @@ async function publishDaily() {
       }),
       meta: offer,
     });
+    }
   }
 
   if (coffee) {
+    const coffeeKey = getTodayKey(`coffee-${coffee.name}`);
+    if (!alreadyPublished({ link: coffeeKey, title: coffee.name, date: new Date().toISOString() })) {
     pendingPosts.push({
       type: 'coffee',
-      key: `coffee-${coffee.name}`,
+      key: coffeeKey,
       text: [
         '☕ Де сьогодні випити каву на Чайці',
         `Місце дня: ${coffee.name}`,
@@ -119,6 +121,21 @@ async function publishDaily() {
       ].join('\n\n'),
       meta: coffee,
     });
+    }
+  }
+
+  if (!pendingPosts.length && SEND_HEARTBEAT) {
+    const heartbeatText = [
+      '📰 Новини від додатку ChaikaUA',
+      'Бот і Telegram-зв’язок працюють коректно. Сьогодні релевантних новин не знайдено.',
+      `Джерело: ${process.env.SITE_URL || 'ChaikaUA'}`,
+      'Дякуємо, що користуєтеся додатком ЖК Чайка.',
+      `Скачати додаток: ${process.env.SITE_URL || 'https://chaika-ua.netlify.app'}`,
+    ].join('\n\n');
+
+    await sendTelegramMessage(heartbeatText);
+    console.log('Sent heartbeat message');
+    return;
   }
 
   for (const post of pendingPosts.slice(0, 3)) {
