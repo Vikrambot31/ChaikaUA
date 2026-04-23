@@ -32,3 +32,17 @@ export async function sendTelegramMessage(text) {
 
   return res.data;
 }
+
+export async function sendTelegramPhoto(photoUrl, caption) {
+  if (!process.env.TELEGRAM_BOT_TOKEN || !process.env.TELEGRAM_CHAT_ID) {
+    throw new Error('Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID');
+  }
+
+  const res = await axios.post(`${BASE()}/sendPhoto`, {
+    chat_id: process.env.TELEGRAM_CHAT_ID,
+    photo: photoUrl,
+    caption,
+  });
+
+  return res.data;
+}

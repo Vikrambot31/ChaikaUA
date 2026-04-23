@@ -2,7 +2,7 @@ import 'dotenv/config';
 import cron from 'node-cron';
 import { getLatestNews } from './news.js';
 import { summarizeNewsItem, isEmptySummary } from './ai.js';
-import { formatTelegramPost, sendTelegramMessage } from './telegram.js';
+import { formatTelegramPost, sendTelegramMessage, sendTelegramPhoto } from './telegram.js';
 import { loadPublishedItems, savePublishedItem } from './storage.js';
 import { buildOffersDigest } from './offers.js';
 import { getCoffeeSpotWithImage } from './cafes.js';
@@ -122,7 +122,10 @@ async function publishDaily() {
   }
 
   for (const post of pendingPosts.slice(0, 3)) {
-    const result = await sendTelegramMessage(post.text);
+    const result = post.type === 'coffee' && post.meta?.imageUrl
+      ? await sendTelegramPhoto(post.meta.imageUrl, post.text)
+      : await sendTelegramMessage(post.text);
+
     savePublishedItem({
       key: post.key,
       publishedAt: new Date().toISOString(),
