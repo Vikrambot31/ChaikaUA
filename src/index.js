@@ -4,11 +4,9 @@ import { getLatestNews } from './news.js';
 import { summarizeNewsItem, isEmptySummary } from './ai.js';
 import { formatTelegramPost, sendTelegramMessage, sendTelegramPhoto } from './telegram.js';
 import { loadPublishedItems, savePublishedItem } from './storage.js';
-import { buildOffersDigest } from './offers.js';
-import { getCoffeeSpotWithImage } from './cafes.js';
+import { getPlacesPostOfDay } from './cafes.js';
 
 const RUN_MODE = process.env.RUN_MODE || 'cron';
-const SEND_HEARTBEAT = String(process.env.SEND_HEARTBEAT || '').toLowerCase() === 'true';
 
 function getTodayKey(prefix) {
   const date = new Intl.DateTimeFormat('en-CA', {
@@ -32,14 +30,23 @@ function alreadyPublished(item) {
 
 async function publishDaily() {
   const news = await getLatestNews(10);
-  const offer = buildOffersDigest();
-  const coffee = getCoffeeSpotWithImage();
+  const placesPost = getPlacesPostOfDay();
 
   const pendingPosts = [];
 
-  if (!news.length) {
-    console.log('No relevant news found, skipping run');
-  } else {
+  if (placesPost) {
+    const placesKey = getTodayKey(`places-${placesPost.items.map((item) => item.name).join('-')}`);
+    if (!alreadyPublished({ link: placesKey, title: placesPost.title, date: new Date().toISOString() })) {
+      pendingPosts.push({
+        type: 'places',
+        key: placesKey,
+        text: placesPost.text,
+        meta: placesPost,
+      });
+    }
+  }
+
+  if (news.length) {
     for (const item of news.slice(0, 3)) {
       if (alreadyPublished(item)) continue;
 
@@ -83,63 +90,13 @@ async function publishDaily() {
         text,
         meta: item,
       });
+
+      break;
     }
   }
 
-  if (offer) {
-    const offerKey = getTodayKey('offer-digest');
-    if (!alreadyPublished({ link: offerKey, title: offer.title, date: new Date().toISOString() })) {
-    pendingPosts.push({
-      type: 'offer',
-      key: offerKey,
-      text: formatTelegramPost({
-        title: offer.title,
-        summary: offer.summary,
-        source: offer.source,
-        link: offer.link,
-      }),
-      meta: offer,
-    });
-    }
-  }
-
-  if (coffee) {
-    const coffeeKey = getTodayKey(`coffee-${coffee.name}`);
-    if (!alreadyPublished({ link: coffeeKey, title: coffee.name, date: new Date().toISOString() })) {
-    pendingPosts.push({
-      type: 'coffee',
-      key: coffeeKey,
-      text: [
-        '☕ Де сьогодні випити каву на Чайці',
-        `Місце дня: ${coffee.name}`,
-        `Адреса: ${coffee.address}`,
-        'Коротко: одна з найкращих точок для швидкої кави поруч із домом.',
-        `Джерело: ${process.env.SITE_URL || 'ChaikaUA'}`,
-        'Дякуємо, що користуєтеся додатком ЖК Чайка.',
-        'Розкажіть свої новини та події в чаті у мобільному додатку.',
-        `Скачати додаток: ${process.env.SITE_URL || 'https://chaika-ua.netlify.app'}`,
-      ].join('\n\n'),
-      meta: coffee,
-    });
-    }
-  }
-
-  if (!pendingPosts.length && SEND_HEARTBEAT) {
-    const heartbeatText = [
-      '📰 Новини від додатку ChaikaUA',
-      'Бот і Telegram-зв’язок працюють коректно. Сьогодні релевантних новин не знайдено.',
-      `Джерело: ${process.env.SITE_URL || 'ChaikaUA'}`,
-      'Дякуємо, що користуєтеся додатком ЖК Чайка.',
-      `Скачати додаток: ${process.env.SITE_URL || 'https://chaika-ua.netlify.app'}`,
-    ].join('\n\n');
-
-    await sendTelegramMessage(heartbeatText);
-    console.log('Sent heartbeat message');
-    return;
-  }
-
-  for (const post of pendingPosts.slice(0, 3)) {
-    const result = post.type === 'coffee' && post.meta?.imageUrl
+  for (const post of pendingPosts.slice(0, 2)) {
+    const result = post.type === 'places' && post.meta?.imageUrl
       ? await sendTelegramPhoto(post.meta.imageUrl, post.text)
       : await sendTelegramMessage(post.text);
 

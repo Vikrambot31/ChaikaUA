@@ -25,3 +25,30 @@ export function getCoffeeSpotWithImage() {
   if (!spot || !spot.imageUrl) return null;
   return spot;
 }
+
+export function getPlacesPostOfDay() {
+  const ordered = rotateByDay([...CAFE_SPOTS].sort((a, b) => b.score - a.score));
+  const items = ordered.slice(0, 2);
+  if (items.length < 2) return null;
+
+  const imageUrl = items.find((item) => item.imageUrl)?.imageUrl || '';
+  if (!imageUrl) return null;
+
+  const text = [
+    '📍 Два місця на Чайці, куди можна піти сьогодні',
+    `1) ${items[0].name} — ${items[0].address}`,
+    `2) ${items[1].name} — ${items[1].address}`,
+    'Коротко: сьогодні радимо звернути увагу на ці два місця поруч із домом.',
+    `Джерело: ${process.env.SITE_URL || 'ChaikaUA'}`,
+    'Дякуємо, що користуєтеся додатком ЖК Чайка.',
+    'Розкажіть свої новини та події в чаті у мобільному додатку.',
+    `Скачати додаток: ${process.env.SITE_URL || 'https://chaika-ua.netlify.app'}`,
+  ].join('\n\n');
+
+  return {
+    title: 'Два місця на Чайці, куди можна піти сьогодні',
+    items,
+    imageUrl,
+    text,
+  };
+}
