@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import cron from 'node-cron';
 import { getLatestNews } from './news.js';
-import { summarizeNewsItem } from './ai.js';
+import { summarizeNewsItem, isEmptySummary } from './ai.js';
 import { formatTelegramPost, sendTelegramMessage } from './telegram.js';
 import { loadPublishedItems, savePublishedItem } from './storage.js';
 
@@ -23,12 +23,28 @@ async function publishDaily() {
     if (alreadyPublished(item)) continue;
 
     const summary = await summarizeNewsItem(item);
+    if (isEmptySummary(summary)) {
+      console.log(`Skipped empty summary for: ${item.title}`);
+      continue;
+    }
+
+    const cleanedSummary = String(summary).replace(/\s+/g, ' ').trim();
+    if (!cleanedSummary || cleanedSummary.length < 10) {
+      console.log(`Skipped too short summary for: ${item.title}`);
+      continue;
+    }
+
     const text = formatTelegramPost({
       title: item.title,
-      summary,
+      summary: cleanedSummary,
       source: item.source,
       link: item.link,
     });
+
+    if (!text || !String(text).trim()) {
+      console.log(`Skipped empty telegram post for: ${item.title}`);
+      continue;
+    }
 
     const result = await sendTelegramMessage(text);
 

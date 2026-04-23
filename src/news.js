@@ -8,6 +8,8 @@ export const RSS_FEEDS = [
   'https://vechirniy.kyiv.ua/rss/',
   'https://bigkyiv.com.ua/feed/',
   'https://www.koda.gov.ua/rss',
+  'https://ukrinform.ua/rss/block-lastnews',
+  'https://www.pravda.com.ua/rss/view_news/',
 ];
 
 const KEYWORDS = [
@@ -76,6 +78,7 @@ export async function getLatestNews(limit = 10) {
       collected.push(...items.filter(isRelevantNews));
     } catch (error) {
       // skip source and continue
+      continue;
     }
 
     if (collected.length >= limit) break;

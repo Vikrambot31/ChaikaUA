@@ -47,3 +47,7 @@ export async function summarizeNewsItem(item) {
     return `${normalizeText(item.title)}. ${normalizeText(item.summary).slice(0, 160)}`;
   }
 }
+
+export function isEmptySummary(summary) {
+  return !normalizeText(summary || '').trim();
+}
