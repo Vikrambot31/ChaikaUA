@@ -8,10 +8,13 @@ function normalizeText(text = '') {
 
 export function formatTelegramPost({ title, summary, source, link }) {
   return [
-    `📰 ${normalizeText(title)}`,
+    `📰 Новини від додатку ChaikaUA`,
+    `✨ ${normalizeText(title)}`,
     normalizeText(summary),
     `Джерело: ${normalizeText(source)}`,
     link ? `Посилання: ${normalizeText(link)}` : '',
+    'Дякуємо, що користуєтеся додатком ЖК Чайка.',
+    'Розкажіть свої новини та події в чаті у мобільному додатку.',
   ].filter(Boolean).join('\n\n');
 }
 

@@ -16,6 +16,8 @@ const KEYWORDS = [
   'чайка',
   'chayka',
   'chaika',
+  'жк чайка',
+  'осбб чайка',
   'буча',
   'бучан',
   'софіїв',
@@ -36,6 +38,11 @@ const KEYWORDS = [
   'дорог',
   'жкг',
   'аварі',
+  'комунал',
+  'перекрит',
+  'безпек',
+  'укрит',
+  'світл',
   'Житомирськ',
   'Житомирская',
 ];
@@ -44,14 +51,18 @@ export function scoreNewsItem(item) {
   const text = `${item.title || ''} ${item.contentSnippet || ''} ${item.content || ''} ${item.link || ''}`.toLowerCase();
   let score = 0;
 
+  if (/чайк|жк чайк|осбб чайк/i.test(text)) score += 40;
+  if (/бучан|буча/i.test(text)) score += 26;
+  if (/софіїв|софиев|борщаг/i.test(text)) score += 24;
+  if (/житомир|житомирськ/i.test(text)) score += 20;
+  if (/безпек|укрит|тривог|поліц|пожеж|авар/i.test(text)) score += 18;
+  if (/перекрит|ремонт|дорог|транспорт|авар|світл|вода|тепло|комунал/i.test(text)) score += 16;
+
   for (const keyword of KEYWORDS) {
     if (text.includes(keyword.toLowerCase())) {
-      score += keyword.length >= 6 ? 4 : 2;
+      score += keyword.length >= 6 ? 3 : 1;
     }
   }
-
-  if (/чайк|бучан|софіїв|софиев/i.test(text)) score += 18;
-  if (/перекрит|ремонт|авар|укрит|безпек|світл|вода|тепло|транспорт/i.test(text)) score += 8;
 
   return Math.min(score, 100);
 }

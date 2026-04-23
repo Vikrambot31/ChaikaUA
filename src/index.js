@@ -25,9 +25,10 @@ async function publishDaily() {
 
     if (SEND_HEARTBEAT) {
       const heartbeatText = [
-        '📰 Новини Чайки',
-        'Сьогодні релевантних новин не знайдено. Бот і Telegram-зв’язок працюють коректно.',
+        '📰 Новини від додатку ChaikaUA',
+        'Бот і Telegram-зв’язок працюють коректно. Сьогодні релевантних новин не знайдено.',
         `Джерело: ${process.env.SITE_URL || 'ChaikaUA'}`,
+        'Дякуємо, що користуєтеся додатком ЖК Чайка.',
       ].join('\n\n');
 
       await sendTelegramMessage(heartbeatText);
