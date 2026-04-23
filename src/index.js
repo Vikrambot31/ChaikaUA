@@ -19,6 +19,11 @@ function alreadyPublished(item) {
 
 async function publishDaily() {
   const news = await getLatestNews(10);
+  if (!news.length) {
+    console.log('No relevant news found, skipping run');
+    return;
+  }
+
   for (const item of news) {
     if (alreadyPublished(item)) continue;
 

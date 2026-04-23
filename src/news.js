@@ -1,6 +1,6 @@
 import Parser from 'rss-parser';
 
-const parser = new Parser({ timeout: 7000 });
+const parser = new Parser({ timeout: 3500 });
 
 export const RSS_FEEDS = [
   'https://kyivcity.gov.ua/news/rss/',
@@ -61,10 +61,9 @@ export function isRelevantNews(item) {
 }
 
 export async function getLatestNews(limit = 10) {
-  const collected = [];
-
-  for (const url of RSS_FEEDS) {
-    try {
+  const settled = await Promise.allSettled(
+    RSS_FEEDS.map(async (url) => {
+      console.log(`[news] loading ${url}`);
       const feed = await parser.parseURL(url);
       const items = (feed.items || []).map((item) => ({
         title: item.title || '',
@@ -75,14 +74,20 @@ export async function getLatestNews(limit = 10) {
         score: scoreNewsItem(item),
       }));
 
-      collected.push(...items.filter(isRelevantNews));
-    } catch (error) {
-      // skip source and continue
-      continue;
-    }
+      return items.filter(isRelevantNews);
+    })
+  );
 
-    if (collected.length >= limit) break;
-  }
+  const collected = settled
+    .flatMap((result, index) => {
+      if (result.status === 'fulfilled') {
+        console.log(`[news] ok ${RSS_FEEDS[index]}`);
+        return result.value;
+      }
+
+      console.log(`[news] skip ${RSS_FEEDS[index]}`);
+      return [];
+    });
 
   const unique = new Map();
   for (const item of collected) {
