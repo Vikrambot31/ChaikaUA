@@ -6,14 +6,33 @@ function normalizeText(text = '') {
   return String(text).replace(/\s+/g, ' ').trim();
 }
 
+function getSourceLabel(link = '', source = '') {
+  const normalizedLink = normalizeText(link);
+  if (!normalizedLink) {
+    return normalizeText(source);
+  }
+
+  try {
+    const hostname = new URL(normalizedLink).hostname.replace(/^www\./, '');
+    return hostname;
+  } catch {
+    return normalizeText(source || normalizedLink);
+  }
+}
+
+function getAppLabel() {
+  return getSourceLabel(process.env.SITE_URL || 'https://chaika-ua.netlify.app', 'ChaikaUA');
+}
+
 export function formatTelegramPost({ title, summary, source, link }) {
   return [
     `📰 Новини від додатку ChaikaUA`,
     `✨ ${normalizeText(title)}`,
-    normalizeText(summary),
-    `Джерело: ${normalizeText(source)}`,
-    link ? `Посилання: ${normalizeText(link)}` : '',
-    `Дякуємо, що користуєтеся додатком ЖК Чайка. Розкажіть свої новини та події в чаті у мобільному додатку. Скачати додаток: ${process.env.SITE_URL || 'https://chaika-ua.netlify.app'}`,
+    `🧾 ${normalizeText(summary)}`,
+    `📍 Джерело: ${normalizeText(source)}`,
+    link ? `🔗 Посилання: ${getSourceLabel(link, source)}` : '',
+    `💬 Розкажіть свої новини та події в чаті у мобільному додатку.`,
+    `📲 Додаток: ${getAppLabel()}`,
   ].filter(Boolean).join('\n');
 }
 

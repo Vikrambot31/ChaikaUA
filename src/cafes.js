@@ -39,11 +39,12 @@ export function getPlacesPostOfDay() {
 
   const text = [
     '📍 Два місця на Чайці, куди можна піти сьогодні',
-    `1) ${items[0].name} — ${items[0].address}`,
-    `2) ${items[1].name} — ${items[1].address}`,
-    'Коротко: сьогодні радимо звернути увагу на ці два місця поруч із домом.',
-    `Джерело: ${process.env.SITE_URL || 'ChaikaUA'}`,
-    `Дякуємо, що користуєтеся додатком ЖК Чайка. Розкажіть свої новини та події в чаті у мобільному додатку. Скачати додаток: ${process.env.SITE_URL || 'https://chaika-ua.netlify.app'}`,
+    `☕ 1) ${items[0].name} — ${items[0].address}`,
+    `🍽️ 2) ${items[1].name} — ${items[1].address}`,
+    '✨ Коротко: сьогодні радимо звернути увагу на ці два місця поруч із домом.',
+    `📍 Джерело: ChaikaUA`,
+    `💬 Розкажіть свої новини та події в чаті у мобільному додатку.`,
+    `📲 Додаток: chaika-ua.netlify.app`,
   ].join('\n');
 
   return {
