@@ -48,6 +48,23 @@ const KEYWORDS = [
 ];
 
 const BLOCKED_KEYWORDS = [
+  'росі',
+  'россия',
+  'рф',
+  'москва',
+  'кремл',
+  'сша',
+  'європ',
+  'китай',
+  'ізраїл',
+  'іран',
+  'нато',
+  'g20',
+  'оон',
+  'світ',
+  'world',
+  'україна і світ',
+  'міжнарод',
   'одес',
   'львів',
   'харків',
@@ -73,6 +90,57 @@ const BLOCKED_KEYWORDS = [
   'парламент',
   'міноборон',
 ];
+
+const LOCALITY_KEYWORDS = [
+  'чайка',
+  'жк чайка',
+  'осбб чайка',
+  'буча',
+  'бучан',
+  'бучанський',
+  'софіїв',
+  'софиев',
+  'борщаг',
+  'житомирськ',
+  'житомирская',
+  'київ',
+  'киев',
+  'київська область',
+  'киевская область',
+  'київщина',
+];
+
+const IMPACT_KEYWORDS = [
+  'світл',
+  'відключ',
+  'вода',
+  'тепло',
+  'газ',
+  'жкг',
+  'комунал',
+  'ремонт',
+  'перекрит',
+  'дорог',
+  'рух',
+  'маршрут',
+  'автобус',
+  'транспорт',
+  'укрит',
+  'безпек',
+  'тривог',
+  'сирен',
+  'пожеж',
+  'авар',
+  'шторм',
+  'замороз',
+  'погод',
+  'генератор',
+  'інфраструкт',
+];
+
+function hasAnyKeyword(text, keywords) {
+  return keywords.some((keyword) => text.includes(keyword.toLowerCase()));
+}
 
 export function scoreNewsItem(item) {
   const text = `${item.title || ''} ${item.contentSnippet || ''} ${item.content || ''} ${item.link || ''}`.toLowerCase();
@@ -101,7 +169,19 @@ export function scoreNewsItem(item) {
 }
 
 export function isRelevantNews(item) {
-  return scoreNewsItem(item) >= 18;
+  const text = `${item.title || ''} ${item.contentSnippet || ''} ${item.content || ''} ${item.link || ''}`.toLowerCase();
+  const hasLocality = hasAnyKeyword(text, LOCALITY_KEYWORDS);
+  const hasImpact = hasAnyKeyword(text, IMPACT_KEYWORDS);
+
+  if (!hasLocality) {
+    return false;
+  }
+
+  if (!hasImpact && !/чайк|бучан|софіїв|софиев|борщаг/i.test(text)) {
+    return false;
+  }
+
+  return scoreNewsItem(item) >= 24;
 }
 
 export async function getLatestNews(limit = 10) {
