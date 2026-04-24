@@ -1,5 +1,8 @@
 name: Chaika Morning News
 
+permissions:
+  contents: write
+
 on:
   workflow_dispatch:
   schedule:
