@@ -4,6 +4,7 @@ import path from 'path';
 const DATA_DIR = path.resolve('data');
 const FILE_PATH = path.join(DATA_DIR, 'published-news.json');
 const DAILY_FILE_PATH = path.join(DATA_DIR, 'daily-run.json');
+const FEED_FILE_PATH = path.join(DATA_DIR, 'feed.json');
 
 function ensureDataDir() {
   if (!fs.existsSync(DATA_DIR)) {
@@ -26,6 +27,23 @@ export function savePublishedItem(item) {
   const current = loadPublishedItems();
   current.unshift(item);
   fs.writeFileSync(FILE_PATH, JSON.stringify(current.slice(0, 500), null, 2), 'utf8');
+}
+
+export function loadFeedItems() {
+  try {
+    ensureDataDir();
+    if (!fs.existsSync(FEED_FILE_PATH)) return [];
+    return JSON.parse(fs.readFileSync(FEED_FILE_PATH, 'utf8'));
+  } catch {
+    return [];
+  }
+}
+
+export function saveFeedItem(item) {
+  ensureDataDir();
+  const current = loadFeedItems();
+  current.unshift(item);
+  fs.writeFileSync(FEED_FILE_PATH, JSON.stringify(current.slice(0, 100), null, 2), 'utf8');
 }
 
 export function loadDailyRunState() {

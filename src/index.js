@@ -3,7 +3,7 @@ import cron from 'node-cron';
 import { getLatestNews } from './news.js';
 import { summarizeNewsItem, isEmptySummary } from './ai.js';
 import { formatTelegramPost, sendTelegramMessage, sendTelegramPhoto } from './telegram.js';
-import { loadPublishedItems, savePublishedItem, hasDailyRunFor, saveDailyRunEntry } from './storage.js';
+import { loadPublishedItems, savePublishedItem, hasDailyRunFor, saveDailyRunEntry, saveFeedItem } from './storage.js';
 import { getPlacesPostOfDay } from './cafes.js';
 
 const RUN_MODE = process.env.RUN_MODE || 'cron';
@@ -119,6 +119,19 @@ async function publishDaily() {
       type: post.type,
       title: post.meta?.title || post.meta?.name || '',
       link: post.meta?.link || '',
+    });
+    saveFeedItem({
+      id: post.key,
+      title: post.meta?.title || post.meta?.name || '',
+      shortText: post.type === 'news'
+        ? post.text.split('\n').slice(2, 3).join(' ').replace(/^🧾\s*/, '')
+        : post.text.split('\n').slice(1, 4).join(' '),
+      sourceName: post.type === 'news' ? (post.meta?.source || 'ChaikaUA') : 'ChaikaUA',
+      sourceUrl: process.env.SITE_URL || 'https://chaika-ua.netlify.app',
+      publishedAt: new Date().toISOString(),
+      priority: post.type === 'news' ? 'important' : 'info',
+      aiGenerated: true,
+      postType: post.type,
     });
     saveDailyRunEntry({
       type: post.type,
