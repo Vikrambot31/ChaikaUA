@@ -13,10 +13,8 @@ export function formatTelegramPost({ title, summary, source, link }) {
     normalizeText(summary),
     `Джерело: ${normalizeText(source)}`,
     link ? `Посилання: ${normalizeText(link)}` : '',
-    'Дякуємо, що користуєтеся додатком ЖК Чайка.',
-    'Розкажіть свої новини та події в чаті у мобільному додатку.',
-    `Скачати додаток: ${process.env.SITE_URL || 'https://chaika-ua.netlify.app'}`,
-  ].filter(Boolean).join('\n\n');
+    `Дякуємо, що користуєтеся додатком ЖК Чайка. Розкажіть свої новини та події в чаті у мобільному додатку. Скачати додаток: ${process.env.SITE_URL || 'https://chaika-ua.netlify.app'}`,
+  ].filter(Boolean).join('\n');
 }
 
 export async function sendTelegramMessage(text) {

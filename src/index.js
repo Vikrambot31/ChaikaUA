@@ -3,7 +3,7 @@ import cron from 'node-cron';
 import { getLatestNews } from './news.js';
 import { summarizeNewsItem, isEmptySummary } from './ai.js';
 import { formatTelegramPost, sendTelegramMessage, sendTelegramPhoto } from './telegram.js';
-import { loadPublishedItems, savePublishedItem } from './storage.js';
+import { loadPublishedItems, savePublishedItem, loadDailyRunState, saveDailyRunState } from './storage.js';
 import { getPlacesPostOfDay } from './cafes.js';
 
 const RUN_MODE = process.env.RUN_MODE || 'cron';
@@ -18,6 +18,15 @@ function getTodayKey(prefix) {
   return `${prefix}-${date}`;
 }
 
+function getTodayDate() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Kyiv',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
 function getNewsKey(item) {
   return item.link || `${item.title}-${item.date}`;
 }
@@ -29,6 +38,13 @@ function alreadyPublished(item) {
 }
 
 async function publishDaily() {
+  const today = getTodayDate();
+  const dailyState = loadDailyRunState();
+  if (dailyState?.date === today) {
+    console.log(`Daily publication already completed for ${today}`);
+    return;
+  }
+
   const news = await getLatestNews(10);
   const placesPost = getPlacesPostOfDay();
 
@@ -110,12 +126,18 @@ async function publishDaily() {
     });
     console.log(`Published: ${post.type}`);
   }
+
+  saveDailyRunState({
+    date: today,
+    publishedAt: new Date().toISOString(),
+    postCount: Math.min(pendingPosts.length, 2),
+  });
 }
 
 if (RUN_MODE === 'once') {
   await publishDaily();
 } else {
-  cron.schedule('*/30 * * * *', async () => {
+  cron.schedule('0 8 * * *', async () => {
     try {
       await publishDaily();
     } catch (error) {

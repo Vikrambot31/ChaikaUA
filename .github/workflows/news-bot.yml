@@ -3,7 +3,7 @@ name: Chaika News Bot
 on:
   workflow_dispatch:
   schedule:
-    - cron: '*/30 * * * *'
+    - cron: '0 5 * * *'
 
 jobs:
   publish:
