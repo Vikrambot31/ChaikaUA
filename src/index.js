@@ -3,10 +3,11 @@ import cron from 'node-cron';
 import { getLatestNews } from './news.js';
 import { summarizeNewsItem, isEmptySummary } from './ai.js';
 import { formatTelegramPost, sendTelegramMessage, sendTelegramPhoto } from './telegram.js';
-import { loadPublishedItems, savePublishedItem, loadDailyRunState, saveDailyRunState } from './storage.js';
+import { loadPublishedItems, savePublishedItem, hasDailyRunFor, saveDailyRunEntry } from './storage.js';
 import { getPlacesPostOfDay } from './cafes.js';
 
 const RUN_MODE = process.env.RUN_MODE || 'cron';
+const POST_TYPE = process.env.POST_TYPE || 'all';
 
 function getTodayKey(prefix) {
   const date = new Intl.DateTimeFormat('en-CA', {
@@ -39,18 +40,13 @@ function alreadyPublished(item) {
 
 async function publishDaily() {
   const today = getTodayDate();
-  const dailyState = loadDailyRunState();
-  if (dailyState?.date === today) {
-    console.log(`Daily publication already completed for ${today}`);
-    return;
-  }
 
   const news = await getLatestNews(10);
   const placesPost = getPlacesPostOfDay();
 
   const pendingPosts = [];
 
-  if (placesPost) {
+  if ((POST_TYPE === 'all' || POST_TYPE === 'places') && placesPost && !hasDailyRunFor('places', today)) {
     const placesKey = getTodayKey(`places-${placesPost.items.map((item) => item.name).join('-')}`);
     if (!alreadyPublished({ link: placesKey, title: placesPost.title, date: new Date().toISOString() })) {
       pendingPosts.push({
@@ -62,7 +58,7 @@ async function publishDaily() {
     }
   }
 
-  if (news.length) {
+  if ((POST_TYPE === 'all' || POST_TYPE === 'news') && news.length && !hasDailyRunFor('news', today)) {
     for (const item of news.slice(0, 3)) {
       if (alreadyPublished(item)) continue;
 
@@ -124,21 +120,31 @@ async function publishDaily() {
       title: post.meta?.title || post.meta?.name || '',
       link: post.meta?.link || '',
     });
+    saveDailyRunEntry({
+      type: post.type,
+      date: today,
+      publishedAt: new Date().toISOString(),
+      key: post.key,
+    });
     console.log(`Published: ${post.type}`);
   }
-
-  saveDailyRunState({
-    date: today,
-    publishedAt: new Date().toISOString(),
-    postCount: Math.min(pendingPosts.length, 2),
-  });
 }
 
 if (RUN_MODE === 'once') {
   await publishDaily();
 } else {
-  cron.schedule('0 8 * * *', async () => {
+  cron.schedule('0 7 * * *', async () => {
     try {
+      process.env.POST_TYPE = 'news';
+      await publishDaily();
+    } catch (error) {
+      console.error(error);
+    }
+  }, { timezone: 'Europe/Kyiv' });
+
+  cron.schedule('0 11 * * *', async () => {
+    try {
+      process.env.POST_TYPE = 'places';
       await publishDaily();
     } catch (error) {
       console.error(error);

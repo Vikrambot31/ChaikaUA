@@ -42,3 +42,16 @@ export function saveDailyRunState(state) {
   ensureDataDir();
   fs.writeFileSync(DAILY_FILE_PATH, JSON.stringify(state, null, 2), 'utf8');
 }
+
+export function hasDailyRunFor(type, date) {
+  const state = loadDailyRunState();
+  if (!state || !Array.isArray(state.runs)) return false;
+  return state.runs.some((run) => run.type === type && run.date === date);
+}
+
+export function saveDailyRunEntry(entry) {
+  const state = loadDailyRunState() || { runs: [] };
+  const runs = Array.isArray(state.runs) ? state.runs : [];
+  runs.unshift(entry);
+  saveDailyRunState({ runs: runs.slice(0, 100) });
+}

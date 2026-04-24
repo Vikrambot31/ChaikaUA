@@ -1,12 +1,12 @@
-name: Chaika News Bot
+name: Chaika Morning News
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 5 * * *'
+    - cron: '0 4 * * *'
 
 jobs:
-  publish:
+  publish-news:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -22,10 +22,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run once
+      - name: Publish morning news
         env:
           RUN_MODE: once
-          SEND_HEARTBEAT: ${{ github.event_name == 'workflow_dispatch' && 'true' || 'false' }}
+          POST_TYPE: news
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
