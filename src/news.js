@@ -1,16 +1,9 @@
 import Parser from 'rss-parser';
+import { ACTIVE_RSS_SOURCES } from './sources.js';
 
 const parser = new Parser({ timeout: 3500 });
 
-export const RSS_FEEDS = [
-  'https://kyivcity.gov.ua/news/rss/',
-  'https://suspilne.media/kyiv/rss/all.rss',
-  'https://vechirniy.kyiv.ua/rss/',
-  'https://bigkyiv.com.ua/feed/',
-  'https://www.koda.gov.ua/rss',
-  'https://ukrinform.ua/rss/block-lastnews',
-  'https://www.pravda.com.ua/rss/view_news/',
-];
+export const RSS_FEEDS = ACTIVE_RSS_SOURCES;
 
 const KEYWORDS = [
   'чайка',
