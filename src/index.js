@@ -8,6 +8,7 @@ import { getPlacesPostOfDay } from './cafes.js';
 
 const RUN_MODE = process.env.RUN_MODE || 'cron';
 const POST_TYPE = process.env.POST_TYPE || 'all';
+const FORCE_FEED_SYNC = String(process.env.FORCE_FEED_SYNC || '').toLowerCase() === 'true';
 
 function getTodayKey(prefix) {
   const date = new Intl.DateTimeFormat('en-CA', {
@@ -46,9 +47,9 @@ async function publishDaily() {
 
   const pendingPosts = [];
 
-  if ((POST_TYPE === 'all' || POST_TYPE === 'places') && placesPost && !hasDailyRunFor('places', today)) {
+  if ((POST_TYPE === 'all' || POST_TYPE === 'places') && placesPost && (!hasDailyRunFor('places', today) || FORCE_FEED_SYNC)) {
     const placesKey = getTodayKey(`places-${placesPost.items.map((item) => item.name).join('-')}`);
-    if (!alreadyPublished({ link: placesKey, title: placesPost.title, date: new Date().toISOString() })) {
+    if (!alreadyPublished({ link: placesKey, title: placesPost.title, date: new Date().toISOString() }) || FORCE_FEED_SYNC) {
       pendingPosts.push({
         type: 'places',
         key: placesKey,
@@ -58,9 +59,9 @@ async function publishDaily() {
     }
   }
 
-  if ((POST_TYPE === 'all' || POST_TYPE === 'news') && news.length && !hasDailyRunFor('news', today)) {
+  if ((POST_TYPE === 'all' || POST_TYPE === 'news') && news.length && (!hasDailyRunFor('news', today) || FORCE_FEED_SYNC)) {
     for (const item of news.slice(0, 3)) {
-      if (alreadyPublished(item)) continue;
+      if (alreadyPublished(item) && !FORCE_FEED_SYNC) continue;
 
       let summary = '';
       try {
@@ -108,9 +109,11 @@ async function publishDaily() {
   }
 
   for (const post of pendingPosts.slice(0, 2)) {
-    const result = post.type === 'places' && post.meta?.imageUrl
-      ? await sendTelegramPhoto(post.meta.imageUrl, post.text)
-      : await sendTelegramMessage(post.text);
+    const result = FORCE_FEED_SYNC
+      ? { result: { message_id: null } }
+      : post.type === 'places' && post.meta?.imageUrl
+        ? await sendTelegramPhoto(post.meta.imageUrl, post.text)
+        : await sendTelegramMessage(post.text);
 
     savePublishedItem({
       key: post.key,
@@ -139,7 +142,7 @@ async function publishDaily() {
       publishedAt: new Date().toISOString(),
       key: post.key,
     });
-    console.log(`Published: ${post.type}`);
+    console.log(`${FORCE_FEED_SYNC ? 'Synced feed' : 'Published'}: ${post.type}`);
   }
 }
 
