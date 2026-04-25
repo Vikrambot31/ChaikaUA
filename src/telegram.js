@@ -45,7 +45,7 @@ export async function sendTelegramMessage(text) {
     chat_id: process.env.TELEGRAM_CHAT_ID,
     text,
     disable_web_page_preview: true,
-  });
+  }, { timeout: 20000 });
 
   return res.data;
 }
@@ -59,7 +59,7 @@ export async function sendTelegramPhoto(photoUrl, caption) {
     chat_id: process.env.TELEGRAM_CHAT_ID,
     photo: photoUrl,
     caption,
-  });
+  }, { timeout: 20000 });
 
   return res.data;
 }
