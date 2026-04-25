@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-04-25",
+      "publishedAt": "2026-04-25T06:23:23.566Z",
+      "key": "https://www.pravda.com.ua/news/2026/04/25/8031750/"
+    },
+    {
       "type": "places",
       "date": "2026-04-24",
       "publishedAt": "2026-04-24T07:49:16.140Z",
