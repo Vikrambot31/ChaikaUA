@@ -37,14 +37,13 @@ export function getPlacesPostOfDay() {
   const items = ordered.slice(0, 2);
   if (items.length < 2) return null;
 
+  const emoji0 = items[0].type === 'cafe' ? '☕' : '🛒';
+  const emoji1 = items[1].type === 'cafe' ? '☕' : '🛒';
   const text = [
-    '📍 Два місця на Чайці, куди можна піти сьогодні',
-    `☕ 1) ${items[0].name} — ${items[0].address}`,
-    `🍽️ 2) ${items[1].name} — ${items[1].address}`,
-    '✨ Коротко: сьогодні радимо звернути увагу на ці два місця поруч із домом.',
-    `📍 Джерело: ChaikaUA`,
-    `💬 Розкажіть свої новини та події в чаті у мобільному додатку.`,
-    `📲 Додаток: chaika-ua.netlify.app`,
+    `${emoji0} ${items[0].name} — ${items[0].address}`,
+    `${emoji1} ${items[1].name} — ${items[1].address}`,
+    '',
+    '#ЖКЧайка #Ірпінь #КиївськаОбласть #Місця',
   ].join('\n');
 
   return {

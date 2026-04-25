@@ -1,218 +1,208 @@
+import axios from 'axios';
 import Parser from 'rss-parser';
 import { ACTIVE_RSS_SOURCES } from './sources.js';
 
-const parser = new Parser({ timeout: 3500 });
+const parser = new Parser({
+  timeout: 12000,
+  headers: {
+    'User-Agent': 'ChaikaUA-NewsBot/1.0 (+https://chaika-ua.netlify.app)',
+    Accept: 'application/rss+xml, application/xml, text/xml, */*',
+  },
+  customFields: {
+    item: ['content:encoded', 'description'],
+  },
+});
 
-export const RSS_FEEDS = ACTIVE_RSS_SOURCES;
-
-const KEYWORDS = [
-  'чайка',
-  'chayka',
-  'chaika',
-  'жк чайка',
-  'осбб чайка',
-  'буча',
-  'бучан',
-  'софіїв',
-  'софиев',
-  'борщаг',
-  'київ',
-  'kyiv',
-  'київщина',
-  'область',
-  'безпек',
-  'укрит',
-  'перекрит',
-  'ремонт',
-  'світл',
-  'вода',
-  'тепло',
-  'транспорт',
-  'дорог',
-  'жкг',
-  'аварі',
-  'комунал',
-  'перекрит',
-  'безпек',
-  'укрит',
-  'світл',
-  'Житомирськ',
-  'Житомирская',
-];
-
-const BLOCKED_KEYWORDS = [
-  'росі',
-  'россия',
-  'рф',
-  'москва',
-  'кремл',
-  'сша',
-  'європ',
-  'китай',
-  'ізраїл',
-  'іран',
-  'нато',
-  'g20',
-  'оон',
-  'світ',
-  'world',
-  'україна і світ',
-  'міжнарод',
-  'одес',
-  'львів',
-  'харків',
-  'дніпр',
-  'запоріж',
-  'терноп',
-  'полтав',
-  'чернів',
-  'черніг',
-  'суми',
-  'кибер',
-  'кібер',
-  'cyber',
-  'security',
-  'штучний інтелект',
-  'ai',
-  'віртуал',
-  'фінанс',
-  'економік',
-  'прем’єр',
-  'президент',
-  'вибор',
-  'парламент',
-  'міноборон',
-];
-
-const LOCALITY_KEYWORDS = [
+const LOCAL_KEYWORDS = [
   'чайка',
   'жк чайка',
-  'осбб чайка',
   'буча',
   'бучан',
-  'бучанський',
-  'софіїв',
-  'софиев',
-  'борщаг',
-  'житомирськ',
-  'житомирская',
+  'софіївська борщагівка',
+  'софиевская борщаговка',
+  'житомирська траса',
+  'житомирское шоссе',
   'київ',
   'киев',
   'київська область',
   'киевская область',
-  'київщина',
 ];
 
 const IMPACT_KEYWORDS = [
-  'світл',
+  'світло',
+  'електро',
   'відключ',
   'вода',
   'тепло',
-  'газ',
   'жкг',
   'комунал',
-  'ремонт',
   'перекрит',
-  'дорог',
   'рух',
-  'маршрут',
-  'автобус',
   'транспорт',
-  'укрит',
-  'безпек',
-  'тривог',
-  'сирен',
-  'пожеж',
   'авар',
-  'шторм',
-  'замороз',
+  'безпек',
+  'безопас',
+  'укрит',
+  'тривог',
   'погод',
-  'генератор',
   'інфраструкт',
+  'медицина',
+  'школ',
+  'садок',
 ];
 
-function hasAnyKeyword(text, keywords) {
-  return keywords.some((keyword) => text.includes(keyword.toLowerCase()));
+const BLOCK_KEYWORDS = [
+  'сша',
+  'евросоюз',
+  'nato',
+  'нато',
+  'ізраїл',
+  'израиль',
+  'сирія',
+  'сирия',
+  'китай',
+  'африка',
+  'європа',
+  'европа',
+  'криптовалют',
+  'біткоїн',
+  'биткоин',
+  'шоубіз',
+  'шоубизнес',
+];
+
+function normalizeText(value) {
+  return String(value || '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
 }
 
-export function scoreNewsItem(item) {
-  const text = `${item.title || ''} ${item.contentSnippet || ''} ${item.content || ''} ${item.link || ''}`.toLowerCase();
+function buildItemText(item) {
+  return normalizeText(`${item.title || ''} ${item.contentSnippet || ''} ${item.content || ''}`);
+}
+
+function containsAny(text, terms) {
+  return terms.some((term) => text.includes(term));
+}
+
+function scoreItem(item) {
+  const text = buildItemText(item);
   let score = 0;
 
-  for (const blocked of BLOCKED_KEYWORDS) {
-    if (text.includes(blocked)) {
-      return 0;
-    }
-  }
+  if (containsAny(text, LOCAL_KEYWORDS)) score += 3;
+  if (containsAny(text, IMPACT_KEYWORDS)) score += 2;
+  if (containsAny(text, BLOCK_KEYWORDS)) score -= 4;
+  if (/повітрян|тривог|обстріл|дтп|авар|відключ|ремонт|перекрит/i.test(text)) score += 1;
 
-  if (/чайк|жк чайк|осбб чайк/i.test(text)) score += 40;
-  if (/бучан|буча/i.test(text)) score += 26;
-  if (/софіїв|софиев|борщаг/i.test(text)) score += 24;
-  if (/житомир|житомирськ/i.test(text)) score += 20;
-  if (/безпек|укрит|тривог|поліц|пожеж|авар/i.test(text)) score += 18;
-  if (/перекрит|ремонт|дорог|транспорт|авар|світл|вода|тепло|комунал/i.test(text)) score += 16;
-
-  for (const keyword of KEYWORDS) {
-    if (text.includes(keyword.toLowerCase())) {
-      score += keyword.length >= 6 ? 3 : 1;
-    }
-  }
-
-  return Math.min(score, 100);
+  return score;
 }
 
 export function isRelevantNews(item) {
-  const text = `${item.title || ''} ${item.contentSnippet || ''} ${item.content || ''} ${item.link || ''}`.toLowerCase();
-  const hasLocality = hasAnyKeyword(text, LOCALITY_KEYWORDS);
-  const hasImpact = hasAnyKeyword(text, IMPACT_KEYWORDS);
+  const text = buildItemText(item);
+  const hasLocal = containsAny(text, LOCAL_KEYWORDS);
+  const hasImpact = containsAny(text, IMPACT_KEYWORDS);
+  const blocked = containsAny(text, BLOCK_KEYWORDS);
+  if (blocked && !hasLocal) return false;
+  return hasLocal || (hasImpact && /\bкиїв|киев|область|обл\b/i.test(text));
+}
 
-  if (!hasLocality) {
-    return false;
+function normalizeDate(item) {
+  const raw = item.isoDate || item.pubDate || item.published || item.date;
+  const parsed = raw ? new Date(raw) : new Date();
+  if (Number.isNaN(parsed.getTime())) return new Date().toISOString();
+  return parsed.toISOString();
+}
+
+function cleanItem(item, sourceUrl) {
+  const sourceHost = (() => {
+    try {
+      return new URL(sourceUrl).hostname;
+    } catch {
+      return sourceUrl;
+    }
+  })();
+
+  return {
+    title: String(item.title || '').trim(),
+    link: String(item.link || '').trim(),
+    source: sourceHost,
+    date: normalizeDate(item),
+    contentSnippet: String(item.contentSnippet || '').trim(),
+    content: String(item['content:encoded'] || item.content || item.description || '').trim(),
+  };
+}
+
+async function readSource(rssUrl) {
+  try {
+    const response = await axios.get(rssUrl, {
+      timeout: 12000,
+      headers: {
+        'User-Agent': 'ChaikaUA-NewsBot/1.0 (+https://chaika-ua.netlify.app)',
+        Accept: 'application/rss+xml, application/xml, text/xml, */*',
+      },
+      responseType: 'text',
+    });
+    const feed = await parser.parseString(String(response.data || ''));
+    const items = Array.isArray(feed.items) ? feed.items : [];
+    return items.map((item) => cleanItem(item, rssUrl));
+  } catch (error) {
+    console.log(`[news] failed ${rssUrl}: ${error.message}`);
+    return [];
   }
+}
 
-  if (!hasImpact && !/чайк|бучан|софіїв|софиев|борщаг/i.test(text)) {
-    return false;
+function normalizeTitle(title) {
+  return String(title || '')
+    .toLowerCase()
+    .replace(/<[^>]+>/g, '')
+    .replace(/[^\wа-яёіїєґ\s]/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 80);
+}
+
+function dedupe(items) {
+  const seenLinks = new Set();
+  const seenTitles = new Set();
+  const out = [];
+  for (const item of items) {
+    const linkKey = (item.link || '').toLowerCase().trim();
+    const titleKey = normalizeTitle(item.title);
+    if (!titleKey) continue;
+    if (linkKey && seenLinks.has(linkKey)) continue;
+    if (seenTitles.has(titleKey)) continue;
+    if (linkKey) seenLinks.add(linkKey);
+    seenTitles.add(titleKey);
+    out.push(item);
   }
-
-  return scoreNewsItem(item) >= 24;
+  return out;
 }
 
 export async function getLatestNews(limit = 10) {
-  const settled = await Promise.allSettled(
-    RSS_FEEDS.map(async (url) => {
-      console.log(`[news] loading ${url}`);
-      const feed = await parser.parseURL(url);
-      const items = (feed.items || []).map((item) => ({
-        title: item.title || '',
-        link: item.link || '',
-        date: item.pubDate || item.isoDate || new Date().toISOString(),
-        source: feed.title || new URL(url).hostname,
-        summary: item.contentSnippet || item.content || '',
-        score: scoreNewsItem(item),
-      }));
+  const sourceUrls = ACTIVE_RSS_SOURCES.filter(Boolean);
+  const loaded = await Promise.all(sourceUrls.map((url) => readSource(url)));
+  const flattened = loaded.flat();
 
-      return items.filter(isRelevantNews);
+  const relevant = flattened
+    .filter((item) => item.title && item.link)
+    .filter((item) => isRelevantNews(item))
+    .map((item) => ({ ...item, _score: scoreItem(item) }));
+
+  const sorted = dedupe(relevant)
+    .sort((a, b) => {
+      const byScore = b._score - a._score;
+      if (byScore !== 0) return byScore;
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
     })
-  );
+    .slice(0, Math.max(1, limit))
+    .map(({ _score, ...item }) => item);
 
-  const collected = settled
-    .flatMap((result, index) => {
-      if (result.status === 'fulfilled') {
-        console.log(`[news] ok ${RSS_FEEDS[index]}`);
-        return result.value;
-      }
-
-      console.log(`[news] skip ${RSS_FEEDS[index]}`);
-      return [];
-    });
-
-  const unique = new Map();
-  for (const item of collected) {
-    const key = item.link || `${item.title}-${item.date}`;
-    if (!unique.has(key)) unique.set(key, item);
+  for (const url of sourceUrls) {
+    const count = sorted.filter((item) => item.link.includes(new URL(url).hostname)).length;
+    console.log(`[news] source ${url} -> ${count} relevant`);
   }
 
-  return Array.from(unique.values())
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, limit);
+  return sorted;
 }

@@ -26,14 +26,11 @@ function getAppLabel() {
 
 export function formatTelegramPost({ title, summary, source, link }) {
   return [
-    `📰 Новини від додатку ChaikaUA`,
-    `✨ ${normalizeText(title)}`,
-    `🧾 ${normalizeText(summary)}`,
-    `📍 Джерело: ${normalizeText(source)}`,
-    link ? `🔗 Посилання: ${getSourceLabel(link, source)}` : '',
-    `💬 Розкажіть свої новини та події в чаті у мобільному додатку.`,
-    `📲 Додаток: ${getAppLabel()}`,
-  ].filter(Boolean).join('\n');
+    normalizeText(summary),
+    '',
+    link ? `🔗 ${getSourceLabel(link, source)}` : `📍 ${normalizeText(source)}`,
+    `📲 ${getAppLabel()}`,
+  ].filter((line) => line !== undefined && line !== null).join('\n');
 }
 
 export async function sendTelegramMessage(text) {

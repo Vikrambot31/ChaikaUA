@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import axios from 'axios';
 import cron from 'node-cron';
 import { getLatestNews } from './news.js';
 import { summarizeNewsItem, isEmptySummary } from './ai.js';
@@ -9,6 +10,24 @@ import { getPlacesPostOfDay } from './cafes.js';
 const RUN_MODE = process.env.RUN_MODE || 'cron';
 const POST_TYPE = process.env.POST_TYPE || 'all';
 const FORCE_FEED_SYNC = String(process.env.FORCE_FEED_SYNC || '').toLowerCase() === 'true';
+
+function extractFeedText(post) {
+  return String(post.text || '')
+    .split('\n')
+    .filter((line) => {
+      const trimmed = line.trim();
+      return trimmed
+        && !/^📰/.test(trimmed)
+        && !/^✨/.test(trimmed)
+        && !/^📍/.test(trimmed)
+        && !/^🔗/.test(trimmed)
+        && !/^📲/.test(trimmed)
+        && !/^💬/.test(trimmed);
+    })
+    .join(' ')
+    .replace(/^🧾\s*/, '')
+    .trim();
+}
 
 function getTodayKey(prefix) {
   const date = new Intl.DateTimeFormat('en-CA', {
@@ -33,6 +52,25 @@ function getNewsKey(item) {
   return item.link || `${item.title}-${item.date}`;
 }
 
+async function fetchOgImage(url) {
+  if (!url) return null;
+  try {
+    const res = await axios.get(url, {
+      timeout: 8000,
+      headers: { 'User-Agent': 'ChaikaUA-NewsBot/1.0 (+https://chaika-ua.netlify.app)' },
+      responseType: 'text',
+    });
+    const html = String(res.data || '');
+    const match = html.match(/<meta[^>]+(?:property="og:image"|name="og:image")[^>]+content="([^"]+)"/i)
+      || html.match(/<meta[^>]+content="([^"]+)"[^>]+(?:property="og:image"|name="og:image")/i);
+    const imageUrl = match ? match[1].trim() : null;
+    if (!imageUrl || !/^https?:\/\//.test(imageUrl)) return null;
+    return imageUrl;
+  } catch {
+    return null;
+  }
+}
+
 function alreadyPublished(item) {
   const published = loadPublishedItems();
   const key = getNewsKey(item);
@@ -41,13 +79,17 @@ function alreadyPublished(item) {
 
 async function publishDaily() {
   const today = getTodayDate();
+  const shouldRunNewsToday = !hasDailyRunFor('news', today) || FORCE_FEED_SYNC;
+  const shouldRunPlacesToday = !hasDailyRunFor('places', today) || FORCE_FEED_SYNC;
 
-  const news = await getLatestNews(10);
-  const placesPost = getPlacesPostOfDay();
+  const shouldPublishPlaces = POST_TYPE === 'all' || POST_TYPE === 'places';
+  const shouldPublishNews = POST_TYPE === 'all' || POST_TYPE === 'news';
+  const news = shouldPublishNews ? await getLatestNews(10) : [];
+  const placesPost = shouldPublishPlaces ? getPlacesPostOfDay() : null;
 
   const pendingPosts = [];
 
-  if ((POST_TYPE === 'all' || POST_TYPE === 'places') && placesPost && (!hasDailyRunFor('places', today) || FORCE_FEED_SYNC)) {
+  if (shouldPublishPlaces && placesPost && shouldRunPlacesToday) {
     const placesKey = getTodayKey(`places-${placesPost.items.map((item) => item.name).join('-')}`);
     if (!alreadyPublished({ link: placesKey, title: placesPost.title, date: new Date().toISOString() }) || FORCE_FEED_SYNC) {
       pendingPosts.push({
@@ -59,7 +101,8 @@ async function publishDaily() {
     }
   }
 
-  if ((POST_TYPE === 'all' || POST_TYPE === 'news') && news.length && (!hasDailyRunFor('news', today) || FORCE_FEED_SYNC)) {
+  let newsPostAdded = false;
+  if (shouldPublishNews && shouldRunNewsToday && news.length) {
     for (const item of news.slice(0, 3)) {
       if (alreadyPublished(item) && !FORCE_FEED_SYNC) continue;
 
@@ -97,22 +140,44 @@ async function publishDaily() {
         continue;
       }
 
+      const imageUrl = await fetchOgImage(item.link).catch(() => null);
+
       pendingPosts.push({
         type: 'news',
         key: getNewsKey(item),
         text,
+        imageUrl: imageUrl || '',
         meta: item,
       });
+      newsPostAdded = true;
 
       break;
     }
   }
 
+  if (shouldPublishNews && shouldRunNewsToday && !newsPostAdded) {
+    const calmKey = getTodayKey('news-calm-report');
+    const calmText = 'На Чайці сьогодні все мирно і спокійно — і це теж гарна новина для всіх.\n\n#ЖКЧайка #Ірпінь #КиївськаОбласть';
+    if (!alreadyPublished({ link: calmKey, title: calmText, date: new Date().toISOString() }) || FORCE_FEED_SYNC) {
+      pendingPosts.push({
+        type: 'news',
+        key: calmKey,
+        text: calmText,
+        meta: {
+          title: calmText,
+          link: process.env.SITE_URL || 'https://chaika-ua.netlify.app',
+          source: 'ChaikaUA',
+        },
+      });
+    }
+  }
+
   for (const post of pendingPosts.slice(0, 2)) {
+    const postImageUrl = post.imageUrl || (post.type === 'places' ? post.meta?.imageUrl : '');
     const result = FORCE_FEED_SYNC
       ? { result: { message_id: null } }
-      : post.type === 'places' && post.meta?.imageUrl
-        ? await sendTelegramPhoto(post.meta.imageUrl, post.text)
+      : postImageUrl
+        ? await sendTelegramPhoto(postImageUrl, post.text)
         : await sendTelegramMessage(post.text);
 
     savePublishedItem({
@@ -126,11 +191,11 @@ async function publishDaily() {
     saveFeedItem({
       id: post.key,
       title: post.meta?.title || post.meta?.name || '',
-      shortText: post.type === 'news'
-        ? post.text.split('\n').slice(2, 3).join(' ').replace(/^🧾\s*/, '')
-        : post.text.split('\n').slice(1, 4).join(' '),
+      shortText: extractFeedText(post),
       sourceName: post.type === 'news' ? (post.meta?.source || 'ChaikaUA') : 'ChaikaUA',
-      sourceUrl: process.env.SITE_URL || 'https://chaika-ua.netlify.app',
+      sourceUrl: post.type === 'news'
+        ? (post.meta?.link || process.env.SITE_URL || 'https://chaika-ua.netlify.app')
+        : (process.env.SITE_URL || 'https://chaika-ua.netlify.app'),
       publishedAt: new Date().toISOString(),
       priority: post.type === 'news' ? 'important' : 'info',
       aiGenerated: true,

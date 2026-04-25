@@ -11,7 +11,7 @@ on:
 jobs:
   publish-places:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -44,4 +44,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/feed.json data/published-news.json data/daily-run.json || true
           git diff --cached --quiet || git commit -m "update places feed"
-          git push
+          git pull --rebase origin main || true
+          git push origin main
