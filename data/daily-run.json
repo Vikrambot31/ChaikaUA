@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-04-28",
+      "publishedAt": "2026-04-28T10:04:43.815Z",
+      "key": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-04-28"
+    },
+    {
       "type": "news",
       "date": "2026-04-28",
       "publishedAt": "2026-04-28T06:26:20.129Z",
