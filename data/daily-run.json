@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-04-28",
+      "publishedAt": "2026-04-28T06:26:20.129Z",
+      "key": "https://bigkyiv.com.ua/de-u-kyyevi-sogodni-obmezhuvatymut-ruh-yaki-dilyanky-krashhe-obyizhdzhaty-3/"
+    },
+    {
       "type": "places",
       "date": "2026-04-27",
       "publishedAt": "2026-04-27T10:04:09.806Z",
