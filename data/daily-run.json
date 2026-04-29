@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-04-29",
+      "publishedAt": "2026-04-29T06:19:55.230Z",
+      "key": "https://bigkyiv.com.ua/u-kilkoh-rajonah-kyyeva-sogodni-obmezhuvatymut-ruh-yaki-dilyanky-krashhe-obyizhdzhaty/"
+    },
+    {
       "type": "places",
       "date": "2026-04-28",
       "publishedAt": "2026-04-28T10:04:43.815Z",
