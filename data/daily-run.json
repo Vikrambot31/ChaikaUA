@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-04-30",
+      "publishedAt": "2026-04-30T06:23:57.443Z",
+      "key": "https://bigkyiv.com.ua/u-czentri-stolyczi-sogodni-obmezhat-ruh/"
+    },
+    {
       "type": "places",
       "date": "2026-04-29",
       "publishedAt": "2026-04-29T09:55:40.789Z",
