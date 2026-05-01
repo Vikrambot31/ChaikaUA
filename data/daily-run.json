@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-05-01",
+      "publishedAt": "2026-05-01T06:33:17.550Z",
+      "key": "https://bigkyiv.com.ua/na-sumshhyni-vorozhyj-dron-poczilyv-v-avtobus-ye-postrazhdali/"
+    },
+    {
       "type": "places",
       "date": "2026-04-30",
       "publishedAt": "2026-04-30T09:56:53.034Z",
