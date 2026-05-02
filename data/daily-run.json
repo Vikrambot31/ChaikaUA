@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-05-02",
+      "publishedAt": "2026-05-02T08:56:18.814Z",
+      "key": "places-BALCONE COFFEE-Coffee ART-2026-05-02"
+    },
+    {
       "type": "news",
       "date": "2026-05-02",
       "publishedAt": "2026-05-02T06:02:55.691Z",
