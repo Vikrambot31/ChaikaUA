@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-05-02",
+      "publishedAt": "2026-05-02T06:02:55.691Z",
+      "key": "https://bigkyiv.com.ua/zahysnyk-proviv-22-doby-z-turniketom-chekayuchy-na-evakuacziyu/"
+    },
+    {
       "type": "places",
       "date": "2026-05-01",
       "publishedAt": "2026-05-01T09:24:38.390Z",
