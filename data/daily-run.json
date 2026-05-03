@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-05-03",
+      "publishedAt": "2026-05-03T06:23:22.693Z",
+      "key": "https://bigkyiv.com.ua/ruh-berestejskym-prospektom-galmuvatyme-kilka-dniv-cherez-remont-dorogy/"
+    },
+    {
       "type": "places",
       "date": "2026-05-02",
       "publishedAt": "2026-05-02T08:56:18.814Z",
