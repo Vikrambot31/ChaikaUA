@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-05-04",
+      "publishedAt": "2026-05-04T06:35:15.965Z",
+      "key": "https://bigkyiv.com.ua/pid-kyyevom-vodij-legkovyka-zbyv-ditej-na-samokati-odyn-z-hlopchykiv-zagynuv/"
+    },
+    {
       "type": "places",
       "date": "2026-05-03",
       "publishedAt": "2026-05-03T09:11:31.210Z",
