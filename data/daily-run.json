@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-05-06",
+      "publishedAt": "2026-05-06T10:07:25.593Z",
+      "key": "places-Chaykava-NOVUS-2026-05-06"
+    },
+    {
       "type": "news",
       "date": "2026-05-06",
       "publishedAt": "2026-05-06T06:26:19.633Z",
