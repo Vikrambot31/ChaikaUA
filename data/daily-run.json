@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-05-07",
+      "publishedAt": "2026-05-07T06:31:26.437Z",
+      "key": "https://bigkyiv.com.ua/de-u-kyyevi-sogodni-obmezhuvatymut-ruh-lokacziyi/"
+    },
+    {
       "type": "places",
       "date": "2026-05-06",
       "publishedAt": "2026-05-06T10:07:25.593Z",
