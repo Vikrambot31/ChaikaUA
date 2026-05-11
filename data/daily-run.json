@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-05-11",
+      "publishedAt": "2026-05-11T07:36:30.410Z",
+      "key": "https://bigkyiv.com.ua/remontni-roboty-vplynut-na-ruh-nyzky-rejsiv-miskoyi-kilczevoyi-elektrychky/"
+    },
+    {
       "type": "places",
       "date": "2026-05-10",
       "publishedAt": "2026-05-10T09:20:02.235Z",
