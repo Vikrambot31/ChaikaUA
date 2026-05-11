@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-05-11",
+      "publishedAt": "2026-05-11T10:51:39.805Z",
+      "key": "places-#МОЖЕКАВИ?-Fora-2026-05-11"
+    },
+    {
       "type": "news",
       "date": "2026-05-11",
       "publishedAt": "2026-05-11T07:36:30.410Z",
