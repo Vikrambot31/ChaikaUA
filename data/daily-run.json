@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-05-12",
+      "publishedAt": "2026-05-12T06:33:39.577Z",
+      "key": "https://bigkyiv.com.ua/peremyrya-zavershylos-vorog-vnochi-atakuvav-kyyiv-ta-oblast/"
+    },
+    {
       "type": "places",
       "date": "2026-05-11",
       "publishedAt": "2026-05-11T10:51:39.805Z",
