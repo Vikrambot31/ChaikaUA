@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-05-13",
+      "publishedAt": "2026-05-13T06:43:52.978Z",
+      "key": "https://bigkyiv.com.ua/de-u-kyyevi-bezkoshtovno-pospilkuvatysya-z-psyhologom-ta-pozajmatysya-jogoyu-2/"
+    },
+    {
       "type": "places",
       "date": "2026-05-12",
       "publishedAt": "2026-05-12T10:22:18.520Z",
