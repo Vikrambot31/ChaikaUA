@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-05-13",
+      "publishedAt": "2026-05-13T10:11:47.425Z",
+      "key": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-05-13"
+    },
+    {
       "type": "news",
       "date": "2026-05-13",
       "publishedAt": "2026-05-13T06:43:52.978Z",
