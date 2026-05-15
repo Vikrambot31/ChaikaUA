@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-05-15",
+      "publishedAt": "2026-05-15T10:11:14.470Z",
+      "key": "places-Coffee ART-ANMI SOUL-2026-05-15"
+    },
+    {
       "type": "news",
       "date": "2026-05-15",
       "publishedAt": "2026-05-15T06:51:48.508Z",
