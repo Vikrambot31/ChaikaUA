@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-05-17",
+      "publishedAt": "2026-05-17T06:41:14.928Z",
+      "key": "https://bigkyiv.com.ua/molod-zaproshuyut-na-bezplatnyj-vyshkil-chyn-geroyiv-vid-sso-zsu/"
+    },
+    {
       "type": "places",
       "date": "2026-05-16",
       "publishedAt": "2026-05-16T09:18:52.863Z",
