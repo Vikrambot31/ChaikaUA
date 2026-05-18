@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-05-18",
+      "publishedAt": "2026-05-18T07:57:23.431Z",
+      "key": "https://bigkyiv.com.ua/poperedu-tyzhden-zlyv-ta-proholody-po-vsij-ukrayini/"
+    },
+    {
       "type": "places",
       "date": "2026-05-17",
       "publishedAt": "2026-05-17T09:26:24.136Z",
