@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-05-19",
+      "publishedAt": "2026-05-19T10:52:20.647Z",
+      "key": "places-NOVUS-Grano Bakery-2026-05-19"
+    },
+    {
       "type": "news",
       "date": "2026-05-19",
       "publishedAt": "2026-05-19T07:41:14.033Z",
