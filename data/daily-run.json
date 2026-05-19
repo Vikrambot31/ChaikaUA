@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-05-19",
+      "publishedAt": "2026-05-19T07:41:14.033Z",
+      "key": "https://bigkyiv.com.ua/petycziya-shhodo-vidmovy-zaluchaty-inozemcziv-do-roboty-v-ukrayini-nabrala-neobhidni-golosy/"
+    },
+    {
       "type": "places",
       "date": "2026-05-18",
       "publishedAt": "2026-05-18T11:35:33.982Z",
