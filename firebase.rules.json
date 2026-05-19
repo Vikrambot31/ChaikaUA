@@ -1,0 +1,503 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "requests": {
+      ".read": "auth != null",
+      ".indexOn": [
+        "timestamp",
+        "status",
+        "category",
+        "userId",
+        "createdAt",
+        "buildingId"
+      ],
+      "$requestId": {
+        ".write": "(auth != null && !data.exists()) || (data.exists() && (data.child('userId').val() === auth.uid || auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'))",
+        ".validate": true
+      }
+    },
+    "app_suggestions": {
+      ".read": "auth != null",
+      ".indexOn": [
+        "createdAt",
+        "moderationStatus",
+        "userId"
+      ],
+      "$suggestionId": {
+        ".write": "(auth != null && !data.exists()) || (data.exists() && (data.child('userId').val() === auth.uid || auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'))",
+        ".validate": true
+      }
+    },
+    "community_photos": {
+      ".read": "auth != null",
+      ".indexOn": [
+        "createdAt",
+        "status",
+        "userId"
+      ],
+      "$photoId": {
+        ".write": "(auth != null && !data.exists()) || (data.exists() && (data.child('userId').val() === auth.uid || auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'))",
+        ".validate": true
+      }
+    },
+    "test_photos": {
+      ".read": "auth != null",
+      "$photoId": {
+        ".write": "auth != null"
+      }
+    },
+    "photo_uploads": {
+      ".read": "auth != null",
+      ".indexOn": [
+        "uploadedAt",
+        "status",
+        "uid"
+      ],
+      "$photoId": {
+        ".write": "(auth != null && !data.exists()) || (data.exists() && (data.child('uid').val() === auth.uid || auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'))",
+        ".validate": true
+      }
+    },
+    "lost_found": {
+      ".read": "auth != null",
+      ".indexOn": [
+        "createdAt",
+        "moderationStatus",
+        "type",
+        "userId"
+      ],
+      "$itemId": {
+        ".write": "(auth != null && !data.exists()) || (data.exists() && (data.child('userId').val() === auth.uid || auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'))",
+        ".validate": true
+      }
+    },
+    "job_listings": {
+      ".read": "auth != null",
+      ".indexOn": [
+        "createdAt",
+        "moderationStatus",
+        "workType",
+        "userId"
+      ],
+      "$itemId": {
+        ".write": "(auth != null && !data.exists()) || (data.exists() && (data.child('userId').val() === auth.uid || auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'))",
+        ".validate": true
+      }
+    },
+    "buy_sell_listings": {
+      ".read": "auth != null",
+      ".indexOn": [
+        "createdAt",
+        "moderationStatus",
+        "category",
+        "userId"
+      ],
+      "$itemId": {
+        ".write": "(auth != null && !data.exists()) || (data.exists() && (data.child('userId').val() === auth.uid || auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'))",
+        ".validate": true
+      }
+    },
+    "contacts_listings": {
+      ".read": "auth != null",
+      ".indexOn": [
+        "createdAt",
+        "moderationStatus",
+        "userId"
+      ],
+      "$itemId": {
+        ".write": "(auth != null && !data.exists()) || (data.exists() && (data.child('userId').val() === auth.uid || auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'))",
+        ".validate": true
+      }
+    },
+    "users": {
+      ".read": "auth != null",
+      "$userId": {
+        ".read": "auth != null",
+        ".write": "auth.uid === $userId || auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin'",
+        ".validate": true,
+        "profile_history": {
+          "$timestamp": {
+            ".write": "auth.uid === $userId || auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin'",
+            ".validate": true
+          }
+        }
+      }
+    },
+    "profileViewRequests": {
+      "$targetUserId": {
+        ".read": "auth.uid === $targetUserId || auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin'",
+        "$requesterId": {
+          ".read": "auth.uid === $requesterId || auth.uid === $targetUserId || auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin'",
+          ".write": "(auth.uid === $requesterId && (!data.exists() || data.child('status').val() === 'denied') && newData.child('status').val() === 'pending') || (auth.uid === $targetUserId && data.exists() && (newData.child('status').val() === 'approved' || newData.child('status').val() === 'denied')) || auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin'",
+          ".validate": true
+        }
+      }
+    },
+    "outgoingProfileRequestsByUser": {
+      "$requesterId": {
+        ".read": "auth.uid === $requesterId || auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin'",
+        "$targetUserId": {
+          ".read": "auth.uid === $requesterId || auth.uid === $targetUserId || auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin'",
+          ".write": "(auth.uid === $requesterId && (!data.exists() || data.child('status').val() === 'denied') && newData.child('status').val() === 'pending') || (auth.uid === $targetUserId && data.exists() && (newData.child('status').val() === 'approved' || newData.child('status').val() === 'denied')) || auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin'",
+          ".validate": true
+        }
+      }
+    },
+    "referrals": {
+      "$referrerPhone": {
+        ".read": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator' || root.child('users/' + auth.uid + '/phone').val() === $referrerPhone || root.child('users/' + auth.uid + '/phone').val() === ('+' + $referrerPhone)",
+        "$phone": {
+          ".write": "auth != null",
+          ".validate": true
+        }
+      }
+    },
+    "local_business": {
+      ".read": "auth != null",
+      ".indexOn": [
+        "createdAt",
+        "status",
+        "categoryKey",
+        "uid"
+      ],
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth.uid === $uid || auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin'",
+        ".validate": true
+      }
+    },
+    "user_roles": {
+      ".read": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'",
+      "$userId": {
+        ".read": "auth != null",
+        ".write": "auth.uid === $userId || auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin'",
+        "role": {
+          ".validate": "newData.isString() && (auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || newData.val() === 'user' || auth.uid === $userId)"
+        },
+        "fcmToken": {
+          ".write": "auth.uid === $userId || auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin'"
+        }
+      }
+    },
+    "security_config": {
+      "app_control": {
+        "current": {
+          ".read": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous'",
+          ".write": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'",
+          ".validate": true
+        }
+      }
+    },
+    "authorized_devices": {
+      ".read": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'",
+      "$userId": {
+        ".read": "auth.uid === $userId || auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'",
+        "$deviceId": {
+          ".write": "auth != null && ((auth.uid === $userId && ((!data.exists() && newData.child('is_allowed').val() === (root.child('security_config/app_control/current/allow_new_devices').val() === true) && newData.child('is_blocked').val() === false) || (data.exists() && newData.child('device_id').val() === data.child('device_id').val() && newData.child('platform').val() === data.child('platform').val() && newData.child('created_at').val() === data.child('created_at').val() && newData.child('is_allowed').val() === data.child('is_allowed').val() && newData.child('is_blocked').val() === data.child('is_blocked').val())) ) || auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator')",
+          ".validate": "newData.hasChildren(['device_id','device_name','platform','app_version','created_at','last_seen_at','is_allowed','is_blocked','security_flags']) && newData.child('device_id').isString() && newData.child('device_id').val() === $deviceId && newData.child('device_id').val().length <= 128 && newData.child('device_name').isString() && newData.child('device_name').val().length <= 120 && newData.child('platform').isString() && newData.child('platform').val().length <= 32 && newData.child('app_version').isString() && newData.child('app_version').val().length <= 64 && newData.child('created_at').isNumber() && newData.child('created_at').val() > 0 && newData.child('last_seen_at').isNumber() && newData.child('last_seen_at').val() > 0 && newData.child('is_allowed').isBoolean() && newData.child('is_blocked').isBoolean()",
+          "device_id": {
+            ".validate": "newData.isString() && newData.val() === $deviceId && newData.val().length <= 128"
+          },
+          "device_name": {
+            ".validate": "newData.isString() && newData.val().length <= 120"
+          },
+          "platform": {
+            ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "app_version": {
+            ".validate": "newData.isString() && newData.val().length <= 64"
+          },
+          "created_at": {
+            ".validate": "newData.isNumber() && newData.val() > 0"
+          },
+          "last_seen_at": {
+            ".validate": "newData.isNumber() && newData.val() > 0"
+          },
+          "is_allowed": {
+            ".validate": "newData.isBoolean()"
+          },
+          "is_blocked": {
+            ".validate": "newData.isBoolean()"
+          },
+          "security_flags": {
+            ".validate": "newData.hasChildren()",
+            "$flagIndex": {
+              ".validate": "$flagIndex.matches(/^(0|[1-9]|1[0-9])$/) && newData.isString() && newData.val().length <= 64"
+            }
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      }
+    },
+    "user_update_locks": {
+      "$userId": {
+        ".read": "auth.uid === $userId || auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'",
+        ".write": "auth.uid === $userId",
+        ".validate": true
+      }
+    },
+    "security_logs": {
+      "client_events": {
+        ".read": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'",
+        "$partition": {
+          "$eventId": {
+            ".write": "auth != null",
+            ".validate": true
+          }
+        }
+      }
+    },
+    "app_releases": {
+      ".read": "auth != null",
+      ".indexOn": ["createdAt", "timestamp"],
+      "$versionKey": {
+        ".write": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin'",
+        "summary": {
+          ".write": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'"
+        }
+      }
+    },
+    "stats": {
+      ".read": "auth != null",
+      "$statId": {
+        ".write": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin'"
+      }
+    },
+    "sports": {
+      ".read": "auth != null",
+      "$sportId": {
+        "players": {
+          "$userId": {
+            ".write": "auth.uid === $userId",
+            ".validate": true
+          }
+        },
+        "days": {
+          "$date": {
+            "$userId": {
+              ".write": "auth.uid === $userId",
+              ".validate": true
+            }
+          }
+        }
+      }
+    },
+    "user_subscription": {
+      "$userId": {
+        ".read": "auth.uid === $userId || auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'",
+        ".write": "auth.uid === $userId"
+      }
+    },
+    "ops": {
+      "events": {
+        ".read": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'",
+        ".indexOn": [
+          "at",
+          "type"
+        ],
+        "$eventId": {
+          ".write": "auth != null",
+          ".validate": true
+        }
+      },
+      "errors": {
+        ".read": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'",
+        ".indexOn": [
+          "at",
+          "functionName"
+        ],
+        "$errorId": {
+          ".write": "auth != null",
+          ".validate": true
+        }
+      }
+    },
+    "places": {
+      ".read": "auth != null",
+      ".write": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin'"
+    },
+    "service_moderation": {
+      "blocked_users": {
+        ".read": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'",
+        ".indexOn": [
+          "blockedAt",
+          "email",
+          "phone"
+        ],
+        "$userId": {
+          ".read": "auth.uid === $userId || auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'",
+          ".write": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'",
+          ".validate": true
+        }
+      },
+      "deleted_users": {
+        ".read": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'",
+        ".indexOn": [
+          "deletedAt",
+          "email",
+          "phone"
+        ],
+        "$userId": {
+          ".read": "auth.uid === $userId || auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'",
+          ".write": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'",
+          ".validate": true
+        }
+      }
+    },
+    "osbb_votes": {
+      ".read": "auth != null",
+      "$buildingId": {
+        ".read": "auth != null",
+        ".indexOn": [
+          "createdAt",
+          "moderationStatus"
+        ],
+        "$voteId": {
+          ".write": "auth != null",
+          ".validate": true
+        }
+      }
+    },
+    "osbb_house_topics": {
+      ".read": "auth != null",
+      "$buildingId": {
+        ".read": "auth != null",
+        ".indexOn": [
+          "createdAt",
+          "moderationStatus"
+        ],
+        "$topicId": {
+          ".write": "auth != null",
+          ".validate": true
+        }
+      }
+    },
+    "osbb_collections": {
+      ".read": "auth != null",
+      "$buildingId": {
+        ".read": "auth != null",
+        ".indexOn": [
+          "createdAt",
+          "moderationStatus"
+        ],
+        "$collectionId": {
+          ".write": "auth != null",
+          ".validate": true
+        }
+      }
+    },
+    "osbb_news": {
+      ".read": "auth != null",
+      "$buildingId": {
+        ".read": "auth != null",
+        ".indexOn": [
+          "publishedAt",
+          "moderationStatus"
+        ],
+        "$newsId": {
+          ".write": "auth != null",
+          ".validate": true
+        }
+      }
+    },
+    "osbb_members": {
+      "$buildingId": {
+        "$userId": {
+          ".read": "auth.uid === $userId || auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'",
+          ".write": "auth.uid === $userId",
+          ".validate": true
+        }
+      }
+    },
+    "problem_votes": {
+      ".read": "auth != null",
+      "$requestId": {
+        "$userId": {
+          ".read": "auth != null",
+          ".write": "auth.uid === $userId"
+        }
+      }
+    },
+    "age_verifications": {
+      "$userId": {
+        ".read": "auth.uid === $userId || auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'",
+        ".write": "auth.uid === $userId",
+        ".validate": true
+      }
+    },
+    "rate_limits": {
+      "$userId": {
+        ".read": "auth.uid === $userId || auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'",
+        "requests": {
+          "lastAt": {
+            ".write": "auth.uid === $userId",
+            ".validate": true
+          }
+        },
+        "lost_found": {
+          "lastAt": {
+            ".write": "auth.uid === $userId",
+            ".validate": true
+          }
+        },
+        "buy_sell": {
+          "lastAt": {
+            ".write": "auth.uid === $userId",
+            ".validate": true
+          }
+        },
+        "contacts": {
+          "lastAt": {
+            ".write": "auth.uid === $userId",
+            ".validate": true
+          }
+        },
+        "job_listings": {
+          "lastAt": {
+            ".write": "auth.uid === $userId",
+            ".validate": true
+          }
+        }
+      }
+    },
+    "diagnostics": {
+      "runtime_control": {
+        ".read": true,
+        ".write": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || (auth != null && (root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'))",
+        ".validate": "newData.hasChildren(['enabled']) && newData.child('enabled').isBoolean() && (!newData.child('updatedAt').exists() || newData.child('updatedAt').isNumber())"
+      },
+      "runtime": {
+        ".indexOn": ["at", "timestamp", "level", "eventType", "deviceId", "sessionId"],
+        ".read": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || (auth != null && (root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'))",
+        "$eventId": {
+          ".write": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous'",
+          ".validate": "newData.hasChildren(['timestamp','at','sessionId','deviceId','level','eventType','message']) && newData.child('timestamp').isString() && newData.child('timestamp').val().length <= 64 && newData.child('at').isNumber() && newData.child('at').val() > 0 && newData.child('sessionId').isString() && newData.child('sessionId').val().length <= 128 && newData.child('deviceId').isString() && newData.child('deviceId').val().length <= 128 && newData.child('level').isString() && (newData.child('level').val() === 'info' || newData.child('level').val() === 'warn' || newData.child('level').val() === 'error' || newData.child('level').val() === 'fatal') && newData.child('eventType').isString() && newData.child('eventType').val().length <= 64 && newData.child('message').isString() && newData.child('message').val().length <= 2000"
+        }
+      },
+      "runtime_moderation": {
+        ".read": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'",
+        "$errorId": {
+          ".write": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'",
+          ".validate": true
+        }
+      },
+      "user_reports": {
+        ".read": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'",
+        "$reportId": {
+          ".write": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'",
+          ".validate": true
+        }
+      },
+      "photo_test_logs": {
+        ".read": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'",
+        "$sessionId": {
+          ".write": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'",
+          ".validate": true
+        }
+      }
+    }
+  }
+}
