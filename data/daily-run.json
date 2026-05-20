@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-05-20",
+      "publishedAt": "2026-05-20T10:40:21.563Z",
+      "key": "places-Grano Bakery-Кав'ярня ХЛІБ та КАВА-2026-05-20"
+    },
+    {
       "type": "news",
       "date": "2026-05-20",
       "publishedAt": "2026-05-20T07:38:39.165Z",
