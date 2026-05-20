@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-05-20",
+      "publishedAt": "2026-05-20T07:38:39.165Z",
+      "key": "https://bigkyiv.com.ua/vorog-znovu-atakuvav-zhytlovyj-sektor-odesy-udarnymy-bezpilotnykamy/"
+    },
+    {
       "type": "places",
       "date": "2026-05-19",
       "publishedAt": "2026-05-19T10:52:20.647Z",
