@@ -1,0 +1,92 @@
+# Firebase Admin SDK service account keys — NEVER commit these
+*firebase-adminsdk*.json
+chaikaua-3cd9d-firebase-adminsdk-fbsvc-0d750d2252.json
+
+node_modules/
+.expo/
+.gradle-local/
+.android-local/
+android/.gradle/
+android/build/
+android/app/build/
+ios/build/
+build/
+dist/
+coverage/
+cache/
+.cache/
+**/cache/
+*.apk
+*.aab
+.env
+android/keystore.properties
+android/app/release.keystore
+android/app/debug.keystore
+*.jks
+*.keystore
+*.log
+*.tmp
+*.temp
+*.bak
+*.zip
+*.pyc
+*.exe
+*.quarantine
+desktop.ini
+functions/functions.yaml
+
+# Local AI/editor/workspace state
+.claude/
+.continue/
+.continueignore
+.vscode/
+opencode.jsonc
+START_OPENCODE_LOCAL_WORKSPACE.bat
+
+# Local test/emulator/runtime artifacts
+.maestro/
+firebase-debug.log
+expo-output.log
+debug.log
+release/
+backups/
+tmp_*/
+tmp_*
+__pycache__/
+**/__pycache__/
+deploy_cli_config/
+tools/
+android/
+
+# Local/generated document extraction folders and ad-hoc reports
+Info--/
+Biz-PROCESS-MONITOR/
+admin-panel/.claude/
+admin-panel/WEB-VERSION_ADMIN/
+admin-panel/Test PHOTO - --- )/
+admin-panel/*.txt
+*.docx
+*.txt
+firebase.rules.backup-*.json
+firebase.rules.rollback-*.json
+storage.rules.backup-*.txt
+ADMIN_PANEL_FIX_SUMMARY.md
+DEPLOY_ADMIN_PANEL.md
+MIGRATION_NOTES.md
+MODERATION_ACCESS_INSTRUCTION.md
+RUN_DIAGNOSIS.md
+admin-panel/start-admin-panel.bat
+build-apk.bat
+copy-apk-to-releases.bat
+deploy-cors.js
+deploy_cors.py
+diagnose-photos.js
+run-maestro.bat
+Безопасность и защита/
+ЗАПУСК АПК/
+сайт Чайка Лайф/
+
+# Local helper outputs and one-off media/maintenance tools
+make_animation.py
+optimize_assets.py
+check_lmstudio.bat

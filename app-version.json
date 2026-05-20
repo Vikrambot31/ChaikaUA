@@ -1,0 +1,13 @@
+{
+  "latestVersion": "1.1.238",
+  "minSupportedVersion": "1.1.238",
+  "forceUpdate": true,
+  "updateTitle": "Оновіть додаток",
+  "updateText": "Вийшла нова версія Чайки. Стара версія більше не підтримується.",
+  "androidUrl": "https://chaika-ua.netlify.app/release/ChaikaUA-v1.1.238-2026-05-19_18-41.apk",
+  "iosUrl": "https://chaika-ua.netlify.app/",
+  "webUrl": "https://chaika-ua.netlify.app/",
+  "landingUrl": "https://chaika-ua.netlify.app/",
+  "lastVersionDate": "2026-05-19",
+  "lastBuildStamp": "2026-05-19_18-41"
+}

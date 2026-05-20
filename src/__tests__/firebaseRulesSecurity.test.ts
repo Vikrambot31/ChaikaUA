@@ -1,0 +1,45 @@
+import fs from 'fs';
+import path from 'path';
+
+const readProjectFile = (fileName: string) =>
+  fs.readFileSync(path.join(__dirname, '..', '..', fileName), 'utf8');
+
+describe('Firebase rules explicit child-read policy', () => {
+  it('keeps Realtime Database rules valid JSON', () => {
+    expect(() => JSON.parse(readProjectFile('firebase.rules.json'))).not.toThrow();
+  });
+
+  it('denies reads and writes at root level', () => {
+    const parsed = JSON.parse(readProjectFile('firebase.rules.json'));
+    expect(parsed.rules['.read']).toBe(false);
+    expect(parsed.rules['.write']).toBe(false);
+  });
+
+  it('removes hardcoded owner email and role-gated rule fragments', () => {
+    const rules = readProjectFile('firebase.rules.json');
+
+    expect(rules).not.toContain('vikramsave@ukr.net');
+    expect(rules).not.toContain('email_verified');
+    expect(rules).not.toContain("role').val() == 'admin'");
+    expect(rules).not.toContain("role').val() == 'moderator'");
+  });
+
+  it('keeps moderation collections readable/writable for authenticated users', () => {
+    const parsed = JSON.parse(readProjectFile('firebase.rules.json'));
+
+    expect(parsed.rules.requests['.read']).toBe('auth != null');
+    expect(parsed.rules.community_photos['.read']).toBe('auth != null');
+
+    expect(parsed.rules.requests.$requestId['.write']).toContain('auth != null');
+    expect(parsed.rules.community_photos.$photoId['.write']).toContain('auth != null');
+  });
+
+  it('uses auth-only storage access', () => {
+    const rules = readProjectFile('storage.rules');
+
+    expect(rules).toContain('function signedIn()');
+    expect(rules).toContain('allow get, list: if signedIn();');
+    expect(rules).toContain('function isAdmin()');
+    expect(rules).toContain('function isOwner(userId)');
+  });
+});

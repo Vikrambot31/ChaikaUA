@@ -1,0 +1,15 @@
+[
+  {
+    "origin": [
+      "http://localhost:5173",
+      "http://localhost:5174",
+      "http://localhost:5175",
+      "https://chaikaua-3cd9d.web.app",
+      "https://chaikaua-3cd9d.firebaseapp.com",
+      "https://adminpanel-chaika-life.netlify.app"
+    ],
+    "method": ["GET", "HEAD"],
+    "responseHeader": ["Content-Type", "Content-Length", "Cache-Control", "Authorization"],
+    "maxAgeSeconds": 3600
+  }
+]

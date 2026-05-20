@@ -1,0 +1,987 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
+import { classifyStartupTransientIssue } from './startupSync';
+import { getSessionId } from './sessionService';
+import { getBreadcrumbs } from './breadcrumbService';
+
+declare const require: any;
+
+export type RuntimeMonitorSeverity = 'info' | 'warning' | 'critical';
+
+export type RuntimeMonitorSource =
+  | 'client_error'
+  | 'runtime'
+  | 'global_handler'
+  | 'error_boundary'
+  | 'trace';
+
+export type RuntimeMonitorStatus = 'start' | 'progress' | 'success' | 'fail' | 'cancel' | 'timeout';
+
+export interface RuntimeMonitorEntry {
+  id: string;
+  at: number;
+  lastSeenAt?: number;
+  repeatCount?: number;
+  sessionId?: string;
+  appVersion?: string;
+  screen: string;
+  action?: string;
+  status?: RuntimeMonitorStatus;
+  shortType: string;
+  humanMessage: string;
+  severity: RuntimeMonitorSeverity;
+  rawMessage: string;
+  firebasePath?: string;
+  feature?: string;
+  stage?: string;
+  code?: string;
+  firebaseCode?: string;
+  networkState?: string;
+  deviceInfo?: string;
+  androidVersion?: string;
+  appMode?: string;
+  details?: Record<string, unknown>;
+  breadcrumbs?: Array<{ at: number; category: string; message: string; screen?: string }>;
+  stack?: string;
+  source: RuntimeMonitorSource;
+}
+
+type RuntimeMonitorListener = (entries: RuntimeMonitorEntry[]) => void;
+
+type LoggerInput = {
+  screen: string;
+  error: unknown;
+  extra?: Record<string, unknown>;
+  source?: RuntimeMonitorSource;
+};
+
+type TraceInput = {
+  screen: string;
+  action: string;
+  status: RuntimeMonitorStatus;
+  forceRecord?: boolean;
+  feature?: string;
+  stage?: string;
+  firebasePath?: string;
+  firebaseCode?: string;
+  message?: string;
+  details?: Record<string, unknown>;
+  error?: unknown;
+};
+
+const STORAGE_KEY = '@chaika:runtime_monitor_logs';
+const MAX_ENTRIES = 50;
+const MAX_STACK_LENGTH = 2000;
+const MAX_FORMATTED_LOG_LENGTH = 20000;
+
+let cachedAppVersion: string | null = null;
+
+const getAppVersion = (): string => {
+  if (cachedAppVersion !== null) return cachedAppVersion;
+  try {
+    const app = require('expo-application') as { nativeApplicationVersion?: string | null };
+    if (typeof app.nativeApplicationVersion === 'string' && app.nativeApplicationVersion) {
+      cachedAppVersion = app.nativeApplicationVersion;
+      return cachedAppVersion;
+    }
+  } catch { /* noop */ }
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const vf = require('../../app-version.json') as { latestVersion?: string };
+    if (typeof vf?.latestVersion === 'string') {
+      cachedAppVersion = vf.latestVersion;
+      return cachedAppVersion;
+    }
+  } catch { /* noop */ }
+  cachedAppVersion = 'unknown';
+  return cachedAppVersion;
+};
+const EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
+const PHONE_RE = /\+?\d[\d\s().-]{7,}\d/g;
+const SENSITIVE_KEY_RE = /password|token|secret|email|phone|message|content|body|text|description|form/i;
+const DEDUP_WINDOW_MS = 20_000;
+const listeners = new Set<RuntimeMonitorListener>();
+
+let entries: RuntimeMonitorEntry[] = [];
+let hydrationPromise: Promise<void> | null = null;
+let globalHandlersInitialized = false;
+let latestNetworkState = 'unknown';
+
+// Offline retry: entries that failed to write to Firebase are kept here
+// and flushed automatically on the next successful write.
+const offlineRetryQueue: RuntimeMonitorEntry[] = [];
+const MAX_RETRY_QUEUE = 30;
+
+const redactString = (value: string): string =>
+  value
+    .replace(EMAIL_RE, '[redacted-email]')
+    .replace(PHONE_RE, '[redacted-phone]');
+
+const sanitizeString = (value: unknown): string =>
+  redactString(typeof value === 'string' ? value : String(value ?? ''));
+
+const trimForStorage = (value: string, maxLength = 500): string =>
+  value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
+
+const BROKEN_TEXT_RE =
+  /\uFFFD|[A-Za-z][><@][A-Za-z0-9><@]{2,}|\!\?\>@|D>B>|\?@>|\s[UQWXTV]\s/;
+
+const looksBrokenText = (value: string): boolean => BROKEN_TEXT_RE.test(value);
+
+const stabilizeDisplayText = (primary: string, fallback: string): string => {
+  const safePrimary = sanitizeString(primary || '').trim();
+  const safeFallback = sanitizeString(fallback || '').trim();
+
+  if (!safePrimary) {
+    return safeFallback || 'Runtime error';
+  }
+  if (looksBrokenText(safePrimary) && safeFallback && !looksBrokenText(safeFallback)) {
+    return safeFallback;
+  }
+  return safePrimary;
+};
+
+const sanitizeValue = (value: unknown, key = ''): unknown => {
+  if (SENSITIVE_KEY_RE.test(key)) {
+    return '[redacted]';
+  }
+  if (typeof value === 'string') {
+    return trimForStorage(sanitizeString(value));
+  }
+  if (Array.isArray(value)) {
+    return value.slice(0, 20).map((item) => sanitizeValue(item));
+  }
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    Object.entries(value as Record<string, unknown>).slice(0, 30).forEach(([itemKey, itemValue]) => {
+      out[itemKey] = sanitizeValue(itemValue, itemKey);
+    });
+    return out;
+  }
+  return value;
+};
+
+const sanitizeRecord = (value: Record<string, unknown> = {}): Record<string, unknown> =>
+  sanitizeValue(value) as Record<string, unknown>;
+
+const normalizeBreadcrumbs = (value: unknown): RuntimeMonitorEntry['breadcrumbs'] => {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  return value
+    .filter((item) => item && typeof item === 'object')
+    .map((item) => {
+      const breadcrumb = item as {
+        at?: unknown;
+        category?: unknown;
+        message?: unknown;
+        screen?: unknown;
+      };
+
+      return {
+        at: Number(breadcrumb.at ?? Date.now()),
+        category: sanitizeString(breadcrumb.category ?? 'runtime'),
+        message: sanitizeString(breadcrumb.message ?? ''),
+        screen: typeof breadcrumb.screen === 'string' ? sanitizeString(breadcrumb.screen) : undefined,
+      };
+    });
+};
+
+const isDevRuntime = (): boolean => {
+  const runtimeGlobal = globalThis as typeof globalThis & { __DEV__?: boolean };
+  return typeof runtimeGlobal.__DEV__ === 'boolean' ? runtimeGlobal.__DEV__ : false;
+};
+
+const getRuntimeEnvironment = (): Pick<RuntimeMonitorEntry, 'sessionId' | 'appVersion' | 'networkState' | 'deviceInfo' | 'androidVersion' | 'appMode'> => ({
+  sessionId: getSessionId(),
+  appVersion: getAppVersion(),
+  networkState: latestNetworkState,
+  deviceInfo: `${Platform.OS}${Platform.Version ? ` ${String(Platform.Version)}` : ''}`,
+  androidVersion: Platform.OS === 'android' ? String(Platform.Version) : undefined,
+  appMode: isDevRuntime() ? 'debug' : 'release',
+});
+
+const doRemoteWrite = async (entry: RuntimeMonitorEntry): Promise<void> => {
+  const firebaseCore = require('../firebase-core') as typeof import('../firebase-core');
+  const databaseModule = require('firebase/database') as typeof import('firebase/database');
+  const user = firebaseCore.auth.currentUser;
+  if (!user || user.isAnonymous) {
+    return;
+  }
+  await databaseModule.push(databaseModule.ref(firebaseCore.database, 'diagnostics/runtime'),
+    sanitizeRecord(entry as unknown as Record<string, unknown>),
+  );
+};
+
+const persistRemoteDiagnostic = async (entry: RuntimeMonitorEntry): Promise<void> => {
+  // Flush queued offline entries first (if network is back)
+  if (offlineRetryQueue.length > 0) {
+    const toFlush = offlineRetryQueue.splice(0, offlineRetryQueue.length);
+    for (const pending of toFlush) {
+      try {
+        await doRemoteWrite(pending);
+      } catch {
+        // Network still down вЂ” re-queue silently (don't loop forever)
+        if (offlineRetryQueue.length < MAX_RETRY_QUEUE) {
+          offlineRetryQueue.unshift(pending);
+        }
+        break;
+      }
+    }
+  }
+
+  try {
+    await doRemoteWrite(entry);
+  } catch {
+    // Network unavailable вЂ” queue for next attempt
+    if (offlineRetryQueue.length < MAX_RETRY_QUEUE) {
+      offlineRetryQueue.push(entry);
+    }
+  }
+};
+
+const emit = (): void => {
+  const snapshot = [...entries];
+  listeners.forEach((listener) => listener(snapshot));
+};
+
+const persist = async (): Promise<void> => {
+  try {
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+  } catch {
+    // Best-effort cache only.
+  }
+};
+
+const normalizeErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) {
+    return sanitizeString(error.message || error.name || 'Unknown error');
+  }
+  if (error && typeof error === 'object' && 'message' in error) {
+    return sanitizeString((error as { message?: unknown }).message ?? 'Unknown error');
+  }
+  return sanitizeString(error || 'Unknown error');
+};
+
+const normalizeErrorStack = (error: unknown): string | undefined => {
+  if (error instanceof Error && typeof error.stack === 'string' && error.stack.trim()) {
+    return trimForStorage(sanitizeString(error.stack.trim()), MAX_STACK_LENGTH);
+  }
+  if (error && typeof error === 'object' && 'stack' in error) {
+    const stack = (error as { stack?: unknown }).stack;
+    if (typeof stack === 'string' && stack.trim()) {
+      return trimForStorage(sanitizeString(stack.trim()), MAX_STACK_LENGTH);
+    }
+  }
+  return undefined;
+};
+
+const extractErrorCode = (error: unknown): string | undefined => {
+  const code =
+    error && typeof error === 'object' && 'code' in error
+      ? (error as { code?: unknown }).code
+      : undefined;
+
+  return typeof code === 'string' && code.trim() ? sanitizeString(code.trim()) : undefined;
+};
+
+const extractFirebasePath = (screen: string, extra: Record<string, unknown> = {}): string | undefined => {
+  const directPathKeys = ['firebasePath', 'path', 'storagePath', 'dbPath'];
+  for (const key of directPathKeys) {
+    const value = extra[key];
+    if (typeof value === 'string' && value.trim() && !SENSITIVE_KEY_RE.test(key)) {
+      return sanitizeString(value.trim());
+    }
+  }
+
+  const section = typeof extra.section === 'string' ? sanitizeString(extra.section) : '';
+  if (section.startsWith('osbb_') || section.startsWith('service_')) {
+    return section;
+  }
+
+  if (screen.includes('firebaseChatAPI')) return 'requests';
+  if (screen.includes('photoAPI')) return 'photos';
+  if (screen.includes('buySell')) return 'buy_sell';
+  if (screen.includes('Kontakt') || screen.includes('Contact')) return 'contacts';
+  if (screen.includes('job')) return 'jobs';
+  if (screen.includes('lostFound')) return 'lost_found';
+  if (screen.includes('local_business')) return 'local_business';
+
+  return undefined;
+};
+
+const buildShortTypeAndMessage = (
+  screen: string,
+  rawMessage: string,
+  extra: Record<string, unknown> = {},
+): Pick<RuntimeMonitorEntry, 'shortType' | 'humanMessage' | 'severity'> => {
+  const haystack = `${screen} ${rawMessage} ${JSON.stringify(extra)}`.toLowerCase();
+  const isGalleryUpload =
+    screen.includes('PhotoUploadScreen') ||
+    screen.includes('photoAPI.uploadPhotoToStorage') ||
+    screen.includes('photoAPI.addPhoto') ||
+    (typeof extra.feature === 'string' && extra.feature === 'gallery');
+  const isPermission = /permission|denied|unauthorized|forbidden/.test(haystack);
+  const isTimeout = /timeout|timed out|time out/.test(haystack);
+  const isUpload = /upload|storage|photo|image/.test(haystack);
+  const isPicker = /picker|getpendingresult|no usable asset|uri/.test(haystack);
+  const isForm = /submit|saveprofile|request|form|local_business|addrequest/.test(haystack);
+  const isCallable = /callable|function|httpscallable|cloud function/.test(haystack);
+  const isModeration = /moderation|moderator|serviceModeration/i.test(screen);
+  const isSync = /sync|subscribe|onvalue|realtime/.test(haystack);
+  const isCrash = /fatal|crash|errorboundary|render|unhandled/.test(haystack);
+  const isFirebase = /firebase|rtdb|database/.test(haystack);
+  const noUri = /no usable asset|РЅРµ РІРµСЂРЅСѓР» uri|returned null|picker returned without/iu.test(haystack);
+  const isFileTooLarge = /too large|file too large|СЃР»РёС€РєРѕРј Р±РѕР»СЊС€РѕР№|РІРµР»РёРєРµ|5 РјР±|5mb/iu.test(haystack);
+  const isUnsupported = /unsupported|format|mime|webp|png|jpg|jpeg/.test(haystack);
+  const isNetwork = /network|offline|fetch|internet|connection lost/.test(haystack);
+  const isUnknownModule = /requiring unknown module "undefined"|requiring unknown module/.test(haystack);
+  const isAtobMissing = /property 'atob' doesn't exist|atob doesn't exist|atob is not defined/.test(haystack);
+  const isConnectionLost = /firebase_connection|connection lost|onrealtimedisconnect_|onconnectionlost_/.test(haystack);
+
+  if (isUnknownModule) {
+    return {
+      shortType: 'РЎР±РѕР№ Р·Р°РіСЂСѓР·РєРё РјРѕРґСѓР»СЏ',
+      humanMessage: 'Runtime РЅРµ СЃРјРѕРі Р·Р°РіСЂСѓР·РёС‚СЊ JS-РјРѕРґСѓР»СЊ. РћР±С‹С‡РЅРѕ СЌС‚Рѕ dynamic require/import СЃ undefined РёР»Рё РѕС‚СЃСѓС‚СЃС‚РІСѓСЋС‰РёР№ РїР°РєРµС‚ РІ release bundle.',
+      severity: 'critical',
+    };
+  }
+
+  if (isAtobMissing) {
+    return {
+      shortType: 'РЎР±РѕР№ РґРµРєРѕРґРёСЂРѕРІР°РЅРёСЏ С„Р°Р№Р»Р°',
+      humanMessage: 'Р’ СЃСЂРµРґРµ React Native РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚ atob. РР·-Р·Р° СЌС‚РѕРіРѕ С‡С‚РµРЅРёРµ base64 РґР»СЏ upload РїСЂРµСЂС‹РІР°РµС‚СЃСЏ РґРѕ РѕС‚РїСЂР°РІРєРё РІ Firebase.',
+      severity: 'critical',
+    };
+  }
+
+  if (isConnectionLost) {
+    return {
+      shortType: 'РџРѕС‚РµСЂСЏ СЃРѕРµРґРёРЅРµРЅРёСЏ Firebase',
+      humanMessage: 'РЎРѕРµРґРёРЅРµРЅРёРµ СЃ Firebase РІСЂРµРјРµРЅРЅРѕ РїСЂРµСЂРІР°Р»РѕСЃСЊ. РћР±С‹С‡РЅРѕ СЌС‚Рѕ СЃРµС‚СЊ/РїРµСЂРµРїРѕРґРєР»СЋС‡РµРЅРёРµ, Р° РЅРµ РѕС€РёР±РєР° РїСЂР°РІ РґРѕСЃС‚СѓРїР°.',
+      severity: 'warning',
+    };
+  }
+
+  if (isGalleryUpload) {
+    if (noUri || isPicker) {
+      return {
+        shortType: 'Р“Р°Р»РµСЂРµСЏ: С„РѕС‚Рѕ РЅРµ РІС‹Р±СЂР°РЅРѕ',
+        humanMessage: 'РЎР±РѕР№ РЅР° СЌС‚Р°РїРµ РІС‹Р±РѕСЂР° С„РѕС‚Рѕ. РџРёРєРµСЂ РЅРµ РІРµСЂРЅСѓР» URI С„Р°Р№Р»Р° РёР· С‚РµР»РµС„РѕРЅР°.',
+        severity: 'warning',
+      };
+    }
+
+    if (isPermission) {
+      return {
+        shortType: 'Р“Р°Р»РµСЂРµСЏ: РЅРµС‚ РґРѕСЃС‚СѓРїР° Рє С„РѕС‚Рѕ',
+        humanMessage: 'РџСЂРёР»РѕР¶РµРЅРёСЋ РЅРµ СЂР°Р·СЂРµС€С‘РЅ РґРѕСЃС‚СѓРї Рє РіР°Р»РµСЂРµРµ/РєР°РјРµСЂРµ РёР»Рё Firebase Rules Р·Р°РїСЂРµС‚РёР»Рё РѕРїРµСЂР°С†РёСЋ.',
+        severity: 'critical',
+      };
+    }
+
+    if (isFileTooLarge) {
+      return {
+        shortType: 'Р“Р°Р»РµСЂРµСЏ: С„Р°Р№Р» СЃР»РёС€РєРѕРј Р±РѕР»СЊС€РѕР№',
+        humanMessage: 'Р¤РѕС‚Рѕ РѕС‚РєР»РѕРЅРµРЅРѕ РёР·-Р·Р° СЂР°Р·РјРµСЂР° С„Р°Р№Р»Р°. Р’С‹Р±РµСЂРёС‚Рµ РјРµРЅСЊС€РµРµ С„РѕС‚Рѕ РёР»Рё РїРѕРІС‚РѕСЂРёС‚Рµ СЃ РґСЂСѓРіРѕР№ РєРѕРјРїСЂРµСЃСЃРёРµР№.',
+        severity: 'warning',
+      };
+    }
+
+    if (isUnsupported) {
+      return {
+        shortType: 'Р“Р°Р»РµСЂРµСЏ: С„РѕСЂРјР°С‚ РЅРµ РїРѕРґРґРµСЂР¶Р°РЅ',
+        humanMessage: 'Р’С‹Р±СЂР°РЅРЅС‹Р№ С„Р°Р№Р» РЅРµ РїСЂРѕС€С‘Р» РїСЂРѕРІРµСЂРєСѓ С„РѕСЂРјР°С‚Р°. РќСѓР¶РµРЅ JPG/PNG/WEBP.',
+        severity: 'warning',
+      };
+    }
+
+    if (isTimeout || isNetwork) {
+      return {
+        shortType: 'Р“Р°Р»РµСЂРµСЏ: upload timeout',
+        humanMessage: 'РЎР±РѕР№ СЃРµС‚Рё РёР»Рё С‚Р°Р№РјР°СѓС‚ РїСЂРё РѕС‚РїСЂР°РІРєРµ С„РѕС‚Рѕ РІ Firebase Storage.',
+        severity: 'critical',
+      };
+    }
+
+    if (isUpload || isFirebase || isForm) {
+      return {
+        shortType: 'Р“Р°Р»РµСЂРµСЏ: С„РѕС‚Рѕ РЅРµ Р·Р°РіСЂСѓР¶РµРЅРѕ',
+        humanMessage: 'РЎР±РѕР№ РЅР° СЌС‚Р°РїРµ upload РёР»Рё СЃРѕС…СЂР°РЅРµРЅРёСЏ РєР°СЂС‚РѕС‡РєРё С„РѕС‚Рѕ РІ Firebase. РЎРјРѕС‚СЂРёС‚Рµ С‚РµС…РЅРёС‡РµСЃРєСѓСЋ РїСЂРёС‡РёРЅСѓ РЅРёР¶Рµ.',
+        severity: 'critical',
+      };
+    }
+  }
+
+  if (isCrash) {
+    return {
+      shortType: 'РЎР±РѕР№ РёРЅС‚РµСЂС„РµР№СЃР°',
+      humanMessage: 'РџСЂРѕРёР·РѕС€Р»Р° runtime РѕС€РёР±РєР° РІ РёРЅС‚РµСЂС„РµР№СЃРµ. Р­РєСЂР°РЅ РёР»Рё React-РєРѕРјРїРѕРЅРµРЅС‚ Р·Р°РІРµСЂС€РёР»СЃСЏ СЃ РёСЃРєР»СЋС‡РµРЅРёРµРј.',
+      severity: 'critical',
+    };
+  }
+
+  if (isPicker || noUri) {
+    return {
+      shortType: 'Р¤РѕС‚Рѕ РЅРµ РІС‹Р±СЂР°РЅРѕ',
+      humanMessage: 'Android picker РЅРµ РІРµСЂРЅСѓР» URI, РІРµСЂРЅСѓР» РїСѓСЃС‚РѕР№ СЂРµР·СѓР»СЊС‚Р°С‚ РёР»Рё Р·Р°РІРµСЂС€РёР»СЃСЏ СЃ РѕС€РёР±РєРѕР№.',
+      severity: 'warning',
+    };
+  }
+
+  if (isUpload && isTimeout) {
+    return {
+      shortType: 'Р¤РѕС‚Рѕ РЅРµ Р·Р°РіСЂСѓР¶РµРЅРѕ',
+      humanMessage: 'Firebase Storage РЅРµ РѕС‚РІРµС‚РёР» РІРѕРІСЂРµРјСЏ. Р—Р°РіСЂСѓР·РєР° С„Р°Р№Р»Р° РїСЂРµСЂРІР°Р»Р°СЃСЊ РїРѕ С‚Р°Р№РјР°СѓС‚Сѓ.',
+      severity: 'critical',
+    };
+  }
+
+  if (isUpload) {
+    return {
+      shortType: 'Р¤РѕС‚Рѕ РЅРµ Р·Р°РіСЂСѓР¶РµРЅРѕ',
+      humanMessage: 'РћС€РёР±РєР° РїСЂРё Р·Р°РіСЂСѓР·РєРµ С„Р°Р№Р»Р° РёР»Рё СЂР°Р±РѕС‚Рµ СЃ Firebase Storage.',
+      severity: isPermission ? 'critical' : 'warning',
+    };
+  }
+
+  if (isPermission && isModeration) {
+    return {
+      shortType: 'РћС€РёР±РєР° РјРѕРґРµСЂР°С†РёРё',
+      humanMessage: 'Р”РµР№СЃС‚РІРёРµ РјРѕРґРµСЂР°С‚РѕСЂР° РѕС‚РєР»РѕРЅРµРЅРѕ. РЎРєРѕСЂРµРµ РІСЃРµРіРѕ Firebase Rules Р·Р°РїСЂРµС‚РёР»Рё Р·Р°РїРёСЃСЊ РёР»Рё СѓРґР°Р»РµРЅРёРµ.',
+      severity: 'critical',
+    };
+  }
+
+  if (isPermission) {
+    return {
+      shortType: 'Р”РѕСЃС‚СѓРї Р·Р°РїСЂРµС‰С‘РЅ',
+      humanMessage: 'Firebase Rules РёР»Рё РїСЂР°РІР° РґРѕСЃС‚СѓРїР° Р·Р°РїСЂРµС‚РёР»Рё СЌС‚Сѓ РѕРїРµСЂР°С†РёСЋ.',
+      severity: 'critical',
+    };
+  }
+
+  if (isCallable) {
+    return {
+      shortType: 'Cloud Function РЅРµ РѕС‚РІРµС‚РёР»Р°',
+      humanMessage: 'Р’С‹Р·РѕРІ СЃРµСЂРІРµСЂРЅРѕР№ С„СѓРЅРєС†РёРё Р·Р°РІРµСЂС€РёР»СЃСЏ РѕС€РёР±РєРѕР№ РёР»Рё РІРµСЂРЅСѓР» РЅРµСѓСЃРїРµС€РЅС‹Р№ РѕС‚РІРµС‚.',
+      severity: 'critical',
+    };
+  }
+
+  if (isForm && isTimeout) {
+    return {
+      shortType: 'Р¤РѕСЂРјР° РЅРµ РѕС‚РїСЂР°РІР»РµРЅР°',
+      humanMessage: 'РћС‚РїСЂР°РІРєР° С„РѕСЂРјС‹ Р·Р°РІРёСЃР»Р° СЃР»РёС€РєРѕРј РґРѕР»РіРѕ. Р’РѕР·РјРѕР¶РЅР° РїСЂРѕР±Р»РµРјР° СЃРµС‚Рё РёР»Рё РјРµРґР»РµРЅРЅС‹Р№ РѕС‚РІРµС‚ Firebase.',
+      severity: 'warning',
+    };
+  }
+
+  if (isForm) {
+    return {
+      shortType: 'Р¤РѕСЂРјР° РЅРµ РѕС‚РїСЂР°РІР»РµРЅР°',
+      humanMessage: 'РћС€РёР±РєР° РІРѕ РІСЂРµРјСЏ РѕС‚РїСЂР°РІРєРё РёР»Рё СЃРѕС…СЂР°РЅРµРЅРёСЏ С„РѕСЂРјС‹. Р—Р°РїРёСЃСЊ РЅРµ РґРѕС€Р»Р° РґРѕ Firebase РїРѕР»РЅРѕСЃС‚СЊСЋ.',
+      severity: 'warning',
+    };
+  }
+
+  if (isModeration) {
+    return {
+      shortType: 'РћС€РёР±РєР° РјРѕРґРµСЂР°С†РёРё',
+      humanMessage: 'Р’Рѕ РІСЂРµРјСЏ Р·Р°РіСЂСѓР·РєРё РґР°РЅРЅС‹С… РјРѕРґРµСЂР°С†РёРё РёР»Рё РІС‹РїРѕР»РЅРµРЅРёСЏ РґРµР№СЃС‚РІРёСЏ РїСЂРѕРёР·РѕС€С‘Р» СЃР±РѕР№.',
+      severity: 'warning',
+    };
+  }
+
+  if (isSync) {
+    return {
+      shortType: 'РЎР±РѕР№ СЃРёРЅС…СЂРѕРЅРёР·Р°С†РёРё',
+      humanMessage: 'Realtime-РѕР±РЅРѕРІР»РµРЅРёРµ РЅРµ СЃРјРѕРіР»Рѕ РєРѕСЂСЂРµРєС‚РЅРѕ РїРѕР»СѓС‡РёС‚СЊ РёР»Рё РѕР±РЅРѕРІРёС‚СЊ РґР°РЅРЅС‹Рµ.',
+      severity: 'warning',
+    };
+  }
+
+  if (isFirebase) {
+    return {
+      shortType: 'РћС€РёР±РєР° Firebase',
+      humanMessage: 'РћРїРµСЂР°С†РёСЏ Firebase Р·Р°РІРµСЂС€РёР»Р°СЃСЊ РѕС€РёР±РєРѕР№. РџСЂРѕРІРµСЂСЊС‚Рµ СЃРµС‚СЊ, Rules Рё СЃС‚СЂСѓРєС‚СѓСЂСѓ РґР°РЅРЅС‹С….',
+      severity: isTimeout ? 'warning' : 'critical',
+    };
+  }
+
+  return {
+    shortType: 'Runtime РѕС€РёР±РєР°',
+    humanMessage: 'Р’Рѕ РІСЂРµРјСЏ СЂР°Р±РѕС‚С‹ РїСЂРёР»РѕР¶РµРЅРёСЏ РїСЂРѕРёР·РѕС€Р»Р° РІРЅСѓС‚СЂРµРЅРЅСЏСЏ РѕС€РёР±РєР°.',
+    severity: 'warning',
+  };
+};
+
+const createEntryFromLogger = ({
+  screen,
+  error,
+  extra = {},
+  source = 'client_error',
+}: LoggerInput): RuntimeMonitorEntry | null => {
+  const rawMessage = normalizeErrorMessage(error);
+  const startupDecision = classifyStartupTransientIssue({
+    screen,
+    rawMessage,
+    extra,
+    source,
+  });
+  if (startupDecision.shouldSuppress) {
+    return null;
+  }
+  const description = buildShortTypeAndMessage(screen, rawMessage, extra);
+
+  const severity = description.severity;
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    at: Date.now(),
+    repeatCount: 1,
+    screen: sanitizeString(screen || 'unknown'),
+    shortType: stabilizeDisplayText(description.shortType, 'Runtime error'),
+    humanMessage: stabilizeDisplayText(description.humanMessage, rawMessage || 'Runtime error occurred'),
+    severity,
+    rawMessage,
+    firebasePath: extractFirebasePath(screen, extra),
+    feature: typeof extra.feature === 'string' ? sanitizeString(extra.feature) : undefined,
+    stage: typeof extra.stage === 'string' ? sanitizeString(extra.stage) : undefined,
+    code: extractErrorCode(error),
+    firebaseCode: extractErrorCode(error) || (typeof extra.code === 'string' ? sanitizeString(extra.code) : undefined),
+    details: sanitizeRecord(extra),
+    ...getRuntimeEnvironment(),
+    breadcrumbs: severity === 'critical' ? getBreadcrumbs() : undefined,
+    stack: normalizeErrorStack(error),
+    source,
+  };
+};
+
+const createEntryFromTrace = ({
+  screen,
+  action,
+  status,
+  feature,
+  stage,
+  firebasePath,
+  firebaseCode,
+  message,
+  details = {},
+  error,
+}: TraceInput): RuntimeMonitorEntry => {
+  const rawMessage = error ? normalizeErrorMessage(error) : sanitizeString(message || `${action}:${status}`);
+  const severity: RuntimeMonitorSeverity = status === 'fail' || status === 'timeout' ? 'critical' : 'info';
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    at: Date.now(),
+    repeatCount: 1,
+    screen: sanitizeString(screen || 'unknown'),
+    action: sanitizeString(action || 'unknown_action'),
+    status,
+    shortType: `${sanitizeString(action || 'Action')} В· ${status}`,
+    humanMessage: message
+      ? sanitizeString(message)
+      : `Runtime trace: ${sanitizeString(action || 'action')} Р·Р°РІРµСЂС€РёР»СЃСЏ СЃРѕ СЃС‚Р°С‚СѓСЃРѕРј ${status}.`,
+    severity,
+    rawMessage,
+    firebasePath: firebasePath ? sanitizeString(firebasePath) : extractFirebasePath(screen, details),
+    feature: feature ? sanitizeString(feature) : undefined,
+    stage: stage ? sanitizeString(stage) : undefined,
+    code: error ? extractErrorCode(error) : undefined,
+    firebaseCode: firebaseCode ? sanitizeString(firebaseCode) : error ? extractErrorCode(error) : undefined,
+    details: sanitizeRecord(details),
+    ...getRuntimeEnvironment(),
+    breadcrumbs: severity === 'critical' ? getBreadcrumbs() : undefined,
+    stack: error ? normalizeErrorStack(error) : undefined,
+    source: 'trace',
+  };
+};
+
+const buildFingerprint = (entry: RuntimeMonitorEntry): string =>
+  [
+    entry.screen,
+    entry.shortType,
+    entry.severity,
+    entry.firebasePath ?? '',
+    entry.code ?? '',
+    entry.action ?? '',
+    entry.status ?? '',
+    entry.rawMessage,
+  ].join('|');
+
+const appendEntry = async (entry: RuntimeMonitorEntry): Promise<void> => {
+  const existingIndex = entries.findIndex((item) => buildFingerprint(item) === buildFingerprint(entry));
+  if (existingIndex >= 0) {
+    const existing = entries[existingIndex];
+    if (entry.at - existing.at <= DEDUP_WINDOW_MS) {
+      const merged: RuntimeMonitorEntry = {
+        ...existing,
+        at: entry.at,
+        lastSeenAt: entry.at,
+        repeatCount: (existing.repeatCount ?? 1) + 1,
+      };
+      const nextEntries = [...entries];
+      nextEntries.splice(existingIndex, 1);
+      entries = [merged, ...nextEntries].slice(0, MAX_ENTRIES);
+      emit();
+      await persist();
+      return;
+    }
+  }
+
+  entries = [entry, ...entries].slice(0, MAX_ENTRIES);
+  emit();
+  await persist();
+  void persistRemoteDiagnostic(entry);
+};
+
+export const initRuntimeMonitor = async (): Promise<void> => {
+  if (!hydrationPromise) {
+    hydrationPromise = (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(STORAGE_KEY);
+        if (!raw) {
+          return;
+        }
+
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) {
+          return;
+        }
+
+        entries = parsed
+          .filter((item) => item && typeof item === 'object')
+          .map((item) => ({
+            id: sanitizeString((item as { id?: unknown }).id ?? ''),
+            at: Number((item as { at?: unknown }).at ?? Date.now()),
+            lastSeenAt: Number((item as { lastSeenAt?: unknown }).lastSeenAt ?? (item as { at?: unknown }).at ?? Date.now()),
+            repeatCount: Number((item as { repeatCount?: unknown }).repeatCount ?? 1),
+            sessionId: typeof (item as { sessionId?: unknown }).sessionId === 'string'
+              ? sanitizeString((item as { sessionId?: string }).sessionId)
+              : undefined,
+            appVersion: typeof (item as { appVersion?: unknown }).appVersion === 'string'
+              ? sanitizeString((item as { appVersion?: string }).appVersion)
+              : undefined,
+            screen: sanitizeString((item as { screen?: unknown }).screen ?? 'unknown'),
+            action: typeof (item as { action?: unknown }).action === 'string'
+              ? sanitizeString((item as { action?: string }).action)
+              : undefined,
+            status: ((item as { status?: RuntimeMonitorStatus }).status ?? undefined),
+            shortType: sanitizeString((item as { shortType?: unknown }).shortType ?? 'Runtime РѕС€РёР±РєР°'),
+            humanMessage: sanitizeString((item as { humanMessage?: unknown }).humanMessage ?? 'РџСЂРѕРёР·РѕС€Р»Р° РѕС€РёР±РєР°.'),
+            severity: ((item as { severity?: RuntimeMonitorSeverity }).severity ?? 'warning'),
+            rawMessage: sanitizeString((item as { rawMessage?: unknown }).rawMessage ?? ''),
+            firebasePath: typeof (item as { firebasePath?: unknown }).firebasePath === 'string'
+              ? sanitizeString((item as { firebasePath?: string }).firebasePath)
+              : undefined,
+            feature: typeof (item as { feature?: unknown }).feature === 'string'
+              ? sanitizeString((item as { feature?: string }).feature)
+              : undefined,
+            stage: typeof (item as { stage?: unknown }).stage === 'string'
+              ? sanitizeString((item as { stage?: string }).stage)
+              : undefined,
+            code: typeof (item as { code?: unknown }).code === 'string'
+              ? sanitizeString((item as { code?: string }).code)
+              : undefined,
+            firebaseCode: typeof (item as { firebaseCode?: unknown }).firebaseCode === 'string'
+              ? sanitizeString((item as { firebaseCode?: string }).firebaseCode)
+              : undefined,
+            networkState: typeof (item as { networkState?: unknown }).networkState === 'string'
+              ? sanitizeString((item as { networkState?: string }).networkState)
+              : undefined,
+            deviceInfo: typeof (item as { deviceInfo?: unknown }).deviceInfo === 'string'
+              ? sanitizeString((item as { deviceInfo?: string }).deviceInfo)
+              : undefined,
+            androidVersion: typeof (item as { androidVersion?: unknown }).androidVersion === 'string'
+              ? sanitizeString((item as { androidVersion?: string }).androidVersion)
+              : undefined,
+            appMode: typeof (item as { appMode?: unknown }).appMode === 'string'
+              ? sanitizeString((item as { appMode?: string }).appMode)
+              : undefined,
+            details: (item as { details?: unknown }).details && typeof (item as { details?: unknown }).details === 'object'
+              ? sanitizeRecord((item as { details?: Record<string, unknown> }).details)
+              : undefined,
+            breadcrumbs: normalizeBreadcrumbs((item as { breadcrumbs?: unknown }).breadcrumbs),
+            stack: typeof (item as { stack?: unknown }).stack === 'string'
+              ? sanitizeString((item as { stack?: string }).stack)
+              : undefined,
+            source: ((item as { source?: RuntimeMonitorSource }).source ?? 'client_error'),
+          }))
+          .slice(0, MAX_ENTRIES);
+      } catch {
+        entries = [];
+      } finally {
+        emit();
+      }
+    })();
+  }
+
+  await hydrationPromise;
+};
+
+export const recordRuntimeMonitorError = async (input: LoggerInput): Promise<void> => {
+  await initRuntimeMonitor();
+  const entry = createEntryFromLogger(input);
+  if (!entry) {
+    return;
+  }
+  await appendEntry(entry);
+};
+
+export const recordRuntimeTrace = async (input: TraceInput): Promise<void> => {
+  const shouldRecord =
+    input.forceRecord ||
+    input.status === 'fail' ||
+    input.status === 'timeout' ||
+    input.status === 'cancel' ||
+    Boolean(input.error);
+
+  if (!shouldRecord) {
+    return;
+  }
+
+  await initRuntimeMonitor();
+  await appendEntry(createEntryFromTrace(input));
+};
+
+export const setRuntimeMonitorNetworkState = (state: string): void => {
+  latestNetworkState = sanitizeString(state || 'unknown');
+};
+
+export const getRuntimeMonitorEntries = (): RuntimeMonitorEntry[] => [...entries];
+
+export const subscribeRuntimeMonitor = (listener: RuntimeMonitorListener): (() => void) => {
+  listeners.add(listener);
+  listener([...entries]);
+  void initRuntimeMonitor();
+  return () => {
+    listeners.delete(listener);
+  };
+};
+
+export const clearRuntimeMonitorEntries = async (): Promise<void> => {
+  entries = [];
+  emit();
+  try {
+    await AsyncStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // noop
+  }
+};
+
+export const formatRuntimeMonitorEntries = (items: RuntimeMonitorEntry[] = entries): string =>
+  items
+    .slice(0, MAX_ENTRIES)
+    .map((item) => {
+      const lines = [
+        `[${new Date(item.at).toLocaleString('ru-RU')}] ${item.severity.toUpperCase()} - ${item.shortType}`,
+        `РџРѕРІС‚РѕСЂС‹: ${item.repeatCount ?? 1}`,
+        `Р­РєСЂР°РЅ: ${item.screen}`,
+        item.action ? `Action: ${item.action}` : '',
+        item.status ? `Status: ${item.status}` : '',
+        `РћР±СЉСЏСЃРЅРµРЅРёРµ: ${item.humanMessage}`,
+        `РўРµС…РЅРёС‡РµСЃРєР°СЏ РїСЂРёС‡РёРЅР°: ${item.rawMessage || 'РЅРµС‚ РґР°РЅРЅС‹С…'}`,
+      ].filter(Boolean);
+
+      if (item.firebasePath) {
+        lines.push(`Firebase РїСѓС‚СЊ: ${item.firebasePath}`);
+      }
+      if (item.stage) {
+        lines.push(`Р­С‚Р°Рї: ${item.stage}`);
+      }
+
+      if (item.code) {
+        lines.push(`РљРѕРґ: ${item.code}`);
+      }
+      if (item.firebaseCode) {
+        lines.push(`Firebase code: ${item.firebaseCode}`);
+      }
+      if (item.sessionId) {
+        lines.push(`Session: ${item.sessionId}`);
+      }
+      if (item.appVersion) {
+        lines.push(`AppVersion: ${item.appVersion}`);
+      }
+      if (item.networkState) {
+        lines.push(`Network: ${item.networkState}`);
+      }
+      if (item.deviceInfo) {
+        lines.push(`Device: ${item.deviceInfo}`);
+      }
+      if (item.androidVersion) {
+        lines.push(`Android: ${item.androidVersion}`);
+      }
+      if (item.appMode) {
+        lines.push(`Mode: ${item.appMode}`);
+      }
+      if (item.details && Object.keys(item.details).length) {
+        lines.push(`Details: ${JSON.stringify(item.details, null, 2)}`);
+      }
+      if (item.breadcrumbs && item.breadcrumbs.length > 0) {
+        lines.push(`Breadcrumbs (РїРѕСЃР»РµРґРЅРёРµ ${item.breadcrumbs.length} РґРµР№СЃС‚РІРёР№):`);
+        item.breadcrumbs.forEach((b) => {
+          const t = new Date(b.at).toLocaleTimeString('ru-RU');
+          lines.push(`  [${t}] ${b.category} ${b.screen ? `(${b.screen}) ` : ''}в†’ ${b.message}`);
+        });
+      }
+
+      lines.push(`Source: ${item.source}`);
+      if (item.stack) {
+        lines.push(`Stack: ${item.stack}`);
+      }
+
+      return lines.join('\n');
+    })
+    .join('\n\n')
+    .slice(0, MAX_FORMATTED_LOG_LENGTH);
+
+const PROBLEMATIC_KEYWORDS = [
+  'error',
+  'warning',
+  'failed',
+  'fail',
+  'rejected',
+  'timeout',
+  'upload fail',
+  'upload failed',
+  'network fail',
+  'firebase fail',
+  'unhandled promise',
+  'crash',
+  'exception',
+  'permission denied',
+];
+
+const includesProblematicKeyword = (value: string): boolean => {
+  const haystack = value.toLowerCase();
+  return PROBLEMATIC_KEYWORDS.some((keyword) => haystack.includes(keyword));
+};
+
+export const isProblematicRuntimeMonitorEntry = (item: RuntimeMonitorEntry): boolean => {
+  if (item.severity === 'critical' || item.severity === 'warning') {
+    return true;
+  }
+
+  if (item.status === 'fail' || item.status === 'timeout') {
+    return true;
+  }
+
+  const joined = [
+    item.shortType,
+    item.humanMessage,
+    item.rawMessage,
+    item.action ?? '',
+    item.code ?? '',
+    item.firebaseCode ?? '',
+    item.feature ?? '',
+    item.source,
+  ].join(' ');
+
+  return includesProblematicKeyword(joined);
+};
+
+const severityRank: Record<RuntimeMonitorSeverity, number> = {
+  critical: 0,
+  warning: 1,
+  info: 2,
+};
+
+export const sortRuntimeMonitorBySeverity = (items: RuntimeMonitorEntry[]): RuntimeMonitorEntry[] =>
+  [...items].sort((a, b) => {
+    const rankDiff = severityRank[a.severity] - severityRank[b.severity];
+    if (rankDiff !== 0) {
+      return rankDiff;
+    }
+
+    const statusWeight = (entry: RuntimeMonitorEntry): number => {
+      if (entry.status === 'fail') return 0;
+      if (entry.status === 'timeout') return 1;
+      if (entry.status === 'cancel') return 2;
+      if (entry.status === 'progress') return 3;
+      if (entry.status === 'start') return 4;
+      return 5;
+    };
+
+    const statusDiff = statusWeight(a) - statusWeight(b);
+    if (statusDiff !== 0) {
+      return statusDiff;
+    }
+
+    return b.at - a.at;
+  });
+
+export const formatProblematicRuntimeMonitorEntries = (items: RuntimeMonitorEntry[] = entries): string =>
+  items
+    .filter(isProblematicRuntimeMonitorEntry)
+    .slice(0, MAX_ENTRIES)
+    .map((item) => {
+      const lines = [
+        `[${new Date(item.at).toLocaleString('ru-RU')}] ${item.severity.toUpperCase()} ${item.status ? `(${item.status.toUpperCase()})` : ''}`.trim(),
+        `screen: ${item.screen}`,
+        `action: ${item.action || '-'}`,
+        `message: ${item.humanMessage || '-'}`,
+        `error_code: ${item.code || '-'}`,
+        `firebase_code: ${item.firebaseCode || '-'}`,
+        `device_info: ${item.deviceInfo || '-'}`,
+        `android_version: ${item.androidVersion || '-'}`,
+        `raw: ${item.rawMessage || '-'}`,
+      ];
+
+      if (item.stack) {
+        lines.push(`stack_trace: ${item.stack}`);
+      }
+
+      return lines.join('\n');
+    })
+    .join('\n\n')
+    .slice(0, MAX_FORMATTED_LOG_LENGTH);
+
+export const initRuntimeMonitorGlobalHandlers = (): void => {
+  if (globalHandlersInitialized) {
+    return;
+  }
+  globalHandlersInitialized = true;
+
+  const globalErrorUtils = (globalThis as { ErrorUtils?: { getGlobalHandler?: () => ((error: unknown, isFatal?: boolean) => void) | undefined; setGlobalHandler?: (handler: (error: unknown, isFatal?: boolean) => void) => void } }).ErrorUtils;
+  const previousHandler = globalErrorUtils?.getGlobalHandler?.();
+
+  globalErrorUtils?.setGlobalHandler?.((error: unknown, isFatal?: boolean) => {
+    void recordRuntimeMonitorError({
+      screen: isFatal ? 'GlobalFatalHandler' : 'GlobalErrorHandler',
+      error,
+      extra: { isFatal: Boolean(isFatal) },
+      source: 'global_handler',
+    });
+    previousHandler?.(error, isFatal);
+  });
+
+  const globalTarget = globalThis as {
+    onunhandledrejection?: ((event: { reason?: unknown }) => void) | null;
+    addEventListener?: (type: string, listener: (event: { reason?: unknown }) => void) => void;
+  };
+
+  const rejectionHandler = (event: { reason?: unknown }) => {
+    void recordRuntimeMonitorError({
+      screen: 'UnhandledPromiseRejection',
+      error: event?.reason ?? 'Unhandled promise rejection',
+      source: 'global_handler',
+    });
+  };
+
+  if (typeof globalTarget.addEventListener === 'function') {
+    try {
+      globalTarget.addEventListener('unhandledrejection', rejectionHandler);
+      return;
+    } catch {
+      // fallback below
+    }
+  }
+
+  const previousRejectionHandler = globalTarget.onunhandledrejection;
+  globalTarget.onunhandledrejection = (event) => {
+    rejectionHandler(event);
+    previousRejectionHandler?.(event);
+  };
+};
+

@@ -1,0 +1,121 @@
+export const SCREEN_THEME = {
+  appBg: '#F6EACB',
+  appBgSoft: '#FBF4DE',
+  paper: '#F8F0DD',
+  paperStrong: '#FFF9EE',
+  cardCream: '#F4E7C8',
+  terracotta: '#C77A5D',
+  terracottaDark: '#9D5E45',
+  woodGreen: '#7E9D69',
+  woodGreenDark: '#5F7B4D',
+  enamelBlue: '#5F84B4',
+  enamelBlueDark: '#42648C',
+  linenOlive: '#9BB77B',
+  linenOliveDark: '#78915B',
+  textPrimary: '#4A3C27',
+  textSecondary: '#7B6B51',
+  textMuted: '#9C8B6F',
+  accentGold: '#D8AF59',
+  accentCream: '#FFF3CE',
+  borderSoft: 'rgba(108, 76, 39, 0.12)',
+  borderStrong: 'rgba(123, 86, 56, 0.22)',
+  shadow: 'rgba(95, 64, 37, 0.18)',
+  shadowDeep: 'rgba(84, 57, 31, 0.26)',
+  darkBg: '#171B46',
+  darkSurface: 'rgba(17, 20, 52, 0.84)',
+  lightBg: '#F6EACB',
+  lightBgAlt: '#FBF4DE',
+  lightCard: 'rgba(255,249,238,0.86)',
+  lightCardStrong: 'rgba(255,252,245,0.94)',
+  glassBorder: 'rgba(123, 86, 56, 0.18)',
+  accentPink: '#D87B8C',
+  accentPurple: '#8D7AB8',
+  accentTeal: '#7FAF9E',
+  accentPrimary: '#C77A5D',
+
+  bevelLight: 'rgba(255, 255, 255, 0.35)',
+  bevelLightSoft: 'rgba(255, 255, 255, 0.18)',
+  bevelDark: 'rgba(0, 0, 0, 0.18)',
+  bevelDarkSoft: 'rgba(0, 0, 0, 0.08)',
+
+  insetShadowTop: 'rgba(0, 0, 0, 0.12)',
+  insetShadowBottom: 'rgba(255, 255, 255, 0.06)',
+
+  raisedShadow: {
+    shadowColor: '#5C3A1E',
+    shadowOpacity: 0.28,
+    shadowRadius: 6,
+    shadowOffset: { width: 2, height: 5 },
+    elevation: 6,
+  },
+  raisedShadowStrong: {
+    shadowColor: '#5C3A1E',
+    shadowOpacity: 0.36,
+    shadowRadius: 10,
+    shadowOffset: { width: 3, height: 8 },
+    elevation: 9,
+  },
+  pressedShadow: {
+    shadowColor: '#5C3A1E',
+    shadowOpacity: 0.10,
+    shadowRadius: 2,
+    shadowOffset: { width: 1, height: 2 },
+    elevation: 2,
+  },
+
+  glassOverlay: 'rgba(255, 255, 255, 0.12)',
+  glassShine: 'rgba(255, 255, 255, 0.22)',
+
+  woodGrainLight: '#D4C1A0',
+  woodGrainDark: '#B8A07A',
+  metalShine: 'rgba(255, 255, 255, 0.28)',
+  metalShadow: 'rgba(0, 0, 0, 0.22)',
+
+  embossLight: 'rgba(255, 248, 225, 0.6)',
+  embossDark: 'rgba(74, 56, 31, 0.22)',
+};
+
+export const LIGHT_ORBS = [
+  { top: -30, left: -50, size: 180, color: 'rgba(205, 151, 101, 0.14)' },
+  { top: 180, right: -60, size: 160, color: 'rgba(113, 146, 99, 0.12)' },
+  { bottom: -70, left: 20, size: 220, color: 'rgba(104, 136, 183, 0.10)' },
+];
+
+export const TACTILE_TILE_THEMES = [
+  {
+    backgroundColor: '#7E9D69',
+    borderColor: '#6A8756',
+    iconTint: '#FFF7DE',
+    shadowColor: 'rgba(99, 127, 76, 0.34)',
+  },
+  {
+    backgroundColor: '#EEE3CB',
+    borderColor: '#D5C8A8',
+    iconTint: '#8A7351',
+    shadowColor: 'rgba(128, 105, 69, 0.22)',
+  },
+  {
+    backgroundColor: '#C77A5D',
+    borderColor: '#B16A4F',
+    iconTint: '#FFF0E6',
+    shadowColor: 'rgba(157, 94, 69, 0.30)',
+  },
+  {
+    backgroundColor: '#5F84B4',
+    borderColor: '#4C719C',
+    iconTint: '#F7FAFF',
+    shadowColor: 'rgba(66, 100, 140, 0.30)',
+  },
+  {
+    backgroundColor: '#9BB77B',
+    borderColor: '#82A064',
+    iconTint: '#F5FBEF',
+    shadowColor: 'rgba(120, 145, 91, 0.28)',
+  },
+  {
+    backgroundColor: '#F0E5CF',
+    borderColor: '#D8C7A0',
+    iconTint: '#9B714F',
+    shadowColor: 'rgba(130, 108, 71, 0.22)',
+  },
+] as const;

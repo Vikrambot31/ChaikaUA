@@ -1,6 +1,6 @@
 {
   "rules": {
-    ".read": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous'",
+    ".read": false,
     ".write": false,
     "requests": {
       ".read": "auth != null",
@@ -110,13 +110,29 @@
         ".validate": true
       }
     },
+    "dating_profiles": {
+      ".read": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'"
+    },
+    "dating_anketa_listings": {
+      ".read": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'"
+    },
+    "coffee_requests": {
+      ".read": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'"
+    },
     "users": {
       ".read": "auth != null",
       "$userId": {
         ".read": "auth != null",
         ".write": "auth.uid === $userId || auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin'",
         ".validate": true,
+        "profilePrivacy": {
+          ".read": "auth.uid === $userId || auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'"
+        },
+        "profileRequestsArchive": {
+          ".read": "auth.uid === $userId || auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'"
+        },
         "profile_history": {
+          ".read": "auth.uid === $userId || auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'",
           "$timestamp": {
             ".write": "auth.uid === $userId || auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin'",
             ".validate": true
@@ -347,6 +363,13 @@
         }
       }
     },
+    "buildings": {
+      "$buildingId": {
+        "totalApartments": {
+          ".read": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous'"
+        }
+      }
+    },
     "osbb_votes": {
       ".read": "auth != null",
       "$buildingId": {
@@ -458,6 +481,172 @@
         "job_listings": {
           "lastAt": {
             ".write": "auth.uid === $userId",
+            ".validate": true
+          }
+        }
+      }
+    },
+    "feature_flags": {
+      "invite_access": {
+        ".indexOn": [
+          "updatedAt",
+          "mode"
+        ],
+        "current": {
+          ".read": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'",
+          ".write": false,
+          ".validate": "newData.hasChildren(['enabled','updatedAt']) && newData.child('enabled').isBoolean() && newData.child('updatedAt').isNumber() && (!newData.child('mode').exists() || (newData.child('mode').isString() && (newData.child('mode').val() === 'disabled' || newData.child('mode').val() === 'soft' || newData.child('mode').val() === 'medium' || newData.child('mode').val() === 'hard'))) && (!newData.child('updatedBy').exists() || newData.child('updatedBy').isString()) && (!newData.child('version').exists() || newData.child('version').isNumber())"
+        },
+        "config": {
+          ".read": "auth != null",
+          ".write": false,
+          ".validate": "newData.hasChildren(['mode','mandatory_sections_enabled','soft_banner_enabled','guest_access_enabled','guest_access_hours','fallback_mode','updatedAt']) && newData.child('mode').isString() && (newData.child('mode').val() === 'disabled' || newData.child('mode').val() === 'soft' || newData.child('mode').val() === 'medium' || newData.child('mode').val() === 'hard') && newData.child('mandatory_sections_enabled').isBoolean() && newData.child('soft_banner_enabled').isBoolean() && newData.child('guest_access_enabled').isBoolean() && newData.child('guest_access_hours').isNumber() && newData.child('guest_access_hours').val() >= 1 && newData.child('guest_access_hours').val() <= 8760 && newData.child('fallback_mode').isString() && (newData.child('fallback_mode').val() === 'open' || newData.child('fallback_mode').val() === 'cached' || newData.child('fallback_mode').val() === 'strict') && newData.child('updatedAt').isNumber() && (!newData.child('version').exists() || newData.child('version').isNumber())"
+        }
+      }
+    },
+    "user_access": {
+      ".indexOn": [
+        "status",
+        "updatedAt"
+      ],
+      "$uid": {
+        ".read": "auth.uid === $uid || auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'",
+        ".write": false,
+        ".validate": "newData.hasChildren(['status','updatedAt']) && (!newData.child('version').exists() || newData.child('version').isNumber())",
+        "status": {
+          ".validate": "newData.isString() && (newData.val() === 'guest' || newData.val() === 'not_started' || newData.val() === 'pending' || newData.val() === 'pending_sponsor' || newData.val() === 'approved' || newData.val() === 'denied' || newData.val() === 'blocked' || newData.val() === 'needs_manual_review' || newData.val() === 'temporary_access' || newData.val() === 'whitelist_access')"
+        },
+        "updatedAt": {
+          ".validate": "newData.isNumber()"
+        },
+        "version": {
+          ".validate": "newData.isNumber()"
+        }
+      }
+    },
+    "trust_tree": {
+      ".read": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'",
+      ".write": false,
+      ".indexOn": [
+        "sponsorUid",
+        "status",
+        "depthToRoot",
+        "approvedAt"
+      ],
+      "$uid": {
+        ".validate": "newData.hasChildren(['userUid','phoneHash','approvedAt','approvalSource','depthToRoot','status','riskLevel','createdAt']) && newData.child('userUid').val() === $uid && (!newData.child('sponsorUid').exists() || (newData.child('sponsorUid').isString() && newData.child('sponsorUid').val().length <= 128)) && (!newData.child('updatedAt').exists() || newData.child('updatedAt').isNumber())",
+        "userUid": {
+          ".validate": "newData.isString() && newData.val() === $uid"
+        },
+        "phoneHash": {
+          ".validate": "newData.isString() && newData.val().length >= 32 && newData.val().length <= 128"
+        },
+        "sponsorUid": {
+          ".validate": "newData.isString() && newData.val().length <= 128"
+        },
+        "approvedAt": {
+          ".validate": "newData.isNumber()"
+        },
+        "approvalSource": {
+          ".validate": "newData.isString() && (newData.val() === 'manual_admin' || newData.val() === 'auto_tree' || newData.val() === 'migration')"
+        },
+        "depthToRoot": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 99"
+        },
+        "status": {
+          ".validate": "newData.isString() && (newData.val() === 'active' || newData.val() === 'blocked' || newData.val() === 'revoked')"
+        },
+        "riskLevel": {
+          ".validate": "newData.isString() && (newData.val() === 'low' || newData.val() === 'medium' || newData.val() === 'high' || newData.val() === 'blocked')"
+        },
+        "createdAt": {
+          ".validate": "newData.isNumber()"
+        },
+        "updatedAt": {
+          ".validate": "newData.isNumber()"
+        }
+      }
+    },
+    "trust_tree_index": {
+      "by_phone": {
+        ".read": false,
+        ".write": false,
+        "$phoneHash": {
+          ".validate": "$phoneHash.length >= 32 && $phoneHash.length <= 128 && newData.isString() && newData.val().length <= 128"
+        }
+      }
+    },
+    "trusted_sponsors": {
+      ".read": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'",
+      ".write": false,
+      ".indexOn": [
+        "status",
+        "createdAt",
+        "updatedAt",
+        "lastInviteAt"
+      ],
+      "$sponsorPhoneHash": {
+        ".validate": "newData.hasChildren(['phoneMasked','status','createdAt','createdBy']) && newData.child('phoneMasked').isString() && newData.child('phoneMasked').val().length <= 32 && newData.child('status').isString() && (newData.child('status').val() === 'active' || newData.child('status').val() === 'disabled') && newData.child('createdAt').isNumber() && newData.child('createdBy').isString() && (!newData.child('updatedAt').exists() || newData.child('updatedAt').isNumber()) && (!newData.child('updatedBy').exists() || newData.child('updatedBy').isString()) && (!newData.child('note').exists() || (newData.child('note').isString() && newData.child('note').val().length <= 280)) && (!newData.child('approvedInviteCount').exists() || newData.child('approvedInviteCount').isNumber()) && (!newData.child('lastInviteAt').exists() || newData.child('lastInviteAt').isNumber())"
+      }
+    },
+    "invite_requests": {
+      ".read": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'",
+      ".write": false,
+      ".indexOn": [
+        "status",
+        "createdAt",
+        "updatedAt",
+        "moderatedAt",
+        "requesterUid",
+        "requesterPhoneHash",
+        "sponsorPhoneHash"
+      ],
+      "$requestId": {
+        ".validate": "newData.hasChildren(['requesterUid','requesterPhoneHash','sponsorPhoneHash','status','createdAt']) && newData.child('requesterUid').isString() && newData.child('requesterPhoneHash').isString() && newData.child('sponsorPhoneHash').isString() && newData.child('status').isString() && (newData.child('status').val() === 'pending' || newData.child('status').val() === 'approved' || newData.child('status').val() === 'denied' || newData.child('status').val() === 'cancelled') && newData.child('createdAt').isNumber() && (!newData.child('updatedAt').exists() || newData.child('updatedAt').isNumber()) && (!newData.child('moderatedAt').exists() || newData.child('moderatedAt').isNumber()) && (!newData.child('moderatedBy').exists() || newData.child('moderatedBy').isString()) && (!newData.child('moderationReason').exists() || (newData.child('moderationReason').isString() && newData.child('moderationReason').val().length <= 280)) && (!newData.child('source').exists() || (newData.child('source').isString() && (newData.child('source').val() === 'mobile' || newData.child('source').val() === 'admin')))"
+      }
+    },
+    "invite_logs": {
+      ".read": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin'",
+      ".write": false,
+      ".indexOn": [
+        "requestId",
+        "action",
+        "createdAt",
+        "actorUid",
+        "actorType",
+        "riskLevel"
+      ],
+      "$logId": {
+        ".validate": "!data.exists() && newData.hasChildren(['requestId','action','actorType','createdAt']) && newData.child('requestId').isString() && newData.child('action').isString() && (newData.child('action').val() === 'auto_approve' || newData.child('action').val() === 'auto_deny' || newData.child('action').val() === 'manual_approve' || newData.child('action').val() === 'manual_deny' || newData.child('action').val() === 'manual_block' || newData.child('action').val() === 'sponsor_confirm' || newData.child('action').val() === 'sponsor_reject' || newData.child('action').val() === 'cascade_block' || newData.child('action').val() === 'cascade_review' || newData.child('action').val() === 'status_change' || newData.child('action').val() === 'phone_change' || newData.child('action').val() === 'mode_change') && newData.child('actorType').isString() && (newData.child('actorType').val() === 'system' || newData.child('actorType').val() === 'admin' || newData.child('actorType').val() === 'moderator' || newData.child('actorType').val() === 'sponsor' || newData.child('actorType').val() === 'user') && newData.child('createdAt').isNumber() && (!newData.child('actorUid').exists() || newData.child('actorUid').isString()) && (!newData.child('riskLevel').exists() || (newData.child('riskLevel').isString() && (newData.child('riskLevel').val() === 'low' || newData.child('riskLevel').val() === 'medium' || newData.child('riskLevel').val() === 'high' || newData.child('riskLevel').val() === 'blocked')))"
+      }
+    },
+    "invite_attempts": {
+      ".read": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'",
+      ".write": false,
+      "uid": {
+        "$uid": {
+          "current": {
+            ".validate": true
+          }
+        }
+      },
+      "phone": {
+        "$requesterPhoneHash": {
+          "current": {
+            ".validate": true
+          }
+        }
+      },
+      "sponsor": {
+        "$sponsorPhoneHash": {
+          "current": {
+            ".validate": true
+          }
+        }
+      },
+      "ip": {
+        "$ipHash": {
+          "current": {
             ".validate": true
           }
         }
