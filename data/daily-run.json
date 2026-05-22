@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-05-22",
+      "publishedAt": "2026-05-22T07:38:48.411Z",
+      "key": "https://bigkyiv.com.ua/ruh-gostomelskym-shose-obmezhyly-do-kinczya-misyaczya/"
+    },
+    {
       "type": "places",
       "date": "2026-05-21",
       "publishedAt": "2026-05-21T10:56:55.001Z",
