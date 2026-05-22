@@ -97,7 +97,7 @@ export default function PhotoUploadField({
   uid,
   userName,
   maxPhotos = 5,
-  storagePath: storageFolder = 'test_photos',
+  storagePath: storageFolder = 'community_photos',
   onPhotosChange,
   onPickerOpenChange,
   onDebugEvent,
@@ -297,7 +297,7 @@ export default function PhotoUploadField({
                 storagePath: uploadPath,
                 downloadUrl: url,
                 thumbUrl: item.thumbUri,
-                status: 'pending',
+                status: 'approved',
               });
             } catch (dbErr) {
               console.warn('[PhotoUploadField] metadata write failed after upload', {
@@ -379,8 +379,7 @@ export default function PhotoUploadField({
         allowsMultipleSelection: remaining > 1,
         selectionLimit: remaining,
         allowsEditing: false,
-        quality: 0.9,
-        ...(Platform.OS === 'android' ? { legacy: true } : null),
+        quality: 1,
       });
 
       T(`handleAddPhoto: picker returned canceled=${result.canceled} directAssets=${result.assets?.length ?? 0}`);

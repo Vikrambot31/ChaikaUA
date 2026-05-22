@@ -3,7 +3,7 @@
     "name": "Chaika Life",
     "slug": "chaika-ua",
     "scheme": "chaikaua",
-    "version": "1.1.271",
+    "version": "1.1.273",
     "runtimeVersion": {
       "policy": "appVersion"
     },
@@ -81,7 +81,7 @@
     "extra": {
       "firebaseApiKey": "AIzaSyDcohmy5PiUiEDQ5mholkY59HpOmeeoG6E",
       "firebaseAuthDomain": "chaikaua-3cd9d.firebaseapp.com",
-      "firebaseDatabaseURL": "https://chaikaua-3cd9d-default-rtdb.firebaseio.com",
+      "firebaseDatabaseURL": "https://chaikaua-3cd9d-default-rtdb.europe-west1.firebasedatabase.app",
       "firebaseProjectId": "chaikaua-3cd9d",
       "firebaseStorageBucket": "chaikaua-3cd9d.firebasestorage.app",
       "firebaseMessagingSenderId": "1027130010906",

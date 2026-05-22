@@ -1054,10 +1054,11 @@ export const photoAPI = {
       await ensureFirebaseAuth();
       const upload = await uploadPhotoToNamespace(localUri, {
         namespace: 'community_photos',
+        resolveDownloadUrl: true,
         logContext: { source: 'photoAPI.uploadPhotoToStorage' },
       });
       fileName = upload.storagePath;
-      return { success: true, data: { url: fileName, storagePath: fileName } };
+      return { success: true, data: { url: upload.downloadUrl ?? upload.storagePath, storagePath: upload.storagePath } };
     } catch (error: unknown) {
       const firebaseCode =
         error && typeof error === 'object' && 'code' in error
@@ -1125,10 +1126,9 @@ export const photoAPI = {
         ...(normalizedUploadedByEmail ? { uploadedByEmail: normalizedUploadedByEmail } : {}),
         createdAt: now,
         uploadedAt: now,
-        status: 'pending',
+        status: 'approved',
         target: photoData.target || 'gallery_public',
-        safetyStatus: 'pending',
-        safetyReason: 'awaiting_moderator_safety_review',
+        safetyStatus: 'approved',
         likes: 0,
         userId: user.uid,
         ...(resolvedStoragePath ? { storagePath: resolvedStoragePath } : {}),

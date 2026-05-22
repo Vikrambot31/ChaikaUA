@@ -1,11 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Image,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -15,7 +13,7 @@ import {
 } from 'react-native';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
-import { equalTo, get, orderByChild, query, ref } from 'firebase/database';
+import { equalTo, get, onValue, orderByChild, query, ref } from 'firebase/database';
 import MiniTabBar from '../components/MiniTabBar';
 import AppPhotoImage from '../components/AppPhotoImage';
 import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField';
@@ -154,6 +152,7 @@ const GalleryChaikaScreen: React.FC = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const isUnlimitedGalleryUploader = (user?.email || '').trim().toLowerCase() === UNLIMITED_GALLERY_UPLOAD_EMAIL;
 
+  // ── Этап 1: подписка на роль ──────────────────────────────────────────────
   useEffect(() => {
     if (!user?.id) {
       setIsAdmin(false);
@@ -165,32 +164,31 @@ const GalleryChaikaScreen: React.FC = () => {
     });
   }, [user?.id]);
 
-  const loadGallery = useCallback(async () => {
+  // ── Этап 1: onValue — реалтайм подписка на галерею ───────────────────────
+  useEffect(() => {
     setLoadingGallery(true);
-    try {
-      await ensureFirebaseAuth();
-      const snap = await get(ref(database, 'community_photos'));
-      const raw = snap.val() as Record<string, unknown> | null;
-      const items = Object.entries(raw ?? {})
-        .map(([id, value]) => mapCommunityPhotoRecord(id, value))
-        .filter((item) =>
-          typeof item.imageUri === 'string' &&
-          Boolean(item.imageUri) &&
-          item.target !== 'my_photos' &&
-          (
-            isAdmin ||
-            item.status === 'approved' ||
-            item.userId === user?.id
+    const photosRef = ref(database, 'community_photos');
+    const unsub = onValue(
+      photosRef,
+      (snapshot) => {
+        setLoadingGallery(false);
+        const raw = snapshot.val() as Record<string, unknown> | null;
+        const items = Object.entries(raw ?? {})
+          .map(([id, value]) => mapCommunityPhotoRecord(id, value))
+          .filter((item) =>
+            typeof item.imageUri === 'string' &&
+            Boolean(item.imageUri) &&
+            item.target !== 'my_photos' &&
+            (isAdmin || item.status === 'approved' || item.userId === user?.id)
           )
-        )
-        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-        .slice(0, 500);
-
-      setCommunityPhotos(items);
-      setVisibleCount(12);
-    } finally {
-      setLoadingGallery(false);
-    }
+          .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+          .slice(0, 500);
+        setCommunityPhotos(items);
+        setVisibleCount(12);
+      },
+      () => setLoadingGallery(false),
+    );
+    return unsub;
   }, [isAdmin, user?.id]);
 
   const loadMonthlyLimit = useCallback(async () => {
@@ -200,7 +198,9 @@ const GalleryChaikaScreen: React.FC = () => {
     }
     try {
       const authUser = await ensureFirebaseAuth();
-      const snap = await get(query(ref(database, 'community_photos'), orderByChild('userId'), equalTo(authUser.uid)));
+      const snap = await get(
+        query(ref(database, 'community_photos'), orderByChild('userId'), equalTo(authUser.uid)),
+      );
       const raw = snap.val() as Record<string, Record<string, unknown>> | null;
       if (!raw) { setMonthlyUsed(0); return; }
       const now = new Date();
@@ -216,57 +216,48 @@ const GalleryChaikaScreen: React.FC = () => {
   }, [user?.id]);
 
   useEffect(() => {
-    void loadGallery();
     void loadMonthlyLimit();
-  }, [loadGallery, loadMonthlyLimit]);
+  }, [loadMonthlyLimit]);
 
+  // ── Этап 3: исправленный handleSubmit — один addPhoto + guard ─────────────
   const handleSubmit = useCallback(async () => {
     const done = formPhotos.filter((p) => p.status === 'done');
     if (done.length === 0) { Alert.alert(text.errorTitle, text.needPhoto); return; }
     if (!user?.id) { navigation.navigate('LoginScreen'); return; }
     if (!isAdmin && !isUnlimitedGalleryUploader && monthlyUsed >= MONTHLY_LIMIT) { Alert.alert(text.monthlyLimitTitle, text.monthlyLimitText); return; }
 
+    const photo = done[0];
+    const resolvedImageUri = photo.downloadUrl?.trim() ?? '';
+    const resolvedStoragePath = photo.storagePath?.trim() ?? '';
+
+    if (!resolvedImageUri && !resolvedStoragePath) {
+      Alert.alert(text.errorTitle, text.needPhoto);
+      return;
+    }
+
     setSubmitting(true);
     try {
-      const results = await Promise.all(
-        done.map((photo) =>
-          photoAPI.addPhoto({
-            title: 'Фото Чайки',
-            imageUri: photo.downloadUrl || photo.storagePath,
-            storagePath: photo.storagePath,
-            uploadedBy: user?.email || user?.name || 'Anonymous',
-            target: 'gallery_public',
-          }),
-        ),
-      );
-      const failed = results.filter((r) => !r.success);
-      if (failed.length > 0) {
-        const firstErr = failed[0];
-        Alert.alert(text.errorTitle, ('error' in firstErr ? firstErr.error : undefined) ?? 'Upload failed');
+      const result = await photoAPI.addPhoto({
+        title: 'Фото Чайки',
+        imageUri: resolvedImageUri,
+        storagePath: resolvedStoragePath || undefined,
+        uploadedBy: user?.email || user?.name || 'Anonymous',
+        target: 'gallery_public',
+      });
+      if (!result.success) {
+        Alert.alert(text.errorTitle, ('error' in result ? result.error : undefined) ?? 'Upload failed');
         return;
       }
       setAddFormVisible(false);
       setFormPhotos([]);
       Alert.alert(text.successTitle, text.successMsg);
-      await Promise.all([loadMonthlyLimit(), loadGallery()]);
+      await loadMonthlyLimit(); // onValue обновит галерею автоматически
     } catch (err) {
       Alert.alert(text.errorTitle, err instanceof Error ? err.message : String(err));
     } finally {
       setSubmitting(false);
     }
-  }, [formPhotos, isAdmin, isUnlimitedGalleryUploader, monthlyUsed, loadGallery, loadMonthlyLimit, navigation, text, user?.email, user?.id, user?.name]);
-
-  const pickerActiveRef = useRef(false);
-
-  const handlePickerOpenChange = useCallback((isOpen: boolean) => {
-    pickerActiveRef.current = isOpen;
-  }, []);
-
-  const closeAddForm = useCallback(() => {
-    if (pickerActiveRef.current) return;
-    setAddFormVisible(false);
-    setFormPhotos([]);
-  }, []);
+  }, [formPhotos, isAdmin, isUnlimitedGalleryUploader, monthlyUsed, loadMonthlyLimit, navigation, text, user?.email, user?.id, user?.name]);
 
   const galleryRows = useMemo(() => communityPhotos.slice(0, visibleCount), [communityPhotos, visibleCount]);
   const hasMore = visibleCount < communityPhotos.length;
@@ -274,7 +265,7 @@ const GalleryChaikaScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* ── Main scrollable content: gallery first ── */}
+      {/* ── Main scrollable content ── */}
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
@@ -288,7 +279,35 @@ const GalleryChaikaScreen: React.FC = () => {
           <Text style={styles.subtitle}>{text.subtitle}</Text>
         </View>
 
-        {/* Gallery section — top */}
+        {/* ── Этап 2: inline форма (вместо Modal) ── */}
+        {addFormVisible ? (
+          <View style={styles.formCard}>
+            <Text style={styles.formTitle}>{text.addFormTitle}</Text>
+            <Text style={styles.limitNote}>{text.monthProgress(monthlyUsed)}</Text>
+            <PhotoUploadField
+              uid={user?.id ?? ''}
+              userName={user?.name ?? ''}
+              maxPhotos={3}
+              storagePath="community_photos"
+              onPhotosChange={(photos) => setFormPhotos(photos.filter((p) => p.status === 'done'))}
+            />
+            <View style={styles.infoCard}>
+              <Text style={styles.infoText}>{text.info}</Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.submitBtn, (submitting || limitReached) && styles.submitBtnDisabled]}
+              onPress={() => { void handleSubmit(); }}
+              disabled={submitting || limitReached}
+              activeOpacity={0.85}
+            >
+              {submitting
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={styles.submitBtnText}>{text.publish}</Text>}
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
+        {/* Gallery section */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>{text.galleryTitle}</Text>
           {loadingGallery ? (
@@ -357,7 +376,7 @@ const GalleryChaikaScreen: React.FC = () => {
               Alert.alert(text.monthlyLimitTitle, text.monthlyLimitText);
               return;
             }
-            setAddFormVisible(true);
+            setAddFormVisible((v) => !v);
           }}
           activeOpacity={0.85}
         >
@@ -368,76 +387,6 @@ const GalleryChaikaScreen: React.FC = () => {
       </View>
 
       <MiniTabBar />
-
-      {/* ── Add photo bottom sheet (same structure as Kuplu-Prodam) ── */}
-      <Modal
-        visible={addFormVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={closeAddForm}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.sheetOverlay}
-        >
-          <TouchableOpacity
-            style={styles.sheetBackdrop}
-            activeOpacity={1}
-            onPress={closeAddForm}
-          />
-          <View style={styles.sheetWrapper}>
-            <View style={styles.sheet}>
-              {/* Sheet handle */}
-              <View style={styles.sheetHandle} />
-
-              {/* Sheet header */}
-              <View style={styles.sheetHeader}>
-                <Text style={styles.sheetTitle}>{text.addFormTitle}</Text>
-                <TouchableOpacity onPress={closeAddForm} style={styles.sheetCloseBtn} activeOpacity={0.7}>
-                  <Text style={styles.sheetCloseTxt}>✕</Text>
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-                contentContainerStyle={styles.sheetContent}
-                style={styles.sheetScroll}
-              >
-                {/* Limit note */}
-                <Text style={styles.limitNote}>{text.monthProgress(monthlyUsed)}</Text>
-
-                {/* Photo upload field */}
-                <PhotoUploadField
-                  uid={user?.id ?? ''}
-                  userName={user?.name ?? ''}
-                  maxPhotos={5}
-                  storagePath="community_photos"
-                  onPhotosChange={(photos) => setFormPhotos(photos.filter((p) => p.status === 'done'))}
-                  onPickerOpenChange={handlePickerOpenChange}
-                />
-
-                {/* Info hint */}
-                <View style={styles.infoCard}>
-                  <Text style={styles.infoText}>{text.info}</Text>
-                </View>
-
-                {/* Submit */}
-                <TouchableOpacity
-                  style={[styles.submitBtn, (submitting || limitReached) && styles.submitBtnDisabled]}
-                  onPress={() => { void handleSubmit(); }}
-                  disabled={submitting || limitReached}
-                  activeOpacity={0.85}
-                >
-                  {submitting
-                    ? <ActivityIndicator color="#fff" />
-                    : <Text style={styles.submitBtnText}>{text.publish}</Text>}
-                </TouchableOpacity>
-              </ScrollView>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
 
       {/* ── Photo preview modal ── */}
       <Modal visible={Boolean(previewPhoto)} transparent animationType="fade" onRequestClose={() => setPreviewPhoto(null)}>
@@ -474,6 +423,22 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 22, fontWeight: '900', color: SCREEN_THEME.textPrimary, textAlign: 'center' },
   subtitle: { marginTop: 4, color: SCREEN_THEME.textSecondary, textAlign: 'center', lineHeight: 19, fontSize: 13 },
+
+  // ── Этап 2: inline form card ──
+  formCard: {
+    backgroundColor: '#FFFAF4',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E4D0AB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  formTitle: { fontSize: 17, fontWeight: '900', color: SCREEN_THEME.textPrimary, marginBottom: 8 },
 
   section: { marginBottom: 14 },
   sectionLabel: { fontSize: 13, fontWeight: '800', color: SCREEN_THEME.textSecondary, marginBottom: 8, marginLeft: 2 },
@@ -545,54 +510,6 @@ const styles = StyleSheet.create({
   },
   addBarBtnDisabled: { backgroundColor: '#C0A898' },
   addBarBtnText: { color: '#fff', fontSize: 16, fontWeight: '900', letterSpacing: 0.3 },
-
-  // Bottom sheet (same structure as Kuplu-Prodam to prevent unmount on picker return)
-  sheetOverlay: { flex: 1, justifyContent: 'flex-end' },
-  sheetBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
-  sheetWrapper: { justifyContent: 'flex-end' },
-  sheetScroll: { flexGrow: 0 },
-  sheet: {
-    backgroundColor: '#FFFAF4',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '94%',
-    minHeight: '88%',
-    paddingBottom: 32,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    elevation: 20,
-  },
-  sheetHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#D4C0A8',
-    alignSelf: 'center',
-    marginTop: 10,
-    marginBottom: 4,
-  },
-  sheetHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EDE3D5',
-  },
-  sheetTitle: { fontSize: 17, fontWeight: '900', color: SCREEN_THEME.textPrimary },
-  sheetCloseBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#EDE3D5',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sheetCloseTxt: { fontSize: 14, fontWeight: '700', color: SCREEN_THEME.textSecondary },
-  sheetContent: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24 },
 
   limitNote: { color: SCREEN_THEME.textMuted, fontSize: 12, fontWeight: '700', marginBottom: 12, marginLeft: 2 },
   infoCard: {
