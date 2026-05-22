@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-05-22",
+      "publishedAt": "2026-05-22T10:40:44.266Z",
+      "key": "places-Мозаїка Espresso bar-#МОЖЕКАВИ?-2026-05-22"
+    },
+    {
       "type": "news",
       "date": "2026-05-22",
       "publishedAt": "2026-05-22T07:38:48.411Z",
