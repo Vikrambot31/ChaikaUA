@@ -1,4 +1,4 @@
-import { ref, push, update, onValue, remove, query, orderByChild, equalTo, get } from 'firebase/database';
+import { ref, push, update, onValue, remove, query, orderByChild, equalTo, get, limitToLast } from 'firebase/database';
 import { database } from '../firebase-core';
 import { createPendingModeration, ModerationStatus } from '../utils/moderation';
 import { sanitizeStoredText } from '../utils/textUtils';
@@ -25,10 +25,15 @@ export interface ContactListing {
   moderationReason?: string;
   rejectionReason?: string;
   showPhone?: boolean;
+  isArchived?: boolean;
 }
 
 const PATH = 'contacts_listings';
-const FOUR_MONTHS_MS = 120 * 24 * 60 * 60 * 1000;
+const CONTACT_LISTING_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const ACTIVE_LIMIT = 100;
+const ACTIVE_LIMIT_BUFFER = 20;
+const FEED_MINIMUM = 10;
+const ARCHIVED_FALLBACK_LIMIT = 20;
 const normalizePrice = (value: string): string => {
   const sanitized = value.replace(',', '.').replace(/[^\d.]/g, '');
   const numeric = Number(sanitized);
@@ -38,49 +43,62 @@ const normalizePrice = (value: string): string => {
   return numeric.toFixed(Number.isInteger(numeric) ? 0 : 2);
 };
 
+const mapContactItem = (id: string, data: any, isArchived?: boolean): ContactListing => ({
+  id,
+  itemName: data.itemName || '',
+  category: data.category || '',
+  condition: data.condition || '',
+  price: data.price || '',
+  description: data.description || '',
+  phone: data.phone || '',
+  photoUri: data.photoUri || data.photoStoragePath || '',
+  photoStoragePath: data.photoStoragePath || data.photoUri || '',
+  photoId: data.photoId || '',
+  moderationStatus: isArchived ? 'approved' : (data.moderationStatus || 'pending'),
+  submittedForModerationAt: data.submittedForModerationAt || '',
+  createdAt: data.createdAt || '',
+  expiresAt: data.expiresAt || '',
+  userId: data.userId || '',
+  moderationReason: isArchived ? '' : (data.moderationReason || data.reason || ''),
+  rejectionReason: isArchived ? '' : (data.rejectionReason || data.reason || ''),
+  showPhone: data.showPhone !== false,
+  isArchived,
+});
+
 export const contactsService = {
   subscribe(callback: (items: ContactListing[]) => void): () => void {
-    const listRef = query(ref(database, PATH), orderByChild('moderationStatus'), equalTo('approved'));
+    const listRef = query(ref(database, PATH), orderByChild('moderationStatus'), equalTo('approved'), limitToLast(ACTIVE_LIMIT + ACTIVE_LIMIT_BUFFER));
 
     const unsubscribe = onValue(listRef, (snapshot) => {
       const raw = snapshot.val();
-      if (!raw) {
-        callback([]);
+      const now = Date.now();
+      const active: ContactListing[] = raw
+        ? Object.entries(raw as Record<string, any>)
+            .map(([id, data]) => mapContactItem(id, data))
+            .filter((item) => {
+              const expired = item.expiresAt && new Date(item.expiresAt).getTime() < now;
+              return item.moderationStatus === 'approved' && !expired;
+            })
+            .reverse()
+            .slice(0, ACTIVE_LIMIT)
+        : [];
+
+      if (active.length >= FEED_MINIMUM) {
+        void resolveMediaAccessUrls(active, 'contacts_listings', (item) => item.photoStoragePath || item.photoUri || '', (item, url) => ({ ...item, photoUri: url })).then(callback);
         return;
       }
-      const now = Date.now();
-      const items: ContactListing[] = Object.entries(raw as Record<string, any>)
-        .map(([id, data]) => ({
-          id,
-          itemName: data.itemName || '',
-          category: data.category || '',
-          condition: data.condition || '',
-          price: data.price || '',
-          description: data.description || '',
-          phone: data.phone || '',
-          photoUri: data.photoUri || data.photoStoragePath || '',
-          photoStoragePath: data.photoStoragePath || data.photoUri || '',
-          photoId: data.photoId || '',
-          moderationStatus: data.moderationStatus || 'pending',
-          submittedForModerationAt: data.submittedForModerationAt || '',
-          createdAt: data.createdAt || '',
-          expiresAt: data.expiresAt || '',
-          userId: data.userId || '',
-          moderationReason: data.moderationReason || data.reason || '',
-          rejectionReason: data.rejectionReason || data.reason || '',
-          showPhone: data.showPhone !== false,
-        }))
-        .filter((item) => {
-          const expired = item.expiresAt && new Date(item.expiresAt).getTime() < now;
-          return item.moderationStatus === 'approved' && !expired;
-        })
-        .reverse();
-      void resolveMediaAccessUrls(
-        items,
-        'contacts_listings',
-        (item) => item.photoStoragePath || item.photoUri || '',
-        (item, url) => ({ ...item, photoUri: url }),
-      ).then(callback);
+
+      void get(query(ref(database, PATH), orderByChild('moderationStatus'), equalTo('expired'), limitToLast(ARCHIVED_FALLBACK_LIMIT))).then((expiredSnapshot) => {
+        const expiredRaw = expiredSnapshot.val();
+        const archived: ContactListing[] = expiredRaw
+          ? Object.entries(expiredRaw as Record<string, any>)
+              .map(([id, data]) => mapContactItem(id, data, true))
+              .reverse()
+          : [];
+        void resolveMediaAccessUrls([...active, ...archived], 'contacts_listings', (item) => item.photoStoragePath || item.photoUri || '', (item, url) => ({ ...item, photoUri: url })).then(callback);
+      }).catch(() => {
+        void resolveMediaAccessUrls(active, 'contacts_listings', (item) => item.photoStoragePath || item.photoUri || '', (item, url) => ({ ...item, photoUri: url })).then(callback);
+      });
     });
 
     return unsubscribe;
@@ -90,7 +108,7 @@ export const contactsService = {
     const listRef = ref(database, PATH);
     const user = await ensureFirebaseAuth();
     const pendingModeration = createPendingModeration();
-    const expiresAt = item.expiresAt || new Date(Date.now() + FOUR_MONTHS_MS).toISOString();
+    const expiresAt = item.expiresAt || new Date(Date.now() + CONTACT_LISTING_TTL_MS).toISOString();
     const photoStoragePath = item.photoStoragePath || item.photoUri;
     const sanitized = {
       ...item,

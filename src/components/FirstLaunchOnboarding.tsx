@@ -23,15 +23,15 @@ type Slide = {
 const SLIDES: Slide[] = [
   {
     key: 'intro-1',
-    image: require('../../assets/intro1.png'),
+    image: require('../../assets/WEBP-version/intro1.webp'),
   },
   {
     key: 'intro-2',
-    image: require('../../assets/intro2.png'),
+    image: require('../../assets/WEBP-version/intro2.webp'),
   },
   {
     key: 'intro-3',
-    image: require('../../assets/intro3.png'),
+    image: require('../../assets/WEBP-version/intro3.webp'),
   },
 ];
 

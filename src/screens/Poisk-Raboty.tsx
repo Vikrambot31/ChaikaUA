@@ -19,7 +19,7 @@ import ContactReasonModal from '../components/ContactReasonModal';
 import { safeCallPhone } from '../utils/communicationActions';
 import type { DetailItemData } from '../utils/detailViewTypes';
 
-const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000;
+const TWO_MONTHS_MS = 60 * 24 * 60 * 60 * 1000;
 type AppLanguage = 'ua' | 'ru' | 'en';
 type JobListingKind = 'resume' | 'vacancy';
 
@@ -488,7 +488,7 @@ const JobSearchScreen: React.FC = () => {
         moderationStatus: 'pending',
         submittedForModerationAt: createdAt.toISOString(),
         createdAt: createdAt.toISOString(),
-        expiresAt: new Date(createdAt.getTime() + THREE_MONTHS_MS).toISOString(),
+        expiresAt: new Date(createdAt.getTime() + TWO_MONTHS_MS).toISOString(),
         userId: user?.id || '',
       });
 
@@ -602,7 +602,7 @@ const JobSearchScreen: React.FC = () => {
         <View style={styles.headerCard}>
           <View style={styles.headerImageFrame}>
             <Image
-              source={require('../../assets/workChaika.png')}
+              source={require('../../assets/WEBP-version/workChaika.webp')}
               style={styles.headerImage}
               resizeMode="contain"
             />
@@ -779,9 +779,13 @@ const JobSearchScreen: React.FC = () => {
                     ) : (
                       <Text style={styles.badge}>{text.vacancyContact}: {item.name}</Text>
                     )}
-                    <Text style={styles.moderationBadge}>
-                      {getModerationLabel(item.moderationStatus, moderationLabels)}
-                    </Text>
+                    {item.isArchived ? (
+                      <Text style={styles.archiveBadge}>Архів</Text>
+                    ) : (
+                      <Text style={styles.moderationBadge}>
+                        {getModerationLabel(item.moderationStatus, moderationLabels)}
+                      </Text>
+                    )}
                   </View>
                   <Text style={styles.listingAbout}>{item.about || text.aboutMissing}</Text>
                 </TouchableOpacity>
@@ -1012,6 +1016,7 @@ const styles = StyleSheet.create({
   },
   deleteText: { color: '#D05B4D', fontWeight: '700' },
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
+  archiveBadge: { fontSize: 10, fontWeight: '700', color: '#fff', backgroundColor: '#8B7355', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 4, overflow: 'hidden' },
   kindBadge: { color: '#FFFFFF', backgroundColor: SCREEN_THEME.woodGreen, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 5, fontSize: 11, fontWeight: '900' },
   kindBadgeVacancy: { backgroundColor: SCREEN_THEME.terracotta },
   badge: { color: SCREEN_THEME.enamelBlueDark, backgroundColor: '#E8F0F3', borderRadius: 999, paddingHorizontal: 9, paddingVertical: 5, fontSize: 11, fontWeight: '900' },

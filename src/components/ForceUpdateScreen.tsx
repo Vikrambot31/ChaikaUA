@@ -68,7 +68,7 @@ const ForceUpdateScreen: React.FC<ForceUpdateScreenProps> = ({ result, onRetry }
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.card}>
-        <Image source={require('../../assets/Update.png')} style={styles.headerImage} resizeMode="contain" />
+        <Image source={require('../../assets/WEBP-version/Update.webp')} style={styles.headerImage} resizeMode="contain" />
         <View style={styles.iconBox}>
           <MaterialCommunityIcons name="cellphone-arrow-down" size={42} color="#fff" />
         </View>

@@ -41,7 +41,7 @@ export interface Request {
   description: string;
   isCensored: boolean;
   isApproved: boolean;
-  status?: 'pending' | 'approved' | 'rejected';
+  status?: 'pending' | 'approved' | 'rejected' | 'expired';
   createdAt: Date;
   timestamp: number;
   text?: string;
@@ -71,7 +71,7 @@ export interface HelpRequest {
   createdAt: Date;
   expiresAt: Date;
   isBurning: boolean;
-  moderationStatus?: 'pending' | 'approved' | 'rejected';
+  moderationStatus?: 'pending' | 'approved' | 'rejected' | 'expired';
   submittedForModerationAt?: string;
   moderatedAt?: string;
   moderationReason?: string;
@@ -85,8 +85,10 @@ export interface CommunityPhoto {
   imageUri: string | number;
   storagePath?: string;
   uploadedBy: string;
+  userId?: string;
   createdAt: Date;
   status: 'pending' | 'approved' | 'rejected';
+  target?: 'gallery_public' | 'my_photos';
   likes: number;
   locationLabel?: string;
   locationType?: 'building' | 'place';

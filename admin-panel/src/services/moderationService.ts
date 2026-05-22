@@ -1,9 +1,10 @@
-import { get, ref, remove, update } from 'firebase/database';
-import { database } from '../firebase/firebase';
+import { get, ref } from 'firebase/database';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { database, firebaseApp } from '../firebase/firebase';
 import { resolveMediaUrl } from './mediaService';
 import { MODERATION_PATHS } from './securityPaths';
 
-export type ModerationStatus = 'pending' | 'approved' | 'rejected';
+export type ModerationStatus = 'pending' | 'approved' | 'rejected' | 'expired';
 
 export type ModerationSectionKey =
   | 'requests'
@@ -13,6 +14,7 @@ export type ModerationSectionKey =
   | 'datingAnketaListings'
   | 'coffeeRequests'
   | 'buySell'
+  | 'contactsListings'
   | 'localBusiness'
   | 'jobs'
   | 'lostFound'
@@ -52,6 +54,19 @@ type SectionConfig = {
   nested?: boolean;
 };
 
+type AdminModerationAction = 'approved' | 'rejected' | 'delete';
+
+type AdminModerationPayload = {
+  section: ModerationSectionKey;
+  path: string;
+  currentStatus: ModerationStatus;
+  action: AdminModerationAction;
+};
+
+type CallableResult = {
+  ok: boolean;
+};
+
 export const MODERATION_SECTIONS: SectionConfig[] = [
   { key: 'requests', label: 'Заявки', path: MODERATION_PATHS.requests, statusField: 'status', approvedValue: 'approved', rejectedValue: 'rejected' },
   { key: 'appSuggestions', label: 'Предложения по приложению', path: MODERATION_PATHS.appSuggestions, statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
@@ -60,6 +75,7 @@ export const MODERATION_SECTIONS: SectionConfig[] = [
   { key: 'datingAnketaListings', label: 'Анкеты знакомств', path: MODERATION_PATHS.datingAnketaListings, statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
   { key: 'coffeeRequests', label: 'Кофе-заявки', path: MODERATION_PATHS.coffeeRequests, statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
   { key: 'buySell', label: 'Куплю/Продам', path: MODERATION_PATHS.buySell, statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
+  { key: 'contactsListings', label: 'Хочу связаться', path: MODERATION_PATHS.contactsListings, statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
   { key: 'localBusiness', label: 'Локальный бизнес', path: MODERATION_PATHS.localBusiness, statusField: 'status', approvedValue: 'active', rejectedValue: 'rejected' },
   { key: 'jobs', label: 'Работа', path: MODERATION_PATHS.jobs, statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
   { key: 'lostFound', label: 'Потеряно/Найдено', path: MODERATION_PATHS.lostFound, statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
@@ -69,6 +85,8 @@ export const MODERATION_SECTIONS: SectionConfig[] = [
   { key: 'osbbCollections', label: 'OSBB сборы', path: MODERATION_PATHS.osbbCollections, statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected', nested: true },
 ];
 
+const functions = getFunctions(firebaseApp);
+
 const getString = (value: unknown): string => typeof value === 'string' ? value : '';
 
 const getNumber = (value: unknown): number => Number.isFinite(value) ? Number(value) : 0;
@@ -77,6 +95,7 @@ const getStatus = (config: SectionConfig, value: Record<string, unknown>): Moder
   const raw = value[config.statusField];
   if (raw === 'approved' || raw === 'active') return 'approved';
   if (raw === 'rejected') return 'rejected';
+  if (raw === 'expired') return 'expired';
   return 'pending';
 };
 
@@ -211,46 +230,34 @@ export const getModerationSummary = (items: ModerationItem[]): ModerationSummary
   pending: items.filter((item) => item.status === 'pending').length,
   approved: items.filter((item) => item.status === 'approved').length,
   rejected: items.filter((item) => item.status === 'rejected').length,
+  expired: items.filter((item) => item.status === 'expired').length,
 });
 
 export const moderateItem = async (
   item: ModerationItem,
-  status: Exclude<ModerationStatus, 'pending'>,
-  actorUid: string,
+  status: 'approved' | 'rejected',
 ): Promise<void> => {
   const config = MODERATION_SECTIONS.find((section) => section.key === item.section);
   if (!config) throw new Error('Неизвестный раздел модерации.');
 
-  const approvedValue = config.approvedValue;
-  const nextStatusValue = status === 'approved' ? approvedValue : config.rejectedValue;
-  const patch: Record<string, unknown> = {
-    [config.statusField]: nextStatusValue,
-    moderatedAt: Date.now(),
-    moderatedBy: actorUid,
-  };
-
-  if (config.key === 'requests') {
-    patch.isApproved = status === 'approved';
-  }
-
-  if (status === 'rejected') {
-    patch.moderationReason = 'default_rejected';
-    patch.rejectionReason = 'default_rejected';
-  } else {
-    patch.moderationReason = null;
-    patch.rejectionReason = null;
-  }
-
-  if (config.key === 'communityPhotos' && status === 'approved') {
-    patch.safetyStatus = 'manual_reviewed';
-    patch.safetyReviewedAt = Date.now();
-    patch.safetyReviewedBy = actorUid;
-    patch.safetyReason = 'moderator_reviewed_before_publication';
-  }
-
-  await update(ref(database, item.path), patch);
+  const callable = httpsCallable<AdminModerationPayload, CallableResult>(functions, 'adminModerateContentItem');
+  await callable({
+    section: item.section,
+    path: item.path,
+    currentStatus: item.status,
+    action: status,
+  });
 };
 
 export const deleteModerationItem = async (item: ModerationItem): Promise<void> => {
-  await remove(ref(database, item.path));
+  const config = MODERATION_SECTIONS.find((section) => section.key === item.section);
+  if (!config) throw new Error('Неизвестный раздел модерации.');
+
+  const callable = httpsCallable<AdminModerationPayload, CallableResult>(functions, 'adminModerateContentItem');
+  await callable({
+    section: item.section,
+    path: item.path,
+    currentStatus: item.status,
+    action: 'delete',
+  });
 };

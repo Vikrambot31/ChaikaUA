@@ -23,6 +23,7 @@ const suspiciousRe = new RegExp(
   ].join('|'),
   'u'
 );
+const suspiciousCommentRe = /!>E@0=8BL|!5;5:B>@K/u;
 
 function walk(dir, out = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -50,17 +51,21 @@ for (const file of files) {
   const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/);
   lines.forEach((line, index) => {
     const trimmed = line.trim();
-    if (
-      trimmed.startsWith('//') ||
-      trimmed.startsWith('/*') ||
-      trimmed.startsWith('*') ||
-      trimmed.startsWith('{/*') ||
-      trimmed.includes('looksLikeBrokenEncoding')
-    ) {
+    if (trimmed.includes('looksLikeBrokenEncoding')) {
       return;
     }
 
-    if (suspiciousRe.test(line)) {
+    const isComment =
+      trimmed.startsWith('//') ||
+      trimmed.startsWith('/*') ||
+      trimmed.startsWith('*') ||
+      trimmed.startsWith('{/*');
+
+    if (isComment && !suspiciousCommentRe.test(line)) {
+      return;
+    }
+
+    if (suspiciousRe.test(line) || suspiciousCommentRe.test(line)) {
       failures.push(`${path.relative(root, file)}:${index + 1}: ${line.trim()}`);
     }
   });

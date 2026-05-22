@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -35,16 +35,18 @@ const UI_TEXT = {
     addFormTitle: 'Додати фото до галереї',
     publish: 'Надіслати на модерацію',
     successTitle: 'Успішно',
-    successMsg: 'Фото надіслано на модерацію.',
+    successMsg: 'Фото завантажено, чекає перевірки адміна.',
     errorTitle: 'Помилка',
     needPhoto: 'Спочатку додайте фото.',
     info: 'Фото потрапить у галерею після перевірки модератором.',
     monthlyLimitTitle: 'Ліміт на місяць',
-    monthlyLimitText: 'Можна додати не більше 2 фото на місяць.',
+    monthlyLimitText: 'Можна додати не більше 5 фото на місяць.',
     monthProgress: (used: number) => `Ліміт: ${used}/5 фото цього місяця`,
     limitReached: 'Ліміт на цей місяць вичерпано',
     galleryTitle: 'Останні фото в галереї',
     noPhotosYet: 'Поки немає жодного фото. Будьте першим!',
+    pendingBadge: 'На перевірці',
+    rejectedBadge: 'Відхилено',
     loadMore: 'Завантажити ще',
     close: 'Закрити',
   },
@@ -55,16 +57,18 @@ const UI_TEXT = {
     addFormTitle: 'Добавить фото в галерею',
     publish: 'Отправить на модерацию',
     successTitle: 'Успешно',
-    successMsg: 'Фото отправлено на модерацию.',
+    successMsg: 'Фото загружено, ожидает проверки админа.',
     errorTitle: 'Ошибка',
     needPhoto: 'Сначала добавьте фото.',
     info: 'Фото появится в галерее после проверки модератором.',
     monthlyLimitTitle: 'Лимит на месяц',
-    monthlyLimitText: 'Можно добавить не более 2 фото в месяц.',
+    monthlyLimitText: 'Можно добавить не более 5 фото в месяц.',
     monthProgress: (used: number) => `Лимит: ${used}/5 фото в этом месяце`,
     limitReached: 'Лимит на этот месяц исчерпан',
     galleryTitle: 'Последние фото в галерее',
     noPhotosYet: 'Фото пока нет. Будьте первым!',
+    pendingBadge: 'На проверке',
+    rejectedBadge: 'Отклонено',
     loadMore: 'Загрузить ещё',
     close: 'Закрыть',
   },
@@ -75,7 +79,7 @@ const UI_TEXT = {
     addFormTitle: 'Add photo to gallery',
     publish: 'Submit for moderation',
     successTitle: 'Success',
-    successMsg: 'The photo was sent for moderation.',
+    successMsg: 'The photo was uploaded and is waiting for admin review.',
     errorTitle: 'Error',
     needPhoto: 'Add a photo first.',
     info: 'The photo will appear in the gallery after moderator review.',
@@ -85,12 +89,53 @@ const UI_TEXT = {
     limitReached: 'Monthly limit reached',
     galleryTitle: 'Latest gallery photos',
     noPhotosYet: 'No photos yet. Be the first!',
+    pendingBadge: 'Under review',
+    rejectedBadge: 'Rejected',
     loadMore: 'Load more',
     close: 'Close',
   },
 } as const;
 
 const MONTHLY_LIMIT = 5;
+const UNLIMITED_GALLERY_UPLOAD_EMAIL = 'vikramsave@ukr.net';
+
+const isPublicGalleryPhotoRecord = (record: Record<string, unknown> | null | undefined): boolean => {
+  if (!record) return false;
+  const target = typeof record.target === 'string' ? record.target : '';
+  if (target === 'my_photos') return false;
+  if (target === 'gallery_public') return true;
+
+  const title = typeof record.title === 'string' ? record.title.trim() : '';
+  return Boolean(title) && title !== 'Photo' && title !== 'Р¤РѕС‚Рѕ';
+};
+
+const mapCommunityPhotoRecord = (id: string, value: unknown): CommunityPhoto => {
+  const record = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+  const status = record.status === 'approved' || record.status === 'rejected' ? record.status : 'pending';
+  const createdAt = typeof record.createdAt === 'number'
+    ? record.createdAt
+    : typeof record.uploadedAt === 'number'
+      ? record.uploadedAt
+      : Date.now();
+
+  return {
+    id,
+    title: typeof record.title === 'string' ? record.title : 'Photo',
+    description: typeof record.description === 'string' ? record.description : '',
+    imageUri: typeof record.imageUri === 'string' ? record.imageUri : '',
+    storagePath: typeof record.storagePath === 'string' ? record.storagePath : undefined,
+    uploadedBy: typeof record.uploadedBy === 'string' ? record.uploadedBy : 'Anonymous',
+    userId: typeof record.userId === 'string' ? record.userId : undefined,
+    createdAt: new Date(createdAt),
+    status,
+    target: record.target === 'my_photos' ? 'my_photos' : 'gallery_public',
+    likes: typeof record.likes === 'number' ? record.likes : 0,
+    locationLabel: typeof record.locationLabel === 'string' ? record.locationLabel : undefined,
+    locationType: record.locationType === 'building' || record.locationType === 'place' ? record.locationType : undefined,
+    moderationReason: typeof record.moderationReason === 'string' ? record.moderationReason : undefined,
+    rejectionReason: typeof record.rejectionReason === 'string' ? record.rejectionReason : undefined,
+  };
+};
 
 const GalleryChaikaScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
@@ -107,6 +152,7 @@ const GalleryChaikaScreen: React.FC = () => {
   const [visibleCount, setVisibleCount] = useState(12);
   const [addFormVisible, setAddFormVisible] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const isUnlimitedGalleryUploader = (user?.email || '').trim().toLowerCase() === UNLIMITED_GALLERY_UPLOAD_EMAIL;
 
   useEffect(() => {
     if (!user?.id) {
@@ -115,27 +161,37 @@ const GalleryChaikaScreen: React.FC = () => {
     }
 
     return subscribeCurrentUserSecurityRole((snapshot) => {
-      setIsAdmin(snapshot.role === 'admin');
+      setIsAdmin(snapshot.role === 'admin' || snapshot.role === 'moderator');
     });
   }, [user?.id]);
 
   const loadGallery = useCallback(async () => {
     setLoadingGallery(true);
     try {
-      const result = await photoAPI.getPhotosOnce();
-      if (!result.success) return;
-
-      const items = result.data
-        .filter((item) => item.status === 'approved' && typeof item.imageUri === 'string' && item.imageUri)
+      await ensureFirebaseAuth();
+      const snap = await get(ref(database, 'community_photos'));
+      const raw = snap.val() as Record<string, unknown> | null;
+      const items = Object.entries(raw ?? {})
+        .map(([id, value]) => mapCommunityPhotoRecord(id, value))
+        .filter((item) =>
+          typeof item.imageUri === 'string' &&
+          Boolean(item.imageUri) &&
+          item.target !== 'my_photos' &&
+          (
+            isAdmin ||
+            item.status === 'approved' ||
+            item.userId === user?.id
+          )
+        )
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-        .slice(0, 100);
+        .slice(0, 500);
 
       setCommunityPhotos(items);
       setVisibleCount(12);
     } finally {
       setLoadingGallery(false);
     }
-  }, []);
+  }, [isAdmin, user?.id]);
 
   const loadMonthlyLimit = useCallback(async () => {
     if (!user?.id) {
@@ -145,11 +201,14 @@ const GalleryChaikaScreen: React.FC = () => {
     try {
       const authUser = await ensureFirebaseAuth();
       const snap = await get(query(ref(database, 'community_photos'), orderByChild('userId'), equalTo(authUser.uid)));
-      const raw = snap.val() as Record<string, { createdAt?: unknown }> | null;
+      const raw = snap.val() as Record<string, Record<string, unknown>> | null;
       if (!raw) { setMonthlyUsed(0); return; }
       const now = new Date();
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-      const count = Object.values(raw).filter((e) => typeof e?.createdAt === 'number' && e.createdAt >= monthStart).length;
+      const count = Object.values(raw).filter((record) => {
+        const createdAt = typeof record?.createdAt === 'number' ? record.createdAt : 0;
+        return createdAt >= monthStart && isPublicGalleryPhotoRecord(record);
+      }).length;
       setMonthlyUsed(count);
     } catch {
       setMonthlyUsed(0);
@@ -165,7 +224,7 @@ const GalleryChaikaScreen: React.FC = () => {
     const done = formPhotos.filter((p) => p.status === 'done');
     if (done.length === 0) { Alert.alert(text.errorTitle, text.needPhoto); return; }
     if (!user?.id) { navigation.navigate('LoginScreen'); return; }
-    if (!isAdmin && monthlyUsed >= MONTHLY_LIMIT) { Alert.alert(text.monthlyLimitTitle, text.monthlyLimitText); return; }
+    if (!isAdmin && !isUnlimitedGalleryUploader && monthlyUsed >= MONTHLY_LIMIT) { Alert.alert(text.monthlyLimitTitle, text.monthlyLimitText); return; }
 
     setSubmitting(true);
     try {
@@ -173,9 +232,10 @@ const GalleryChaikaScreen: React.FC = () => {
         done.map((photo) =>
           photoAPI.addPhoto({
             title: 'Фото Чайки',
-            imageUri: photo.storagePath || photo.downloadUrl,
+            imageUri: photo.downloadUrl || photo.storagePath,
             storagePath: photo.storagePath,
             uploadedBy: user?.email || user?.name || 'Anonymous',
+            target: 'gallery_public',
           }),
         ),
       );
@@ -194,16 +254,23 @@ const GalleryChaikaScreen: React.FC = () => {
     } finally {
       setSubmitting(false);
     }
-  }, [formPhotos, isAdmin, monthlyUsed, loadGallery, loadMonthlyLimit, navigation, text, user?.email, user?.id, user?.name]);
+  }, [formPhotos, isAdmin, isUnlimitedGalleryUploader, monthlyUsed, loadGallery, loadMonthlyLimit, navigation, text, user?.email, user?.id, user?.name]);
+
+  const pickerActiveRef = useRef(false);
+
+  const handlePickerOpenChange = useCallback((isOpen: boolean) => {
+    pickerActiveRef.current = isOpen;
+  }, []);
 
   const closeAddForm = useCallback(() => {
+    if (pickerActiveRef.current) return;
     setAddFormVisible(false);
     setFormPhotos([]);
   }, []);
 
   const galleryRows = useMemo(() => communityPhotos.slice(0, visibleCount), [communityPhotos, visibleCount]);
   const hasMore = visibleCount < communityPhotos.length;
-  const limitReached = !isAdmin && monthlyUsed >= MONTHLY_LIMIT;
+  const limitReached = !isAdmin && !isUnlimitedGalleryUploader && monthlyUsed >= MONTHLY_LIMIT;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -213,7 +280,7 @@ const GalleryChaikaScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <Image source={require('../../assets/galery.png')} style={styles.headerBanner} resizeMode="cover" />
+        <Image source={require('../../assets/WEBP-version/galery.webp')} style={styles.headerBanner} resizeMode="cover" />
 
         {/* Header */}
         <View style={styles.heroCard}>
@@ -233,22 +300,37 @@ const GalleryChaikaScreen: React.FC = () => {
           ) : (
             <>
               <View style={styles.galleryGrid}>
-                {galleryRows.map((photo) => (
-                  <TouchableOpacity
-                    key={photo.id}
-                    style={styles.galleryThumbCard}
-                    onPress={() => setPreviewPhoto({ uri: String(photo.imageUri || ''), storagePath: photo.storagePath })}
-                    activeOpacity={0.85}
-                  >
-                    <AppPhotoImage
-                      uri={photo.imageUri}
-                      storagePath={photo.storagePath}
-                      style={styles.galleryThumb}
-                      resizeMode="cover"
-                      debugLabel={`Gallery:${photo.id}`}
-                    />
-                  </TouchableOpacity>
-                ))}
+                {galleryRows.map((photo) => {
+                  const isPending = photo.status === 'pending';
+                  const isRejected = photo.status === 'rejected';
+                  return (
+                    <TouchableOpacity
+                      key={photo.id}
+                      style={styles.galleryThumbCard}
+                      onPress={() => setPreviewPhoto({ uri: String(photo.imageUri || ''), storagePath: photo.storagePath })}
+                      activeOpacity={0.85}
+                    >
+                      <AppPhotoImage
+                        uri={photo.imageUri}
+                        storagePath={photo.storagePath}
+                        style={[
+                          styles.galleryThumb,
+                          isPending && styles.galleryThumbPending,
+                          isRejected && styles.galleryThumbRejected,
+                        ]}
+                        resizeMode="cover"
+                        debugLabel={`Gallery:${photo.id}`}
+                      />
+                      {isPending || isRejected ? (
+                        <View style={[styles.statusOverlayBadge, isRejected && styles.statusOverlayBadgeRejected]}>
+                          <Text style={styles.statusOverlayBadgeText}>
+                            {isPending ? text.pendingBadge : text.rejectedBadge}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
               {hasMore && (
                 <TouchableOpacity
@@ -287,68 +369,72 @@ const GalleryChaikaScreen: React.FC = () => {
 
       <MiniTabBar />
 
-      {/* ── Add photo bottom sheet ── */}
+      {/* ── Add photo bottom sheet (same structure as Kuplu-Prodam) ── */}
       <Modal
         visible={addFormVisible}
         transparent
         animationType="slide"
         onRequestClose={closeAddForm}
       >
-        <TouchableOpacity
-          style={styles.sheetBackdrop}
-          activeOpacity={1}
-          onPress={closeAddForm}
-        />
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.sheetWrapper}
+          style={styles.sheetOverlay}
         >
-          <View style={styles.sheet}>
-            {/* Sheet handle */}
-            <View style={styles.sheetHandle} />
+          <TouchableOpacity
+            style={styles.sheetBackdrop}
+            activeOpacity={1}
+            onPress={closeAddForm}
+          />
+          <View style={styles.sheetWrapper}>
+            <View style={styles.sheet}>
+              {/* Sheet handle */}
+              <View style={styles.sheetHandle} />
 
-            {/* Sheet header */}
-            <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>{text.addFormTitle}</Text>
-              <TouchableOpacity onPress={closeAddForm} style={styles.sheetCloseBtn} activeOpacity={0.7}>
-                <Text style={styles.sheetCloseTxt}>✕</Text>
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              contentContainerStyle={styles.sheetContent}
-            >
-              {/* Limit note */}
-              <Text style={styles.limitNote}>{text.monthProgress(monthlyUsed)}</Text>
-
-              {/* Photo upload field */}
-              <PhotoUploadField
-                uid={user?.id ?? ''}
-                userName={user?.name ?? ''}
-                maxPhotos={2}
-                storagePath="community_photos"
-                onPhotosChange={(photos) => setFormPhotos(photos.filter((p) => p.status === 'done'))}
-              />
-
-              {/* Info hint */}
-              <View style={styles.infoCard}>
-                <Text style={styles.infoText}>{text.info}</Text>
+              {/* Sheet header */}
+              <View style={styles.sheetHeader}>
+                <Text style={styles.sheetTitle}>{text.addFormTitle}</Text>
+                <TouchableOpacity onPress={closeAddForm} style={styles.sheetCloseBtn} activeOpacity={0.7}>
+                  <Text style={styles.sheetCloseTxt}>✕</Text>
+                </TouchableOpacity>
               </View>
 
-              {/* Submit */}
-              <TouchableOpacity
-                style={[styles.submitBtn, (submitting || limitReached) && styles.submitBtnDisabled]}
-                onPress={() => { void handleSubmit(); }}
-                disabled={submitting || limitReached}
-                activeOpacity={0.85}
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={styles.sheetContent}
+                style={styles.sheetScroll}
               >
-                {submitting
-                  ? <ActivityIndicator color="#fff" />
-                  : <Text style={styles.submitBtnText}>{text.publish}</Text>}
-              </TouchableOpacity>
-            </ScrollView>
+                {/* Limit note */}
+                <Text style={styles.limitNote}>{text.monthProgress(monthlyUsed)}</Text>
+
+                {/* Photo upload field */}
+                <PhotoUploadField
+                  uid={user?.id ?? ''}
+                  userName={user?.name ?? ''}
+                  maxPhotos={5}
+                  storagePath="community_photos"
+                  onPhotosChange={(photos) => setFormPhotos(photos.filter((p) => p.status === 'done'))}
+                  onPickerOpenChange={handlePickerOpenChange}
+                />
+
+                {/* Info hint */}
+                <View style={styles.infoCard}>
+                  <Text style={styles.infoText}>{text.info}</Text>
+                </View>
+
+                {/* Submit */}
+                <TouchableOpacity
+                  style={[styles.submitBtn, (submitting || limitReached) && styles.submitBtnDisabled]}
+                  onPress={() => { void handleSubmit(); }}
+                  disabled={submitting || limitReached}
+                  activeOpacity={0.85}
+                >
+                  {submitting
+                    ? <ActivityIndicator color="#fff" />
+                    : <Text style={styles.submitBtnText}>{text.publish}</Text>}
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -415,6 +501,21 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   galleryThumb: { width: '100%', height: '100%' },
+  galleryThumbPending: { opacity: 0.45 },
+  galleryThumbRejected: { opacity: 0.3 },
+  statusOverlayBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    right: 8,
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: 'rgba(50, 50, 50, 0.78)',
+  },
+  statusOverlayBadgeRejected: { backgroundColor: 'rgba(120, 26, 26, 0.82)' },
+  statusOverlayBadgeText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900' },
   loadMoreBtn: {
     marginTop: 14,
     alignSelf: 'center',
@@ -445,17 +546,11 @@ const styles = StyleSheet.create({
   addBarBtnDisabled: { backgroundColor: '#C0A898' },
   addBarBtnText: { color: '#fff', fontSize: 16, fontWeight: '900', letterSpacing: 0.3 },
 
-  // Bottom sheet
-  sheetBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-  },
-  sheetWrapper: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-  },
+  // Bottom sheet (same structure as Kuplu-Prodam to prevent unmount on picker return)
+  sheetOverlay: { flex: 1, justifyContent: 'flex-end' },
+  sheetBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
+  sheetWrapper: { justifyContent: 'flex-end' },
+  sheetScroll: { flexGrow: 0 },
   sheet: {
     backgroundColor: '#FFFAF4',
     borderTopLeftRadius: 24,
@@ -532,5 +627,3 @@ const styles = StyleSheet.create({
 });
 
 export default GalleryChaikaScreen;
-
-

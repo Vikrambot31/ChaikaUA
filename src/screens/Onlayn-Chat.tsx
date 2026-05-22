@@ -128,6 +128,204 @@ const UI_TEXT = {
 const PAGE_SIZE = 20;
 const CATEGORY_STORAGE_KEY = 'online-chat:selected-category';
 
+const TOPIC_LABELS = {
+  ua: {
+    going_shopping: 'Фудшеринг',
+    ride_share: 'Підвезу',
+    need_ride: 'Потрібна машина',
+    parking_help: 'Паркування',
+    parcel_delivery: 'Доставка',
+    plumbing: 'Сантехніка',
+    electrical: 'Електрика',
+    locks_doors: 'Замки і двері',
+    windows_balconies: 'Вікна і балкони',
+    home_appliances: 'Побутова техніка',
+    furniture: 'Меблі',
+    small_repair: 'Дрібний ремонт',
+    cleaning: 'Прибирання',
+    trash_removal: 'Вивіз речей',
+    laundry: 'Прання',
+    plants: 'Рослини',
+    childcare: 'Допомога дітям',
+    elderly_help: 'Допомога літнім',
+    psychological_support: 'Психологічна підтримка',
+    medical_consultation: 'Медична консультація',
+    medicine: 'Ліки',
+    dog_walking: 'Вигул собаки',
+    pet_care: 'Догляд за тваринами',
+    found_pet: 'Знайдено тварину',
+    lost_pet: 'Шукають тварину',
+    free_items: 'Віддам безкоштовно',
+    borrow_tool: 'Позичити інструмент',
+    item_exchange: 'Обмін речами',
+    lost_item: 'Загублена річ',
+    found_item: 'Знайдена річ',
+    elevator: 'Ліфт',
+    noise: 'Шум',
+    parking_blocked: 'Паркування',
+    yard_trash: 'Двір / сміття',
+    yard_lighting: 'Освітлення',
+    management_request: 'Звернення до управи',
+    tutoring: 'Репетитор',
+    job_search: 'Пошук роботи',
+    sports_company: 'Спорт',
+    creative_club: 'Творчий гурток',
+    master_services: 'Майстер',
+    legal_consultation: 'Юридична консультація',
+    documents: 'Документи',
+    problem: 'Проблеми ЖК',
+    contacts: 'Контакти',
+    buy_sell: 'Куплю / продам',
+    lost_found: 'Загублено / знайдено',
+    help_neighbors: 'Допомога',
+    transport: 'Транспорт',
+    repair: 'Ремонт',
+    care: 'Турбота',
+    pets: 'Тварини',
+    foodsharing: 'Фудшеринг',
+    other: 'Заявка',
+  },
+  ru: {
+    going_shopping: 'Фудшеринг',
+    ride_share: 'Подвезу',
+    need_ride: 'Нужна машина',
+    parking_help: 'Парковка',
+    parcel_delivery: 'Доставка',
+    plumbing: 'Сантехника',
+    electrical: 'Электрика',
+    locks_doors: 'Замки и двери',
+    windows_balconies: 'Окна и балконы',
+    home_appliances: 'Бытовая техника',
+    furniture: 'Мебель',
+    small_repair: 'Мелкий ремонт',
+    cleaning: 'Уборка',
+    trash_removal: 'Вывоз вещей',
+    laundry: 'Стирка',
+    plants: 'Растения',
+    childcare: 'Помощь детям',
+    elderly_help: 'Помощь пожилым',
+    psychological_support: 'Психологическая поддержка',
+    medical_consultation: 'Медицинская консультация',
+    medicine: 'Лекарства',
+    dog_walking: 'Выгул собаки',
+    pet_care: 'Уход за животными',
+    found_pet: 'Найдено животное',
+    lost_pet: 'Ищут животное',
+    free_items: 'Отдам бесплатно',
+    borrow_tool: 'Одолжить инструмент',
+    item_exchange: 'Обмен вещами',
+    lost_item: 'Потерянная вещь',
+    found_item: 'Найденная вещь',
+    elevator: 'Лифт',
+    noise: 'Шум',
+    parking_blocked: 'Парковка',
+    yard_trash: 'Двор / мусор',
+    yard_lighting: 'Освещение',
+    management_request: 'Обращение в управление',
+    tutoring: 'Репетитор',
+    job_search: 'Поиск работы',
+    sports_company: 'Спорт',
+    creative_club: 'Творческий кружок',
+    master_services: 'Мастер',
+    legal_consultation: 'Юридическая консультация',
+    documents: 'Документы',
+    problem: 'Проблемы ЖК',
+    contacts: 'Контакты',
+    buy_sell: 'Куплю / продам',
+    lost_found: 'Потеряно / найдено',
+    help_neighbors: 'Помощь',
+    transport: 'Транспорт',
+    repair: 'Ремонт',
+    care: 'Забота',
+    pets: 'Животные',
+    foodsharing: 'Фудшеринг',
+    other: 'Заявка',
+  },
+  en: {
+    going_shopping: 'Foodsharing',
+    ride_share: 'Ride offer',
+    need_ride: 'Need a ride',
+    parking_help: 'Parking',
+    parcel_delivery: 'Delivery',
+    plumbing: 'Plumbing',
+    electrical: 'Electrical',
+    locks_doors: 'Locks and doors',
+    windows_balconies: 'Windows',
+    home_appliances: 'Appliances',
+    furniture: 'Furniture',
+    small_repair: 'Small repair',
+    cleaning: 'Cleaning',
+    trash_removal: 'Trash removal',
+    laundry: 'Laundry',
+    plants: 'Plants',
+    childcare: 'Childcare',
+    elderly_help: 'Elderly help',
+    psychological_support: 'Support',
+    medical_consultation: 'Medical advice',
+    medicine: 'Medicine',
+    dog_walking: 'Dog walking',
+    pet_care: 'Pet care',
+    found_pet: 'Found pet',
+    lost_pet: 'Lost pet',
+    free_items: 'Free items',
+    borrow_tool: 'Borrow a tool',
+    item_exchange: 'Item exchange',
+    lost_item: 'Lost item',
+    found_item: 'Found item',
+    elevator: 'Elevator',
+    noise: 'Noise',
+    parking_blocked: 'Parking',
+    yard_trash: 'Yard / trash',
+    yard_lighting: 'Yard lighting',
+    management_request: 'Management request',
+    tutoring: 'Tutoring',
+    job_search: 'Job search',
+    sports_company: 'Sport',
+    creative_club: 'Creative club',
+    master_services: 'Master services',
+    legal_consultation: 'Legal advice',
+    documents: 'Documents',
+    problem: 'Building issue',
+    contacts: 'Contacts',
+    buy_sell: 'Buy / sell',
+    lost_found: 'Lost / found',
+    help_neighbors: 'Help',
+    transport: 'Transport',
+    repair: 'Repair',
+    care: 'Care',
+    pets: 'Pets',
+    foodsharing: 'Foodsharing',
+    other: 'Request',
+  },
+} as const;
+
+const normalizeTopicKey = (value?: string | null) =>
+  String(value || '').trim().toLowerCase();
+
+const formatTopicLabel = (key: string, language: keyof typeof TOPIC_LABELS) => {
+  const labels = TOPIC_LABELS[language] ?? TOPIC_LABELS.ua;
+  if (key in labels) {
+    return labels[key as keyof typeof labels];
+  }
+  return key
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^\w/, (char) => char.toUpperCase()) || labels.other;
+};
+
+const splitChatTopic = (item: ChatRequest, language: keyof typeof TOPIC_LABELS) => {
+  const rawText = String(item.description || item.text || '').trim();
+  const bracketMatch = rawText.match(/^\[([^\]]+)]\s*(.*)$/);
+  const explicitTopic = bracketMatch?.[1]?.trim();
+  const cleanDescription = (bracketMatch?.[2] || rawText).trim();
+  const topicKey = normalizeTopicKey(explicitTopic || item.subcategory || item.category || item.group || 'other');
+  return {
+    topic: formatTopicLabel(topicKey, language),
+    description: cleanDescription || rawText,
+  };
+};
+
 const OnlineChatScreen = () => {
   const navigation = useNavigation<ChatNavigation>();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
@@ -498,7 +696,7 @@ const OnlineChatScreen = () => {
           }
           renderItem={({ item }) => {
             const timestamp = getChatRequestTimestamp(item) || Date.now();
-            const categoryLabel = item.category ? categoryLabelMap[item.category] : null;
+            const { topic, description } = splitChatTopic(item, language);
             const timeAgo = getTimeAgo(timestamp);
             const own = isOwnRequest(item);
 
@@ -521,11 +719,9 @@ const OnlineChatScreen = () => {
                     {/* Name row */}
                     <View style={styles.chatNameRow}>
                       <Text style={styles.chatName} numberOfLines={1}>{item.name?.trim() || '—'}</Text>
-                      {categoryLabel ? (
-                        <View style={styles.chatCategoryBadge}>
-                          <Text style={styles.chatCategoryText}>{categoryLabel}</Text>
-                        </View>
-                      ) : null}
+                      <View style={styles.chatCategoryBadge}>
+                        <Text style={styles.chatCategoryText} numberOfLines={1}>{topic}</Text>
+                      </View>
                       <View style={styles.chatDateBadge}>
                         <Text style={styles.chatDateText}>{timeAgo}</Text>
                       </View>
@@ -533,7 +729,7 @@ const OnlineChatScreen = () => {
                     {/* Description box */}
                     <View style={styles.chatDescBox}>
                       <Text style={styles.chatDescText} numberOfLines={2}>
-                        {item.text ?? text.noDescription}
+                        {description || text.noDescription}
                       </Text>
                     </View>
                   </View>
@@ -909,18 +1105,22 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: SCREEN_THEME.textPrimary,
     flexShrink: 1,
+    minWidth: 0,
   },
   chatCategoryBadge: {
-    backgroundColor: '#EDE3D0',
+    backgroundColor: '#DCECCF',
+    borderWidth: 1,
+    borderColor: '#B8D69E',
     borderRadius: 999,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    flexShrink: 0,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    flexShrink: 1,
+    maxWidth: '42%',
   },
   chatCategoryText: {
     fontSize: 10,
     fontWeight: '800',
-    color: SCREEN_THEME.textSecondary,
+    color: '#466833',
   },
   chatDateBadge: {
     backgroundColor: '#DDEAF0',

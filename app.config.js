@@ -24,7 +24,7 @@ module.exports = ({ config }) => {
         process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID_PROD ||
         process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
       adminServiceEmail: process.env.EXPO_PUBLIC_ADMIN_SERVICE_EMAIL || 'vikramsave@ukr.net',
-      versionConfigUrl: process.env.VERSION_CONFIG_URL || 'https://chaika-ua.netlify.app/app-version.json',
+      versionConfigUrl: process.env.VERSION_CONFIG_URL || 'https://chaika-life.netlify.app/app-version.json',
       serviceModerationPin: process.env.SERVICE_MODERATION_PIN || '',
     },
   };

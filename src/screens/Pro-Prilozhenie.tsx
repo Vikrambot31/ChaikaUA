@@ -190,7 +190,7 @@ const AppInfoScreen: React.FC = () => {
 
         <View style={styles.logoCard}>
           <View style={styles.logoFrame}>
-            <Image source={require('../../assets/Logo-Chaika LIFE.png')} style={styles.logo} resizeMode="contain" />
+            <Image source={require('../../assets/WEBP-version/Logo-Chaika LIFE.webp')} style={styles.logo} resizeMode="contain" />
           </View>
         </View>
 

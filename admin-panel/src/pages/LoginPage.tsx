@@ -1,6 +1,6 @@
 import { FormEvent, useState } from 'react';
 import { InfoHint } from '../components/InfoHint';
-import { signInAdmin, signInWithGoogle } from '../services/authService';
+import { isGoogleOnlyAuthMode, signInAdmin, signInWithGoogle } from '../services/authService';
 
 type LoginPageProps = {
   deniedError?: string | null;
@@ -24,6 +24,7 @@ const getLoginError = (error: unknown): string => {
 };
 
 export const LoginPage = ({ deniedError }: LoginPageProps) => {
+  const googleOnly = isGoogleOnlyAuthMode();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -61,34 +62,40 @@ export const LoginPage = ({ deniedError }: LoginPageProps) => {
         <p className="eyebrow">Chaika Life</p>
         <div className="headingWithHint">
           <h1>Админ-панель</h1>
-          <InfoHint text="Вход только для аккаунтов с ролью admin/moderator в Firebase." />
+          <InfoHint text="Вход только для владельца или аккаунтов с ролью admin/moderator в Firebase." />
         </div>
-        <p className="loginText">Вход для администратора или модератора Firebase.</p>
+        <p className="loginText">
+          {googleOnly ? 'Вход через Google для владельца или разрешенного администратора.' : 'Вход для администратора или модератора Firebase.'}
+        </p>
 
-        <label className="field">
-          <span>Email</span>
-          <input
-            autoComplete="email"
-            inputMode="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            placeholder="admin@example.com"
-            type="email"
-            required
-          />
-        </label>
+        {!googleOnly ? (
+          <>
+            <label className="field">
+              <span>Email</span>
+              <input
+                autoComplete="email"
+                inputMode="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="admin@example.com"
+                type="email"
+                required
+              />
+            </label>
 
-        <label className="field">
-          <span>Пароль</span>
-          <input
-            autoComplete="current-password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            placeholder="********"
-            type="password"
-            required
-          />
-        </label>
+            <label className="field">
+              <span>Пароль</span>
+              <input
+                autoComplete="current-password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="********"
+                type="password"
+                required
+              />
+            </label>
+          </>
+        ) : null}
 
         {(error || deniedError) ? <p className="formError">{error || deniedError}</p> : null}
 
@@ -96,11 +103,13 @@ export const LoginPage = ({ deniedError }: LoginPageProps) => {
           {busy ? 'Проверка...' : 'Войти через Google'}
         </button>
 
-        <div className="divider" />
+        {!googleOnly ? <div className="divider" /> : null}
 
-        <button className="primaryButton" type="submit" disabled={busy}>
-          {busy ? 'Проверка...' : 'Войти по email'}
-        </button>
+        {!googleOnly ? (
+          <button className="primaryButton" type="submit" disabled={busy}>
+            {busy ? 'Проверка...' : 'Войти по email'}
+          </button>
+        ) : null}
       </form>
     </main>
   );

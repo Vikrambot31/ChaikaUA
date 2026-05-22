@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+﻿import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -20,6 +20,8 @@ type InviteAccessScreenProps = {
   requesterPhone: string;
   onSubmitted: () => void;
   onContinue: () => void;
+  allowContinue?: boolean;
+  hardLocked?: boolean;
 };
 
 const PHONE_PLACEHOLDER = '+380XXXXXXXXX';
@@ -28,6 +30,8 @@ export default function InviteAccessScreen({
   requesterPhone,
   onSubmitted,
   onContinue,
+  allowContinue = true,
+  hardLocked = false,
 }: InviteAccessScreenProps) {
   const [sponsorPhone, setSponsorPhone] = useState('');
   const [loading, setLoading] = useState(false);
@@ -35,19 +39,23 @@ export default function InviteAccessScreen({
 
   const normalizedRequesterPhone = useMemo(() => normalizeSponsorPhone(requesterPhone), [requesterPhone]);
   const normalizedSponsorPhone = useMemo(() => normalizeSponsorPhone(sponsorPhone), [sponsorPhone]);
-  const canSubmit = isValidSponsorPhone(normalizedRequesterPhone) && isValidSponsorPhone(normalizedSponsorPhone) && !loading;
+  const requesterPhoneValid = isValidSponsorPhone(normalizedRequesterPhone);
+  const canSubmit = requesterPhoneValid && isValidSponsorPhone(normalizedSponsorPhone) && !loading;
+  const restrictionMessage = hardLocked && !requesterPhoneValid
+    ? 'У HARD-режимі доступ можливий лише після підтвердження телефона у форматі +380XXXXXXXXX.'
+    : null;
 
   const handleSubmit = async () => {
     if (!isValidSponsorPhone(normalizedRequesterPhone)) {
-      setMessage('Ваш телефон должен быть в формате +380XXXXXXXXX.');
+      setMessage('Ваш телефон має бути у форматі +380XXXXXXXXX.');
       return;
     }
     if (!isValidSponsorPhone(normalizedSponsorPhone)) {
-      setMessage('Телефон поручителя должен быть в формате +380XXXXXXXXX.');
+      setMessage('Телефон поручителя має бути у форматі +380XXXXXXXXX.');
       return;
     }
     if (normalizedRequesterPhone === normalizedSponsorPhone) {
-      setMessage('Телефон поручителя должен отличаться от вашего телефона.');
+      setMessage('Телефон поручителя має відрізнятися від вашого телефону.');
       return;
     }
 
@@ -55,10 +63,10 @@ export default function InviteAccessScreen({
     setMessage(null);
     try {
       await submitInviteRequest(normalizedRequesterPhone, normalizedSponsorPhone);
-      setMessage('Заявка отправлена. Мы покажем статус после проверки.');
+      setMessage('Заявку надіслано. Статус зʼявиться після перевірки.');
       onSubmitted();
     } catch {
-      setMessage('Не удалось отправить заявку. Проверьте связь и попробуйте ещё раз.');
+      setMessage('Не вдалося надіслати заявку. Перевірте звʼязок і спробуйте ще раз.');
     } finally {
       setLoading(false);
     }
@@ -70,10 +78,10 @@ export default function InviteAccessScreen({
       style={styles.root}
     >
       <View style={styles.panel}>
-        <Text style={styles.eyebrow}>Invite Access</Text>
+        <Text style={styles.eyebrow}>Доступ за запрошенням</Text>
         <Text style={styles.title}>Поручитель</Text>
         <Text style={styles.subtitle}>
-          Укажите телефон поручителя в формате +380XXXXXXXXX. Ответ на экране всегда общий, чтобы не раскрывать данные поручителей.
+          Вкажіть телефон поручителя у форматі +380XXXXXXXXX. Відповідь на екрані завжди загальна, щоб не розкривати персональні дані поручителів.
         </Text>
 
         <View style={styles.field}>
@@ -101,6 +109,7 @@ export default function InviteAccessScreen({
           />
         </View>
 
+        {restrictionMessage ? <Text style={styles.message}>{restrictionMessage}</Text> : null}
         {message ? <Text style={styles.message}>{message}</Text> : null}
 
         <TouchableOpacity
@@ -109,17 +118,19 @@ export default function InviteAccessScreen({
           onPress={handleSubmit}
           style={[styles.primaryButton, !canSubmit && styles.buttonDisabled]}
         >
-          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>Отправить заявку</Text>}
+          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>Надіслати заявку</Text>}
         </TouchableOpacity>
 
+        {allowContinue ? (
         <TouchableOpacity
           activeOpacity={0.85}
           disabled={loading}
           onPress={onContinue}
           style={styles.secondaryButton}
         >
-          <Text style={styles.secondaryButtonText}>Продолжить без заявки</Text>
+          <Text style={styles.secondaryButtonText}>Продовжити без заявки</Text>
         </TouchableOpacity>
+        ) : null}
       </View>
     </KeyboardAvoidingView>
   );

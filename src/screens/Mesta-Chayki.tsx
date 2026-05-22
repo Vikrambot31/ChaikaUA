@@ -5,12 +5,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationProp, useNavigation, useRoute } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { onValue, ref } from 'firebase/database';
-import MiniTabBar from '../components/MiniTabBar';
 import { LIGHT_ORBS, SCREEN_THEME } from '../utils/screenTheme';
 import { chaykaPlaces } from '../services/chaykaPlacesData';
 import { Place, PlaceType } from '../types/app';
 import { RootState } from '../redux/store';
-import { LastRatingMap, RatingAggregate, addWeightedRating, getRatingDaysLeft } from '../utils/monthlyRating';
+import StarRatingModal from '../components/StarRatingModal';
+import { DailyRatingUsage, RatingAggregate, UserRatingMap, canUseDailyRating, recordDailyRatingUse, replaceWeightedRating } from '../utils/monthlyRating';
 import { openInGoogleMaps } from '../utils/googleMapsLink';
 import { getMapFocusPlaceParams } from '../utils/mapFocusParams';
 import { buySellService, BuySellListing } from '../services/buySellService';
@@ -37,8 +37,11 @@ const allSalons = chaykaPlaces.filter((p) => p.type === PlaceType.SALON);
 
 const RESTAURANT_RATINGS_KEY = '@chaika:restaurant_ratings_v1';
 const RESTAURANT_VOTES_KEY = '@chaika:restaurant_rating_votes_v1';
+const RESTAURANT_USER_RATINGS_KEY = '@chaika:restaurant_user_ratings_v1';
 const STORE_RATINGS_KEY = '@chaika:store_ratings_v1';
 const STORE_VOTES_KEY = '@chaika:store_rating_votes_v1';
+const STORE_USER_RATINGS_KEY = '@chaika:store_user_ratings_v1';
+const DAILY_USAGE_KEY = '@chaika:place_rating_daily_usage_v1';
 const ACTIVE_SECTION_KEY = '@chaika:places_active_section_v2';
 
 type RatingsByPlace = Record<string, RatingAggregate>;
@@ -89,6 +92,10 @@ const UI_TEXT = {
     rateAgainIn: 'Повторно оцінити через',
     days: 'дн.',
     votes: 'голосів',
+    ratingPrompt: 'Оцініть місце',
+    ratingHint: 'Оберіть кількість зірок. Свою оцінку можна змінити.',
+    ratingLimitTitle: 'Ліміт',
+    ratingLimitText: 'Завтра зможете поставити ще.',
     typeLabels: {
       [PlaceType.SHOP]: 'Магазин',
       [PlaceType.SCHOOL]: 'Школа',
@@ -131,6 +138,10 @@ const UI_TEXT = {
     rateAgainIn: 'Повторно оценить через',
     days: 'дн.',
     votes: 'голосов',
+    ratingPrompt: 'Оцените место',
+    ratingHint: 'Выберите количество звезд. Свою оценку можно изменить.',
+    ratingLimitTitle: 'Лимит',
+    ratingLimitText: 'Завтра сможете поставить еще.',
     typeLabels: {
       [PlaceType.SHOP]: 'Магазин',
       [PlaceType.SCHOOL]: 'Школа',
@@ -173,6 +184,10 @@ const UI_TEXT = {
     rateAgainIn: 'Rate again in',
     days: 'days',
     votes: 'votes',
+    ratingPrompt: 'Rate this place',
+    ratingHint: 'Choose the number of stars. You can change your rating.',
+    ratingLimitTitle: 'Limit',
+    ratingLimitText: 'You can add more ratings tomorrow.',
     typeLabels: {
       [PlaceType.SHOP]: 'Shop',
       [PlaceType.SCHOOL]: 'School',
@@ -212,13 +227,13 @@ type PlaceRowProps = {
   idx: number;
   section: SectionKey;
   ratings: RatingsByPlace;
-  onRate: (place: Place, value: number) => void;
+  onRatePress: (place: Place) => void;
   typeLabel?: string;
   navigation: ReturnType<typeof useNavigation<NavigationProp<Record<string, object | undefined>>>>;
   votesLabel: string;
 };
 
-const PlaceRow: React.FC<PlaceRowProps> = ({ place, idx, section, ratings, onRate, typeLabel, navigation, votesLabel }) => {
+const PlaceRow: React.FC<PlaceRowProps> = ({ place, idx, section, ratings, onRatePress, typeLabel, navigation, votesLabel }) => {
   const cfg = SECTION_META[section];
   const current = getRating(place, ratings);
   const rounded = Math.round(current.rating);
@@ -254,7 +269,7 @@ const PlaceRow: React.FC<PlaceRowProps> = ({ place, idx, section, ratings, onRat
           <View style={styles.ratingLine}>
             <View style={styles.stars}>
               {[1, 2, 3, 4, 5].map((star) => (
-                <TouchableOpacity key={star} onPress={(e) => { e.stopPropagation?.(); onRate(place, star); }} activeOpacity={0.72}>
+                <TouchableOpacity key={star} onPress={(e) => { e.stopPropagation?.(); onRatePress(place); }} activeOpacity={0.72}>
                   <MaterialCommunityIcons
                     name={star <= rounded ? 'star' : 'star-outline'}
                     size={22}
@@ -283,9 +298,11 @@ const PlacesScreen: React.FC = () => {
   const [activeSection, setActiveSection] = useState<SectionKey>(defaultSection);
 
   const [restaurantRatings, setRestaurantRatings] = useState<RatingsByPlace>({});
-  const [restaurantVotes, setRestaurantVotes] = useState<LastRatingMap>({});
+  const [restaurantUserRatings, setRestaurantUserRatings] = useState<UserRatingMap>({});
   const [storeRatings, setStoreRatings] = useState<RatingsByPlace>({});
-  const [storeVotes, setStoreVotes] = useState<LastRatingMap>({});
+  const [storeUserRatings, setStoreUserRatings] = useState<UserRatingMap>({});
+  const [dailyUsage, setDailyUsage] = useState<DailyRatingUsage | null>(null);
+  const [ratingTarget, setRatingTarget] = useState<Place | null>(null);
   const [residentGoods, setResidentGoods] = useState<BuySellListing[]>([]);
   const [residentServices, setResidentServices] = useState<BusinessItem[]>([]);
   const [residentDataLoading, setResidentDataLoading] = useState(true);
@@ -293,16 +310,18 @@ const PlacesScreen: React.FC = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const [rr, rv, sr, sv] = await Promise.all([
+        const [rr, rur, sr, sur, du] = await Promise.all([
           AsyncStorage.getItem(RESTAURANT_RATINGS_KEY),
-          AsyncStorage.getItem(RESTAURANT_VOTES_KEY),
+          AsyncStorage.getItem(RESTAURANT_USER_RATINGS_KEY),
           AsyncStorage.getItem(STORE_RATINGS_KEY),
-          AsyncStorage.getItem(STORE_VOTES_KEY),
+          AsyncStorage.getItem(STORE_USER_RATINGS_KEY),
+          AsyncStorage.getItem(DAILY_USAGE_KEY),
         ]);
         if (rr) setRestaurantRatings(JSON.parse(rr) as RatingsByPlace);
-        if (rv) setRestaurantVotes(JSON.parse(rv) as LastRatingMap);
+        if (rur) setRestaurantUserRatings(JSON.parse(rur) as UserRatingMap);
         if (sr) setStoreRatings(JSON.parse(sr) as RatingsByPlace);
-        if (sv) setStoreVotes(JSON.parse(sv) as LastRatingMap);
+        if (sur) setStoreUserRatings(JSON.parse(sur) as UserRatingMap);
+        if (du) setDailyUsage(JSON.parse(du) as DailyRatingUsage);
       } catch {}
     };
     void load();
@@ -389,33 +408,42 @@ const PlacesScreen: React.FC = () => {
   }, [activeSection, sortedRestaurants, sortedStores]);
 
   const ratings = activeSection === 'stores' ? storeRatings : restaurantRatings;
+  const userRatings = activeSection === 'stores' ? storeUserRatings : restaurantUserRatings;
 
   const handleRate = async (place: Place, value: number) => {
     const isRestaurant = activeSection === 'restaurants';
     const currentRatings = isRestaurant ? restaurantRatings : storeRatings;
-    const currentVotes = isRestaurant ? restaurantVotes : storeVotes;
+    const currentUserRatings = isRestaurant ? restaurantUserRatings : storeUserRatings;
     const ratingsKey = isRestaurant ? RESTAURANT_RATINGS_KEY : STORE_RATINGS_KEY;
-    const votesKey = isRestaurant ? RESTAURANT_VOTES_KEY : STORE_VOTES_KEY;
+    const userRatingsKey = isRestaurant ? RESTAURANT_USER_RATINGS_KEY : STORE_USER_RATINGS_KEY;
+    const legacyVotesKey = isRestaurant ? RESTAURANT_VOTES_KEY : STORE_VOTES_KEY;
+    const previousValue = currentUserRatings[place.id];
+    const isNewRating = !previousValue;
 
-    const daysLeft = getRatingDaysLeft(currentVotes[place.id]);
-    if (daysLeft > 0) {
-      Alert.alert(text.ratingAlready, `${text.rateAgainIn} ${daysLeft} ${text.days}`);
+    if (isNewRating && !canUseDailyRating(dailyUsage)) {
+      Alert.alert(text.ratingLimitTitle, text.ratingLimitText);
       return;
     }
 
-    const nextRatings = { ...currentRatings, [place.id]: addWeightedRating(getRating(place, currentRatings), value) };
-    const nextVotes = { ...currentVotes, [place.id]: new Date().toISOString() };
+    const nextRatings = { ...currentRatings, [place.id]: replaceWeightedRating(getRating(place, currentRatings), value, previousValue) };
+    const nextUserRatings = { ...currentUserRatings, [place.id]: value };
+    const nextDailyUsage = isNewRating ? recordDailyRatingUse(dailyUsage) : dailyUsage;
     if (isRestaurant) {
       setRestaurantRatings(nextRatings);
-      setRestaurantVotes(nextVotes);
+      setRestaurantUserRatings(nextUserRatings);
     } else {
       setStoreRatings(nextRatings);
-      setStoreVotes(nextVotes);
+      setStoreUserRatings(nextUserRatings);
     }
-    await Promise.all([
+    if (nextDailyUsage) setDailyUsage(nextDailyUsage);
+    const writes = [
       AsyncStorage.setItem(ratingsKey, JSON.stringify(nextRatings)),
-      AsyncStorage.setItem(votesKey, JSON.stringify(nextVotes)),
-    ]);
+      AsyncStorage.setItem(userRatingsKey, JSON.stringify(nextUserRatings)),
+      AsyncStorage.removeItem(legacyVotesKey),
+    ];
+    if (nextDailyUsage) writes.push(AsyncStorage.setItem(DAILY_USAGE_KEY, JSON.stringify(nextDailyUsage)));
+    await Promise.all(writes);
+    setRatingTarget(null);
   };
 
   const setSection = (section: SectionKey) => {
@@ -562,7 +590,7 @@ const PlacesScreen: React.FC = () => {
               idx={idx}
               section={activeSection}
               ratings={ratings}
-              onRate={handleRate}
+              onRatePress={setRatingTarget}
               typeLabel={text.typeLabels[place.type]}
               navigation={navigation}
               votesLabel={text.votes}
@@ -571,7 +599,15 @@ const PlacesScreen: React.FC = () => {
         )}
       </ScrollView>
 
-      <MiniTabBar />
+      <StarRatingModal
+        visible={Boolean(ratingTarget)}
+        title={ratingTarget?.name ?? text.ratingPrompt}
+        subtitle={text.ratingHint}
+        value={ratingTarget ? userRatings[ratingTarget.id] ?? Math.round(getRating(ratingTarget, ratings).rating) : 0}
+        onSelect={(value) => { if (ratingTarget) void handleRate(ratingTarget, value); }}
+        onClose={() => setRatingTarget(null)}
+      />
+
     </SafeAreaView>
   );
 };

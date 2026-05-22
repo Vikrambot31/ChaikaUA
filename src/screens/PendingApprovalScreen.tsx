@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   StyleSheet,
@@ -17,33 +17,34 @@ type PendingApprovalScreenProps = {
   onRefreshStatus: (snapshot: InviteRequestSnapshot) => void;
   onCreateNewRequest: () => void;
   onContinue: () => void;
+  allowContinue?: boolean;
 };
 
 const POLL_INTERVAL_MS = 30000;
 
 const getTitle = (status: InviteRequestSnapshot['status']): string => {
-  if (status === 'approved') return 'Заявка одобрена';
-  if (status === 'denied' || status === 'auto_denied') return 'Заявка отклонена';
-  if (status === 'needs_manual_review') return 'Заявка на дополнительной проверке';
-  if (status === 'pending_sponsor') return 'Ждём подтверждение поручителя';
-  return 'Заявка ожидает проверки';
+  if (status === 'approved') return 'Заявку схвалено';
+  if (status === 'denied' || status === 'auto_denied') return 'Заявку відхилено';
+  if (status === 'needs_manual_review') return 'Заявка на додатковій перевірці';
+  if (status === 'pending_sponsor') return 'Очікуємо підтвердження поручителя';
+  return 'Заявка очікує перевірки';
 };
 
 const getBody = (status: InviteRequestSnapshot['status']): string => {
-  if (status === 'approved') return 'Доступ через поручителя подтверждён. Можно продолжить пользоваться приложением.';
-  if (status === 'denied' || status === 'auto_denied') return 'Пока не получилось подтвердить доступ. Можно отправить новую заявку или продолжить просмотр доступных разделов.';
-  if (status === 'needs_manual_review') return 'Нам нужно немного больше времени. Заявка уже в очереди, этот экран обновляет статус автоматически.';
-  if (status === 'pending_sponsor') return 'Поручителю отправлено мягкое подтверждение. Обычно это занимает до 48 часов. Если ответа не будет, заявка перейдёт на ручную проверку, а вы сможете продолжить пользоваться доступными разделами.';
-  return 'Заявка проверяется. Этот экран обновляет статус автоматически, но приложение не блокируется.';
+  if (status === 'approved') return 'Доступ через поручителя підтверджено. Можна продовжувати користуватися застосунком.';
+  if (status === 'denied' || status === 'auto_denied') return 'Поки не вдалося підтвердити доступ. Ви можете надіслати нову заявку або продовжити перегляд доступних розділів.';
+  if (status === 'needs_manual_review') return 'Потрібно трохи більше часу. Заявка вже в черзі, цей екран оновлює статус автоматично.';
+  if (status === 'pending_sponsor') return 'Поручителю надіслано мʼяке підтвердження. Зазвичай це займає до 48 годин. Якщо відповіді не буде, заявку переведемо на ручну перевірку, а ви зможете користуватися доступними розділами.';
+  return 'Заявка перевіряється. Цей екран оновлює статус автоматично, але застосунок не блокується.';
 };
 
 const getStatusLabel = (status: InviteRequestSnapshot['status']): string => {
-  if (status === 'approved') return 'Доступ подтверждён';
-  if (status === 'denied' || status === 'auto_denied') return 'Нужна новая заявка';
-  if (status === 'needs_manual_review') return 'Дополнительная проверка';
-  if (status === 'pending_sponsor') return 'Ожидается ответ поручителя';
-  if (status === 'pending') return 'Заявка отправлена';
-  return 'Статус обновляется';
+  if (status === 'approved') return 'Доступ підтверджено';
+  if (status === 'denied' || status === 'auto_denied') return 'Потрібна нова заявка';
+  if (status === 'needs_manual_review') return 'Додаткова перевірка';
+  if (status === 'pending_sponsor') return 'Очікується відповідь поручителя';
+  if (status === 'pending') return 'Заявку надіслано';
+  return 'Статус оновлюється';
 };
 
 export default function PendingApprovalScreen({
@@ -51,6 +52,7 @@ export default function PendingApprovalScreen({
   onRefreshStatus,
   onCreateNewRequest,
   onContinue,
+  allowContinue = true,
 }: PendingApprovalScreenProps) {
   const [snapshot, setSnapshot] = useState(initialStatus);
   const [loading, setLoading] = useState(false);
@@ -64,7 +66,7 @@ export default function PendingApprovalScreen({
       setSnapshot(next);
       onRefreshStatus(next);
     } catch {
-      setError('Не удалось обновить статус. Проверьте связь и попробуйте ещё раз.');
+      setError('Не вдалося оновити статус. Перевірте звʼязок і спробуйте ще раз.');
     } finally {
       setLoading(false);
     }
@@ -89,7 +91,7 @@ export default function PendingApprovalScreen({
   return (
     <View style={styles.root}>
       <View style={styles.panel}>
-        <Text style={styles.eyebrow}>Invite Access</Text>
+        <Text style={styles.eyebrow}>Доступ за запрошенням</Text>
         <Text style={styles.title}>{getTitle(snapshot.status)}</Text>
         <Text style={styles.subtitle}>{getBody(snapshot.status)}</Text>
 
@@ -102,7 +104,7 @@ export default function PendingApprovalScreen({
           ]}>
             {getStatusLabel(snapshot.status)}
           </Text>
-          {snapshot.updatedAt ? <Text style={styles.meta}>Обновлено: {new Date(snapshot.updatedAt).toLocaleString()}</Text> : null}
+          {snapshot.updatedAt ? <Text style={styles.meta}>Оновлено: {new Date(snapshot.updatedAt).toLocaleString('uk-UA')}</Text> : null}
           {snapshot.moderationReason ? <Text style={styles.meta}>{snapshot.moderationReason}</Text> : null}
         </View>
 
@@ -114,7 +116,7 @@ export default function PendingApprovalScreen({
           onPress={() => void refresh()}
           style={styles.primaryButton}
         >
-          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>Обновить статус</Text>}
+          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>Оновити статус</Text>}
         </TouchableOpacity>
 
         {snapshot.status === 'denied' || snapshot.status === 'auto_denied' || snapshot.status === 'cancelled' ? (
@@ -124,18 +126,20 @@ export default function PendingApprovalScreen({
             onPress={onCreateNewRequest}
             style={styles.secondaryButton}
           >
-            <Text style={styles.secondaryButtonText}>Отправить новую заявку</Text>
+            <Text style={styles.secondaryButtonText}>Надіслати нову заявку</Text>
           </TouchableOpacity>
         ) : null}
 
+        {allowContinue ? (
         <TouchableOpacity
           activeOpacity={0.85}
           disabled={loading}
           onPress={onContinue}
           style={styles.secondaryButton}
         >
-          <Text style={styles.secondaryButtonText}>Продолжить в приложение</Text>
+          <Text style={styles.secondaryButtonText}>Продовжити в застосунок</Text>
         </TouchableOpacity>
+        ) : null}
       </View>
     </View>
   );

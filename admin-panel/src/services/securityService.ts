@@ -33,6 +33,7 @@ export type ManagedAuthorizedDevice = {
   is_blocked: boolean;
   security_flags: string[];
   email?: string;
+  personal_force_update?: boolean;
 };
 
 export type SecurityLogRecord = {
@@ -44,7 +45,7 @@ export type SecurityLogRecord = {
   device_id?: string | null;
 };
 
-type RawDevice = Partial<Omit<ManagedAuthorizedDevice, 'uid' | 'email'>>;
+type RawDevice = Partial<Omit<ManagedAuthorizedDevice, 'uid' | 'email'>> & { personal_force_update?: unknown };
 
 type RawUser = {
   email?: unknown;
@@ -122,6 +123,7 @@ const normalizeDevice = (
       ? value.security_flags.filter((flag): flag is string => typeof flag === 'string').slice(0, 20)
       : [],
     email,
+    ...(value.personal_force_update === true ? { personal_force_update: true } : {}),
   };
 };
 
@@ -295,6 +297,16 @@ export const updateSecurityAppControl = async (
 
   await update(ref(database, SECURITY_APP_CONTROL_PATH), writePayload);
   return { changed: true };
+};
+
+export const setPersonalForceUpdate = async (
+  uid: string,
+  deviceId: string,
+  value: boolean,
+): Promise<void> => {
+  await update(ref(database, `${SECURITY_AUTHORIZED_DEVICES_PATH}/${uid}/${deviceId}`), {
+    personal_force_update: value,
+  });
 };
 
 export const updateManagedDeviceStatus = async (

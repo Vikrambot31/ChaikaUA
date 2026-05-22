@@ -252,7 +252,7 @@ const ImportantNewsScreen: React.FC = () => {
           <>
             <Text style={styles.screenTitle}>{text.headerTitle}</Text>
             <View style={styles.coverWrap}>
-              <Image source={require('../../assets/NOVOSTI.png')} style={styles.coverImage} resizeMode="cover" />
+              <Image source={require('../../assets/WEBP-version/NOVOSTI.webp')} style={styles.coverImage} resizeMode="cover" />
             </View>
           </>
         )}

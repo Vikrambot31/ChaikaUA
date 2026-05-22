@@ -1,4 +1,4 @@
-import { off, onValue, ref } from 'firebase/database';
+import { get, off, onValue, ref } from 'firebase/database';
 import { database } from '../firebase/firebase';
 import {
   MODERATION_PATHS,
@@ -23,6 +23,7 @@ export type DashboardStats = {
   pending: number;
   approved: number;
   rejected: number;
+  expired: number;
 };
 
 export type DashboardActivity = {
@@ -60,6 +61,7 @@ type ModerationCounter = {
   pending: number;
   approved: number;
   rejected: number;
+  expired: number;
 };
 
 type RawSecurityLog = {
@@ -81,6 +83,7 @@ const emptyStats: DashboardStats = {
   pending: 0,
   approved: 0,
   rejected: 0,
+  expired: 0,
 };
 
 const emptyCounter: ModerationCounter = {
@@ -88,6 +91,7 @@ const emptyCounter: ModerationCounter = {
   pending: 0,
   approved: 0,
   rejected: 0,
+  expired: 0,
 };
 
 const moderationDashboardPaths = [
@@ -98,6 +102,7 @@ const moderationDashboardPaths = [
   MODERATION_PATHS.datingAnketaListings,
   MODERATION_PATHS.coffeeRequests,
   MODERATION_PATHS.buySell,
+  MODERATION_PATHS.contactsListings,
   MODERATION_PATHS.localBusiness,
   MODERATION_PATHS.jobs,
   MODERATION_PATHS.lostFound,
@@ -109,14 +114,15 @@ const moderationDashboardPaths = [
 
 const getNumber = (value: unknown): number => Number.isFinite(value) ? Number(value) : 0;
 
-const getModerationStatus = (value: Record<string, unknown>): 'pending' | 'approved' | 'rejected' => {
+const getModerationStatus = (value: Record<string, unknown>): 'pending' | 'approved' | 'rejected' | 'expired' => {
   const raw = value.moderationStatus ?? value.status;
   if (raw === 'approved' || raw === 'active') return 'approved';
   if (raw === 'rejected') return 'rejected';
+  if (raw === 'expired') return 'expired';
   return 'pending';
 };
 
-const VALID_STATUSES = new Set(['pending', 'approved', 'rejected'] as const);
+const VALID_STATUSES = new Set(['pending', 'approved', 'rejected', 'expired'] as const);
 
 const countModerationRecord = (counter: ModerationCounter, value: Record<string, unknown>) => {
   const status = getModerationStatus(value);
@@ -242,6 +248,7 @@ export const subscribeDashboard = (
         pending: moderation.pending,
         approved: moderation.approved,
         rejected: moderation.rejected,
+        expired: moderation.expired,
       },
       issues: [...systemIssues, ...deviceStats.deviceIssues, ...pendingOverflow],
     });
@@ -254,6 +261,7 @@ export const subscribeDashboard = (
         pending: acc.pending + item.pending,
         approved: acc.approved + item.approved,
         rejected: acc.rejected + item.rejected,
+        expired: acc.expired + item.expired,
       }),
       { ...emptyCounter },
     );
@@ -266,11 +274,12 @@ export const subscribeDashboard = (
     emit();
   }, (error) => onError?.(error)));
 
-  unsubscribers.push(onValue(ref(database, USERS_PATH), (snapshot) => {
+  // Однократное чтение вместо realtime-потока — USERS_PATH слишком тяжёлый для streaming.
+  void get(ref(database, USERS_PATH)).then((snapshot) => {
     const raw = snapshot.val();
     usersTotal = raw && typeof raw === 'object' ? Object.keys(raw).length : 0;
     emit();
-  }, (error) => onError?.(error)));
+  }).catch((error: unknown) => onError?.(error instanceof Error ? error : new Error(String(error))));
 
   unsubscribers.push(onValue(ref(database, SECURITY_AUTHORIZED_DEVICES_PATH), (snapshot) => {
     deviceStats = buildDeviceStats(snapshot.val());

@@ -86,7 +86,7 @@ export default function LanguagePickerOnboarding({ onDone }: Props) {
                     {lang.label}
                   </Text>
                   {lang.code === 'ru' ? (
-                    <Image source={require('../../assets/Russia No war.png')} style={styles.noWarIcon} resizeMode="contain" />
+                    <Image source={require('../../assets/WEBP-version/Russia No war.webp')} style={styles.noWarIcon} resizeMode="contain" />
                   ) : null}
                 </View>
                 {selected === lang.code && <View style={styles.checkDot} />}

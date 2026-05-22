@@ -1,8 +1,10 @@
+import * as FileSystem from 'expo-file-system';
 import { getDownloadURL, getStorage, ref as storageRef, uploadBytes } from 'firebase/storage';
 import { ensureFirebaseAuth } from '../firebase-auth-session';
 import { uniqueId } from '../utils/cryptoId';
 import { compressImage, getContentType, getPhotoFileExtension } from '../utils/imageCompressor';
 import { safeLogError } from '../utils/errorLogger';
+import { NATIVE_UPLOAD_NAMESPACES } from '../utils/featureFlags';
 import { safePromiseTimeout } from '../utils/safePromiseTimeout';
 import { recordRuntimeTrace } from './runtimeMonitorService';
 
@@ -57,6 +59,242 @@ const mapNamespaceToFeature = (namespace: string): UploadFeature => {
 };
 
 export async function uploadPhotoToNamespace(
+  localUri: string,
+  options: PhotoUploadOptions,
+): Promise<UploadedPhotoResult> {
+  if (NATIVE_UPLOAD_NAMESPACES.has(options.namespace)) {
+    return uploadViaFileSystem(localUri, options);
+  }
+
+  return uploadViaBlobFetch(localUri, options);
+}
+
+async function uploadViaFileSystem(
+  localUri: string,
+  options: PhotoUploadOptions,
+): Promise<UploadedPhotoResult> {
+  const storage = getStorage();
+  const user = await ensureFirebaseAuth();
+  const timeoutMs = options.timeoutMs ?? PHOTO_UPLOAD_TIMEOUT_MS;
+  const maxAttempts = options.maxAttempts ?? PHOTO_UPLOAD_MAX_ATTEMPTS;
+  const backoffMs = options.backoffMs ?? PHOTO_UPLOAD_BACKOFF_MS;
+  const sourceLabel = options.sourceLabel ?? 'photoUploadService.uploadPhotoToNamespace';
+  const feature = options.feature ?? mapNamespaceToFeature(options.namespace);
+  const storagePath = `${options.namespace}/${user.uid}/${uniqueId()}.${getPhotoFileExtension(localUri)}`;
+  const bucket = storage.app.options.storageBucket;
+  const encodedPath = encodeURIComponent(storagePath);
+  const fileRef = storageRef(storage, storagePath);
+
+  void recordRuntimeTrace({
+    screen: sourceLabel,
+    action: 'native_upload_engine_start',
+    status: 'start',
+    feature,
+    stage: 'native_engine_start',
+    firebasePath: storagePath,
+    details: {
+      uriScheme: localUri.split(':')[0] || 'file',
+      attempts: maxAttempts,
+      timeoutMs,
+      storageRoot: options.namespace,
+      uid: user.uid,
+      ...options.logContext,
+    },
+  });
+
+  try {
+    const compressedUri = await compressImage(localUri, {
+      maxWidth: 1920,
+      maxHeight: 1920,
+      quality: 0.82,
+    });
+    const contentType = getContentType(compressedUri);
+    const fileInfo = await FileSystem.getInfoAsync(compressedUri);
+    const fileSize = fileInfo.exists ? (fileInfo.size ?? 0) : 0;
+    let lastError: unknown = null;
+
+    if (!bucket) {
+      throw new Error('Firebase Storage bucket is not configured');
+    }
+
+    if (!fileInfo.exists || fileSize <= 0) {
+      throw new Error('Invalid file after compression');
+    }
+
+    void recordRuntimeTrace({
+      screen: sourceLabel,
+      action: 'native_upload_engine_prepared',
+      status: 'success',
+      feature,
+      stage: 'prepareNativeFileUpload',
+      firebasePath: storagePath,
+      details: {
+        contentType,
+        size: fileSize,
+        ...options.logContext,
+      },
+    });
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        const uploadUrl = `https://firebasestorage.googleapis.com/upload/storage/v1/b/${bucket}/o?name=${encodedPath}&uploadType=media`;
+        const idToken = await user.getIdToken(attempt > 1);
+
+        void recordRuntimeTrace({
+          screen: sourceLabel,
+          action: 'FileSystem.uploadAsync',
+          status: attempt === 1 ? 'start' : 'progress',
+          feature,
+          stage: `FileSystem.uploadAsync.attempt_${attempt}`,
+          firebasePath: storagePath,
+          details: { attempt, attempts: maxAttempts, timeoutMs, ...options.logContext },
+        });
+
+        const result = await safePromiseTimeout(
+          FileSystem.uploadAsync(uploadUrl, compressedUri, {
+            uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+            httpMethod: 'POST',
+            headers: {
+              'Content-Type': contentType,
+              Authorization: `Bearer ${idToken}`,
+            },
+            sessionType: FileSystem.FileSystemSessionType.FOREGROUND,
+          }),
+          timeoutMs,
+          `${options.namespace}.nativeUploadPhoto:${storagePath}:attempt_${attempt}`,
+        );
+
+        if (result.status < 200 || result.status >= 300) {
+          throw new Error(`Upload HTTP error: status=${result.status} body=${result.body?.slice(0, 200) ?? ''}`);
+        }
+
+        let responseData: Record<string, unknown>;
+        try {
+          responseData = JSON.parse(result.body) as Record<string, unknown>;
+        } catch {
+          // HTTP 200 but body is not valid JSON — file IS in Storage already.
+          // Avoid orphaning it: resolve the download URL via SDK instead of throwing.
+          void recordRuntimeTrace({
+            screen: sourceLabel,
+            action: 'FileSystem.uploadAsync',
+            status: 'success',
+            feature,
+            stage: `FileSystem.uploadAsync.attempt_${attempt}`,
+            firebasePath: storagePath,
+            details: { attempt, attempts: maxAttempts, responseParseError: true, bodyPreview: result.body?.slice(0, 100) ?? '', ...options.logContext },
+          });
+          void recordRuntimeTrace({
+            screen: sourceLabel,
+            action: 'native_upload_engine_complete',
+            status: 'success',
+            feature,
+            stage: 'native_engine_complete',
+            firebasePath: storagePath,
+            details: { contentType, size: fileSize, sdkFallback: true, ...options.logContext },
+          });
+          const downloadUrl = options.resolveDownloadUrl ? await getDownloadURL(fileRef) : undefined;
+          return { storagePath, contentType, downloadUrl, size: fileSize };
+        }
+
+        const downloadTokens = typeof responseData.downloadTokens === 'string'
+          ? responseData.downloadTokens
+          : '';
+        const token = downloadTokens.split(',')[0];
+        const downloadUrl = token
+          ? `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodedPath}?alt=media&token=${token}`
+          : options.resolveDownloadUrl
+            ? await getDownloadURL(fileRef)
+            : undefined;
+
+        void recordRuntimeTrace({
+          screen: sourceLabel,
+          action: 'FileSystem.uploadAsync',
+          status: 'success',
+          feature,
+          stage: `FileSystem.uploadAsync.attempt_${attempt}`,
+          firebasePath: storagePath,
+          details: { attempt, attempts: maxAttempts, hasDownloadUrl: Boolean(downloadUrl), ...options.logContext },
+        });
+
+        void recordRuntimeTrace({
+          screen: sourceLabel,
+          action: 'native_upload_engine_complete',
+          status: 'success',
+          feature,
+          stage: 'native_engine_complete',
+          firebasePath: storagePath,
+          details: {
+            contentType,
+            size: fileSize,
+            hasDownloadUrl: Boolean(downloadUrl),
+            ...options.logContext,
+          },
+        });
+
+        return {
+          storagePath,
+          contentType,
+          downloadUrl,
+          size: fileSize,
+        };
+      } catch (error) {
+        lastError = error;
+        void recordRuntimeTrace({
+          screen: sourceLabel,
+          action: 'FileSystem.uploadAsync',
+          status: attempt < maxAttempts ? 'progress' : 'fail',
+          feature,
+          stage: `FileSystem.uploadAsync.attempt_${attempt}`,
+          firebasePath: storagePath,
+          firebaseCode: extractFirebaseCode(error),
+          error,
+          details: { attempt, attempts: maxAttempts, timeoutMs, ...options.logContext },
+        });
+        if (attempt < maxAttempts) {
+          await delay(attempt * backoffMs);
+        }
+      }
+    }
+
+    if (lastError) {
+      safeLogError('photoUploadService.uploadViaFileSystem', lastError, {
+        stage: 'native_storage_upload',
+        firebasePath: storagePath,
+        storageBucket: bucket,
+        authUid: user.uid,
+        timeoutMs,
+        attempts: maxAttempts,
+        namespace: options.namespace,
+        ...options.logContext,
+      });
+      throw lastError;
+    }
+
+    throw new Error('Native upload failed without an error');
+  } catch (error) {
+    void recordRuntimeTrace({
+      screen: sourceLabel,
+      action: 'native_upload_engine_complete',
+      status: 'fail',
+      feature,
+      stage: 'native_engine_complete',
+      firebasePath: storagePath,
+      firebaseCode: extractFirebaseCode(error),
+      error,
+      details: {
+        storageBucket: bucket || 'unknown',
+        authUid: user.uid,
+        timeoutMs,
+        attempts: maxAttempts,
+        namespace: options.namespace,
+        ...options.logContext,
+      },
+    });
+    throw error;
+  }
+}
+
+async function uploadViaBlobFetch(
   localUri: string,
   options: PhotoUploadOptions,
 ): Promise<UploadedPhotoResult> {

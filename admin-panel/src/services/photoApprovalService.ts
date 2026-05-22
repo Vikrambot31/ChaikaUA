@@ -12,6 +12,7 @@ export type PhotoRecord = {
   storagePath?: string;
   uploadedBy?: string;
   status: ApprovalStatus;
+  target?: 'gallery_public' | 'my_photos';
   uploadedAt: number;
   moderationReason?: string;
   moderatedAt?: number;
@@ -39,10 +40,17 @@ const normalizeRecord = (key: string, raw: unknown): PhotoRecord | null => {
     storagePath: getString(r.storagePath) || getString(r.photoStoragePath) || undefined,
     uploadedBy: getString(r.uploadedBy) || getString(r.userName) || undefined,
     status: normalizeStatus(r.status),
+    target: r.target === 'my_photos' ? 'my_photos' : 'gallery_public',
     uploadedAt: getNumber(r.uploadedAt) || getNumber(r.createdAt) || getNumber(r.timestamp),
     moderationReason: getString(r.moderationReason) || undefined,
     moderatedAt: getNumber(r.moderatedAt) || undefined,
   };
+};
+
+const isPublicGalleryPhoto = (photo: PhotoRecord): boolean => {
+  const title = typeof photo.title === 'string' ? photo.title.trim() : '';
+  const isLegacyPersonalDefault = title === 'Photo' || title === 'Р¤РѕС‚Рѕ';
+  return photo.target === 'gallery_public' && !isLegacyPersonalDefault;
 };
 
 export const loadPhotos = async (): Promise<PhotoRecord[]> => {
@@ -52,6 +60,7 @@ export const loadPhotos = async (): Promise<PhotoRecord[]> => {
   return Object.entries(raw)
     .map(([key, val]) => normalizeRecord(key, val))
     .filter((x): x is PhotoRecord => x !== null)
+    .filter(isPublicGalleryPhoto)
     .sort((a, b) => b.uploadedAt - a.uploadedAt);
 };
 

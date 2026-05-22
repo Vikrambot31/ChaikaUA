@@ -14,7 +14,7 @@ import { auth, database, storage } from './firebase-core';
 import { ensureFirebaseAuth, isModeratorUser } from './firebase-auth-session';
 import { Request as AppRequest, CommunityPhoto as AppPhoto, AudioAttachment } from './types/app';
 import { resolveMediaAccessUrls } from './services/mediaAccess';
-import { getSecurityRole } from './services/securityRoles';
+
 
 export { auth, database, storage };
 
@@ -67,7 +67,7 @@ const MAX_PHOTO_TITLE_LENGTH = 80;
 const MAX_PHOTO_DESCRIPTION_LENGTH = 300;
 const MAX_AUDIO_UPLOAD_BYTES = 5 * 1024 * 1024; // 5 MB (~60s @ HIGH_QUALITY)
 const DAILY_REQUEST_LIMIT = 30;
-const MONTHLY_PHOTO_LIMIT = 5;
+
 const HIGH_PRIORITY_REQUEST_CATEGORIES = new Set<string>(['medical', 'electricity', 'care', 'repair']);
 const STORAGE_UPLOAD_TIMEOUT_MS = 20_000;
 
@@ -127,6 +127,7 @@ interface DbPhotoValue {
   createdAt?: unknown;
   uploadedAt?: unknown;
   status?: unknown;
+  target?: unknown;
   likes?: unknown;
   locationLabel?: unknown;
   locationType?: unknown;
@@ -134,6 +135,7 @@ interface DbPhotoValue {
   rejectionReason?: unknown;
   reason?: unknown;
 }
+
 
 /** Shape of a raw database user node. */
 interface DbUserValue {
@@ -182,6 +184,7 @@ interface AddPhotoPayload {
   imageUri: string;
   storagePath?: string;
   uploadedBy?: string;
+  target?: 'gallery_public';
   locationLabel?: string;
   locationType?: 'building' | 'place';
 }
@@ -255,6 +258,17 @@ const getRequestModerationMeta = (category: unknown): ModerationMeta => {
     moderationPriority: 'standard',
     moderationQueue: 'standard',
   };
+};
+
+const getRequestExpiryTtlMs = (payload: AddRequestPayload): number => {
+  const category = String(payload.category || '').toLowerCase();
+  const group = String(payload.group || '').toLowerCase();
+  const subcategory = String(payload.subcategory || '').toLowerCase();
+
+  if (category === 'problem') return 30 * 24 * 60 * 60 * 1000;
+  if (group === 'help_neighbors' || category === 'medical' || category === 'care') return 10 * 24 * 60 * 60 * 1000;
+  if (subcategory === 'going_shopping' || subcategory === 'ride_share' || group === 'foodsharing' || group === 'transport') return 10 * 24 * 60 * 60 * 1000;
+  return 15 * 24 * 60 * 60 * 1000;
 };
 
 /**
@@ -413,29 +427,12 @@ const mapDbRequestToAppRequest = (id: string, value: unknown): AppRequest => {
   };
 };
 
-const getCurrentMonthStartMs = (): number => {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-};
 
 const getCurrentDayStartMs = (): number => {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 };
 
-const countCurrentMonthItemsByUser = async (
-  path: 'requests' | 'community_photos',
-  userId: string,
-): Promise<number> => {
-  const snapshot = await get(query(ref(database, path), orderByChild('userId'), equalTo(userId)));
-  const raw = snapshot.val() as Record<string, { createdAt?: unknown }> | null;
-  if (!raw) return 0;
-
-  const monthStart = getCurrentMonthStartMs();
-  return Object.values(raw).filter(
-    (entry) => typeof entry?.createdAt === 'number' && entry.createdAt >= monthStart,
-  ).length;
-};
 
 const countCurrentDayItemsByUser = async (
   path: 'requests' | 'community_photos',
@@ -513,6 +510,7 @@ const mapDbPhotoToAppPhoto = (id: string, value: unknown): AppPhoto => {
         : 'Anonymous',
     createdAt: new Date(createdAt),
     status,
+    target: v?.target === 'my_photos' ? 'my_photos' : 'gallery_public',
     likes: typeof v?.likes === 'number' ? v.likes : 0,
     locationLabel:
       typeof v?.locationLabel === 'string' ? v.locationLabel : undefined,
@@ -663,7 +661,7 @@ export const firebaseChatAPI = {
         ...moderationMeta,
         timestamp: Date.now(),
         createdAt: Date.now(),
-        expires_at: Date.now() + 3 * 24 * 60 * 60 * 1000,
+        expires_at: Date.now() + getRequestExpiryTtlMs(requestData),
         ...(requestData.audio ? { audio: requestData.audio } : {}),
         ...(requestData.photoStoragePath || requestData.photoUri
           ? {
@@ -705,6 +703,7 @@ export const firebaseChatAPI = {
             ref(database, 'requests'),
             orderByChild('status'),
             equalTo('approved'),
+            limitToLast(200),
           );
       const [requestsSnapshot] = await Promise.all([get(requestsRef)]);
       const requests: AppRequest[] = [];
@@ -815,7 +814,7 @@ export const firebaseChatAPI = {
           requestsQuery,
           orderByChild('status'),
           equalTo('approved'),
-          limitToLast(Math.max(limit * 4, 80)),
+          limitToLast(Math.max(limit * 4, 200)),
         );
       } else if (category) {
         requestsQuery = query(
@@ -1083,13 +1082,6 @@ export const photoAPI = {
   addPhoto: async (photoData: AddPhotoPayload): Promise<ApiVoidResult> => {
     try {
       const user: FirebaseUser = await ensureFirebaseAuth();
-      const roleSnapshot = await getSecurityRole(user.uid);
-      if (roleSnapshot.role !== 'admin') {
-        const monthlyPhotosCount = await countCurrentMonthItemsByUser('community_photos', user.uid);
-        if (monthlyPhotosCount >= MONTHLY_PHOTO_LIMIT) {
-          throw new Error(`Monthly photo limit reached (${MONTHLY_PHOTO_LIMIT})`);
-        }
-      }
       const normalizedTitle = normalizeText(
         photoData.title,
         MAX_PHOTO_TITLE_LENGTH,
@@ -1134,6 +1126,7 @@ export const photoAPI = {
         createdAt: now,
         uploadedAt: now,
         status: 'pending',
+        target: photoData.target || 'gallery_public',
         safetyStatus: 'pending',
         safetyReason: 'awaiting_moderator_safety_review',
         likes: 0,
@@ -1304,6 +1297,8 @@ const signInWithGoogleMobile = async (): Promise<FirebaseUser> => {
   const { GoogleSignin, statusCodes } = require('@react-native-google-signin/google-signin') as {
     GoogleSignin: {
       hasPlayServices: (opts: { showPlayServicesUpdateDialog: boolean }) => Promise<void>;
+      hasPreviousSignIn?: () => boolean;
+      signOut?: () => Promise<void>;
       signIn: () => Promise<{ idToken?: string; data?: { idToken?: string } }>;
     };
     statusCodes: {
@@ -1315,6 +1310,9 @@ const signInWithGoogleMobile = async (): Promise<FirebaseUser> => {
 
   try {
     await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+    if (GoogleSignin.signOut && (!GoogleSignin.hasPreviousSignIn || GoogleSignin.hasPreviousSignIn())) {
+      await GoogleSignin.signOut();
+    }
     const userInfo = await GoogleSignin.signIn();
     const idToken = userInfo?.idToken || userInfo?.data?.idToken;
     if (!idToken) {

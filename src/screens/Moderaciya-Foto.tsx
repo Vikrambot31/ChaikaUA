@@ -129,6 +129,12 @@ const T = {
   },
 } as const;
 
+const isPublicGalleryPhoto = (photo: CommunityPhoto): boolean => {
+  const title = typeof photo.title === 'string' ? photo.title.trim() : '';
+  const isLegacyPersonalDefault = title === 'Photo' || title === 'Р¤РѕС‚Рѕ';
+  return photo.target === 'gallery_public' && !isLegacyPersonalDefault;
+};
+
 const PhotoModerationScreen: React.FC = () => {
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ru') as Lang);
   const text = T[language];
@@ -173,7 +179,7 @@ const PhotoModerationScreen: React.FC = () => {
         loaders.push((async () => {
           const photoRes = await photoAPI.getPhotosOnce();
           if (photoRes.success && photoRes.data) {
-            setPhotos(photoRes.data);
+            setPhotos(photoRes.data.filter(isPublicGalleryPhoto));
           }
         })());
       }

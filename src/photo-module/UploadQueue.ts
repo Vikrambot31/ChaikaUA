@@ -54,7 +54,7 @@ export const UploadQueue = {
       screen: 'UploadQueue.enqueue',
       action: 'enqueue',
       status: exists ? 'progress' : 'start',
-      feature: 'gallery',
+      feature: 'profile',
       stage: 'enqueue',
       details: {
         photoId,
@@ -96,20 +96,21 @@ export const UploadQueue = {
           screen: 'UploadQueue.process',
           action: 'task_start',
           status: 'start',
-          feature: 'gallery',
+          feature: 'profile',
           stage: `task.attempt_${task.retryCount + 1}`,
           details: {
             photoId: task.photoId,
             uriScheme: task.localUri.split(':')[0] || 'file',
             retryCount: task.retryCount,
-            namespace: 'community_photos',
+            namespace: 'user_photos',
           },
         });
 
         try {
           const upload = await uploadAndSavePhoto(task.localUri, {
-            namespace: 'community_photos',
+            namespace: 'user_photos',
             resolveDownloadUrl: true,
+            feature: 'profile',
             sourceLabel: 'PhotoModule.UploadQueue',
             logContext: { photoId: task.photoId, retryCount: task.retryCount },
             communityMetadata: task.metadata,
@@ -119,7 +120,7 @@ export const UploadQueue = {
             screen: 'UploadQueue.process',
             action: 'task_complete',
             status: 'success',
-            feature: 'gallery',
+            feature: 'profile',
             stage: 'task_complete',
             firebasePath: upload.storagePath,
             details: {
@@ -146,7 +147,7 @@ export const UploadQueue = {
             screen: 'UploadQueue.process',
             action: 'task_fail',
             status: retryCount >= MAX_RETRY_COUNT ? 'fail' : 'progress',
-            feature: 'gallery',
+            feature: 'profile',
             stage: `task.attempt_${retryCount}`,
             error,
             details: {

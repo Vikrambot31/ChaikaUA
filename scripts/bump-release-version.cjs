@@ -1,7 +1,9 @@
-const fs = require('fs');
+﻿const fs = require('fs');
 const path = require('path');
 
 const root = path.resolve(__dirname, '..');
+const siteDir = path.join(root, 'chaika-site');
+const siteReleaseDir = path.join(siteDir, 'release');
 
 const readText = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8');
 const writeText = (relativePath, value) => fs.writeFileSync(path.join(root, relativePath), value, 'utf8');
@@ -21,6 +23,8 @@ const currentVersion = String(packageJson.version || '1.0.0');
 const parts = currentVersion.split('.').map((part) => Number.parseInt(part, 10));
 while (parts.length < 3) parts.push(0);
 const nextVersion = `${parts[0] || 0}.${parts[1] || 0}.${(parts[2] || 0) + 1}`;
+const apkFileName = `ChaikaLife-v${nextVersion}-${buildStamp}.apk`;
+const apkRelativeUrl = `release/${apkFileName}`;
 
 packageJson.version = nextVersion;
 writeJson('package.json', packageJson);
@@ -42,8 +46,30 @@ versionConfig.latestVersion = nextVersion;
 versionConfig.minSupportedVersion = nextVersion;
 versionConfig.lastVersionDate = buildDate;
 versionConfig.lastBuildStamp = buildStamp;
-versionConfig.androidUrl = `https://chaika-ua.netlify.app/release/ChaikaUA-v${nextVersion}-${buildStamp}.apk`;
+versionConfig.androidUrl = `https://chaika-life.netlify.app/${apkRelativeUrl}`;
 writeJson('app-version.json', versionConfig);
+writeJson(path.join('chaika-site', 'app-version.json'), versionConfig);
+
+if (!fs.existsSync(siteReleaseDir)) {
+  fs.mkdirSync(siteReleaseDir, { recursive: true });
+}
+
+writeJson(path.join('chaika-site', 'release', 'latest.json'), {
+  version: nextVersion,
+  buildDate,
+  buildStamp,
+  apkFile: apkFileName,
+  apkUrl: apkRelativeUrl,
+});
+
+const siteIndexPath = path.join('chaika-site', 'index.html');
+if (fs.existsSync(path.join(root, siteIndexPath))) {
+  let siteIndex = readText(siteIndexPath);
+  siteIndex = siteIndex
+    .replace(/Р’РµСЂСЃС–СЏ\s+\d+\.\d+\.\d+/g, `Р’РµСЂСЃС–СЏ ${nextVersion}`)
+    .replace(/href="(?:https?:\/\/[^\"]+\/)?release\/[^"]+\.apk"/g, `href="${apkRelativeUrl}"`);
+  writeText(siteIndexPath, siteIndex);
+}
 
 let constants = readText('src/utils/constants.ts');
 constants = constants
@@ -69,3 +95,4 @@ console.log(`VERSION=${nextVersion}`);
 console.log(`VERSION_CODE=${nextVersionCode}`);
 console.log(`BUILD_DATE=${buildDate}`);
 console.log(`BUILD_STAMP=${buildStamp}`);
+

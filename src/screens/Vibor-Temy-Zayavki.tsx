@@ -83,7 +83,7 @@ const RequestTopicScreen: React.FC = () => {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Image source={require('../../assets/Operator.png')} style={styles.headerImage} resizeMode="cover" />
+        <Image source={require('../../assets/WEBP-version/Operator.webp')} style={styles.headerImage} resizeMode="cover" />
 
         <View style={styles.quickGrid}>
           <TouchableOpacity

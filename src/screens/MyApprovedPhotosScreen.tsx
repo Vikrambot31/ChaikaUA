@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -33,7 +33,7 @@ const UI_TEXT = {
     filterPending: (n: number) => `Очікують (${n})`,
     filterApproved: (n: number) => `Схвалені (${n})`,
     filterRejected: (n: number) => `Відхилені (${n})`,
-    statusPending: 'Очікує схвалення',
+    statusPending: 'На перевірці',
     statusApproved: 'Схвалено',
     statusRejected: 'Відхилено',
     reviewedAt: 'Перевірено: ',
@@ -51,7 +51,7 @@ const UI_TEXT = {
     filterPending: (n: number) => `Ожидают (${n})`,
     filterApproved: (n: number) => `Одобрены (${n})`,
     filterRejected: (n: number) => `Отклонены (${n})`,
-    statusPending: 'Ожидает одобрения',
+    statusPending: 'На проверке',
     statusApproved: 'Одобрено',
     statusRejected: 'Отклонено',
     reviewedAt: 'Проверено: ',
@@ -69,7 +69,7 @@ const UI_TEXT = {
     filterPending: (n: number) => `Pending (${n})`,
     filterApproved: (n: number) => `Approved (${n})`,
     filterRejected: (n: number) => `Rejected (${n})`,
-    statusPending: 'Pending approval',
+    statusPending: 'Under review',
     statusApproved: 'Approved',
     statusRejected: 'Rejected',
     reviewedAt: 'Reviewed: ',
@@ -97,9 +97,9 @@ type PhotoRecord = {
 };
 
 const STATUS_LABEL_BY_LANG: Record<Lang, Record<ApprovalStatus, string>> = {
-  ua: { pending: 'Очікує схвалення', approved: 'Схвалено', rejected: 'Відхилено' },
-  ru: { pending: 'Ожидает одобрения', approved: 'Одобрено', rejected: 'Отклонено' },
-  en: { pending: 'Pending approval', approved: 'Approved', rejected: 'Rejected' },
+  ua: { pending: 'На перевірці', approved: 'Схвалено', rejected: 'Відхилено' },
+  ru: { pending: 'На проверке', approved: 'Одобрено', rejected: 'Отклонено' },
+  en: { pending: 'Under review', approved: 'Approved', rejected: 'Rejected' },
 };
 
 const STATUS_COLOR: Record<ApprovalStatus, string> = {
@@ -137,6 +137,16 @@ export default function MyApprovedPhotosScreen() {
   const [filter, setFilter] = useState<ApprovalStatus | 'all'>('all');
   const [addFormVisible, setAddFormVisible] = useState(false);
   const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
+  const pickerActiveRef = useRef(false);
+
+  const handlePickerOpenChange = useCallback((isOpen: boolean) => {
+    pickerActiveRef.current = isOpen;
+  }, []);
+
+  const handleRequestCloseModal = useCallback(() => {
+    if (pickerActiveRef.current) return;
+    setAddFormVisible(false);
+  }, []);
 
   useEffect(() => {
     if (!user?.id) {
@@ -273,7 +283,11 @@ export default function MyApprovedPhotosScreen() {
             <View key={photo.firebaseKey} style={styles.card}>
               <Image
                 source={{ uri: photo.thumbUrl || photo.downloadUrl }}
-                style={styles.thumb}
+                style={[
+                  styles.thumb,
+                  photo.status === 'pending' && styles.thumbPending,
+                  photo.status === 'rejected' && styles.thumbRejected,
+                ]}
                 resizeMode="cover"
               />
               <View style={styles.cardBody}>
@@ -324,12 +338,12 @@ export default function MyApprovedPhotosScreen() {
         visible={addFormVisible}
         transparent
         animationType="slide"
-        onRequestClose={() => setAddFormVisible(false)}
+        onRequestClose={handleRequestCloseModal}
       >
         <TouchableOpacity
           style={styles.sheetBackdrop}
           activeOpacity={1}
-          onPress={() => setAddFormVisible(false)}
+          onPress={handleRequestCloseModal}
         />
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -358,6 +372,7 @@ export default function MyApprovedPhotosScreen() {
                 maxPhotos={5}
                 storagePath="community_photos"
                 onPhotosChange={(p) => setFormPhotos(p)}
+                onPickerOpenChange={handlePickerOpenChange}
               />
               <View style={styles.infoCard}>
                 <Text style={styles.infoText}>
@@ -435,6 +450,8 @@ const styles = StyleSheet.create({
     height: 90,
     backgroundColor: '#E8E0D4',
   },
+  thumbPending: { opacity: 0.45 },
+  thumbRejected: { opacity: 0.3 },
   cardBody: {
     flex: 1,
     padding: 10,

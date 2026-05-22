@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Linking,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -11,11 +12,14 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSelector } from 'react-redux';
+import { get, ref } from 'firebase/database';
 import type { RootState } from '../redux/store';
 import { getBuildInfo, type BuildInfo } from '../utils/buildInfo';
 import { getReleases, getScreenNameForFile, type ReleaseInfo } from '../services/releaseInfoService';
+import { trackApkDownload } from '../services/apkDownloadTracker';
 import { COLORS } from '../utils/constants';
 import { SCREEN_THEME } from '../utils/screenTheme';
+import { database } from '../firebase-config';
 
 type Lang = 'ua' | 'ru' | 'en';
 
@@ -39,6 +43,9 @@ const COPY = {
     moreFiles: 'ще файлів',
     appVersion: 'Версія APP',
     summary: 'Опис',
+    downloadApk: 'Завантажити APK',
+    downloading: 'Відкриваємо...',
+    newVersionAvailable: 'Доступна нова версія',
   },
   ru: {
     title: 'Версия APP и обновления',
@@ -59,6 +66,9 @@ const COPY = {
     moreFiles: 'ещё файлов',
     appVersion: 'Версия APP',
     summary: 'Описание',
+    downloadApk: 'Скачать APK',
+    downloading: 'Открываем...',
+    newVersionAvailable: 'Доступна новая версия',
   },
   en: {
     title: 'App Version & Updates',
@@ -79,6 +89,9 @@ const COPY = {
     moreFiles: 'more files',
     appVersion: 'App Version',
     summary: 'Summary',
+    downloadApk: 'Download APK',
+    downloading: 'Opening...',
+    newVersionAvailable: 'New version available',
   },
 } as const;
 
@@ -169,6 +182,10 @@ const AppVersionInfoScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [apkUrl, setApkUrl] = useState<string | null>(null);
+  const [latestVersion, setLatestVersion] = useState<string | null>(null);
+  const [latestBuildStamp, setLatestBuildStamp] = useState<string | null>(null);
+  const [downloadBusy, setDownloadBusy] = useState(false);
 
   const loadData = useCallback(async (isRefresh = false) => {
     if (isRefresh) {
@@ -185,6 +202,17 @@ const AppVersionInfoScreen: React.FC = () => {
       ]);
       setBuildInfo(info);
       setReleases(releaseList);
+
+      // Load APK URL from version registry (written by build-core.ps1 after each deploy)
+      try {
+        const snap = await get(ref(database, 'app_version_registry/current'));
+        const reg = snap.val() as { apkUrl?: string; version?: string; buildStamp?: string } | null;
+        if (reg?.apkUrl) setApkUrl(reg.apkUrl);
+        if (reg?.version) setLatestVersion(reg.version);
+        if (reg?.buildStamp) setLatestBuildStamp(reg.buildStamp);
+      } catch {
+        // Registry may not exist yet — ignore silently
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : text.error);
     } finally {
@@ -192,6 +220,22 @@ const AppVersionInfoScreen: React.FC = () => {
       setRefreshing(false);
     }
   }, [text.error]);
+
+  const handleDownload = useCallback(async () => {
+    if (!apkUrl || downloadBusy) return;
+    setDownloadBusy(true);
+    try {
+      await Linking.openURL(apkUrl);
+      void trackApkDownload(
+        latestVersion ?? buildInfo?.appVersion ?? '',
+        latestBuildStamp ?? buildInfo?.buildStamp ?? '',
+      );
+    } catch {
+      // Ignore — URL open failure is non-fatal
+    } finally {
+      setDownloadBusy(false);
+    }
+  }, [apkUrl, downloadBusy, latestVersion, latestBuildStamp, buildInfo]);
 
   useEffect(() => {
     void loadData();
@@ -225,11 +269,23 @@ const AppVersionInfoScreen: React.FC = () => {
         >
           {buildInfo ? (
             <View style={styles.currentCard}>
-              <Text style={styles.currentCardTitle}>{'\u{1F4E6}'} ChaikaUA-v{buildInfo.appVersion}-{buildInfo.buildDate}</Text>
+              <Text style={styles.currentCardTitle}>{'\u{1F4E6}'} ChaikaLife-v{buildInfo.appVersion}-{buildInfo.buildDate}</Text>
               <Text style={styles.currentCardMeta}>{text.source}: {buildInfo.source}</Text>
               <Text style={styles.currentCardMeta}>{text.build}: {buildInfo.buildStamp || '\u2014'}</Text>
               <Text style={styles.currentCardMeta}>{text.commit}: {buildInfo.commitHash ? buildInfo.commitHash.slice(0, 8) : '\u2014'}</Text>
               <Text style={styles.currentCardMeta}>{text.mode}: {buildInfo.buildMode || '\u2014'}</Text>
+              {apkUrl ? (
+                <TouchableOpacity
+                  style={styles.downloadBtn}
+                  onPress={() => void handleDownload()}
+                  activeOpacity={0.82}
+                  disabled={downloadBusy}
+                >
+                  <Text style={styles.downloadBtnText}>
+                    {downloadBusy ? text.downloading : `\u2B07 ${text.downloadApk} v${latestVersion ?? buildInfo.appVersion}`}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
           ) : null}
 
@@ -287,6 +343,17 @@ const styles = StyleSheet.create({
   },
   currentCardTitle: { color: '#fff', fontSize: 16, fontWeight: '900', marginBottom: 8 },
   currentCardMeta: { color: 'rgba(255,255,255,0.85)', fontSize: 13, marginTop: 3 },
+  downloadBtn: {
+    marginTop: 14,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.35)',
+  },
+  downloadBtnText: { color: '#fff', fontWeight: '800', fontSize: 14 },
   sectionTitle: { fontSize: 18, fontWeight: '900', color: '#1A1A1A', marginBottom: 12 },
   releaseCard: {
     backgroundColor: '#fff',

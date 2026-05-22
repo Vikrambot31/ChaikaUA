@@ -10,7 +10,7 @@ export interface ElectricityReport {
   createdAt: Date;
   userName: string;
   userPhone: string;
-  moderationStatus?: 'pending' | 'approved' | 'rejected';
+  moderationStatus?: 'pending' | 'approved' | 'rejected' | 'expired';
   submittedForModerationAt?: string;
 }
 

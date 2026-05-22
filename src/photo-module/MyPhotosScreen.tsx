@@ -26,7 +26,6 @@ import { safeLogError } from '../utils/errorLogger';
 import { uniqueId } from '../utils/cryptoId';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { showUserError } from '../utils/userFacingErrors';
-import { subscribeCurrentUserSecurityRole } from '../services/securityRoles';
 import AppPhotoImage from '../components/AppPhotoImage';
 import { getBestPhotoUri, getPhotoThumbnailUri, ImageStorage } from './ImageStorage';
 import { PhotoSelector } from './PhotoSelector';
@@ -101,41 +100,6 @@ const UI_TEXT = {
   },
 } as const;
 
-const MONTHLY_LIMIT = 5;
-const SCREEN_PHOTO_LIMIT = 5;
-
-const getMonthlyLimitTitle = (language: AppLanguage): string => (
-  language === 'ru' ? 'Лимит на месяц' : language === 'en' ? 'Monthly limit' : 'Ліміт на місяць'
-);
-
-const getMonthlyLimitText = (language: AppLanguage): string => (
-  language === 'ru'
-    ? 'Можно добавить не более 10 фото в месяц.'
-    : language === 'en'
-      ? 'You can add no more than 5 photos per month.'
-      : 'Можна додати не більше 2 фото на місяць.'
-);
-
-const getMonthlyProgressText = (language: AppLanguage, used: number): string => (
-  language === 'ru'
-    ? `В этом месяце добавлено: ${used}/5`
-    : language === 'en'
-      ? `Added this month: ${used}/5`
-      : `У цьому місяці додано: ${used}/5`
-);
-
-const getScreenLimitTitle = (language: AppLanguage): string => (
-  language === 'ru' ? 'Лимит на экране' : language === 'en' ? 'Screen limit' : 'Ліміт на екрані'
-);
-
-const getScreenLimitText = (language: AppLanguage): string => (
-  language === 'ru'
-    ? 'На этом экране можно хранить до 10 фото.'
-    : language === 'en'
-      ? 'You can store up to 5 photos on this screen.'
-      : 'На цьому екрані можна зберігати до 10 фото.'
-);
-
 const statusColor: Record<UserPhoto['status'], string> = {
   queued: '#A66A00',
   uploading: SCREEN_THEME.enamelBlueDark,
@@ -183,7 +147,6 @@ const MyPhotosScreen: React.FC = () => {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [previewPhoto, setPreviewPhoto] = useState<PreviewPhoto | null>(null);
   // local progress tracking — not persisted to AsyncStorage
-  const [isAdmin, setIsAdmin] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const handleBack = useCallback(() => {
     if (typeof navigation.canGoBack === 'function' && navigation.canGoBack()) {
@@ -194,22 +157,11 @@ const MyPhotosScreen: React.FC = () => {
   }, [navigation]);
 
   useEffect(() => {
-    if (!uid) {
-      setIsAdmin(false);
-      return undefined;
-    }
-
-    return subscribeCurrentUserSecurityRole((snapshot) => {
-      setIsAdmin(snapshot.role === 'admin');
-    });
-  }, [uid]);
-
-  useEffect(() => {
     const unsubscribe = ImageStorage.subscribe(setPhotos);
 
     if (selectMode) {
       void ImageStorage.getPhotos().then((existing) => {
-        if (existing.length === 0 && !limitReached) {
+        if (existing.length === 0) {
           void addPhoto();
         }
       });
@@ -238,23 +190,15 @@ const MyPhotosScreen: React.FC = () => {
     error: text.error,
   }), [text]);
 
-  const monthlyUsed = useMemo(() => {
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-    return photos.filter((photo) => Number(photo.createdAt) >= monthStart).length;
-  }, [photos]);
-
-  const limitReached = !isAdmin && monthlyUsed >= MONTHLY_LIMIT;
-  const screenLimitReached = !isAdmin && photos.length >= SCREEN_PHOTO_LIMIT;
-
   // ─── upload a single photo to Firebase Storage (same flow as PhotoUploadField) ──
 
   const uploadToStorage = useCallback(async (id: string, localUri: string): Promise<UploadAndSaveResult | null> => {
     setUploadProgress((prev) => ({ ...prev, [id]: 1 }));
     try {
       const upload = await uploadAndSavePhoto(localUri, {
-        namespace: 'community_photos',
+        namespace: 'user_photos',
         resolveDownloadUrl: true,
+        feature: 'profile',
         communityMetadata: {
           uploadedBy: userEmail || userName || uid,
         },
@@ -284,14 +228,6 @@ const MyPhotosScreen: React.FC = () => {
 
   const addPhoto = useCallback(async () => {
     if (adding) return;
-    if (screenLimitReached) {
-      Alert.alert(getScreenLimitTitle(language), getScreenLimitText(language));
-      return;
-    }
-    if (limitReached) {
-      Alert.alert(getMonthlyLimitTitle(language), getMonthlyLimitText(language));
-      return;
-    }
     setAdding(true);
     try {
       // 1. Permission request — same as PhotoUploadField
@@ -373,7 +309,7 @@ const MyPhotosScreen: React.FC = () => {
     } finally {
       setAdding(false);
     }
-  }, [adding, handleBack, language, limitReached, navigation, screenLimitReached, selectMode, uid, uploadToStorage]);
+  }, [adding, handleBack, language, navigation, selectMode, uid, uploadToStorage]);
 
   // ─── retry failed upload ──────────────────────────────────────────────────────
 
@@ -481,7 +417,6 @@ const MyPhotosScreen: React.FC = () => {
         <View style={styles.headerCopy}>
           <Text style={styles.title}>{text.title}</Text>
           <Text style={styles.subtitle}>{selectMode ? text.selectHint : text.subtitle}</Text>
-          {!selectMode ? <Text style={styles.limitNote}>{getMonthlyProgressText(language, monthlyUsed)}</Text> : null}
         </View>
       </View>
 
@@ -501,7 +436,7 @@ const MyPhotosScreen: React.FC = () => {
         }
       />
 
-      <TouchableOpacity style={[styles.addButton, (adding || limitReached || screenLimitReached) && styles.addButtonDisabled]} onPress={addPhoto} activeOpacity={0.88} disabled={adding || limitReached || screenLimitReached}>
+      <TouchableOpacity style={[styles.addButton, adding && styles.addButtonDisabled]} onPress={addPhoto} activeOpacity={0.88} disabled={adding}>
         {adding ? <ActivityIndicator color="#fff" /> : <MaterialCommunityIcons name="plus" size={22} color="#fff" />}
         <Text style={styles.addButtonText}>{text.add}</Text>
       </TouchableOpacity>

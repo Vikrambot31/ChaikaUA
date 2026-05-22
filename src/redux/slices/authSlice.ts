@@ -1,5 +1,5 @@
 /**
- * Redux слайс для управления авторизацией
+ * Redux slice for authentication state.
  */
 
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
@@ -19,25 +19,25 @@ const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
-    // Установить пользователя
+    // Set user
     setUser: (state, action: PayloadAction<User>) => {
       state.user = action.payload;
       state.isAuthenticated = true;
       state.isBootstrapped = true;
     },
 
-    // Установить режим загрузки
+    // Set loading state
     setLoading: (state, action: PayloadAction<boolean>) => {
       state.loading = action.payload;
     },
 
-    // Установить ошибку
+    // Set auth error
     setError: (state, action: PayloadAction<string | null>) => {
       state.error = action.payload;
       state.loading = false;
     },
 
-    // Логаут
+    // Logout
     logout: (state) => {
       state.isAuthenticated = false;
       state.user = null;
@@ -46,12 +46,12 @@ const authSlice = createSlice({
       state.isBootstrapped = true;
     },
 
-    // !>E@0=8BL FCM токен
+    // Set FCM token
     setFCMToken: (state, action: PayloadAction<string | null>) => {
       state.fcmToken = action.payload;
     },
 
-    // Очистить ошибку
+    // Clear auth error
     clearError: (state) => {
       state.error = null;
     },
@@ -60,7 +60,7 @@ const authSlice = createSlice({
       state.isBootstrapped = action.payload;
     },
 
-    // Обновить дни использования
+    // Update days used
     updateDaysUsed: (state, action: PayloadAction<number>) => {
       if (state.user) {
         state.user.daysUsed = action.payload;
@@ -80,7 +80,7 @@ export const {
   updateDaysUsed,
 } = authSlice.actions;
 
-// !5;5:B>@K
+// Selectors
 export const selectIsAuthenticated = (state: RootState) => state.auth.isAuthenticated;
 export const selectUser = (state: RootState) => state.auth.user;
 export const selectAuthLoading = (state: RootState) => state.auth.loading;

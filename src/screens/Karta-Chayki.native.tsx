@@ -1,7 +1,6 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
-  Image,
   SafeAreaView,
   StyleSheet,
   Text,
@@ -16,7 +15,6 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import PlaceMarker from '../components/PlaceMarker';
 import PlaceDetailsPanel from './Panel-Detaley-Mesta';
-import { SkeletonList } from '../components/SkeletonLoader';
 import { usePlaces } from '../hooks/usePlaces';
 import { AppDispatch } from '../redux/store';
 import { filterByTypes } from '../redux/slices/placesSlice';
@@ -76,11 +74,6 @@ const UI_TEXT = {
   },
 } as const;
 
-const MAP_SPLASH_TEXT = {
-  ua: 'Завантаження карти',
-  ru: 'Загрузка карты',
-  en: 'Loading map',
-} as const;
 
 const MAP_FALLBACK_TEXT = {
   ua: {
@@ -180,7 +173,6 @@ const MapScreen: React.FC = () => {
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const text = UI_TEXT[language];
   const places = useSelector((state: RootState) => state.places.items);
-  const loading = useSelector((state: RootState) => state.places.loading);
   const error = useSelector((state: RootState) => state.places.error);
   const selectedTypes = useSelector((state: RootState) => state.places.selectedTypes);
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
@@ -188,10 +180,8 @@ const MapScreen: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [typeSearchText, setTypeSearchText] = useState('');
   const [filtersVisible, setFiltersVisible] = useState(false);
-  const [showMapSplash, setShowMapSplash] = useState(true);
   const [mapReady, setMapReady] = useState(false);
   const [mapLoadFailed, setMapLoadFailed] = useState(false);
-  const splashText = MAP_SPLASH_TEXT[language];
   const mapFallbackText = MAP_FALLBACK_TEXT[language];
   const placeLabels = PLACE_TYPE_LABELS[language];
   const fallbackFocusedPlace = useMemo<Place | null>(() => {
@@ -287,15 +277,6 @@ const MapScreen: React.FC = () => {
   }, [loadPlaces]);
 
   useEffect(() => {
-    setShowMapSplash(true);
-    const timeout = setTimeout(() => {
-      setShowMapSplash(false);
-    }, 3000);
-
-    return () => clearTimeout(timeout);
-  }, []);
-
-  useEffect(() => {
     if (mapReady) {
       setMapLoadFailed(false);
       return undefined;
@@ -303,7 +284,6 @@ const MapScreen: React.FC = () => {
 
     const timeout = setTimeout(() => {
       setMapLoadFailed(true);
-      setShowMapSplash(false);
     }, 6500);
 
     return () => clearTimeout(timeout);
@@ -460,14 +440,6 @@ const MapScreen: React.FC = () => {
   );
 
   const renderEmpty = () => {
-    if (loading) {
-      return (
-        <View style={styles.emptyContainer}>
-          <SkeletonList count={5} />
-        </View>
-      );
-    }
-
     if (error) {
       return (
         <View style={styles.errorContainer}>
@@ -522,7 +494,7 @@ const MapScreen: React.FC = () => {
               initialRegion={mapRegion}
               showsUserLocation={false}
               showsMyLocationButton={false}
-              loadingEnabled
+              loadingEnabled={false}
               onMapReady={() => {
                 setMapReady(true);
                 setMapLoadFailed(false);
@@ -579,16 +551,6 @@ const MapScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {showMapSplash ? (
-        <View style={styles.splashContainer}>
-          <Image source={require('../../assets/map4.png')} style={styles.splashImage} resizeMode="cover" />
-          <View style={styles.splashOverlay} />
-          <View style={styles.splashCaption}>
-            <Text style={styles.splashText}>{splashText}</Text>
-          </View>
-        </View>
-      ) : null}
-
       <View pointerEvents="none" style={styles.backgroundOrbs}>
         {LIGHT_ORBS.map((orb, index) => (
           <View
@@ -706,44 +668,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: SCREEN_THEME.appBg,
-  },
-  splashContainer: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 20,
-    elevation: 20,
-    backgroundColor: '#1F1828',
-    justifyContent: 'flex-end',
-  },
-  splashImage: {
-    ...StyleSheet.absoluteFillObject,
-    width: '100%',
-    height: '100%',
-  },
-  splashOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(22, 16, 28, 0.22)',
-  },
-  splashCaption: {
-    marginHorizontal: 20,
-    marginBottom: 28,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 249, 238, 0.92)',
-    borderWidth: 1,
-    borderColor: 'rgba(130, 87, 45, 0.18)',
-    shadowColor: '#2A1B12',
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 8,
-  },
-  splashText: {
-    color: '#2C211B',
-    textAlign: 'center',
-    fontSize: 20,
-    lineHeight: 24,
-    fontWeight: '900',
   },
   backgroundOrbs: {
     ...StyleSheet.absoluteFillObject,

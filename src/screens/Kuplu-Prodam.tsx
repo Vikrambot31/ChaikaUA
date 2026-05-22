@@ -23,7 +23,7 @@ import ContactReasonModal from '../components/ContactReasonModal';
 import { safeCallPhone } from '../utils/communicationActions';
 import type { DetailItemData } from '../utils/detailViewTypes';
 
-const FOUR_MONTHS_MS = 120 * 24 * 60 * 60 * 1000;
+const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000;
 
 const ITEM_CATEGORY_VALUES = [
   'furniture',
@@ -479,7 +479,7 @@ const BuySellScreen: React.FC = () => {
         moderationStatus: 'pending',
         submittedForModerationAt: createdAt.toISOString(),
         createdAt: createdAt.toISOString(),
-        expiresAt: new Date(createdAt.getTime() + FOUR_MONTHS_MS).toISOString(),
+        expiresAt: new Date(createdAt.getTime() + THREE_MONTHS_MS).toISOString(),
         userId: user?.id || '',
       });
 
@@ -657,13 +657,17 @@ const BuySellScreen: React.FC = () => {
                   <View style={styles.listingMeta}>
                     <Text style={styles.listingBadgeText}>{text.conditionLabels[item.condition as keyof typeof text.conditionLabels] ?? item.condition}</Text>
                     <Text style={styles.listingPrice}>{item.price} грн</Text>
-                    <Text style={styles.statusBadge}>
-                      {getModerationLabel(item.moderationStatus, {
-                        pending: text.pending,
-                        approved: text.approved,
-                        rejected: text.rejected,
-                      })}
-                    </Text>
+                    {item.isArchived ? (
+                      <Text style={styles.archiveBadge}>Архів</Text>
+                    ) : (
+                      <Text style={styles.statusBadge}>
+                        {getModerationLabel(item.moderationStatus, {
+                          pending: text.pending,
+                          approved: text.approved,
+                          rejected: text.rejected,
+                        })}
+                      </Text>
+                    )}
                   </View>
                   <Text style={styles.listingDescription} numberOfLines={2}>{item.description || text.noDesc}</Text>
                   {Boolean(item.photoUri || item.photoStoragePath) ? (
@@ -875,6 +879,7 @@ const styles = StyleSheet.create({
   listingName: { fontWeight: '800', color: SCREEN_THEME.textPrimary, flex: 1, marginRight: 8 },
   deleteText: { color: '#D05B4D', fontWeight: '700' },
   listingMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+  archiveBadge: { fontSize: 10, fontWeight: '700', color: '#fff', backgroundColor: '#8B7355', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 4, overflow: 'hidden' },
   listingBadgeText: { fontSize: 11, fontWeight: '700', color: '#7B1FA2' },
   listingPrice: { fontSize: 15, fontWeight: '900', color: '#00897B' },
   statusBadge: { fontSize: 11, fontWeight: '900', color: '#8A5A00', backgroundColor: '#FFF2C7', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },

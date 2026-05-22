@@ -35,7 +35,7 @@ const LanguageSelector: React.FC = () => {
             activeOpacity={0.7}
           >
             {lang.code === 'ru' ? (
-              <Image source={require('../../assets/Russia No war.png')} style={styles.noWarIcon} resizeMode="contain" />
+              <Image source={require('../../assets/WEBP-version/Russia No war.webp')} style={styles.noWarIcon} resizeMode="contain" />
             ) : (
               <Text style={styles.flag}>{lang.flag}</Text>
             )}

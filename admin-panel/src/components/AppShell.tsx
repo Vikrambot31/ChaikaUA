@@ -5,7 +5,7 @@ import { signOutAdmin } from '../services/authService';
 import { useFirebaseConnection } from '../hooks/useFirebaseConnection';
 import { InfoHint } from './InfoHint';
 
-export type AdminPageKey = 'dashboard' | 'moderation' | 'invite_access' | 'security' | 'errors' | 'photo_approval' | 'releases' | 'photo_test';
+export type AdminPageKey = 'dashboard' | 'moderation' | 'archive' | 'invite_access' | 'guarantor_tree' | 'access_control' | 'security' | 'errors' | 'photo_approval' | 'releases' | 'ai_diagnostics';
 
 type AppShellProps = {
   children: ReactNode;
@@ -27,9 +27,24 @@ const navItems: Array<{ key: AdminPageKey; label: string; hint: string }> = [
     hint: 'Проверка заявок и контента: одобрение, отклонение и удаление.',
   },
   {
+    key: 'archive',
+    label: 'Архив',
+    hint: 'Просроченные записи: просмотр, восстановление в активные или окончательное удаление.',
+  },
+  {
     key: 'invite_access',
     label: 'Приглашения',
     hint: 'Доверенные поручители, заявки на доступ и флаг включения системы приглашений.',
+  },
+  {
+    key: 'guarantor_tree',
+    label: 'Дерево поручителей',
+    hint: 'Визуализация цепочек приглашений и связей между поручителями.',
+  },
+  {
+    key: 'access_control',
+    label: 'Контроль доступа',
+    hint: 'Управление уровнями Public / Registered / Trusted. Статистика, режим системы, быстрая выдача временного доступа.',
   },
   {
     key: 'security',
@@ -52,21 +67,24 @@ const navItems: Array<{ key: AdminPageKey; label: string; hint: string }> = [
     hint: 'История релизов APK: версии, изменённые файлы, коммит-сообщения.',
   },
   {
-    key: 'photo_test',
-    label: 'Тест фото',
-    hint: 'Логи из экрана «Тест фото» мобильного приложения (путь: diagnostics/photo_test_logs).',
+    key: 'ai_diagnostics',
+    label: 'AI Diagnostics',
+    hint: 'Глубокий AI-аудит проекта: Upload, Firebase, Runtime, Performance, Observability, Crash Safety. Запуск, live-прогресс, отчёты.',
   },
 ];
 
 const navItemIcons: Record<AdminPageKey, string> = {
   dashboard: '\u{1F4CA}',
   moderation: '\u{1F50D}',
+  archive: 'AR',
   invite_access: 'IA',
+  guarantor_tree: '🌳',
+  access_control: '\u{1F510}',
   security: '\u{1F6E1}',
   errors: '\u{1F6A8}',
   photo_approval: '\u{2705}',
   releases: '\u{1F4E6}',
-  photo_test: '\u{1F4F7}',
+  ai_diagnostics: '\u{1F9E0}',
 };
 
 const roleLabel = (role: SecurityRole): string => {

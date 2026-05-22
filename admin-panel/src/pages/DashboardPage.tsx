@@ -1,10 +1,20 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { User } from 'firebase/auth';
 import { InfoHint } from '../components/InfoHint';
 import type { AdminPageKey } from '../components/AppShell';
 import { firebaseConfig } from '../firebase/firebase';
 import { useDashboard } from '../hooks/useDashboard';
 import { updateSecurityAppControl } from '../services/securityService';
+import { loadInviteAccessState, type InviteAccessMode } from '../services/inviteAccessService';
+import { computeAccessStats, getModeDescription } from '../services/accessControlService';
+
+type AccessSummary = {
+  enabled: boolean;
+  mode: InviteAccessMode;
+  trusted: number;
+  pending: number;
+  needsReview: number;
+};
 
 const statusLabel = (connected: boolean | null): string => {
   if (connected === null) return 'ПРОВЕРКА';
@@ -23,6 +33,20 @@ export const DashboardPage = ({ user, onNavigate }: DashboardPageProps) => {
   const { connected, config, stats, activities, issues, error } = useDashboard();
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [accessSummary, setAccessSummary] = useState<AccessSummary | null>(null);
+
+  useEffect(() => {
+    loadInviteAccessState().then((state) => {
+      const s = computeAccessStats(state.requests);
+      setAccessSummary({
+        enabled: state.flag.enabled,
+        mode: state.flag.mode,
+        trusted: s.trusted,
+        pending: s.pendingSponsor,
+        needsReview: s.needsReview,
+      });
+    }).catch(() => {/* non-critical */});
+  }, []);
 
   const runQuickAction = async (action: 'maintenance' | 'disable_app' | 'enable_app') => {
     if (action === 'disable_app') {
@@ -80,6 +104,7 @@ export const DashboardPage = ({ user, onNavigate }: DashboardPageProps) => {
         <article className="metric metric-violet"><span>Всего модерации</span><strong>{stats.moderationTotal}</strong></article>
         <article className="metric metric-warning"><span>Ожидают</span><strong>{stats.pending}</strong></article>
         <article className="metric metric-dark"><span>Отклонены</span><strong>{stats.rejected}</strong></article>
+        <article className="metric metric-info"><span>Архив</span><strong>{stats.expired}</strong></article>
       </div>
 
       <div className="grid dashboardGrid">
@@ -170,6 +195,54 @@ export const DashboardPage = ({ user, onNavigate }: DashboardPageProps) => {
               </div>
             ))}
             {!issues.length ? <p>КРИТИЧЕСКИХ ПРОБЛЕМ НЕТ</p> : null}
+          </div>
+        </article>
+
+        <article className="panel">
+          <div className="headingWithHint">
+            <h3>Контроль доступа</h3>
+            <InfoHint text="Состояние 3-уровневой системы: Public / Registered / Trusted." />
+          </div>
+          {accessSummary ? (
+            <>
+              <dl className="details compactDetails" style={{ marginBottom: 12 }}>
+                <div>
+                  <dt>Система</dt>
+                  <dd>
+                    <span className={accessSummary.enabled ? 'status active' : 'status warning'} style={{ fontSize: 11 }}>
+                      {accessSummary.enabled ? `ВКЛ · ${accessSummary.mode.toUpperCase()}` : 'ВЫКЛ'}
+                    </span>
+                  </dd>
+                </div>
+                <div><dt>Trusted пользователей</dt><dd className={healthClass(accessSummary.trusted > 0)}>{accessSummary.trusted}</dd></div>
+                <div><dt>Ожидают одобрения</dt><dd className={healthClass(accessSummary.pending === 0)}>{accessSummary.pending}</dd></div>
+                <div>
+                  <dt>Требуют проверки</dt>
+                  <dd className={healthClass(accessSummary.needsReview === 0)}>
+                    {accessSummary.needsReview > 0 ? `${accessSummary.needsReview} ⚠` : '0'}
+                  </dd>
+                </div>
+              </dl>
+              <p style={{ fontSize: 12, color: '#607594', margin: '0 0 12px' }}>
+                {getModeDescription(accessSummary.mode)}
+              </p>
+            </>
+          ) : (
+            <p style={{ color: '#5d6f8b' }}>Загрузка...</p>
+          )}
+          <div className="quickActions">
+            <div className="actionWithHint">
+              <button type="button" className="smallButton" onClick={() => onNavigate('access_control')}>
+                Контроль доступа
+              </button>
+              <InfoHint text="Статистика по уровням, заявки, выдача временного доступа." />
+            </div>
+            <div className="actionWithHint">
+              <button type="button" className="smallButton" onClick={() => onNavigate('invite_access')}>
+                Управление поручителями
+              </button>
+              <InfoHint text="Доверенные поручители и полный список заявок." />
+            </div>
           </div>
         </article>
       </div>

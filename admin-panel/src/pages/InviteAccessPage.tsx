@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { SecurityRole } from '../services/authService';
 import { InfoHint } from '../components/InfoHint';
 import {
   createTrustedSponsor,
   grantTemporaryAccess,
   loadInviteAccessState,
+  loadMoreRequests,
   moderateInviteRequest,
   setInviteAccessEnabled,
   setInviteAccessMode,
@@ -21,6 +22,7 @@ type InviteAccessPageProps = {
 };
 
 type RequestFilter = 'pending' | 'needs_manual_review' | 'approved' | 'denied';
+type DateFilter = 'all' | 'today' | 'yesterday' | 'week' | 'month';
 
 const emptyState: InviteAccessState = {
   flag: {
@@ -32,6 +34,25 @@ const emptyState: InviteAccessState = {
   },
   sponsors: [],
   requests: [],
+  hasMore: false,
+};
+
+const getDateFilterBounds = (filter: DateFilter): { start: number; end: number } => {
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  if (filter === 'today') return { start: startOfToday, end: Infinity };
+  if (filter === 'yesterday') return { start: startOfToday - 86400000, end: startOfToday };
+  if (filter === 'week') return { start: startOfToday - 7 * 86400000, end: Infinity };
+  if (filter === 'month') return { start: startOfToday - 30 * 86400000, end: Infinity };
+  return { start: 0, end: Infinity };
+};
+
+const dateFilterLabel = (filter: DateFilter): string => {
+  if (filter === 'today') return 'сегодня';
+  if (filter === 'yesterday') return 'вчера';
+  if (filter === 'week') return '7 дней';
+  if (filter === 'month') return '30 дней';
+  return 'все';
 };
 
 const PHONE_RE = /^\+380\d{9}$/;
@@ -70,6 +91,14 @@ const requestFilterLabel = (status: RequestFilter): string => {
   return 'ожидающие';
 };
 
+const isOpenRequestStatus = (status: InviteRequestStatus): boolean =>
+  status === 'pending' || status === 'pending_sponsor' || status === 'needs_manual_review';
+
+const matchesRequestFilter = (item: InviteRequest, filter: RequestFilter): boolean => {
+  if (filter === 'pending') return isOpenRequestStatus(item.status);
+  return item.status === filter;
+};
+
 const modeLabel = (mode: InviteAccessMode): string => {
   if (mode === 'soft') return 'SOFT';
   if (mode === 'medium') return 'MEDIUM';
@@ -91,6 +120,7 @@ const formatInviteError = (error: unknown): string => {
 export const InviteAccessPage = ({ role }: InviteAccessPageProps) => {
   const [state, setState] = useState<InviteAccessState>(emptyState);
   const [requestFilter, setRequestFilter] = useState<RequestFilter>('pending');
+  const [dateFilter, setDateFilter] = useState<DateFilter>('all');
   const [sponsorPhone, setSponsorPhone] = useState('');
   const [sponsorNote, setSponsorNote] = useState('');
   const [moderationReason, setModerationReason] = useState('');
@@ -102,6 +132,10 @@ export const InviteAccessPage = ({ role }: InviteAccessPageProps) => {
 
   const canManageSponsors = role === 'admin';
   const canModerateRequests = role === 'admin' || role === 'moderator';
+
+  const autoRefreshRef = useRef({ loading, busyAction, refresh: async () => {} });
+  autoRefreshRef.current.loading = loading;
+  autoRefreshRef.current.busyAction = busyAction;
 
   const refresh = async () => {
     setLoading(true);
@@ -115,22 +149,35 @@ export const InviteAccessPage = ({ role }: InviteAccessPageProps) => {
     }
   };
 
+  autoRefreshRef.current.refresh = refresh;
+
   useEffect(() => {
     void refresh();
   }, []);
 
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (!autoRefreshRef.current.loading && !autoRefreshRef.current.busyAction) {
+        void autoRefreshRef.current.refresh();
+      }
+    }, 30_000);
+    return () => clearInterval(id);
+  }, []);
+
   const counts = useMemo(() => ({
     sponsorsActive: state.sponsors.filter((item) => item.status === 'active').length,
-    pending: state.requests.filter((item) => item.status === 'pending').length,
+    pending: state.requests.filter((item) => isOpenRequestStatus(item.status)).length,
     manualReview: state.requests.filter((item) => item.status === 'needs_manual_review').length,
     approved: state.requests.filter((item) => item.status === 'approved').length,
     denied: state.requests.filter((item) => item.status === 'denied').length,
   }), [state.requests, state.sponsors]);
 
-  const filteredRequests = useMemo(
-    () => state.requests.filter((item) => item.status === requestFilter),
-    [requestFilter, state.requests],
-  );
+  const filteredRequests = useMemo(() => {
+    const { start, end } = getDateFilterBounds(dateFilter);
+    return state.requests.filter(
+      (item) => matchesRequestFilter(item, requestFilter) && item.createdAt >= start && item.createdAt < end,
+    );
+  }, [requestFilter, dateFilter, state.requests]);
 
   const runAction = async (actionId: string, action: () => Promise<void>, success: string) => {
     setBusyAction(actionId);
@@ -213,6 +260,20 @@ export const InviteAccessPage = ({ role }: InviteAccessPageProps) => {
     );
   };
 
+  const loadMore = async () => {
+    if (!state.hasMore || loading || Boolean(busyAction)) return;
+    setLoading(true);
+    try {
+      const oldest = state.requests.reduce((min, r) => Math.min(min, r.createdAt), Infinity);
+      const { requests: more, hasMore: nextHasMore } = await loadMoreRequests(oldest);
+      setState((prev) => ({ ...prev, requests: [...prev.requests, ...more], hasMore: nextHasMore }));
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Не удалось загрузить ещё заявки.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const grantTempAccess = (request: InviteRequest) => {
     if (!request.requesterUid) {
       setMessage('Нельзя выдать временный доступ: у заявки нет requesterUid.');
@@ -282,16 +343,19 @@ export const InviteAccessPage = ({ role }: InviteAccessPageProps) => {
             <div><dt>Кем обновлено</dt><dd>{state.flag.updatedBy || '-'}</dd></div>
             <div><dt>Версия</dt><dd>{state.flag.version || '-'}</dd></div>
           </dl>
-          <button
-            type="button"
-            className={state.flag.enabled ? 'smallButton dangerButton inviteFlagButton' : 'smallButton inviteFlagButton'}
-            disabled={!canManageSponsors || Boolean(busyAction)}
-            onClick={toggleFeatureFlag}
-          >
-            {busyAction === 'flag'
-              ? 'Изменяем статус...'
-              : state.flag.enabled ? 'Выключить доступ по приглашениям' : 'Включить доступ по приглашениям'}
-          </button>
+          <div className="actionWithHint">
+            <button
+              type="button"
+              className={state.flag.enabled ? 'smallButton dangerButton inviteFlagButton' : 'smallButton inviteFlagButton'}
+              disabled={!canManageSponsors || Boolean(busyAction)}
+              onClick={toggleFeatureFlag}
+            >
+              {busyAction === 'flag'
+                ? 'Изменяем статус...'
+                : state.flag.enabled ? 'Выключить доступ по приглашениям' : 'Включить доступ по приглашениям'}
+            </button>
+            <InfoHint text="Включает или выключает приём новых заявок. При включении — выбранный режим активируется немедленно. При выключении — существующие заявки остаются, новые не принимаются. Только администратор." />
+          </div>
           {!canManageSponsors ? <p className="mutedText">Только администратор может менять флаг системы приглашений.</p> : null}
           <div className="segmented" style={{ marginTop: 12 }}>
             {(['disabled', 'soft', 'medium', 'hard'] as InviteAccessMode[]).map((mode) => (
@@ -306,6 +370,32 @@ export const InviteAccessPage = ({ role }: InviteAccessPageProps) => {
               </button>
             ))}
           </div>
+          <InfoHint
+            content={(
+              <div className="modeHint">
+                <p className="modeHintTitle">Как работают режимы</p>
+                <div className="modeHintList">
+                  <div className="modeHintItem">
+                    <span className="modeBadge mode-disabled">DISABLED</span>
+                    <p>Система отключена: новые заявки не принимаются.</p>
+                  </div>
+                  <div className="modeHintItem">
+                    <span className="modeBadge mode-soft">SOFT</span>
+                    <p>Мягкий запуск: допускается гостевой поток, авто-одобрение включено.</p>
+                  </div>
+                  <div className="modeHintItem">
+                    <span className="modeBadge mode-medium">MEDIUM</span>
+                    <p>Обязательная проверка заявки, безопасные случаи одобряются автоматически.</p>
+                  </div>
+                  <div className="modeHintItem">
+                    <span className="modeBadge mode-hard">HARD</span>
+                    <p>Строгий контроль: нужен поручитель, авто-одобрение отключено.</p>
+                  </div>
+                </div>
+                <p className="modeHintNote">Подсказка: двигайтесь по шагам SOFT -&gt; MEDIUM -&gt; HARD, когда растет нагрузка или риски.</p>
+              </div>
+            )}
+          />
         </article>
 
         <article className="panel">
@@ -329,14 +419,17 @@ export const InviteAccessPage = ({ role }: InviteAccessPageProps) => {
               placeholder="Необязательная заметка администратора"
             />
           </label>
-          <button
-            type="button"
-            className="smallButton"
-            disabled={!canManageSponsors || Boolean(busyAction)}
-            onClick={addSponsor}
-          >
-            Добавить поручителя
-          </button>
+          <div className="actionWithHint">
+            <button
+              type="button"
+              className="smallButton"
+              disabled={!canManageSponsors || Boolean(busyAction)}
+              onClick={addSponsor}
+            >
+              Добавить поручителя
+            </button>
+            <InfoHint text="Создаёт запись в trusted_sponsors с хешированным ключом телефона. Если поручитель уже существует — перезаписывает и переводит в статус active. Требуется формат +380XXXXXXXXX." />
+          </div>
           {!canManageSponsors ? <p className="mutedText">Только администратор может добавлять или обновлять поручителей.</p> : null}
         </article>
       </div>
@@ -380,6 +473,7 @@ export const InviteAccessPage = ({ role }: InviteAccessPageProps) => {
                     >
                       {sponsor.status === 'active' ? 'Отключить' : 'Включить'}
                     </button>
+                    <InfoHint text="Включает или отключает поручителя через adminUpdateTrustedSponsor. Отключённый поручитель не блокирует существующие одобрения, но новые заявки с ним получат повышенный риск-скор." />
                   </td>
                 </tr>
               ))}
@@ -406,6 +500,18 @@ export const InviteAccessPage = ({ role }: InviteAccessPageProps) => {
                 onClick={() => setRequestFilter(status)}
               >
                 {requestFilterLabel(status)}
+              </button>
+            ))}
+          </div>
+          <div className="segmented">
+            {(['all', 'today', 'yesterday', 'week', 'month'] as DateFilter[]).map((df) => (
+              <button
+                key={df}
+                type="button"
+                className={dateFilter === df ? 'active' : ''}
+                onClick={() => setDateFilter(df)}
+              >
+                {dateFilterLabel(df)}
               </button>
             ))}
           </div>
@@ -474,33 +580,42 @@ export const InviteAccessPage = ({ role }: InviteAccessPageProps) => {
                   </td>
                   <td className="moderationActions">
                     {request.status !== 'approved' ? (
+                      <>
+                        <button
+                          type="button"
+                          className="smallButton"
+                          disabled={!canModerateRequests || Boolean(busyAction)}
+                          onClick={() => moderate(request, 'approved')}
+                        >
+                          Одобрить
+                        </button>
+                        <InfoHint text="Вызывает adminModerateInviteRequest(approved). Обновляет user_access → approved и создаёт узел в trust_tree. Действие необратимо без ручного вмешательства." />
+                      </>
+                    ) : null}
+                    {request.status !== 'denied' ? (
+                      <>
+                        <button
+                          type="button"
+                          className="smallButton dangerButton"
+                          disabled={!canModerateRequests || Boolean(busyAction)}
+                          onClick={() => moderate(request, 'denied')}
+                        >
+                          Отклонить
+                        </button>
+                        <InfoHint text="Вызывает adminModerateInviteRequest(denied). Увеличивает denied_count пользователя. При достижении лимита (max_denied_before_block) — пользователь блокируется автоматически." />
+                      </>
+                    ) : null}
+                    <>
                       <button
                         type="button"
                         className="smallButton"
-                        disabled={!canModerateRequests || Boolean(busyAction)}
-                        onClick={() => moderate(request, 'approved')}
+                        disabled={!canManageSponsors || Boolean(busyAction)}
+                        onClick={() => grantTempAccess(request)}
                       >
-                        Одобрить
+                        Временно
                       </button>
-                    ) : null}
-                    {request.status !== 'denied' ? (
-                      <button
-                        type="button"
-                        className="smallButton dangerButton"
-                        disabled={!canModerateRequests || Boolean(busyAction)}
-                        onClick={() => moderate(request, 'denied')}
-                      >
-                        Отклонить
-                      </button>
-                    ) : null}
-                    <button
-                      type="button"
-                      className="smallButton"
-                      disabled={!canManageSponsors || Boolean(busyAction)}
-                      onClick={() => grantTempAccess(request)}
-                    >
-                      Временно
-                    </button>
+                      <InfoHint text="Вызывает grantTemporaryAccess. Даёт временный доступ без одобрения и без записи в trust_tree. Срок от 1 до 168 часов. Причина обязательна. Только администратор." />
+                    </>
                   </td>
                 </tr>
               ))}
@@ -510,6 +625,19 @@ export const InviteAccessPage = ({ role }: InviteAccessPageProps) => {
             </tbody>
           </table>
         </div>
+        {state.hasMore ? (
+          <div className="actionWithHint" style={{ marginTop: 12 }}>
+            <button
+              type="button"
+              className="smallButton"
+              disabled={loading || Boolean(busyAction)}
+              onClick={() => void loadMore()}
+            >
+              {loading ? 'Загрузка...' : 'Загрузить ещё'}
+            </button>
+            <InfoHint text="Загружает следующие 100 заявок по дате создания (старше уже загруженных). Фильтр по статусу и дате применяется к уже загруженным данным." />
+          </div>
+        ) : null}
       </article>
     </section>
   );

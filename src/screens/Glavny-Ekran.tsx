@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
@@ -45,7 +45,7 @@ const BTN_ASPECT = 138 / 150;
 const BTN_W = Math.round(GRID_CELL_W * (IS_NARROW_SCREEN ? 0.79 : 0.85));
 const BTN_H = Math.round(BTN_W * BTN_ASPECT);
 const PANEL2_H = Math.round(SCREEN_W * 1.524);
-const PANEL2_IMAGE = require('../../assets/Panel2.png');
+const PANEL2_IMAGE = require('../../assets/WEBP-version/Panel2.webp');
 
 type HomeButtonConfig = {
   artwork: ImageSourcePropType;
@@ -85,30 +85,30 @@ type LiveFeedItem = {
 const FEED_UI = {
   ua: {
     liveTitle: 'Активність зараз',
-    live: '● ЗАРАЗ',
+    live: '● Наживо',
     help: 'Потрібна допомога',
-    request: 'Заявка',
-    news: 'Новина',
+    request: 'Запит',
+    news: 'Новини',
     photo: 'Фото додано',
     contact: 'Читати ->',
-    noActivity: 'Тут з\'явиться активність сусідів',
+    noActivity: 'Активність сусідів зʼявиться тут',
     electricityLabel: 'Світло',
-    powerOn: 'Світло є ✓',
-    powerOff: 'Немає світла ✕',
+    powerOn: 'Світло є 🟢',
+    powerOff: 'Нема світла 🔴',
     genericActivity: 'Активність мешканців',
   },
   ru: {
     liveTitle: 'Активность сейчас',
-    live: '● СЕЙЧАС',
+    live: '● Прямо',
     help: 'Нужна помощь',
-    request: 'Заявка',
-    news: 'Новость',
+    request: 'Запрос',
+    news: 'Новости',
     photo: 'Добавлено фото',
     contact: 'Читать ->',
-    noActivity: 'Здесь появится активность соседей',
+    noActivity: 'Активность соседей появится здесь',
     electricityLabel: 'Свет',
-    powerOn: 'Свет есть ✓',
-    powerOff: 'Нет света ✕',
+    powerOn: 'Свет есть 🟢',
+    powerOff: 'Нет света 🔴',
     genericActivity: 'Активность жителей',
   },
   en: {
@@ -121,8 +121,8 @@ const FEED_UI = {
     contact: 'Read ->',
     noActivity: 'Neighbor activity will appear here',
     electricityLabel: 'Electricity',
-    powerOn: 'Power on ✓',
-    powerOff: 'Power off ✕',
+    powerOn: 'Power on ?',
+    powerOff: 'Power off ?',
     genericActivity: 'Resident activity',
   },
 } as const;
@@ -130,44 +130,44 @@ const FEED_ACTIVITY_LABELS = {
   ua: {
     problem: 'Проблема ЖК',
     electricity: 'Статус світла',
-    lostFound: 'Знайдено або загублено',
+    lostFound: 'Загублено або знайдено',
     foundPet: 'Знайдено тварину',
     lostPet: 'Шукають тварину',
     foundItem: 'Знайдено річ',
     lostItem: 'Загублена річ',
-    buySell: 'Купівля / продаж',
+    buySell: 'Куплю / Продам',
     contacts: 'Контакти Чайки',
     jobSearch: 'Пошук роботи',
     help: 'Потрібна допомога',
     transport: 'Транспорт і поїздки',
-    repair: 'Ремонт і техніка',
-    household: 'Побут і прибирання',
-    care: 'Турбота і допомога',
+    repair: 'Ремонт і інструменти',
+    household: 'Дім і прибирання',
+    care: 'Турбота і підтримка',
     pets: 'Тварини',
     exchange: 'Обмін і речі',
     foodsharing: 'Фудшеринг',
-    education: 'Навчання і послуги',
+    education: 'Освіта і послуги',
   },
   ru: {
     problem: 'Проблема ЖК',
     electricity: 'Статус света',
-    lostFound: 'Найдено или потеряно',
+    lostFound: 'Потеряно или найдено',
     foundPet: 'Найдено животное',
     lostPet: 'Ищут животное',
     foundItem: 'Найдена вещь',
     lostItem: 'Потеряна вещь',
-    buySell: 'Покупка / продажа',
+    buySell: 'Куплю / Продам',
     contacts: 'Контакты Чайки',
     jobSearch: 'Поиск работы',
     help: 'Нужна помощь',
     transport: 'Транспорт и поездки',
-    repair: 'Ремонт и техника',
-    household: 'Быт и уборка',
-    care: 'Забота и помощь',
+    repair: 'Ремонт и инструменты',
+    household: 'Дом и уборка',
+    care: 'Забота и поддержка',
     pets: 'Животные',
     exchange: 'Обмен и вещи',
     foodsharing: 'Фудшеринг',
-    education: 'Обучение и услуги',
+    education: 'Образование и услуги',
   },
   en: {
     problem: 'Building issue',
@@ -194,46 +194,46 @@ const FEED_ACTIVITY_LABELS = {
 type AppLanguage = keyof typeof FEED_UI;
 
 const FEED_SUBCATEGORY_LABELS: Record<string, { ua: string; ru: string; en: string }> = {
-  found_pet: { ua: 'Р—РЅР°Р№РґРµРЅРѕ С‚РІР°СЂРёРЅСѓ', ru: 'РќР°Р№РґРµРЅРѕ Р¶РёРІРѕС‚РЅРѕРµ', en: 'Found pet' },
-  lost_pet: { ua: 'РЁСѓРєР°СЋС‚СЊ С‚РІР°СЂРёРЅСѓ', ru: 'РС‰СѓС‚ Р¶РёРІРѕС‚РЅРѕРµ', en: 'Lost pet' },
-  found_item: { ua: 'Р—РЅР°Р№РґРµРЅРѕ СЂС–С‡', ru: 'РќР°Р№РґРµРЅР° РІРµС‰СЊ', en: 'Found item' },
-  lost_item: { ua: 'Р—Р°РіСѓР±Р»РµРЅР° СЂС–С‡', ru: 'РџРѕС‚РµСЂСЏРЅР° РІРµС‰СЊ', en: 'Lost item' },
-  childcare: { ua: 'Р”РѕРїРѕРјРѕРіР° Р· РґС–С‚СЊРјРё', ru: 'РџРѕРјРѕС‰СЊ СЃ РґРµС‚СЊРјРё', en: 'Childcare help' },
-  electrical: { ua: 'Р•Р»РµРєС‚СЂРёРєР°', ru: 'Р­Р»РµРєС‚СЂРёРєР°', en: 'Electrical help' },
-  plumbing: { ua: 'РЎР°РЅС‚РµС…РЅС–РєР°', ru: 'РЎР°РЅС‚РµС…РЅРёРєР°', en: 'Plumbing' },
-  dog_walking: { ua: 'Р’РёРіСѓР» СЃРѕР±Р°РєРё', ru: 'Р’С‹РіСѓР» СЃРѕР±Р°РєРё', en: 'Dog walking' },
-  pet_care: { ua: 'Р”РѕРіР»СЏРґ Р·Р° С‚РІР°СЂРёРЅРѕСЋ', ru: 'РЈС…РѕРґ Р·Р° Р¶РёРІРѕС‚РЅС‹Рј', en: 'Pet care' },
-  ride_share: { ua: 'РџС–РґРІРµР·Сѓ', ru: 'РџРѕРґРІРµР·Сѓ', en: 'Ride share' },
-  need_ride: { ua: 'РџРѕС‚СЂС–Р±РЅР° РјР°С€РёРЅР°', ru: 'РќСѓР¶РЅР° РјР°С€РёРЅР°', en: 'Need a ride' },
-  parking_help: { ua: 'Р”РѕРїРѕРјРѕРіР° Р· РїР°СЂРєСѓРІР°РЅРЅСЏРј', ru: 'РџРѕРјРѕС‰СЊ СЃ РїР°СЂРєРѕРІРєРѕР№', en: 'Parking help' },
-  parcel_delivery: { ua: 'Р”РѕСЃС‚Р°РІРєР° СЂРµС‡РµР№', ru: 'Р”РѕСЃС‚Р°РІРєР° РІРµС‰РµР№', en: 'Parcel delivery' },
-  cleaning: { ua: 'РџСЂРёР±РёСЂР°РЅРЅСЏ', ru: 'РЈР±РѕСЂРєР°', en: 'Cleaning' },
-  medicine: { ua: 'Р›С–РєРё', ru: 'Р›РµРєР°СЂСЃС‚РІР°', en: 'Medicine' },
-  medical_consultation: { ua: 'РњРµРґРёС‡РЅР° РєРѕРЅСЃСѓР»СЊС‚Р°С†С–СЏ', ru: 'РњРµРґРёС†РёРЅСЃРєР°СЏ РєРѕРЅСЃСѓР»СЊС‚Р°С†РёСЏ', en: 'Medical consultation' },
-  elderly_help: { ua: 'Р”РѕРїРѕРјРѕРіР° Р»С–С‚РЅС–Рј', ru: 'РџРѕРјРѕС‰СЊ РїРѕР¶РёР»С‹Рј', en: 'Elderly help' },
-  psychological_support: { ua: 'РџСЃРёС…РѕР»РѕРіС–С‡РЅР° РїС–РґС‚СЂРёРјРєР°', ru: 'РџСЃРёС…РѕР»РѕРіРёС‡РµСЃРєР°СЏ РїРѕРґРґРµСЂР¶РєР°', en: 'Psychological support' },
-  free_items: { ua: 'Р’С–РґРґР°Рј Р±РµР·РєРѕС€С‚РѕРІРЅРѕ', ru: 'РћС‚РґР°Рј Р±РµСЃРїР»Р°С‚РЅРѕ', en: 'Free items' },
-  borrow_tool: { ua: 'РџРѕР·РёС‡РёС‚Рё С–РЅСЃС‚СЂСѓРјРµРЅС‚', ru: 'РћРґРѕР»Р¶РёС‚СЊ РёРЅСЃС‚СЂСѓРјРµРЅС‚', en: 'Borrow tool' },
-  item_exchange: { ua: 'РћР±РјС–РЅ СЂРµС‡Р°РјРё', ru: 'РћР±РјРµРЅ РІРµС‰Р°РјРё', en: 'Item exchange' },
-  noise: { ua: 'РЁСѓРј РІС–Рґ СЃСѓСЃС–РґС–РІ', ru: 'РЁСѓРј РѕС‚ СЃРѕСЃРµРґРµР№', en: 'Noise from neighbors' },
-  elevator: { ua: 'РџСЂРѕР±Р»РµРјР° Р· Р»С–С„С‚РѕРј', ru: 'РџСЂРѕР±Р»РµРјР° СЃ Р»РёС„С‚РѕРј', en: 'Elevator issue' },
-  parking_blocked: { ua: 'РџР°СЂРєРѕРІРєР° РїРµСЂРµРєСЂРёС‚Р°', ru: 'РџР°СЂРєРѕРІРєР° РїРµСЂРµРєСЂС‹С‚Р°', en: 'Blocked parking' },
-  yard_trash: { ua: 'РЎРјС–С‚С‚СЏ Сѓ РґРІРѕСЂС–', ru: 'РњСѓСЃРѕСЂ РІРѕ РґРІРѕСЂРµ', en: 'Yard trash' },
-  yard_lighting: { ua: 'РћСЃРІС–С‚Р»РµРЅРЅСЏ Сѓ РґРІРѕСЂС–', ru: 'РћСЃРІРµС‰РµРЅРёРµ РІРѕ РґРІРѕСЂРµ', en: 'Yard lighting' },
-  management_request: { ua: 'Р—РІРµСЂРЅРµРЅРЅСЏ РґРѕ СѓРїСЂР°РІРё', ru: 'РћР±СЂР°С‰РµРЅРёРµ РІ СѓРїСЂР°РІСѓ', en: 'Management request' },
-  tutoring: { ua: 'Р РµРїРµС‚РёС‚РѕСЂСЃС‚РІРѕ', ru: 'Р РµРїРµС‚РёС‚РѕСЂСЃС‚РІРѕ', en: 'Tutoring' },
-  job_search: { ua: 'РџРѕС€СѓРє СЂРѕР±РѕС‚Рё', ru: 'РџРѕРёСЃРє СЂР°Р±РѕС‚С‹', en: 'Job search' },
-  sports_company: { ua: 'РЎРїРѕСЂС‚РёРІРЅР° РєРѕРјРїР°РЅС–СЏ', ru: 'РЎРїРѕСЂС‚РёРІРЅР°СЏ РєРѕРјРїР°РЅРёСЏ', en: 'Sports company' },
-  creative_club: { ua: 'РўРІРѕСЂС‡РёР№ РіСѓСЂС‚РѕРє', ru: 'РўРІРѕСЂС‡РµСЃРєРёР№ РєР»СѓР±', en: 'Creative club' },
-  master_services: { ua: 'РџРѕСЃР»СѓРіРё РјР°Р№СЃС‚СЂР°', ru: 'РЈСЃР»СѓРіРё РјР°СЃС‚РµСЂР°', en: 'Personal services' },
-  legal_consultation: { ua: 'Р®СЂРёРґРёС‡РЅР° РєРѕРЅСЃСѓР»СЊС‚Р°С†С–СЏ', ru: 'Р®СЂРёРґРёС‡РµСЃРєР°СЏ РєРѕРЅСЃСѓР»СЊС‚Р°С†РёСЏ', en: 'Legal consultation' },
-  documents: { ua: 'Р”РѕРєСѓРјРµРЅС‚Рё С– РґРѕРІС–РґРєРё', ru: 'Р”РѕРєСѓРјРµРЅС‚С‹ Рё СЃРїСЂР°РІРєРё', en: 'Documents and certificates' },
+  found_pet: { ua: 'Знайдено тварину', ru: 'Найдено животное', en: 'Found pet' },
+  lost_pet: { ua: 'Шукають тварину', ru: 'Ищут животное', en: 'Lost pet' },
+  found_item: { ua: 'Знайдено річ', ru: 'Найдена вещь', en: 'Found item' },
+  lost_item: { ua: 'Загублена річ', ru: 'Потеряна вещь', en: 'Lost item' },
+  childcare: { ua: 'Допомога з дітьми', ru: 'Помощь с детьми', en: 'Childcare help' },
+  electrical: { ua: 'Електрика', ru: 'Электрика', en: 'Electrical help' },
+  plumbing: { ua: 'Сантехніка', ru: 'Сантехника', en: 'Plumbing' },
+  dog_walking: { ua: 'Вигул собаки', ru: 'Выгул собаки', en: 'Dog walking' },
+  pet_care: { ua: 'Догляд за твариною', ru: 'Уход за животным', en: 'Pet care' },
+  ride_share: { ua: 'Підвезу', ru: 'Подвезу', en: 'Ride share' },
+  need_ride: { ua: 'Потрібна машина', ru: 'Нужна машина', en: 'Need a ride' },
+  parking_help: { ua: 'Допомога з паркуванням', ru: 'Помощь с парковкой', en: 'Parking help' },
+  parcel_delivery: { ua: 'Доставка речей', ru: 'Доставка вещей', en: 'Parcel delivery' },
+  cleaning: { ua: 'Прибирання', ru: 'Уборка', en: 'Cleaning' },
+  medicine: { ua: 'Ліки', ru: 'Лекарства', en: 'Medicine' },
+  medical_consultation: { ua: 'Медична консультація', ru: 'Медицинская консультация', en: 'Medical consultation' },
+  elderly_help: { ua: 'Допомога літнім', ru: 'Помощь пожилым', en: 'Elderly help' },
+  psychological_support: { ua: 'Психологічна підтримка', ru: 'Психологическая поддержка', en: 'Psychological support' },
+  free_items: { ua: 'Віддам безкоштовно', ru: 'Отдам бесплатно', en: 'Free items' },
+  borrow_tool: { ua: 'Позичити інструмент', ru: 'Одолжить инструмент', en: 'Borrow tool' },
+  item_exchange: { ua: 'Обмін речами', ru: 'Обмен вещами', en: 'Item exchange' },
+  noise: { ua: 'Шум від сусідів', ru: 'Шум от соседей', en: 'Noise from neighbors' },
+  elevator: { ua: 'Проблема з ліфтом', ru: 'Проблема с лифтом', en: 'Elevator issue' },
+  parking_blocked: { ua: 'Парковка перекрита', ru: 'Парковка перекрыта', en: 'Blocked parking' },
+  yard_trash: { ua: 'Сміття у дворі', ru: 'Мусор во дворе', en: 'Yard trash' },
+  yard_lighting: { ua: 'Освітлення у дворі', ru: 'Освещение во дворе', en: 'Yard lighting' },
+  management_request: { ua: 'Звернення до управи', ru: 'Обращение в управу', en: 'Management request' },
+  tutoring: { ua: 'Репетиторство', ru: 'Репетиторство', en: 'Tutoring' },
+  job_search: { ua: 'Пошук роботи', ru: 'Поиск работы', en: 'Job search' },
+  sports_company: { ua: 'Спортивна компанія', ru: 'Спортивная компания', en: 'Sports company' },
+  creative_club: { ua: 'Творчий гурток', ru: 'Творческий клуб', en: 'Creative club' },
+  master_services: { ua: 'Послуги майстра', ru: 'Услуги мастера', en: 'Personal services' },
+  legal_consultation: { ua: 'Юридична консультація', ru: 'Юридическая консультация', en: 'Legal consultation' },
+  documents: { ua: 'Документи і довідки', ru: 'Документы и справки', en: 'Documents and certificates' },
 };
 
 const stripFeedPrefix = (value: string): string =>
   value
     .replace(/^\[[^[\]]+\]\s*/u, '')
-    .replace(/^[\s\-–—:]+/u, '')
+    .replace(/^[\s\-•:]+/u, '')
     .trim();
 
 const looksLikeBrokenEncoding = (value: string): boolean =>
@@ -295,7 +295,7 @@ const getRequestPreviewText = (req: AppRequest, language: AppLanguage): string =
     return FEED_SUBCATEGORY_LABELS[subcategory][language];
   }
   if (category === 'problem' || group === 'problems' || group === 'building_issues') {
-    return building ? `${labels.problem} · ${building}` : labels.problem;
+    return building ? `${labels.problem} • ${building}` : labels.problem;
   }
   if (category === 'buy_sell' || group === 'buy_sell' || group === 'exchange') return labels.buySell;
   if (category === 'contacts' || group === 'contacts') return labels.contacts;
@@ -492,22 +492,22 @@ const getFeedBadge = (params: {
     .toLowerCase();
 
   if (params.urgent || haystack.includes('help') || haystack.includes('help_neighbors')) {
-    return { badge: 'рџ†', badgeBg: 'rgba(199, 122, 93, 0.20)', badgeColor: '#9E3B25' };
+    return { badge: '🆘', badgeBg: 'rgba(199, 122, 93, 0.20)', badgeColor: '#9E3B25' };
   }
   if (haystack.includes('building_issues') || haystack.includes('problem') || haystack.includes('electricity')) {
-    return { badge: 'вљЎ', badgeBg: 'rgba(216, 175, 89, 0.20)', badgeColor: '#A86E13' };
+    return { badge: '⚡', badgeBg: 'rgba(216, 175, 89, 0.20)', badgeColor: '#A86E13' };
   }
   if (haystack.includes('contacts')) {
-    return { badge: 'вќ¤пёЏ', badgeBg: 'rgba(199, 122, 93, 0.16)', badgeColor: '#A14F3A' };
+    return { badge: '❤️', badgeBg: 'rgba(199, 122, 93, 0.16)', badgeColor: '#A14F3A' };
   }
   if (haystack.includes('buy_sell') || haystack.includes('exchange') || haystack.includes('foodsharing')) {
-    return { badge: 'в­ђ', badgeBg: 'rgba(216, 175, 89, 0.20)', badgeColor: '#8E6241' };
+    return { badge: '⭐', badgeBg: 'rgba(216, 175, 89, 0.20)', badgeColor: '#8E6241' };
   }
   if (haystack.includes('lost_found') || haystack.includes('pets') || haystack.includes('found_pet') || haystack.includes('lost_pet')) {
-    return { badge: 'рџђѕ', badgeBg: 'rgba(155, 183, 123, 0.20)', badgeColor: '#6F8754' };
+    return { badge: '🐾', badgeBg: 'rgba(155, 183, 123, 0.20)', badgeColor: '#6F8754' };
   }
   if (haystack.includes('job_search') || haystack.includes('jobs') || haystack.includes('tutoring') || haystack.includes('education_services') || haystack.includes('education')) {
-    return { badge: 'рџ’ј', badgeBg: 'rgba(95, 132, 180, 0.18)', badgeColor: '#4E6E9A' };
+    return { badge: '💼', badgeBg: 'rgba(95, 132, 180, 0.18)', badgeColor: '#4E6E9A' };
   }
 
   return {};
@@ -648,7 +648,7 @@ const HomeScreen: React.FC = () => {
         badgeColor: badge.badgeColor,
         avatarUri: undefined,
         typeLabel: feedText.electricityLabel,
-        text: `${report.status === 'on' ? feedText.powerOn : feedText.powerOff} · ${report.buildingId}`.slice(0, 72),
+        text: `${report.status === 'on' ? feedText.powerOn : feedText.powerOff} • ${report.buildingId}`.slice(0, 72),
         screen: 'ElectricityStatusScreen',
       });
     }
@@ -665,10 +665,10 @@ const HomeScreen: React.FC = () => {
   };
 
   const BUTTONS: HomeButtonConfig[] = [
-    { labelKey: 'mapButton', tab: 'MapTab', artwork: require('../../assets/2-map.png') },
-    { labelKey: 'helpNeighbors', screen: 'HelpNeighborsScreen', artwork: require('../../assets/1-help.png') },
-    { labelKey: 'homeProblems', screen: 'ChaikaProblemsScreen', artwork: require('../../assets/3-broken.png') },
-    { labelKey: 'chaikaBonus', screen: 'ChaikaBonusPlusScreen', artwork: require('../../assets/4-people.png') },
+    { labelKey: 'mapButton', tab: 'MapTab', artwork: require('../../assets/WEBP-version/2-map.webp') },
+    { labelKey: 'helpNeighbors', screen: 'HelpNeighborsScreen', artwork: require('../../assets/WEBP-version/1-help.webp') },
+    { labelKey: 'homeProblems', screen: 'ChaikaProblemsScreen', artwork: require('../../assets/WEBP-version/3-broken.webp') },
+    { labelKey: 'chaikaBonus', screen: 'ChaikaBonusPlusScreen', artwork: require('../../assets/WEBP-version/4-people.webp') },
   ];
 
   const TOP_INFO: TopInfoItem[] = [
@@ -744,12 +744,12 @@ const HomeScreen: React.FC = () => {
 
           <View style={styles.headerCenter}>
             <Text style={styles.brandTitle}>{t.mainScreen.brandTitle}</Text>
-            <Text style={styles.brandBeta}>(бета версія)</Text>
+            <Text style={styles.brandBeta}>(beta версія)</Text>
             <Text style={styles.brandSubtitle}>{t.mainScreen.brandSubtitle}</Text>
           </View>
 
           <View style={styles.logoWrap}>
-            <Image source={require('../../assets/Logo-Chaika LIFE.png')} style={styles.logoImg} resizeMode="contain" />
+            <Image source={require('../../assets/WEBP-version/Logo-Chaika LIFE.webp')} style={styles.logoImg} resizeMode="contain" />
           </View>
         </View>
 
@@ -843,7 +843,7 @@ const HomeScreen: React.FC = () => {
                         <Text style={styles.feedTypeLabel} numberOfLines={1}>
                           {item.typeLabel}
                         </Text>
-                        {!!item.name && <Text style={styles.feedName} numberOfLines={1}>· {item.name}</Text>}
+                        {!!item.name && <Text style={styles.feedName} numberOfLines={1}>• {item.name}</Text>}
                       </View>
                       <Text style={styles.feedItemText} numberOfLines={2}>{item.text}</Text>
                     </View>
@@ -1170,24 +1170,23 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   panel2Stage: {
-    width: SCREEN_W,
+    alignSelf: 'stretch',
     height: PANEL2_H,
-    marginLeft: -16,
     overflow: 'hidden',
     position: 'relative',
   },
   panel2Shadow: {
-    width: SCREEN_W,
+    width: '100%',
     backgroundColor: 'transparent',
     overflow: 'hidden',
     zIndex: 1,
   },
-  panel2Img: { width: SCREEN_W, height: PANEL2_H },
+  panel2Img: { width: '100%', height: PANEL2_H },
   panel2FrameOverlay: {
     position: 'absolute',
     top: 0,
     left: 0,
-    width: SCREEN_W,
+    width: '100%',
     height: PANEL2_H,
     zIndex: 8,
   },
@@ -1251,4 +1250,3 @@ const styles = StyleSheet.create({
 });
 
 export default HomeScreen;
-

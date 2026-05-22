@@ -11,13 +11,16 @@ import { LIGHT_ORBS, SCREEN_THEME } from '../utils/screenTheme';
 import { chaykaPlaces } from '../services/chaykaPlacesData';
 import { Place, PlaceType } from '../types/app';
 import { RootState } from '../redux/store';
-import { LastRatingMap, RatingAggregate, addWeightedRating, getRatingDaysLeft } from '../utils/monthlyRating';
+import StarRatingModal from '../components/StarRatingModal';
+import { DailyRatingUsage, RatingAggregate, UserRatingMap, canUseDailyRating, recordDailyRatingUse, replaceWeightedRating } from '../utils/monthlyRating';
 
 const topCafes = chaykaPlaces
   .filter((place) => place.type === PlaceType.CAFE || place.type === PlaceType.RESTAURANT);
 
 const STORAGE_KEY = '@chaika:cafe_ratings_v1';
 const LAST_VOTE_KEY = '@chaika:cafe_rating_votes_v1';
+const USER_RATINGS_KEY = '@chaika:cafe_user_ratings_v1';
+const DAILY_USAGE_KEY = '@chaika:place_rating_daily_usage_v1';
 
 type RatingsByPlace = Record<string, RatingAggregate>;
 
@@ -36,6 +39,10 @@ const UI_TEXT = {
     rateAgainIn: 'Повторно оцінити можна через',
     days: 'дн.',
     votes: 'голосів',
+    ratingPrompt: 'Оцініть місце',
+    ratingHint: 'Оберіть кількість зірок. Свою оцінку можна змінити.',
+    ratingLimitTitle: 'Ліміт',
+    ratingLimitText: 'Завтра зможете поставити ще.',
   },
   ru: {
     title: 'Топ кафе Чайки',
@@ -47,6 +54,10 @@ const UI_TEXT = {
     rateAgainIn: 'Повторно оценить можно через',
     days: 'дн.',
     votes: 'голосов',
+    ratingPrompt: 'Оцените место',
+    ratingHint: 'Выберите количество звезд. Свою оценку можно изменить.',
+    ratingLimitTitle: 'Лимит',
+    ratingLimitText: 'Завтра сможете поставить еще.',
   },
   en: {
     title: 'Top Chaika Life Cafes',
@@ -58,6 +69,10 @@ const UI_TEXT = {
     rateAgainIn: 'You can rate again in',
     days: 'days',
     votes: 'votes',
+    ratingPrompt: 'Rate this place',
+    ratingHint: 'Choose the number of stars. You can change your rating.',
+    ratingLimitTitle: 'Limit',
+    ratingLimitText: 'You can add more ratings tomorrow.',
   },
 } as const;
 
@@ -66,21 +81,26 @@ const TopCafeScreen: React.FC = () => {
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const text = UI_TEXT[language];
   const [ratings, setRatings] = useState<RatingsByPlace>({});
-  const [lastVotes, setLastVotes] = useState<LastRatingMap>({});
+  const [userRatings, setUserRatings] = useState<UserRatingMap>({});
+  const [dailyUsage, setDailyUsage] = useState<DailyRatingUsage | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [ratingTarget, setRatingTarget] = useState<Place | null>(null);
 
   useEffect(() => {
     const loadRatings = async () => {
       try {
-        const [rawRatings, rawVotes] = await Promise.all([
+        const [rawRatings, rawUserRatings, rawDailyUsage] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEY),
-          AsyncStorage.getItem(LAST_VOTE_KEY),
+          AsyncStorage.getItem(USER_RATINGS_KEY),
+          AsyncStorage.getItem(DAILY_USAGE_KEY),
         ]);
         setRatings(rawRatings ? (JSON.parse(rawRatings) as RatingsByPlace) : {});
-        setLastVotes(rawVotes ? (JSON.parse(rawVotes) as LastRatingMap) : {});
+        setUserRatings(rawUserRatings ? (JSON.parse(rawUserRatings) as UserRatingMap) : {});
+        setDailyUsage(rawDailyUsage ? (JSON.parse(rawDailyUsage) as DailyRatingUsage) : null);
       } catch {
         setRatings({});
-        setLastVotes({});
+        setUserRatings({});
+        setDailyUsage(null);
       } finally {
         setIsLoading(false);
       }
@@ -98,23 +118,31 @@ const TopCafeScreen: React.FC = () => {
   }, [ratings]);
 
   const handleRate = async (cafe: Place, value: number) => {
-    const daysLeft = getRatingDaysLeft(lastVotes[cafe.id]);
-    if (daysLeft > 0) {
-      Alert.alert(text.ratingAlready, `${text.rateAgainIn} ${daysLeft} ${text.days}`);
+    const previousValue = userRatings[cafe.id];
+    const isNewRating = !previousValue;
+
+    if (isNewRating && !canUseDailyRating(dailyUsage)) {
+      Alert.alert(text.ratingLimitTitle, text.ratingLimitText);
       return;
     }
 
     const nextRatings = {
       ...ratings,
-      [cafe.id]: addWeightedRating(getPlaceRating(cafe, ratings), value),
+      [cafe.id]: replaceWeightedRating(getPlaceRating(cafe, ratings), value, previousValue),
     };
-    const nextLastVotes = { ...lastVotes, [cafe.id]: new Date().toISOString() };
+    const nextUserRatings = { ...userRatings, [cafe.id]: value };
+    const nextDailyUsage = isNewRating ? recordDailyRatingUse(dailyUsage) : dailyUsage;
     setRatings(nextRatings);
-    setLastVotes(nextLastVotes);
-    await Promise.all([
+    setUserRatings(nextUserRatings);
+    if (nextDailyUsage) setDailyUsage(nextDailyUsage);
+    const writes = [
       AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(nextRatings)),
-      AsyncStorage.setItem(LAST_VOTE_KEY, JSON.stringify(nextLastVotes)),
-    ]);
+      AsyncStorage.setItem(USER_RATINGS_KEY, JSON.stringify(nextUserRatings)),
+      AsyncStorage.removeItem(LAST_VOTE_KEY),
+    ];
+    if (nextDailyUsage) writes.push(AsyncStorage.setItem(DAILY_USAGE_KEY, JSON.stringify(nextDailyUsage)));
+    await Promise.all(writes);
+    setRatingTarget(null);
   };
 
   return (
@@ -166,7 +194,7 @@ const TopCafeScreen: React.FC = () => {
                 <View style={styles.ratingLine}>
                   <View style={styles.starsInput}>
                     {[1, 2, 3, 4, 5].map((star) => (
-                      <TouchableOpacity key={star} onPress={(e) => { e.stopPropagation?.(); void handleRate(cafe, star); }} activeOpacity={0.72}>
+                      <TouchableOpacity key={star} onPress={(e) => { e.stopPropagation?.(); setRatingTarget(cafe); }} activeOpacity={0.72}>
                         <MaterialCommunityIcons name={star <= rounded ? 'star' : 'star-outline'} size={24} color={star <= rounded ? '#FFA000' : '#D6C4A3'} />
                       </TouchableOpacity>
                     ))}
@@ -178,6 +206,14 @@ const TopCafeScreen: React.FC = () => {
           );
         })}
       </ScrollView>
+      <StarRatingModal
+        visible={Boolean(ratingTarget)}
+        title={ratingTarget?.name ?? text.ratingPrompt}
+        subtitle={text.ratingHint}
+        value={ratingTarget ? userRatings[ratingTarget.id] ?? Math.round(getPlaceRating(ratingTarget, ratings).rating) : 0}
+        onSelect={(value) => { if (ratingTarget) void handleRate(ratingTarget, value); }}
+        onClose={() => setRatingTarget(null)}
+      />
       <MiniTabBar />
     </SafeAreaView>
   );
@@ -237,4 +273,3 @@ const styles = StyleSheet.create({
 });
 
 export default TopCafeScreen;
-

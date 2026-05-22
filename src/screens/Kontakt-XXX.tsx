@@ -14,15 +14,16 @@ import { RootState } from '../redux/store';
 import { contactsService, ContactListing } from '../services/contactsService';
 import { getModerationUserMessage, showUserError } from '../utils/userFacingErrors';
 import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField';
-import { get, ref } from 'firebase/database';
+import { get, onValue, ref, runTransaction } from 'firebase/database';
 import { database } from '../firebase-config';
 import { useContactRequest } from '../hooks/useContactRequest';
 import ContactReasonModal from '../components/ContactReasonModal';
 import { pickUserAvatarUri } from '../utils/userAvatar';
-import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
+import { safeOpenViber } from '../utils/communicationActions';
 import type { DetailItemData } from '../utils/detailViewTypes';
 
-const FOUR_MONTHS_MS = 120 * 24 * 60 * 60 * 1000;
+const CONTACT_LISTING_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const CONTACT_LIKES_PATH = 'contact_likes';
 
 const CONTACT_LEGACY_CATEGORY_VALUES = [
   'furniture',
@@ -275,7 +276,9 @@ const KontaktiChaikyScreen: React.FC = () => {
   const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
   const [showPhoneOnCard, setShowPhoneOnCard] = useState(true);
   const [listings, setListings] = useState<ContactListing[]>([]);
-  const [avatarByUserId, setAvatarByUserId] = useState<Record<string, string>>({});
+  const [profileByUserId, setProfileByUserId] = useState<Record<string, { name?: string; avatarUri?: string }>>({});
+  const [likeMap, setLikeMap] = useState<Record<string, Record<string, true>>>({});
+  const [likeBusyId, setLikeBusyId] = useState<string | null>(null);
   const [selectedFilterCategory, setSelectedFilterCategory] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [addFormVisible, setAddFormVisible] = useState(false);
@@ -347,21 +350,29 @@ const KontaktiChaikyScreen: React.FC = () => {
             const snap = await get(ref(database, `users/${uid}`));
             const data = snap.val() as Record<string, unknown> | null;
             const photo = pickUserAvatarUri(data);
-            return [uid, photo] as const;
+            const name = typeof data?.name === 'string' ? data.name.trim() : '';
+            return [uid, { name, avatarUri: photo }] as const;
           } catch {
-            return [uid, ''] as const;
+            return [uid, {}] as const;
           }
         }),
       );
       if (cancelled) return;
-      setAvatarByUserId((prev) => {
+      setProfileByUserId((prev) => {
         const next = { ...prev };
-        resolved.forEach(([uid, photo]) => { if (photo) next[uid] = photo; });
+        resolved.forEach(([uid, profile]) => { next[uid] = { ...next[uid], ...profile }; });
         return next;
       });
     })();
     return () => { cancelled = true; };
   }, [listings]);
+
+  useEffect(() => {
+    const unsubscribe = onValue(ref(database, CONTACT_LIKES_PATH), (snapshot) => {
+      setLikeMap((snapshot.val() as Record<string, Record<string, true>> | null) ?? {});
+    });
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     const anim = Animated.loop(
@@ -378,6 +389,21 @@ const KontaktiChaikyScreen: React.FC = () => {
 
   const handleViber = (phoneRaw: string) => {
     void safeOpenViber(phoneRaw, language);
+  };
+
+  const toggleLike = async (id: string) => {
+    if (!user?.id || likeBusyId) return;
+    setLikeBusyId(id);
+    try {
+      await runTransaction(ref(database, `${CONTACT_LIKES_PATH}/${id}/${user.id}`), (current: boolean | null) => {
+        if (current === true) return null;
+        return true;
+      });
+    } catch {
+      // Like failures are non-blocking for the contact card.
+    } finally {
+      setLikeBusyId(null);
+    }
   };
 
   const filteredListings = useMemo(() => {
@@ -498,7 +524,7 @@ const KontaktiChaikyScreen: React.FC = () => {
         moderationStatus: 'pending',
         submittedForModerationAt: createdAt.toISOString(),
         createdAt: createdAt.toISOString(),
-        expiresAt: new Date(createdAt.getTime() + FOUR_MONTHS_MS).toISOString(),
+        expiresAt: new Date(createdAt.getTime() + CONTACT_LISTING_TTL_MS).toISOString(),
         userId: user?.id || '',
         showPhone: showPhoneOnCard,
       });
@@ -685,15 +711,20 @@ const KontaktiChaikyScreen: React.FC = () => {
               </View>
             ) : (
               filteredListings.map((item) => {
+                const profile = item.userId ? profileByUserId[item.userId] : undefined;
                 const avatarUri = pickUserAvatarUri(
                   item,
-                  item.userId ? { photoURL: avatarByUserId[item.userId] } : undefined,
+                  profile?.avatarUri ? { photoURL: profile.avatarUri } : undefined,
                 );
                 const isOwn = item.userId === user?.id;
                 const showPhone = !!(item.phone && item.showPhone !== false);
                 const conditionLabel = text.conditionLabels[item.condition as keyof typeof text.conditionLabels] ?? item.condition;
                 const ageText = item.price ? `${item.price} р.` : '';
+                const categoryLabel = getCategoryLabel(item.category);
                 const descriptionText = item.description?.trim() || text.noDesc;
+                const displayName = profile?.name || item.itemName;
+                const likes = Object.keys(likeMap[item.id] ?? {}).length;
+                const hasLiked = !!(user?.id && likeMap[item.id]?.[user.id]);
                 const modMsg = getModerationUserMessage(language, item.moderationStatus, item.rejectionReason || item.moderationReason);
                 const showModInfo = isOwn && item.moderationStatus !== 'approved';
 
@@ -704,23 +735,30 @@ const KontaktiChaikyScreen: React.FC = () => {
                     onPress={() => navigation.navigate('ItemDetailScreen', { item: mapToDetailData(item) })}
                     activeOpacity={0.86}
                   >
-                    {/* Top: avatar + info */}
                     <View style={styles.kCardTop}>
-                      <MiniUserAvatar
-                        uri={avatarUri || ''}
-                        name={item.itemName}
-                        size={56}
-                        borderRadius={14}
-                        backgroundColor="#6A8BA5"
-                      />
-
+                      {Boolean(item.photoUri || item.photoStoragePath) ? (
+                        <AppPhotoImage
+                          uri={item.photoUri}
+                          storagePath={item.photoStoragePath}
+                          style={styles.kPhoto}
+                          resizeMode="cover"
+                          debugLabel={`Contact:${item.id}`}
+                        />
+                      ) : (
+                        <MiniUserAvatar
+                          uri={avatarUri || ''}
+                          name={displayName}
+                          size={92}
+                          borderRadius={14}
+                          backgroundColor="#6A8BA5"
+                        />
+                      )}
                       <View style={styles.kInfo}>
-                        {/* Name row */}
                         <View style={styles.kNameRow}>
-                          <Text style={styles.kName} numberOfLines={1}>{item.itemName}</Text>
-                          <View style={styles.kConditionBadge}>
-                            <Text style={styles.kConditionText}>{conditionLabel}</Text>
-                          </View>
+                          <Text style={styles.kName} numberOfLines={1}>{displayName}</Text>
+                          {item.isArchived ? (
+                            <Text style={styles.kArchiveBadge}>Архів</Text>
+                          ) : null}
                           {ageText ? (
                             <View style={styles.kAgeBadge}>
                               <Text style={styles.kAgeText}>{ageText}</Text>
@@ -728,9 +766,17 @@ const KontaktiChaikyScreen: React.FC = () => {
                           ) : null}
                         </View>
 
-                        {/* Description box */}
+                        <View style={styles.kMetaChips}>
+                          <View style={styles.kCategoryBadge}>
+                            <Text style={styles.kCategoryText} numberOfLines={1}>{categoryLabel}</Text>
+                          </View>
+                          <View style={styles.kConditionBadge}>
+                            <Text style={styles.kConditionText} numberOfLines={1}>{conditionLabel}</Text>
+                          </View>
+                        </View>
+
                         <View style={styles.kDescBox}>
-                          <Text style={styles.kDescText} numberOfLines={2}>{descriptionText}</Text>
+                          <Text style={styles.kDescText} numberOfLines={3}>{descriptionText}</Text>
                         </View>
 
                         {/* Moderation info (own listings only) */}
@@ -739,17 +785,6 @@ const KontaktiChaikyScreen: React.FC = () => {
                         ) : null}
                       </View>
                     </View>
-
-                    {/* Фото объявления */}
-                    {Boolean(item.photoUri || item.photoStoragePath) ? (
-                      <AppPhotoImage
-                        uri={item.photoUri}
-                        storagePath={item.photoStoragePath}
-                        style={styles.kPhoto}
-                        resizeMode="cover"
-                        debugLabel={`Contact:${item.id}`}
-                      />
-                    ) : null}
 
                     {/* Actions row */}
                     <View style={styles.kActionsRow}>
@@ -767,15 +802,19 @@ const KontaktiChaikyScreen: React.FC = () => {
                       ) : null}
 
                       <TouchableOpacity
-                        style={[styles.kBtnOutlined, !showPhone && styles.kBtnDisabled]}
-                        onPress={() => showPhone && void safeCallPhone(item.phone, language)}
-                        disabled={!showPhone}
+                        style={[styles.kBtnLike, hasLiked && styles.kBtnLikeActive, (!user?.id || likeBusyId === item.id) && styles.kBtnDisabled]}
+                        onPress={() => void toggleLike(item.id)}
+                        disabled={!user?.id || likeBusyId === item.id}
                         activeOpacity={0.8}
                       >
-                        <MaterialCommunityIcons name="phone-outline" size={13} color={showPhone ? ACCENT : '#B0A090'} />
-                        <Text style={[styles.kBtnOutlinedText, !showPhone && styles.kBtnDisabledText]}>
-                          {language === 'en' ? 'Call' : language === 'ru' ? 'Позвонить' : 'Подзвонити'}
-                        </Text>
+                        {likeBusyId === item.id ? (
+                          <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                          <>
+                            <MaterialCommunityIcons name={hasLiked ? 'heart' : 'heart-outline'} size={14} color="#fff" />
+                            <Text style={styles.kBtnLikeText}>{likes}</Text>
+                          </>
+                        )}
                       </TouchableOpacity>
 
                       <TouchableOpacity
@@ -1046,6 +1085,27 @@ const styles = StyleSheet.create({
     color: '#2D2520',
     flexShrink: 1,
   },
+  kMetaChips: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    flexWrap: 'wrap',
+  },
+  kCategoryBadge: {
+    backgroundColor: '#E6F0E9',
+    borderWidth: 1,
+    borderColor: '#B8D3BF',
+    borderRadius: 999,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    maxWidth: '52%',
+  },
+  kCategoryText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#2D7E4D',
+  },
+  kArchiveBadge: { fontSize: 10, fontWeight: '700', color: '#fff', backgroundColor: '#8B7355', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 3, overflow: 'hidden', flexShrink: 0 },
   kConditionBadge: {
     backgroundColor: '#F3E5F5',
     borderWidth: 1,
@@ -1122,6 +1182,25 @@ const styles = StyleSheet.create({
   kBtnDisabledText: {
     color: '#B0A090',
   },
+  kBtnLike: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    minWidth: 46,
+    backgroundColor: '#7A1E5C',
+  },
+  kBtnLikeActive: {
+    backgroundColor: '#B13A70',
+  },
+  kBtnLikeText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#fff',
+  },
   kBtnViber: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1149,10 +1228,10 @@ const styles = StyleSheet.create({
     marginLeft: 'auto' as const,
   },
   kPhoto: {
-    width: '100%',
-    height: 180,
+    width: 92,
+    height: 108,
     borderRadius: 14,
-    marginTop: 10,
+    backgroundColor: '#FFF3E0',
   },
   kBtnRoundDelete: {
     width: 32,

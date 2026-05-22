@@ -1,11 +1,10 @@
 /**
- * rateLimiter.ts вЂ” РїСЂРѕСЃС‚РѕР№ rate limiting РґР»СЏ С„РѕСЂРј.
+ * rateLimiter.ts - simple in-memory rate limiting for forms.
  *
- * РҐСЂР°РЅРёС‚ timestamp РїРѕСЃР»РµРґРЅРµР№ РѕС‚РїСЂР°РІРєРё РїРѕ РєР»СЋС‡Сѓ РІ РїР°РјСЏС‚Рё.
- * РџРѕСЃР»Рµ СЂРµСЃС‚Р°СЂС‚Р° РїСЂРёР»РѕР¶РµРЅРёСЏ СЃС‡С‘С‚С‡РёРєРё СЃР±СЂР°СЃС‹РІР°СЋС‚СЃСЏ (СЌС‚Рѕ РЅРѕСЂРјР°Р»СЊРЅРѕ).
+ * Stores the last submit timestamp by key. Counters reset after app restart.
  *
- * РСЃРїРѕР»СЊР·РѕРІР°РЅРёРµ:
- *   const limiter = useRateLimiter('help_request', 60_000); // 1 РјРёРЅ cooldown
+ * Usage:
+ *   const limiter = useRateLimiter('help_request', 60_000); // 1 min cooldown
  *   if (!limiter.canSubmit()) { ... show cooldown message ... }
  *   await limiter.recordSubmit();
  */
@@ -13,18 +12,18 @@
 const lastSubmitTimes: Record<string, number> = {};
 
 export interface RateLimiter {
-  /** РџСЂРѕРІРµСЂСЏРµС‚, РјРѕР¶РЅРѕ Р»Рё РѕС‚РїСЂР°РІРёС‚СЊ С„РѕСЂРјСѓ РїСЂСЏРјРѕ СЃРµР№С‡Р°СЃ */
+  /** Checks whether the form can be submitted now. */
   canSubmit: () => boolean;
-  /** Р’РѕР·РІСЂР°С‰Р°РµС‚ РѕСЃС‚Р°РІС€РµРµСЃСЏ РІСЂРµРјСЏ РѕР¶РёРґР°РЅРёСЏ РІ СЃРµРєСѓРЅРґР°С… (0 РµСЃР»Рё РјРѕР¶РЅРѕ РѕС‚РїСЂР°РІР»СЏС‚СЊ) */
+  /** Returns remaining cooldown in seconds, or 0 if submit is allowed. */
   cooldownSecondsLeft: () => number;
-  /** Р—Р°РїРёСЃС‹РІР°РµС‚ РІСЂРµРјСЏ РїРѕСЃР»РµРґРЅРµР№ РѕС‚РїСЂР°РІРєРё */
+  /** Records a submit timestamp. */
   recordSubmit: () => void;
 }
 
 /**
- * Простий rate limiter для конкретної форми.
- * @param key     РЈРЅРёРєР°Р»СЊРЅС‹Р№ РєР»СЋС‡ С„РѕСЂРјС‹
- * @param cooldownMs РњРёРЅРёРјР°Р»СЊРЅС‹Р№ РёРЅС‚РµСЂРІР°Р» РјРµР¶РґСѓ РѕС‚РїСЂР°РІРєР°РјРё (РјСЃ)
+ * Simple rate limiter for a concrete form.
+ * @param key Unique form key
+ * @param cooldownMs Minimum interval between submits, in ms
  */
 export function createRateLimiter(key: string, cooldownMs: number): RateLimiter {
   return {
@@ -47,10 +46,10 @@ export function createRateLimiter(key: string, cooldownMs: number): RateLimiter 
 
 // Pre-built limiters for known forms
 export const RATE_LIMITERS = {
-  helpRequest: createRateLimiter('help_request', 60_000),      // 1 РјРёРЅ
-  lostFound: createRateLimiter('lost_found', 120_000),          // 2 РјРёРЅ
-  buySell: createRateLimiter('buy_sell', 120_000),              // 2 РјРёРЅ
-  contacts: createRateLimiter('contacts', 120_000),             // 2 РјРёРЅ
-  osbbCollection: createRateLimiter('osbb_collection', 60_000), // 1 РјРёРЅ
-  osbbTopic: createRateLimiter('osbb_topic', 30_000),           // 30 СЃРµРє
+  helpRequest: createRateLimiter('help_request', 60_000),      // 1 min
+  lostFound: createRateLimiter('lost_found', 120_000),          // 2 min
+  buySell: createRateLimiter('buy_sell', 120_000),              // 2 min
+  contacts: createRateLimiter('contacts', 120_000),             // 2 min
+  osbbCollection: createRateLimiter('osbb_collection', 60_000), // 1 min
+  osbbTopic: createRateLimiter('osbb_topic', 30_000),           // 30 sec
 } as const;

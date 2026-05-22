@@ -294,7 +294,7 @@ const HelpNeighborsScreen: React.FC = () => {
     <SafeAreaView style={styles.container}>
       {showHelpSplash ? (
         <View style={styles.splashContainer}>
-          <Image source={require('../../assets/dopomoga1.png')} style={styles.splashImage} resizeMode="cover" />
+          <Image source={require('../../assets/WEBP-version/dopomoga1.webp')} style={styles.splashImage} resizeMode="cover" />
           <View style={styles.splashOverlay} />
           <View style={styles.splashCaption}>
             <Text style={styles.splashText}>{text.splash}</Text>
@@ -305,7 +305,7 @@ const HelpNeighborsScreen: React.FC = () => {
       {isReady ? (
         <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
           <View style={styles.headerCard}>
-            <Image source={require('../../assets/Sosedi pomogaut.png')} style={styles.headerImage} resizeMode="cover" />
+            <Image source={require('../../assets/WEBP-version/Sosedi pomogaut.webp')} style={styles.headerImage} resizeMode="cover" />
           </View>
 
           <View style={styles.formCard}>

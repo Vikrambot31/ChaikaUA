@@ -1,4 +1,4 @@
-import { ref, push, update, onValue, remove, query, orderByChild, equalTo, get } from 'firebase/database';
+import { ref, push, update, onValue, remove, query, orderByChild, equalTo, get, limitToLast } from 'firebase/database';
 import { database } from '../firebase-core';
 import { createPendingModeration, ModerationStatus } from '../utils/moderation';
 import { sanitizeStoredText } from '../utils/textUtils';
@@ -25,10 +25,15 @@ export interface BuySellListing {
   moderationReason?: string;
   rejectionReason?: string;
   showPhone?: boolean;
+  isArchived?: boolean;
 }
 
 const PATH = 'buy_sell_listings';
-const DEFAULT_LISTING_TTL_MS = 120 * 24 * 60 * 60 * 1000;
+const DEFAULT_LISTING_TTL_MS = 90 * 24 * 60 * 60 * 1000;
+const ACTIVE_LIMIT = 300;
+const ACTIVE_LIMIT_BUFFER = 60;
+const FEED_MINIMUM = 10;
+const ARCHIVED_FALLBACK_LIMIT = 20;
 const normalizePrice = (value: string): string => {
   const sanitized = value.replace(',', '.').replace(/[^\d.]/g, '');
   const numeric = Number(sanitized);
@@ -38,49 +43,62 @@ const normalizePrice = (value: string): string => {
   return numeric.toFixed(Number.isInteger(numeric) ? 0 : 2);
 };
 
+const mapBuySellItem = (id: string, data: any, isArchived?: boolean): BuySellListing => ({
+  id,
+  itemName: data.itemName || '',
+  category: data.category || '',
+  condition: data.condition || '',
+  price: data.price || '',
+  description: data.description || '',
+  phone: data.phone || '',
+  photoUri: data.photoUri || data.photoStoragePath || '',
+  photoStoragePath: data.photoStoragePath || data.photoUri || '',
+  photoId: data.photoId || '',
+  moderationStatus: isArchived ? 'approved' : (data.moderationStatus || 'pending'),
+  submittedForModerationAt: data.submittedForModerationAt || '',
+  createdAt: data.createdAt || '',
+  expiresAt: data.expiresAt || '',
+  userId: data.userId || '',
+  moderationReason: isArchived ? '' : (data.moderationReason || data.reason || ''),
+  rejectionReason: isArchived ? '' : (data.rejectionReason || data.reason || ''),
+  showPhone: data.showPhone !== false,
+  isArchived,
+});
+
 export const buySellService = {
   subscribe(callback: (items: BuySellListing[]) => void): () => void {
-    const listRef = query(ref(database, PATH), orderByChild('moderationStatus'), equalTo('approved'));
+    const listRef = query(ref(database, PATH), orderByChild('moderationStatus'), equalTo('approved'), limitToLast(ACTIVE_LIMIT + ACTIVE_LIMIT_BUFFER));
 
     const unsubscribe = onValue(listRef, (snapshot) => {
       const raw = snapshot.val();
-      if (!raw) {
-        callback([]);
+      const now = Date.now();
+      const active: BuySellListing[] = raw
+        ? Object.entries(raw as Record<string, any>)
+            .map(([id, data]) => mapBuySellItem(id, data))
+            .filter((item) => {
+              const expired = item.expiresAt && new Date(item.expiresAt).getTime() < now;
+              return item.moderationStatus === 'approved' && !expired;
+            })
+            .reverse()
+            .slice(0, ACTIVE_LIMIT)
+        : [];
+
+      if (active.length >= FEED_MINIMUM) {
+        void resolveMediaAccessUrls(active, 'buy_sell_listings', (item) => item.photoStoragePath || item.photoUri || '', (item, url) => ({ ...item, photoUri: url })).then(callback);
         return;
       }
-      const now = Date.now();
-      const items: BuySellListing[] = Object.entries(raw as Record<string, any>)
-        .map(([id, data]) => ({
-          id,
-          itemName: data.itemName || '',
-          category: data.category || '',
-          condition: data.condition || '',
-          price: data.price || '',
-          description: data.description || '',
-          phone: data.phone || '',
-          photoUri: data.photoUri || data.photoStoragePath || '',
-          photoStoragePath: data.photoStoragePath || data.photoUri || '',
-          photoId: data.photoId || '',
-          moderationStatus: data.moderationStatus || 'pending',
-          submittedForModerationAt: data.submittedForModerationAt || '',
-          createdAt: data.createdAt || '',
-          expiresAt: data.expiresAt || '',
-          userId: data.userId || '',
-          moderationReason: data.moderationReason || data.reason || '',
-          rejectionReason: data.rejectionReason || data.reason || '',
-          showPhone: data.showPhone !== false,
-        }))
-        .filter((item) => {
-          const expired = item.expiresAt && new Date(item.expiresAt).getTime() < now;
-          return item.moderationStatus === 'approved' && !expired;
-        })
-        .reverse();
-      void resolveMediaAccessUrls(
-        items,
-        'buy_sell_listings',
-        (item) => item.photoStoragePath || item.photoUri || '',
-        (item, url) => ({ ...item, photoUri: url }),
-      ).then(callback);
+
+      void get(query(ref(database, PATH), orderByChild('moderationStatus'), equalTo('expired'), limitToLast(ARCHIVED_FALLBACK_LIMIT))).then((expiredSnapshot) => {
+        const expiredRaw = expiredSnapshot.val();
+        const archived: BuySellListing[] = expiredRaw
+          ? Object.entries(expiredRaw as Record<string, any>)
+              .map(([id, data]) => mapBuySellItem(id, data, true))
+              .reverse()
+          : [];
+        void resolveMediaAccessUrls([...active, ...archived], 'buy_sell_listings', (item) => item.photoStoragePath || item.photoUri || '', (item, url) => ({ ...item, photoUri: url })).then(callback);
+      }).catch(() => {
+        void resolveMediaAccessUrls(active, 'buy_sell_listings', (item) => item.photoStoragePath || item.photoUri || '', (item, url) => ({ ...item, photoUri: url })).then(callback);
+      });
     });
 
     return unsubscribe;

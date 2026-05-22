@@ -42,6 +42,8 @@ type RawChaykaNewsItem = Partial<Omit<ChaykaNewsItem, 'priority' | 'aiGenerated'
 const CHAYKA_NEWS_CACHE_KEY = 'chayka_news_cache_v1';
 const DEFAULT_CHAYKA_NEWS_URL = 'https://raw.githubusercontent.com/Vikrambot31/ChaikaUA/main/data/feed.json';
 const CHAYKA_NEWS_TIMEOUT_MS = 6500;
+const CHAYKA_NEWS_ACTIVE_LIMIT = 200;
+const CHAYKA_NEWS_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const CHAYKA_NEWS_POLL_MS = Math.max(
   5000,
   Number(process.env.EXPO_PUBLIC_CHAYKA_NEWS_POLL_MS || 7000) || 7000
@@ -124,6 +126,10 @@ export const normalizeChaykaNews = (items: RawChaykaNewsItem[]): ChaykaNewsItem[
       return normalized;
     })
     .filter((item) => {
+      const publishedAt = getTimestamp(item.publishedAt);
+      if (publishedAt > 0 && publishedAt + CHAYKA_NEWS_TTL_MS < Date.now()) {
+        return false;
+      }
       const dedupeKey = item.id || item.sourceUrl || `${item.title}-${item.publishedAt}`;
       if (seen.has(dedupeKey)) {
         return false;
@@ -131,7 +137,8 @@ export const normalizeChaykaNews = (items: RawChaykaNewsItem[]): ChaykaNewsItem[
       seen.add(dedupeKey);
       return item.shortText.length > 0;
     })
-    .sort((a, b) => getTimestamp(b.publishedAt) - getTimestamp(a.publishedAt));
+    .sort((a, b) => getTimestamp(b.publishedAt) - getTimestamp(a.publishedAt))
+    .slice(0, CHAYKA_NEWS_ACTIVE_LIMIT);
 };
 
 export const loadChaykaNewsDetailed = async (): Promise<{ status: ChaykaNewsLoadStatus; fromCache: boolean; items: ChaykaNewsItem[] }> => {

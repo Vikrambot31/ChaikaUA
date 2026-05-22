@@ -5,11 +5,9 @@ const { createInviteAccessFunctions } = require('./inviteAccess');
 
 admin.initializeApp();
 
-const firebaseConfig = typeof functions.config === 'function' ? functions.config() : {};
-
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || firebaseConfig?.telegram?.bot_token || '';
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || process.env.TELEGRAM_CHANNEL_ID || firebaseConfig?.telegram?.chat_id || '';
-const CHAYKA_TELEGRAM_TOPIC = process.env.CHAYKA_TELEGRAM_TOPIC || firebaseConfig?.telegram?.topic || '';
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || process.env.TELEGRAM_CHANNEL_ID || '';
+const CHAYKA_TELEGRAM_TOPIC = process.env.CHAYKA_TELEGRAM_TOPIC || '';
 const EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
 const PHONE_RE = /\+?\d[\d\s().-]{7,}\d/g;
 const OSBB_VOTE_PATH = 'osbb_votes';
@@ -190,7 +188,6 @@ const getRoleForUid = async (uid) => {
 Object.assign(exports, createInviteAccessFunctions({
   functions,
   admin,
-  firebaseConfig,
   writeOpsEvent,
   writeOpsError,
   isPrimaryServiceOwnerContext,
@@ -437,9 +434,13 @@ const getRecordMediaPath = (record) => String(
   record?.storagePath || record?.photoStoragePath || record?.imageStoragePath || record?.imageUri || record?.photoUri || '',
 );
 
-const getRecordOwnerId = (collection, itemId, record) => String(
-  record?.userId || record?.uid || '',
-);
+const getRecordOwnerId = (collection, itemId, record) => {
+  const ownerId = String(record?.userId || '').trim();
+  if (!ownerId) {
+    throw new functions.https.HttpsError('failed-precondition', 'Media record owner is missing');
+  }
+  return ownerId;
+};
 
 const getRecordModerationStatus = (record) => String(record?.status || record?.moderationStatus || '').toLowerCase();
 
@@ -541,7 +542,7 @@ const signInWithEmailRateLimitedHandler = functions.https.onCall(async (data, co
   }
 
   const rateLimit = await assertAuthAttemptAllowed(email, context.rawRequest?.ip);
-  const apiKey = process.env.FIREBASE_API_KEY || firebaseConfig?.firebase?.api_key || firebaseConfig?.auth?.api_key || '';
+  const apiKey = process.env.FIREBASE_API_KEY || '';
   if (!apiKey) {
     throw new functions.https.HttpsError('failed-precondition', 'Server sign-in API key is not configured');
   }
@@ -803,49 +804,286 @@ exports.getMediaDataUrlHttp = functions.https.onRequest(async (req, res) => {
   }
 });
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+const MONTH_MS = 30 * DAY_MS;
+const EXPIRED_DELETE_AFTER_MS = 45 * DAY_MS;
+const STUCK_PENDING_MS = 7 * DAY_MS;
+const MAX_ACTIONS_PER_COLLECTION = 500;
+
+const EXPIRING_COLLECTIONS = [
+  { path: 'lost_found', statusField: 'moderationStatus', ttlMs: 15 * DAY_MS },
+  { path: 'job_listings', statusField: 'moderationStatus', ttlMs: 2 * MONTH_MS },
+  { path: 'buy_sell_listings', statusField: 'moderationStatus', ttlMs: 3 * MONTH_MS },
+  { path: 'contacts_listings', statusField: 'moderationStatus', ttlMs: 30 * DAY_MS },
+];
+
+const ADMIN_MODERATION_SECTIONS = {
+  requests: { path: 'requests', statusField: 'status', approvedValue: 'approved', rejectedValue: 'rejected' },
+  appSuggestions: { path: 'app_suggestions', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
+  communityPhotos: { path: 'community_photos', statusField: 'status', approvedValue: 'approved', rejectedValue: 'rejected' },
+  datingProfiles: { path: 'dating_profiles', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
+  datingAnketaListings: { path: 'dating_anketa_listings', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
+  coffeeRequests: { path: 'coffee_requests', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
+  buySell: { path: 'buy_sell_listings', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
+  contactsListings: { path: 'contacts_listings', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
+  localBusiness: { path: 'local_business', statusField: 'status', approvedValue: 'active', rejectedValue: 'rejected' },
+  jobs: { path: 'job_listings', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
+  lostFound: { path: 'lost_found', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
+  osbbNews: { path: 'osbb_news', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected', nested: true },
+  osbbVotes: { path: 'osbb_votes', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected', nested: true },
+  osbbHouseTopics: { path: 'osbb_house_topics', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected', nested: true },
+  osbbCollections: { path: 'osbb_collections', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected', nested: true },
+};
+
+const ADMIN_MODERATION_RESTORE_TTL_MS = {
+  lostFound: 15 * DAY_MS,
+  jobs: 60 * DAY_MS,
+  buySell: 90 * DAY_MS,
+  contactsListings: 30 * DAY_MS,
+  requests: 15 * DAY_MS,
+};
+
+const SAFE_RTDB_PATH_RE = /^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+){1,2}$/;
+
+const assertAdminModerationAccess = async (context) => {
+  if (!context.auth?.uid) {
+    throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+  }
+  if (isPrimaryServiceOwnerContext(context)) {
+    return { uid: context.auth.uid, role: 'owner' };
+  }
+  const role = await getRoleForUid(context.auth.uid);
+  if (role === 'admin' || role === 'moderator') {
+    return { uid: context.auth.uid, role };
+  }
+  throw new functions.https.HttpsError('permission-denied', 'Moderator access required');
+};
+
+const assertModerationTargetPath = (data, config) => {
+  const rawPath = String(data?.path || '').trim();
+  if (!SAFE_RTDB_PATH_RE.test(rawPath)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid moderation path');
+  }
+
+  const parts = rawPath.split('/');
+  if (parts[0] !== config.path || parts.length !== (config.nested ? 3 : 2)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Moderation path does not match section');
+  }
+  return rawPath;
+};
+
+exports.adminModerateContentItem = functions.https.onCall(async (data, context) => {
+  try {
+    const actor = await assertAdminModerationAccess(context);
+    const section = String(data?.section || '').trim();
+    const action = String(data?.action || '').trim();
+    const itemStatus = String(data?.currentStatus || '').trim();
+    const config = ADMIN_MODERATION_SECTIONS[section];
+
+    if (!config) {
+      throw new functions.https.HttpsError('invalid-argument', 'Unknown moderation section');
+    }
+    if (action !== 'approved' && action !== 'rejected' && action !== 'delete') {
+      throw new functions.https.HttpsError('invalid-argument', 'Unsupported moderation action');
+    }
+
+    const targetPath = assertModerationTargetPath(data, config);
+    const db = admin.database();
+    const targetRef = db.ref(targetPath);
+    const snapshot = await targetRef.once('value');
+    if (!snapshot.exists()) {
+      throw new functions.https.HttpsError('not-found', 'Moderation item not found');
+    }
+
+    const now = Date.now();
+    if (action === 'delete') {
+      await targetRef.remove();
+    } else {
+      const patch = {
+        [config.statusField]: action === 'approved' ? config.approvedValue : config.rejectedValue,
+        moderatedAt: now,
+        moderatedBy: actor.uid,
+      };
+
+      if (section === 'requests') {
+        patch.isApproved = action === 'approved';
+      }
+
+      if (action === 'rejected') {
+        patch.moderationReason = 'default_rejected';
+        patch.rejectionReason = 'default_rejected';
+      } else {
+        patch.moderationReason = null;
+        patch.rejectionReason = null;
+      }
+
+      if (section === 'communityPhotos' && action === 'approved') {
+        patch.safetyStatus = 'manual_reviewed';
+        patch.safetyReviewedAt = now;
+        patch.safetyReviewedBy = actor.uid;
+        patch.safetyReason = 'moderator_reviewed_before_publication';
+      }
+
+      if (itemStatus === 'expired' && action === 'approved') {
+        const ttl = ADMIN_MODERATION_RESTORE_TTL_MS[section];
+        if (ttl) {
+          patch.expiresAt = now + ttl;
+          patch.archivedAt = null;
+          patch.archiveReason = null;
+        }
+      }
+
+      await targetRef.update(patch);
+    }
+
+    await writeOpsEvent('admin_moderation_action', {
+      actorUid: actor.uid,
+      actorRole: actor.role,
+      section,
+      action,
+      path: targetPath,
+    });
+
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    await writeOpsError('adminModerateContentItem', error, {
+      uid: context.auth?.uid || null,
+      section: data?.section || null,
+      action: data?.action || null,
+      path: data?.path || null,
+    });
+    throw new functions.https.HttpsError('internal', 'Failed to apply moderation action');
+  }
+});
+
+const parseRecordTimeMs = (value) => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
+
+const getCreatedTimeMs = (record = {}) => (
+  parseRecordTimeMs(record.createdAt) ||
+  parseRecordTimeMs(record.timestamp) ||
+  parseRecordTimeMs(record.submittedForModerationAt) ||
+  null
+);
+
+const getRequestTtlMs = (record = {}) => {
+  const category = String(record.category || '').toLowerCase();
+  const group = String(record.group || '').toLowerCase();
+  const subcategory = String(record.subcategory || '').toLowerCase();
+
+  if (category === 'problem') return 30 * DAY_MS;
+  if (group === 'help_neighbors' || category === 'medical' || category === 'care') return 10 * DAY_MS;
+  if (subcategory === 'going_shopping' || subcategory === 'ride_share' || group === 'foodsharing' || group === 'transport') return 10 * DAY_MS;
+  return 15 * DAY_MS;
+};
+
+const getRecordExpiresAtMs = (record = {}, fallbackTtlMs) => {
+  const explicit = parseRecordTimeMs(record.expiresAt) || parseRecordTimeMs(record.expires_at);
+  if (explicit) return explicit;
+  const createdAt = getCreatedTimeMs(record);
+  return createdAt ? createdAt + fallbackTtlMs : null;
+};
+
+const expireFlatCollection = async ({ db, path, statusField, ttlMs, now, updates }) => {
+  const snapshot = await db.ref(path).once('value');
+  const records = snapshot.val() || {};
+  let scannedCount = 0;
+  let expiredCount = 0;
+  let deletedCount = 0;
+  let stuckCount = 0;
+
+  Object.entries(records).forEach(([id, record]) => {
+    if (expiredCount + deletedCount + stuckCount >= MAX_ACTIONS_PER_COLLECTION) return;
+    if (!record || typeof record !== 'object') return;
+    scannedCount += 1;
+
+    const currentStatus = String(record[statusField] || '').toLowerCase();
+    const createdAt = getCreatedTimeMs(record);
+    const expiresAt = getRecordExpiresAtMs(record, ttlMs(record));
+    const archivedAt = parseRecordTimeMs(record.archivedAt) || parseRecordTimeMs(record.expiredAt);
+
+    if ((currentStatus === 'processing' || currentStatus === 'pending') && createdAt && createdAt + STUCK_PENDING_MS < now) {
+      updates[`${path}/${id}/${statusField}`] = 'expired';
+      updates[`${path}/${id}/archivedAt`] = now;
+      updates[`${path}/${id}/archiveReason`] = 'stuck_processing_or_pending';
+      stuckCount += 1;
+      return;
+    }
+
+    if (currentStatus === 'expired') {
+      if (archivedAt && archivedAt + EXPIRED_DELETE_AFTER_MS < now) {
+        updates[`${path}/${id}`] = null;
+        deletedCount += 1;
+      }
+      return;
+    }
+
+    if (currentStatus === 'approved' && expiresAt && expiresAt < now) {
+      updates[`${path}/${id}/${statusField}`] = 'expired';
+      updates[`${path}/${id}/archivedAt`] = now;
+      updates[`${path}/${id}/archiveReason`] = 'expired_by_schedule';
+      expiredCount += 1;
+    }
+  });
+
+  return { path, scannedCount, expiredCount, deletedCount, stuckCount };
+};
+
+const cleanupExpiredRecordsHandler = async () => {
+  const db = admin.database();
+  const now = Date.now();
+  const updates = {};
+  const summaries = [];
+
+  try {
+    summaries.push(await expireFlatCollection({
+      db,
+      path: 'requests',
+      statusField: 'status',
+      ttlMs: getRequestTtlMs,
+      now,
+      updates,
+    }));
+
+    for (const config of EXPIRING_COLLECTIONS) {
+      summaries.push(await expireFlatCollection({
+        db,
+        ...config,
+        ttlMs: () => config.ttlMs,
+        now,
+        updates,
+      }));
+    }
+
+    if (Object.keys(updates).length > 0) {
+      await db.ref().update(updates);
+    }
+
+    await writeOpsEvent('cleanup_expired_records', {
+      checkedAt: now,
+      updateCount: Object.keys(updates).length,
+      summaries,
+    });
+    return null;
+  } catch (error) {
+    console.error('Error cleaning up expired records:', error);
+    await writeOpsError('cleanupExpiredRecords', error, { checkedAt: now });
+    return null;
+  }
+};
+
+// Legacy export name kept for existing schedules/deployments. It now archives first, then deletes old archive records.
 exports.cleanupExpiredRequests = functions.pubsub
   .schedule('every 24 hours')
   .timeZone('Europe/Kiev')
-  .onRun(async (context) => {
-    const db = admin.database();
-    const now = Date.now();
-    const threeDaysMs = 3 * 24 * 60 * 60 * 1000;
-
-    try {
-      const snapshot = await db.ref('requests').once('value');
-      const requests = snapshot.val();
-      
-      if (!requests) {
-        console.log('No requests to clean up');
-        return null;
-      }
-
-      const deletions = [];
-      Object.entries(requests).forEach(([id, request]) => {
-        const explicitExpiresAt = typeof request.expires_at === 'number' ? request.expires_at : null;
-        const createdAt = typeof request.createdAt === 'number' ? request.createdAt : null;
-        const timestamp = typeof request.timestamp === 'number' ? request.timestamp : null;
-        const expiresAt = explicitExpiresAt ?? (createdAt ? createdAt + threeDaysMs : null) ?? (timestamp ? timestamp + threeDaysMs : null);
-
-        if (expiresAt !== null && expiresAt < now) {
-          console.log(`Deleting expired request: ${id}`);
-          deletions.push(db.ref(`requests/${id}`).remove());
-        }
-      });
-
-      await Promise.all(deletions);
-      await writeOpsEvent('cleanup_expired_requests', {
-        deletedCount: deletions.length,
-        scannedCount: Object.keys(requests).length,
-      });
-      console.log(`Cleaned up ${deletions.length} expired requests`);
-      return null;
-    } catch (error) {
-      console.error('Error cleaning up requests:', error);
-      await writeOpsError('cleanupExpiredRequests', error);
-      return null;
-    }
-  });
+  .onRun(cleanupExpiredRecordsHandler);
 
 // Відправка сповіщення модераторам про нову заявку
 exports.notifyModeratorsOnNewRequest = functions.database
@@ -1663,7 +1901,7 @@ exports.onRoleChanged = functions.database
 
 exports.sendChaykaTelegramTest = functions.https.onRequest(async (req, res) => {
   try {
-    const configuredSecret = process.env.TELEGRAM_TEST_SECRET || firebaseConfig?.telegram?.test_secret || '';
+    const configuredSecret = process.env.TELEGRAM_TEST_SECRET || '';
     const providedSecret = req.get('x-telegram-test-secret') || req.query.secret || '';
     if (!configuredSecret || providedSecret !== configuredSecret) {
       res.status(403).json({ ok: false, error: 'Forbidden' });

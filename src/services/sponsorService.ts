@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { firebaseApp } from '../firebase-core';
+import { auth, firebaseApp } from '../firebase-core';
 
 export const SPONSOR_PHONE_RE = /^\+380\d{9}$/;
 
@@ -29,6 +29,7 @@ export type InviteRequestSnapshot = {
   bypass?: boolean;
   riskScore?: number;
   riskLevel?: string;
+  configUpdatedAt?: number;
 };
 
 type SubmitInviteRequestResponse = {
@@ -67,11 +68,12 @@ type RawInviteStatusResponse = {
   bypass?: boolean;
   riskScore?: number;
   riskLevel?: string;
+  configUpdatedAt?: number;
 };
 
 const functions = getFunctions(firebaseApp);
 const INVITE_STATUS_CACHE_KEY = '@chaika:invite_access_status_v1';
-const INVITE_STATUS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const INVITE_STATUS_CACHE_TTL_MS = 5 * 60 * 1000;
 
 const normalizeStatus = (value: unknown): InviteRequestStatus => {
   if (
@@ -101,15 +103,18 @@ const normalizeUserAccess = (value: RawInviteStatusResponse['userAccess']): User
   };
 };
 
+const getInviteStatusCacheKey = (): string =>
+  `${INVITE_STATUS_CACHE_KEY}:${auth.currentUser?.uid || 'anonymous'}`;
+
 const cacheInviteStatus = async (snapshot: InviteRequestSnapshot): Promise<void> => {
   try {
-    await AsyncStorage.setItem(INVITE_STATUS_CACHE_KEY, JSON.stringify({ snapshot, cachedAt: Date.now() }));
+    await AsyncStorage.setItem(getInviteStatusCacheKey(), JSON.stringify({ snapshot, cachedAt: Date.now() }));
   } catch {}
 };
 
 const getCachedInviteStatus = async (): Promise<InviteRequestSnapshot | null> => {
   try {
-    const raw = await AsyncStorage.getItem(INVITE_STATUS_CACHE_KEY);
+    const raw = await AsyncStorage.getItem(getInviteStatusCacheKey());
     if (!raw) return null;
     const parsed = JSON.parse(raw) as { snapshot?: InviteRequestSnapshot; cachedAt?: number };
     if (!parsed.snapshot || Date.now() - Number(parsed.cachedAt || 0) > INVITE_STATUS_CACHE_TTL_MS) return null;
@@ -119,7 +124,12 @@ const getCachedInviteStatus = async (): Promise<InviteRequestSnapshot | null> =>
   }
 };
 
-export const normalizeSponsorPhone = (value: string): string => value.trim();
+export const normalizeSponsorPhone = (value: string): string => {
+  const raw = String(value || '').trim().replace(/[\s().-]/g, '');
+  if (/^0\d{9}$/.test(raw)) return `+38${raw}`;
+  if (/^380\d{9}$/.test(raw)) return `+${raw}`;
+  return raw;
+};
 
 export const isValidSponsorPhone = (value: string): boolean =>
   SPONSOR_PHONE_RE.test(normalizeSponsorPhone(value));
@@ -163,6 +173,7 @@ export const getMyInviteRequestStatus = async (): Promise<InviteRequestSnapshot>
       accessStatus: result.data.accessStatus,
       userAccess: normalizeUserAccess(result.data.userAccess),
       bypass: result.data.bypass === true,
+      configUpdatedAt: Number(result.data.configUpdatedAt || 0),
       status: 'disabled',
     };
     await cacheInviteStatus(snapshot);
@@ -183,6 +194,7 @@ export const getMyInviteRequestStatus = async (): Promise<InviteRequestSnapshot>
     moderationReason: result.data.moderationReason || '',
     riskScore: Number(result.data.riskScore || 0),
     riskLevel: result.data.riskLevel || '',
+    configUpdatedAt: Number(result.data.configUpdatedAt || 0),
   };
   await cacheInviteStatus(snapshot);
   return snapshot;

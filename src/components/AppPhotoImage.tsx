@@ -39,7 +39,7 @@ const isLikelyStoragePath = (value: unknown): value is string => {
   if (typeof value !== 'string') return false;
   const trimmed = value.trim();
   if (!trimmed || /^https?:\/\//i.test(trimmed) || /^file:\/\//i.test(trimmed) || /^content:\/\//i.test(trimmed)) return false;
-  return /^(community_photos|lost_found|buy_sell|buy_sell_listings|contacts|contacts_listings|local_business|requests|profile_photos)\//i.test(trimmed);
+  return /^(community_photos|user_photos|lost_found|buy_sell|buy_sell_listings|contacts|contacts_listings|local_business|requests|profile_photos)\//i.test(trimmed);
 };
 
 const stripQuery = (value: string): string => value.split('?')[0];
@@ -125,9 +125,13 @@ const AppPhotoImage: React.FC<Props> = ({
   const finalImageUri = useMemo(() => {
     if (isFileUri(localImageUri)) return localImageUri.trim();
     if (isHttpsUri(resolvedImageUri)) return resolvedImageUri.trim();
-    if (!preferredPath && isHttpsUri(uri)) return uri.trim();
+    // Use the stored https URI immediately — no need to wait for getDownloadURL.
+    // getDownloadURL still runs in the background via the preferredPath effect for local caching.
+    if (isHttpsUri(uri)) return uri.trim();
+    // Support file:// URIs directly (e.g. local preview during upload, or thumbnail).
+    if (isFileUri(uri)) return uri.trim();
     return '';
-  }, [localImageUri, preferredPath, resolvedImageUri, uri]);
+  }, [localImageUri, resolvedImageUri, uri]);
   const uriDiagnostics = useMemo(() => getUriDiagnostics(uri), [uri]);
   const [failed, setFailed] = useState(false);
   const [failureReason, setFailureReason] = useState('');

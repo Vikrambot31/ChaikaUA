@@ -222,7 +222,7 @@ const persistRemoteDiagnostic = async (entry: RuntimeMonitorEntry): Promise<void
       try {
         await doRemoteWrite(pending);
       } catch {
-        // Network still down вЂ” re-queue silently (don't loop forever)
+        // Network still down - re-queue silently (don't loop forever)
         if (offlineRetryQueue.length < MAX_RETRY_QUEUE) {
           offlineRetryQueue.unshift(pending);
         }
@@ -234,7 +234,7 @@ const persistRemoteDiagnostic = async (entry: RuntimeMonitorEntry): Promise<void
   try {
     await doRemoteWrite(entry);
   } catch {
-    // Network unavailable вЂ” queue for next attempt
+    // Network unavailable - queue for next attempt
     if (offlineRetryQueue.length < MAX_RETRY_QUEUE) {
       offlineRetryQueue.push(entry);
     }
@@ -332,8 +332,8 @@ const buildShortTypeAndMessage = (
   const isSync = /sync|subscribe|onvalue|realtime/.test(haystack);
   const isCrash = /fatal|crash|errorboundary|render|unhandled/.test(haystack);
   const isFirebase = /firebase|rtdb|database/.test(haystack);
-  const noUri = /no usable asset|РЅРµ РІРµСЂРЅСѓР» uri|returned null|picker returned without/iu.test(haystack);
-  const isFileTooLarge = /too large|file too large|СЃР»РёС€РєРѕРј Р±РѕР»СЊС€РѕР№|РІРµР»РёРєРµ|5 РјР±|5mb/iu.test(haystack);
+  const noUri = /no usable asset|не вернул uri|returned null|picker returned without/iu.test(haystack);
+  const isFileTooLarge = /too large|file too large|слишком большой|велике|5 мб|5mb/iu.test(haystack);
   const isUnsupported = /unsupported|format|mime|webp|png|jpg|jpeg/.test(haystack);
   const isNetwork = /network|offline|fetch|internet|connection lost/.test(haystack);
   const isUnknownModule = /requiring unknown module "undefined"|requiring unknown module/.test(haystack);
@@ -342,24 +342,24 @@ const buildShortTypeAndMessage = (
 
   if (isUnknownModule) {
     return {
-      shortType: 'РЎР±РѕР№ Р·Р°РіСЂСѓР·РєРё РјРѕРґСѓР»СЏ',
-      humanMessage: 'Runtime РЅРµ СЃРјРѕРі Р·Р°РіСЂСѓР·РёС‚СЊ JS-РјРѕРґСѓР»СЊ. РћР±С‹С‡РЅРѕ СЌС‚Рѕ dynamic require/import СЃ undefined РёР»Рё РѕС‚СЃСѓС‚СЃС‚РІСѓСЋС‰РёР№ РїР°РєРµС‚ РІ release bundle.',
+      shortType: 'Сбой загрузки модуля',
+      humanMessage: 'Runtime не смог загрузить JS-модуль. Обычно это dynamic require/import с undefined или отсутствующий пакет в release bundle.',
       severity: 'critical',
     };
   }
 
   if (isAtobMissing) {
     return {
-      shortType: 'РЎР±РѕР№ РґРµРєРѕРґРёСЂРѕРІР°РЅРёСЏ С„Р°Р№Р»Р°',
-      humanMessage: 'Р’ СЃСЂРµРґРµ React Native РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚ atob. РР·-Р·Р° СЌС‚РѕРіРѕ С‡С‚РµРЅРёРµ base64 РґР»СЏ upload РїСЂРµСЂС‹РІР°РµС‚СЃСЏ РґРѕ РѕС‚РїСЂР°РІРєРё РІ Firebase.',
+      shortType: 'Сбой декодирования файла',
+      humanMessage: 'В среде React Native отсутствует atob. Из-за этого чтение base64 для upload прерывается до отправки в Firebase.',
       severity: 'critical',
     };
   }
 
   if (isConnectionLost) {
     return {
-      shortType: 'РџРѕС‚РµСЂСЏ СЃРѕРµРґРёРЅРµРЅРёСЏ Firebase',
-      humanMessage: 'РЎРѕРµРґРёРЅРµРЅРёРµ СЃ Firebase РІСЂРµРјРµРЅРЅРѕ РїСЂРµСЂРІР°Р»РѕСЃСЊ. РћР±С‹С‡РЅРѕ СЌС‚Рѕ СЃРµС‚СЊ/РїРµСЂРµРїРѕРґРєР»СЋС‡РµРЅРёРµ, Р° РЅРµ РѕС€РёР±РєР° РїСЂР°РІ РґРѕСЃС‚СѓРїР°.',
+      shortType: 'Потеря соединения Firebase',
+      humanMessage: 'Соединение с Firebase временно прервалось. Обычно это сеть/переподключение, а не ошибка прав доступа.',
       severity: 'warning',
     };
   }
@@ -367,48 +367,48 @@ const buildShortTypeAndMessage = (
   if (isGalleryUpload) {
     if (noUri || isPicker) {
       return {
-        shortType: 'Р“Р°Р»РµСЂРµСЏ: С„РѕС‚Рѕ РЅРµ РІС‹Р±СЂР°РЅРѕ',
-        humanMessage: 'РЎР±РѕР№ РЅР° СЌС‚Р°РїРµ РІС‹Р±РѕСЂР° С„РѕС‚Рѕ. РџРёРєРµСЂ РЅРµ РІРµСЂРЅСѓР» URI С„Р°Р№Р»Р° РёР· С‚РµР»РµС„РѕРЅР°.',
+        shortType: 'Галерея: фото не выбрано',
+        humanMessage: 'Сбой на этапе выбора фото. Пикер не вернул URI файла из телефона.',
         severity: 'warning',
       };
     }
 
     if (isPermission) {
       return {
-        shortType: 'Р“Р°Р»РµСЂРµСЏ: РЅРµС‚ РґРѕСЃС‚СѓРїР° Рє С„РѕС‚Рѕ',
-        humanMessage: 'РџСЂРёР»РѕР¶РµРЅРёСЋ РЅРµ СЂР°Р·СЂРµС€С‘РЅ РґРѕСЃС‚СѓРї Рє РіР°Р»РµСЂРµРµ/РєР°РјРµСЂРµ РёР»Рё Firebase Rules Р·Р°РїСЂРµС‚РёР»Рё РѕРїРµСЂР°С†РёСЋ.',
+        shortType: 'Галерея: нет доступа к фото',
+        humanMessage: 'Приложению не разрешён доступ к галерее/камере или Firebase Rules запретили операцию.',
         severity: 'critical',
       };
     }
 
     if (isFileTooLarge) {
       return {
-        shortType: 'Р“Р°Р»РµСЂРµСЏ: С„Р°Р№Р» СЃР»РёС€РєРѕРј Р±РѕР»СЊС€РѕР№',
-        humanMessage: 'Р¤РѕС‚Рѕ РѕС‚РєР»РѕРЅРµРЅРѕ РёР·-Р·Р° СЂР°Р·РјРµСЂР° С„Р°Р№Р»Р°. Р’С‹Р±РµСЂРёС‚Рµ РјРµРЅСЊС€РµРµ С„РѕС‚Рѕ РёР»Рё РїРѕРІС‚РѕСЂРёС‚Рµ СЃ РґСЂСѓРіРѕР№ РєРѕРјРїСЂРµСЃСЃРёРµР№.',
+        shortType: 'Галерея: файл слишком большой',
+        humanMessage: 'Фото отклонено из-за размера файла. Выберите фото поменьше или повторите с другой компрессией.',
         severity: 'warning',
       };
     }
 
     if (isUnsupported) {
       return {
-        shortType: 'Р“Р°Р»РµСЂРµСЏ: С„РѕСЂРјР°С‚ РЅРµ РїРѕРґРґРµСЂР¶Р°РЅ',
-        humanMessage: 'Р’С‹Р±СЂР°РЅРЅС‹Р№ С„Р°Р№Р» РЅРµ РїСЂРѕС€С‘Р» РїСЂРѕРІРµСЂРєСѓ С„РѕСЂРјР°С‚Р°. РќСѓР¶РµРЅ JPG/PNG/WEBP.',
+        shortType: 'Галерея: формат не поддержан',
+        humanMessage: 'Выбранный файл не прошёл проверку формата. Нужен JPG/PNG/WEBP.',
         severity: 'warning',
       };
     }
 
     if (isTimeout || isNetwork) {
       return {
-        shortType: 'Р“Р°Р»РµСЂРµСЏ: upload timeout',
-        humanMessage: 'РЎР±РѕР№ СЃРµС‚Рё РёР»Рё С‚Р°Р№РјР°СѓС‚ РїСЂРё РѕС‚РїСЂР°РІРєРµ С„РѕС‚Рѕ РІ Firebase Storage.',
+        shortType: 'Галерея: upload timeout',
+        humanMessage: 'Сбой сети или таймаут при отправке фото в Firebase Storage.',
         severity: 'critical',
       };
     }
 
     if (isUpload || isFirebase || isForm) {
       return {
-        shortType: 'Р“Р°Р»РµСЂРµСЏ: С„РѕС‚Рѕ РЅРµ Р·Р°РіСЂСѓР¶РµРЅРѕ',
-        humanMessage: 'РЎР±РѕР№ РЅР° СЌС‚Р°РїРµ upload РёР»Рё СЃРѕС…СЂР°РЅРµРЅРёСЏ РєР°СЂС‚РѕС‡РєРё С„РѕС‚Рѕ РІ Firebase. РЎРјРѕС‚СЂРёС‚Рµ С‚РµС…РЅРёС‡РµСЃРєСѓСЋ РїСЂРёС‡РёРЅСѓ РЅРёР¶Рµ.',
+        shortType: 'Галерея: фото не загружено',
+        humanMessage: 'Сбой на этапе upload или сохранения карточки фото в Firebase. Смотрите техническую причину ниже.',
         severity: 'critical',
       };
     }
@@ -416,103 +416,103 @@ const buildShortTypeAndMessage = (
 
   if (isCrash) {
     return {
-      shortType: 'РЎР±РѕР№ РёРЅС‚РµСЂС„РµР№СЃР°',
-      humanMessage: 'РџСЂРѕРёР·РѕС€Р»Р° runtime РѕС€РёР±РєР° РІ РёРЅС‚РµСЂС„РµР№СЃРµ. Р­РєСЂР°РЅ РёР»Рё React-РєРѕРјРїРѕРЅРµРЅС‚ Р·Р°РІРµСЂС€РёР»СЃСЏ СЃ РёСЃРєР»СЋС‡РµРЅРёРµРј.',
+      shortType: 'Сбой интерфейса',
+      humanMessage: 'Произошла runtime ошибка в интерфейсе. Экран или React-компонент завершился с исключением.',
       severity: 'critical',
     };
   }
 
   if (isPicker || noUri) {
     return {
-      shortType: 'Р¤РѕС‚Рѕ РЅРµ РІС‹Р±СЂР°РЅРѕ',
-      humanMessage: 'Android picker РЅРµ РІРµСЂРЅСѓР» URI, РІРµСЂРЅСѓР» РїСѓСЃС‚РѕР№ СЂРµР·СѓР»СЊС‚Р°С‚ РёР»Рё Р·Р°РІРµСЂС€РёР»СЃСЏ СЃ РѕС€РёР±РєРѕР№.',
+      shortType: 'Фото не выбрано',
+      humanMessage: 'Android picker не вернул URI, вернул пустой результат или завершился с ошибкой.',
       severity: 'warning',
     };
   }
 
   if (isUpload && isTimeout) {
     return {
-      shortType: 'Р¤РѕС‚Рѕ РЅРµ Р·Р°РіСЂСѓР¶РµРЅРѕ',
-      humanMessage: 'Firebase Storage РЅРµ РѕС‚РІРµС‚РёР» РІРѕРІСЂРµРјСЏ. Р—Р°РіСЂСѓР·РєР° С„Р°Р№Р»Р° РїСЂРµСЂРІР°Р»Р°СЃСЊ РїРѕ С‚Р°Р№РјР°СѓС‚Сѓ.',
+      shortType: 'Фото не загружено',
+      humanMessage: 'Firebase Storage не ответил вовремя. Загрузка файла прервалась по таймауту.',
       severity: 'critical',
     };
   }
 
   if (isUpload) {
     return {
-      shortType: 'Р¤РѕС‚Рѕ РЅРµ Р·Р°РіСЂСѓР¶РµРЅРѕ',
-      humanMessage: 'РћС€РёР±РєР° РїСЂРё Р·Р°РіСЂСѓР·РєРµ С„Р°Р№Р»Р° РёР»Рё СЂР°Р±РѕС‚Рµ СЃ Firebase Storage.',
+      shortType: 'Фото не загружено',
+      humanMessage: 'Ошибка при загрузке файла или работе с Firebase Storage.',
       severity: isPermission ? 'critical' : 'warning',
     };
   }
 
   if (isPermission && isModeration) {
     return {
-      shortType: 'РћС€РёР±РєР° РјРѕРґРµСЂР°С†РёРё',
-      humanMessage: 'Р”РµР№СЃС‚РІРёРµ РјРѕРґРµСЂР°С‚РѕСЂР° РѕС‚РєР»РѕРЅРµРЅРѕ. РЎРєРѕСЂРµРµ РІСЃРµРіРѕ Firebase Rules Р·Р°РїСЂРµС‚РёР»Рё Р·Р°РїРёСЃСЊ РёР»Рё СѓРґР°Р»РµРЅРёРµ.',
+      shortType: 'Ошибка модерации',
+      humanMessage: 'Действие модератора отклонено. Скорее всего Firebase Rules запретили запись или удаление.',
       severity: 'critical',
     };
   }
 
   if (isPermission) {
     return {
-      shortType: 'Р”РѕСЃС‚СѓРї Р·Р°РїСЂРµС‰С‘РЅ',
-      humanMessage: 'Firebase Rules РёР»Рё РїСЂР°РІР° РґРѕСЃС‚СѓРїР° Р·Р°РїСЂРµС‚РёР»Рё СЌС‚Сѓ РѕРїРµСЂР°С†РёСЋ.',
+      shortType: 'Доступ запрещён',
+      humanMessage: 'Firebase Rules или права доступа запретили эту операцию.',
       severity: 'critical',
     };
   }
 
   if (isCallable) {
     return {
-      shortType: 'Cloud Function РЅРµ РѕС‚РІРµС‚РёР»Р°',
-      humanMessage: 'Р’С‹Р·РѕРІ СЃРµСЂРІРµСЂРЅРѕР№ С„СѓРЅРєС†РёРё Р·Р°РІРµСЂС€РёР»СЃСЏ РѕС€РёР±РєРѕР№ РёР»Рё РІРµСЂРЅСѓР» РЅРµСѓСЃРїРµС€РЅС‹Р№ РѕС‚РІРµС‚.',
+      shortType: 'Cloud Function не ответила',
+      humanMessage: 'Вызов серверной функции завершился ошибкой или вернул неуспешный ответ.',
       severity: 'critical',
     };
   }
 
   if (isForm && isTimeout) {
     return {
-      shortType: 'Р¤РѕСЂРјР° РЅРµ РѕС‚РїСЂР°РІР»РµРЅР°',
-      humanMessage: 'РћС‚РїСЂР°РІРєР° С„РѕСЂРјС‹ Р·Р°РІРёСЃР»Р° СЃР»РёС€РєРѕРј РґРѕР»РіРѕ. Р’РѕР·РјРѕР¶РЅР° РїСЂРѕР±Р»РµРјР° СЃРµС‚Рё РёР»Рё РјРµРґР»РµРЅРЅС‹Р№ РѕС‚РІРµС‚ Firebase.',
+      shortType: 'Форма не отправлена',
+      humanMessage: 'Отправка формы зависла слишком долго. Возможна проблема сети или медленный ответ Firebase.',
       severity: 'warning',
     };
   }
 
   if (isForm) {
     return {
-      shortType: 'Р¤РѕСЂРјР° РЅРµ РѕС‚РїСЂР°РІР»РµРЅР°',
-      humanMessage: 'РћС€РёР±РєР° РІРѕ РІСЂРµРјСЏ РѕС‚РїСЂР°РІРєРё РёР»Рё СЃРѕС…СЂР°РЅРµРЅРёСЏ С„РѕСЂРјС‹. Р—Р°РїРёСЃСЊ РЅРµ РґРѕС€Р»Р° РґРѕ Firebase РїРѕР»РЅРѕСЃС‚СЊСЋ.',
+      shortType: 'Форма не отправлена',
+      humanMessage: 'Ошибка во время отправки или сохранения формы. Запись не дошла до Firebase полностью.',
       severity: 'warning',
     };
   }
 
   if (isModeration) {
     return {
-      shortType: 'РћС€РёР±РєР° РјРѕРґРµСЂР°С†РёРё',
-      humanMessage: 'Р’Рѕ РІСЂРµРјСЏ Р·Р°РіСЂСѓР·РєРё РґР°РЅРЅС‹С… РјРѕРґРµСЂР°С†РёРё РёР»Рё РІС‹РїРѕР»РЅРµРЅРёСЏ РґРµР№СЃС‚РІРёСЏ РїСЂРѕРёР·РѕС€С‘Р» СЃР±РѕР№.',
+      shortType: 'Ошибка модерации',
+      humanMessage: 'Во время загрузки данных модерации или выполнения действия произошёл сбой.',
       severity: 'warning',
     };
   }
 
   if (isSync) {
     return {
-      shortType: 'РЎР±РѕР№ СЃРёРЅС…СЂРѕРЅРёР·Р°С†РёРё',
-      humanMessage: 'Realtime-РѕР±РЅРѕРІР»РµРЅРёРµ РЅРµ СЃРјРѕРіР»Рѕ РєРѕСЂСЂРµРєС‚РЅРѕ РїРѕР»СѓС‡РёС‚СЊ РёР»Рё РѕР±РЅРѕРІРёС‚СЊ РґР°РЅРЅС‹Рµ.',
+      shortType: 'Сбой синхронизации',
+      humanMessage: 'Realtime-обновление не смогло корректно получить или обновить данные.',
       severity: 'warning',
     };
   }
 
   if (isFirebase) {
     return {
-      shortType: 'РћС€РёР±РєР° Firebase',
-      humanMessage: 'РћРїРµСЂР°С†РёСЏ Firebase Р·Р°РІРµСЂС€РёР»Р°СЃСЊ РѕС€РёР±РєРѕР№. РџСЂРѕРІРµСЂСЊС‚Рµ СЃРµС‚СЊ, Rules Рё СЃС‚СЂСѓРєС‚СѓСЂСѓ РґР°РЅРЅС‹С….',
+      shortType: 'Ошибка Firebase',
+      humanMessage: 'Операция Firebase завершилась ошибкой. Проверьте сеть, Rules и структуру данных.',
       severity: isTimeout ? 'warning' : 'critical',
     };
   }
 
   return {
-    shortType: 'Runtime РѕС€РёР±РєР°',
-    humanMessage: 'Р’Рѕ РІСЂРµРјСЏ СЂР°Р±РѕС‚С‹ РїСЂРёР»РѕР¶РµРЅРёСЏ РїСЂРѕРёР·РѕС€Р»Р° РІРЅСѓС‚СЂРµРЅРЅСЏСЏ РѕС€РёР±РєР°.',
+    shortType: 'Runtime ошибка',
+    humanMessage: 'Во время работы приложения произошла внутренняя ошибка.',
     severity: 'warning',
   };
 };
@@ -579,10 +579,10 @@ const createEntryFromTrace = ({
     screen: sanitizeString(screen || 'unknown'),
     action: sanitizeString(action || 'unknown_action'),
     status,
-    shortType: `${sanitizeString(action || 'Action')} В· ${status}`,
+    shortType: `${sanitizeString(action || 'Action')} · ${status}`,
     humanMessage: message
       ? sanitizeString(message)
-      : `Runtime trace: ${sanitizeString(action || 'action')} Р·Р°РІРµСЂС€РёР»СЃСЏ СЃРѕ СЃС‚Р°С‚СѓСЃРѕРј ${status}.`,
+      : `Runtime trace: ${sanitizeString(action || 'action')} завершился со статусом ${status}.`,
     severity,
     rawMessage,
     firebasePath: firebasePath ? sanitizeString(firebasePath) : extractFirebasePath(screen, details),
@@ -668,8 +668,8 @@ export const initRuntimeMonitor = async (): Promise<void> => {
               ? sanitizeString((item as { action?: string }).action)
               : undefined,
             status: ((item as { status?: RuntimeMonitorStatus }).status ?? undefined),
-            shortType: sanitizeString((item as { shortType?: unknown }).shortType ?? 'Runtime РѕС€РёР±РєР°'),
-            humanMessage: sanitizeString((item as { humanMessage?: unknown }).humanMessage ?? 'РџСЂРѕРёР·РѕС€Р»Р° РѕС€РёР±РєР°.'),
+            shortType: sanitizeString((item as { shortType?: unknown }).shortType ?? 'Runtime ошибка'),
+            humanMessage: sanitizeString((item as { humanMessage?: unknown }).humanMessage ?? 'Произошла ошибка.'),
             severity: ((item as { severity?: RuntimeMonitorSeverity }).severity ?? 'warning'),
             rawMessage: sanitizeString((item as { rawMessage?: unknown }).rawMessage ?? ''),
             firebasePath: typeof (item as { firebasePath?: unknown }).firebasePath === 'string'
@@ -776,23 +776,23 @@ export const formatRuntimeMonitorEntries = (items: RuntimeMonitorEntry[] = entri
     .map((item) => {
       const lines = [
         `[${new Date(item.at).toLocaleString('ru-RU')}] ${item.severity.toUpperCase()} - ${item.shortType}`,
-        `РџРѕРІС‚РѕСЂС‹: ${item.repeatCount ?? 1}`,
-        `Р­РєСЂР°РЅ: ${item.screen}`,
+        `Повторы: ${item.repeatCount ?? 1}`,
+        `Экран: ${item.screen}`,
         item.action ? `Action: ${item.action}` : '',
         item.status ? `Status: ${item.status}` : '',
-        `РћР±СЉСЏСЃРЅРµРЅРёРµ: ${item.humanMessage}`,
-        `РўРµС…РЅРёС‡РµСЃРєР°СЏ РїСЂРёС‡РёРЅР°: ${item.rawMessage || 'РЅРµС‚ РґР°РЅРЅС‹С…'}`,
+        `Объяснение: ${item.humanMessage}`,
+        `Техническая причина: ${item.rawMessage || 'нет данных'}`,
       ].filter(Boolean);
 
       if (item.firebasePath) {
-        lines.push(`Firebase РїСѓС‚СЊ: ${item.firebasePath}`);
+        lines.push(`Firebase путь: ${item.firebasePath}`);
       }
       if (item.stage) {
-        lines.push(`Р­С‚Р°Рї: ${item.stage}`);
+        lines.push(`Этап: ${item.stage}`);
       }
 
       if (item.code) {
-        lines.push(`РљРѕРґ: ${item.code}`);
+        lines.push(`Код: ${item.code}`);
       }
       if (item.firebaseCode) {
         lines.push(`Firebase code: ${item.firebaseCode}`);
@@ -819,10 +819,10 @@ export const formatRuntimeMonitorEntries = (items: RuntimeMonitorEntry[] = entri
         lines.push(`Details: ${JSON.stringify(item.details, null, 2)}`);
       }
       if (item.breadcrumbs && item.breadcrumbs.length > 0) {
-        lines.push(`Breadcrumbs (РїРѕСЃР»РµРґРЅРёРµ ${item.breadcrumbs.length} РґРµР№СЃС‚РІРёР№):`);
+        lines.push(`Breadcrumbs (последние ${item.breadcrumbs.length} действий):`);
         item.breadcrumbs.forEach((b) => {
           const t = new Date(b.at).toLocaleTimeString('ru-RU');
-          lines.push(`  [${t}] ${b.category} ${b.screen ? `(${b.screen}) ` : ''}в†’ ${b.message}`);
+          lines.push(`  [${t}] ${b.category} ${b.screen ? `(${b.screen}) ` : ''}-> ${b.message}`);
         });
       }
 

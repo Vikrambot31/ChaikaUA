@@ -497,7 +497,7 @@ try {
     Set-Location $ProjectRoot
     New-Item -ItemType Directory -Force -Path $ReleaseDir | Out-Null
 
-    $safeName = "ChaikaUA-v$($AppVersion -replace '[\s:/\\]','-')-$($BuildStamp -replace '[\s:/\\]','-')"
+    $safeName = "ChaikaLife-v$($AppVersion -replace '[\s:/\\]','-')-$($BuildStamp -replace '[\s:/\\]','-')"
     $VersionedApkPath = Join-Path $ReleaseDir "$safeName.apk"
 
     Remove-FileSafe $VersionedApkPath

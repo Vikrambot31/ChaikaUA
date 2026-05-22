@@ -44,7 +44,7 @@
     "test_photos": {
       ".read": "auth != null",
       "$photoId": {
-        ".write": "auth != null"
+        ".write": false
       }
     },
     "photo_uploads": {
@@ -242,10 +242,26 @@
               ".validate": "$flagIndex.matches(/^(0|[1-9]|1[0-9])$/) && newData.isString() && newData.val().length <= 64"
             }
           },
+          "personal_force_update": {
+            ".validate": "newData.isBoolean()"
+          },
           "$other": {
             ".validate": false
           }
         }
+      }
+    },
+    "apk_downloads": {
+      ".read": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'",
+      "$uid": {
+        ".read": "auth.uid === $uid || auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'",
+        ".write": "auth.uid === $uid",
+        ".validate": "newData.hasChildren(['version','downloadedAt','deviceId','buildStamp']) && newData.child('version').isString() && newData.child('version').val().length <= 32 && newData.child('downloadedAt').isNumber() && newData.child('downloadedAt').val() > 0 && newData.child('deviceId').isString() && newData.child('deviceId').val().length <= 128 && newData.child('buildStamp').isString() && newData.child('buildStamp').val().length <= 64"
+      }
+    },
+    "app_version_registry": {
+      "current": {
+        ".read": "auth != null"
       }
     },
     "user_update_locks": {
@@ -606,7 +622,7 @@
       }
     },
     "invite_logs": {
-      ".read": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin'",
+      ".read": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'",
       ".write": false,
       ".indexOn": [
         "requestId",
@@ -619,6 +635,11 @@
       "$logId": {
         ".validate": "!data.exists() && newData.hasChildren(['requestId','action','actorType','createdAt']) && newData.child('requestId').isString() && newData.child('action').isString() && (newData.child('action').val() === 'auto_approve' || newData.child('action').val() === 'auto_deny' || newData.child('action').val() === 'manual_approve' || newData.child('action').val() === 'manual_deny' || newData.child('action').val() === 'manual_block' || newData.child('action').val() === 'sponsor_confirm' || newData.child('action').val() === 'sponsor_reject' || newData.child('action').val() === 'cascade_block' || newData.child('action').val() === 'cascade_review' || newData.child('action').val() === 'status_change' || newData.child('action').val() === 'phone_change' || newData.child('action').val() === 'mode_change') && newData.child('actorType').isString() && (newData.child('actorType').val() === 'system' || newData.child('actorType').val() === 'admin' || newData.child('actorType').val() === 'moderator' || newData.child('actorType').val() === 'sponsor' || newData.child('actorType').val() === 'user') && newData.child('createdAt').isNumber() && (!newData.child('actorUid').exists() || newData.child('actorUid').isString()) && (!newData.child('riskLevel').exists() || (newData.child('riskLevel').isString() && (newData.child('riskLevel').val() === 'low' || newData.child('riskLevel').val() === 'medium' || newData.child('riskLevel').val() === 'high' || newData.child('riskLevel').val() === 'blocked')))"
       }
+    },
+    "sponsor_confirmations": {
+      ".read": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'",
+      ".write": false,
+      ".indexOn": ["sponsorUid", "status", "requesterUid"]
     },
     "invite_attempts": {
       ".read": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'",
@@ -662,7 +683,7 @@
         ".indexOn": ["at", "timestamp", "level", "eventType", "deviceId", "sessionId"],
         ".read": "auth.uid === 'LfqIMCAyEzLAb7TNc83lYGW9RiV2' || (auth != null && (root.child('user_roles/' + auth.uid + '/role').val() === 'admin' || root.child('user_roles/' + auth.uid + '/role').val() === 'moderator'))",
         "$eventId": {
-          ".write": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous'",
+          ".write": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous' && !data.exists() && (!newData.child('uid').exists() || newData.child('uid').val() === auth.uid)",
           ".validate": "newData.hasChildren(['timestamp','at','sessionId','deviceId','level','eventType','message']) && newData.child('timestamp').isString() && newData.child('timestamp').val().length <= 64 && newData.child('at').isNumber() && newData.child('at').val() > 0 && newData.child('sessionId').isString() && newData.child('sessionId').val().length <= 128 && newData.child('deviceId').isString() && newData.child('deviceId').val().length <= 128 && newData.child('level').isString() && (newData.child('level').val() === 'info' || newData.child('level').val() === 'warn' || newData.child('level').val() === 'error' || newData.child('level').val() === 'fatal') && newData.child('eventType').isString() && newData.child('eventType').val().length <= 64 && newData.child('message').isString() && newData.child('message').val().length <= 2000"
         }
       },

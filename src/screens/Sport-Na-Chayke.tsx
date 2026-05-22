@@ -121,7 +121,7 @@ const SportNaChaykeScreen: React.FC = () => {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
           <View style={styles.heroImageWrap}>
-            <Image source={require('../../assets/Sport.png')} style={styles.heroImage} resizeMode="contain" />
+            <Image source={require('../../assets/WEBP-version/Sport.webp')} style={styles.heroImage} resizeMode="contain" />
           </View>
           <View style={styles.liveLine}>
             <Animated.Text style={[styles.liveDot, { opacity: blinkAnim }]}>●</Animated.Text>

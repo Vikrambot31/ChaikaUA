@@ -49,7 +49,7 @@ const UI_TEXT = {
     hintTitle: 'Обов\'язково — коротка назва фото',
     hintDesc: 'Необов\'язково — короткий опис',
     hintPhoto: 'Обов\'язково — фото з галереї або камери',
-    moderationSuccess: 'Фото надіслано на модерацію',
+    moderationSuccess: 'Фото завантажено, чекає перевірки адміна',
     categories: {
       building: 'Будинок',
       place: 'Місце',
@@ -84,7 +84,7 @@ const UI_TEXT = {
     hintTitle: 'Обязательно — краткое название фото',
     hintDesc: 'Необязательно — краткое описание',
     hintPhoto: 'Обязательно — фото из галереи или камеры',
-    moderationSuccess: 'Фото отправлено на модерацию',
+    moderationSuccess: 'Фото загружено, ожидает проверки админа',
     categories: {
       building: 'Дом',
       place: 'Место',
@@ -119,7 +119,7 @@ const UI_TEXT = {
     hintTitle: 'Required — short photo title',
     hintDesc: 'Optional — short description',
     hintPhoto: 'Required — photo from gallery or camera',
-    moderationSuccess: 'Photo submitted for moderation',
+    moderationSuccess: 'Photo uploaded and waiting for admin review',
     categories: {
       building: 'Building',
       place: 'Place',
@@ -268,6 +268,7 @@ const user = useSelector((state: RootState) => state.auth.user);
             uploadedBy,
             imageUri: photo.downloadUrl,
             storagePath: photo.storagePath,
+            target: 'gallery_public',
             locationLabel: selectedLocation?.label,
             locationType: selectedLocation?.type,
           }),

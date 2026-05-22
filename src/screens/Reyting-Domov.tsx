@@ -12,6 +12,7 @@ import { RootState } from '../redux/store';
 import { BUILDINGS, getFullAddress } from '../data/buildings';
 import { LastRatingMap, canRateNow, getRatingDaysLeft } from '../utils/monthlyRating';
 import { useTranslation } from '../i18n/useTranslation';
+import StarRatingModal from '../components/StarRatingModal';
 
 const STORAGE_KEY = '@chaika:building_ratings_v1';
 const LAST_VOTE_KEY = '@chaika:building_rating_votes_v1';
@@ -37,6 +38,7 @@ type RatingValue = {
 };
 
 type RatingsByBuilding = Record<string, RatingValue>;
+type RatingCategoryKey = keyof Pick<RatingValue, 'cleaning' | 'elevator' | 'electricity' | 'services'>;
 
 const RATING_EXPLANATION = {
   ua: {
@@ -51,6 +53,12 @@ const RATING_EXPLANATION = {
     title: 'How the rating is calculated',
     body: 'The final score is the average of four categories: cleaning, elevator, electricity, and services. More votes make the building rating more reliable.',
   },
+} as const;
+
+const RATING_MODAL_HINT = {
+  ua: 'Оберіть кількість зірок для цієї категорії.',
+  ru: 'Выберите количество звезд для этой категории.',
+  en: 'Choose the number of stars for this category.',
 } as const;
 
 const getEmptyRating = (): RatingValue => ({
@@ -92,6 +100,7 @@ export default function RatingScreen() {
   const [storedRatings, setStoredRatings] = useState<RatingsByBuilding>({});
   const [lastVotes, setLastVotes] = useState<LastRatingMap>({});
   const [voted, setVoted] = useState(false);
+  const [ratingModalCategory, setRatingModalCategory] = useState<RatingCategoryKey | null>(null);
 
   const CATEGORIES = [
     { key: 'cleaning', label: t.ratingScreen.categories.cleaning, icon: 'broom' as const },
@@ -146,7 +155,10 @@ export default function RatingScreen() {
 
   const selectedBuilding = BUILDINGS.find((building) => building.id === selectedBuildingId) ?? BUILDINGS[0];
 
-  const handleVote = (category: string, value: number) => setRatings((prev) => ({ ...prev, [category]: value }));
+  const handleVote = (category: string, value: number) => {
+    setRatings((prev) => ({ ...prev, [category]: value }));
+    setRatingModalCategory(null);
+  };
   const handleSubmitVote = async () => {
     const daysLeft = getRatingDaysLeft(lastVotes[selectedBuildingId]);
     if (daysLeft > 0) {
@@ -202,7 +214,7 @@ export default function RatingScreen() {
         <Text style={styles.title}>{t.ratingScreen.title}</Text>
         <View style={styles.headerSpacer} />
       </View>
-      <Image source={require('../../assets/Reiting_Domov.png')} style={styles.headerImage} resizeMode="contain" />
+      <Image source={require('../../assets/WEBP-version/Reiting_Domov.webp')} style={styles.headerImage} resizeMode="contain" />
 
       <>
           <View style={styles.tabBar}>
@@ -233,7 +245,7 @@ export default function RatingScreen() {
               )}
               renderItem={({ item, index }) => (
                 <View style={[styles.buildingCard, index < 3 && styles.buildingCardTop]}>
-                  <Image source={require('../../assets/Dom1.png')} style={styles.buildingCardDom} resizeMode="cover" />
+                  <Image source={require('../../assets/WEBP-version/Dom1.webp')} style={styles.buildingCardDom} resizeMode="cover" />
                   <View style={styles.buildingCardInner}>
                     <View style={styles.buildingRank}>
                       <Text style={styles.rankNum}>#{index + 1}</Text>
@@ -313,7 +325,7 @@ export default function RatingScreen() {
                         </View>
                         <View style={styles.starsInput}>
                           {[1, 2, 3, 4, 5].map((star) => (
-                            <TouchableOpacity key={star} onPress={() => handleVote(cat.key, star)} activeOpacity={0.7}>
+                            <TouchableOpacity key={star} onPress={() => setRatingModalCategory(cat.key as RatingCategoryKey)} activeOpacity={0.7}>
                               <MaterialCommunityIcons name={star <= (ratings[cat.key] || 0) ? 'star' : 'star-outline'} size={30} color={star <= (ratings[cat.key] || 0) ? '#FFA000' : '#D6C4A3'} />
                             </TouchableOpacity>
                           ))}
@@ -329,6 +341,14 @@ export default function RatingScreen() {
             </ScrollView>
           )}
         </>
+      <StarRatingModal
+        visible={Boolean(ratingModalCategory)}
+        title={CATEGORIES.find((cat) => cat.key === ratingModalCategory)?.label ?? t.ratingScreen.submitRating}
+        subtitle={RATING_MODAL_HINT[language]}
+        value={ratingModalCategory ? ratings[ratingModalCategory] || 0 : 0}
+        onSelect={(value) => { if (ratingModalCategory) handleVote(ratingModalCategory, value); }}
+        onClose={() => setRatingModalCategory(null)}
+      />
       <MiniTabBar />
     </SafeAreaView>
   );
@@ -418,4 +438,3 @@ const styles = StyleSheet.create({
   votedText: { fontSize: 16, fontWeight: '900', color: '#4F7A3D' },
   votedSub: { fontSize: 13, color: SCREEN_THEME.textSecondary },
 });
-

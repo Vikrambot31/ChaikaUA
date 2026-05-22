@@ -14,6 +14,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { Picker } from '@react-native-picker/picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -36,6 +37,8 @@ import type { DetailItemData } from '../utils/detailViewTypes';
 import { normalizePhoneText } from '../utils/textUtils';
 import { normalizeUkrainianPhoneStrict } from '../utils/validators';
 import { safeLogError } from '../utils/errorLogger';
+import StarRatingModal from '../components/StarRatingModal';
+import { DailyRatingUsage, canUseDailyRating, recordDailyRatingUse } from '../utils/monthlyRating';
 
 // --- Types --------------------------------------------------------------------
 
@@ -178,6 +181,7 @@ const BUSINESS_CATEGORIES: BusinessCategory[] = [
 ];
 
 const DESC_MAX = 400;
+const DAILY_USAGE_KEY = '@chaika:place_rating_daily_usage_v1';
 
 // --- i18n ---------------------------------------------------------------------
 
@@ -201,6 +205,9 @@ const UI_TEXT = {
     signInToLike: 'Увійдіть, щоб поставити лайк.',
     rating: 'Рейтинг',
     signInToRate: 'Увійдіть, щоб поставити оцінку.',
+    ratingHint: 'Оберіть кількість зірок. Свою оцінку можна змінити.',
+    ratingLimitTitle: 'Ліміт',
+    ratingLimitText: 'Завтра зможете поставити ще.',
     priceFrom: 'від',
     priceTo: 'до',
     currencyDefault: '₴',
@@ -257,6 +264,9 @@ const UI_TEXT = {
     signInToLike: 'Войдите, чтобы поставить лайк.',
     rating: 'Рейтинг',
     signInToRate: 'Войдите, чтобы поставить оценку.',
+    ratingHint: 'Выберите количество звезд. Свою оценку можно изменить.',
+    ratingLimitTitle: 'Лимит',
+    ratingLimitText: 'Завтра сможете поставить еще.',
     priceFrom: 'от',
     priceTo: 'до',
     currencyDefault: '₴',
@@ -313,6 +323,9 @@ const UI_TEXT = {
     signInToLike: 'Sign in to like this listing.',
     rating: 'Rating',
     signInToRate: 'Sign in to rate this listing.',
+    ratingHint: 'Choose the number of stars. You can change your rating.',
+    ratingLimitTitle: 'Limit',
+    ratingLimitText: 'You can add more ratings tomorrow.',
     priceFrom: 'from',
     priceTo: 'to',
     currencyDefault: '₴',
@@ -406,6 +419,8 @@ export default function ZhkBusinessListScreen() {
   const t = UI_TEXT[language];
 
   const [items, setItems] = useState<BusinessItem[]>([]);
+  const [dailyRatingUsage, setDailyRatingUsage] = useState<DailyRatingUsage | null>(null);
+  const [ratingTargetId, setRatingTargetId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -420,6 +435,12 @@ export default function ZhkBusinessListScreen() {
   const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [myRequest, setMyRequest] = useState<MyBusinessRequest>(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem(DAILY_USAGE_KEY)
+      .then((raw) => setDailyRatingUsage(raw ? (JSON.parse(raw) as DailyRatingUsage) : null))
+      .catch(() => setDailyRatingUsage(null));
+  }, []);
   const pickerActiveRef = React.useRef(false);
 
   const loadData = useCallback(async () => {
@@ -758,7 +779,11 @@ export default function ZhkBusinessListScreen() {
       return;
     }
     const current = items.find((entry) => entry.id === itemId);
-    if (current?.ratingByUserId?.[uid]) return;
+    const isNewRating = !current?.ratingByUserId?.[uid];
+    if (isNewRating && !canUseDailyRating(dailyRatingUsage)) {
+      Alert.alert(t.ratingLimitTitle, t.ratingLimitText);
+      return;
+    }
 
     try {
       const result = await runTransaction(ref(database, `local_business/${itemId}`), (rawCurrent) => {
@@ -766,7 +791,6 @@ export default function ZhkBusinessListScreen() {
         const ratingByUserId = (data.ratingByUserId && typeof data.ratingByUserId === 'object'
           ? data.ratingByUserId
           : {}) as Record<string, number>;
-        if (ratingByUserId[uid]) return rawCurrent;
         return {
           ...data,
           ratingByUserId: { ...ratingByUserId, [uid]: stars },
@@ -781,10 +805,22 @@ export default function ZhkBusinessListScreen() {
           : {};
         return { ...entry, ratingByUserId };
       }));
+      if (isNewRating) {
+        const nextDailyUsage = recordDailyRatingUse(dailyRatingUsage);
+        setDailyRatingUsage(nextDailyUsage);
+        await AsyncStorage.setItem(DAILY_USAGE_KEY, JSON.stringify(nextDailyUsage));
+      }
+      setRatingTargetId(null);
     } catch {
       // keep current state on error
     }
-  }, [isAuthenticated, items, t.rating, t.signInToRate, user?.id]);
+  }, [dailyRatingUsage, isAuthenticated, items, t.rating, t.ratingLimitText, t.ratingLimitTitle, t.signInToRate, user?.id]);
+
+  const ratingTarget = ratingTargetId ? items.find((entry) => entry.id === ratingTargetId) ?? null : null;
+  const ratingTargetValues = Object.values(ratingTarget?.ratingByUserId || {});
+  const ratingTargetAvg = ratingTargetValues.length > 0
+    ? ratingTargetValues.reduce((sum, value) => sum + value, 0) / ratingTargetValues.length
+    : 0;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -902,7 +938,7 @@ export default function ZhkBusinessListScreen() {
                 item={item}
                 avatarUri={(item.userId && avatarByUserId[item.userId]) || ''}
                 onLike={handleLike}
-                onRate={handleRating}
+                onOpenRating={setRatingTargetId}
                 currentUserId={user?.id}
               onContact={item.userId && item.userId !== user?.id ? () => openContactModal({ userId: item.userId as string, name: item.contactName, sourceType: 'buysell', sourceId: item.id, sourceTitle: item.contactName }) : undefined}
               />
@@ -1022,6 +1058,14 @@ export default function ZhkBusinessListScreen() {
       </Modal>
 
       <MiniTabBar />
+      <StarRatingModal
+        visible={Boolean(ratingTarget)}
+        title={ratingTarget?.subcategoryLabel || ratingTarget?.categoryLabel || t.rating}
+        subtitle={t.ratingHint}
+        value={ratingTarget && user?.id ? ratingTarget.ratingByUserId?.[user.id] ?? Math.round(ratingTargetAvg) : 0}
+        onSelect={(value) => { if (ratingTarget) void handleRating(ratingTarget.id, value); }}
+        onClose={() => setRatingTargetId(null)}
+      />
       <ContactReasonModal
         visible={contactModalVisible}
         pending={contactPending}
@@ -1039,14 +1083,14 @@ function BusinessCard({
   item,
   avatarUri,
   onLike,
-  onRate,
+  onOpenRating,
   currentUserId,
   onContact,
 }: {
   item: BusinessItem;
   avatarUri?: string;
   onLike: (itemId: string) => Promise<void>;
-  onRate: (itemId: string, stars: number) => Promise<void>;
+  onOpenRating: (itemId: string) => void;
   currentUserId?: string;
   onContact?: () => void;
 }) {
@@ -1110,10 +1154,9 @@ function BusinessCard({
               {[1, 2, 3, 4, 5].map((star) => (
                 <TouchableOpacity
                   key={star}
-                  onPress={() => { void onRate(item.id, star); }}
-                  disabled={hasRated}
+                  onPress={() => onOpenRating(item.id)}
                   hitSlop={{ top: 5, bottom: 5, left: 3, right: 3 }}
-                  activeOpacity={hasRated ? 1 : 0.7}
+                  activeOpacity={0.7}
                 >
                   <MaterialCommunityIcons
                     name={star <= Math.round(avgRating) ? 'star' : 'star-outline'}

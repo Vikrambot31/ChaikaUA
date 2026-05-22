@@ -1,4 +1,4 @@
-export type ModerationStatus = 'pending' | 'approved' | 'rejected';
+export type ModerationStatus = 'pending' | 'approved' | 'rejected' | 'expired';
 
 export const createPendingModeration = () => ({
   moderationStatus: 'pending' as ModerationStatus,

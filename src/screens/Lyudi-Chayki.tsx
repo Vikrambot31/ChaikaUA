@@ -18,7 +18,7 @@ import AppPhotoImage from '../components/AppPhotoImage';
 import { communityUsersAPI } from '../firebase-config';
 import { selectUser } from '../redux/slices/authSlice';
 import type { RootState } from '../redux/store';
-import { User } from '../types/app';
+import { HelpRequest, Request, User } from '../types/app';
 import { getChaikaActivity, getLevelName } from '../utils/chaikaLevels';
 import { profilePermissionService } from '../services/profilePermissionService';
 import { ProfileViewRequestModal, PermissionModalState } from '../components/ProfileViewRequestModal';
@@ -157,7 +157,7 @@ const mapCurrentUser = (user: User | null, text: UiText): CommunityUser | null =
     id: user.id,
     name: user.name || text.residentFallback,
     phone: user.phone,
-    photoURL: user.photoURL,
+    photoURL: user.photoURL || undefined,
     city: user.city,
     registeredAt: user.registeredAt ? new Date(user.registeredAt).toISOString() : undefined,
     daysUsed: user.daysUsed,
@@ -170,9 +170,9 @@ export default function TopGirlsBoysScreen() {
   const user = useSelector(selectUser);
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
   const text = UI_TEXT[language];
-  const appRequests = useSelector((state: RootState) => state.requests?.items ?? []);
-  const approvedRequests = useSelector((state: RootState) => state.requests?.approved ?? []);
-  const helpRequests = useSelector((state: RootState) => state.helpRequests?.items ?? []);
+  const appRequests = useSelector((state: RootState) => state.requests?.items ?? []) as Request[];
+  const approvedRequests = useSelector((state: RootState) => state.requests?.approved ?? []) as Request[];
+  const helpRequests = useSelector((state: RootState) => state.helpRequests?.items ?? []) as HelpRequest[];
   const [people, setPeople] = useState<CommunityUser[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -187,13 +187,29 @@ export default function TopGirlsBoysScreen() {
     targetName: string;
     contactInfo: string;
   }>({ visible: false, state: 'confirm', targetId: '', targetName: '', contactInfo: '' });
-  const currentUserStats = useMemo(() => {
-    return {
-      requestCount: appRequests.length + helpRequests.length,
-      reviewCount: approvedRequests.length,
-      likeCount: 0,
+  const activityByUserId = useMemo(() => {
+    const stats: Record<string, { requestCount: number; reviewCount: number; likeCount: number }> = {};
+    const ensureStats = (userId?: string) => {
+      if (!userId) return null;
+      stats[userId] ??= { requestCount: 0, reviewCount: 0, likeCount: 0 };
+      return stats[userId];
     };
-  }, [appRequests.length, approvedRequests.length, helpRequests.length]);
+
+    appRequests.forEach((request) => {
+      const userStats = ensureStats(request.userId);
+      if (userStats) userStats.requestCount += 1;
+    });
+    helpRequests.forEach((request) => {
+      const userStats = ensureStats(request.userId);
+      if (userStats) userStats.requestCount += 1;
+    });
+    approvedRequests.forEach((request) => {
+      const userStats = ensureStats(request.userId);
+      if (userStats) userStats.reviewCount += 1;
+    });
+
+    return stats;
+  }, [appRequests, approvedRequests, helpRequests]);
 
   const mergeWithCurrentUser = useCallback(
     (remoteUsers: CommunityUser[]) => {
@@ -254,13 +270,13 @@ export default function TopGirlsBoysScreen() {
   const ranked: Person[] = useMemo(() => {
     return people
       .map((person) => {
-        const isCurrentUser = person.id === user?.id;
+        const userStats = activityByUserId[person.id] ?? { requestCount: 0, reviewCount: 0, likeCount: 0 };
         const activity = getChaikaActivity({
           registeredAt: person.registeredAt ? new Date(person.registeredAt) : undefined,
           daysUsed: person.daysUsed,
-          requestCount: isCurrentUser ? currentUserStats.requestCount : 0,
-          reviewCount: isCurrentUser ? currentUserStats.reviewCount : 0,
-          likeCount: isCurrentUser ? currentUserStats.likeCount : 0,
+          requestCount: userStats.requestCount,
+          reviewCount: userStats.reviewCount,
+          likeCount: userStats.likeCount,
         });
 
         return {
@@ -272,7 +288,7 @@ export default function TopGirlsBoysScreen() {
         };
       })
       .sort((a, b) => b.level - a.level || b.points - a.points || b.days - a.days || a.name.localeCompare(b.name));
-  }, [currentUserStats, people, user?.id]);
+  }, [activityByUserId, language, people]);
 
   const filteredRanked = useMemo(() => {
     const resolvedByStatus = ranked.filter((person) => {

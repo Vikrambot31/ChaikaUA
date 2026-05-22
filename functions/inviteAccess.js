@@ -18,6 +18,7 @@ const GENERIC_SUBMIT_RESPONSE = { ok: true, status: 'received' };
 const OWNER_UID = 'LfqIMCAyEzLAb7TNc83lYGW9RiV2';
 const OWNER_PHONE = '+380509000127';
 const SUBMIT_LOCK_TTL_MS = 60 * 1000;
+const PROCESSING_TIMEOUT_MS = 10 * 60 * 1000;
 const TEMPORARY_ACCESS_MIN_HOURS = 1;
 const TEMPORARY_ACCESS_MAX_HOURS = 168;
 
@@ -106,6 +107,14 @@ const normalizePhone = (value) => {
   return raw;
 };
 
+const normalizePhoneDigits = (value) => {
+  const digits = String(value || '').replace(/\D/g, '');
+  if (digits.length === 10 && digits.startsWith('0')) return `38${digits}`;
+  if (digits.length === 11 && digits.startsWith('80')) return `3${digits}`;
+  if (digits.length === 12 && digits.startsWith('380')) return digits;
+  return digits;
+};
+
 const assertPhone = (functions, value, fieldName) => {
   const phone = normalizePhone(value);
   if (!PHONE_RE.test(phone)) {
@@ -116,6 +125,11 @@ const assertPhone = (functions, value, fieldName) => {
     });
   }
   return phone;
+};
+
+const toCanonicalPhone = (value) => {
+  const digits = normalizePhoneDigits(value);
+  return digits.length === 12 && digits.startsWith('380') ? `+${digits}` : '';
 };
 
 const controlledError = (functions, firebaseCode, code, details = {}) =>
@@ -142,16 +156,16 @@ const assertPhoneHash = (functions, value, fieldName) => {
   return key;
 };
 
-const getHashSecret = (firebaseConfig) =>
-  String(
-    process.env.INVITE_ACCESS_HASH_SECRET ||
-    firebaseConfig?.invite_access?.hash_secret ||
-    firebaseConfig?.invite?.hash_secret ||
-    '',
-  ).trim();
+const getHashSecret = (functions) => {
+  const config = functions.config?.() || {};
+  const secret = process.env.INVITE_ACCESS_HASH_SECRET ||
+    config.invite_access?.hash_secret ||
+    config.invite?.hash_secret;
+  return typeof secret === 'string' ? secret.trim() : '';
+};
 
-const assertHashSecret = (functions, firebaseConfig) => {
-  const secret = getHashSecret(firebaseConfig);
+const assertHashSecret = (functions) => {
+  const secret = getHashSecret(functions);
   if (!secret) {
     throw new functions.https.HttpsError('failed-precondition', 'Invite access is not configured');
   }
@@ -475,6 +489,47 @@ const buildTrustNode = ({ uid, phoneHash, phoneMasked, sponsor, request, actorUi
   };
 };
 
+const normalizeUserPhone = (value = {}) =>
+  toCanonicalPhone(value.phone || value.phoneNumber || value.mobile || '');
+
+const findUsersByCanonicalPhones = async (db, canonicalPhones) => {
+  const targets = new Set(canonicalPhones);
+  const snapshot = await db.ref(USERS_PATH).once('value');
+  const matches = new Map();
+  snapshot.forEach((child) => {
+    const value = child.val() && typeof child.val() === 'object' ? child.val() : {};
+    const phone = normalizeUserPhone(value);
+    if (targets.has(phone) && !matches.has(phone)) {
+      matches.set(phone, {
+        uid: child.key,
+        phone,
+      });
+    }
+  });
+  return matches;
+};
+
+const buildManualRootNode = ({ uid, phone, phoneHash, ownerPhoneHash, actorUid, existingNode, config, now }) => ({
+  userUid: uid,
+  phoneHash,
+  phoneMasked: maskPhone(phone),
+  sponsorUid: OWNER_UID,
+  sponsorPhoneHash: ownerPhoneHash,
+  sponsorName: 'root',
+  approvedBy: actorUid,
+  approvedAt: now,
+  approvalSource: 'manual_admin',
+  depthToRoot: 1,
+  rootPath: [OWNER_UID],
+  riskScore: 0,
+  riskLevel: 'low',
+  inviteCount: Number(existingNode?.inviteCount || 0),
+  inviteLimit: getInviteLimitForDepth(config, 1),
+  status: 'active',
+  createdAt: Number(existingNode?.createdAt || now),
+  updatedAt: now,
+});
+
 const buildSponsorConfirmation = (requestId, requestData, config, now) => {
   const timeoutHours = Math.max(1, Number(config.sponsor_confirmation_timeout_hours || DEFAULT_INVITE_CONFIG.sponsor_confirmation_timeout_hours));
   const expiresAt = now + timeoutHours * 60 * 60 * 1000;
@@ -683,7 +738,6 @@ const createInviteAccessFunctions = (deps) => {
   const {
     functions,
     admin,
-    firebaseConfig,
     writeOpsEvent,
     writeOpsError,
     isPrimaryServiceOwnerContext,
@@ -873,7 +927,7 @@ const createInviteAccessFunctions = (deps) => {
     try {
       assertAuthenticated(functions, context);
 
-      const secret = assertHashSecret(functions, firebaseConfig);
+      const secret = assertHashSecret(functions);
       db = admin.database();
       const config = await getInviteConfig(db);
       const profilePhone = await getUserPhone(db, context.auth.uid);
@@ -1148,6 +1202,7 @@ const createInviteAccessFunctions = (deps) => {
         return {
           featureEnabled: config.enabled === true,
           mode: config.mode,
+          configUpdatedAt: Number(config.updatedAt || 0),
           bypass,
           accessStatus: bypass ? 'approved' : userAccess.status,
           userAccess: publicUserAccess(userAccess),
@@ -1159,6 +1214,7 @@ const createInviteAccessFunctions = (deps) => {
       return {
         featureEnabled: config.enabled === true,
         mode: config.mode,
+        configUpdatedAt: Number(config.updatedAt || 0),
         bypass,
         accessStatus: bypass ? 'approved' : userAccess.status,
         userAccess: publicUserAccess(userAccess),
@@ -1181,7 +1237,7 @@ const createInviteAccessFunctions = (deps) => {
   const adminCreateTrustedSponsor = functions.https.onCall(async (data, context) => {
     try {
       const actor = await assertAdminAccess(functions, context, helpers);
-      const secret = assertHashSecret(functions, firebaseConfig);
+      const secret = assertHashSecret(functions);
       const sponsorPhone = assertPhone(functions, data?.sponsorPhone, 'sponsorPhone');
       const sponsorPhoneHash = hashValue(secret, sponsorPhone);
       const db = admin.database();
@@ -1225,7 +1281,7 @@ const createInviteAccessFunctions = (deps) => {
   const adminUpdateTrustedSponsor = functions.https.onCall(async (data, context) => {
     try {
       const actor = await assertAdminAccess(functions, context, helpers);
-      const secret = assertHashSecret(functions, firebaseConfig);
+      const secret = assertHashSecret(functions);
       const sponsorPhone = data?.sponsorPhone === undefined
         ? ''
         : assertPhone(functions, data?.sponsorPhone, 'sponsorPhone');
@@ -1280,6 +1336,120 @@ const createInviteAccessFunctions = (deps) => {
     }
   });
 
+  const adminGrantRootAccessByPhones = functions.https.onCall(async (data, context) => {
+    try {
+      const actor = await assertAdminAccess(functions, context, helpers);
+      const secret = assertHashSecret(functions);
+      const rawPhones = Array.isArray(data?.phones) ? data.phones : [];
+      const requestedPhones = [...new Set(rawPhones.map((phone) => sanitizeText(phone, 64)).filter(Boolean))];
+      if (requestedPhones.length === 0) {
+        throw new functions.https.HttpsError('invalid-argument', 'phones is required');
+      }
+
+      const db = admin.database();
+      const now = Date.now();
+      const config = await getInviteConfig(db);
+      const ownerPhoneHash = hashValue(secret, OWNER_PHONE);
+      const canonicalByInput = new Map();
+      const validPhones = [];
+
+      for (const phone of requestedPhones) {
+        const canonicalPhone = toCanonicalPhone(phone);
+        canonicalByInput.set(phone, canonicalPhone);
+        if (canonicalPhone) validPhones.push(canonicalPhone);
+      }
+
+      const usersByPhone = await findUsersByCanonicalPhones(db, validPhones);
+      const results = [];
+      const updates = {};
+      const grantLogs = [];
+
+      for (const phone of requestedPhones) {
+        const canonicalPhone = canonicalByInput.get(phone);
+        if (!canonicalPhone) {
+          results.push({
+            phone,
+            uid: '',
+            status: 'error',
+            message: 'Номер не распознан. Поддерживаются украинские номера 0XXXXXXXXX, 380XXXXXXXXX, +380XXXXXXXXX.',
+          });
+          continue;
+        }
+
+        const user = usersByPhone.get(canonicalPhone);
+        if (!user) {
+          results.push({
+            phone,
+            uid: '',
+            status: 'not_found',
+            message: 'Пользователь с таким телефоном не найден в /users.',
+          });
+          continue;
+        }
+
+        const phoneHash = hashValue(secret, canonicalPhone);
+        const [accessSnapshot, nodeSnapshot] = await Promise.all([
+          db.ref(`${USER_ACCESS_PATH}/${user.uid}`).once('value'),
+          db.ref(`${TRUST_TREE_PATH}/${user.uid}`).once('value'),
+        ]);
+        const currentAccess = accessSnapshot.val() && typeof accessSnapshot.val() === 'object' ? accessSnapshot.val() : {};
+        const existingNode = nodeSnapshot.val() && typeof nodeSnapshot.val() === 'object' ? nodeSnapshot.val() : {};
+
+        const trustNode = buildManualRootNode({
+          uid: user.uid,
+          phone: canonicalPhone,
+          phoneHash,
+          ownerPhoneHash,
+          actorUid: actor.uid,
+          existingNode,
+          config,
+          now,
+        });
+
+        updates[`${TRUST_TREE_PATH}/${user.uid}`] = trustNode;
+        updates[`${TRUST_TREE_PHONE_INDEX_PATH}/${phoneHash}`] = user.uid;
+        updates[`${USER_ACCESS_PATH}/${user.uid}/status`] = 'approved';
+        updates[`${USER_ACCESS_PATH}/${user.uid}/manual_grant_reason`] = 'manual_root_grant';
+        updates[`${USER_ACCESS_PATH}/${user.uid}/manual_grant_by`] = actor.uid;
+        updates[`${USER_ACCESS_PATH}/${user.uid}/manual_grant_at`] = now;
+        updates[`${USER_ACCESS_PATH}/${user.uid}/updatedAt`] = now;
+        updates[`${USER_ACCESS_PATH}/${user.uid}/version`] = Number(currentAccess.version || 0) + 1;
+
+        grantLogs.push({
+          actorType: 'admin',
+          actorUid: actor.uid,
+          requesterUid: user.uid,
+          reason: 'admin_grant_root_access_by_phone',
+        });
+
+        results.push({
+          phone,
+          uid: user.uid,
+          status: 'granted',
+          message: 'Привязан к корню и получил полный trusted-доступ.',
+        });
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await db.ref('/').update(updates);
+      }
+
+      await Promise.all(grantLogs.map((payload) => writeInviteLog(db, 'manual_root_grant', payload)));
+
+      await writeOpsEvent('manual_root_access_granted', {
+        actorUid: actor.uid,
+        requestedCount: requestedPhones.length,
+        grantedCount: results.filter((result) => result.status === 'granted').length,
+      });
+
+      return { ok: true, results };
+    } catch (error) {
+      return handleUnexpectedError(functions, helpers, 'adminGrantRootAccessByPhones', error, {
+        uid: context.auth?.uid || null,
+      });
+    }
+  });
+
   const adminModerateInviteRequest = functions.https.onCall(async (data, context) => {
     try {
       const actor = await assertModeratorAccess(functions, context, helpers);
@@ -1325,32 +1495,23 @@ const createInviteAccessFunctions = (deps) => {
         throw new functions.https.HttpsError('failed-precondition', 'Invite request was already decided');
       }
 
-      const userAccessPatch = {
-        status,
-        updatedAt: now,
-        current_request_id: requestId,
-      };
       const currentAccess = await readUserAccess(db, request.requesterUid);
-      userAccessPatch.version = Number(currentAccess.version || 0) + 1;
+      const updates = {
+        [`${USER_ACCESS_PATH}/${request.requesterUid}/status`]: status,
+        [`${USER_ACCESS_PATH}/${request.requesterUid}/updatedAt`]: now,
+        [`${USER_ACCESS_PATH}/${request.requesterUid}/current_request_id`]: requestId,
+        [`${USER_ACCESS_PATH}/${request.requesterUid}/version`]: Number(currentAccess.version || 0) + 1,
+      };
 
       if (status === 'denied') {
-        userAccessPatch.denied_count = Number(currentAccess.denied_count || 0) + 1;
-        userAccessPatch.last_denied_at = now;
+        updates[`${USER_ACCESS_PATH}/${request.requesterUid}/denied_count`] = Number(currentAccess.denied_count || 0) + 1;
+        updates[`${USER_ACCESS_PATH}/${request.requesterUid}/last_denied_at`] = now;
       }
 
-      await db.ref(`${USER_ACCESS_PATH}/${request.requesterUid}`).update(userAccessPatch);
-
+      let sponsor;
       if (status === 'approved' && request.status !== 'approved' && request.sponsorPhoneHash) {
-        const sponsorRef = db.ref(`${TRUSTED_SPONSORS_PATH}/${request.sponsorPhoneHash}`);
-        await sponsorRef.child('approvedInviteCount').transaction((current) => Number(current || 0) + 1);
-        await sponsorRef.update({
-          lastInviteAt: now,
-          updatedAt: now,
-          updatedBy: actor.uid,
-        });
-
         const config = await getInviteConfig(db);
-        const sponsor = await findSponsorNode(db, request.sponsorPhoneHash);
+        sponsor = await findSponsorNode(db, request.sponsorPhoneHash);
         const trustNode = buildTrustNode({
           uid: request.requesterUid,
           phoneHash: request.requesterPhoneHash,
@@ -1364,9 +1525,19 @@ const createInviteAccessFunctions = (deps) => {
           riskLevel: String(request.riskLevel || 'low'),
           now,
         });
-        await db.ref().update({
-          [`${TRUST_TREE_PATH}/${request.requesterUid}`]: trustNode,
-          [`${TRUST_TREE_PHONE_INDEX_PATH}/${request.requesterPhoneHash}`]: request.requesterUid,
+        updates[`${TRUST_TREE_PATH}/${request.requesterUid}`] = trustNode;
+        updates[`${TRUST_TREE_PHONE_INDEX_PATH}/${request.requesterPhoneHash}`] = request.requesterUid;
+      }
+
+      await db.ref('/').update(updates);
+
+      if (status === 'approved' && request.status !== 'approved' && request.sponsorPhoneHash) {
+        const sponsorRef = db.ref(`${TRUSTED_SPONSORS_PATH}/${request.sponsorPhoneHash}`);
+        await sponsorRef.child('approvedInviteCount').transaction((current) => Number(current || 0) + 1);
+        await sponsorRef.update({
+          lastInviteAt: now,
+          updatedAt: now,
+          updatedBy: actor.uid,
         });
 
         if (sponsor?.uid) {
@@ -1690,7 +1861,30 @@ const createInviteAccessFunctions = (deps) => {
         expired.push({ confirmationId, requestId, requesterUid, sponsorUid: String(confirmation.sponsorUid || '') });
       }
 
-      if (expired.length === 0 && skipped.length === 0) {
+      // Recover stuck 'processing' confirmations (Cloud Function crash recovery)
+      const stuckSnapshot = await db.ref(SPONSOR_CONFIRMATIONS_PATH).orderByChild('status').equalTo('processing').once('value');
+      const stuckCandidates = [];
+      stuckSnapshot.forEach((child) => {
+        const value = child.val() || {};
+        const updatedAt = Number(value.updatedAt || 0);
+        if (updatedAt > 0 && now - updatedAt >= PROCESSING_TIMEOUT_MS) {
+          stuckCandidates.push({ confirmationId: child.key, value });
+        }
+      });
+      for (const candidate of stuckCandidates) {
+        const confirmationRef = db.ref(`${SPONSOR_CONFIRMATIONS_PATH}/${candidate.confirmationId}`);
+        await confirmationRef.transaction((current) => {
+          if (!current || typeof current !== 'object') return current;
+          if (String(current.status || '') !== 'processing') return;
+          if (now - Number(current.updatedAt || 0) < PROCESSING_TIMEOUT_MS) return;
+          return { ...current, status: 'pending', updatedAt: now };
+        });
+      }
+      if (stuckCandidates.length > 0) {
+        await writeOpsEvent('stuck_processing_confirmations_recovered', { recoveredCount: stuckCandidates.length });
+      }
+
+      if (expired.length === 0 && skipped.length === 0 && stuckCandidates.length === 0) {
         await writeOpsEvent('expired_sponsor_confirmations_processed', { expiredCount: 0 });
         return null;
       }
@@ -1721,7 +1915,7 @@ const createInviteAccessFunctions = (deps) => {
       }
 
       if (data.enabled) {
-        assertHashSecret(functions, firebaseConfig);
+        assertHashSecret(functions);
       }
 
       const flagRef = admin.database().ref(FEATURE_FLAG_PATH);
@@ -1778,7 +1972,7 @@ const createInviteAccessFunctions = (deps) => {
         throw new functions.https.HttpsError('invalid-argument', 'mode must be disabled, soft, medium or hard');
       }
       if (mode !== 'disabled') {
-        assertHashSecret(functions, firebaseConfig);
+        assertHashSecret(functions);
       }
 
       const db = admin.database();
@@ -1825,7 +2019,7 @@ const createInviteAccessFunctions = (deps) => {
   const initializeInviteAccessRoot = functions.https.onCall(async (data, context) => {
     try {
       const actor = await assertAdminAccess(functions, context, helpers);
-      const secret = assertHashSecret(functions, firebaseConfig);
+      const secret = assertHashSecret(functions);
       const ownerPhone = assertPhone(functions, data?.ownerPhone || OWNER_PHONE, 'ownerPhone');
       const ownerUid = sanitizeText(data?.ownerUid || OWNER_UID, 128);
       const db = admin.database();
@@ -1886,6 +2080,7 @@ const createInviteAccessFunctions = (deps) => {
     processExpiredSponsorConfirmations,
     adminCreateTrustedSponsor,
     adminUpdateTrustedSponsor,
+    adminGrantRootAccessByPhones,
     adminModerateInviteRequest,
     adminSetInviteAccessEnabled,
     adminSetInviteAccessMode,

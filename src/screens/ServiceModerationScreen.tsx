@@ -95,6 +95,12 @@ type CommunityMember = {
   registeredAt?: string;
 };
 
+const isPublicGalleryPhoto = (photo: CommunityPhoto): boolean => {
+  const title = typeof photo.title === 'string' ? photo.title.trim() : '';
+  const isLegacyPersonalDefault = title === 'Photo' || title === 'Р¤РѕС‚Рѕ';
+  return photo.target === 'gallery_public' && !isLegacyPersonalDefault;
+};
+
 type FailedSectionIssue = {
   section: Tab;
   sectionLabel: string;
@@ -587,9 +593,10 @@ const ServiceModerationScreen: React.FC = () => {
           uploadedBy: typeof value.uploadedBy === 'string' ? value.uploadedBy : '',
           createdAt: new Date(typeof value.uploadedAt === 'number' ? value.uploadedAt : 0),
           status: (value.status === 'approved' || value.status === 'rejected' ? value.status : 'pending') as 'pending' | 'approved' | 'rejected',
+          target: (value.target === 'my_photos' ? 'my_photos' : 'gallery_public') as CommunityPhoto['target'],
           likes: 0,
           moderationReason: typeof value.moderationReason === 'string' ? value.moderationReason : undefined,
-        }));
+        })).filter(isPublicGalleryPhoto);
         if (mountedRef.current) {
           setPhotos(nextPhotos);
         }

@@ -1,15 +1,17 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, StyleSheet, Text, View } from 'react-native';
 import { useSelector } from 'react-redux';
 import { COLORS } from '../utils/constants';
 import { selectUser } from '../redux/slices/authSlice';
 import InviteAccessScreen from '../screens/InviteAccessScreen';
 import PendingApprovalScreen from '../screens/PendingApprovalScreen';
+import InviteAccessIntroSlides from './InviteAccessIntroSlides';
 import {
   getMyInviteRequestStatus,
   isValidSponsorPhone,
   type InviteRequestSnapshot,
 } from '../services/sponsorService';
+import { TrustedAccessContext } from '../contexts/TrustedAccessContext';
 
 type SoftInviteAccessGateProps = {
   children: React.ReactNode;
@@ -18,15 +20,20 @@ type SoftInviteAccessGateProps = {
 const REFRESH_ON_ACTIVE_THROTTLE_MS = 15000;
 
 const shouldShowInviteRequest = (snapshot: InviteRequestSnapshot | null): boolean =>
-  snapshot?.featureEnabled === true && (snapshot.status === 'none' || snapshot.status === 'cancelled');
+  snapshot?.featureEnabled === true && snapshot.status === 'cancelled';
 
 const shouldShowPending = (snapshot: InviteRequestSnapshot | null): boolean =>
   snapshot?.featureEnabled === true && (
+    snapshot.status === 'denied' ||
+    snapshot.status === 'auto_denied' ||
+    snapshot.accessStatus === 'blocked'
+  );
+
+const hasPendingInvite = (snapshot: InviteRequestSnapshot | null): boolean =>
+  snapshot?.featureEnabled === true && (
     snapshot.status === 'pending' ||
     snapshot.status === 'pending_sponsor' ||
-    snapshot.status === 'needs_manual_review' ||
-    snapshot.status === 'denied' ||
-    snapshot.status === 'auto_denied'
+    snapshot.status === 'needs_manual_review'
   );
 
 const hasRuntimeAccess = (snapshot: InviteRequestSnapshot | null): boolean => (
@@ -45,9 +52,12 @@ const hasTemporaryAccess = (snapshot: InviteRequestSnapshot | null): boolean => 
   snapshot?.userAccess?.status === 'temporary_access'
 );
 
+const isHardMode = (snapshot: InviteRequestSnapshot | null): boolean =>
+  snapshot?.mode === 'hard';
+
 const formatTempAccessUntil = (expiresAt?: number): string => {
   if (!expiresAt) return '';
-  return new Date(expiresAt).toLocaleString();
+  return new Date(expiresAt).toLocaleString('uk-UA');
 };
 
 export default function SoftInviteAccessGate({ children }: SoftInviteAccessGateProps) {
@@ -55,8 +65,26 @@ export default function SoftInviteAccessGate({ children }: SoftInviteAccessGateP
   const [snapshot, setSnapshot] = useState<InviteRequestSnapshot | null>(null);
   const [loading, setLoading] = useState(false);
   const [dismissedForSession, setDismissedForSession] = useState(false);
+  const [forcedInviteVisible, setForcedInviteVisible] = useState(false);
+  const [inviteIntroSeen, setInviteIntroSeen] = useState(false);
   const [lastRefreshAt, setLastRefreshAt] = useState(0);
+  const wasInviteRequiredRef = useRef(false);
   const requesterPhone = user?.phone || '';
+  const inviteRequired = shouldShowInviteRequest(snapshot);
+  const showInviteFlow = forcedInviteVisible || inviteRequired;
+
+  const openInviteAccess = () => {
+    setDismissedForSession(false);
+    setInviteIntroSeen(true);
+    setForcedInviteVisible(true);
+  };
+
+  const trustedValue = (isTrusted: boolean, isLoading: boolean, pendingInvite: boolean) => ({
+    isTrusted,
+    isLoading,
+    hasPendingInvite: pendingInvite,
+    openInviteAccess,
+  });
 
   const refresh = async () => {
     if (!user?.id) {
@@ -70,7 +98,7 @@ export default function SoftInviteAccessGate({ children }: SoftInviteAccessGateP
       setSnapshot(next);
       setLastRefreshAt(Date.now());
     } catch {
-      setSnapshot({ featureEnabled: false, status: 'disabled' });
+      setSnapshot({ featureEnabled: true, status: 'none', accessStatus: 'not_started' });
     } finally {
       setLoading(false);
     }
@@ -78,6 +106,7 @@ export default function SoftInviteAccessGate({ children }: SoftInviteAccessGateP
 
   useEffect(() => {
     setDismissedForSession(false);
+    setInviteIntroSeen(false);
     void refresh();
   }, [user?.id]);
 
@@ -95,26 +124,84 @@ export default function SoftInviteAccessGate({ children }: SoftInviteAccessGateP
     return () => subscription.remove();
   }, [lastRefreshAt, user?.id]);
 
-  if (!user?.id || dismissedForSession || snapshot?.featureEnabled !== true) {
-    return <>{children}</>;
+  useEffect(() => {
+    if (inviteRequired && !wasInviteRequiredRef.current) {
+      setInviteIntroSeen(false);
+    }
+    wasInviteRequiredRef.current = inviteRequired;
+  }, [inviteRequired]);
+
+  // в”Ђв”Ђ No user (not logged in) в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+  // Auth guards handle redirect; trusted = false but irrelevant since there's
+  // no authenticated session.
+  if (!user?.id) {
+    return (
+      <TrustedAccessContext.Provider value={trustedValue(false, false, false)}>
+        {children}
+      </TrustedAccessContext.Provider>
+    );
   }
 
+  // в”Ђв”Ђ User skipped the invite gate ("Continue without request") в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+  // They are Registered but NOT Trusted. Show app with restricted access
+  // and an amber banner explaining the limitation.
+  if (dismissedForSession) {
+    return (
+      <TrustedAccessContext.Provider value={trustedValue(false, false, false)}>
+        <View style={styles.runtimeAccessRoot}>
+          {children}
+          <View pointerEvents="none" style={styles.registeredBanner}>
+            <Text style={styles.registeredBannerTitle}>Обмежений доступ</Text>
+            <Text style={styles.registeredBannerText}>Для повного доступу потрібна перевірка заявки або підтвердження поручителя. Поки доступні базові розділи.</Text>
+          </View>
+        </View>
+      </TrustedAccessContext.Provider>
+    );
+  }
+
+  // в”Ђв”Ђ Snapshot still loading (null = not yet fetched) в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+  // Propagate isLoading: true so GuardedScreen shows a spinner instead of
+  // the AccessRestrictedScreen while we wait for the server response.
+  if (snapshot === null) {
+    return (
+      <TrustedAccessContext.Provider value={trustedValue(false, true, false)}>
+        {children}
+      </TrustedAccessContext.Provider>
+    );
+  }
+
+  // в”Ђв”Ђ Feature disabled globally в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+  // When featureEnabled is false/undefined the invite system is turned off вЂ”
+  // no restrictions apply.
+  if (snapshot.featureEnabled !== true) {
+    return (
+      <TrustedAccessContext.Provider value={trustedValue(true, false, false)}>
+        {children}
+      </TrustedAccessContext.Provider>
+    );
+  }
+
+  // в”Ђв”Ђ User has full runtime access (approved / whitelist / bypass) в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
   if (hasRuntimeAccess(snapshot)) {
     if (!hasTemporaryAccess(snapshot)) {
-      return <>{children}</>;
+      return (
+        <TrustedAccessContext.Provider value={trustedValue(true, false, false)}>
+          {children}
+        </TrustedAccessContext.Provider>
+      );
     }
 
     const expiresLabel = formatTempAccessUntil(snapshot.userAccess?.temp_expires_at);
     return (
-      <View style={styles.runtimeAccessRoot}>
-        {children}
-        <View pointerEvents="none" style={styles.tempAccessBanner}>
-          <Text style={styles.tempAccessTitle}>Доступ тимчасово активовано</Text>
-          <Text style={styles.tempAccessText}>
-            Може знадобитися додаткова перевірка{expiresLabel ? ` до ${expiresLabel}` : ''}.
-          </Text>
+      <TrustedAccessContext.Provider value={trustedValue(true, false, false)}>
+        <View style={styles.runtimeAccessRoot}>
+          {children}
+          <View pointerEvents="none" style={styles.tempAccessBanner}>
+            <Text style={styles.tempAccessTitle}>Доступ тимчасово активовано</Text>
+            <Text style={styles.tempAccessText}>Може знадобитися додаткова перевірка{expiresLabel ? ` до ${expiresLabel}` : ""}.</Text>
+          </View>
         </View>
-      </View>
+      </TrustedAccessContext.Provider>
     );
   }
 
@@ -126,34 +213,85 @@ export default function SoftInviteAccessGate({ children }: SoftInviteAccessGateP
     );
   }
 
-  if (!isValidSponsorPhone(requesterPhone)) {
-    return <>{children}</>;
-  }
-
-  if (shouldShowInviteRequest(snapshot)) {
-    return (
-      <InviteAccessScreen
-        requesterPhone={requesterPhone}
-        onSubmitted={() => {
-          void refresh();
-        }}
-        onContinue={() => setDismissedForSession(true)}
-      />
-    );
-  }
-
   if (shouldShowPending(snapshot)) {
     return (
       <PendingApprovalScreen
         initialStatus={snapshot}
         onRefreshStatus={setSnapshot}
-        onCreateNewRequest={() => setSnapshot({ featureEnabled: true, status: 'none' })}
-        onContinue={() => setDismissedForSession(true)}
+        onCreateNewRequest={() => {
+          setSnapshot({ featureEnabled: true, status: 'none' });
+          setForcedInviteVisible(true);
+        }}
+        allowContinue={false}
+        onContinue={() => {}}
       />
     );
   }
 
-  return <>{children}</>;
+  // в”Ђв”Ђ User without a valid +380 phone and no approved access в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+  // Let them use the app as a guest, but never grant trusted access implicitly.
+  if (!isValidSponsorPhone(requesterPhone)) {
+    return (
+      <TrustedAccessContext.Provider value={trustedValue(false, false, false)}>
+        <View style={styles.runtimeAccessRoot}>
+          {children}
+          <View pointerEvents="none" style={styles.registeredBanner}>
+            <Text style={styles.registeredBannerTitle}>Обмежений доступ</Text>
+            <Text style={styles.registeredBannerText}>Для повного доступу потрібна перевірка заявки або підтвердження поручителя. Поки доступні базові розділи.</Text>
+          </View>
+        </View>
+      </TrustedAccessContext.Provider>
+    );
+  }
+
+  if (showInviteFlow) {
+    if (!inviteIntroSeen) {
+      return <InviteAccessIntroSlides onDone={() => setInviteIntroSeen(true)} />;
+    }
+
+    return (
+      <InviteAccessScreen
+        requesterPhone={requesterPhone}
+        allowContinue={!isHardMode(snapshot)}
+        hardLocked={isHardMode(snapshot)}
+        onSubmitted={() => {
+          setForcedInviteVisible(false);
+          void refresh();
+        }}
+        onContinue={() => {
+          setForcedInviteVisible(false);
+          setDismissedForSession(true);
+        }}
+      />
+    );
+  }
+
+  if (hasPendingInvite(snapshot)) {
+    return (
+      <TrustedAccessContext.Provider value={trustedValue(false, false, true)}>
+        <View style={styles.runtimeAccessRoot}>
+          {children}
+          <View pointerEvents="none" style={styles.registeredBanner}>
+            <Text style={styles.registeredBannerTitle}>Обмежений доступ</Text>
+            <Text style={styles.registeredBannerText}>Для повного доступу потрібна перевірка заявки або підтвердження поручителя. Поки доступні базові розділи.</Text>
+          </View>
+        </View>
+      </TrustedAccessContext.Provider>
+    );
+  }
+
+  // в”Ђв”Ђ Guest access fallback: no approved/temporary/whitelist status в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+  return (
+    <TrustedAccessContext.Provider value={trustedValue(false, false, false)}>
+      <View style={styles.runtimeAccessRoot}>
+        {children}
+        <View pointerEvents="none" style={styles.registeredBanner}>
+          <Text style={styles.registeredBannerTitle}>Обмежений доступ</Text>
+          <Text style={styles.registeredBannerText}>Для повного доступу потрібна перевірка заявки або підтвердження поручителя. Поки доступні базові розділи.</Text>
+        </View>
+      </View>
+    </TrustedAccessContext.Provider>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -166,6 +304,33 @@ const styles = StyleSheet.create({
   runtimeAccessRoot: {
     flex: 1,
   },
+  // Amber banner shown when user skipped the invite gate (Registered, not Trusted)
+  registeredBanner: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    top: 48,
+    borderRadius: 16,
+    backgroundColor: 'rgba(180, 100, 0, 0.92)',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 5,
+  },
+  registeredBannerTitle: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  registeredBannerText: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 12,
+    marginTop: 3,
+  },
+  // Blue banner shown for temporary_access users
   tempAccessBanner: {
     position: 'absolute',
     left: 16,
@@ -192,3 +357,4 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
 });
+

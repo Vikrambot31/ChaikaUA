@@ -1,4 +1,4 @@
-import { ref, push, update, onValue, remove, query, orderByChild, equalTo, get } from 'firebase/database';
+import { ref, push, update, onValue, remove, query, orderByChild, equalTo, get, limitToLast } from 'firebase/database';
 import { database } from '../firebase-core';
 import { createPendingModeration, ModerationStatus } from '../utils/moderation';
 import { sanitizeStoredText } from '../utils/textUtils';
@@ -20,44 +20,67 @@ export interface JobListing {
   userId: string;
   moderationReason?: string;
   rejectionReason?: string;
+  isArchived?: boolean;
 }
 
 const PATH = 'job_listings';
+const ACTIVE_LIMIT = 150;
+const ACTIVE_LIMIT_BUFFER = 30;
+const FEED_MINIMUM = 10;
+const ARCHIVED_FALLBACK_LIMIT = 20;
+
+const mapJobItem = (id: string, data: any, isArchived?: boolean): JobListing => ({
+  id,
+  listingKind: (data.listingKind === 'vacancy' ? 'vacancy' : 'resume') as JobListing['listingKind'],
+  name: data.name || '',
+  phone: data.phone || '',
+  age: data.age || '',
+  workType: data.workType || '',
+  about: data.about || '',
+  moderationStatus: isArchived ? 'approved' : (data.moderationStatus || 'pending'),
+  submittedForModerationAt: data.submittedForModerationAt || '',
+  createdAt: data.createdAt || '',
+  expiresAt: data.expiresAt || '',
+  userId: data.userId || '',
+  moderationReason: isArchived ? '' : (data.moderationReason || data.reason || ''),
+  rejectionReason: isArchived ? '' : (data.rejectionReason || data.reason || ''),
+  isArchived,
+});
 
 export const jobService = {
   subscribe(callback: (items: JobListing[]) => void): () => void {
-    const listRef = query(ref(database, PATH), orderByChild('moderationStatus'), equalTo('approved'));
+    const listRef = query(ref(database, PATH), orderByChild('moderationStatus'), equalTo('approved'), limitToLast(ACTIVE_LIMIT + ACTIVE_LIMIT_BUFFER));
 
     const unsubscribe = onValue(listRef, (snapshot) => {
       const raw = snapshot.val();
-      if (!raw) {
-        callback([]);
+      const now = Date.now();
+      const active: JobListing[] = raw
+        ? Object.entries(raw as Record<string, any>)
+            .map(([id, data]) => mapJobItem(id, data))
+            .filter((item) => {
+              const expired = item.expiresAt && new Date(item.expiresAt).getTime() < now;
+              return item.moderationStatus === 'approved' && !expired;
+            })
+            .reverse()
+            .slice(0, ACTIVE_LIMIT)
+        : [];
+
+      if (active.length >= FEED_MINIMUM) {
+        callback(active);
         return;
       }
-      const now = Date.now();
-      const items: JobListing[] = Object.entries(raw as Record<string, any>)
-        .map(([id, data]) => ({
-          id,
-          listingKind: (data.listingKind === 'vacancy' ? 'vacancy' : 'resume') as JobListing['listingKind'],
-          name: data.name || '',
-          phone: data.phone || '',
-          age: data.age || '',
-          workType: data.workType || '',
-          about: data.about || '',
-          moderationStatus: data.moderationStatus || 'pending',
-          submittedForModerationAt: data.submittedForModerationAt || '',
-          createdAt: data.createdAt || '',
-          expiresAt: data.expiresAt || '',
-          userId: data.userId || '',
-          moderationReason: data.moderationReason || data.reason || '',
-          rejectionReason: data.rejectionReason || data.reason || '',
-        }))
-        .filter((item) => {
-          const expired = item.expiresAt && new Date(item.expiresAt).getTime() < now;
-          return item.moderationStatus === 'approved' && !expired;
-        })
-        .reverse();
-      callback(items);
+
+      void get(query(ref(database, PATH), orderByChild('moderationStatus'), equalTo('expired'), limitToLast(ARCHIVED_FALLBACK_LIMIT))).then((expiredSnapshot) => {
+        const expiredRaw = expiredSnapshot.val();
+        const archived: JobListing[] = expiredRaw
+          ? Object.entries(expiredRaw as Record<string, any>)
+              .map(([id, data]) => mapJobItem(id, data, true))
+              .reverse()
+          : [];
+        callback([...active, ...archived]);
+      }).catch(() => {
+        callback(active);
+      });
     });
 
     return unsubscribe;

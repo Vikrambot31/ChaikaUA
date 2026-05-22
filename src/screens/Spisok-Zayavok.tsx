@@ -13,16 +13,19 @@ import { COLORS, SIZES } from '../utils/constants';
 import { SkeletonList } from '../components/SkeletonLoader';
 import MiniTabBar from '../components/MiniTabBar';
 import type { AppDispatch, RootState } from '../redux/store';
-import { firebaseChatAPI } from '../firebase-config';
+import { database, firebaseChatAPI } from '../firebase-config';
 import { isModeratorUser } from '../firebase-auth-session';
 import { useContactRequest } from '../hooks/useContactRequest';
 import ContactReasonModal from '../components/ContactReasonModal';
-import { database } from '../firebase-config';
 import { resolveUserAvatarMap } from '../utils/userAvatar';
 
 type RequestsNavigation = NativeStackNavigationProp<Record<string, object | undefined>>;
 type AppLanguage = 'ua' | 'ru' | 'en';
 type RequestStatusFilter = 'all' | 'approved' | 'pending' | 'rejected';
+type RequestsPageResult = { success: boolean; data?: Request[]; error?: string };
+
+const isRequestsPageResult = (value: unknown): value is RequestsPageResult =>
+  Boolean(value && typeof value === 'object' && 'success' in value);
 
 const UI_TEXT = {
   ua: {
@@ -105,6 +108,10 @@ const RequestsScreen: React.FC = () => {
         limit: PAGE_SIZE + 1,
         cursorBefore,
       });
+      if (!isRequestsPageResult(result)) {
+        setError(text.loadingError);
+        return false;
+      }
       if (!result.success || !result.data) {
         setError((!result.success && 'error' in result ? result.error : undefined) ?? text.loadingError);
         return false;
@@ -536,7 +543,6 @@ const styles = StyleSheet.create({
 });
 
 export default RequestsScreen;
-
 
 
 

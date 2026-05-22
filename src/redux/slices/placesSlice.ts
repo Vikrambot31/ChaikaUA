@@ -18,14 +18,14 @@ const applyFilters = (state: PlacesState) => {
   const query = state.searchQuery.trim().toLocaleLowerCase('uk-UA');
   const hasSelectedTypes = state.selectedTypes.length > 0;
   const categoryAliases: Record<string, string> = {
-    shop: 'РјР°РіР°Р·РёРЅ С‚РѕРІР°СЂС‹',
-    school: 'С€РєРѕР»Р° С€РєРѕР»С‹',
-    kindergarten: 'РґРµС‚СЃРєРёР№ СЃР°Рґ РґРµС‚СЃРєРёРµ СЃР°РґС‹ РґРµС‚Рё',
-    cafe: 'РєР°С„Рµ',
-    restaurant: 'СЂРµСЃС‚РѕСЂР°РЅ СЂРµСЃС‚РѕСЂР°РЅС‹ РµРґР°',
-    salon: 'СЃР°Р»РѕРЅ СЃР°Р»РѕРЅС‹',
-    pharmacy: 'Р°РїС‚РµРєР° Р°РїС‚eРєРё',
-    service: 'СѓСЃР»СѓРіРё С‡Р°СЃС‚РЅС‹Рµ СѓСЃР»СѓРіРё СЃРµСЂРІРёСЃ',
+    shop: 'магазин товары',
+    school: 'школа школы',
+    kindergarten: 'детский сад детские сады дети',
+    cafe: 'кафе',
+    restaurant: 'ресторан рестораны еда',
+    salon: 'салон салоны',
+    pharmacy: 'аптека аптеки',
+    service: 'услуги частные услуги сервис',
   };
 
   state.filtered = state.items.filter((place) => {
@@ -55,7 +55,7 @@ export const fetchPlaces = createAsyncThunk<Place[], { force?: boolean } | undef
     } catch (error) {
       console.warn('[placesSlice] fetchPlaces failed', error instanceof Error ? error.message : String(error));
       safeLogError('placesSlice.fetchPlaces', error);
-      return rejectWithValue('РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ РјРµСЃС‚Р°. РџСЂРѕРІРµСЂСЊС‚Рµ РёРЅС‚РµСЂРЅРµС‚ Рё РїРѕРїСЂРѕР±СѓР№С‚Рµ РµС‰С‘ СЂР°Р·.');
+      return rejectWithValue('Не удалось загрузить места. Проверьте интернет и попробуйте еще раз.');
     }
   },
   {

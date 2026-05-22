@@ -442,7 +442,7 @@ const HelpRequestScreen: React.FC = () => {
               </>
             )}
 
-          {/* Description field вЂ” required, min 10 chars */}
+          {/* Description field - required, min 10 chars */}
           <FormSectionLabel label={text.labelDescription} completed={isDescriptionComplete} containerStyle={styles.labelRow} labelStyle={styles.label} />
           <TextInput
             placeholder={text.descriptionPlaceholder}

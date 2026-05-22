@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -84,7 +83,6 @@ const UI_TEXT = {
 
 const MapScreen: React.FC = () => {
   const places = useSelector((state: RootState) => state.places.items);
-  const loading = useSelector((state: RootState) => state.places.loading);
   const error = useSelector((state: RootState) => state.places.error);
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
   const text = UI_TEXT[language];
@@ -175,9 +173,7 @@ const MapScreen: React.FC = () => {
           })}
         </View>
 
-        {loading ? (
-          <ActivityIndicator size="large" color={COLORS.primary} style={styles.loading} />
-        ) : error ? (
+        {error ? (
           <Text style={styles.errorText}>{error}</Text>
         ) : sortedPlaces.length === 0 ? (
           <View style={styles.emptyState}>
@@ -343,9 +339,6 @@ const styles = StyleSheet.create({
   },
   filterTextActive: {
     color: '#FFFFFF',
-  },
-  loading: {
-    marginVertical: 20,
   },
   errorText: {
     color: COLORS.error,

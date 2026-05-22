@@ -4,7 +4,10 @@ export type ChatRequestLike = {
   name: string;
   photoUri?: string;
   text?: string;
+  description?: string;
   category?: string;
+  group?: string;
+  subcategory?: string;
   phone?: string;
   timestamp?: number;
   createdAt?: { getTime?: () => number } | Date;

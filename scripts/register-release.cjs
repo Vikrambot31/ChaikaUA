@@ -105,6 +105,22 @@ async function registerRelease() {
     console.log(`[REGISTER]   Files changed: ${fileCount}`);
     console.log(`[REGISTER]   Version key: ${versionKey}`);
     console.log(`[REGISTER]   Path: app_releases/${versionKey}`);
+
+    // Write app_version_registry/current so the mobile app and admin panel
+    // always know the latest published APK URL without hard-coding it.
+    const safeName = 'ChaikaLife-v' +
+      String(report.appVersion || '').replace(/[\s:/\\]/g, '-') + '-' +
+      String(report.buildStamp || '').replace(/[\s:/\\]/g, '-');
+    const apkUrl = `https://chaika-life.netlify.app/release/${safeName}.apk`;
+
+    await db.ref('app_version_registry/current').set({
+      version: String(report.appVersion || ''),
+      buildStamp: String(report.buildStamp || ''),
+      apkUrl,
+      publishedAt: Date.now(),
+    });
+    console.log(`[REGISTER] Version registry updated: app_version_registry/current`);
+    console.log(`[REGISTER]   APK URL: ${apkUrl}`);
   } catch (err) {
     console.warn(`[REGISTER] Firebase registration failed (warning, build continues): ${err.message}`);
     console.warn('[REGISTER] To enable: set GOOGLE_APPLICATION_CREDENTIALS to a service account JSON file');

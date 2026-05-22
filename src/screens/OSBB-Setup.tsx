@@ -156,7 +156,7 @@ const OsbbSetupScreen: React.FC<Props> = ({ onDone }) => {
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={styles.header}>
-            <Image source={require('../../assets/OSBB.png')} style={styles.headerImage} resizeMode="cover" />
+            <Image source={require('../../assets/WEBP-version/OSBB.webp')} style={styles.headerImage} resizeMode="cover" />
             <View style={styles.headerBody}>
               <Text style={styles.title}>{text.title}</Text>
               <Text style={styles.subtitle}>{text.subtitle}</Text>

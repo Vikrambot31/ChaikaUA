@@ -14,6 +14,8 @@ import {
 
 type ModerationPageProps = {
   user: User;
+  initialStatusFilter?: StatusFilter;
+  archiveMode?: boolean;
 };
 
 type StatusFilter = 'all' | ModerationStatus;
@@ -21,9 +23,9 @@ type StatusFilter = 'all' | ModerationStatus;
 const sectionLabel = (key: ModerationSectionKey): string =>
   MODERATION_SECTIONS.find((section) => section.key === key)?.label || key;
 
-export const ModerationPage = ({ user }: ModerationPageProps) => {
+export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveMode = false }: ModerationPageProps) => {
   const [items, setItems] = useState<ModerationItem[]>([]);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('pending');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(initialStatusFilter);
   const [sectionFilter, setSectionFilter] = useState<'all' | ModerationSectionKey>('all');
   const [search, setSearch] = useState('');
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -96,7 +98,7 @@ export const ModerationPage = ({ user }: ModerationPageProps) => {
         await deleteModerationItem(item);
         setMessage('Запись удалена.');
       } else {
-        await moderateItem(item, action, user.uid);
+        await moderateItem(item, action);
         setMessage(action === 'approved' ? 'Запись одобрена.' : 'Запись отклонена.');
       }
       await refresh();
@@ -125,8 +127,8 @@ export const ModerationPage = ({ user }: ModerationPageProps) => {
         <div>
           <p className="eyebrow">Сервисная модерация</p>
           <div className="headingWithHint">
-            <h2>Модерация</h2>
-            <InfoHint text="Проверка контента и заявок: approve, reject, delete по текущим Firebase путям." />
+            <h2>{archiveMode ? 'Архив' : 'Модерация'}</h2>
+            <InfoHint text={archiveMode ? 'Просроченные записи остаются доступными администратору: их можно восстановить или удалить.' : 'Проверка контента и заявок: approve, reject, delete по текущим Firebase путям.'} />
           </div>
         </div>
         <div className="actionWithHint">
@@ -144,6 +146,7 @@ export const ModerationPage = ({ user }: ModerationPageProps) => {
         <article className="metric metric-warning"><span>Ожидают</span><strong>{summary.pending}</strong></article>
         <article className="metric metric-success"><span>Одобрены</span><strong>{summary.approved}</strong></article>
         <article className="metric metric-dark"><span>Отклонены</span><strong>{summary.rejected}</strong></article>
+        <article className="metric metric-info"><span>Просрочены</span><strong>{summary.expired}</strong></article>
       </div>
 
       <div className="filtersRow">
@@ -154,6 +157,7 @@ export const ModerationPage = ({ user }: ModerationPageProps) => {
             <option value="pending">Ожидают</option>
             <option value="approved">Одобрены</option>
             <option value="rejected">Отклонены</option>
+            <option value="expired">Просрочены</option>
           </select>
         </label>
         <label className="field">
@@ -244,7 +248,7 @@ export const ModerationPage = ({ user }: ModerationPageProps) => {
                         disabled={busyActions.size > 0}
                         onClick={() => void runAction(item, 'approved')}
                       >
-                        Одобрить
+                        {item.status === 'expired' ? 'Восстановить' : 'Одобрить'}
                       </button>
                     ) : null}
                     {item.status !== 'rejected' ? (

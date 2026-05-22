@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import React, { Suspense, useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { NavigationContainer, createNavigationContainerRef, getStateFromPath as getNavigationStateFromPath, type LinkingOptions, useNavigation, useRoute } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -69,6 +69,8 @@ import type { Request, Place } from '../types/app';
 import type { NewsItem as OsbbEditableNewsItem } from '../screens/OSBB-AddNews';
 import { selectAuthBootstrapped, selectIsAuthenticated } from '../redux/selectors';
 import { subscribeCurrentUserSecurityRole, type SecurityRole } from '../services/securityRoles';
+import { TrustedAccessContext } from '../contexts/TrustedAccessContext';
+import AccessRestrictedScreen from '../screens/AccessRestrictedScreen';
 import { recordScreenOpenDiagnostic } from '../services/liveDiagnosticsService';
 import { addBreadcrumb } from '../services/breadcrumbService';
 import { setSnapshotCurrentScreen } from '../services/stateSnapshotService';
@@ -306,6 +308,8 @@ const ROUTE_FILE_MAP: Record<string, string> = {
 
 function ScreenFileInfoOverlay() {
   const [visibleFile, setVisibleFile] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const isAuthenticated = useSelector(selectIsAuthenticated);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => () => {
@@ -313,6 +317,22 @@ function ScreenFileInfoOverlay() {
       clearTimeout(hideTimer.current);
     }
   }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setIsAdmin(false);
+      return () => {};
+    }
+
+    const unsubscribe = subscribeCurrentUserSecurityRole((snapshot: { role: SecurityRole }) => {
+      setIsAdmin(snapshot.role === 'admin');
+    });
+    return unsubscribe;
+  }, [isAuthenticated]);
+
+  if (!isAdmin) {
+    return null;
+  }
 
   const handlePress = () => {
     const routeName = navigationRef.getCurrentRoute()?.name ?? null;
@@ -344,15 +364,23 @@ function GuardedScreen({
   mode,
 }: {
   children: React.ReactElement;
-  mode: 'auth' | 'complete' | 'admin' | 'moderator';
+  mode: 'auth' | 'complete' | 'admin' | 'moderator' | 'trusted';
 }) {
   const navigation = useNavigation<import('@react-navigation/native').NavigationProp<Record<string, object | undefined>> & { replace: (name: string, params?: object) => void }>();
   const route = useRoute<import('@react-navigation/native').RouteProp<Record<string, { [key: string]: unknown } | undefined>, string>>();
   const isBootstrapped = useSelector(selectAuthBootstrapped);
   const isAuthenticated = useSelector(selectIsAuthenticated);
+
+  // roleStatus is used for:
+  //   admin/moderator — checks if user has the required platform role
+  //   trusted         — checks if user is admin/mod (bypass) or falls through to context
   const [roleStatus, setRoleStatus] = useState<'loading' | 'allowed' | 'denied'>(
-    mode === 'admin' || mode === 'moderator' ? 'loading' : 'allowed',
+    mode === 'admin' || mode === 'moderator' || mode === 'trusted' ? 'loading' : 'allowed',
   );
+
+  // TrustedAccessContext is provided by SoftInviteAccessGate and reflects
+  // the user's invite/sponsor status loaded from the server.
+  const { isTrusted, isLoading: isTrustedLoading, hasPendingInvite, openInviteAccess } = useContext(TrustedAccessContext);
 
   useEffect(() => {
     if (!isBootstrapped) {
@@ -372,27 +400,32 @@ function GuardedScreen({
   }, [isAuthenticated, isBootstrapped, navigation, route.name, route.params]);
 
   useEffect(() => {
-    if (mode !== 'admin' && mode !== 'moderator') {
+    if (mode !== 'admin' && mode !== 'moderator' && mode !== 'trusted') {
       return;
     }
     if (!isAuthenticated || !isBootstrapped) {
       return;
     }
     const unsubscribe = subscribeCurrentUserSecurityRole((snapshot: { role: SecurityRole }) => {
-      const allowed =
-        mode === 'admin'
-          ? snapshot.role === 'admin'
-          : snapshot.role === 'admin' || snapshot.role === 'moderator';
-      setRoleStatus(allowed ? 'allowed' : 'denied');
+      if (mode === 'admin') {
+        setRoleStatus(snapshot.role === 'admin' ? 'allowed' : 'denied');
+      } else if (mode === 'moderator') {
+        setRoleStatus(snapshot.role === 'admin' || snapshot.role === 'moderator' ? 'allowed' : 'denied');
+      } else {
+        // trusted mode: admin/mod bypass; regular users fall through to context check
+        setRoleStatus(snapshot.role === 'admin' || snapshot.role === 'moderator' ? 'allowed' : 'denied');
+      }
     });
     return unsubscribe;
   }, [mode, isAuthenticated, isBootstrapped]);
 
   useEffect(() => {
-    if (roleStatus === 'denied') {
+    // For admin/moderator modes: redirect to MainTabs when role is insufficient.
+    // For trusted mode: do NOT redirect — show AccessRestrictedScreen inline instead.
+    if (roleStatus === 'denied' && mode !== 'trusted') {
       navigation.replace('MainTabs' as never);
     }
-  }, [roleStatus, navigation]);
+  }, [roleStatus, navigation, mode]);
 
   if (!isBootstrapped) {
     return <GuardFallback />;
@@ -402,6 +435,32 @@ function GuardedScreen({
     return <GuardFallback />;
   }
 
+  // ── Trusted mode ────────────────────────────────────────────────────────
+  if (mode === 'trusted') {
+    if (roleStatus === 'loading') {
+      return <GuardFallback />;
+    }
+    // Admin/mod bypass — always allowed regardless of invite status
+    if (roleStatus === 'allowed') {
+      return children;
+    }
+    // Not admin/mod: check invite/sponsor status from context
+    if (isTrustedLoading) {
+      return <GuardFallback />;
+    }
+    if (!isTrusted) {
+      return (
+        <AccessRestrictedScreen
+          pendingInvite={hasPendingInvite}
+          onOpenInviteAccess={hasPendingInvite ? undefined : openInviteAccess}
+          onGoBack={() => navigation.goBack()}
+        />
+      );
+    }
+    return children;
+  }
+
+  // ── Admin / Moderator / Auth modes ──────────────────────────────────────
   if (roleStatus === 'loading' || roleStatus === 'denied') {
     return <GuardFallback />;
   }
@@ -453,7 +512,7 @@ const MyApprovedPhotosScreen = createLazyScreen(() => import('../screens/MyAppro
 
 const withGuard = <P extends object>(
   Component: React.ComponentType<P>,
-  mode: 'auth' | 'complete' | 'admin' | 'moderator' = 'complete',
+  mode: 'auth' | 'complete' | 'admin' | 'moderator' | 'trusted' = 'complete',
 ) => {
   const WrappedScreen = (props: P) => (
     <GuardedScreen mode={mode}>
@@ -587,13 +646,33 @@ function AuthNavigation() {
       'HelpHistoryScreen',
       'MyRequestsScreen',
       'EditProfileScreen',
+    ]);
+    // Routes that require trusted resident status. Deep links to these routes
+    // from unauthenticated users are redirected to LoginScreen. Authenticated
+    // but non-trusted users will be handled inline by GuardedScreen.
+    const trustedRoutes = new Set<keyof RootStackParamList>([
+      'ViewUserProfile',
+      'TopGirlsBoysScreen',
+      'KontaktiChaikyScreen',
+      'ZhkBusinessListScreen',
+      'OnlineChatTab',
+      'OnlineChatList',
       'PoruchitelScreen',
+      'OsbbHubScreen',
       'OsbbSborScreen',
       'OsbbGolosuvannyaScreen',
+      'OsbbFinansyScreen',
+      'OsbbNovostyScreen',
       'OsbbSetupScreen',
       'OsbbAddNewsScreen',
-      'NotificationSettingsScreen',
+      'GalleryChaikaScreen',
+      'LostAndFoundScreen',
+      'JobSearchScreen',
+      'BuySellScreen',
+      'SportDetailScreen',
+      'ProfileRequestsScreen',
       'MyPhotosScreen',
+      'MyApprovedPhotosScreen',
     ]);
 
     const getDeepestRouteName = (state: ReturnType<typeof getNavigationStateFromPath> | undefined): string | null => {
@@ -621,7 +700,12 @@ function AuthNavigation() {
           return resolvedState;
         }
 
-        if (!isAuthenticated && (authOnlyRoutes.has(targetRouteName as keyof RootStackParamList) || completeRoutes.has(targetRouteName as keyof RootStackParamList))) {
+        const routeKey = targetRouteName as keyof RootStackParamList;
+        if (!isAuthenticated && (
+          authOnlyRoutes.has(routeKey) ||
+          completeRoutes.has(routeKey) ||
+          trustedRoutes.has(routeKey)
+        )) {
           return {
             routes: [{ name: 'LoginScreen' }],
           };
@@ -654,7 +738,7 @@ function AuthNavigation() {
     >
       <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="MainTabs">
         <Stack.Screen name="MainTabs" component={MainTabNavigator} />
-        <Stack.Screen name="OnlineChatTab" component={OnlineChatNavigator} />
+        <Stack.Screen name="OnlineChatTab" component={withGuard(OnlineChatNavigator, 'trusted')} />
         <Stack.Screen name="RequestsTab" component={RequestTopicScreen} />
         <Stack.Screen name="ListScreen" component={ListScreen} />
         <Stack.Screen name="PlaceDetailsPanel" component={PlaceDetailsPanel as React.ComponentType<unknown>} />
@@ -662,15 +746,15 @@ function AuthNavigation() {
         <Stack.Screen name="HelpNeighborsScreen" component={HelpNeighborsScreen} />
         <Stack.Screen name="HelpRequestScreen" component={HelpRequestScreen} />
         <Stack.Screen name="TopPlacesScreen" component={TopPlacesScreen} />
-        <Stack.Screen name="TopGirlsBoysScreen" component={TopGirlsBoysScreen} />
+        <Stack.Screen name="TopGirlsBoysScreen" component={withGuard(TopGirlsBoysScreen, 'trusted')} />
         <Stack.Screen name="ChaikaProblemsScreen" component={ChaikaProblemsScreen} />
         <Stack.Screen name="InterestingPlacesScreen" component={InterestingPlacesScreen} />
         <Stack.Screen name="ElectricityStatusScreen" component={ElectricityStatusScreen} />
         <Stack.Screen name="HelpScreen" component={HelpScreen} />
         <Stack.Screen name="AnnouncementsScreen" component={AnnouncementsScreen} />
-        <Stack.Screen name="JobSearchScreen" component={JobSearchScreen} />
-        <Stack.Screen name="BuySellScreen" component={BuySellScreen} />
-        <Stack.Screen name="KontaktiChaikyScreen" component={KontaktiChaikyScreen} />
+        <Stack.Screen name="JobSearchScreen" component={withGuard(JobSearchScreen, 'trusted')} />
+        <Stack.Screen name="BuySellScreen" component={withGuard(BuySellScreen, 'trusted')} />
+        <Stack.Screen name="KontaktiChaikyScreen" component={withGuard(KontaktiChaikyScreen, 'trusted')} />
         <Stack.Screen name="ItemDetailScreen" component={ItemDetailScreen} />
         <Stack.Screen name="AppInfoScreen" component={AppInfoScreen} />
         <Stack.Screen name="LoginScreen" component={LoginScreen} />
@@ -698,28 +782,28 @@ function AuthNavigation() {
         <Stack.Screen name="RatingScreen" component={RatingScreen} />
         <Stack.Screen name="QRCodeScreen" component={QRCodeScreen} />
         <Stack.Screen name="EditProfileScreen" component={withGuard(EditProfileScreen, 'auth')} />
-        <Stack.Screen name="ViewUserProfile" component={ViewUserProfileScreen} />
+        <Stack.Screen name="ViewUserProfile" component={withGuard(ViewUserProfileScreen, 'trusted')} />
         <Stack.Screen name="PlacesAndPeopleHub" component={PlacesAndPeopleHub} />
-        <Stack.Screen name="PoruchitelScreen" component={withGuard(PoruchitelScreen, 'auth')} />
-        <Stack.Screen name="OsbbHubScreen" component={OsbbHubScreen} />
-        <Stack.Screen name="OsbbSborScreen" component={withGuard(OsbbSborScreen, 'auth')} />
-        <Stack.Screen name="OsbbGolosuvannyaScreen" component={withGuard(OsbbGolosuvannyaScreen, 'auth')} />
-        <Stack.Screen name="OsbbFinansyScreen" component={OsbbFinansyScreen} />
-        <Stack.Screen name="OsbbNovostyScreen" component={OsbbNovostyScreen} />
-        <Stack.Screen name="OsbbSetupScreen" component={withGuard(OsbbSetupScreen, 'auth')} />
-        <Stack.Screen name="OsbbAddNewsScreen" component={withGuard(OsbbAddNewsScreen, 'auth')} />
+        <Stack.Screen name="PoruchitelScreen" component={withGuard(PoruchitelScreen, 'trusted')} />
+        <Stack.Screen name="OsbbHubScreen" component={withGuard(OsbbHubScreen, 'trusted')} />
+        <Stack.Screen name="OsbbSborScreen" component={withGuard(OsbbSborScreen, 'trusted')} />
+        <Stack.Screen name="OsbbGolosuvannyaScreen" component={withGuard(OsbbGolosuvannyaScreen, 'trusted')} />
+        <Stack.Screen name="OsbbFinansyScreen" component={withGuard(OsbbFinansyScreen, 'trusted')} />
+        <Stack.Screen name="OsbbNovostyScreen" component={withGuard(OsbbNovostyScreen, 'trusted')} />
+        <Stack.Screen name="OsbbSetupScreen" component={withGuard(OsbbSetupScreen, 'trusted')} />
+        <Stack.Screen name="OsbbAddNewsScreen" component={withGuard(OsbbAddNewsScreen, 'trusted')} />
         <Stack.Screen name="OsbbAdminScreen" component={withGuard(OsbbAdminScreen, 'auth')} />
         <Stack.Screen name="ChaikaBonusPlusScreen" component={ChaikaBonusPlusScreen} />
-        <Stack.Screen name="GalleryChaikaScreen" component={GalleryChaikaScreen} />
-        <Stack.Screen name="LostAndFoundScreen" component={LostAndFoundScreen} />
+        <Stack.Screen name="GalleryChaikaScreen" component={withGuard(GalleryChaikaScreen, 'trusted')} />
+        <Stack.Screen name="LostAndFoundScreen" component={withGuard(LostAndFoundScreen, 'trusted')} />
         <Stack.Screen name="ImportantNewsScreen" component={ImportantNewsScreen} />
-        <Stack.Screen name="NotificationSettingsScreen" component={NotificationSettingsScreen} />
-        <Stack.Screen name="ZhkBusinessListScreen" component={ZhkBusinessListScreen} />
+        <Stack.Screen name="NotificationSettingsScreen" component={withGuard(NotificationSettingsScreen, 'auth')} />
+        <Stack.Screen name="ZhkBusinessListScreen" component={withGuard(ZhkBusinessListScreen, 'trusted')} />
         <Stack.Screen name="SportNaChaykeScreen" component={withGuard(SportNaChaykeScreen, 'auth')} />
-        <Stack.Screen name="SportDetailScreen" component={withGuard(SportDetailScreen, 'auth')} />
-        <Stack.Screen name="ProfileRequestsScreen" component={withGuard(ProfileRequestsScreen, 'auth')} />
-        <Stack.Screen name="MyPhotosScreen" component={withGuard(MyPhotosScreen, 'auth')} options={{ headerShown: false }} />
-        <Stack.Screen name="MyApprovedPhotosScreen" component={withGuard(MyApprovedPhotosScreen, 'auth')} options={{ headerShown: false }} />
+        <Stack.Screen name="SportDetailScreen" component={withGuard(SportDetailScreen, 'trusted')} />
+        <Stack.Screen name="ProfileRequestsScreen" component={withGuard(ProfileRequestsScreen, 'trusted')} />
+        <Stack.Screen name="MyPhotosScreen" component={withGuard(MyPhotosScreen, 'trusted')} options={{ headerShown: false }} />
+        <Stack.Screen name="MyApprovedPhotosScreen" component={withGuard(MyApprovedPhotosScreen, 'trusted')} options={{ headerShown: false }} />
         <Stack.Screen name="AppVersionInfoScreen" component={AppVersionInfoScreen} />
       </Stack.Navigator>
       <ScreenFileInfoOverlay />

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 import AppPhotoImage from './AppPhotoImage';
 
-const NO_FOTO = require('../../assets/noFoto.png');
+const NO_FOTO = require('../../assets/WEBP-version/noFoto.webp');
 
 type Props = {
   uri?: string;

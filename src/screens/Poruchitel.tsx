@@ -173,6 +173,7 @@ const PoruchitelScreen: React.FC = () => {
       setConfirmations(next.filter((item) => item.status === 'pending'));
     } catch {
       setConfirmations([]);
+      setLoadError(language === 'ua' ? 'Не вдалося завантажити підтвердження. Спробуйте ще раз.' : language === 'ru' ? 'Не удалось загрузить подтверждения. Попробуйте еще раз.' : 'Could not load confirmations. Please try again.');
     } finally {
       setConfirmationsLoading(false);
     }

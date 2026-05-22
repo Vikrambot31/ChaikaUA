@@ -1,4 +1,4 @@
-import { ref, push, update, onValue, query, orderByChild, equalTo, remove, get } from 'firebase/database';
+import { ref, push, update, onValue, query, orderByChild, equalTo, remove, get, limitToLast } from 'firebase/database';
 import { database } from '../firebase-core';
 import { createPendingModeration, ModerationStatus } from '../utils/moderation';
 import { sanitizeStoredText } from '../utils/textUtils';
@@ -23,42 +23,66 @@ export interface LostFoundItem {
   userPhotoURL?: string;
   moderationReason?: string;
   rejectionReason?: string;
+  isArchived?: boolean;
 }
 
 const PATH = 'lost_found';
-const DEFAULT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const DEFAULT_TTL_MS = 15 * 24 * 60 * 60 * 1000;
+const ACTIVE_LIMIT = 100;
+const ACTIVE_LIMIT_BUFFER = 20;
+const FEED_MINIMUM = 10;
+const ARCHIVED_FALLBACK_LIMIT = 20;
+
+const mapLostFoundItem = (id: string, data: any, now: number, isArchived?: boolean): LostFoundItem => ({
+  id,
+  type: data.type || 'found',
+  name: data.name || '',
+  phone: data.phone || '',
+  category: data.category || '',
+  photoUri: data.photoUri || data.photoStoragePath || '',
+  photoStoragePath: data.photoStoragePath || data.photoUri || '',
+  moderationStatus: isArchived ? 'approved' : (data.moderationStatus || 'pending'),
+  submittedForModerationAt: data.submittedForModerationAt || '',
+  createdAt: data.createdAt || '',
+  expiresAt: data.expiresAt || new Date(now + DEFAULT_TTL_MS).toISOString(),
+  userId: data.userId || '',
+  userPhotoURL: data.userPhotoURL || '',
+  moderationReason: isArchived ? '' : (data.moderationReason || data.reason || ''),
+  rejectionReason: isArchived ? '' : (data.rejectionReason || data.reason || ''),
+  isArchived,
+});
+
 export const lostFoundService = {
   subscribe(callback: (items: LostFoundItem[]) => void): () => void {
-    const listRef = query(ref(database, PATH), orderByChild('moderationStatus'), equalTo('approved'));
+    const listRef = query(ref(database, PATH), orderByChild('moderationStatus'), equalTo('approved'), limitToLast(ACTIVE_LIMIT + ACTIVE_LIMIT_BUFFER));
 
     const unsubscribe = onValue(listRef, (snapshot) => {
       const raw = snapshot.val();
-      if (!raw) {
-        callback([]);
+      const now = Date.now();
+      const active: LostFoundItem[] = raw
+        ? Object.entries(raw as Record<string, any>)
+            .map(([id, data]) => mapLostFoundItem(id, data, now))
+            .filter((item) => item.moderationStatus === 'approved' && new Date(item.expiresAt).getTime() > now)
+            .reverse()
+            .slice(0, ACTIVE_LIMIT)
+        : [];
+
+      if (active.length >= FEED_MINIMUM) {
+        callback(active);
         return;
       }
-      const now = Date.now();
-      const items: LostFoundItem[] = Object.entries(raw as Record<string, any>)
-        .map(([id, data]) => ({
-          id,
-          type: data.type || 'found',
-          name: data.name || '',
-          phone: data.phone || '',
-          category: data.category || '',
-          photoUri: data.photoUri || data.photoStoragePath || '',
-          photoStoragePath: data.photoStoragePath || data.photoUri || '',
-          moderationStatus: data.moderationStatus || 'pending',
-          submittedForModerationAt: data.submittedForModerationAt || '',
-          createdAt: data.createdAt || '',
-          expiresAt: data.expiresAt || new Date(now + DEFAULT_TTL_MS).toISOString(),
-          userId: data.userId || '',
-          userPhotoURL: data.userPhotoURL || '',
-          moderationReason: data.moderationReason || data.reason || '',
-          rejectionReason: data.rejectionReason || data.reason || '',
-        }))
-        .filter((item) => item.moderationStatus === 'approved' && new Date(item.expiresAt).getTime() > now)
-        .reverse();
-      callback(items);
+
+      void get(query(ref(database, PATH), orderByChild('moderationStatus'), equalTo('expired'), limitToLast(ARCHIVED_FALLBACK_LIMIT))).then((expiredSnapshot) => {
+        const expiredRaw = expiredSnapshot.val();
+        const archived: LostFoundItem[] = expiredRaw
+          ? Object.entries(expiredRaw as Record<string, any>)
+              .map(([id, data]) => mapLostFoundItem(id, data, now, true))
+              .reverse()
+          : [];
+        callback([...active, ...archived]);
+      }).catch(() => {
+        callback(active);
+      });
     });
 
     return unsubscribe;

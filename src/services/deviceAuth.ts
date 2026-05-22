@@ -42,6 +42,7 @@ export type AuthorizedDeviceRecord = {
   is_allowed: boolean;
   is_blocked: boolean;
   security_flags: string[];
+  personal_force_update?: boolean;
 };
 
 export type DeviceAuthorizationStatus = {
@@ -328,6 +329,7 @@ const normalizeAuthorizedDeviceRecord = (
     is_allowed: value.is_allowed === true,
     is_blocked: value.is_blocked === true,
     security_flags: sanitizeSecurityFlags(value.security_flags),
+    ...(value.personal_force_update === true ? { personal_force_update: true } : {}),
   };
 };
 

@@ -30,21 +30,77 @@ const formatDateShort = (date: Date | string): string => {
   return `${day}.${month}`;
 };
 
-const getTopicVisual = (request: Request): { icon: keyof typeof MaterialCommunityIcons.glyphMap; label: string } => {
+const TOPIC_LABELS = {
+  ua: {
+    medical: 'Медицина',
+    repair: 'Ремонт',
+    care: 'Допомога',
+    job: 'Робота',
+    buySell: 'Куплю / продам',
+    contacts: 'Контакти',
+    lostFound: 'Загублено / знайдено',
+    electricity: 'Світло',
+    transport: 'Транспорт',
+    foodsharing: 'Фудшеринг',
+    pets: 'Тварини',
+    problem: 'Проблеми ЖК',
+    request: 'Заявка',
+  },
+  ru: {
+    medical: 'Медицина',
+    repair: 'Ремонт',
+    care: 'Помощь',
+    job: 'Работа',
+    buySell: 'Куплю / продам',
+    contacts: 'Контакты',
+    lostFound: 'Потеряно / найдено',
+    electricity: 'Свет',
+    transport: 'Транспорт',
+    foodsharing: 'Фудшеринг',
+    pets: 'Животные',
+    problem: 'Проблемы ЖК',
+    request: 'Заявка',
+  },
+  en: {
+    medical: 'Medical',
+    repair: 'Repair',
+    care: 'Help',
+    job: 'Work',
+    buySell: 'Buy / sell',
+    contacts: 'Contacts',
+    lostFound: 'Lost / found',
+    electricity: 'Power',
+    transport: 'Transport',
+    foodsharing: 'Foodsharing',
+    pets: 'Pets',
+    problem: 'Building issue',
+    request: 'Request',
+  },
+} as const;
+
+const getTopicVisual = (
+  request: Request,
+  language: keyof typeof TOPIC_LABELS,
+): { icon: keyof typeof MaterialCommunityIcons.glyphMap; label: string } => {
+  const labels = TOPIC_LABELS[language] ?? TOPIC_LABELS.ua;
   const category = String(request.category ?? '').toLocaleLowerCase('uk-UA');
   const group = String(request.group ?? '').toLocaleLowerCase('uk-UA');
   const subcategory = String(request.subcategory ?? '').toLocaleLowerCase('uk-UA');
   const hay = `${category} ${group} ${subcategory}`;
 
-  if (hay.includes('medical') || hay.includes('medicine') || hay.includes('РјРµРґ')) return { icon: 'medical-bag', label: 'РњРµРґРёС†РёРЅР°' };
-  if (hay.includes('repair') || hay.includes('plumb') || hay.includes('electric')) return { icon: 'wrench-outline', label: 'Р РµРјРѕРЅС‚' };
-  if (hay.includes('care') || hay.includes('child') || hay.includes('elder')) return { icon: 'heart-outline', label: 'Р”РѕРіР»СЏРґ' };
-  if (hay.includes('job')) return { icon: 'briefcase-outline', label: 'Р РѕР±РѕС‚Р°' };
-  if (hay.includes('buy_sell') || hay.includes('exchange') || hay.includes('sale')) return { icon: 'shopping-outline', label: 'РљСѓРїР»СЋ / РїСЂРѕРґР°Рј' };
-  if (hay.includes('contacts_listings') || hay.includes('contacts/')) return { icon: 'account-group-outline', label: 'РљРѕРЅС‚Р°РєС‚Рё' };
-  if (hay.includes('lost_found') || hay.includes('found') || hay.includes('lost')) return { icon: 'map-marker-question-outline', label: 'Р—Р°РіСѓР±Р»РµРЅРѕ / Р·РЅР°Р№РґРµРЅРѕ' };
-  if (hay.includes('electricity') || hay.includes('power') || hay.includes('СЃРІС–С‚')) return { icon: 'lightning-bolt-outline', label: 'РЎРІС–С‚Р»Рѕ' };
-  return { icon: 'clipboard-text-outline', label: request.category || request.group || 'Р—Р°РїРёС‚' };
+  if (hay.includes('medical') || hay.includes('medicine')) return { icon: 'medical-bag', label: labels.medical };
+  if (hay.includes('repair') || hay.includes('plumb') || hay.includes('electric')) return { icon: 'wrench-outline', label: labels.repair };
+  if (hay.includes('care') || hay.includes('child') || hay.includes('elder')) return { icon: 'heart-outline', label: labels.care };
+  if (hay.includes('job') || hay.includes('education_services')) return { icon: 'briefcase-outline', label: labels.job };
+  if (hay.includes('buy_sell') || hay.includes('exchange') || hay.includes('sale')) return { icon: 'shopping-outline', label: labels.buySell };
+  if (hay.includes('contacts')) return { icon: 'account-group-outline', label: labels.contacts };
+  if (hay.includes('lost_found') || hay.includes('found') || hay.includes('lost')) return { icon: 'map-marker-question-outline', label: labels.lostFound };
+  if (hay.includes('electricity') || hay.includes('power')) return { icon: 'lightning-bolt-outline', label: labels.electricity };
+  if (hay.includes('transport') || hay.includes('ride')) return { icon: 'car-outline', label: labels.transport };
+  if (hay.includes('foodsharing') || hay.includes('shopping')) return { icon: 'basket-outline', label: labels.foodsharing };
+  if (hay.includes('pets') || hay.includes('pet')) return { icon: 'paw-outline', label: labels.pets };
+  if (hay.includes('problem') || hay.includes('building_issues')) return { icon: 'home-alert-outline', label: labels.problem };
+  return { icon: 'clipboard-text-outline', label: labels.request };
 };
 
 const RequestItem: React.FC<RequestItemProps> = ({
@@ -63,12 +119,12 @@ const RequestItem: React.FC<RequestItemProps> = ({
   language = 'ua',
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
-  const topic = useMemo(() => getTopicVisual(request), [request]);
+  const topic = useMemo(() => getTopicVisual(request, language), [language, request]);
 
   const statusInfo = useMemo(() => {
-    if (request.status === 'rejected') return { label: language === 'ru' ? 'РћС‚РєР»РѕРЅРµРЅРѕ' : language === 'en' ? 'Rejected' : 'Р’С–РґС…РёР»РµРЅРѕ', bg: '#fee2e2', color: '#b91c1c' };
-    if (request.status === 'approved' || request.isApproved) return { label: language === 'ru' ? 'РћРґРѕР±СЂРµРЅРѕ' : language === 'en' ? 'Approved' : 'РЎС…РІР°Р»РµРЅРѕ', bg: '#e7f4ea', color: '#1f7a3a' };
-    return { label: language === 'ru' ? 'РћР¶РёРґР°РµС‚' : language === 'en' ? 'Pending' : 'РћС‡С–РєСѓС”', bg: '#fff2cc', color: '#8a5b00' };
+    if (request.status === 'rejected') return { label: language === 'ru' ? 'Отклонено' : language === 'en' ? 'Rejected' : 'Відхилено', bg: '#fee2e2', color: '#b91c1c' };
+    if (request.status === 'approved' || request.isApproved) return { label: language === 'ru' ? 'Одобрено' : language === 'en' ? 'Approved' : 'Схвалено', bg: '#e7f4ea', color: '#1f7a3a' };
+    return { label: language === 'ru' ? 'Ожидает' : language === 'en' ? 'Pending' : 'Очікує', bg: '#fff2cc', color: '#8a5b00' };
   }, [language, request.isApproved, request.status]);
 
   const hasActions = !isOwn && (onProfile || onContact);
@@ -76,13 +132,13 @@ const RequestItem: React.FC<RequestItemProps> = ({
   const resolvedAvatarUri = useMemo(() => pickUserAvatarUri({ photoURL: avatarUri }, request), [avatarUri, request]);
 
   const L = useMemo(() => ({
-    profile: language === 'ru' ? 'РџСЂРѕС„РёР»СЊ' : language === 'en' ? 'Profile' : 'РџСЂРѕС„С–Р»СЊ',
-    contact: language === 'ru' ? 'РЎРІСЏР·Р°С‚СЊСЃСЏ' : language === 'en' ? 'Contact' : "Р—РІ'СЏР·Р°С‚РёСЃСЏ",
-    approve: language === 'ru' ? 'РћРґРѕР±СЂРёС‚СЊ' : language === 'en' ? 'Approve' : 'РЎС…РІР°Р»РёС‚Рё',
-    reject: language === 'ru' ? 'РћС‚РєР»РѕРЅРёС‚СЊ' : language === 'en' ? 'Reject' : 'Р’С–РґС…РёР»РёС‚Рё',
-    delete: language === 'ru' ? 'РЈРґР°Р»РёС‚СЊ' : language === 'en' ? 'Delete' : 'Р’РёРґР°Р»РёС‚Рё',
-    cancel: language === 'ru' ? 'РћС‚РјРµРЅР°' : language === 'en' ? 'Cancel' : 'РЎРєР°СЃСѓРІР°С‚Рё',
-    more: language === 'ru' ? 'Р•С‰С‘' : language === 'en' ? 'More' : 'Р©Рµ',
+    profile: language === 'ru' ? 'Профиль' : language === 'en' ? 'Profile' : 'Профіль',
+    contact: language === 'ru' ? 'Связаться' : language === 'en' ? 'Contact' : "Зв'язатися",
+    approve: language === 'ru' ? 'Одобрить' : language === 'en' ? 'Approve' : 'Схвалити',
+    reject: language === 'ru' ? 'Отклонить' : language === 'en' ? 'Reject' : 'Відхилити',
+    delete: language === 'ru' ? 'Удалить' : language === 'en' ? 'Delete' : 'Видалити',
+    cancel: language === 'ru' ? 'Отмена' : language === 'en' ? 'Cancel' : 'Скасувати',
+    more: language === 'ru' ? 'Еще' : language === 'en' ? 'More' : 'Ще',
   }), [language]);
 
   return (

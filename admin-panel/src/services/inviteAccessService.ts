@@ -1,10 +1,11 @@
-import { get, ref } from 'firebase/database';
+import { endBefore, get, limitToLast, orderByChild, query, ref } from 'firebase/database';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { database, firebaseApp } from '../firebase/firebase';
 
 const FEATURE_FLAG_PATH = 'feature_flags/invite_access/current';
 const TRUSTED_SPONSORS_PATH = 'trusted_sponsors';
 const INVITE_REQUESTS_PATH = 'invite_requests';
+const PAGE_SIZE = 100;
 
 export type InviteAccessMode = 'disabled' | 'soft' | 'medium' | 'hard';
 export type InviteRequestStatus = 'pending' | 'pending_sponsor' | 'approved' | 'denied' | 'cancelled' | 'needs_manual_review' | 'auto_denied';
@@ -57,6 +58,7 @@ export type InviteAccessState = {
   flag: InviteFeatureFlag;
   sponsors: TrustedSponsor[];
   requests: InviteRequest[];
+  hasMore: boolean;
 };
 
 type CallableResult = {
@@ -148,7 +150,7 @@ export const loadInviteAccessState = async (): Promise<InviteAccessState> => {
   const [flagSnapshot, sponsorsSnapshot, requestsSnapshot] = await Promise.all([
     get(ref(database, FEATURE_FLAG_PATH)),
     get(ref(database, TRUSTED_SPONSORS_PATH)),
-    get(ref(database, INVITE_REQUESTS_PATH)),
+    get(query(ref(database, INVITE_REQUESTS_PATH), orderByChild('createdAt'), limitToLast(PAGE_SIZE))),
   ]);
 
   const rawSponsors = sponsorsSnapshot.val() as Record<string, unknown> | null;
@@ -168,7 +170,20 @@ export const loadInviteAccessState = async (): Promise<InviteAccessState> => {
     flag: normalizeFlag(flagSnapshot.val()),
     sponsors,
     requests,
+    hasMore: requests.length >= PAGE_SIZE,
   };
+};
+
+export const loadMoreRequests = async (oldestCreatedAt: number): Promise<{ requests: InviteRequest[]; hasMore: boolean }> => {
+  const requestsSnapshot = await get(
+    query(ref(database, INVITE_REQUESTS_PATH), orderByChild('createdAt'), endBefore(oldestCreatedAt), limitToLast(PAGE_SIZE)),
+  );
+  const rawRequests = requestsSnapshot.val() as Record<string, unknown> | null;
+  const requests = Object.entries(rawRequests ?? {})
+    .map(([id, value]) => normalizeRequest(id, value))
+    .filter((value): value is InviteRequest => value !== null)
+    .sort((left, right) => right.createdAt - left.createdAt);
+  return { requests, hasMore: requests.length >= PAGE_SIZE };
 };
 
 export const setInviteAccessEnabled = async (enabled: boolean): Promise<void> => {

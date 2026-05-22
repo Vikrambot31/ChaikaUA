@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, Image, SafeAreaView, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, Linking, SafeAreaView, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import MiniTabBar from '../components/MiniTabBar';
@@ -53,6 +53,14 @@ export default function QRCodeScreen() {
     }
   };
 
+  const onOpenUrl = async () => {
+    try {
+      await Linking.openURL(APP_URL);
+    } catch {
+      Alert.alert(t.errorTitle, APP_URL);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.backgroundLayer}>
@@ -92,17 +100,17 @@ export default function QRCodeScreen() {
             </View>
           </View>
 
-          <View style={styles.urlCard}>
+          <TouchableOpacity style={styles.urlCard} onPress={onOpenUrl} activeOpacity={0.85}>
             <Text style={styles.urlLabel}>Chaika Life</Text>
             <Text style={styles.url}>{APP_URL}</Text>
-          </View>
+          </TouchableOpacity>
 
           <TouchableOpacity style={styles.button} onPress={onShare} activeOpacity={0.88}>
             <TactileIcon icon="share-variant-outline" size={42} iconSize={18} backgroundColor="#7A4B36" tint="#FFF3CE" />
             <Text style={styles.buttonText}>{t.share}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.ghost} onPress={() => Alert.alert(t.copied, APP_URL)}>
+          <TouchableOpacity style={styles.ghost} onPress={onOpenUrl}>
             <Text style={styles.ghostText}>{t.open}</Text>
           </TouchableOpacity>
         </View>

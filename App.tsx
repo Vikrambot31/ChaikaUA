@@ -2,7 +2,7 @@ import 'react-native-gesture-handler';
 import React, { useEffect, useState } from 'react';
 import { AppState, Image, Platform } from 'react-native';
 import { Provider, useDispatch, useSelector } from 'react-redux';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { onAuthStateChanged } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -27,6 +27,7 @@ import { identifyCrashUser, initCrashReporting } from './src/services/crashRepor
 import { logClientError } from './src/utils/errorLogger';
 import { initRuntimeMonitorGlobalHandlers, recordRuntimeTrace } from './src/services/runtimeMonitorService';
 import { flushLiveDiagnostics, initLiveDiagnostics } from './src/services/liveDiagnosticsService';
+import { signOutPrimarySession } from './src/services/authSessionService';
 import AppAccessGuard from './src/components/AppAccessGuard';
 import AccountResumeScreen from './src/components/AccountResumeScreen';
 import StartupSyncBanner from './src/components/StartupSyncBanner';
@@ -181,7 +182,7 @@ function AppWithAuthSync({ remoteConfigSnapshot, onRemoteConfigSnapshot }: AppWi
       }
 
       void fcmAPI.removeTokenForUser(currentUser.id).catch((e: unknown) => logClientError('fcm.removeToken.blocked', e));
-      void signOut(auth).catch(() => undefined);
+      void signOutPrimarySession().catch((e: unknown) => logClientError('auth.signOut.blocked', e));
       dispatch(logout());
       identifyCrashUser(null);
       void persistor.purge();
@@ -266,7 +267,7 @@ function AppWithAuthSync({ remoteConfigSnapshot, onRemoteConfigSnapshot }: AppWi
           ) {
             if (active) {
               void fcmAPI.removeTokenForUser(user.uid).catch((e: unknown) => logClientError('fcm.removeToken.tokenExpired', e));
-              try { await signOut(auth); } catch { /* ignore */ }
+              await signOutPrimarySession().catch((e: unknown) => logClientError('auth.signOut.tokenExpired', e));
               dispatch(logout());
               identifyCrashUser(null);
               void persistor.purge();
@@ -305,11 +306,7 @@ function AppWithAuthSync({ remoteConfigSnapshot, onRemoteConfigSnapshot }: AppWi
 
         if (accessControl.isBlocked || accessControl.isDeleted) {
           void fcmAPI.removeTokenForUser(user.uid).catch((e: unknown) => logClientError('fcm.removeToken.accessBlocked', e));
-          try {
-            await signOut(auth);
-          } catch {
-            // Do not block logout if Firebase sign-out fails.
-          }
+          await signOutPrimarySession().catch((e: unknown) => logClientError('auth.signOut.accessBlocked', e));
           dispatch(logout());
           identifyCrashUser(null);
           void persistor.purge();
@@ -394,10 +391,10 @@ function AppWithAuthSync({ remoteConfigSnapshot, onRemoteConfigSnapshot }: AppWi
       <AccountResumeScreen
         user={currentUser}
         onContinue={() => setResumeDecisionMade(true)}
-        onSwitch={() => {
-          void signOut(auth).catch(() => undefined);
+        onSwitch={async () => {
+          await signOutPrimarySession({ resumeAnonymous: true }).catch((e: unknown) => logClientError('auth.signOut.switchAccount', e));
           dispatch(logout());
-          void persistor.purge();
+          await persistor.purge().catch(() => undefined);
           setResumeDecisionMade(true);
         }}
       />
@@ -444,10 +441,10 @@ export default function App() {
     const preloadStartupImages = async () => {
       try {
         const sources = [
-          require('./assets/Logo-Chaika LIFE.png'),
-          require('./assets/intro1.png'),
-          require('./assets/intro2.png'),
-          require('./assets/intro3.png'),
+          require('./assets/WEBP-version/Logo-Chaika LIFE.webp'),
+          require('./assets/WEBP-version/intro1.webp'),
+          require('./assets/WEBP-version/intro2.webp'),
+          require('./assets/WEBP-version/intro3.webp'),
         ];
 
         await Promise.all(

@@ -83,6 +83,24 @@ const toPersonalUpdateResult = (lock: UserUpdateLockRecord): VersionCheckResult 
   };
 };
 
+const toPersonalDeviceUpdateResult = (uid: string | null, deviceId: string | null): VersionCheckResult => {
+  const currentVersion = getCurrentAppVersion();
+  return {
+    currentVersion,
+    requiresUpdate: true,
+    hasNewVersion: true,
+    configUrl: `rtdb://authorized_devices/${uid ?? 'unknown'}/${deviceId ?? 'unknown'}`,
+    config: {
+      latestVersion: currentVersion,
+      minSupportedVersion: currentVersion,
+      forceUpdate: true,
+      updateTitle: 'Оновіть додаток',
+      updateText: 'Для вашого пристрою доступне обовʼязкове оновлення застосунку.',
+      landingUrl: 'https://chaika-life.netlify.app/',
+    },
+  };
+};
+
 const AppAccessGuard: React.FC<AppAccessGuardProps> = ({
   children,
   initialRemoteConfigSnapshot,
@@ -356,6 +374,11 @@ const AppAccessGuard: React.FC<AppAccessGuardProps> = ({
     return compareVersions(getCurrentAppVersion(), personalUpdateLock.required_version) < 0;
   }, [personalUpdateLock?.force_update_required, personalUpdateLock?.required_version]);
 
+  const requiresPersonalDeviceUpdate = useMemo(
+    () => deviceStatus.record?.personal_force_update === true,
+    [deviceStatus.record?.personal_force_update],
+  );
+
   useEffect(() => {
     if (deviceStatus.status === 'blocked') {
       void logSecurityAuditEvent('blocked_access_attempt', {
@@ -374,6 +397,17 @@ const AppAccessGuard: React.FC<AppAccessGuardProps> = ({
         result={toPersonalUpdateResult(personalUpdateLock)}
         onRetry={() => {
           void refreshRemoteConfig();
+        }}
+      />
+    );
+  }
+
+  if (!isBypassUser && requiresPersonalDeviceUpdate) {
+    return (
+      <ForceUpdateScreen
+        result={toPersonalDeviceUpdateResult(currentUser?.id ?? null, deviceStatus.deviceId)}
+        onRetry={() => {
+          void refreshDeviceStatus();
         }}
       />
     );

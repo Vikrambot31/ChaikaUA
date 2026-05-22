@@ -18,6 +18,7 @@ export interface CommunityPhotoMetadata {
   title?: string;
   description?: string;
   uploadedBy?: string;
+  target?: 'gallery_public';
   locationLabel?: string;
   locationType?: 'building' | 'place';
 }
@@ -89,9 +90,10 @@ export async function uploadAndSavePhoto(
       const result = await photoAPI.addPhoto({
         title: options.communityMetadata?.title || 'Фото',
         description: options.communityMetadata?.description || '',
-        imageUri: upload.storagePath,
+        imageUri: upload.downloadUrl || upload.storagePath,
         storagePath: upload.storagePath,
         uploadedBy: options.communityMetadata?.uploadedBy,
+        target: options.communityMetadata?.target || 'gallery_public',
         locationLabel: options.communityMetadata?.locationLabel,
         locationType: options.communityMetadata?.locationType,
       });

@@ -6,7 +6,6 @@ import { useSelector } from 'react-redux';
 import { safeNavigate } from '../utils/safeNavigation';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import TactileIcon from '../components/TactileIcon';
-import MiniTabBar from '../components/MiniTabBar';
 import { RootState } from '../redux/store';
 
 type BonusItem = {
@@ -123,7 +122,7 @@ const ChaikaBonusPlusScreen: React.FC = () => {
         <View style={styles.headerSpacer} />
       </View>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Image source={require('../../assets/Service.png')} style={styles.headerImage} resizeMode="cover" />
+        <Image source={require('../../assets/WEBP-version/Service.webp')} style={styles.headerImage} resizeMode="cover" />
         <Text style={styles.pageTitle}>{text.headerTitle}</Text>
 
         <Text style={styles.sectionLabel}>{text.sectionFrequent}</Text>
@@ -135,7 +134,6 @@ const ChaikaBonusPlusScreen: React.FC = () => {
         <Text style={styles.sectionLabel}>{text.sectionMarket}</Text>
         <View style={styles.list}>{text.market.map(renderItem)}</View>
       </ScrollView>
-      <MiniTabBar />
     </SafeAreaView>
   );
 };

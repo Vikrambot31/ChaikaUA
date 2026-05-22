@@ -16,6 +16,7 @@ const initialState: DashboardState = {
     pending: 0,
     approved: 0,
     rejected: 0,
+    expired: 0,
   },
 };
 

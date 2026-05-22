@@ -1,0 +1,4 @@
+# Keep directory structure but ignore generated reports
+latest/
+history/
+index.json

@@ -5,12 +5,11 @@ import { useDispatch, useSelector } from 'react-redux';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { signOut } from 'firebase/auth';
 import { logout, selectUser } from '../redux/slices/authSlice';
 import { selectExpiresAt, selectPlan } from '../redux/slices/subscriptionSlice';
 import { setLanguage } from '../redux/slices/languageSlice';
-import { auth, fcmAPI } from '../firebase-config';
-import { RootState } from '../redux/store';
+import { fcmAPI } from '../firebase-config';
+import { persistor, RootState } from '../redux/store';
 import { LIGHT_ORBS, SCREEN_THEME } from '../utils/screenTheme';
 import TactileIcon from '../components/TactileIcon';
 import TactileCard from '../components/TactileCard';
@@ -20,7 +19,7 @@ import { CHAIKA_LEVELS, getChaikaActivity, getLevelName } from '../utils/chaikaL
 import { profilePermissionService } from '../services/profilePermissionService';
 import { logClientEvent } from '../utils/errorLogger';
 import AppPhotoImage from '../components/AppPhotoImage';
-import { ensureFirebaseAuth } from '../firebase-auth-session';
+import { signOutPrimarySession } from '../services/authSessionService';
 
 type AppNavigation = import('@react-navigation/native').NavigationProp<Record<string, object | undefined>>;
 
@@ -235,13 +234,9 @@ const ProfileScreen: React.FC = () => {
           if (user?.id) {
             await fcmAPI.removeTokenForUser(user.id).catch(() => undefined);
           }
-          try {
-            await signOut(auth);
-          } catch {
-            // ignore
-          }
-          await ensureFirebaseAuth().catch(() => undefined);
+          await signOutPrimarySession({ resumeAnonymous: true }).catch(() => undefined);
           dispatch(logout());
+          await persistor.purge().catch(() => undefined);
           navigation.navigate('MainTabs', { screen: 'HomeTab' });
         },
       },
@@ -395,7 +390,7 @@ const ProfileScreen: React.FC = () => {
           {user?.photoURL ? (
             <AppPhotoImage uri={user.photoURL} style={styles.headerImage} resizeMode="cover" debugLabel={`Profile:${user.id}`} />
           ) : (
-            <Image source={require('../../assets/profil.png')} style={styles.headerImage} resizeMode="cover" />
+            <Image source={require('../../assets/WEBP-version/profil.webp')} style={styles.headerImage} resizeMode="cover" />
           )}
           <View style={styles.headerInfo}>
             <Text style={[styles.userName, !user?.name && styles.userNameGuest]}>{user?.name || text.guest}</Text>
@@ -610,7 +605,7 @@ const ProfileScreen: React.FC = () => {
                         {opt.code === 'ua' ? `🇺🇦 ${opt.label}` : opt.label}
                       </Text>
                       {opt.code === 'ru' ? (
-                        <Image source={require('../../assets/Russia No war.png')} style={styles.noWarLangIcon} resizeMode="contain" />
+                        <Image source={require('../../assets/WEBP-version/Russia No war.webp')} style={styles.noWarLangIcon} resizeMode="contain" />
                       ) : null}
                     </View>
                   </TouchableOpacity>
@@ -669,7 +664,7 @@ const ProfileScreen: React.FC = () => {
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>{`Chaika Life v${APP_VERSION}`}</Text>
-          <Text style={styles.footerSubtext}>В© 2026 {text.allRights}</Text>
+          <Text style={styles.footerSubtext}>© 2026 {text.allRights}</Text>
         </View>
       </ScrollView>
 

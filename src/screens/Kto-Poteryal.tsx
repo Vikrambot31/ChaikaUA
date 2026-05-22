@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -164,6 +164,11 @@ const LostAndFoundScreen: React.FC = () => {
   const [addFormVisible, setAddFormVisible] = useState(false);
   const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const pickerActiveRef = useRef(false);
+
+  const handlePickerOpenChange = useCallback((isOpen: boolean) => {
+    pickerActiveRef.current = isOpen;
+  }, []);
   const [closingId, setClosingId] = useState<string | null>(null);
   const [previewPhoto, setPreviewPhoto] = useState<{ uri: string; storagePath?: string } | null>(null);
 
@@ -375,6 +380,7 @@ const LostAndFoundScreen: React.FC = () => {
                       <Text style={[styles.typeBadge, item.type === 'lost' ? styles.lostBadge : styles.foundBadge]} numberOfLines={1}>
                         {typeLabels[item.type]}
                       </Text>
+                      {item.isArchived ? <Text style={styles.archiveBadge}>Архів</Text> : null}
                       <View style={styles.dateModRow}>
                         {!!itemDate && <Text style={styles.itemDate}>{itemDate}</Text>}
                         <MaterialCommunityIcons name={modIcon.name} size={15} color={modIcon.color} />
@@ -428,7 +434,7 @@ const LostAndFoundScreen: React.FC = () => {
         visible={addFormVisible}
         transparent
         animationType="slide"
-        onRequestClose={() => setAddFormVisible(false)}
+        onRequestClose={() => { if (!pickerActiveRef.current) setAddFormVisible(false); }}
       >
         <TouchableOpacity
           style={styles.sheetBackdrop}
@@ -490,6 +496,7 @@ const LostAndFoundScreen: React.FC = () => {
                 maxPhotos={1}
                 storagePath="lost_found"
                 onPhotosChange={(photos) => setFormPhotos(photos.filter((p) => p.status === 'done'))}
+                onPickerOpenChange={handlePickerOpenChange}
               />
 
               {/* Submit */}
@@ -606,6 +613,7 @@ const styles = StyleSheet.create({
     gap: 6,
     marginBottom: 5,
   },
+  archiveBadge: { fontSize: 10, fontWeight: '700', color: '#fff', backgroundColor: '#8B7355', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, overflow: 'hidden' },
   typeBadge: {
     maxWidth: '66%',
     borderRadius: 999,
