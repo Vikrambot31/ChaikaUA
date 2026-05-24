@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-05-24",
+      "publishedAt": "2026-05-24T06:55:29.279Z",
+      "key": "https://bigkyiv.com.ua/u-kyyevi-cherez-nichnu-ataku-podekudy-perekryto-ruh-transportu-ne-kursuyut-tramvayi/"
+    },
+    {
       "type": "places",
       "date": "2026-05-23",
       "publishedAt": "2026-05-23T09:30:33.325Z",
