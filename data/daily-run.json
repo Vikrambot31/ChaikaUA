@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-05-25",
+      "publishedAt": "2026-05-25T08:14:35.801Z",
+      "key": "https://bigkyiv.com.ua/u-kyyevi-vidnovyly-ruh-nyzky-trolejbusiv-pislya-vchorashnoyi-ataky/"
+    },
+    {
       "type": "places",
       "date": "2026-05-24",
       "publishedAt": "2026-05-24T09:46:29.147Z",
