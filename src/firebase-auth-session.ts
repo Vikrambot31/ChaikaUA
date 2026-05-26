@@ -4,6 +4,7 @@ import Constants from 'expo-constants';
 import { DeviceAuthorizationStatus, syncAuthorizedDeviceForCurrentUser } from './services/deviceAuth';
 
 const FALLBACK_PRIMARY_SERVICE_EMAIL = 'vikramsave@ukr.net';
+const DEFAULT_AUTH_BOOTSTRAP_TIMEOUT_MS = 8000;
 
 const normalizeEmail = (email?: string | null) => email?.toLowerCase().trim() ?? '';
 
@@ -14,11 +15,19 @@ const PRIMARY_SERVICE_EMAIL = normalizeEmail(
 );
 
 type EmailUser = {
+  uid?: string | null;
   email?: string | null;
   emailVerified?: boolean;
 } | null;
 
+const ADMIN_BACKUP_UID = String(
+  Constants.expoConfig?.extra?.adminBackupUid ||
+  process.env.EXPO_PUBLIC_ADMIN_BACKUP_UID ||
+  '',
+).trim();
+
 let authBootstrapPromise: Promise<any> | null = null;
+let anonymousSignInPromise: Promise<any> | null = null;
 
 export const getCurrentUser = () => auth.currentUser;
 
@@ -28,14 +37,57 @@ export const isAnonymousFirebaseUser = (user = auth.currentUser): boolean =>
 export const isRealFirebaseUser = (user = auth.currentUser): boolean =>
   Boolean(user && !isAnonymousFirebaseUser(user));
 
-export const ensureFirebaseAuth = async () => {
-  // Wait for Firebase to restore the persisted session before deciding to sign in
-  // anonymously. On Android cold start, auth.currentUser is briefly null while
-  // Firebase reads from storage — without this wait, signInAnonymously races with
-  // session restore, producing a uid mismatch that causes permission_denied writes.
+export class AuthBootstrapTimeoutError extends Error {
+  code = 'auth_timeout';
+
+  constructor() {
+    super('auth_timeout');
+    this.name = 'AuthBootstrapTimeoutError';
+  }
+}
+
+const createAuthTimeoutPromise = (timeoutMs: number): Promise<never> =>
+  new Promise((_, reject) => {
+    setTimeout(() => reject(new AuthBootstrapTimeoutError()), timeoutMs);
+  });
+
+export const bootstrapAuth = async (options?: {
+  timeoutMs?: number;
+  force?: boolean;
+}) => {
+  const timeoutMs = options?.timeoutMs ?? DEFAULT_AUTH_BOOTSTRAP_TIMEOUT_MS;
+  if (!authBootstrapPromise || options?.force) {
+    authBootstrapPromise = (async () => {
+      await Promise.race([
+        auth.authStateReady(),
+        createAuthTimeoutPromise(timeoutMs),
+      ]);
+      return auth.currentUser;
+    })();
+  }
+
+  return authBootstrapPromise;
+};
+
+export const resetAuthBootstrap = () => {
+  authBootstrapPromise = null;
+};
+
+export const isAuthBootstrapTimeoutError = (error: unknown): boolean =>
+  error instanceof AuthBootstrapTimeoutError ||
+  (error instanceof Error && error.message === 'auth_timeout') ||
+  (typeof error === 'object' && error !== null && (error as { code?: string }).code === 'auth_timeout');
+
+// Waits for Firebase to restore the persisted session, then returns the current user.
+// If no session exists, signs in anonymously so that guests satisfy "auth != null"
+// rules and can read public data (feeds, requests, etc.) without registration.
+export const ensureFirebaseAuth = async (): Promise<any> => {
   try {
-    await auth.authStateReady();
-  } catch {
+    await bootstrapAuth();
+  } catch (error) {
+    if (isAuthBootstrapTimeoutError(error)) {
+      throw error;
+    }
     // authStateReady may throw if auth is not properly initialized; proceed anyway.
   }
 
@@ -43,15 +95,16 @@ export const ensureFirebaseAuth = async () => {
     return auth.currentUser;
   }
 
-  if (!authBootstrapPromise) {
-    authBootstrapPromise = signInAnonymously(auth)
+  // No session — sign in anonymously so that guests can read data.
+  // Deduplicated: parallel callers share the same in-flight promise.
+  if (!anonymousSignInPromise) {
+    anonymousSignInPromise = signInAnonymously(auth)
       .then((credential) => credential.user)
-      .finally(() => {
-        authBootstrapPromise = null;
-      });
+      .catch(() => null)
+      .finally(() => { anonymousSignInPromise = null; });
   }
 
-  return authBootstrapPromise;
+  return anonymousSignInPromise;
 };
 
 export const isPrimaryServiceEmail = (user: EmailUser = auth.currentUser): boolean => {
@@ -60,7 +113,7 @@ export const isPrimaryServiceEmail = (user: EmailUser = auth.currentUser): boole
 };
 
 export const hasPrimaryServiceAccess = (user: EmailUser = auth.currentUser): boolean =>
-  Boolean(isPrimaryServiceEmail(user) && user?.emailVerified);
+  Boolean((ADMIN_BACKUP_UID && user?.uid === ADMIN_BACKUP_UID) || (isPrimaryServiceEmail(user) && user?.emailVerified));
 
 export const getPrimaryServiceAccessState = (user: EmailUser = auth.currentUser) => ({
   isPrimaryEmail: isPrimaryServiceEmail(user),
@@ -113,5 +166,5 @@ export const requireModerator = async () => {
 
 export const getRequestsAccessScope = async (): Promise<string> => {
   const user = await ensureFirebaseAuth();
-  return `authenticated:${user.uid}`;
+  return user ? `authenticated:${user.uid}` : 'unauthenticated';
 };
