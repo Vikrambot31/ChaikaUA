@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-05-26",
+      "publishedAt": "2026-05-26T07:40:23.853Z",
+      "key": "https://bigkyiv.com.ua/u-kyyevi-do-pyatnyczi-obmezhuvatymut-ruh-pivdennym-mostom/"
+    },
+    {
       "type": "places",
       "date": "2026-05-25",
       "publishedAt": "2026-05-25T11:40:51.211Z",
