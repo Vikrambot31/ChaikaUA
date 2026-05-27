@@ -1,3 +1,19 @@
+/**
+ * TZ_4.4 — MyPhotosScreen
+ *
+ * Shows the user's photos in three sections by moderation status:
+ *   • «На модерації» — status = 'pending' (blurred preview, badge)
+ *   • «Одобрені»     — status = 'approved'
+ *   • «Відхилені»    — status = 'rejected' (rejection reason shown)
+ *
+ * In-flight (uploading/queued/error) photos come from local ImageStorage.
+ * Moderation-status photos come from a one-time RTDB get() on focus.
+ *
+ * TZ_4.5 — Duplicate prevention:
+ *   • "Add photo" button is disabled if there are any pending photos.
+ *   • A banner is shown: «Ваше фото перевіряється».
+ */
+
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -7,29 +23,29 @@ import {
   Modal,
   Platform,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { get, ref, query, orderByChild, onValue } from 'firebase/database';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
-import * as ImageManipulator from 'expo-image-manipulator';
-import * as FileSystem from 'expo-file-system';
-import { deleteObject, ref as storageRef } from 'firebase/storage';
 import { RouteProp, useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { RootState } from '../redux/store';
-import { storage } from '../firebase-core';
-import { uploadAndSavePhoto, type UploadAndSaveResult } from '../services/unifiedPhotoUpload';
+import AppPhotoImage from '../components/AppPhotoImage';
+import { database } from '../firebase-core';
+import { photoService } from '../services/photoService';
 import { safeLogError } from '../utils/errorLogger';
-import { uniqueId } from '../utils/cryptoId';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { showUserError } from '../utils/userFacingErrors';
-import AppPhotoImage from '../components/AppPhotoImage';
 import { getBestPhotoUri, getPhotoThumbnailUri, ImageStorage } from './ImageStorage';
 import { PhotoSelector } from './PhotoSelector';
+import { UploadQueue } from './UploadQueue';
 import type { MyPhotosScreenParams, UserPhoto } from './types';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type AppLanguage = 'ua' | 'ru' | 'en';
 type Navigation = {
@@ -40,63 +56,97 @@ type Navigation = {
 type Route = RouteProp<Record<string, MyPhotosScreenParams | undefined>, string>;
 type PreviewPhoto = { uri: string; storagePath?: string };
 
+/** A photo record fetched from RTDB (user_photos/{uid} node). */
+type RtdbPhoto = {
+  id: string;
+  storagePath: string;
+  imageUri: string;
+  status: 'pending' | 'approved' | 'rejected';
+  uploadedAt: number;
+  moderationReason?: string;
+  title?: string;
+};
+
+// ─── i18n ─────────────────────────────────────────────────────────────────────
+
 const UI_TEXT = {
   ua: {
     title: 'Мої фотографії',
     subtitle: 'Єдина галерея ваших фото в застосунку.',
+    selectHint: 'Оберіть фото для цього розділу',
     add: 'Додати фото',
+    camera: 'Камера',
+    library: 'Галерея',
+    cancel: 'Скасувати',
     emptyTitle: 'Фото ще немає',
     emptyText: 'Додайте фото один раз, потім використовуйте його в будь-якому розділі.',
-    selectHint: 'Оберіть фото для цього розділу',
     deleteTitle: 'Видалити фото?',
-    deleteText: 'Фото буде прибрано з вашої галереї.',
+    deleteText: 'Фото буде приховано з вашої галереї.',
     yes: 'Так',
     no: 'Ні',
-    cancel: 'Скасувати',
-    delete: 'Видалити',
     queued: 'У черзі',
     uploading: 'Завантаження',
     uploaded: 'Готово',
     error: 'Помилка',
-    retry: 'Повторити',
+    sectionPending: 'На модерації',
+    sectionApproved: 'Одобрені',
+    sectionRejected: 'Відхилені',
+    sectionUploading: 'Завантажуються',
+    pendingBanner: 'Ваше фото перевіряється — нові завантаження тимчасово недоступні',
+    rejectedReason: 'Причина:',
+    moderationNote: 'Видно тільки вам до одобрення',
   },
   ru: {
     title: 'Мои фотографии',
     subtitle: 'Единая галерея ваших фото в приложении.',
+    selectHint: 'Выберите фото для этого раздела',
     add: 'Добавить фото',
+    camera: 'Камера',
+    library: 'Галерея',
+    cancel: 'Отмена',
     emptyTitle: 'Фото пока нет',
     emptyText: 'Добавьте фото один раз, затем используйте его в любом разделе.',
-    selectHint: 'Выберите фото для этого раздела',
     deleteTitle: 'Удалить фото?',
-    deleteText: 'Фото будет убрано из вашей галереи.',
+    deleteText: 'Фото будет скрыто из вашей галереи.',
     yes: 'Да',
     no: 'Нет',
-    cancel: 'Отмена',
-    delete: 'Удалить',
     queued: 'В очереди',
     uploading: 'Загрузка',
     uploaded: 'Готово',
     error: 'Ошибка',
-    retry: 'Повторить',
+    sectionPending: 'На модерации',
+    sectionApproved: 'Одобренные',
+    sectionRejected: 'Отклонённые',
+    sectionUploading: 'Загружаются',
+    pendingBanner: 'Ваше фото проверяется — новые загрузки временно недоступны',
+    rejectedReason: 'Причина:',
+    moderationNote: 'Видно только вам до одобрения',
   },
   en: {
     title: 'My photos',
     subtitle: 'One gallery for all your app photos.',
+    selectHint: 'Choose a photo for this section',
     add: 'Add photo',
+    camera: 'Camera',
+    library: 'Gallery',
+    cancel: 'Cancel',
     emptyTitle: 'No photos yet',
     emptyText: 'Add a photo once, then use it in any section.',
-    selectHint: 'Choose a photo for this section',
     deleteTitle: 'Delete photo?',
-    deleteText: 'The photo will be removed from your gallery.',
+    deleteText: 'The photo will be hidden from your gallery.',
     yes: 'Yes',
     no: 'No',
-    cancel: 'Cancel',
-    delete: 'Delete',
     queued: 'Queued',
     uploading: 'Uploading',
     uploaded: 'Ready',
     error: 'Error',
-    retry: 'Retry',
+    sectionPending: 'Under review',
+    sectionApproved: 'Approved',
+    sectionRejected: 'Rejected',
+    sectionUploading: 'Uploading',
+    pendingBanner: 'Your photo is being reviewed — new uploads are temporarily unavailable',
+    rejectedReason: 'Reason:',
+    moderationNote: 'Only visible to you until approved',
   },
 } as const;
 
@@ -107,47 +157,131 @@ const statusColor: Record<UserPhoto['status'], string> = {
   error: SCREEN_THEME.terracottaDark,
 };
 
-// ─── helpers (same pattern as PhotoUploadField / Kuplu-Prodam) ────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const requestPickerPermission = async (): Promise<boolean> => {
-  if (Platform.OS === 'android' && Number(Platform.Version) >= 33) return true;
-  const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-  return status === 'granted';
-};
+/** Fetch user's personal photos from RTDB user_photos/{uid} node. */
+async function fetchUserPhotosFromRtdb(uid: string): Promise<RtdbPhoto[]> {
+  try {
+    const snap = await get(ref(database, `user_photos/${uid}`));
+    if (!snap.exists()) return [];
+    const raw = snap.val() as Record<string, Record<string, unknown>>;
+    return Object.entries(raw)
+      .map(([key, val]) => ({
+        id: key,
+        storagePath: typeof val.storagePath === 'string' ? val.storagePath : '',
+        imageUri: typeof val.imageUri === 'string' ? val.imageUri : '',
+        status: (val.status === 'approved' || val.status === 'rejected')
+          ? (val.status as 'approved' | 'rejected')
+          : ('pending' as const),
+        uploadedAt: typeof val.uploadedAt === 'number' ? val.uploadedAt : 0,
+        moderationReason: typeof val.moderationReason === 'string' ? val.moderationReason : undefined,
+        title: typeof val.title === 'string' ? val.title : undefined,
+      }))
+      .sort((a, b) => b.uploadedAt - a.uploadedAt);
+  } catch (err) {
+    safeLogError('MyPhotosScreen.fetchUserPhotosFromRtdb', err, { uid });
+    return [];
+  }
+}
 
-const copyToCache = async (uri: string): Promise<string> => {
-  const ext = uri.split('?')[0].split('.').pop()?.toLowerCase() ?? 'jpg';
-  const dest = `${FileSystem.cacheDirectory}photo_${uniqueId()}.${ext}`;
-  await FileSystem.copyAsync({ from: uri, to: dest });
-  return dest;
-};
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
-const makeThumbnail = async (uri: string): Promise<string> => {
-  const result = await ImageManipulator.manipulateAsync(
-    uri,
-    [{ resize: { width: 360 } }],
-    { compress: 0.72, format: ImageManipulator.SaveFormat.JPEG },
-  );
-  return result.uri;
-};
+const SectionHeader: React.FC<{ label: string; count: number; color?: string }> = ({
+  label,
+  count,
+  color,
+}) => (
+  <View style={sStyles.sectionHeader}>
+    <Text style={[sStyles.sectionLabel, color ? { color } : {}]}>{label}</Text>
+    <View style={[sStyles.sectionBadge, color ? { backgroundColor: color } : {}]}>
+      <Text style={sStyles.sectionBadgeText}>{count}</Text>
+    </View>
+  </View>
+);
 
-// ─────────────────────────────────────────────────────────────────────────────
+const PendingCard: React.FC<{
+  photo: RtdbPhoto;
+  onPress: () => void;
+  noteText: string;
+}> = ({ photo, onPress, noteText }) => (
+  <TouchableOpacity style={sStyles.rtdbCard} activeOpacity={0.88} onPress={onPress}>
+    {/* Dimmed image — pending photos blurred for other users, dim here to indicate status */}
+    <AppPhotoImage
+      uri={photo.imageUri}
+      storagePath={photo.storagePath}
+      style={[StyleSheet.absoluteFill, { opacity: 0.5 }]}
+      resizeMode="cover"
+      debugLabel="MyPhotosPending"
+    />
+    <View style={sStyles.moderationOverlay}>
+      <MaterialCommunityIcons name="clock-outline" size={16} color="#FFD54F" />
+      <Text style={sStyles.moderationText} numberOfLines={2}>
+        {noteText}
+      </Text>
+    </View>
+  </TouchableOpacity>
+);
+
+const RejectedCard: React.FC<{
+  photo: RtdbPhoto;
+  reasonLabel: string;
+  onPress: () => void;
+}> = ({ photo, reasonLabel, onPress }) => (
+  <TouchableOpacity
+    style={[sStyles.rtdbCard, sStyles.rejectedCard]}
+    activeOpacity={0.88}
+    onPress={onPress}
+  >
+    <AppPhotoImage
+      uri={photo.imageUri}
+      storagePath={photo.storagePath}
+      style={[StyleSheet.absoluteFill, { opacity: 0.4 }]}
+      resizeMode="cover"
+      debugLabel="MyPhotosRejected"
+    />
+    <View style={sStyles.moderationOverlay}>
+      <MaterialCommunityIcons name="close-circle-outline" size={16} color="#EF9A9A" />
+      {photo.moderationReason ? (
+        <Text style={[sStyles.moderationText, { color: '#EF9A9A' }]} numberOfLines={3}>
+          {reasonLabel} {photo.moderationReason}
+        </Text>
+      ) : null}
+    </View>
+  </TouchableOpacity>
+);
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
 
 const MyPhotosScreen: React.FC = () => {
   const navigation = useNavigation<Navigation>();
   const route = useRoute<Route>();
-  const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as AppLanguage;
+  const language = useSelector(
+    (state: RootState) => state.language?.current ?? 'ua',
+  ) as AppLanguage;
   const uid = useSelector((state: RootState) => state.auth.user?.id ?? '');
   const userName = useSelector((state: RootState) => state.auth.user?.name ?? '');
   const userEmail = useSelector((state: RootState) => state.auth.user?.email ?? '');
-  const text = UI_TEXT[language];
+  const text = UI_TEXT[language] ?? UI_TEXT.ru;
   const selectMode = Boolean(route.params?.selectMode);
-  const [photos, setPhotos] = useState<UserPhoto[]>([]);
+
+  const [localPhotos, setLocalPhotos] = useState<UserPhoto[]>([]);
+  const [rtdbPhotos, setRtdbPhotos] = useState<RtdbPhoto[]>([]);
+  const [rtdbLoading, setRtdbLoading] = useState(false);
   const [adding, setAdding] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [previewPhoto, setPreviewPhoto] = useState<PreviewPhoto | null>(null);
-  // local progress tracking — not persisted to AsyncStorage
-  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
+
+  const userId = uid || userEmail || 'local-user';
+
+  // Derived moderation sections
+  const pendingPhotos = useMemo(() => rtdbPhotos.filter((p) => p.status === 'pending'), [rtdbPhotos]);
+  const approvedPhotos = useMemo(() => rtdbPhotos.filter((p) => p.status === 'approved'), [rtdbPhotos]);
+  const rejectedPhotos = useMemo(() => rtdbPhotos.filter((p) => p.status === 'rejected'), [rtdbPhotos]);
+
+  // TZ_4.5 — button disabled while any pending photo exists
+  const hasPendingPhotos = pendingPhotos.length > 0;
+  const addButtonDisabled = hasPendingPhotos || adding;
+
   const handleBack = useCallback(() => {
     if (typeof navigation.canGoBack === 'function' && navigation.canGoBack()) {
       navigation.goBack();
@@ -156,12 +290,24 @@ const MyPhotosScreen: React.FC = () => {
     navigation.navigate?.('MainTabs');
   }, [navigation]);
 
-  useEffect(() => {
-    const unsubscribe = ImageStorage.subscribe(setPhotos);
+  const loadRtdbPhotos = useCallback(async () => {
+    if (!uid) return;
+    setRtdbLoading(true);
+    try {
+      const photos = await fetchUserPhotosFromRtdb(uid);
+      setRtdbPhotos(photos);
+    } finally {
+      setRtdbLoading(false);
+    }
+  }, [uid]);
 
+  useEffect(() => {
+    const unsubscribe = ImageStorage.subscribe((items) =>
+      setLocalPhotos(items.filter((item) => !item.deleted)),
+    );
     if (selectMode) {
       void ImageStorage.getPhotos().then((existing) => {
-        if (existing.length === 0) {
+        if (existing.filter((item) => !item.deleted).length === 0) {
           void addPhoto();
         }
       });
@@ -173,195 +319,157 @@ const MyPhotosScreen: React.FC = () => {
     };
   }, [selectMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Real-time listener for RTDB photos — syncs when moderator approves/rejects
+  useEffect(() => {
+    if (!uid) return;
+
+    const photosRef = query(
+      ref(database, `user_photos/${uid}`),
+      orderByChild('uploadedAt')
+    );
+
+    const unsubscribe = onValue(
+      photosRef,
+      async (snapshot) => {
+        try {
+          const photos = await fetchUserPhotosFromRtdb(uid);
+          setRtdbPhotos(photos);
+        } catch (err) {
+          safeLogError('MyPhotosScreen.onValue', err, { uid });
+        }
+      },
+      (err) => {
+        safeLogError('MyPhotosScreen.realtimeListener', err, { uid });
+      }
+    );
+
+    return () => unsubscribe();
+  }, [uid]);
+
   useFocusEffect(
     useCallback(() => {
       const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
         handleBack();
         return true;
       });
+      void UploadQueue.process();
+      void loadRtdbPhotos();
       return () => subscription.remove();
-    }, [handleBack]),
+    }, [handleBack, loadRtdbPhotos]),
   );
 
-  const statusLabels = useMemo<Record<UserPhoto['status'], string>>(() => ({
-    queued: text.queued,
-    uploading: text.uploading,
-    uploaded: text.uploaded,
-    error: text.error,
-  }), [text]);
+  const statusLabels = useMemo<Record<UserPhoto['status'], string>>(
+    () => ({
+      queued: text.queued,
+      uploading: text.uploading,
+      uploaded: text.uploaded,
+      error: text.error,
+    }),
+    [text],
+  );
 
-  // ─── upload a single photo to Firebase Storage (same flow as PhotoUploadField) ──
+  const enqueueAndSelect = useCallback(
+    async (photo: UserPhoto | null) => {
+      if (!photo) return;
+      await UploadQueue.enqueue(
+        photo.id,
+        photo.localUri,
+        { uploadedBy: userEmail || userName || userId },
+        { collection: 'user_photos', uid },
+      );
+      if (selectMode) {
+        PhotoSelector.select(photo);
+        handleBack();
+      }
+    },
+    [handleBack, selectMode, uid, userEmail, userId, userName],
+  );
 
-  const uploadToStorage = useCallback(async (id: string, localUri: string): Promise<UploadAndSaveResult | null> => {
-    setUploadProgress((prev) => ({ ...prev, [id]: 1 }));
-    try {
-      const upload = await uploadAndSavePhoto(localUri, {
-        namespace: 'user_photos',
-        resolveDownloadUrl: true,
-        feature: 'profile',
-        communityMetadata: {
-          uploadedBy: userEmail || userName || uid,
-        },
-        sourceLabel: 'MyPhotosScreen.uploadToStorage',
-        logContext: { photoId: id },
-      });
-      await ImageStorage.updatePhoto(id, {
-        imageUrl: upload.downloadUrl || '',
-        storagePath: upload.storagePath,
-        status: 'uploaded',
-        error: undefined,
-      });
-      return upload;
-    } catch (err) {
-      await ImageStorage.updatePhoto(id, { status: 'error', error: err instanceof Error ? err.message : String(err) });
-      throw err;
-    } finally {
-      setUploadProgress((prev) => {
-        const next = { ...prev };
-        delete next[id];
-        return next;
-      });
-    }
-  }, [uid, userEmail, userName]);
-
-  // ─── add photo — same flow as Kuplu-Prodam / PhotoUploadField ────────────────
+  const runAdd = useCallback(
+    async (source: 'camera' | 'library') => {
+      if (adding) return;
+      setAdding(true);
+      try {
+        const photo =
+          source === 'camera'
+            ? await photoService.addFromCamera({ userId, type: 'gallery' })
+            : await photoService.addFromLibrary({ userId, type: 'gallery' });
+        await enqueueAndSelect(photo);
+      } catch (error) {
+        showUserError(language, 'upload', error);
+      } finally {
+        setAdding(false);
+      }
+    },
+    [adding, enqueueAndSelect, language, userId],
+  );
 
   const addPhoto = useCallback(async () => {
-    if (adding) return;
-    setAdding(true);
-    try {
-      // 1. Permission request — same as PhotoUploadField
-      const allowed = await requestPickerPermission();
-      if (!allowed) { setAdding(false); return; }
-
-      // 2. Launch system picker — same as PhotoUploadField
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsMultipleSelection: false,
-        allowsEditing: false,
-        quality: 0.9,
-      });
-
-      // 3. Android fallback — same as PhotoUploadField
-      const assetsFromResult = Array.isArray(result.assets) ? result.assets : [];
-      let assets = assetsFromResult;
-      if (assets.length === 0 && Platform.OS === 'android') {
-        try {
-          const pending = await ImagePicker.getPendingResultAsync();
-          const pendingResults = Array.isArray(pending) ? pending : pending ? [pending] : [];
-          const pendingAsset = pendingResults
-            .map((item) => (!item || 'code' in item || item.canceled ? null : (item.assets?.[0] ?? null)))
-            .find((a): a is ImagePicker.ImagePickerAsset => Boolean(a?.uri)) ?? null;
-          if (pendingAsset) assets = [pendingAsset];
-        } catch (_e) { /* ignore */ }
-      }
-      if (assets.length === 0) {
-        if (!result.canceled) {
-          safeLogError('MyPhotosScreen.addPhoto', new Error('picker returned without usable asset'), {
-            source: 'image-picker',
-          });
-        }
-        setAdding(false);
-        return;
-      }
-
-      const asset = assets[0];
-
-      // 4. Copy to stable cache location — same as PhotoUploadField
-      const cachedUri = await copyToCache(asset.uri);
-
-      // 5. Generate thumbnail — same as PhotoUploadField
-      const thumbUri = await makeThumbnail(cachedUri);
-
-      // 6. Add to ImageStorage immediately → triggers setPhotos → photo appears in grid ✓
-      const id = `photo_${uniqueId()}`;
-      const now = Date.now();
-      const newPhoto: UserPhoto = {
-        id,
-        localUri: cachedUri,
-        thumbnail: thumbUri,
-        imageUrl: '',
-        status: 'uploading',
-        createdAt: now,
-        updatedAt: now,
-        retryCount: 0,
-      };
-      await ImageStorage.addPhoto(newPhoto);
-
-      // 7. Upload to Firebase Storage — same mechanism as PhotoUploadField
-      try {
-        await uploadToStorage(id, cachedUri);
-      } catch (uploadErr) {
-        safeLogError('MyPhotosScreen.uploadToStorage', uploadErr, { photoId: id });
-        // status already set to 'error' inside uploadToStorage's error handler
-      }
-
-      // 8. In selectMode, pass newly added photo back and close
-      if (selectMode) {
-        const added = await ImageStorage.getPhoto(id);
-        if (added) {
-          PhotoSelector.select(added);
-          handleBack();
-        }
-      }
-    } catch (error) {
-      showUserError(language, 'upload', error);
-    } finally {
-      setAdding(false);
+    if (Platform.OS === 'web') {
+      await runAdd('library');
+      return;
     }
-  }, [adding, handleBack, language, navigation, selectMode, uid, uploadToStorage]);
-
-  // ─── retry failed upload ──────────────────────────────────────────────────────
-
-  const retryPhoto = useCallback((photo: UserPhoto) => {
-    void (async () => {
-      if (!photo.localUri) return;
-      await ImageStorage.updatePhoto(photo.id, { status: 'uploading', error: undefined });
-      try {
-        await uploadToStorage(photo.id, photo.localUri);
-      } catch (err) {
-        safeLogError('MyPhotosScreen.retryPhoto', err, { photoId: photo.id });
-      }
-    })();
-  }, [uploadToStorage]);
-
-  // ─── delete photo ─────────────────────────────────────────────────────────────
-
-  const deletePhoto = useCallback((photo: UserPhoto) => {
-    Alert.alert(text.deleteTitle, text.deleteText, [
-      { text: text.no, style: 'cancel' },
-      {
-        text: text.yes,
-        style: 'destructive',
-        onPress: () => {
-          void (async () => {
-            setDeletingId(photo.id);
-            try {
-              const removed = await ImageStorage.removePhoto(photo.id);
-              if (removed?.storagePath) {
-                try {
-                  await deleteObject(storageRef(storage, removed.storagePath));
-                } catch (_e) { /* storage cleanup failure is non-critical */ }
-              }
-            } finally {
-              setDeletingId(null);
-            }
-          })();
-        },
-      },
+    Alert.alert(text.add, '', [
+      { text: text.camera, onPress: () => { void runAdd('camera'); } },
+      { text: text.library, onPress: () => { void runAdd('library'); } },
+      { text: text.cancel, style: 'cancel' },
     ]);
-  }, [text]);
+  }, [runAdd, text]);
 
-  const selectPhoto = useCallback((photo: UserPhoto) => {
-    if (!selectMode) return;
-    PhotoSelector.select(photo);
-    handleBack();
-  }, [handleBack, selectMode]);
+  const retryPhoto = useCallback(
+    (photo: UserPhoto) => {
+      void (async () => {
+        try {
+          await UploadQueue.enqueue(photo.id, photo.localUri, undefined, {
+            collection: 'user_photos',
+            uid,
+          });
+          await UploadQueue.process();
+        } catch (error) {
+          safeLogError('MyPhotosScreen.retryPhoto', error, { photoId: photo.id });
+        }
+      })();
+    },
+    [uid],
+  );
 
-  const renderPhoto = ({ item }: { item: UserPhoto }) => {
-    const displayUri = getBestPhotoUri(item) || getPhotoThumbnailUri(item) || item.localUri || '';
+  const deletePhoto = useCallback(
+    (photo: UserPhoto) => {
+      Alert.alert(text.deleteTitle, text.deleteText, [
+        { text: text.no, style: 'cancel' },
+        {
+          text: text.yes,
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              setDeletingId(photo.id);
+              try {
+                await photoService.delete(photo.id);
+              } catch (error) {
+                safeLogError('MyPhotosScreen.deletePhoto', error, { photoId: photo.id });
+              } finally {
+                setDeletingId(null);
+              }
+            })();
+          },
+        },
+      ]);
+    },
+    [text],
+  );
+
+  const selectPhoto = useCallback(
+    (photo: UserPhoto) => {
+      if (!selectMode) return;
+      PhotoSelector.select(photo);
+      handleBack();
+    },
+    [handleBack, selectMode],
+  );
+
+  const renderLocalPhoto = ({ item }: { item: UserPhoto }) => {
+    const displayUri = getPhotoThumbnailUri(item) || getBestPhotoUri(item) || item.localUri || '';
     const busy = item.status === 'uploading' || deletingId === item.id;
-    const progress = uploadProgress[item.id];
 
     return (
       <TouchableOpacity
@@ -371,13 +479,21 @@ const MyPhotosScreen: React.FC = () => {
           if (selectMode) {
             selectPhoto(item);
           } else if (displayUri) {
-            setPreviewPhoto({ uri: displayUri, storagePath: item.storagePath });
+            setPreviewPhoto({
+              uri: getBestPhotoUri(item) || displayUri,
+              storagePath: item.storagePath,
+            });
           }
         }}
         disabled={deletingId === item.id}
       >
         {displayUri ? (
-          <AppPhotoImage uri={displayUri} storagePath={item.storagePath} style={styles.photo} resizeMode="cover" />
+          <AppPhotoImage
+            uri={displayUri}
+            storagePath={item.storagePath}
+            style={styles.photo}
+            resizeMode="cover"
+          />
         ) : (
           <View style={styles.photoFallback}>
             <MaterialCommunityIcons name="image-off-outline" size={28} color={SCREEN_THEME.textMuted} />
@@ -385,22 +501,27 @@ const MyPhotosScreen: React.FC = () => {
         )}
         <View style={[styles.statusBadge, { backgroundColor: statusColor[item.status] }]}>
           {busy ? <ActivityIndicator size="small" color="#fff" /> : null}
-          <Text style={styles.statusText}>
-            {item.status === 'uploading' && progress !== undefined
-              ? `${statusLabels[item.status]} ${progress}%`
-              : statusLabels[item.status]}
-          </Text>
+          <Text style={styles.statusText}>{statusLabels[item.status]}</Text>
         </View>
         {selectMode ? (
           <View style={styles.selectOverlay}>
             <MaterialCommunityIcons name="check-circle-outline" size={24} color="#fff" />
           </View>
         ) : item.status === 'error' ? (
-          <TouchableOpacity style={styles.retryButton} onPress={() => retryPhoto(item)} activeOpacity={0.82}>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => retryPhoto(item)}
+            activeOpacity={0.82}
+          >
             <MaterialCommunityIcons name="refresh" size={18} color="#fff" />
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity style={styles.deleteButton} onPress={() => deletePhoto(item)} disabled={busy} activeOpacity={0.82}>
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={() => deletePhoto(item)}
+            disabled={busy}
+            activeOpacity={0.82}
+          >
             <MaterialCommunityIcons name="close" size={20} color="#fff" />
           </TouchableOpacity>
         )}
@@ -408,8 +529,15 @@ const MyPhotosScreen: React.FC = () => {
     );
   };
 
+  const hasAnyPhotos =
+    localPhotos.length > 0 ||
+    pendingPhotos.length > 0 ||
+    approvedPhotos.length > 0 ||
+    rejectedPhotos.length > 0;
+
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={handleBack} activeOpacity={0.82}>
           <MaterialCommunityIcons name="arrow-left" size={21} color={SCREEN_THEME.textPrimary} />
@@ -420,29 +548,163 @@ const MyPhotosScreen: React.FC = () => {
         </View>
       </View>
 
-      <FlatList
-        data={photos}
-        keyExtractor={(item: UserPhoto) => item.id}
-        renderItem={renderPhoto}
-        numColumns={2}
-        contentContainerStyle={[styles.grid, photos.length === 0 && styles.emptyGrid]}
-        columnWrapperStyle={photos.length > 0 ? styles.gridRow : undefined}
-        ListEmptyComponent={
+      {/* TZ_4.5 — Banner: disabled while photo is pending */}
+      {hasPendingPhotos && !selectMode ? (
+        <View style={styles.pendingBanner}>
+          <MaterialCommunityIcons name="clock-check-outline" size={18} color="#FFF8E1" />
+          <Text style={styles.pendingBannerText}>{text.pendingBanner}</Text>
+        </View>
+      ) : null}
+
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {!hasAnyPhotos && !rtdbLoading ? (
           <View style={styles.emptyCard}>
-            <MaterialCommunityIcons name="image-multiple-outline" size={42} color={SCREEN_THEME.textMuted} />
+            <MaterialCommunityIcons
+              name="image-multiple-outline"
+              size={42}
+              color={SCREEN_THEME.textMuted}
+            />
             <Text style={styles.emptyTitle}>{text.emptyTitle}</Text>
             <Text style={styles.emptyText}>{text.emptyText}</Text>
           </View>
-        }
-      />
+        ) : null}
 
-      <TouchableOpacity style={[styles.addButton, adding && styles.addButtonDisabled]} onPress={addPhoto} activeOpacity={0.88} disabled={adding}>
-        {adding ? <ActivityIndicator color="#fff" /> : <MaterialCommunityIcons name="plus" size={22} color="#fff" />}
-        <Text style={styles.addButtonText}>{text.add}</Text>
+        {rtdbLoading ? (
+          <View style={styles.loadingRow}>
+            <ActivityIndicator color={SCREEN_THEME.terracotta} />
+          </View>
+        ) : null}
+
+        {/* Section: На модерації */}
+        {pendingPhotos.length > 0 ? (
+          <View style={styles.section}>
+            <SectionHeader
+              label={text.sectionPending}
+              count={pendingPhotos.length}
+              color="#F57F17"
+            />
+            <View style={styles.grid}>
+              {pendingPhotos.map((photo) => (
+                <PendingCard
+                  key={photo.id}
+                  photo={photo}
+                  onPress={() =>
+                    setPreviewPhoto({ uri: photo.imageUri, storagePath: photo.storagePath })
+                  }
+                  noteText={text.moderationNote}
+                />
+              ))}
+            </View>
+          </View>
+        ) : null}
+
+        {/* Section: Одобрені */}
+        {approvedPhotos.length > 0 ? (
+          <View style={styles.section}>
+            <SectionHeader
+              label={text.sectionApproved}
+              count={approvedPhotos.length}
+              color={SCREEN_THEME.woodGreenDark}
+            />
+            <View style={styles.grid}>
+              {approvedPhotos.map((photo) => (
+                <TouchableOpacity
+                  key={photo.id}
+                  style={sStyles.rtdbCard}
+                  activeOpacity={0.88}
+                  onPress={() =>
+                    setPreviewPhoto({ uri: photo.imageUri, storagePath: photo.storagePath })
+                  }
+                >
+                  <AppPhotoImage
+                    uri={photo.imageUri}
+                    storagePath={photo.storagePath}
+                    style={StyleSheet.absoluteFill}
+                    resizeMode="cover"
+                    debugLabel="MyPhotosApproved"
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        ) : null}
+
+        {/* Section: Відхилені */}
+        {rejectedPhotos.length > 0 ? (
+          <View style={styles.section}>
+            <SectionHeader
+              label={text.sectionRejected}
+              count={rejectedPhotos.length}
+              color={SCREEN_THEME.terracottaDark}
+            />
+            <View style={styles.grid}>
+              {rejectedPhotos.map((photo) => (
+                <RejectedCard
+                  key={photo.id}
+                  photo={photo}
+                  reasonLabel={text.rejectedReason}
+                  onPress={() =>
+                    setPreviewPhoto({ uri: photo.imageUri, storagePath: photo.storagePath })
+                  }
+                />
+              ))}
+            </View>
+          </View>
+        ) : null}
+
+        {/* Section: Local in-flight uploads */}
+        {localPhotos.length > 0 ? (
+          <View style={styles.section}>
+            <SectionHeader label={text.sectionUploading} count={localPhotos.length} />
+            <FlatList
+              data={localPhotos}
+              keyExtractor={(item: UserPhoto) => item.id}
+              renderItem={renderLocalPhoto}
+              numColumns={2}
+              scrollEnabled={false}
+              contentContainerStyle={styles.grid}
+              columnWrapperStyle={localPhotos.length > 1 ? styles.gridRow : undefined}
+            />
+          </View>
+        ) : null}
+      </ScrollView>
+
+      {/* FAB — disabled when pending or adding */}
+      <TouchableOpacity
+        style={[styles.addButton, addButtonDisabled && styles.addButtonDisabled]}
+        onPress={() => void addPhoto()}
+        activeOpacity={0.88}
+        disabled={addButtonDisabled}
+      >
+        {adding ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <MaterialCommunityIcons
+            name={hasPendingPhotos ? 'clock-outline' : 'plus'}
+            size={22}
+            color="#fff"
+          />
+        )}
+        <Text style={styles.addButtonText}>
+          {hasPendingPhotos ? text.sectionPending : text.add}
+        </Text>
       </TouchableOpacity>
 
-      <Modal visible={Boolean(previewPhoto)} transparent animationType="fade" onRequestClose={() => setPreviewPhoto(null)}>
-        <TouchableOpacity style={styles.previewBackdrop} activeOpacity={1} onPress={() => setPreviewPhoto(null)}>
+      {/* Preview modal */}
+      <Modal
+        visible={Boolean(previewPhoto)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPreviewPhoto(null)}
+      >
+        <TouchableOpacity
+          style={styles.previewBackdrop}
+          activeOpacity={1}
+          onPress={() => setPreviewPhoto(null)}
+        >
           {previewPhoto ? (
             <AppPhotoImage
               uri={previewPhoto.uri}
@@ -453,13 +715,15 @@ const MyPhotosScreen: React.FC = () => {
             />
           ) : null}
           <View style={styles.previewCloseHint}>
-            <Text style={styles.previewCloseText}>✕</Text>
+            <Text style={styles.previewCloseText}>×</Text>
           </View>
         </TouchableOpacity>
       </Modal>
     </SafeAreaView>
   );
 };
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: SCREEN_THEME.appBg },
@@ -484,15 +748,33 @@ const styles = StyleSheet.create({
   headerCopy: { flex: 1 },
   title: { fontSize: 24, fontWeight: '900', color: SCREEN_THEME.textPrimary },
   subtitle: { marginTop: 4, color: SCREEN_THEME.textSecondary, lineHeight: 19, fontWeight: '600' },
-  limitNote: { marginTop: 6, color: SCREEN_THEME.textMuted, fontSize: 12, fontWeight: '700' },
-  grid: { padding: 14, paddingBottom: 110 },
-  emptyGrid: { flexGrow: 1, justifyContent: 'center' },
+  pendingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 16,
+    marginBottom: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: '#E65100',
+  },
+  pendingBannerText: {
+    flex: 1,
+    color: '#FFF8E1',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 18,
+  },
+  scrollContent: { paddingHorizontal: 14, paddingBottom: 110 },
+  loadingRow: { paddingVertical: 20, alignItems: 'center' },
+  section: { marginBottom: 18 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   gridRow: { gap: 12 },
   photoCard: {
-    flex: 1,
+    width: '47%',
     height: 190,
-    marginBottom: 12,
-    borderRadius: 22,
+    borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: SCREEN_THEME.paperStrong,
     borderWidth: 1,
@@ -553,28 +835,35 @@ const styles = StyleSheet.create({
   },
   emptyCard: {
     backgroundColor: SCREEN_THEME.paperStrong,
-    borderRadius: 26,
+    borderRadius: 12,
     padding: 24,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#E4D0AB',
+    marginTop: 24,
   },
   emptyTitle: { marginTop: 12, fontSize: 18, fontWeight: '900', color: SCREEN_THEME.textPrimary },
-  emptyText: { marginTop: 8, textAlign: 'center', color: SCREEN_THEME.textSecondary, lineHeight: 20, fontWeight: '600' },
+  emptyText: {
+    marginTop: 8,
+    textAlign: 'center',
+    color: SCREEN_THEME.textSecondary,
+    lineHeight: 20,
+    fontWeight: '600',
+  },
   addButton: {
     position: 'absolute',
     left: 16,
     right: 16,
     bottom: 22,
     minHeight: 56,
-    borderRadius: 20,
+    borderRadius: 16,
     backgroundColor: SCREEN_THEME.terracotta,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 8,
   },
-  addButtonDisabled: { opacity: 0.75 },
+  addButtonDisabled: { opacity: 0.55 },
   addButtonText: { color: '#fff', fontSize: 16, fontWeight: '900' },
   previewBackdrop: {
     flex: 1,
@@ -582,7 +871,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  previewImage: { width: '94%', height: '50%', borderRadius: 16 },
+  previewImage: { width: '94%', height: '50%', borderRadius: 12 },
   previewCloseHint: {
     position: 'absolute',
     top: 48,
@@ -594,9 +883,57 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  previewCloseText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  previewCloseText: { color: '#fff', fontSize: 18, fontWeight: '700' },
+});
+
+const sStyles = StyleSheet.create({
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+    marginTop: 4,
+  },
+  sectionLabel: { fontSize: 15, fontWeight: '900', color: SCREEN_THEME.textPrimary },
+  sectionBadge: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: SCREEN_THEME.textMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  sectionBadgeText: { color: '#fff', fontSize: 11, fontWeight: '900' },
+  rtdbCard: {
+    width: '47%',
+    height: 160,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderWidth: 1,
+    borderColor: '#E4D0AB',
+    position: 'relative',
+  },
+  rejectedCard: { borderColor: '#EF9A9A' },
+  moderationOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    padding: 8,
+    backgroundColor: 'rgba(0,0,0,0.62)',
+  },
+  moderationText: {
+    flex: 1,
+    color: '#FFD54F',
+    fontSize: 11,
+    fontWeight: '800',
+    lineHeight: 15,
+  },
 });
 
 export default MyPhotosScreen;
-
-

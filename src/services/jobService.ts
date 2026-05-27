@@ -4,6 +4,7 @@ import { createPendingModeration, ModerationStatus } from '../utils/moderation';
 import { sanitizeStoredText } from '../utils/textUtils';
 import { publishApprovedActivity } from './activityMirror';
 import { ensureFirebaseAuth } from '../firebase-auth-session';
+import { assertTextMatchesLanguage, normalizeAppLang, type AppLang } from '../utils/contentLanguageGuard';
 
 export interface JobListing {
   id: string;
@@ -13,6 +14,8 @@ export interface JobListing {
   age: string;
   workType: string;
   about: string;
+  photoUri?: string;
+  photoStoragePath?: string;
   moderationStatus: ModerationStatus;
   submittedForModerationAt: string;
   createdAt: string;
@@ -21,6 +24,7 @@ export interface JobListing {
   moderationReason?: string;
   rejectionReason?: string;
   isArchived?: boolean;
+  language?: AppLang;
 }
 
 const PATH = 'job_listings';
@@ -37,6 +41,8 @@ const mapJobItem = (id: string, data: any, isArchived?: boolean): JobListing => 
   age: data.age || '',
   workType: data.workType || '',
   about: data.about || '',
+  photoUri: data.photoUri || data.photoStoragePath || '',
+  photoStoragePath: data.photoStoragePath || data.photoUri || '',
   moderationStatus: isArchived ? 'approved' : (data.moderationStatus || 'pending'),
   submittedForModerationAt: data.submittedForModerationAt || '',
   createdAt: data.createdAt || '',
@@ -96,10 +102,14 @@ export const jobService = {
       name: sanitizeStoredText(item.name),
       phone: sanitizeStoredText(item.phone),
       about: sanitizeStoredText(item.about),
+      photoStoragePath: item.photoStoragePath || item.photoUri || '',
+      photoUri: '',
       userId: user.uid,
       moderationStatus: pendingModeration.moderationStatus,
       submittedForModerationAt: pendingModeration.submittedForModerationAt,
+      language: normalizeAppLang(item.language, 'ua'),
     };
+    assertTextMatchesLanguage(`${sanitized.workType} ${sanitized.about}`.trim(), sanitized.language, 'job_listings');
     try {
       const newRef = await push(listRef, sanitized);
       return newRef.key!;
