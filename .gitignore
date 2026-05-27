@@ -102,3 +102,12 @@ admin-panel/nul
 admin-panel/--*
 admin-panel/receipt*.pdf
 admin-panel/nul
+local-server/
+index.js
+CRASH_DIAGNOSTICS_SETUP.md
+DEPLOYMENT_REPORT_*.md
+FIREBASE_PHOTO_RUNBOOK.md
+PHOTO_BUGS_SUMMARY_*.md
+PHOTO_BUGS_AUDIT_*.md
+PHOTO_BUGS_FIXES_*.md
+TX-AUDIT-APK-NOT-INSTALL.md
