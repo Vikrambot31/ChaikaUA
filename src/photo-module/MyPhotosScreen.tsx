@@ -330,7 +330,7 @@ const MyPhotosScreen: React.FC = () => {
 
     const unsubscribe = onValue(
       photosRef,
-      async (snapshot) => {
+      async (_snapshot) => {
         try {
           const photos = await fetchUserPhotosFromRtdb(uid);
           setRtdbPhotos(photos);
