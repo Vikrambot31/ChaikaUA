@@ -1,5 +1,6 @@
 import { get, ref, update, remove } from 'firebase/database';
 import { database } from '../firebase/firebase';
+import { LOCAL_MODE, localGet, localPatch, localDelete } from '../local/LOCAL_MODE';
 
 export interface ReleaseFileEntry {
   commits: string[];
@@ -20,6 +21,10 @@ export interface ReleaseRecord {
   bundleFingerprint: string;
   files: Record<string, ReleaseFileEntry>;
   summary: string;
+  minimumRequiredVersion: string;
+  forceUpdateRequired: boolean;
+  maintenanceMessage: string;
+  betaModeEnabled: boolean;
   createdAt: number;
 }
 
@@ -133,11 +138,32 @@ function mapRecord(key: string, val: Record<string, unknown>): ReleaseRecord {
     bundleFingerprint: typeof val.bundleFingerprint === 'string' ? val.bundleFingerprint : '',
     files,
     summary: typeof val.summary === 'string' ? val.summary : '',
+    minimumRequiredVersion: typeof val.minimumRequiredVersion === 'string'
+      ? val.minimumRequiredVersion
+      : typeof val.minimum_required_version === 'string'
+        ? val.minimum_required_version
+        : '',
+    forceUpdateRequired: val.forceUpdateRequired === true || val.force_update_required === true,
+    maintenanceMessage: typeof val.maintenanceMessage === 'string'
+      ? val.maintenanceMessage
+      : typeof val.maintenance_message === 'string'
+        ? val.maintenance_message
+        : '',
+    betaModeEnabled: val.betaModeEnabled === true || val.beta_mode_enabled === true,
     createdAt: typeof val.createdAt === 'number' ? val.createdAt : 0,
   };
 }
 
 export async function getReleases(): Promise<ReleaseRecord[]> {
+  // LOCAL_MODE: fetch app_releases from local json-server
+  if (LOCAL_MODE) {
+    const raw = await localGet<Array<Record<string, unknown>>>('/app_releases');
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .map((item) => mapRecord(String(item.versionKey || item.id || ''), item))
+      .sort((a, b) => b.createdAt - a.createdAt);
+  }
+
   const snapshot = await get(ref(database, PATH));
   if (!snapshot.exists()) return [];
 
@@ -147,9 +173,50 @@ export async function getReleases(): Promise<ReleaseRecord[]> {
 }
 
 export async function updateReleaseSummary(versionKey: string, summary: string): Promise<void> {
+  // LOCAL_MODE: patch summary on local json-server using versionKey as id
+  if (LOCAL_MODE) {
+    await localPatch(`/app_releases/${versionKey}`, { summary });
+    return;
+  }
+
   await update(ref(database, `${PATH}/${versionKey}`), { summary });
 }
 
+export async function updateReleaseControl(
+  versionKey: string,
+  control: {
+    minimumRequiredVersion: string;
+    forceUpdateRequired: boolean;
+    maintenanceMessage: string;
+    betaModeEnabled: boolean;
+  },
+): Promise<void> {
+  const payload = {
+    minimumRequiredVersion: control.minimumRequiredVersion.trim(),
+    minimum_required_version: control.minimumRequiredVersion.trim(),
+    forceUpdateRequired: control.forceUpdateRequired,
+    force_update_required: control.forceUpdateRequired,
+    maintenanceMessage: control.maintenanceMessage.trim().slice(0, 280),
+    maintenance_message: control.maintenanceMessage.trim().slice(0, 280),
+    betaModeEnabled: control.betaModeEnabled,
+    beta_mode_enabled: control.betaModeEnabled,
+    updatedAt: Date.now(),
+  };
+
+  if (LOCAL_MODE) {
+    await localPatch(`/app_releases/${versionKey}`, payload);
+    return;
+  }
+
+  await update(ref(database, `${PATH}/${versionKey}`), payload);
+}
+
 export async function deleteRelease(versionKey: string): Promise<void> {
+  // LOCAL_MODE: delete release from local json-server
+  if (LOCAL_MODE) {
+    await localDelete(`/app_releases/${versionKey}`);
+    return;
+  }
+
   await remove(ref(database, `${PATH}/${versionKey}`));
 }

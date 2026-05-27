@@ -39,6 +39,7 @@ const UI_TEXT = {
     myRequests: 'Мої заявки',
     helpHistory: 'Історія допомоги',
     notifications: 'Сповіщення',
+    appMonitor: 'Монітор застосунку',
     moderation: 'Центр модерації',
     moderationPasscodeTitle: 'Міні-пароль модерації',
     moderationPasscodeHint: 'Введіть код доступу до сервісного центру.',
@@ -94,6 +95,7 @@ const UI_TEXT = {
     myRequests: 'Мои заявки',
     helpHistory: 'История помощи',
     notifications: 'Уведомления',
+    appMonitor: 'Монитор приложения',
     moderation: 'Центр модерации',
     moderationPasscodeTitle: 'Мини-пароль модерации',
     moderationPasscodeHint: 'Введите код доступа к сервисному центру.',
@@ -149,6 +151,7 @@ const UI_TEXT = {
     myRequests: 'My requests',
     helpHistory: 'Help history',
     notifications: 'Notifications',
+    appMonitor: 'Application monitor',
     moderation: 'Moderation center',
     moderationPasscodeTitle: 'Moderation passcode',
     moderationPasscodeHint: 'Enter the service center access code.',
@@ -198,6 +201,7 @@ const LANG_OPTIONS = [
 ];
 
 const SERVICE_MODERATION_PIN: string = (Constants.expoConfig?.extra as Record<string, string> | undefined)?.serviceModerationPin ?? '';
+const PRIMARY_MODERATION_EMAIL = 'vikramsave@ukr.net';
 const PROFILE_REQUESTS_LAST_SEEN_AT_KEY = '@chaika:profile_requests_last_seen_at:';
 
 const ProfileScreen: React.FC = () => {
@@ -205,7 +209,6 @@ const ProfileScreen: React.FC = () => {
   const dispatch = useDispatch();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const text = UI_TEXT[language];
-  const errorMonitorLabel = language === 'ua' ? 'Монітор помилок' : language === 'ru' ? 'Монитор ошибок' : 'Error monitor';
   const plan = useSelector(selectPlan);
   const expiresAt = useSelector(selectExpiresAt);
   const user = useSelector(selectUser);
@@ -221,6 +224,11 @@ const ProfileScreen: React.FC = () => {
   const [lastSeenPendingAtMs, setLastSeenPendingAtMs] = useState(0);
   const [moderationUnlocked, setModerationUnlocked] = useState(false);
   const isLoggedIn = Boolean(user?.id);
+  const hasPrimaryModerationAccess = Boolean(
+    user?.id &&
+    typeof user?.email === 'string' &&
+    user.email.trim().toLowerCase() === PRIMARY_MODERATION_EMAIL
+  );
   const uaTapCountRef = React.useRef(0);
   const pulseAnim = React.useRef(new Animated.Value(1)).current;
 
@@ -308,10 +316,13 @@ const ProfileScreen: React.FC = () => {
   }, [navigation]);
 
   const openServiceModerationPin = useCallback(() => {
+    if (!hasPrimaryModerationAccess) {
+      return;
+    }
     setModerationPin('');
     setModerationPinError('');
     setModerationPinVisible(true);
-  }, []);
+  }, [hasPrimaryModerationAccess]);
 
   const closeServiceModerationPin = useCallback(() => {
     setModerationPinVisible(false);
@@ -320,6 +331,10 @@ const ProfileScreen: React.FC = () => {
   }, []);
 
   const submitServiceModerationPin = useCallback(() => {
+    if (!hasPrimaryModerationAccess) {
+      closeServiceModerationPin();
+      return;
+    }
     if (moderationPin.trim() !== SERVICE_MODERATION_PIN) {
       void logClientEvent('service_moderation_pin_denied', { uid: user?.id ?? null });
       setModerationPinError(text.moderationPasscodeError);
@@ -328,7 +343,7 @@ const ProfileScreen: React.FC = () => {
 
     closeServiceModerationPin();
     navigation.navigate('ServiceModerationScreen');
-  }, [closeServiceModerationPin, moderationPin, navigation, text.moderationPasscodeError]);
+  }, [closeServiceModerationPin, hasPrimaryModerationAccess, moderationPin, navigation, text.moderationPasscodeError, user?.id]);
 
   const planLabel = text.plans[plan as keyof typeof text.plans] ?? text.plans.free;
   const locale = language === 'en' ? 'en-US' : language === 'ru' ? 'ru-RU' : 'uk-UA';
@@ -504,11 +519,13 @@ const ProfileScreen: React.FC = () => {
             <Text style={styles.cardTitle}>{text.accountSettings}</Text>
           </View>
 
-          <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('LoginScreen')} activeOpacity={0.84}>
-            <TactileIcon icon="login-variant" size={40} iconSize={18} backgroundColor="#5C7A5C" />
-            <Text style={styles.menuLabel}>{text.completeRegistration}</Text>
-            <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
-          </TouchableOpacity>
+          {!isLoggedIn && (
+            <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('LoginScreen')} activeOpacity={0.84}>
+              <TactileIcon icon="login-variant" size={40} iconSize={18} backgroundColor="#5C7A5C" />
+              <Text style={styles.menuLabel}>{text.completeRegistration}</Text>
+              <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity style={styles.menuItem} onPress={handleEditProfile} activeOpacity={0.84}>
             <TactileIcon icon="pencil-outline" size={40} iconSize={18} backgroundColor={SCREEN_THEME.terracotta} />
@@ -517,7 +534,7 @@ const ProfileScreen: React.FC = () => {
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('MyPhotosScreen')} activeOpacity={0.84}>
-            <TactileIcon icon="image-multiple-outline" size={40} iconSize={18} backgroundColor={SCREEN_THEME.woodGreenDark} />
+            <TactileIcon icon="image-multiple-outline" size={40} iconSize={18} backgroundColor="#6A8BA5" />
             <Text style={styles.menuLabel}>{text.myPhotos}</Text>
             <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
           </TouchableOpacity>
@@ -557,15 +574,15 @@ const ProfileScreen: React.FC = () => {
 
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => navigation.navigate('NotificationSettingsScreen')}
+            onPress={() => navigation.navigate('AppMonitorScreen')}
             activeOpacity={0.84}
           >
-            <TactileIcon icon="bell-outline" size={40} iconSize={18} backgroundColor="#C79C47" />
-            <Text style={styles.menuLabel}>{text.notifications}</Text>
+            <TactileIcon icon="monitor-dashboard" size={40} iconSize={18} backgroundColor="#4B7F9E" />
+            <Text style={styles.menuLabel}>{text.appMonitor}</Text>
             <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
           </TouchableOpacity>
 
-          {moderationUnlocked ? (
+          {moderationUnlocked && hasPrimaryModerationAccess ? (
             <TouchableOpacity
               style={styles.menuItem}
               onPress={openServiceModerationPin}
@@ -576,16 +593,6 @@ const ProfileScreen: React.FC = () => {
               <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
             </TouchableOpacity>
           ) : null}
-
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => navigation.navigate('UserErrorMonitorScreen')}
-            activeOpacity={0.84}
-          >
-            <TactileIcon icon="alert-decagram-outline" size={40} iconSize={18} backgroundColor="#7A1E5C" />
-            <Text style={styles.menuLabel}>{errorMonitorLabel}</Text>
-            <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
-          </TouchableOpacity>
 
           <View style={[styles.menuItem, styles.menuItemLast]}>
             <TactileIcon icon="translate" size={40} iconSize={18} backgroundColor="#4B7F9E" />
@@ -622,12 +629,6 @@ const ProfileScreen: React.FC = () => {
             <Text style={styles.cardTitle}>{text.subscription}</Text>
           </View>
 
-          <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('AuthDiagnosticScreen')} activeOpacity={0.84}>
-            <TactileIcon icon="shield-account-outline" size={40} iconSize={18} backgroundColor="#4B7F9E" />
-            <Text style={styles.menuLabel}>{text.userStatus}</Text>
-            <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
-          </TouchableOpacity>
-
           <View style={styles.subscriptionBanner}>
             <Text style={styles.subscriptionPlan}>{planLabel}</Text>
             {expiresAt ? (
@@ -636,16 +637,6 @@ const ProfileScreen: React.FC = () => {
               </Text>
             ) : null}
           </View>
-
-          <TouchableOpacity
-            style={[styles.menuItem, styles.menuItemLast]}
-            onPress={() => navigation.navigate('PoruchitelScreen')}
-            activeOpacity={0.84}
-          >
-            <TactileIcon icon="account-network" size={40} iconSize={18} backgroundColor="#5C7A5C" />
-            <Text style={styles.menuLabel}>{text.guarantor}</Text>
-            <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
-          </TouchableOpacity>
 
         </TactileCard>
 

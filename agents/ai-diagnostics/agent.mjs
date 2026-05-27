@@ -14,9 +14,10 @@
  */
 
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { scanFiles } from './utils/file-scanner.mjs';
-import { countSeverities, calculateHealthScore, calculateCategoryScores, sortByPriority } from './utils/severity.mjs';
+import { countSeverities, calculateHealthScore, calculateVerifiedScore, calculateCategoryScores, sortByPriority } from './utils/severity.mjs';
 import { writeReports } from './reporters/markdown-reporter.mjs';
 import { generateAISummary } from './ai/deepseek-client.mjs';
 
@@ -132,6 +133,7 @@ async function main() {
   logConsole('\nGenerating AI summary...');
 
   const healthScore = calculateHealthScore(allFindings);
+  const verifiedScore = calculateVerifiedScore(allFindings);
   const categoryScores = calculateCategoryScores(allFindings);
   const severityCounts = countSeverities(allFindings);
 
@@ -170,12 +172,25 @@ async function main() {
   // Step 5: Complete
   const duration = Date.now() - startTime;
 
+  // Write findings to disk — daemon reads this file to upload to Firebase
+  const findingsFilePath = path.join(ROOT, 'diagnostics-reports', 'latest', 'findings.json');
+  try {
+    const sortedFindings = sortByPriority(allFindings).slice(0, 500);
+    fs.mkdirSync(path.dirname(findingsFilePath), { recursive: true });
+    fs.writeFileSync(findingsFilePath, JSON.stringify(sortedFindings), 'utf8');
+    emit({ type: 'log', message: `Findings saved to findings.json (${sortedFindings.length} items)`, severity: 'info', scanner: 'reporter' });
+  } catch (err) {
+    emit({ type: 'log', message: `findings.json write error: ${err.message}`, severity: 'warn', scanner: 'reporter' });
+  }
+
   emit({
     type: 'complete',
     healthScore,
+    verifiedScore,
     severityCounts,
     categoryScores,
     findingsCount: allFindings.length,
+    findingsFile: findingsFilePath,
     duration,
     summary: aiSummary?.success ? aiSummary.text : (aiSummary?.text || 'AI summary unavailable'),
     totalSteps: SCANNERS.length + 2,

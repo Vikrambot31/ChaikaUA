@@ -93,6 +93,7 @@ const ViewUserProfileScreen: React.FC = () => {
     const loadUserProfile = async () => {
       if (!userId) {
         Alert.alert(text.error, text.errorLoadProfile);
+        setLoading(false);
         return;
       }
 
@@ -104,19 +105,30 @@ const ViewUserProfileScreen: React.FC = () => {
           setPhone(profile.phone || '');
           setCity(profile.building || '');
         }
-
-        // Load job listing (business services)
-        const jobRef = query(ref(database, 'job_listings'), orderByChild('userId'), equalTo(userId));
-        const jobSnap = await get(jobRef);
-        if (jobSnap.exists()) {
-          const data = jobSnap.val();
-          const firstKey = Object.keys(data)[0];
-          setJobListing({ id: firstKey, ...data[firstKey] } as JobListing);
-        }
       } catch (error) {
         Alert.alert(text.error, text.errorLoadProfile);
       } finally {
         setLoading(false);
+      }
+
+      // Optional section: user services from job_listings.
+      // Failures here should not show a global profile error.
+      try {
+        const jobRef = query(ref(database, 'job_listings'), orderByChild('userId'), equalTo(userId));
+        const jobSnap = await get(jobRef);
+        if (jobSnap.exists()) {
+          const data = jobSnap.val() as Record<string, unknown>;
+          const firstKey = Object.keys(data)[0];
+          if (firstKey) {
+            setJobListing({ id: firstKey, ...(data[firstKey] as Record<string, unknown>) } as JobListing);
+          } else {
+            setJobListing(null);
+          }
+        } else {
+          setJobListing(null);
+        }
+      } catch {
+        setJobListing(null);
       }
     };
 

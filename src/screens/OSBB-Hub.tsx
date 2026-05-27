@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Image, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -178,6 +178,7 @@ const UI_TEXT = {
 
 const OsbbHubScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
+  const navLock = useRef(false);
   const isSetupDone = useSelector(selectOsbbIsSetupDone);
   const osbb = useSelector(selectOsbbBuilding);
   useOsbbMembership();
@@ -305,7 +306,7 @@ const OsbbHubScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
           <Image source={require('../../assets/WEBP-version/OSBB.webp')} style={styles.headerImage} resizeMode="cover" />
           <View style={styles.headerBody}>
@@ -375,7 +376,7 @@ const OsbbHubScreen: React.FC = () => {
                 <TouchableOpacity
                   key={option.id}
                   style={[styles.pollOption, isSelected && styles.pollOptionActive]}
-                  onPress={() => navigation.navigate('ItemDetailScreen', { item: mapToDetailData(option) })}
+                  onPress={() => { if (navLock.current) return; navLock.current = true; navigation.navigate('ItemDetailScreen', { item: mapToDetailData(option) }); setTimeout(() => { navLock.current = false; }, 800); }}
                   activeOpacity={0.86}
                 >
                   <View style={styles.pollTop}>

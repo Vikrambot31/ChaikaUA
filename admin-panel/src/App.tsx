@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { AppShell, type AdminPageKey } from './components/AppShell';
 import { PageErrorBoundary } from './components/PageErrorBoundary';
 import { useAuthAccess } from './hooks/useAuthAccess';
+import { usePhotoPendingCount } from './hooks/usePhotoPendingCount';
 import { DashboardPage } from './pages/DashboardPage';
 import { ArchivePage } from './pages/ArchivePage';
 import { ErrorMonitorPage } from './pages/ErrorMonitorPage';
@@ -14,9 +15,13 @@ import { PhotoApprovalPage } from './pages/PhotoApprovalPage';
 import { ReleasesPage } from './pages/ReleasesPage';
 import { SecurityPage } from './pages/SecurityPage';
 import { AIDiagnosticsPage } from './pages/AIDiagnosticsPage';
+import { ViewModeProvider } from './contexts/ViewModeContext';
+import { DashboardProvider } from './contexts/DashboardContext';
+
+const AppRulesPage = lazy(() => import('./pages/AppRulesPage'));
 
 const VALID_PAGES = new Set<AdminPageKey>([
-  'dashboard', 'moderation', 'archive', 'invite_access', 'guarantor_tree', 'access_control', 'security', 'errors', 'photo_approval', 'releases', 'ai_diagnostics',
+  'dashboard', 'moderation', 'archive', 'invite_access', 'guarantor_tree', 'access_control', 'security', 'errors', 'photo_approval', 'releases', 'ai_diagnostics', 'app_rules',
 ]);
 
 const getPageFromHash = (): AdminPageKey => {
@@ -26,6 +31,7 @@ const getPageFromHash = (): AdminPageKey => {
 
 export const App = () => {
   const access = useAuthAccess();
+  const photoPendingCount = usePhotoPendingCount();
   const [activePage, setActivePage] = useState<AdminPageKey>(getPageFromHash);
 
   useEffect(() => {
@@ -56,13 +62,14 @@ export const App = () => {
     moderation: 'Модерация',
     archive: 'Архив',
     invite_access: 'Доступ по приглашениям',
-    guarantor_tree: 'Дерево поручителей',
+    guarantor_tree: 'Дерево доверия',
     access_control: 'Контроль доступа',
     security: 'Безопасность',
     errors: 'Монитор ошибок',
     photo_approval: 'Одобрение фото',
     releases: 'Релизы',
     ai_diagnostics: 'AI Diagnostics',
+    app_rules: 'Серверні правила',
   };
 
   const renderPage = () => {
@@ -76,19 +83,31 @@ export const App = () => {
     if (activePage === 'photo_approval') return <PhotoApprovalPage />;
     if (activePage === 'releases') return <ReleasesPage />;
     if (activePage === 'ai_diagnostics') return <AIDiagnosticsPage role={access.role} userEmail={access.user.email || ''} />;
+    if (activePage === 'app_rules') {
+      return (
+        <Suspense fallback={<div className="loadingScreen">Завантаження серверних правил...</div>}>
+          <AppRulesPage role={access.role} />
+        </Suspense>
+      );
+    }
     return <DashboardPage user={access.user} onNavigate={navigate} />;
   };
 
   return (
-    <AppShell
-      user={access.user}
-      role={access.role}
-      activePage={activePage}
-      onNavigate={navigate}
-    >
-      <PageErrorBoundary key={activePage} pageName={PAGE_NAMES[activePage]}>
-        {renderPage()}
-      </PageErrorBoundary>
-    </AppShell>
+    <ViewModeProvider>
+    <DashboardProvider>
+      <AppShell
+        user={access.user}
+        role={access.role}
+        activePage={activePage}
+        onNavigate={navigate}
+        photoPendingCount={photoPendingCount}
+      >
+        <PageErrorBoundary key={activePage} pageName={PAGE_NAMES[activePage]}>
+          {renderPage()}
+        </PageErrorBoundary>
+      </AppShell>
+    </DashboardProvider>
+    </ViewModeProvider>
   );
 };

@@ -7,6 +7,7 @@ const TRIGGER_PATH = `${BASE}/_audit_trigger`;
 const STATUS_PATH = `${BASE}/_audit_status`;
 const LOGS_PATH = `${BASE}/_audit_logs`;
 const HISTORY_PATH = `${BASE}/_audit_history`;
+const HEARTBEAT_PATH = `${BASE}/_daemon_heartbeat`;
 
 export type AuditStatus = 'idle' | 'running' | 'completed' | 'failed' | 'cancelled';
 
@@ -184,6 +185,38 @@ export const subscribeFindings = (
     onData(arr);
   }, (error) => onError?.(error));
   return () => { unsubscribe(); };
+};
+
+// Daemon is considered online if heartbeat was written within the last 90 seconds
+const HEARTBEAT_TIMEOUT_MS = 90_000;
+
+export const subscribeDaemonHeartbeat = (
+  onData: (online: boolean) => void,
+): (() => void) => {
+  if (LOCAL_MODE) {
+    onData(false);
+    return () => {};
+  }
+
+  const hbRef = ref(database, HEARTBEAT_PATH);
+  let intervalId: ReturnType<typeof setInterval> | null = null;
+  let lastAt = 0;
+
+  const unsubscribe = onValue(hbRef, (snapshot) => {
+    const raw = snapshot.val();
+    lastAt = raw?.at || 0;
+    onData(lastAt > 0 && Date.now() - lastAt < HEARTBEAT_TIMEOUT_MS);
+  });
+
+  // Re-evaluate online status every 15s in case heartbeat stops coming
+  intervalId = setInterval(() => {
+    onData(lastAt > 0 && Date.now() - lastAt < HEARTBEAT_TIMEOUT_MS);
+  }, 15_000);
+
+  return () => {
+    unsubscribe();
+    if (intervalId) clearInterval(intervalId);
+  };
 };
 
 export const subscribeAuditHistory = (

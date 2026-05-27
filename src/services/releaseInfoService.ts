@@ -84,7 +84,7 @@ const SCREEN_NAME_MAP: Array<{ pattern: RegExp; name: string }> = [
   { pattern: /OSBB-AddNews/, name: 'ОСББ добавить новость' },
   { pattern: /OSBB-AdminPanel/, name: 'ОСББ администрирование' },
   { pattern: /Chaika-Bonus-Plus/, name: 'Чайка Бонус Плюс' },
-  { pattern: /Galereya-Chayki/, name: 'Галерея Чайки' },
+  { pattern: /Foto-Rayona/, name: 'Фото района' },
   { pattern: /Mesta-Chayki/, name: 'Места Чайки' },
   { pattern: /Kto-Poteryal/, name: 'Кто потерял' },
   { pattern: /Vazhnye-Novosti-Chayki/, name: 'Важные новости' },

@@ -23,7 +23,7 @@ const SplashAnimation: React.FC<Props> = ({ onFinish }) => {
     <View style={styles.container}>
       {videoVisible && (
         <Video
-          source={require('../../assets/video Logo2.mp4')}
+          source={require('../../assets/video-Logo2.mp4')}
           style={styles.video}
           resizeMode={ResizeMode.CONTAIN}
           shouldPlay

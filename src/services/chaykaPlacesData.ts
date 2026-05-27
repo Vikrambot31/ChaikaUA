@@ -1202,7 +1202,7 @@ export const chaykaPlaces: Place[] = [
   },
   {
     id: 'place-110',
-    name: 'Vial’ body hub',
+    name: "Vial' body hub",
     address: 'вулиця Валерія Лобановського, 21',
     latitude: 50.4407007,
     longitude: 30.2833196,

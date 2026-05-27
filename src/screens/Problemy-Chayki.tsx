@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, FlatList, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSelector } from 'react-redux';
 import { Picker } from '@react-native-picker/picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -7,12 +7,14 @@ import { ref, onValue, query, orderByChild, equalTo, runTransaction, get, limitT
 import { database } from '../firebase-core';
 
 import { NavigationProp, useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import MiniTabBar from '../components/MiniTabBar';
 import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import TactileIcon from '../components/TactileIcon';
 import { sanitizeStoredText } from '../utils/textUtils';
 import { firebaseChatAPI } from '../firebase-config';
+import { ensureFirebaseAuth } from '../firebase-auth-session';
 import { showUserError } from '../utils/userFacingErrors';
 import { BUILDINGS } from '../data/buildings';
 import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField';
@@ -23,6 +25,7 @@ import { useContactRequest } from '../hooks/useContactRequest';
 import ContactReasonModal from '../components/ContactReasonModal';
 import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
 import type { DetailItemData } from '../utils/detailViewTypes';
+import { getDonePhotos, getRequiredPhotoLabel, validateSubmissionRequirements } from '../utils/submissionRequirements';
 
 type Problem = {
   id: string;
@@ -117,6 +120,18 @@ const CLEAN_PROBLEMS_TEXT = {
     last7Days: 'За 7 днів',
     profile: 'Профіль',
     call: 'Подзвонити',
+    photoAuthTitle: 'Потрібна авторизація',
+    photoAuthBody: 'Щоб завантажувати контент, потрібно авторизуватися. Це умова застосунку.',
+    photoAuthBtn: 'Реєстрація',
+    photoAuthCancel: 'Скасувати',
+    guestPromptTitle: 'Потрібна реєстрація',
+    guestPromptBody: 'Для додавання проблем потрібна РЕЄСТРАЦІЯ.\n\nХочете пройти швидку реєстрацію за 2 хвилини?',
+    guestPromptConfirm: 'Так, зареєструватись',
+    guestPromptDecline: 'Ні',
+    problemLimitTitle: 'Ліміт вичерпано',
+    problemLimitBody: 'Дозволяється лише 3 повідомлення про проблеми на день.',
+    sortByDate: 'За датою',
+    sortByVotes: 'За рейтингом',
   },
   ru: {
     all: 'Все',
@@ -146,6 +161,18 @@ const CLEAN_PROBLEMS_TEXT = {
     last7Days: 'За 7 дней',
     profile: 'Профиль',
     call: 'Позвонить',
+    photoAuthTitle: 'Требуется авторизация',
+    photoAuthBody: 'Чтобы загружать контент, нужно авторизоваться. Это условие приложения.',
+    photoAuthBtn: 'Регистрация',
+    photoAuthCancel: 'Отмена',
+    guestPromptTitle: 'Требуется регистрация',
+    guestPromptBody: 'Для добавления проблем нужна РЕГИСТРАЦИЯ.\n\nХотите пройти быструю регистрацию за 2 минуты?',
+    guestPromptConfirm: 'Да, зарегистрироваться',
+    guestPromptDecline: 'Нет',
+    problemLimitTitle: 'Лимит исчерпан',
+    problemLimitBody: 'Допускается не более 3 сообщений о проблемах в день.',
+    sortByDate: 'По дате',
+    sortByVotes: 'По рейтингу',
   },
   en: {
     all: 'All',
@@ -175,6 +202,18 @@ const CLEAN_PROBLEMS_TEXT = {
     last7Days: 'Last 7 days',
     profile: 'Profile',
     call: 'Call',
+    photoAuthTitle: 'Authorization required',
+    photoAuthBody: 'To upload content, you must be authorized. This is a requirement of the app.',
+    photoAuthBtn: 'Register',
+    photoAuthCancel: 'Cancel',
+    guestPromptTitle: 'Registration required',
+    guestPromptBody: 'To add problems, REGISTRATION is required.\n\nWould you like to register quickly in 2 minutes?',
+    guestPromptConfirm: 'Yes, register',
+    guestPromptDecline: 'No',
+    problemLimitTitle: 'Daily limit reached',
+    problemLimitBody: 'Only 3 problem reports are allowed per day.',
+    sortByDate: 'By date',
+    sortByVotes: 'By rating',
   },
 } as const;
 
@@ -205,6 +244,32 @@ const parseHouseOnly = (building: unknown): string => {
   return houseParts.join(',').trim();
 };
 
+// Дневной лимит репортов о проблемах
+const PROBLEM_DAILY_KEY = 'problem_reports_daily_v1';
+const PROBLEM_MAX_PER_DAY = 3;
+
+type ProblemDailyRecord = { date: string; count: number };
+
+const getTodayStr = () => new Date().toISOString().slice(0, 10);
+
+const loadProblemRecord = async (): Promise<ProblemDailyRecord> => {
+  const today = getTodayStr();
+  try {
+    const raw = await AsyncStorage.getItem(PROBLEM_DAILY_KEY);
+    if (!raw) return { date: today, count: 0 };
+    const parsed = JSON.parse(raw) as ProblemDailyRecord;
+    return parsed.date === today ? parsed : { date: today, count: 0 };
+  } catch {
+    return { date: today, count: 0 };
+  }
+};
+
+const saveProblemRecord = async (record: ProblemDailyRecord): Promise<void> => {
+  try {
+    await AsyncStorage.setItem(PROBLEM_DAILY_KEY, JSON.stringify(record));
+  } catch { /* ignore */ }
+};
+
 const parseAge = (value: unknown): string => {
   if (typeof value === 'number' && Number.isFinite(value)) return String(Math.trunc(value));
   const raw = toClean(value);
@@ -215,9 +280,11 @@ const parseAge = (value: unknown): string => {
 
 export default function ChaikaProblemsScreen() {
 const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
+const navLock = useRef(false);
 const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const user = useSelector((state: RootState) => state.auth.user);
-  const text = CLEAN_PROBLEMS_TEXT[language];
+const text = CLEAN_PROBLEMS_TEXT[language];
+  const requiredPhotoLabel = getRequiredPhotoLabel(language);
   const streetLabel = text.street;
   const houseLabel = text.building;
   const categories = useMemo(
@@ -235,7 +302,7 @@ const language = useSelector((state: RootState) => state.language?.current ?? 'u
 
   const [rawItems, setRawItems] = useState<RawProblem[]>([]);
   const [profileByUserId, setProfileByUserId] = useState<Record<string, { name?: string; phone?: string; age?: string; avatarUri?: string }>>({});
-  const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
+  const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const [voterMap, setVoterMap] = useState<Record<string, Record<string, true>>>({});
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>(text.all);
@@ -250,14 +317,37 @@ const language = useSelector((state: RootState) => state.language?.current ?? 'u
   const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
   const [isPublishFormVisible, setIsPublishFormVisible] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [sortMode, setSortMode] = useState<'date' | 'votes'>('date');
   const [votingBusyId, setVotingBusyId] = useState<string | null>(null);
+  const [voteUserId, setVoteUserId] = useState(user?.id ?? '');
   const profileActionLabel = text.profile;
+  const contactActionLabel = language === 'ua' ? '\u0417\u0432\u0027\u044f\u0437\u043e\u043a' : language === 'ru' ? '\u0421\u0432\u044f\u0437\u044c' : 'Contact';
   const callActionLabel = text.call;
 
   useEffect(() => {
     setFilter(text.all);
     setCategory(text.yard);
   }, [language, text.all, text.yard]);
+
+  useEffect(() => {
+    if (user?.id) {
+      setVoteUserId(user.id);
+      return;
+    }
+
+    let isMounted = true;
+    void ensureFirebaseAuth()
+      .then((firebaseUser) => {
+        if (isMounted) setVoteUserId(firebaseUser.uid);
+      })
+      .catch(() => {
+        if (isMounted) setVoteUserId('');
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id]);
 
   useEffect(() => {
     if (houses.length === 0) {
@@ -376,22 +466,25 @@ const language = useSelector((state: RootState) => state.language?.current ?? 'u
         age: item.age || profile?.age || '',
         avatarUri: item.avatarUri || profile?.avatarUri || '',
         votes: Object.keys(voterMap[item.id] ?? {}).length,
-        hasVoted: !!(user?.id && voterMap[item.id]?.[user.id]),
+        hasVoted: !!(voteUserId && voterMap[item.id]?.[voteUserId]),
       };
     }),
-    [profileByUserId, rawItems, voterMap, user?.id]
+    [profileByUserId, rawItems, voterMap, voteUserId]
   );
 
-  const visible = useMemo(
-    () => items.filter((item) => {
+  const visible = useMemo(() => {
+    const filtered = items.filter((item) => {
       if (filter === text.all) return true;
       const fi = normalizeCategory(filter);
       const ii = normalizeCategory(item.category);
       if (fi !== -1 && ii !== -1) return fi === ii;
       return item.category === filter;
-    }),
-    [filter, items, text.all]
-  );
+    });
+    if (sortMode === 'votes') {
+      return [...filtered].sort((a, b) => b.votes - a.votes);
+    }
+    return filtered; // вже відсортовано за датою (push ID)
+  }, [filter, items, sortMode, text.all]);
 
   const counters = useMemo(() => {
     const now = new Date();
@@ -410,31 +503,66 @@ const language = useSelector((state: RootState) => state.language?.current ?? 'u
   const todayLabel = text.today;
   const weekLabel = text.last7Days;
 
+  const handleAddRequestPress = useCallback(() => {
+    if (!user?.id) {
+      Alert.alert(
+        text.guestPromptTitle,
+        text.guestPromptBody,
+        [
+          { text: text.guestPromptConfirm, onPress: () => navigation.navigate('LoginScreen') },
+          { text: text.guestPromptDecline, style: 'cancel' },
+        ]
+      );
+      return;
+    }
+    setIsPublishFormVisible(true);
+  }, [navigation, text, user?.id]);
+
+  const handleGuestPhotoPress = useCallback(() => {
+    Alert.alert(
+      text.photoAuthTitle,
+      text.photoAuthBody,
+      [
+        { text: text.photoAuthBtn, onPress: () => navigation.navigate('LoginScreen') },
+        { text: text.photoAuthCancel, style: 'cancel' },
+      ]
+    );
+  }, [navigation, text]);
+
   const addProblem = async () => {
     const cleanTitle = sanitizeStoredText(title.trim());
     if (!cleanTitle) {
       Alert.alert(text.error, text.fillTitle);
       return;
     }
-    if (!user?.id) {
-      showUserError(language, 'auth', 'Authentication required');
+    if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, photos: formPhotos, navigation })) {
+      return;
+    }
+    if (!user?.id) return;
+
+    // Перевірка денного ліміту (3 повідомлення на день)
+    const problemRecord = await loadProblemRecord();
+    if (problemRecord.count >= PROBLEM_MAX_PER_DAY) {
+      Alert.alert(text.problemLimitTitle, text.problemLimitBody, [{ text: 'OK' }]);
       return;
     }
 
     setSubmitting(true);
     try {
-    const resolvedPhotoUri = formPhotos[0]?.downloadUrl ?? '';
-    const resolvedStoragePath = formPhotos[0]?.storagePath ?? '';
+    const donePhotos = getDonePhotos(formPhotos);
+    const resolvedPhotoUri = donePhotos[0]?.downloadUrl ?? '';
+    const resolvedStoragePath = donePhotos[0]?.storagePath ?? '';
 
     const result = await firebaseChatAPI.addRequest({
       name: user.name || user.email || '',
       phone: user.phone || '',
+      language,
       category: 'problem',
       group: 'problems',
       subcategory: category,
       building: `${street}, ${house}`,
-      text: `[Problems] ${cleanTitle}`,
-      description: `[Problems] ${cleanTitle}` + `\nAddress: ${street}, ${house}`,
+      text: cleanTitle,
+      description: cleanTitle,
       photoUri: resolvedPhotoUri,
       ...(resolvedStoragePath && /^requests\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp|heic|heif)$/i.test(resolvedStoragePath)
         ? { photoStoragePath: resolvedStoragePath }
@@ -444,6 +572,8 @@ const language = useSelector((state: RootState) => state.language?.current ?? 'u
       showUserError(language, 'send', result.error);
       return;
     }
+    // Зберегти запис ліміту після успішної відправки
+    await saveProblemRecord({ ...problemRecord, count: problemRecord.count + 1 });
     setTitle('');
     setFormPhotos([]);
     setIsPublishFormVisible(false);
@@ -453,18 +583,48 @@ const language = useSelector((state: RootState) => state.language?.current ?? 'u
     }
   };
 
+  const openContactOptions = (problem: Problem) => {
+    if (problem.userId && problem.userId !== user?.id) {
+      openContactModal({ userId: problem.userId, name: problem.name || problem.title, sourceType: 'help', sourceId: problem.id, sourceTitle: problem.title });
+      return;
+    }
+
+    if (problem.phone) {
+      void safeCallPhone(problem.phone, language);
+      return;
+    }
+
+    Alert.alert(contactActionLabel, problem.name || problem.title, [
+      { text: callActionLabel, onPress: () => { void safeCallPhone(problem.phone, language); } },
+      { text: 'Viber', onPress: () => { void safeOpenViber(problem.phone, language); } },
+      { text: text.photoAuthCancel, style: 'cancel' },
+    ]);
+  };
+
   const upvote = async (id: string) => {
-    if (!user?.id || votingBusyId) return;
+    if (votingBusyId) return;
     setVotingBusyId(id);
     const db = database;
-    const voteRef = ref(db, `problem_votes/${id}/${user.id}`);
     try {
-      await runTransaction(voteRef, (current: boolean | null) => {
-        if (current === true) return null;
-        return true;
+      const firebaseUser = await ensureFirebaseAuth();
+      const uid = firebaseUser.uid;
+      if (!uid) throw new Error('Missing Firebase user id for vote');
+      setVoteUserId(uid);
+      const voteRef = ref(db, `problem_votes/${id}/${uid}`);
+      const result = await runTransaction(voteRef, (current: boolean | null) => {
+        return current === true ? null : true;
       });
-    } catch {
-      // ignore
+      if (!result.committed) {
+        throw new Error('Vote transaction was not committed');
+      }
+    } catch (error) {
+      console.warn('[Problemy-Chayki] vote failed:', error);
+      Alert.alert(
+        text.error,
+        language === 'en'
+          ? 'Could not count the vote. Try again.'
+          : '\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0437\u0430\u0441\u0447\u0438\u0442\u0430\u0442\u044c \u0433\u043e\u043b\u043e\u0441. \u041f\u043e\u043f\u0440\u043e\u0431\u0443\u0439\u0442\u0435 \u0435\u0449\u0435 \u0440\u0430\u0437.',
+      );
     } finally {
       setVotingBusyId(null);
     }
@@ -472,205 +632,229 @@ const language = useSelector((state: RootState) => state.language?.current ?? 'u
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.headerCard}>
-          <Text style={styles.headerTitle}>{text.headerTitle}</Text>
-          <Text style={styles.headerSubtitle}>{text.headerSubtitle}</Text>
-          <View style={styles.counterRow}>
-            <View style={styles.counterItem}>
-              <Text style={styles.counterValue}>{counters.today}</Text>
-              <Text style={styles.counterLabel}>{todayLabel}</Text>
+      {/* FlatList replaces the outer ScrollView for virtualized rendering of problem cards */}
+      <FlatList
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.content}
+        data={loading ? [] : visible}
+        keyExtractor={(item) => item.id}
+        initialNumToRender={8}
+        windowSize={5}
+        ListHeaderComponent={
+          <>
+            <View style={styles.headerCard}>
+              <Text style={styles.headerTitle}>{text.headerTitle}</Text>
+              <Text style={styles.headerSubtitle}>{text.headerSubtitle}</Text>
+              <View style={styles.counterRow}>
+                <View style={styles.counterItem}>
+                  <Text style={styles.counterValue}>{counters.today}</Text>
+                  <Text style={styles.counterLabel}>{todayLabel}</Text>
+                </View>
+                <View style={styles.counterItem}>
+                  <Text style={styles.counterValue}>{counters.last7Days}</Text>
+                  <Text style={styles.counterLabel}>{weekLabel}</Text>
+                </View>
+              </View>
             </View>
-            <View style={styles.counterItem}>
-              <Text style={styles.counterValue}>{counters.last7Days}</Text>
-              <Text style={styles.counterLabel}>{weekLabel}</Text>
-            </View>
-          </View>
-        </View>
 
-        <TouchableOpacity
-          style={styles.publishToggleBtn}
-          onPress={() => setIsPublishFormVisible(true)}
-          activeOpacity={0.86}
-        >
-          <Text style={styles.publishToggleBtnText}>{text.addRequest}</Text>
-        </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.publishToggleBtn}
+              onPress={handleAddRequestPress}
+              activeOpacity={0.86}
+            >
+              <Text style={styles.publishToggleBtnText}>{text.addRequest}</Text>
+            </TouchableOpacity>
 
-        {isPublishFormVisible ? (
-          <View style={styles.formCard}>
-            <Text style={styles.formTitle}>{text.formTitle}</Text>
-            <TextInput
-              value={title}
-              onChangeText={setTitle}
-              placeholder={text.titlePlaceholder}
-              placeholderTextColor="#9A8F80"
-              style={styles.input}
-              maxLength={120}
-            />
-            <Text style={styles.fieldLabel}>{streetLabel}</Text>
-            <View style={styles.pickerWrapper}>
-              <Picker selectedValue={street} onValueChange={setStreet} style={styles.picker}>
-                {streets.map((item) => (
-                  <Picker.Item key={item} label={item} value={item} />
-                ))}
-              </Picker>
+            {isPublishFormVisible ? (
+              <View style={styles.formCard}>
+                <Text style={styles.formTitle}>{text.formTitle}</Text>
+                <TextInput
+                  value={title}
+                  onChangeText={setTitle}
+                  placeholder={text.titlePlaceholder}
+                  placeholderTextColor="#9A8F80"
+                  style={styles.input}
+                  maxLength={120}
+                />
+                <Text style={styles.fieldLabel}>{streetLabel}</Text>
+                <View style={styles.pickerWrapper}>
+                  <Picker selectedValue={street} onValueChange={setStreet} style={styles.picker}>
+                    {streets.map((item) => (
+                      <Picker.Item key={item} label={item} value={item} />
+                    ))}
+                  </Picker>
+                </View>
+                <Text style={styles.fieldLabel}>{houseLabel}</Text>
+                <View style={styles.pickerWrapper}>
+                  <Picker selectedValue={house} onValueChange={setHouse} style={styles.picker}>
+                    {houses.map((item) => (
+                      <Picker.Item key={item} label={item} value={item} />
+                    ))}
+                  </Picker>
+                </View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
+                  {formCategories.map((currentCategory) => (
+                    <TouchableOpacity
+                      key={currentCategory}
+                      style={[styles.filter, category === currentCategory && styles.filterActive]}
+                      onPress={() => setCategory(currentCategory)}
+                    >
+                      <Text style={[styles.filterText, category === currentCategory && styles.filterTextActive]}>
+                        {currentCategory}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <Text style={styles.fieldLabel}>{requiredPhotoLabel}</Text>
+                {user?.id ? (
+                  <PhotoUploadField
+                    uid={user.id}
+                    userName={user?.name ?? ''}
+                    maxPhotos={3}
+                    storagePath="requests"
+                    onPhotosChange={setFormPhotos}
+                  />
+                ) : (
+                  <TouchableOpacity style={styles.guestPhotoBtn} onPress={handleGuestPhotoPress} activeOpacity={0.8}>
+                    <MaterialCommunityIcons name="camera-plus-outline" size={22} color={SCREEN_THEME.textSecondary} />
+                    <Text style={styles.guestPhotoBtnText}>{text.photoAuthBtn}</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity style={[styles.addBtn, submitting && { opacity: 0.7 }]} onPress={addProblem} disabled={submitting} activeOpacity={0.85}>
+                  {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.addBtnText}>{text.add}</Text>}
+                </TouchableOpacity>
+              </View>
+            ) : null}
+
+            {/* Перемикач сортування */}
+            <View style={styles.sortRow}>
+              <TouchableOpacity
+                style={[styles.sortBtn, sortMode === 'date' && styles.sortBtnActive]}
+                onPress={() => setSortMode('date')}
+                activeOpacity={0.82}
+              >
+                <MaterialCommunityIcons name="clock-outline" size={13} color={sortMode === 'date' ? '#fff' : SCREEN_THEME.terracottaDark} />
+                <Text style={[styles.sortBtnText, sortMode === 'date' && styles.sortBtnTextActive]}>{text.sortByDate}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.sortBtn, sortMode === 'votes' && styles.sortBtnActive]}
+                onPress={() => setSortMode('votes')}
+                activeOpacity={0.82}
+              >
+                <MaterialCommunityIcons name="heart-outline" size={13} color={sortMode === 'votes' ? '#fff' : SCREEN_THEME.terracottaDark} />
+                <Text style={[styles.sortBtnText, sortMode === 'votes' && styles.sortBtnTextActive]}>{text.sortByVotes}</Text>
+              </TouchableOpacity>
             </View>
-            <Text style={styles.fieldLabel}>{houseLabel}</Text>
-            <View style={styles.pickerWrapper}>
-              <Picker selectedValue={house} onValueChange={setHouse} style={styles.picker}>
-                {houses.map((item) => (
-                  <Picker.Item key={item} label={item} value={item} />
-                ))}
-              </Picker>
-            </View>
+
+            {/* Horizontal category filter — kept as-is inside the header */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
-              {formCategories.map((currentCategory) => (
+              {categories.map((currentCategory) => (
                 <TouchableOpacity
                   key={currentCategory}
-                  style={[styles.filter, category === currentCategory && styles.filterActive]}
-                  onPress={() => setCategory(currentCategory)}
+                  style={[styles.filter, filter === currentCategory && styles.filterActive]}
+                  onPress={() => setFilter(currentCategory)}
                 >
-                  <Text style={[styles.filterText, category === currentCategory && styles.filterTextActive]}>
+                  <Text style={[styles.filterText, filter === currentCategory && styles.filterTextActive]}>
                     {currentCategory}
                   </Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
-            <PhotoUploadField
-              uid={user?.id ?? ''}
-              userName={user?.name ?? ''}
-              maxPhotos={3}
-              storagePath="requests"
-              onPhotosChange={(photos) => setFormPhotos(photos.filter((p) => p.status === 'done'))}
-            />
-            <TouchableOpacity style={[styles.addBtn, submitting && { opacity: 0.7 }]} onPress={addProblem} disabled={submitting} activeOpacity={0.85}>
-              {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.addBtnText}>{text.add}</Text>}
-            </TouchableOpacity>
-          </View>
-        ) : null}
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
-          {categories.map((currentCategory) => (
+          </>
+        }
+        renderItem={({ item: problem }) => (
+          <View style={styles.item}>
             <TouchableOpacity
-              key={currentCategory}
-              style={[styles.filter, filter === currentCategory && styles.filterActive]}
-              onPress={() => setFilter(currentCategory)}
-            >
-              <Text style={[styles.filterText, filter === currentCategory && styles.filterTextActive]}>
-                {currentCategory}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {loading ? (
-          <View style={styles.emptyState}>
-            <ActivityIndicator color={SCREEN_THEME.terracotta} size="large" />
-          </View>
-        ) : visible.length > 0 ? (
-          visible.map((problem) => (
-            <TouchableOpacity
-              key={problem.id}
-              style={styles.item}
-              onPress={() => navigation.navigate('ItemDetailScreen', { item: mapToDetailData(problem) })}
+              style={styles.topRow}
+              onPress={() => { if (navLock.current) return; navLock.current = true; navigation.navigate('ItemDetailScreen', { item: mapToDetailData(problem) }); setTimeout(() => { navLock.current = false; }, 800); }}
               activeOpacity={0.86}
             >
-              <View style={styles.topRow}>
-                <View style={styles.visualWrap}>
-                  {problem.photoUri || problem.photoStoragePath ? (
-                    <AppPhotoImage
-                      uri={problem.photoUri}
-                      storagePath={problem.photoStoragePath}
-                      style={styles.cardPhoto}
-                      resizeMode="cover"
-                      debugLabel={`ProblemsCard:${problem.id}`}
-                      showDebugInfo={false}
-                    />
-                  ) : (
-                    <View style={[styles.cardPhoto, styles.cardPhotoPlaceholder]}>
-                      <MaterialCommunityIcons name="image-off-outline" size={26} color="#B8A888" />
-                    </View>
-                  )}
-                </View>
-
-                <View style={styles.copy}>
-                  <View style={styles.itemTitleBox}>
-                    <Text style={styles.itemTitle} numberOfLines={2}>{problem.title}</Text>
+              <View style={styles.visualWrap}>
+                {problem.photoUri || problem.photoStoragePath ? (
+                  <AppPhotoImage
+                    uri={problem.photoUri}
+                    storagePath={problem.photoStoragePath}
+                    style={styles.cardPhoto}
+                    resizeMode="cover"
+                    debugLabel={`ProblemsCard:${problem.id}`}
+                    showDebugInfo={false}
+                  />
+                ) : (
+                  <View style={[styles.cardPhoto, styles.cardPhotoPlaceholder]}>
+                    <MaterialCommunityIcons name="image-off-outline" size={26} color="#B8A888" />
                   </View>
-
-                  <View style={styles.addressRow}>
-                    {!!problem.street && <Text style={styles.addressStreet} numberOfLines={1}>{problem.street}</Text>}
-                    {!!problem.house && (
-                      <View style={styles.houseBadge}>
-                        <Text style={styles.houseBadgeText} numberOfLines={1}>{problem.house}</Text>
-                      </View>
-                    )}
-                  </View>
-                  <View style={styles.personMetaRow}>
-                    <Text style={styles.personMetaText} numberOfLines={1}>{problem.category} - {problem.votes} {text.votes}</Text>
-                  </View>
-                </View>
+                )}
               </View>
 
-              <View style={styles.bottomActionsRow}>
-                <View style={styles.leftBottomArea}>
-                  <MiniUserAvatar uri={problem.avatarUri || ''} name={problem.name || ''} size={42} borderRadius={14} backgroundColor="#6A8BA5" />
-                  <TouchableOpacity
-                    style={[styles.actionPill, !problem.userId && styles.actionPillDisabled]}
-                    onPress={(e) => { e.stopPropagation(); if (problem.userId) navigation.navigate('ViewUserProfile', { userId: problem.userId }); }}
-                    disabled={!problem.userId}
-                    activeOpacity={problem.userId ? 0.78 : 1}
-                  >
-                    <MaterialCommunityIcons name="badge-account-horizontal-outline" size={15} color="#7A1E5C" />
-                    <Text style={styles.actionPillText} numberOfLines={1}>{profileActionLabel}</Text>
-                  </TouchableOpacity>
+              <View style={styles.copy}>
+                <View style={styles.itemTitleBox}>
+                  <Text style={styles.itemTitle} numberOfLines={2}>{problem.title}</Text>
                 </View>
-                <View style={styles.rightBottomArea}>
-                  <TouchableOpacity
-                    style={[styles.actionPill, !problem.phone && styles.actionPillDisabled]}
-                    onPress={(e) => { e.stopPropagation(); void safeCallPhone(problem.phone, language); }}
-                    disabled={!problem.phone}
-                    activeOpacity={problem.phone ? 0.78 : 1}
-                  >
-                    <MaterialCommunityIcons name="phone-outline" size={15} color="#7A1E5C" />
-                    <Text style={styles.actionPillText} numberOfLines={1}>{callActionLabel}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.actionPill, styles.viberPill, !problem.phone && styles.actionPillDisabled]}
-                    onPress={(e) => { e.stopPropagation(); void safeOpenViber(problem.phone, language); }}
-                    disabled={!problem.phone}
-                    activeOpacity={problem.phone ? 0.78 : 1}
-                  >
-                    <MaterialCommunityIcons name="message-text-outline" size={15} color="#FFFFFF" />
-                    <Text style={[styles.actionPillText, styles.viberPillText]} numberOfLines={1}>Viber</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.voteBtn, problem.hasVoted && styles.voteBtnVoted, (!user?.id || votingBusyId === problem.id) && styles.voteBtnDisabled]}
-                    onPress={(e) => { e.stopPropagation(); void upvote(problem.id); }}
-                    disabled={!user?.id || votingBusyId === problem.id}
-                    activeOpacity={user?.id && votingBusyId !== problem.id ? 0.75 : 1}
-                  >
-                    {votingBusyId === problem.id ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                      <>
-                        <MaterialCommunityIcons name={problem.hasVoted ? 'heart' : 'heart-outline'} size={18} color="#FFFFFF" />
-                        <Text style={styles.voteCount}>{problem.votes}</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
+
+                <View style={styles.addressRow}>
+                  {!!problem.street && <Text style={styles.addressStreet} numberOfLines={1}>{problem.street}</Text>}
+                  {!!problem.house && <Text style={styles.addressHouse} numberOfLines={1}>{problem.house}</Text>}
+                </View>
+                <View style={styles.personMetaRow}>
+                  <Text style={styles.personMetaText} numberOfLines={1}>{problem.category} - {problem.votes} {text.votes}</Text>
                 </View>
               </View>
             </TouchableOpacity>
-          ))
-        ) : (
-          <View style={styles.emptyState}>
-            <TactileIcon icon="checkbox-marked-circle-outline" size={54} iconSize={26} backgroundColor="#403933" />
-            <Text style={styles.emptyTitle}>{text.emptyTitle}</Text>
-            <Text style={styles.emptySub}>{text.emptySubtitle}</Text>
+
+            <View style={styles.bottomActionsRow}>
+              <View style={styles.actionsInnerRow}>
+                <MiniUserAvatar uri={problem.avatarUri || ''} name={problem.name || ''} size={42} borderRadius={14} backgroundColor="#6A8BA5" />
+                <TouchableOpacity
+                  style={[styles.actionPill, styles.profilePill, !problem.userId && styles.actionPillDisabled]}
+                  onPress={(e) => { e.stopPropagation(); if (!problem.userId || navLock.current) return; navLock.current = true; navigation.navigate('ViewUserProfile', { userId: problem.userId }); setTimeout(() => { navLock.current = false; }, 800); }}
+                  disabled={!problem.userId}
+                  activeOpacity={problem.userId ? 0.78 : 1}
+                >
+                  <MaterialCommunityIcons name="badge-account-horizontal-outline" size={15} color="#7A1E5C" />
+                  <Text style={styles.actionPillText} numberOfLines={1}>{profileActionLabel}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionPill, styles.contactPill, (!problem.userId && !problem.phone) && styles.actionPillDisabled]}
+                  onPress={() => openContactOptions(problem)}
+                  disabled={!problem.userId && !problem.phone}
+                  activeOpacity={problem.userId || problem.phone ? 0.78 : 1}
+                >
+                  <MaterialCommunityIcons name="message-text-outline" size={15} color="#FFFFFF" />
+                  <Text style={[styles.actionPillText, styles.contactPillText]} numberOfLines={1}>{contactActionLabel}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.voteBtn, problem.hasVoted && styles.voteBtnVoted, votingBusyId === problem.id && styles.voteBtnDisabled]}
+                  onPress={() => { void upvote(problem.id); }}
+                  disabled={votingBusyId === problem.id}
+                  activeOpacity={votingBusyId !== problem.id ? 0.75 : 1}
+                >
+                  {votingBusyId === problem.id ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <MaterialCommunityIcons name={problem.hasVoted ? 'heart' : 'heart-outline'} size={18} color="#FFFFFF" />
+                      <Text style={styles.voteCount}>{problem.votes}</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
         )}
-      </ScrollView>
+        ListEmptyComponent={
+          loading ? (
+            <View style={styles.emptyState}>
+              <ActivityIndicator color={SCREEN_THEME.terracotta} size="large" />
+            </View>
+          ) : (
+            <View style={styles.emptyState}>
+              <TactileIcon icon="checkbox-marked-circle-outline" size={54} iconSize={26} backgroundColor="#403933" />
+              <Text style={styles.emptyTitle}>{text.emptyTitle}</Text>
+              <Text style={styles.emptySub}>{text.emptySubtitle}</Text>
+            </View>
+          )
+        }
+      />
       <ContactReasonModal
         visible={contactModalVisible}
         pending={contactPending}
@@ -839,20 +1023,17 @@ const styles = StyleSheet.create({
   addressStreet: {
     color: '#4E4237',
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '800',
     flex: 1,
     minWidth: 0,
   },
-  houseBadge: {
-    backgroundColor: '#F7EBD5',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#E4D0AB',
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    maxWidth: 46,
+  addressHouse: {
+    color: '#4E4237',
+    fontSize: 12,
+    fontWeight: '800',
+    flexShrink: 0,
+    maxWidth: 48,
   },
-  houseBadgeText: { color: '#4E4237', fontSize: 11, fontWeight: '900' },
   personMetaRow: { marginTop: 3, flexDirection: 'row', alignItems: 'center' },
   personMetaText: { color: '#77695A', fontSize: 12, fontWeight: '800' },
   itemMeta: { marginTop: 2, color: SCREEN_THEME.textSecondary, fontSize: 12 },
@@ -861,24 +1042,12 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: '#E4D0AB',
+  },
+  actionsInnerRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 5,
     justifyContent: 'space-between',
-    gap: 6,
-  },
-  leftBottomArea: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    flex: 1,
-    minWidth: 0,
-  },
-  rightBottomArea: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    flexShrink: 1,
-    minWidth: 0,
   },
   personRow: {
     flexDirection: 'row',
@@ -896,17 +1065,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
-    paddingHorizontal: 12,
+    gap: 4,
+    paddingHorizontal: 9,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: '#D4B9A8',
     backgroundColor: '#FFF8EA',
     flexShrink: 1,
   },
-  viberPill: {
-    backgroundColor: '#7360F2',
-    borderColor: '#7360F2',
+  profilePill: {
+    flex: 1.2,
+    minWidth: 0,
+  },
+  contactPill: {
+    flex: 0.9,
+    minWidth: 0,
+    backgroundColor: '#8F1238',
+    borderColor: '#8F1238',
   },
   actionPillDisabled: {
     opacity: 0.45,
@@ -917,7 +1092,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     flexShrink: 1,
   },
-  viberPillText: { color: '#FFFFFF' },
+  contactPillText: { color: '#FFFFFF' },
   voteBtn: {
     flexDirection: 'row',
     gap: 4,
@@ -943,6 +1118,52 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: 'center', paddingVertical: 32 },
   emptyTitle: { fontSize: 18, fontWeight: '800', color: SCREEN_THEME.textPrimary, marginTop: 14 },
   emptySub: { color: SCREEN_THEME.textSecondary, marginTop: 6, textAlign: 'center' },
+  sortRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 4,
+    marginTop: 4,
+  },
+  sortBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: '#F3ECE4',
+    borderWidth: 1,
+    borderColor: '#E4D0AB',
+  },
+  sortBtnActive: {
+    backgroundColor: SCREEN_THEME.terracotta,
+    borderColor: SCREEN_THEME.terracotta,
+  },
+  sortBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: SCREEN_THEME.terracottaDark,
+  },
+  sortBtnTextActive: {
+    color: '#FFFFFF',
+  },
+  guestPhotoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E4D0AB',
+    backgroundColor: '#F3ECE4',
+  },
+  guestPhotoBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: SCREEN_THEME.textSecondary,
+  },
 });
 
 

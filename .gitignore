@@ -91,3 +91,14 @@ make_animation.py
 optimize_assets.py
 check_lmstudio.bat
 chaika-site/
+*.bat
+three-brains.md
+nul
+src/nul
+admin-panel/nul
+.netlify/
+.gradle-user-home/
+.task/
+admin-panel/--*
+admin-panel/receipt*.pdf
+admin-panel/nul

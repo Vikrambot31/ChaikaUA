@@ -21,33 +21,13 @@ const PressableButtonCard: React.FC<PressableButtonCardProps> = ({
   const [shadowOpacity] = useState(new Animated.Value(0.1));
 
   const handlePressIn = () => {
-    Animated.parallel([
-      Animated.timing(scaleValue, {
-        toValue: 0.95,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(shadowOpacity, {
-        toValue: 0.3,
-        duration: 100,
-        useNativeDriver: false,
-      }),
-    ]).start();
+    Animated.timing(scaleValue, { toValue: 0.95, duration: 100, useNativeDriver: true }).start();
+    Animated.timing(shadowOpacity, { toValue: 0.3, duration: 100, useNativeDriver: false }).start();
   };
 
   const handlePressOut = () => {
-    Animated.parallel([
-      Animated.timing(scaleValue, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(shadowOpacity, {
-        toValue: 0.1,
-        duration: 100,
-        useNativeDriver: false,
-      }),
-    ]).start();
+    Animated.timing(scaleValue, { toValue: 1, duration: 100, useNativeDriver: true }).start();
+    Animated.timing(shadowOpacity, { toValue: 0.1, duration: 100, useNativeDriver: false }).start();
   };
 
   return (

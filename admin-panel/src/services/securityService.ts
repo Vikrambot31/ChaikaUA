@@ -1,4 +1,4 @@
-import { get, off, onValue, ref, remove, set, update } from 'firebase/database';
+import { get, off, onValue, ref, set, update } from 'firebase/database';
 import { database } from '../firebase/firebase';
 import {
   SECURITY_APP_CONTROL_PATH,
@@ -6,6 +6,7 @@ import {
   SECURITY_LOGS_PATH,
   USERS_PATH,
 } from './securityPaths';
+import { LOCAL_MODE, localGet, localPatch } from '../local/LOCAL_MODE';
 
 export type RemoteAppControlConfig = {
   app_enabled: boolean;
@@ -61,6 +62,21 @@ type RawSecurityLog = {
   } | null;
 };
 
+export type ModeratorRoleRecord = {
+  uid: string;
+  role: 'admin' | 'moderator';
+};
+
+export const getModeratorRoles = async (): Promise<ModeratorRoleRecord[]> => {
+  if (LOCAL_MODE) return [];
+  const snap = await get(ref(database, 'user_roles'));
+  if (!snap.exists()) return [];
+  const raw = snap.val() as Record<string, { role?: unknown }>;
+  return Object.entries(raw)
+    .filter(([, v]) => v?.role === 'admin' || v?.role === 'moderator')
+    .map(([uid, v]) => ({ uid, role: v.role as 'admin' | 'moderator' }));
+};
+
 export const DEFAULT_REMOTE_APP_CONTROL_CONFIG: RemoteAppControlConfig = {
   app_enabled: true,
   maintenance_mode: false,
@@ -72,7 +88,19 @@ export const DEFAULT_REMOTE_APP_CONTROL_CONFIG: RemoteAppControlConfig = {
   config_version: 1,
   updated_at: 0,
 };
+const INVALID_BOOLEAN_FALLBACKS = {
+  allow_new_devices: true,
+  app_enabled: true,
+  maintenance_mode: false,
+  force_update_required: false,
+  beta_mode_enabled: false,
+} as const;
 const MAX_FEED_ITEMS = 50;
+
+const normalizeBoolean = (value: unknown, fallback: boolean, invalidFallback = fallback): boolean => {
+  if (typeof value === 'boolean') return value;
+  return value === undefined ? fallback : invalidFallback;
+};
 
 const normalizeVersion = (value: unknown): string => {
   if (typeof value !== 'string') return DEFAULT_REMOTE_APP_CONTROL_CONFIG.minimum_required_version;
@@ -88,13 +116,13 @@ const normalizeMessage = (value: unknown): string =>
 export const normalizeRemoteAppControlConfig = (value: unknown): RemoteAppControlConfig => {
   const raw = (value as Partial<RemoteAppControlConfig> | null) ?? {};
   return {
-    app_enabled: raw.app_enabled !== false,
-    maintenance_mode: raw.maintenance_mode === true,
+    app_enabled: normalizeBoolean(raw.app_enabled, DEFAULT_REMOTE_APP_CONTROL_CONFIG.app_enabled, INVALID_BOOLEAN_FALLBACKS.app_enabled),
+    maintenance_mode: normalizeBoolean(raw.maintenance_mode, DEFAULT_REMOTE_APP_CONTROL_CONFIG.maintenance_mode, INVALID_BOOLEAN_FALLBACKS.maintenance_mode),
     maintenance_message: normalizeMessage(raw.maintenance_message),
     minimum_required_version: normalizeVersion(raw.minimum_required_version),
-    force_update_required: raw.force_update_required === true,
-    allow_new_devices: raw.allow_new_devices !== false,
-    beta_mode_enabled: raw.beta_mode_enabled === true,
+    force_update_required: normalizeBoolean(raw.force_update_required, DEFAULT_REMOTE_APP_CONTROL_CONFIG.force_update_required, INVALID_BOOLEAN_FALLBACKS.force_update_required),
+    allow_new_devices: normalizeBoolean(raw.allow_new_devices, DEFAULT_REMOTE_APP_CONTROL_CONFIG.allow_new_devices, INVALID_BOOLEAN_FALLBACKS.allow_new_devices),
+    beta_mode_enabled: normalizeBoolean(raw.beta_mode_enabled, DEFAULT_REMOTE_APP_CONTROL_CONFIG.beta_mode_enabled, INVALID_BOOLEAN_FALLBACKS.beta_mode_enabled),
     config_version: Number.isFinite(raw.config_version) ? Number(raw.config_version) : 1,
     updated_at: Number.isFinite(raw.updated_at) ? Number(raw.updated_at) : 0,
     updated_by: typeof raw.updated_by === 'string' ? raw.updated_by.slice(0, 120) : undefined,
@@ -183,6 +211,14 @@ export const subscribeSecurityAppControl = (
   onData: (config: RemoteAppControlConfig) => void,
   onError?: (error: Error) => void,
 ): (() => void) => {
+  // LOCAL_MODE: poll local json-server once and return a no-op unsubscribe
+  if (LOCAL_MODE) {
+    localGet<Record<string, unknown>>('/app_control')
+      .then((raw) => onData(normalizeRemoteAppControlConfig(raw)))
+      .catch((err: unknown) => onError?.(err instanceof Error ? err : new Error(String(err))));
+    return () => {};
+  }
+
   const appControlRef = ref(database, SECURITY_APP_CONTROL_PATH);
   return onValue(
     appControlRef,
@@ -195,10 +231,21 @@ export const subscribeManagedAuthorizedDevices = (
   onData: (devices: ManagedAuthorizedDevice[]) => void,
   onError?: (error: Error) => void,
 ): (() => void) => {
+  // LOCAL_MODE: fetch authorized_devices list from local json-server
+  if (LOCAL_MODE) {
+    localGet<ManagedAuthorizedDevice[]>('/authorized_devices')
+      .then((raw) => onData(Array.isArray(raw) ? raw : []))
+      .catch((err: unknown) => onError?.(err instanceof Error ? err : new Error(String(err))));
+    return () => {};
+  }
+
   const devicesRef = ref(database, SECURITY_AUTHORIZED_DEVICES_PATH);
+  let requestVersion = 0;
   const unsubscribe = onValue(
     devicesRef,
     (snapshot) => {
+      requestVersion += 1;
+      const currentRequestVersion = requestVersion;
       const raw = snapshot.val() as Record<string, Record<string, RawDevice>> | null;
       if (!raw) {
         onData([]);
@@ -216,9 +263,14 @@ export const subscribeManagedAuthorizedDevices = (
 
           const dedupedDevices = dedupeDevicesByLatestActivity(devices);
           dedupedDevices.sort((left, right) => getDeviceActivityTimestamp(right) - getDeviceActivityTimestamp(left));
+          // Ignore outdated async responses that arrive after a newer snapshot.
+          if (currentRequestVersion !== requestVersion) return;
           onData(dedupedDevices);
         })
-        .catch((error: unknown) => onError?.(error instanceof Error ? error : new Error(String(error))));
+        .catch((error: unknown) => {
+          if (currentRequestVersion !== requestVersion) return;
+          onError?.(error instanceof Error ? error : new Error(String(error)));
+        });
     },
     (error) => onError?.(error),
   );
@@ -233,6 +285,14 @@ export const subscribeSecurityLogs = (
   onData: (logs: SecurityLogRecord[]) => void,
   onError?: (error: Error) => void,
 ): (() => void) => {
+  // LOCAL_MODE: fetch security_logs list from local json-server
+  if (LOCAL_MODE) {
+    localGet<SecurityLogRecord[]>('/security_logs')
+      .then((raw) => onData(Array.isArray(raw) ? raw : []))
+      .catch((err: unknown) => onError?.(err instanceof Error ? err : new Error(String(err))));
+    return () => {};
+  }
+
   const logsRef = ref(database, SECURITY_LOGS_PATH);
   const unsubscribe = onValue(
     logsRef,
@@ -255,13 +315,6 @@ export const subscribeSecurityLogs = (
       );
 
       logs.sort((left, right) => right.created_at - left.created_at);
-      const staleLogs = logs.slice(MAX_FEED_ITEMS);
-      if (staleLogs.length) {
-        void Promise.allSettled(
-          staleLogs.map((log) => remove(ref(database, `${SECURITY_LOGS_PATH}/${log.partition}/${log.id}`))),
-        );
-      }
-
       onData(logs.slice(0, MAX_FEED_ITEMS));
     },
     (error) => onError?.(error),
@@ -277,6 +330,12 @@ export const updateSecurityAppControl = async (
   patch: Partial<RemoteAppControlConfig>,
   actorUid: string,
 ): Promise<{ changed: boolean }> => {
+  // LOCAL_MODE: patch app_control on local json-server
+  if (LOCAL_MODE) {
+    await localPatch('/app_control', { ...patch, updated_at: Date.now(), updated_by: actorUid });
+    return { changed: true };
+  }
+
   const snapshot = await get(ref(database, SECURITY_APP_CONTROL_PATH));
   const currentConfig = normalizeRemoteAppControlConfig(snapshot.val() ?? DEFAULT_REMOTE_APP_CONTROL_CONFIG);
   const hasChanges = Object.entries(patch).some(([key, value]) => currentConfig[key as keyof RemoteAppControlConfig] !== value);
@@ -304,6 +363,9 @@ export const setPersonalForceUpdate = async (
   deviceId: string,
   value: boolean,
 ): Promise<void> => {
+  // LOCAL_MODE: stub — no-op
+  if (LOCAL_MODE) return;
+
   await update(ref(database, `${SECURITY_AUTHORIZED_DEVICES_PATH}/${uid}/${deviceId}`), {
     personal_force_update: value,
   });
@@ -314,6 +376,19 @@ export const updateManagedDeviceStatus = async (
   deviceId: string,
   patch: Pick<ManagedAuthorizedDevice, 'is_allowed' | 'is_blocked'>,
 ): Promise<{ changed: boolean }> => {
+  // LOCAL_MODE: find device by uid+device_id and patch it on local json-server
+  if (LOCAL_MODE) {
+    const devices = await localGet<Array<ManagedAuthorizedDevice & { id?: string }>>('/authorized_devices');
+    const device = Array.isArray(devices)
+      ? devices.find((d) => d.uid === uid && d.device_id === deviceId)
+      : null;
+    if (device?.id) {
+      await localPatch(`/authorized_devices/${device.id}`, patch);
+      return { changed: true };
+    }
+    return { changed: false };
+  }
+
   const deviceRef = ref(database, `${SECURITY_AUTHORIZED_DEVICES_PATH}/${uid}/${deviceId}`);
   const snapshot = await get(deviceRef);
   const currentValue = snapshot.val() as RawDevice | null;

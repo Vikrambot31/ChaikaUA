@@ -1,16 +1,79 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { usePhotoApproval } from '../hooks/usePhotoApproval';
-import { storage } from '../firebase/firebase';
 import {
   approvePhoto,
   rejectPhoto,
   deletePhoto,
   deletePhotos,
   resolvePhotoUrl,
-  resolvePhotoAccessUrl,
-  resolvePhotoDataUrl,
   type PhotoRecord,
 } from '../services/photoApprovalService';
+
+const PhotoThumb = ({
+  photo,
+  onOpenLightbox,
+}: {
+  photo: PhotoRecord;
+  onOpenLightbox: (url: string) => void;
+}) => {
+  const [src, setSrc] = useState<string>(photo.imageUri);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!/^https?:\/\//i.test(photo.imageUri) || photo.storagePath) {
+      resolvePhotoUrl(photo).then((url) => {
+        if (!cancelled) setSrc(url);
+      }).catch(() => {/* keep original */});
+    }
+    return () => { cancelled = true; };
+  }, [photo]);
+
+  return (
+    <button
+      type="button"
+      onClick={() => onOpenLightbox(src)}
+      style={{ padding: 0, border: 'none', background: 'none', cursor: 'zoom-in' }}
+      title="Открыть фото"
+    >
+      <img
+        src={src}
+        alt=""
+        style={{ width: 64, height: 64, borderRadius: 8, objectFit: 'cover', display: 'block' }}
+        onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0.3'; }}
+      />
+    </button>
+  );
+};
+
+const Lightbox = ({ url, onClose }: { url: string; onClose: () => void }) => (
+  <div
+    onClick={onClose}
+    style={{
+      position: 'fixed', inset: 0, zIndex: 9999,
+      background: 'rgba(0,0,0,0.88)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      cursor: 'zoom-out',
+    }}
+  >
+    <img
+      src={url}
+      alt=""
+      onClick={(e) => e.stopPropagation()}
+      style={{ maxWidth: '90vw', maxHeight: '90vh', borderRadius: 12, boxShadow: '0 8px 40px #000a' }}
+    />
+    <button
+      type="button"
+      onClick={onClose}
+      style={{
+        position: 'fixed', top: 20, right: 24,
+        background: 'none', border: 'none', color: '#fff',
+        fontSize: 32, cursor: 'pointer', lineHeight: 1,
+      }}
+    >
+      ×
+    </button>
+  </div>
+);
 
 const dateTime = (ts: number) =>
   ts
@@ -25,433 +88,13 @@ const dateTime = (ts: number) =>
 
 type Filter = 'pending' | 'approved' | 'rejected' | 'all';
 
-const PhotoCard = ({
-  photo,
-  selected,
-  onToggleSelect,
-  onApprove,
-  onReject,
-  onDelete,
-  onRemoved,
-}: {
-  photo: PhotoRecord;
-  selected: boolean;
-  onToggleSelect: () => void;
-  onApprove: () => Promise<void>;
-  onReject: (reason: string) => Promise<void>;
-  onDelete: () => Promise<void>;
-  onRemoved: () => void;
-}) => {
-  const [rejectMode, setRejectMode] = useState(false);
-  const [reason, setReason] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [cardError, setCardError] = useState('');
-  const [imgSrc, setImgSrc] = useState(photo.imageUri);
-  const [imgFailed, setImgFailed] = useState(false);
-  const [imageErrorText, setImageErrorText] = useState('');
-  const [urlBusy, setUrlBusy] = useState(false);
-  const autoRefreshTriedRef = useRef(false);
-  const dataUrlTriedRef = useRef(false);
+const getSourceLabel = (photo: PhotoRecord): string =>
+  photo.sourceScreenLabel || photo.sourceScreen || 'Источник неизвестен';
 
-  const handleApprove = async () => {
-    setBusy(true);
-    setCardError('');
-    try {
-      await onApprove();
-    } catch (err) {
-      setCardError(err instanceof Error ? err.message : 'Не удалось одобрить.');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleReject = async () => {
-    setBusy(true);
-    setCardError('');
-    try {
-      await onReject(reason);
-      setRejectMode(false);
-      setReason('');
-    } catch (err) {
-      setCardError(err instanceof Error ? err.message : 'Не удалось отклонить.');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    setBusy(true);
-    try {
-      await onDelete();
-      onRemoved();
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleRefreshUrl = async () => {
-    if (!photo.storagePath) return;
-    autoRefreshTriedRef.current = true;
-    setUrlBusy(true);
-    setCardError('');
-    setImageErrorText('');
-    try {
-      const fresh = await resolvePhotoUrl(photo);
-      setImgSrc(fresh);
-      setImgFailed(false);
-    } catch (err) {
-      console.error('handleRefreshUrl failed:', err);
-      try {
-        const fresh = await resolvePhotoAccessUrl(photo);
-        setImgSrc(fresh);
-        setImgFailed(false);
-      } catch (err2) {
-        console.error('handleRefreshUrl (fallback) failed:', err2);
-        setCardError('Не удалось обновить URL.');
-      }
-    } finally {
-      setUrlBusy(false);
-    }
-  };
-
-  const handleDataUrlFallback = async () => {
-    if (!photo.storagePath || dataUrlTriedRef.current) return;
-    dataUrlTriedRef.current = true;
-    setUrlBusy(true);
-    setCardError('');
-    setImageErrorText('Пробую прочитать файл через серверный fallback...');
-    try {
-      const dataUrl = await resolvePhotoDataUrl(photo);
-      setImgSrc(dataUrl);
-      setImgFailed(false);
-      setImageErrorText('');
-    } catch (err) {
-      console.error('handleDataUrlFallback failed:', err);
-      setImageErrorText('Файл найден, но не читается даже через серверный fallback. Вероятно, файл в Storage повреждён. Удалите это фото и загрузите заново после обновления приложения.');
-      setImgFailed(true);
-    } finally {
-      setUrlBusy(false);
-    }
-  };
-
-  useEffect(() => {
-    if (photo.storagePath && !autoRefreshTriedRef.current) {
-      void handleRefreshUrl();
-    } else if (!photo.storagePath && photo.imageUri && !/^https?:\/\//i.test(photo.imageUri)) {
-      const sp = photo.imageUri;
-      const bucket = typeof storage.app.options.storageBucket === 'string' ? storage.app.options.storageBucket : '';
-      const encoded = sp.split('/').map(encodeURIComponent).join('%2F');
-      setImgSrc(`https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encoded}?alt=media`);
-    }
-  }, [photo.id, photo.storagePath]);
-
-  const handleImageError = () => {
-    if (photo.storagePath && !autoRefreshTriedRef.current) {
-      autoRefreshTriedRef.current = true;
-      setImgFailed(true);
-      setImageErrorText('Пробую получить свежий доступ к файлу...');
-      void handleRefreshUrl();
-      return;
-    }
-    if (photo.storagePath && !dataUrlTriedRef.current) {
-      setImgFailed(true);
-      void handleDataUrlFallback();
-      return;
-    }
-    setImageErrorText('Файл найден, но браузер не может прочитать изображение. Вероятно, файл в Storage повреждён или загружен не как JPEG. Удалите это фото и загрузите заново после обновления приложения.');
-    setImgFailed(true);
-  };
-
-  const statusStyle =
-    photo.status === 'approved'
-      ? { border: '1px solid #2e7d32', background: '#f1f8f2' }
-      : photo.status === 'rejected'
-        ? { border: '1px solid #7a1e1e', background: '#fdf1f1' }
-        : { border: '1px solid #253040', background: '#141b24' };
-
-  return (
-    <div
-      style={{
-        ...statusStyle,
-        borderRadius: 10,
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-      }}
-    >
-      <div style={{ position: 'relative' }}>
-        {imgFailed ? (
-          <div
-            style={{
-              width: '100%',
-              aspectRatio: '1',
-              background: '#1a2030',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 8,
-            }}
-          >
-            <span style={{ color: '#5d6f8b', fontSize: 12 }}>{'Фото недоступно'}</span>
-            {imageErrorText && (
-              <span style={{ color: '#8bb2d6', fontSize: 10, maxWidth: 170, textAlign: 'center', lineHeight: 1.35 }}>
-                {imageErrorText}
-              </span>
-            )}
-            {photo.storagePath && (
-              <button
-                type="button"
-                disabled={urlBusy}
-                onClick={() => void handleRefreshUrl()}
-                style={{
-                  padding: '4px 10px',
-                  borderRadius: 6,
-                  border: '1px solid #4b7f9e',
-                  background: '#1a2d3d',
-                  color: '#7ab8d8',
-                  fontSize: 11,
-                  cursor: 'pointer',
-                  opacity: urlBusy ? 0.6 : 1,
-                }}
-              >
-                {urlBusy ? 'Загрузка...' : 'Обновить URL'}
-              </button>
-            )}
-          </div>
-        ) : (
-          <img
-            src={imgSrc}
-            alt=""
-            style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', display: 'block' }}
-            onError={handleImageError}
-          />
-        )}
-        <div
-          style={{
-            position: 'absolute',
-            top: 6,
-            left: 6,
-            padding: '2px 8px',
-            borderRadius: 6,
-            fontSize: 11,
-            fontWeight: 800,
-            background:
-              photo.status === 'approved'
-                ? '#2e7d32'
-                : photo.status === 'rejected'
-                  ? '#c62828'
-                  : '#F57F17',
-            color: '#fff',
-          }}
-        >
-          {photo.status === 'approved'
-            ? 'Одобрено'
-            : photo.status === 'rejected'
-              ? 'Отклонено'
-              : 'Ожидает'}
-        </div>
-        <label
-          style={{
-            position: 'absolute',
-            top: 6,
-            right: 6,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            background: 'rgba(20,27,36,0.86)',
-            border: '1px solid #3a4b59',
-            borderRadius: 6,
-            padding: '3px 8px',
-            color: '#e8f0fe',
-            fontSize: 11,
-            fontWeight: 700,
-            cursor: 'pointer',
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={selected}
-            onChange={onToggleSelect}
-            disabled={busy}
-            style={{ cursor: 'pointer' }}
-          />
-          {'Выбрать'}
-        </label>
-      </div>
-
-      <div
-        style={{
-          padding: '10px 12px',
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 4,
-        }}
-      >
-        {photo.title && (
-          <p
-            style={{
-              margin: 0,
-              fontWeight: 700,
-              fontSize: 13,
-              color: '#e8f0fe',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {photo.title}
-          </p>
-        )}
-        {photo.uploadedBy && (
-          <p style={{ margin: 0, fontSize: 11, color: '#8bb2d6' }}>{photo.uploadedBy}</p>
-        )}
-        <p style={{ margin: 0, fontSize: 11, color: '#5d6f8b' }}>{dateTime(photo.uploadedAt)}</p>
-        {photo.moderationReason && (
-          <p style={{ margin: 0, fontSize: 11, color: '#e88', fontStyle: 'italic' }}>
-            {'Причина: '}
-            {photo.moderationReason}
-          </p>
-        )}
-        {photo.moderatedAt ? (
-          <p style={{ margin: 0, fontSize: 10, color: '#3d5166' }}>
-            {'Проверено: '}
-            {dateTime(photo.moderatedAt)}
-          </p>
-        ) : null}
-
-        {cardError && (
-          <p style={{ margin: '6px 0 0', fontSize: 11, color: '#e05050' }}>{cardError}</p>
-        )}
-
-        {photo.status === 'pending' && !rejectMode && (
-          <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void handleApprove()}
-              style={{
-                flex: 1,
-                padding: '6px 0',
-                borderRadius: 6,
-                border: 'none',
-                cursor: 'pointer',
-                background: '#2e7d32',
-                color: '#fff',
-                fontWeight: 800,
-                fontSize: 12,
-                opacity: busy ? 0.6 : 1,
-              }}
-            >
-              {'✓ Одобрить'}
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => setRejectMode(true)}
-              style={{
-                flex: 1,
-                padding: '6px 0',
-                borderRadius: 6,
-                border: 'none',
-                cursor: 'pointer',
-                background: '#c62828',
-                color: '#fff',
-                fontWeight: 800,
-                fontSize: 12,
-                opacity: busy ? 0.6 : 1,
-              }}
-            >
-              {'✗ Отклонить'}
-            </button>
-          </div>
-        )}
-
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void handleDelete()}
-          style={{
-            marginTop: 6,
-            width: '100%',
-            padding: '6px 0',
-            borderRadius: 6,
-            border: '1px solid #7a1e1e',
-            background: '#3b1717',
-            color: '#ffb3b3',
-            fontWeight: 800,
-            fontSize: 12,
-            cursor: 'pointer',
-            opacity: busy ? 0.6 : 1,
-          }}
-        >
-          {'Удалить фото'}
-        </button>
-
-        {photo.status === 'pending' && rejectMode && (
-          <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <input
-              type="text"
-              placeholder="Причина отклонения (необязательно)"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '5px 8px',
-                borderRadius: 6,
-                border: '1px solid #7a1e1e',
-                background: '#1a1010',
-                color: '#e8f0fe',
-                fontSize: 12,
-                boxSizing: 'border-box',
-              }}
-            />
-            <div style={{ display: 'flex', gap: 5 }}>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void handleReject()}
-                style={{
-                  flex: 1,
-                  padding: '5px 0',
-                  borderRadius: 6,
-                  border: 'none',
-                  background: '#c62828',
-                  color: '#fff',
-                  fontWeight: 800,
-                  fontSize: 11,
-                  cursor: 'pointer',
-                }}
-              >
-                {'Подтвердить'}
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => {
-                  setRejectMode(false);
-                  setReason('');
-                }}
-                style={{
-                  flex: 1,
-                  padding: '5px 0',
-                  borderRadius: 6,
-                  border: '1px solid #3a4b59',
-                  background: 'none',
-                  color: '#c8d6e8',
-                  fontSize: 11,
-                  cursor: 'pointer',
-                }}
-              >
-                {'Отмена'}
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+const getStatusLabel = (status: PhotoRecord['status']): string => {
+  if (status === 'approved') return 'Одобрено';
+  if (status === 'rejected') return 'Отклонено';
+  return 'Ожидает';
 };
 
 export const PhotoApprovalPage = () => {
@@ -461,11 +104,12 @@ export const PhotoApprovalPage = () => {
   const [filter, setFilter] = useState<Filter>('pending');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
-  // Use locally-patched copy after actions so UI updates immediately without re-fetching
   const photos = localPhotos ?? allPhotos;
+  const [uidFilter, setUidFilter] = useState('');
 
-  // Sync local copy when upstream reloads
   const handleRefresh = async () => {
     setLocalPhotos(null);
     setSelectedIds([]);
@@ -480,11 +124,13 @@ export const PhotoApprovalPage = () => {
     rejected: photos.filter((p) => p.status === 'rejected').length,
   };
 
-  const shown = filter === 'all' ? photos : photos.filter((p) => p.status === filter);
+  const shownByStatus = filter === 'all' ? photos : photos.filter((p) => p.status === filter);
+  const shown = uidFilter.trim()
+    ? shownByStatus.filter((p) => (p.uploadedBy ?? '').toLowerCase().includes(uidFilter.trim().toLowerCase()))
+    : shownByStatus;
   const shownIds = shown.map((p) => p.id);
   const selectedInShown = selectedIds.filter((id) => shownIds.includes(id));
   const allShownSelected = shown.length > 0 && selectedInShown.length === shown.length;
-
   const idMap = useMemo(() => new Map(photos.map((p) => [p.id, p])), [photos]);
 
   const FILTER_TABS: { key: Filter; label: string }[] = [
@@ -506,24 +152,41 @@ export const PhotoApprovalPage = () => {
   };
 
   const handleApprove = async (photo: PhotoRecord) => {
+    setBusyId(photo.id);
     setActionError('');
-    await approvePhoto(photo.id);
-    patchStatus(photo.id, 'approved');
+    try {
+      await approvePhoto(photo.id);
+      patchStatus(photo.id, 'approved');
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Не удалось одобрить фото.');
+    } finally {
+      setBusyId(null);
+    }
   };
 
   const handleReject = async (photo: PhotoRecord, reason: string) => {
+    setBusyId(photo.id);
     setActionError('');
-    await rejectPhoto(photo.id, reason);
-    patchStatus(photo.id, 'rejected', { moderationReason: reason.trim() || 'rejected' });
+    try {
+      await rejectPhoto(photo.id, reason);
+      patchStatus(photo.id, 'rejected', { moderationReason: reason.trim() || 'rejected' });
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Не удалось отклонить фото.');
+    } finally {
+      setBusyId(null);
+    }
   };
 
   const handleDeleteOne = async (photo: PhotoRecord) => {
+    setBusyId(photo.id);
     setActionError('');
     try {
       await deletePhoto(photo.id);
       removeLocal(photo.id);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Не удалось удалить фото.');
+    } finally {
+      setBusyId(null);
     }
   };
 
@@ -547,16 +210,17 @@ export const PhotoApprovalPage = () => {
 
   return (
     <section>
+      {lightboxUrl ? <Lightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} /> : null}
       <div className="pageHeader">
         <div>
           <p className="eyebrow">Модерация</p>
           <h2>Одобрение фото</h2>
           <p style={{ color: '#5d6f8b', fontSize: 13, marginTop: 4 }}>
-            {'Фото из community_photos.'}
+            Фото из community_photos. Таблица показывает экран-источник каждого фото.
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {counts.pending > 0 && (
+          {counts.pending > 0 ? (
             <div
               style={{
                 display: 'flex',
@@ -567,12 +231,12 @@ export const PhotoApprovalPage = () => {
                 padding: '8px 16px',
               }}
             >
-              <span style={{ fontSize: 20 }}>{'!'}</span>
+              <span style={{ fontSize: 20 }}>!</span>
               <span style={{ color: '#fff', fontWeight: 800, fontSize: 15 }}>
-                {counts.pending} {'ожидают одобрения'}
+                {counts.pending} ожидают одобрения
               </span>
             </div>
-          )}
+          ) : null}
           <button
             type="button"
             disabled={loading}
@@ -597,6 +261,28 @@ export const PhotoApprovalPage = () => {
       {error ? <p className="formError">{error}</p> : null}
       {actionError ? <p className="formError">{actionError}</p> : null}
 
+      <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+        <input
+          type="text"
+          placeholder="Фильтр по UID / uploadedBy..."
+          value={uidFilter}
+          onChange={(e) => setUidFilter(e.target.value)}
+          style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid #253040', background: '#141b24', color: '#c8d6e8', fontSize: 13, minWidth: 240 }}
+        />
+        {uidFilter && (
+          <button
+            type="button"
+            onClick={() => setUidFilter('')}
+            style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid #253040', background: '#1a2435', color: '#c8d6e8', fontSize: 12, cursor: 'pointer' }}
+          >
+            Сбросить
+          </button>
+        )}
+        {uidFilter && (
+          <span style={{ color: '#5d6f8b', fontSize: 12 }}>Показано: {shown.length} из {shownByStatus.length}</span>
+        )}
+      </div>
+
       <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
         {FILTER_TABS.map((tab) => (
           <button
@@ -619,7 +305,7 @@ export const PhotoApprovalPage = () => {
         ))}
       </div>
 
-      {shown.length > 0 && (
+      {shown.length > 0 ? (
         <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
           <button
             type="button"
@@ -661,7 +347,7 @@ export const PhotoApprovalPage = () => {
           >
             {bulkBusy ? 'Удаление...' : `Удалить выбранные (${selectedInShown.length})`}
           </button>
-          {selectedInShown.length > 0 && (
+          {selectedInShown.length > 0 ? (
             <button
               type="button"
               onClick={() => setSelectedIds((prev) => prev.filter((id) => !shownIds.includes(id)))}
@@ -676,41 +362,114 @@ export const PhotoApprovalPage = () => {
                 cursor: 'pointer',
               }}
             >
-              {'Очистить выбор'}
+              Очистить выбор
             </button>
-          )}
+          ) : null}
         </div>
-      )}
+      ) : null}
 
       {loading && photos.length === 0 ? (
-        <div style={{ padding: '48px 0', textAlign: 'center', color: '#5d6f8b' }}>{'Загрузка...'}</div>
+        <div style={{ padding: '48px 0', textAlign: 'center', color: '#5d6f8b' }}>Загрузка...</div>
       ) : shown.length === 0 ? (
         <div style={{ padding: '48px 0', textAlign: 'center', color: '#5d6f8b' }}>
           {filter === 'pending' ? 'Нет фото на одобрение' : 'Нет фото в этой категории'}
         </div>
       ) : (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-            gap: 14,
-          }}
-        >
-          {shown.map((photo) => {
-            const p = idMap.get(photo.id) ?? photo;
-            return (
-              <PhotoCard
-                key={p.id}
-                photo={p}
-                selected={selectedIds.includes(p.id)}
-                onToggleSelect={() => toggleSelect(p.id)}
-                onApprove={() => handleApprove(p)}
-                onReject={(r) => handleReject(p, r)}
-                onDelete={() => handleDeleteOne(p)}
-                onRemoved={() => removeLocal(p.id)}
-              />
-            );
-          })}
+        <div style={{ overflowX: 'auto' }}>
+          <table>
+            <thead>
+              <tr>
+                <th style={{ width: 44 }}>Выбор</th>
+                <th style={{ width: 88 }}>Фото</th>
+                <th>Детали</th>
+                <th style={{ minWidth: 210 }}>Экран-источник</th>
+                <th style={{ minWidth: 120 }}>Статус</th>
+                <th style={{ minWidth: 140 }}>Загружено</th>
+                <th style={{ minWidth: 240 }}>Действия</th>
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map((photo) => {
+                const p = idMap.get(photo.id) ?? photo;
+                const sourceLabel = getSourceLabel(p);
+                const sourceDetail = [p.sourceScreen, p.sourceFeature].filter(Boolean).join(' / ');
+                const rowBusy = bulkBusy || busyId === p.id;
+                return (
+                  <tr key={p.id}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(p.id)}
+                        onChange={() => toggleSelect(p.id)}
+                        disabled={rowBusy}
+                      />
+                    </td>
+                    <td>
+                      <PhotoThumb photo={p} onOpenLightbox={setLightboxUrl} />
+                    </td>
+                    <td>
+                      <strong>{p.title || 'Фото'}</strong>
+                      {p.uploadedBy ? <small style={{ display: 'block' }}>{p.uploadedBy}</small> : null}
+                      {p.moderationReason ? (
+                        <small style={{ display: 'block', color: '#e88' }}>{`Причина: ${p.moderationReason}`}</small>
+                      ) : null}
+                    </td>
+                    <td>
+                      <span>{sourceLabel}</span>
+                      {sourceDetail ? <small style={{ display: 'block' }}>{sourceDetail}</small> : null}
+                    </td>
+                    <td>
+                      <span className={`pill ${p.status === 'approved' ? 'good' : p.status === 'rejected' ? 'danger' : ''}`}>
+                        {getStatusLabel(p.status)}
+                      </span>
+                    </td>
+                    <td>
+                      <span>{dateTime(p.uploadedAt)}</span>
+                      {p.moderatedAt ? <small style={{ display: 'block' }}>{`Проверено: ${dateTime(p.moderatedAt)}`}</small> : null}
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {p.status !== 'approved' ? (
+                          <button
+                            type="button"
+                            className="smallButton"
+                            disabled={rowBusy}
+                            onClick={() => void handleApprove(p)}
+                          >
+                            Одобрить
+                          </button>
+                        ) : null}
+                        {p.status !== 'rejected' ? (
+                          <button
+                            type="button"
+                            className="smallButton dangerButton"
+                            disabled={rowBusy}
+                            onClick={() => {
+                              const reason = window.prompt('Причина отклонения (необязательно):', p.moderationReason || '') || '';
+                              void handleReject(p, reason);
+                            }}
+                          >
+                            Отклонить
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          className="smallButton dangerButton"
+                          disabled={rowBusy}
+                          onClick={() => {
+                            const confirmed = window.confirm(`Удалить фото "${p.title || p.id}"?`);
+                            if (confirmed) void handleDeleteOne(p);
+                          }}
+                        >
+                          Удалить
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </section>

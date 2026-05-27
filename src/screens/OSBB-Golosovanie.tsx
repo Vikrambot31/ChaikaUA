@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Alert,
   FlatList,
   SafeAreaView,
   StyleSheet,
@@ -13,10 +12,14 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
+import { onValue, ref } from 'firebase/database';
 import type { RootState } from '../redux/store';
 import { selectUser } from '../redux/slices/authSlice';
 import { selectIsOsbbManager } from '../redux/slices/osbbSlice';
 import { SCREEN_THEME } from '../utils/screenTheme';
+import InlineFieldHint from '../components/InlineFieldHint';
+import { useSoftToast } from '../hooks/useSoftToast';
+import { database } from '../firebase-config';
 import {
   OsbbVoteItem,
   OsbbVoteOption,
@@ -62,6 +65,8 @@ const UI_TEXT = {
     emptyActive: 'Активних голосувань немає',
     emptyClosed: 'Завершених голосувань немає',
     fillQuestion: 'Введіть тему голосування.',
+    voteCreated: 'Голосування створено',
+    saveError: 'Не вдалося зберегти. Перевірте інтернет і спробуйте ще раз.',
   },
   ru: {
     screenTitle: 'Голосование',
@@ -87,6 +92,8 @@ const UI_TEXT = {
     emptyActive: 'Активных голосований нет',
     emptyClosed: 'Завершённых голосований нет',
     fillQuestion: 'Введите тему голосования.',
+    voteCreated: 'Голосование создано',
+    saveError: 'Не удалось сохранить. Проверьте интернет и попробуйте ещё раз.',
   },
   en: {
     screenTitle: 'Voting',
@@ -112,6 +119,8 @@ const UI_TEXT = {
     emptyActive: 'No active votes',
     emptyClosed: 'No closed votes',
     fillQuestion: 'Please enter the voting topic.',
+    voteCreated: 'Voting created',
+    saveError: 'Failed to save. Check your internet connection and try again.',
   },
 } as const;
 
@@ -232,6 +241,7 @@ const VoteCard: React.FC<VoteCardProps> = ({
       <Text style={styles.participationText}>
         {total} {t.of} {participationTotal} {t.participation}
       </Text>
+      <InlineFieldHint message={t.selectOption} type="hint" visible={!isClosed && !item.hasVoted && !selectedOptionId} />
 
       {/* Footer row: deadline + vote button */}
       {!isClosed && (
@@ -272,20 +282,18 @@ const OsbbGolosuvannyaScreen: React.FC = () => {
   const buildingId = useSelector((state: RootState) => state.osbb.buildingId);
   const [totalApartments, setTotalApartments] = useState<number>(0);
   useEffect(() => {
-    if (!buildingId) return;
-    import('../firebase-config').then(({ database }) => {
-      const { ref, onValue } = require('firebase/database');
-      const unsubscribe = onValue(ref(database, `buildings/${buildingId}/totalApartments`), (snap: { val: () => number | null }) => {
-        const val = snap.val();
-        setTotalApartments(typeof val === 'number' && val > 0 ? val : 0);
-      });
-      return unsubscribe;
+    if (!buildingId) return undefined;
+    const unsubscribe = onValue(ref(database, `buildings/${buildingId}/totalApartments`), (snap) => {
+      const val = snap.val();
+      setTotalApartments(typeof val === 'number' && val > 0 ? val : 0);
     });
+    return unsubscribe;
   }, [buildingId]);
   const user = useSelector(selectUser);
   useOsbbMembership();
   const isManager = useSelector(selectIsOsbbManager);
   const t = UI_TEXT[language];
+  const toast = useSoftToast();
 
   const [activeTab, setActiveTab] = useState<OsbbVoteStatus>('active');
   const [newQuestion, setNewQuestion] = useState('');
@@ -301,32 +309,37 @@ const OsbbGolosuvannyaScreen: React.FC = () => {
 
   const addVote = async () => {
     if (!buildingId) {
-      Alert.alert(t.voteTitle, t.setupRequired);
+      toast.showWarning(t.voteTitle, t.setupRequired);
       return;
     }
 
     if (!isManager) {
-      Alert.alert(t.voteTitle, t.managerOnly);
+      toast.showWarning(t.voteTitle, t.managerOnly);
       return;
     }
 
     if (!newQuestion.trim()) {
-      Alert.alert(t.voteTitle, t.fillQuestion);
+      toast.showWarning(t.voteTitle, t.fillQuestion);
       return;
     }
 
     if (!user?.id) {
-      Alert.alert(t.voteTitle, t.setupRequired);
+      toast.showWarning(t.voteTitle, t.setupRequired);
       return;
     }
 
-    await osbbVotingService.addVote(buildingId, {
-      title: newQuestion.trim(),
-      question: newQuestion.trim(),
-      createdBy: user.id,
-      totalApartments,
-    });
-    setNewQuestion('');
+    try {
+      await osbbVotingService.addVote(buildingId, {
+        title: newQuestion.trim(),
+        question: newQuestion.trim(),
+        createdBy: user.id,
+        totalApartments,
+      });
+      setNewQuestion('');
+      toast.showSuccess(t.voteCreated);
+    } catch {
+      toast.showError(t.voteTitle, t.saveError);
+    }
   };
 
   const handleSelectOption = (voteId: string, optionId: string) => {
@@ -338,7 +351,7 @@ const OsbbGolosuvannyaScreen: React.FC = () => {
 
   const handleVote = async (voteId: string, optionId: string) => {
     if (!buildingId || !user?.id) {
-      Alert.alert(t.voteTitle, t.setupRequired);
+      toast.showWarning(t.voteTitle, t.setupRequired);
       return;
     }
 
@@ -352,12 +365,12 @@ const OsbbGolosuvannyaScreen: React.FC = () => {
         delete next[voteId];
         return next;
       });
-      Alert.alert(t.voteTitle, t.voteMsg);
+      toast.showSuccess(t.voteMsg);
     } catch (error) {
       const message = error instanceof Error && error.message === 'already-voted'
         ? t.alreadyVoted
         : t.selectOption;
-      Alert.alert(t.voteTitle, message);
+      toast.showWarning(t.voteTitle, message);
     } finally {
       setVotingId(null);
     }
@@ -415,6 +428,7 @@ const OsbbGolosuvannyaScreen: React.FC = () => {
             placeholderTextColor={SCREEN_THEME.textMuted}
             style={styles.input}
           />
+          <InlineFieldHint message={t.fillQuestion} type="warning" visible={!newQuestion.trim()} />
           <TouchableOpacity style={styles.addVoteBtn} onPress={() => void addVote()} activeOpacity={0.85}>
             <Text style={styles.addVoteText}>{t.addVote}</Text>
           </TouchableOpacity>

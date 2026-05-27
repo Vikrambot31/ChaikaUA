@@ -1,11 +1,13 @@
 {
   "name": "chaika-mobile-app",
-  "version": "1.1.273",
+  "version": "1.1.314",
   "description": "Chaika Life - справочник мест Чайки + заявки соседей",
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
-    "start": "expo start --offline --max-workers 1",
+    "metro:free-port": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -ExecutionPolicy Bypass -File scripts/free-metro-port.ps1",
+    "start": "npm run metro:free-port && expo start --port 8088 --offline --max-workers 1",
     "android": "expo run:android",
+    "start:android": "npm run metro:free-port && expo start --android --port 8088 --offline --max-workers 1",
     "ios": "expo run:ios",
     "web": "expo start --web --offline --max-workers 1",
     "eject": "expo eject",
@@ -13,7 +15,11 @@
     "test:rules:emulator": "node scripts/run-rules-emulator-tests.mjs",
     "moderation": "node scripts/moderation-cli.mjs",
     "seed:gallery": "node scripts/seed-gallery-to-firebase.mjs",
+    "firebase:preflight": "node scripts/firebase-preflight.mjs",
+    "upload:test-photo": "node scripts/upload-test-photo.mjs",
+    "daemon": "node agents/ai-diagnostics/daemon.mjs",
     "audit:community-photos": "node scripts/audit-community-photos.mjs",
+    "backfill:community-photos-public": "node scripts/backfill-community-photos-public.mjs",
     "type-check": "tsc --noEmit",
     "check:encoding": "node scripts/check-encoding.js",
     "rules:check": "node -e \"JSON.parse(require('fs').readFileSync('firebase.rules.json','utf8')); console.log('firebase.rules.json ok')\"",
@@ -29,7 +35,9 @@
     "build:apk": "eas build --platform android --profile preview --local",
     "build:apk:cloud": "eas build --platform android --profile preview",
     "build:production": "eas build --platform android --profile production",
-    "postinstall": "node scripts/patch-expo-modules-agp8.js"
+    "postinstall": "node scripts/patch-expo-modules-agp8.js && node scripts/patch-cli-status-page.js",
+    "facebook:keyhash:debug": "node scripts/get-facebook-keyhash.js",
+    "facebook:keyhash:eas": "eas credentials --platform android"
   },
   "dependencies": {
     "@expo/metro-runtime": "~3.1.3",
@@ -55,6 +63,7 @@
     "expo-font": "~11.10.3",
     "expo-image-manipulator": "~11.8.0",
     "expo-image-picker": "~14.7.1",
+    "expo-intent-launcher": "~10.11.0",
     "expo-linking": "~6.2.2",
     "expo-location": "~16.5.5",
     "expo-notifications": "~0.27.7",

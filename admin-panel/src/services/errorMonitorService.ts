@@ -1,5 +1,6 @@
-import { off, onValue, ref, remove } from 'firebase/database';
+import { off, onValue, ref } from 'firebase/database';
 import { database } from '../firebase/firebase';
+import { LOCAL_MODE, localGet } from '../local/LOCAL_MODE';
 
 export type RuntimeErrorEntry = {
   id: string;
@@ -151,6 +152,31 @@ export const subscribeErrorMonitor = (
   onData: (state: ErrorMonitorState) => void,
   onError?: (error: Error) => void,
 ): (() => void) => {
+  // LOCAL_MODE: fetch diagnostics from local json-server once and emit
+  if (LOCAL_MODE) {
+    Promise.all([
+      localGet<Record<string, unknown>[]>('/diagnostics_runtime').catch(() => []),
+      localGet<Record<string, unknown>[]>('/diagnostics_reports').catch(() => []),
+    ]).then(([rawRuntime, rawReports]) => {
+      const runtimeErrors = Array.isArray(rawRuntime)
+        ? rawRuntime
+          .map((item) => normalizeRuntimeRecord(String(item.id || ''), item))
+          .filter((item): item is RuntimeErrorEntry => Boolean(item))
+          .sort((a, b) => b.submittedAt - a.submittedAt)
+          .slice(0, MAX_FEED_ITEMS)
+        : [];
+      const userReports = Array.isArray(rawReports)
+        ? rawReports
+          .map((item) => normalizeUserReport(String(item.id || ''), item))
+          .filter((item): item is UserErrorReport => Boolean(item))
+          .sort((a, b) => b.submittedAt - a.submittedAt)
+          .slice(0, MAX_FEED_ITEMS)
+        : [];
+      onData({ runtimeErrors, dedupedRuntimeErrors: dedupeRuntimeErrors(runtimeErrors), userReports });
+    }).catch((err: unknown) => onError?.(err instanceof Error ? err : new Error(String(err))));
+    return () => {};
+  }
+
   let runtimeErrors: RuntimeErrorEntry[] = [];
   let userReports: UserErrorReport[] = [];
 
@@ -172,14 +198,8 @@ export const subscribeErrorMonitor = (
         .map(([id, value]) => normalizeRuntimeRecord(id, value))
         .filter((item): item is RuntimeErrorEntry => Boolean(item))
         .sort((a, b) => b.submittedAt - a.submittedAt)
+        .slice(0, MAX_FEED_ITEMS)
       : [];
-    const staleRuntimeErrors = runtimeErrors.slice(MAX_FEED_ITEMS);
-    if (staleRuntimeErrors.length) {
-      void Promise.allSettled(
-        staleRuntimeErrors.map((item) => remove(ref(database, `diagnostics/runtime_moderation/${item.id}`))),
-      );
-      runtimeErrors = runtimeErrors.slice(0, MAX_FEED_ITEMS);
-    }
     emit();
   }, (error) => onError?.(error));
 
@@ -190,14 +210,8 @@ export const subscribeErrorMonitor = (
         .map(([id, value]) => normalizeUserReport(id, value))
         .filter((item): item is UserErrorReport => Boolean(item))
         .sort((a, b) => b.submittedAt - a.submittedAt)
+        .slice(0, MAX_FEED_ITEMS)
       : [];
-    const staleUserReports = userReports.slice(MAX_FEED_ITEMS);
-    if (staleUserReports.length) {
-      void Promise.allSettled(
-        staleUserReports.map((item) => remove(ref(database, `diagnostics/user_reports/${item.id}`))),
-      );
-      userReports = userReports.slice(0, MAX_FEED_ITEMS);
-    }
     emit();
   }, (error) => onError?.(error));
 

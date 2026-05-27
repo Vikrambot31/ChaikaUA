@@ -51,10 +51,16 @@ export const getUserAccessControlStatus = async (
     return { isBlocked: false, isDeleted: false };
   }
 
-  const [blockedSnap, deletedSnap] = await Promise.all([
-    get(ref(database, `${BLOCKED_USERS_PATH}/${uid}`)),
-    get(ref(database, `${DELETED_USERS_PATH}/${uid}`)),
-  ]);
+  let blockedSnap, deletedSnap;
+  try {
+    [blockedSnap, deletedSnap] = await Promise.all([
+      get(ref(database, `${BLOCKED_USERS_PATH}/${uid}`)),
+      get(ref(database, `${DELETED_USERS_PATH}/${uid}`)),
+    ]);
+  } catch (err) {
+    console.error('[serviceModeration] getUserAccessControlStatus failed:', err);
+    return { isBlocked: false, isDeleted: false };
+  }
 
   const blockedValue = blockedSnap.val() as Partial<BlockedUserRecord> | null;
 
@@ -106,7 +112,13 @@ export const subscribeUserAccessControlStatus = (
 };
 
 export const loadBlockedUsers = async (): Promise<BlockedUserRecord[]> => {
-  const snapshot = await get(query(ref(database, BLOCKED_USERS_PATH)));
+  let snapshot;
+  try {
+    snapshot = await get(query(ref(database, BLOCKED_USERS_PATH)));
+  } catch (err) {
+    console.error('[serviceModeration] loadBlockedUsers failed:', err);
+    return [];
+  }
   if (!snapshot.exists()) {
     return [];
   }
@@ -198,5 +210,10 @@ export const deleteOsbbNewsItem = async (
   newsId: string,
 ): Promise<void> => {
   await ensureServiceAdminAccess();
-  await remove(ref(database, `osbb_news/${buildingId}/${newsId}`));
+  try {
+    await remove(ref(database, `osbb_news/${buildingId}/${newsId}`));
+  } catch (err) {
+    console.error('[serviceModeration] deleteOsbbNewsItem failed:', err);
+    throw err;
+  }
 };

@@ -14,6 +14,9 @@ export type RemoteAppVersionConfig = {
   updateTitle?: string;
   updateText?: string;
   androidUrl?: string;
+  apkFileName?: string;
+  apkSha256?: string;
+  apkSizeMB?: number;
   iosUrl?: string;
   webUrl?: string;
   landingUrl?: string;
@@ -69,8 +72,12 @@ const loadCachedConfig = async (): Promise<RemoteAppVersionConfig | undefined> =
   const raw = await AsyncStorage.getItem(VERSION_CACHE_KEY);
   if (!raw) return undefined;
 
-  const parsed = JSON.parse(raw) as unknown;
-  return isValidConfig(parsed) ? parsed : undefined;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return isValidConfig(parsed) ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
 };
 
 const fetchRemoteConfig = async (url: string): Promise<RemoteAppVersionConfig> => {

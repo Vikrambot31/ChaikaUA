@@ -1,4 +1,5 @@
 import admin from 'firebase-admin';
+import { getFirebaseAdminConfig } from './firebase-config.mjs';
 
 const SOURCE_PATH = 'profileViewRequests';
 const DEST_ROOT_PATH = 'outgoingProfileRequestsByUser';
@@ -69,8 +70,7 @@ async function main() {
   const examplesLimit = asPositiveInteger(options['examples-limit'], DEFAULT_EXAMPLES_LIMIT);
   const databaseURL = String(
     options['database-url'] ||
-      process.env.FIREBASE_DATABASE_URL ||
-      process.env.DATABASE_URL ||
+      getFirebaseAdminConfig().databaseURL ||
       '',
   ).trim();
 

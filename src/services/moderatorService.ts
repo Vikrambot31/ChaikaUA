@@ -1,13 +1,12 @@
 import { get, ref, set, remove, onValue, off } from 'firebase/database';
 import { database } from '../firebase-core';
 import { getCurrentUser } from '../firebase-auth-session';
+import { normalizeSecurityRole, type SecurityRole } from './securityRoles';
 import { logClientError, logClientEvent } from '../utils/errorLogger';
-
-export type UserRole = 'admin' | 'moderator' | 'user';
 
 export interface ModeratorRecord {
   uid: string;
-  role: UserRole;
+  role: SecurityRole;
   email?: string;
   name?: string;
   assignedAt: number;
@@ -19,13 +18,10 @@ type ApiResult<T> =
   | { success: false; error: string };
 type ApiVoidResult = { success: true } | { success: false; error: string };
 
-const normalizeRole = (value: unknown): UserRole =>
-  value === 'admin' || value === 'moderator' ? value : 'user';
-
-export const getUserRole = async (uid: string): Promise<UserRole> => {
+export const getUserRole = async (uid: string): Promise<SecurityRole> => {
   try {
     const snapshot = await get(ref(database, `user_roles/${uid}/role`));
-    return normalizeRole(snapshot.val());
+    return normalizeSecurityRole(snapshot.val());
   } catch {
     return 'user';
   }
@@ -108,4 +104,3 @@ export const subscribeModeratorList = (
 
   return () => off(dbRef);
 };
-

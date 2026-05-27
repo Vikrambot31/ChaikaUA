@@ -4,14 +4,16 @@ import { View, Text, TouchableOpacity, StyleSheet, Alert, SafeAreaView, Activity
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationProp, ParamListBase, RouteProp } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
-import { firebaseChatAPI } from '../firebase-config';
+import { database, firebaseChatAPI } from '../firebase-config';
 import type { RootState } from '../redux/store';
 import type { Request } from '../types/app';
 import TactileIcon from '../components/TactileIcon';
 import AppPhotoImage from '../components/AppPhotoImage';
+import MiniUserAvatar from '../components/MiniUserAvatar';
 import { LIGHT_ORBS, SCREEN_THEME } from '../utils/screenTheme';
 import { showUserError } from '../utils/userFacingErrors';
 import { profilePermissionService } from '../services/profilePermissionService';
+import { pickUserAvatarUri, resolveUserAvatarMap } from '../utils/userAvatar';
 
 type RequestDetailParams = {
   request: Request;
@@ -25,9 +27,9 @@ const UI_TEXT = {
     fallbackName: 'Сусід',
     description: 'Опис',
     contact: 'Контакт',
-    connect: 'Хочу зв’язатися',
+    connect: "Хочу зв'язатися",
     connectPending: 'Запит надіслано',
-    connectApproved: 'Зв’язок дозволено',
+    connectApproved: "Зв'язок дозволено",
     connectDenied: 'Запит відхилено',
     connectCant: 'Не вдалося надіслати запит',
     connectSentTitle: 'Запит надіслано',
@@ -134,6 +136,7 @@ const RequestDetailScreen = ({
   const [deleting, setDeleting] = useState(false);
   const [accessStatus, setAccessStatus] = useState<'pending' | 'approved' | 'denied' | null>(null);
   const [sendingConnect, setSendingConnect] = useState(false);
+  const [resolvedAvatarUri, setResolvedAvatarUri] = useState(() => pickUserAvatarUri(request));
 
   const getTimeAgo = (timestamp: number) => {
     const diff = Date.now() - timestamp;
@@ -157,6 +160,20 @@ const RequestDetailScreen = ({
     void loadAccess();
   }, [currentUser?.id, request.userId]);
 
+  useEffect(() => {
+    setResolvedAvatarUri(pickUserAvatarUri({ userPhotoURL: request.userPhotoURL, startAvatarKey: request.startAvatarKey }));
+    const requestUserId = request.userId;
+    if (!requestUserId) return;
+    let cancelled = false;
+    void resolveUserAvatarMap(database, [requestUserId]).then((resolved) => {
+      if (cancelled) return;
+      setResolvedAvatarUri(resolved[requestUserId] || pickUserAvatarUri({ userPhotoURL: request.userPhotoURL, startAvatarKey: request.startAvatarKey }));
+    }).catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [request]);
+
   const handleConnect = async () => {
     if (!currentUser?.id || !request.userId || currentUser.id === request.userId) {
       Alert.alert(text.connectCant, text.connectCant);
@@ -175,7 +192,7 @@ const RequestDetailScreen = ({
         'help',
         {
           name: request.name,
-          photoURL: request.photoUri,
+          photoURL: resolvedAvatarUri,
         },
       );
 
@@ -236,9 +253,7 @@ const RequestDetailScreen = ({
   };
 
   const avatarColor = AVATAR_COLORS[(request.name?.charCodeAt(0) ?? 0) % AVATAR_COLORS.length] || '#C77A5D';
-  const initial = request.name?.charAt(0).toUpperCase() || '?';
   const categoryLabel = text.categories[request.category as keyof typeof text.categories] ?? request.category;
-  const [avatarFailed, setAvatarFailed] = useState(false);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -257,24 +272,17 @@ const RequestDetailScreen = ({
 
       <View style={styles.content}>
         <View style={styles.profileRow}>
-          {request.photoUri && !avatarFailed ? (
-            <AppPhotoImage
-              uri={request.photoUri}
-              storagePath={request.photoStoragePath}
-              style={styles.avatarImage}
-              resizeMode="cover"
-              debugLabel={`RequestDetails:${request.id}`}
-              onError={() => setAvatarFailed(true)}
-            />
-          ) : (
-            <View style={[styles.avatar, { backgroundColor: avatarColor }]}> 
-              <Text style={styles.avatarText}>{initial}</Text>
-            </View>
-          )}
+          <MiniUserAvatar
+            uri={resolvedAvatarUri}
+            name={request.name || text.fallbackName}
+            size={62}
+            borderRadius={31}
+            backgroundColor={avatarColor}
+          />
           <View style={styles.profileInfo}>
             <Text style={styles.nameText}>{request.name || text.fallbackName}</Text>
             <Text style={styles.categoryText}>{categoryLabel}</Text>
-            <Text style={styles.timeText}>{getTimeAgo(request.timestamp ?? request.createdAt?.getTime?.() ?? Date.now())}</Text>
+            <Text style={styles.timeText}>{getTimeAgo(request.timestamp ?? request.createdAt ?? Date.now())}</Text>
           </View>
         </View>
 
@@ -282,6 +290,18 @@ const RequestDetailScreen = ({
           <Text style={styles.cardLabel}>{text.description}</Text>
           <Text style={styles.requestText}>{request.text || request.description}</Text>
         </View>
+
+        {(request.photoUri || request.photoStoragePath) ? (
+          <View style={styles.card}>
+            <AppPhotoImage
+              uri={request.photoUri}
+              storagePath={request.photoStoragePath}
+              style={styles.requestPhoto}
+              resizeMode="contain"
+              debugLabel={`RequestDetails:${request.id}`}
+            />
+          </View>
+        ) : null}
 
         <View style={styles.card}>
           <Text style={styles.cardLabel}>{text.contact}</Text>
@@ -345,10 +365,7 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 18, fontWeight: '900', color: SCREEN_THEME.textPrimary },
   headerSpacer: { width: 42 },
   content: { flex: 1, paddingHorizontal: 20, paddingTop: 8 },
-  profileRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 24, padding: 18, marginBottom: 14, borderWidth: 1, borderColor: '#E4D0AB' },
-  avatar: { width: 62, height: 62, borderRadius: 31, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
-  avatarImage: { width: 62, height: 62, borderRadius: 31, marginRight: 14, backgroundColor: '#E7DDD0' },
-  avatarText: { color: '#FFF9EE', fontWeight: '900', fontSize: 24 },
+  profileRow: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 24, padding: 18, marginBottom: 14, borderWidth: 1, borderColor: '#E4D0AB' },
   profileInfo: { flex: 1 },
   nameText: { fontSize: 19, fontWeight: '900', color: SCREEN_THEME.textPrimary, marginBottom: 4 },
   categoryText: { fontSize: 13, color: SCREEN_THEME.terracottaDark, fontWeight: '800', marginBottom: 2 },
@@ -356,6 +373,7 @@ const styles = StyleSheet.create({
   card: { backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 24, padding: 18, marginBottom: 14, borderWidth: 1, borderColor: '#E4D0AB' },
   cardLabel: { fontSize: 12, color: SCREEN_THEME.textMuted, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.7, fontWeight: '800' },
   requestText: { fontSize: 15, color: SCREEN_THEME.textPrimary, lineHeight: 23 },
+  requestPhoto: { width: '100%', height: 220, borderRadius: 18, backgroundColor: '#E7DDD0' },
   phoneRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   phoneText: { fontSize: 18, fontWeight: '800', color: SCREEN_THEME.textPrimary },
   copyBtn: { padding: 4 },
@@ -382,4 +400,3 @@ const styles = StyleSheet.create({
 });
 
 export default RequestDetailScreen;
-

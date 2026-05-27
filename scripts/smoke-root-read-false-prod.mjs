@@ -11,19 +11,15 @@ import {
   set,
   update,
 } from 'firebase/database';
+import { getFirebaseScriptConfig, getFirebaseAdminConfig } from './firebase-config.mjs';
 
-const databaseURL = process.env.FIREBASE_DATABASE_URL || process.env.DATABASE_URL || '';
-const apiKey = process.env.FIREBASE_API_KEY || '';
-const authDomain = process.env.FIREBASE_AUTH_DOMAIN || 'chaikaua-3cd9d.firebaseapp.com';
-const projectId = process.env.FIREBASE_PROJECT_ID || 'chaikaua-3cd9d';
+const firebaseConfig = getFirebaseScriptConfig();
+const { databaseURL, apiKey, authDomain, projectId } = firebaseConfig;
 const ownerUid = process.env.SMOKE_OWNER_UID || 'LfqIMCAyEzLAb7TNc83lYGW9RiV2';
 const runId = `root_read_false_${Date.now()}`;
 const userUid = `smoke_user_${Date.now()}`;
 
-if (!databaseURL) throw new Error('Missing FIREBASE_DATABASE_URL');
-if (!apiKey) throw new Error('Missing FIREBASE_API_KEY');
-
-admin.initializeApp({ databaseURL });
+admin.initializeApp(getFirebaseAdminConfig());
 
 const app = initializeApp({
   apiKey,

@@ -94,7 +94,8 @@ export default function ItemDetailScreen({
   const item = route.params.item;
   const text = UI_TEXT[language];
   const hasPhone = Boolean(item.phone?.trim());
-  const canContact = Boolean(item.userId && item.userId !== currentUser?.id);
+  const canRequestContact = Boolean(item.userId && item.userId !== currentUser?.id);
+  const canContact = canRequestContact || hasPhone;
   const hasPhoto = Boolean(item.photoUri || item.photoStoragePath);
 
   const fields = [
@@ -112,14 +113,23 @@ export default function ItemDetailScreen({
   };
 
   const handleContact = () => {
-    if (!item.userId) return;
-    openModal({
-      userId: item.userId,
-      name: item.title || text.headerTitle,
-      sourceType: getContactContext(item.sourceType),
-      sourceId: item.sourceId,
-      sourceTitle: item.title,
-    });
+    if (canRequestContact && item.userId) {
+      openModal({
+        userId: item.userId,
+        name: item.title || text.headerTitle,
+        sourceType: getContactContext(item.sourceType),
+        sourceId: item.sourceId,
+        sourceTitle: item.title,
+      });
+      return;
+    }
+
+    if (!hasPhone) return;
+    Alert.alert(text.contact, item.title || text.headerTitle, [
+      { text: text.call, onPress: () => { void safeCallPhone(item.phone, language); } },
+      { text: text.viber, onPress: () => { void safeOpenViber(item.phone, language); } },
+      { text: language === 'en' ? 'Cancel' : '\u041e\u0442\u043c\u0435\u043d\u0430', style: 'cancel' },
+    ]);
   };
 
   return (
@@ -139,7 +149,7 @@ export default function ItemDetailScreen({
             uri={item.photoUri}
             storagePath={item.photoStoragePath}
             style={styles.photo}
-            resizeMode="cover"
+            resizeMode="contain"
             debugLabel={`ItemDetail:${item.sourceType}:${item.sourceId}`}
           />
         ) : (
@@ -236,7 +246,7 @@ const styles = StyleSheet.create({
   headerTitle: { color: '#2D2520', fontSize: 18, fontWeight: '900' },
   headerSpacer: { width: 78 },
   content: { padding: 16, paddingBottom: 112, gap: 12 },
-  photo: { width: '100%', height: 260, borderRadius: 22, backgroundColor: '#E6D6BF' },
+  photo: { width: '100%', height: 300, borderRadius: 22, backgroundColor: '#F0EDE8' },
   photoPlaceholder: {
     height: 220,
     borderRadius: 22,

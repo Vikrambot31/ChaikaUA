@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, KeyboardAvoidingView, Modal, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, FlatList, KeyboardAvoidingView, Modal, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { useSelector } from 'react-redux';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
@@ -7,7 +7,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import MiniTabBar from '../components/MiniTabBar';
 import MiniUserAvatar from '../components/MiniUserAvatar';
-import TactileIcon from '../components/TactileIcon';
 import AppPhotoImage from '../components/AppPhotoImage';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { normalizePhoneText } from '../utils/textUtils';
@@ -16,12 +15,15 @@ import { getModerationLabel } from '../utils/moderation';
 import { buySellService, BuySellListing } from '../services/buySellService';
 import { getModerationUserMessage, showUserError } from '../utils/userFacingErrors';
 import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField';
-import { get, ref } from 'firebase/database';
 import { database } from '../firebase-config';
 import { useContactRequest } from '../hooks/useContactRequest';
 import ContactReasonModal from '../components/ContactReasonModal';
 import { safeCallPhone } from '../utils/communicationActions';
 import type { DetailItemData } from '../utils/detailViewTypes';
+import UploadedPhotosGrid from '../components/UploadedPhotosGrid';
+import { getDonePhotos, getRequiredPhotoLabel, validateSubmissionRequirements } from '../utils/submissionRequirements';
+import UserCardActionBar from '../components/UserCardActionBar';
+import { resolveUserAvatarMap } from '../utils/userAvatar';
 
 const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000;
 
@@ -75,6 +77,8 @@ const UI_TEXT = {
     selectCategory: 'Оберіть категорію...',
     selectCondition: 'Оберіть стан...',
     errorSave: 'Не вдалося зберегти оголошення',
+    photoUploading: 'Дочекайтесь завершення завантаження фото.',
+    photoUploadError: 'Не вдалося завантажити фото. Видаліть його або спробуйте ще раз.',
     errorTitle: 'Помилка',
     deleteText: 'Видалити',
     conditionLabels: { new: 'Новий', like_new: 'Як новий', good: 'Гарний', fair: 'З недоліками' },
@@ -98,8 +102,10 @@ const UI_TEXT = {
     clearSearch: 'Скинути пошук',
     noSearchResults: 'Нічого не знайдено за критеріями',
     noSearchResultsSub: 'Спробуйте прибрати частину фільтрів.',
-    live: 'LIVE',
+    live: 'НАЖИВО',
     liveCount: (count: number) => `всього ${count} активних оголошень на сьогодні`,
+    ok: 'OK',
+    authRequired: 'Увійдіть в акаунт, щоб додати оголошення.',
   },
   ru: {
     title: 'Куплю / Продам',
@@ -134,6 +140,8 @@ const UI_TEXT = {
     selectCategory: 'Выберите категорию...',
     selectCondition: 'Выберите состояние...',
     errorSave: 'Не удалось сохранить объявление',
+    photoUploading: 'Дождитесь завершения загрузки фото.',
+    photoUploadError: 'Не удалось загрузить фото. Удалите его или попробуйте еще раз.',
     errorTitle: 'Ошибка',
     deleteText: 'Удалить',
     conditionLabels: { new: 'Новый', like_new: 'Как новый', good: 'Хороший', fair: 'С недостатками' },
@@ -157,8 +165,10 @@ const UI_TEXT = {
     clearSearch: 'Сбросить поиск',
     noSearchResults: 'Ничего не найдено по критериям',
     noSearchResultsSub: 'Попробуйте убрать часть фильтров.',
-    live: 'LIVE',
+    live: 'В ЭФИРЕ',
     liveCount: (count: number) => `всего ${count} активных объявлений на сегодня`,
+    ok: 'OK',
+    authRequired: 'Войдите в аккаунт, чтобы добавить объявление.',
   },
   en: {
     title: 'Buy / Sell',
@@ -193,6 +203,8 @@ const UI_TEXT = {
     selectCategory: 'Select category...',
     selectCondition: 'Select condition...',
     errorSave: 'Failed to save listing',
+    photoUploading: 'Wait until the photo upload is complete.',
+    photoUploadError: 'Photo upload failed. Remove it or try again.',
     errorTitle: 'Error',
     deleteText: 'Delete',
     conditionLabels: { new: 'New', like_new: 'Like new', good: 'Good', fair: 'With flaws' },
@@ -218,15 +230,19 @@ const UI_TEXT = {
     noSearchResultsSub: 'Try removing some filters.',
     live: 'LIVE',
     liveCount: (count: number) => `${count} active listings today`,
+    ok: 'OK',
+    authRequired: 'Sign in to add a listing.',
   },
 } as const;
 
 const BuySellScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
+  const navLock = useRef(false);
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const user = useSelector((state: RootState) => state.auth.user);
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const text = UI_TEXT[language];
+  const requiredPhotoLabel = getRequiredPhotoLabel(language);
   const [category, setCategory] = useState('');
   const [condition, setCondition] = useState('');
   const [price, setPrice] = useState('');
@@ -255,8 +271,15 @@ const BuySellScreen: React.FC = () => {
 
   const handleRequestCloseModal = useCallback(() => {
     if (pickerActiveRef.current) return;
-    setAddFormVisible(false);
-  }, []);
+    const closeTitle = language === 'ru' ? 'Закрыть форму?' : language === 'en' ? 'Close form?' : 'Закрити форму?';
+    const closeMsg = language === 'ru' ? 'Вы ещё не отправили объявление. Закрыть?' : language === 'en' ? 'You haven\'t submitted the listing yet. Close?' : 'Ви ще не надіслали оголошення. Закрити?';
+    const closeNo = language === 'ru' ? 'Нет' : language === 'en' ? 'No' : 'Ні';
+    const closeYes = language === 'ru' ? 'Да' : language === 'en' ? 'Yes' : 'Так';
+    Alert.alert(closeTitle, closeMsg, [
+      { text: closeNo, style: 'cancel' },
+      { text: closeYes, onPress: () => setAddFormVisible(false) },
+    ]);
+  }, [language]);
 
   useEffect(() => {
     let isMounted = true;
@@ -294,29 +317,10 @@ const BuySellScreen: React.FC = () => {
     const userIds = Array.from(new Set(listings.map((item) => item.userId).filter((id): id is string => Boolean(id))));
     if (userIds.length === 0) return;
     let cancelled = false;
-    void (async () => {
-      const resolved = await Promise.all(
-        userIds.map(async (uid) => {
-          try {
-            const snap = await get(ref(database, `users/${uid}`));
-            const data = snap.val() as { photoURL?: unknown; photoURLs?: unknown } | null;
-            const photoURLs = Array.isArray(data?.photoURLs)
-              ? data.photoURLs.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
-              : [];
-            const photo = photoURLs[0] || (typeof data?.photoURL === 'string' ? data.photoURL : '');
-            return [uid, photo] as const;
-          } catch {
-            return [uid, ''] as const;
-          }
-        }),
-      );
+    void resolveUserAvatarMap(database, userIds).then((resolved) => {
       if (cancelled) return;
-      setAvatarByUserId((prev) => {
-        const next = { ...prev };
-        resolved.forEach(([uid, photo]) => { if (photo) next[uid] = photo; });
-        return next;
-      });
-    })();
+      setAvatarByUserId((prev) => ({ ...prev, ...resolved }));
+    }).catch(() => {});
     return () => { cancelled = true; };
   }, [listings]);
 
@@ -385,6 +389,9 @@ const BuySellScreen: React.FC = () => {
     ],
   );
 
+  const hasUploadingPhotos = formPhotos.some((photo) => photo.status === 'uploading');
+  const hasPhotoErrors = formPhotos.some((photo) => photo.status === 'error');
+
   const resetSearch = () => {
     setSearchItemName('');
     setSearchCategory('');
@@ -435,10 +442,6 @@ const BuySellScreen: React.FC = () => {
   }, [mapToDetailData, navigation]);
 
   const handleSubmit = async () => {
-    if (!user) {
-      navigation.navigate('LoginScreen');
-      return;
-    }
     const normalizedPrice = price.replace(',', '.').replace(/[^\d.]/g, '');
     const numericPrice = Number(normalizedPrice);
 
@@ -454,11 +457,23 @@ const BuySellScreen: React.FC = () => {
       Alert.alert(text.errorTitle, text.errorPhone);
       return;
     }
+    if (hasUploadingPhotos) {
+      Alert.alert(text.errorTitle, text.photoUploading);
+      return;
+    }
+    if (hasPhotoErrors) {
+      Alert.alert(text.errorTitle, text.photoUploadError);
+      return;
+    }
+    if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, photos: formPhotos, navigation })) {
+      return;
+    }
 
     setSubmitting(true);
     try {
-      const resolvedPhotoUri = formPhotos[0]?.downloadUrl ?? '';
-      const resolvedStoragePath = formPhotos[0]?.storagePath ?? '';
+      const donePhotos = getDonePhotos(formPhotos);
+      const resolvedPhotoUri = donePhotos[0]?.downloadUrl ?? '';
+      const resolvedStoragePath = donePhotos[0]?.storagePath ?? '';
 
       const categoryIndex = ITEM_CATEGORY_VALUES.indexOf(category as typeof ITEM_CATEGORY_VALUES[number]);
       const itemName = categoryIndex >= 0 ? text.categories[categoryIndex] : category;
@@ -481,11 +496,12 @@ const BuySellScreen: React.FC = () => {
         createdAt: createdAt.toISOString(),
         expiresAt: new Date(createdAt.getTime() + THREE_MONTHS_MS).toISOString(),
         userId: user?.id || '',
+        language,
       });
 
-      Alert.alert(text.successTitle, text.successMsg);
-      resetForm();
-      setAddFormVisible(false);
+      Alert.alert(text.successTitle, text.successMsg, [
+        { text: text.ok, onPress: () => { resetForm(); setAddFormVisible(false); } },
+      ]);
     } catch (error) {
       showUserError(language, 'send', error);
     } finally {
@@ -603,109 +619,130 @@ const BuySellScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.headerCard}>
-          <Text style={styles.headerTitle}>{text.title}</Text>
-          <Text style={styles.headerSubtitle}>{text.subtitle}</Text>
-          <View style={styles.liveLine}>
-            <Animated.Text style={[styles.liveDot, { opacity: blinkAnim }]}>?</Animated.Text>
-            <Text style={styles.liveText}>{text.live}</Text>
-            <Text style={styles.liveCount}>{text.liveCount(listings.length)}</Text>
-          </View>
-        </View>
-
-        {listings.length > 0 && (
-          <View style={styles.listingsSection}>
-            <Text style={styles.formLabel}>{text.filterLabel}</Text>
-            <View style={styles.pickerWrapper}>
-              <Picker selectedValue={selectedFilterCategory} onValueChange={setSelectedFilterCategory} style={styles.picker}>
-                <Picker.Item label={text.filterAll} value="" />
-                {ITEM_CATEGORY_VALUES.map((value, index) => (
-                  <Picker.Item key={`filter-${value}`} label={text.categories[index]} value={value} />
-                ))}
-              </Picker>
-            </View>
-
-            <View style={styles.listingsHeaderRow}>
-              <Text style={styles.listingsSectionTitle}>{text.listingsTitle} ({filteredListings.length})</Text>
-              <TouchableOpacity style={styles.searchBtn} onPress={() => setSearchModalVisible(true)} activeOpacity={0.82}>
-                <Text style={styles.searchBtnText}>{text.searchButton}</Text>
-              </TouchableOpacity>
-            </View>
-            {hasAdvancedSearch ? (
-              <TouchableOpacity style={styles.clearSearchBtn} onPress={resetSearch} activeOpacity={0.82}>
-                <Text style={styles.clearSearchText}>{text.clearSearch}</Text>
-              </TouchableOpacity>
-            ) : null}
-            {filteredListings.length === 0 ? (
-              <View style={styles.emptyFiltered}>
-                <Text style={styles.emptyFilteredTitle}>{text.noSearchResults}</Text>
-                <Text style={styles.emptyFilteredSub}>{text.noSearchResultsSub}</Text>
+      {/* FlatList replaces the outer ScrollView for virtualized rendering of listing cards */}
+      <FlatList
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        data={listings.length > 0 ? filteredListings : []}
+        keyExtractor={(item) => item.id}
+        initialNumToRender={8}
+        windowSize={5}
+        ListHeaderComponent={
+          <>
+            <View style={styles.headerCard}>
+              <Text style={styles.headerTitle}>{text.title}</Text>
+              <Text style={styles.headerSubtitle}>{text.subtitle}</Text>
+              <View style={styles.liveLine}>
+                <Animated.Text style={[styles.liveDot, { opacity: blinkAnim }]}>?</Animated.Text>
+                <Text style={styles.liveText}>{text.live}</Text>
+                <Text style={styles.liveCount}>{text.liveCount(listings.length)}</Text>
               </View>
-            ) : (
-              filteredListings.map((item) => (
-                <TouchableOpacity key={item.id} style={styles.listingCard} onPress={() => openDetail(item)} activeOpacity={0.86}>
-                  <View style={styles.listingHeader}>
-                    <MiniUserAvatar uri={(item.userId && avatarByUserId[item.userId]) || item.photoUri || ''} name={item.itemName} size={34} borderRadius={11} backgroundColor="#6A8BA5" />
-                    <Text style={[styles.listingName, { marginLeft: 8 }]}>{item.itemName}</Text>
-                    {item.userId === user?.id ? (
-                      <TouchableOpacity onPress={(event) => { event.stopPropagation(); handleDelete(item.id); }}>
-                        <Text style={styles.deleteText}>{text.deleteText}</Text>
-                      </TouchableOpacity>
-                    ) : null}
+            </View>
+
+            {listings.length > 0 ? (
+              <View style={styles.listingsSection}>
+                <Text style={styles.formLabel}>{text.filterLabel}</Text>
+                <View style={styles.pickerWrapper}>
+                  <Picker selectedValue={selectedFilterCategory} onValueChange={setSelectedFilterCategory} style={styles.picker}>
+                    <Picker.Item label={text.filterAll} value="" />
+                    {ITEM_CATEGORY_VALUES.map((value, index) => (
+                      <Picker.Item key={`filter-${value}`} label={text.categories[index]} value={value} />
+                    ))}
+                  </Picker>
+                </View>
+
+                <View style={styles.listingsHeaderRow}>
+                  <Text style={styles.listingsSectionTitle}>{text.listingsTitle} ({filteredListings.length})</Text>
+                  <TouchableOpacity style={styles.searchBtn} onPress={() => setSearchModalVisible(true)} activeOpacity={0.82}>
+                    <Text style={styles.searchBtnText}>{text.searchButton}</Text>
+                  </TouchableOpacity>
+                </View>
+                {hasAdvancedSearch ? (
+                  <TouchableOpacity style={styles.clearSearchBtn} onPress={resetSearch} activeOpacity={0.82}>
+                    <Text style={styles.clearSearchText}>{text.clearSearch}</Text>
+                  </TouchableOpacity>
+                ) : null}
+                {filteredListings.length === 0 ? (
+                  <View style={styles.emptyFiltered}>
+                    <Text style={styles.emptyFilteredTitle}>{text.noSearchResults}</Text>
+                    <Text style={styles.emptyFilteredSub}>{text.noSearchResultsSub}</Text>
                   </View>
-                  <View style={styles.listingMeta}>
-                    <Text style={styles.listingBadgeText}>{text.conditionLabels[item.condition as keyof typeof text.conditionLabels] ?? item.condition}</Text>
-                    <Text style={styles.listingPrice}>{item.price} грн</Text>
-                    {item.isArchived ? (
-                      <Text style={styles.archiveBadge}>Архів</Text>
-                    ) : (
-                      <Text style={styles.statusBadge}>
-                        {getModerationLabel(item.moderationStatus, {
-                          pending: text.pending,
-                          approved: text.approved,
-                          rejected: text.rejected,
-                        })}
-                      </Text>
-                    )}
-                  </View>
-                  <Text style={styles.listingDescription} numberOfLines={2}>{item.description || text.noDesc}</Text>
-                  {Boolean(item.photoUri || item.photoStoragePath) ? (
-                    <AppPhotoImage
-                      uri={item.photoUri}
-                      storagePath={item.photoStoragePath}
-                      style={styles.listingPhoto}
-                      resizeMode="cover"
-                      debugLabel={`BuySell:${item.id}`}
-                    />
-                  ) : (
-                    <View style={[styles.listingPhoto, styles.listingPhotoPlaceholder]}>
-                      <MaterialCommunityIcons name="image-off-outline" size={26} color="#B8A888" />
-                    </View>
-                  )}
-                  <Text style={styles.moderationInfo}>
-                    {getModerationUserMessage(language, item.moderationStatus, item.rejectionReason || item.moderationReason)}
-                  </Text>
-                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
-                    {item.phone ? (
-                      <TouchableOpacity style={styles.phoneAction} onPress={(event) => { event.stopPropagation(); void safeCallPhone(item.phone, language); }} activeOpacity={0.75}>
-                        <TactileIcon icon="phone-outline" size={30} iconSize={13} backgroundColor="#403933" />
-                      </TouchableOpacity>
-                    ) : null}
-                    {item.userId && item.userId !== user?.id ? (
-                      <TouchableOpacity style={styles.phoneAction} onPress={(event) => { event.stopPropagation(); openContactModal({ userId: item.userId as string, name: item.itemName ?? 'Unknown', sourceType: 'buysell', sourceId: item.id, sourceTitle: item.itemName }); }} activeOpacity={0.75}>
-                        <TactileIcon icon="account-arrow-right-outline" size={30} iconSize={13} backgroundColor="#7A1E5C" />
-                      </TouchableOpacity>
-                    ) : null}
-                  </View>
+                ) : null}
+              </View>
+            ) : null}
+          </>
+        }
+        renderItem={({ item }) => {
+          const authorAvatarUri = (item.userId && avatarByUserId[item.userId]) || undefined;
+
+          return (
+            <TouchableOpacity style={styles.listingCard} onPress={() => openDetail(item)} activeOpacity={0.86}>
+            <View style={styles.listingHeader}>
+              <MiniUserAvatar uri={authorAvatarUri} name={item.itemName} size={34} borderRadius={11} backgroundColor="#6A8BA5" />
+              <Text style={[styles.listingName, { marginLeft: 8 }]}>{item.itemName}</Text>
+              {item.userId === user?.id ? (
+                <TouchableOpacity onPress={(event) => { event.stopPropagation(); handleDelete(item.id); }}>
+                  <Text style={styles.deleteText}>{text.deleteText}</Text>
                 </TouchableOpacity>
-              ))
+              ) : null}
+            </View>
+            <View style={styles.listingMeta}>
+              <Text style={styles.listingBadgeText}>{text.conditionLabels[item.condition as keyof typeof text.conditionLabels] ?? item.condition}</Text>
+              <Text style={styles.listingPrice}>{item.price} грн</Text>
+              {item.isArchived ? (
+                <Text style={styles.archiveBadge}>Архів</Text>
+              ) : (
+                <Text style={styles.statusBadge}>
+                  {getModerationLabel(item.moderationStatus, {
+                    pending: text.pending,
+                    approved: text.approved,
+                    rejected: text.rejected,
+                  })}
+                </Text>
+              )}
+            </View>
+            <Text style={styles.listingDescription} numberOfLines={2}>{item.description || text.noDesc}</Text>
+            {Boolean(item.photoUri || item.photoStoragePath) ? (
+              <AppPhotoImage
+                uri={item.photoUri}
+                storagePath={item.photoStoragePath}
+                style={styles.listingPhoto}
+                resizeMode="contain"
+                debugLabel={`BuySell:${item.id}`}
+              />
+            ) : (
+              <View style={[styles.listingPhoto, styles.listingPhotoPlaceholder]}>
+                <MaterialCommunityIcons name="image-off-outline" size={26} color="#B8A888" />
+              </View>
             )}
-          </View>
-        )}
-      </ScrollView>
+            <Text style={styles.moderationInfo}>
+              {getModerationUserMessage(language, item.moderationStatus, item.rejectionReason || item.moderationReason)}
+            </Text>
+            <UserCardActionBar
+              avatarUri={authorAvatarUri}
+              name={item.itemName}
+              userId={item.userId}
+              currentUserId={user?.id}
+              language={language}
+              onProfile={item.userId ? () => { if (navLock.current) return; navLock.current = true; navigation.navigate('ViewUserProfile', { userId: item.userId as string }); setTimeout(() => { navLock.current = false; }, 800); } : undefined}
+              onContact={item.userId && item.userId !== user?.id ? () => openContactModal({ userId: item.userId as string, name: item.itemName ?? 'Unknown', sourceType: 'buysell', sourceId: item.id, sourceTitle: item.itemName }) : item.phone ? () => void safeCallPhone(item.phone, language) : undefined}
+              contactDisabled={!item.phone && (!item.userId || item.userId === user?.id)}
+              likePath="feed_likes/buysell"
+              likeId={item.id}
+            />
+            </TouchableOpacity>
+          );
+        }}
+      />
       <View style={styles.addBar}>
-        <TouchableOpacity style={styles.addBarBtn} onPress={() => setAddFormVisible(true)} activeOpacity={0.85}>
+        <TouchableOpacity style={styles.addBarBtn} onPress={() => {
+          if (!user) {
+            Alert.alert(text.formTitle, text.authRequired);
+            return;
+          }
+          setAddFormVisible(true);
+        }} activeOpacity={0.85}>
           <Text style={styles.addBarBtnText}>{text.addRequest}</Text>
         </TouchableOpacity>
       </View>
@@ -717,7 +754,7 @@ const BuySellScreen: React.FC = () => {
             <View style={styles.sheetHandle} />
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>{text.formTitle}</Text>
-              <TouchableOpacity onPress={() => setAddFormVisible(false)} style={styles.sheetCloseBtn} activeOpacity={0.7}>
+              <TouchableOpacity onPress={handleRequestCloseModal} style={styles.sheetCloseBtn} activeOpacity={0.7}>
                 <Text style={styles.sheetCloseTxt}>✕</Text>
               </TouchableOpacity>
             </View>
@@ -771,21 +808,22 @@ const BuySellScreen: React.FC = () => {
               <Text style={styles.formLabel}>{text.phoneLabel}</Text>
               <TextInput placeholder="+380..." value={phone} onChangeText={(value) => setPhone(normalizePhoneText(value))} keyboardType="phone-pad" style={styles.input} placeholderTextColor="#A0938D" />
 
-              <Text style={styles.formLabel}>{text.photoLabel}</Text>
+              <Text style={styles.formLabel}>{requiredPhotoLabel}</Text>
               <PhotoUploadField
                 uid={user?.id ?? ''}
                 userName={user?.name ?? ''}
                 maxPhotos={5}
                 storagePath="buy_sell"
-                onPhotosChange={(photos) => setFormPhotos(photos.filter((p) => p.status === 'done'))}
+                onPhotosChange={setFormPhotos}
                 onPickerOpenChange={handlePickerOpenChange}
               />
+              <UploadedPhotosGrid />
 
-              <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} activeOpacity={0.85} disabled={submitting}>
+              <TouchableOpacity style={[styles.submitBtn, (submitting || hasUploadingPhotos) && styles.submitBtnDisabled]} onPress={handleSubmit} activeOpacity={0.85} disabled={submitting || hasUploadingPhotos}>
                 {submitting ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.submitBtnText}>{text.submitBtn}</Text>
+                  <Text style={styles.submitBtnText}>{hasUploadingPhotos ? text.photoUploading : text.submitBtn}</Text>
                 )}
               </TouchableOpacity>
             </ScrollView>
@@ -856,6 +894,7 @@ const styles = StyleSheet.create({
   pickerWrapper: { backgroundColor: '#F7F3EE', borderRadius: 16, borderWidth: 1, borderColor: '#E8DDD3', overflow: 'hidden' },
   picker: { color: SCREEN_THEME.textPrimary, height: 50 },
   submitBtn: { backgroundColor: SCREEN_THEME.terracotta, borderRadius: 16, paddingVertical: 14, alignItems: 'center', marginTop: 14 },
+  submitBtnDisabled: { opacity: 0.65 },
   submitBtnText: { color: '#FFFFFF', fontWeight: '800' },
   listingsSection: { marginBottom: 16 },
   listingsHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 8 },
@@ -884,10 +923,9 @@ const styles = StyleSheet.create({
   listingPrice: { fontSize: 15, fontWeight: '900', color: '#00897B' },
   statusBadge: { fontSize: 11, fontWeight: '900', color: '#8A5A00', backgroundColor: '#FFF2C7', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
   listingDescription: { color: SCREEN_THEME.textSecondary, lineHeight: 18, marginBottom: 8 },
-  listingPhoto: { width: '100%', height: 170, borderRadius: 16, marginBottom: 8, backgroundColor: '#FFF3E0' },
+  listingPhoto: { width: '100%', height: 220, borderRadius: 16, marginBottom: 8, backgroundColor: '#F0EDE8' },
   listingPhotoPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   moderationInfo: { color: '#5F5043', backgroundColor: '#FFF8EA', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 8, fontSize: 12, lineHeight: 17, fontWeight: '700' },
-  phoneAction: { marginTop: 8, alignItems: 'flex-start' },
   addBar: {
     paddingHorizontal: 16,
     paddingVertical: 10,

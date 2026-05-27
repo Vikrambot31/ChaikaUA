@@ -23,14 +23,14 @@ export const getLevelName = (
 };
 
 export type ChaikaActivityInput = {
-  registeredAt?: Date;
+  registeredAt?: Date | string;
   daysUsed?: number;
   requestCount: number;
   reviewCount: number;
   likeCount?: number;
 };
 
-export const getDaysInApp = (registeredAt?: Date, daysUsed?: number) => {
+export const getDaysInApp = (registeredAt?: Date | string, daysUsed?: number) => {
   const storedDays = Number.isFinite(daysUsed) ? Number(daysUsed) : 0;
   const registeredTime = registeredAt ? new Date(registeredAt).getTime() : NaN;
   const calculatedDays = Number.isFinite(registeredTime)

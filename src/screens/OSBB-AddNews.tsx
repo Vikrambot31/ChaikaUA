@@ -17,6 +17,8 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../redux/store';
+import { selectIsOsbbManager } from '../redux/slices/osbbSlice';
+import { useOsbbMembership } from '../hooks/useOsbbMembership';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { addOsbbNews, updateOsbbNews } from '../services/osbbNews';
 
@@ -55,6 +57,7 @@ const UI_TEXT = {
     validationTitle: 'Заповніть поля',
     validationMsg: 'Заголовок і текст є обов\'язковими.',
     noBuildingId: 'Не вибрано будинок ОСББ. Поверніться назад і спочатку завершіть налаштування.',
+    managerOnly: 'Лише підтверджений представник правління ОСББ може публікувати новини.',
     charsLeft: 'символів залишилось',
     dateLabel: 'Сьогодні',
   },
@@ -76,6 +79,7 @@ const UI_TEXT = {
     validationTitle: 'Заполните поля',
     validationMsg: 'Заголовок и текст обязательны.',
     noBuildingId: 'Не выбран дом ОСББ. Вернитесь назад и сначала завершите настройку.',
+    managerOnly: 'Только подтверждённый представитель правления ОСББ может публиковать новости.',
     charsLeft: 'символов осталось',
     dateLabel: 'Сегодня',
   },
@@ -97,6 +101,7 @@ const UI_TEXT = {
     validationTitle: 'Check fields',
     validationMsg: 'Title and body are required.',
     noBuildingId: 'No OSBB building selected. Set up a building in the OSBB section before publishing.',
+    managerOnly: 'Only an approved OSBB board representative can publish news.',
     charsLeft: 'characters left',
     dateLabel: 'Today',
   },
@@ -134,6 +139,8 @@ const OsbbAddNewsScreen: React.FC = () => {
 
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
   const buildingId = useSelector((state: RootState) => state.osbb.buildingId);
+  const isManager = useSelector(selectIsOsbbManager);
+  useOsbbMembership();
   const t = UI_TEXT[language];
 
   const [priority, setPriority] = useState<NewsPriority>(editItem?.priority ?? 'info');
@@ -163,6 +170,10 @@ const OsbbAddNewsScreen: React.FC = () => {
     }
     if (!buildingId) {
       Alert.alert(t.validationTitle, t.noBuildingId);
+      return;
+    }
+    if (!isManager) {
+      Alert.alert(t.validationTitle, t.managerOnly);
       return;
     }
 
@@ -278,11 +289,16 @@ const OsbbAddNewsScreen: React.FC = () => {
               <MaterialCommunityIcons name="information-outline" size={16} color="#8A5A00" />
               <Text style={styles.noBuildingText}>{t.noBuildingId}</Text>
             </View>
+          ) : !isManager ? (
+            <View style={styles.noBuildingBanner}>
+              <MaterialCommunityIcons name="shield-lock-outline" size={16} color="#8A5A00" />
+              <Text style={styles.noBuildingText}>{t.managerOnly}</Text>
+            </View>
           ) : null}
           <TouchableOpacity
-            style={[styles.saveButton, (!isFormValid || saving) && styles.saveButtonDisabled]}
+            style={[styles.saveButton, (!isFormValid || saving || !isManager) && styles.saveButtonDisabled]}
             onPress={handleSave}
-            disabled={!isFormValid || saving}
+            disabled={!isFormValid || saving || !isManager}
             activeOpacity={0.85}
           >
             {saving ? (

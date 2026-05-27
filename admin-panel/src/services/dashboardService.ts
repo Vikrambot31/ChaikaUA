@@ -1,5 +1,7 @@
-import { get, off, onValue, ref } from 'firebase/database';
-import { database } from '../firebase/firebase';
+import { get, limitToLast, off, onValue, orderByChild, query, ref } from 'firebase/database';
+import { database, firebaseConfig } from '../firebase/firebase';
+import { LOCAL_MODE, LOCAL_API } from '../local/LOCAL_MODE';
+import { probeRulesLevel } from './rulesProbeService';
 import {
   MODERATION_PATHS,
   SECURITY_APP_CONTROL_PATH,
@@ -24,6 +26,15 @@ export type DashboardStats = {
   approved: number;
   rejected: number;
   expired: number;
+  activeUsersToday: number;
+  permissionDenied24h: number;
+  activeSubscriptions: number;
+  pendingPhotos: number;
+  pendingInviteRequests: number;
+  moderationAvgHours: number;
+  rulesEnforcementLevel: 'OPEN' | 'PARTIAL' | 'SECURE' | 'UNKNOWN';
+  rulesOpenPaths: string[];
+  rulesCheckedAt: number;
 };
 
 export type DashboardActivity = {
@@ -73,6 +84,16 @@ type RawSecurityLog = {
   } | null;
 };
 
+type RawOpsError = {
+  type?: unknown;
+  code?: unknown;
+  message?: unknown;
+  createdAt?: unknown;
+  created_at?: unknown;
+  timestamp?: unknown;
+  at?: unknown;
+};
+
 const emptyStats: DashboardStats = {
   usersTotal: 0,
   devicesTotal: 0,
@@ -84,6 +105,15 @@ const emptyStats: DashboardStats = {
   approved: 0,
   rejected: 0,
   expired: 0,
+  activeUsersToday: 0,
+  permissionDenied24h: 0,
+  activeSubscriptions: 0,
+  pendingPhotos: 0,
+  pendingInviteRequests: 0,
+  moderationAvgHours: 0,
+  rulesEnforcementLevel: 'UNKNOWN',
+  rulesOpenPaths: [],
+  rulesCheckedAt: 0,
 };
 
 const emptyCounter: ModerationCounter = {
@@ -98,9 +128,6 @@ const moderationDashboardPaths = [
   MODERATION_PATHS.requests,
   MODERATION_PATHS.appSuggestions,
   MODERATION_PATHS.communityPhotos,
-  MODERATION_PATHS.datingProfiles,
-  MODERATION_PATHS.datingAnketaListings,
-  MODERATION_PATHS.coffeeRequests,
   MODERATION_PATHS.buySell,
   MODERATION_PATHS.contactsListings,
   MODERATION_PATHS.localBusiness,
@@ -113,6 +140,15 @@ const moderationDashboardPaths = [
 ] as const;
 
 const getNumber = (value: unknown): number => Number.isFinite(value) ? Number(value) : 0;
+
+const getTime = (value: Record<string, unknown>): number =>
+  getNumber(value.createdAt) ||
+  getNumber(value.created_at) ||
+  getNumber(value.timestamp) ||
+  getNumber(value.at) ||
+  Date.parse(String(value.createdAt ?? value.timestamp ?? '')) ||
+  0;
+
 
 const getModerationStatus = (value: Record<string, unknown>): 'pending' | 'approved' | 'rejected' | 'expired' => {
   const raw = value.moderationStatus ?? value.status;
@@ -207,7 +243,121 @@ const flattenLogs = (raw: unknown): DashboardActivity[] => {
   ).sort((left, right) => right.time - left.time).slice(0, 12);
 };
 
-export const subscribeDashboard = (
+const countActiveUsersToday = (raw: unknown): number => {
+  if (!raw || typeof raw !== 'object') return 0;
+  const today = Date.now() - 24 * 60 * 60 * 1000;
+  return Object.values(raw as Record<string, Record<string, unknown>>).filter((user) => {
+    const lastActive = getNumber(user.lastActiveAt) || getNumber(user.last_active_at) || getNumber(user.lastSeenAt);
+    return lastActive >= today;
+  }).length;
+};
+
+const countPermissionDenied24h = (raw: unknown): number => {
+  if (!raw || typeof raw !== 'object') return 0;
+  const since = Date.now() - 24 * 60 * 60 * 1000;
+  return Object.values(raw as Record<string, RawOpsError>).filter((error) => {
+    const text = `${String(error.type ?? '')} ${String(error.code ?? '')} ${String(error.message ?? '')}`.toLowerCase();
+    const timestamp = getTime(error as Record<string, unknown>);
+    return timestamp >= since && (text.includes('permission_denied') || text.includes('permission-denied'));
+  }).length;
+};
+
+const getQueueNumber = (raw: unknown, keys: string[]): number => {
+  if (!raw || typeof raw !== 'object') return 0;
+  const value = raw as Record<string, unknown>;
+  for (const key of keys) {
+    const direct = getNumber(value[key]);
+    if (direct) return direct;
+  }
+  return 0;
+};
+
+// ─── LOCAL_MODE: загрузка данных из localhost:3001 ───────────────────────────
+const subscribeDashboardLocal = (
+  onData: (state: DashboardState) => void,
+  onError?: (error: Error) => void,
+): (() => void) => {
+  let cancelled = false;
+
+  const load = async () => {
+    try {
+      const [users, photos, helpRequests, announcements, lostFound, config] = await Promise.all([
+        fetch(`${LOCAL_API}/users`).then(r => r.json()) as Promise<unknown[]>,
+        fetch(`${LOCAL_API}/photos`).then(r => r.json()) as Promise<Array<{ status: string }>>,
+        fetch(`${LOCAL_API}/helpRequests`).then(r => r.json()) as Promise<unknown[]>,
+        fetch(`${LOCAL_API}/announcements`).then(r => r.json()) as Promise<unknown[]>,
+        fetch(`${LOCAL_API}/lostFound`).then(r => r.json()) as Promise<unknown[]>,
+        fetch(`${LOCAL_API}/config`).then(r => r.json()) as Promise<Record<string, unknown>>,
+      ]);
+
+      if (cancelled) return;
+
+      const allModerationItems = [...photos, ...helpRequests, ...announcements, ...lostFound] as Array<{ status: string }>;
+      const pending = allModerationItems.filter(i => i.status === 'pending').length;
+      const approved = allModerationItems.filter(i => i.status === 'approved').length;
+      const rejected = allModerationItems.filter(i => i.status === 'rejected').length;
+
+      const issues: DashboardIssue[] = [];
+      if (config.maintenanceMode) {
+        issues.push({ id: 'maintenance', title: 'Maintenance mode', detail: 'Режим обслуживания включён.' });
+      }
+      if (config.appEnabled === false) {
+        issues.push({ id: 'app_disabled', title: 'App disabled', detail: 'Приложение отключено.' });
+      }
+      if (pending > 5) {
+        issues.push({ id: 'pending_mod', title: 'Ожидают модерации', detail: `${pending} элементов ждут проверки.` });
+      }
+
+      onData({
+        connected: true,
+        config: {
+          app_enabled: Boolean(config.appEnabled),
+          maintenance_mode: Boolean(config.maintenanceMode),
+          invite_access_enabled: Boolean(config.inviteAccessEnabled),
+          min_app_version: String(config.minAppVersion ?? '0.0.1'),
+          latest_version: String(config.latestVersion ?? '1.0.0-local'),
+        } as unknown as import('./securityService').RemoteAppControlConfig,
+        activities: [],
+        stats: {
+          usersTotal: users.length,
+          devicesTotal: 0,
+          onlineDevices: 0,
+          blockedDevices: 0,
+          newDevices24h: 0,
+          moderationTotal: allModerationItems.length,
+          pending,
+          approved,
+          rejected,
+          expired: 0,
+          activeUsersToday: users.length,
+          permissionDenied24h: 0,
+          activeSubscriptions: 0,
+          pendingPhotos: photos.filter((item) => item.status === 'pending').length,
+          pendingInviteRequests: 0,
+          moderationAvgHours: 0,
+          rulesEnforcementLevel: 'UNKNOWN',
+          rulesOpenPaths: [],
+          rulesCheckedAt: 0,
+        },
+        issues,
+      });
+    } catch (err) {
+      onError?.(err instanceof Error ? err : new Error(String(err)));
+    }
+  };
+
+  void load();
+  const timer = setInterval(() => { void load(); }, 5000);
+  return () => {
+    cancelled = true;
+    clearInterval(timer);
+  };
+};
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const subscribeDashboard = LOCAL_MODE
+  ? subscribeDashboardLocal
+  : (
   onData: (state: DashboardState) => void,
   onError?: (error: Error) => void,
 ): (() => void) => {
@@ -217,6 +367,15 @@ export const subscribeDashboard = (
   let config: RemoteAppControlConfig | null = null;
   let activities: DashboardActivity[] = [];
   let connected: boolean | null = null;
+  let activeUsersToday = 0;
+  let permissionDenied24h = 0;
+  let activeSubscriptions = 0;
+  let pendingPhotos = 0;
+  let pendingInviteRequests = 0;
+  let moderationAvgHours = 0;
+  let rulesEnforcementLevel: DashboardStats['rulesEnforcementLevel'] = 'UNKNOWN';
+  let rulesOpenPaths: string[] = [];
+  let rulesCheckedAt = 0;
 
   const moderationByPath = new Map<string, ModerationCounter>();
 
@@ -249,6 +408,15 @@ export const subscribeDashboard = (
         approved: moderation.approved,
         rejected: moderation.rejected,
         expired: moderation.expired,
+        activeUsersToday,
+        permissionDenied24h,
+        activeSubscriptions,
+        pendingPhotos,
+        pendingInviteRequests,
+        moderationAvgHours,
+        rulesEnforcementLevel,
+        rulesOpenPaths,
+        rulesCheckedAt,
       },
       issues: [...systemIssues, ...deviceStats.deviceIssues, ...pendingOverflow],
     });
@@ -278,6 +446,7 @@ export const subscribeDashboard = (
   void get(ref(database, USERS_PATH)).then((snapshot) => {
     const raw = snapshot.val();
     usersTotal = raw && typeof raw === 'object' ? Object.keys(raw).length : 0;
+    activeUsersToday = countActiveUsersToday(raw);
     emit();
   }).catch((error: unknown) => onError?.(error instanceof Error ? error : new Error(String(error))));
 
@@ -291,8 +460,47 @@ export const subscribeDashboard = (
     emit();
   }, (error) => onError?.(error)));
 
+  // Реальна перевірка: анонімний HTTP-запит до RTDB REST API.
+  // Не залежить від флагу в базі — перевіряє фактичний стан правил.
+  const runRulesProbe = () => {
+    void probeRulesLevel(firebaseConfig.databaseURL ?? '').then((result) => {
+      rulesEnforcementLevel = result.level === 'OPEN' ? 'OPEN'
+        : result.level === 'PARTIAL' ? 'PARTIAL'
+        : result.level === 'SECURE' ? 'SECURE'
+        : 'UNKNOWN';
+      rulesOpenPaths = result.openPaths;
+      rulesCheckedAt = result.checkedAt;
+      emit();
+    });
+  };
+  runRulesProbe();
+  const rulesProbeInterval = setInterval(runRulesProbe, 5 * 60 * 1000);
+  unsubscribers.push(() => clearInterval(rulesProbeInterval));
+
   unsubscribers.push(onValue(ref(database, SECURITY_LOGS_PATH), (snapshot) => {
     activities = flattenLogs(snapshot.val());
+    emit();
+  }, (error) => onError?.(error)));
+
+  unsubscribers.push(onValue(query(ref(database, 'ops/errors'), orderByChild('timestamp'), limitToLast(300)), (snapshot) => {
+    permissionDenied24h = countPermissionDenied24h(snapshot.val());
+    emit();
+  }, (error) => onError?.(error)));
+
+  unsubscribers.push(onValue(ref(database, 'ops/subscriptions/active_count'), (snapshot) => {
+    activeSubscriptions = getNumber(snapshot.val());
+    emit();
+  }, (error) => onError?.(error)));
+
+  unsubscribers.push(onValue(ref(database, 'stats/moderation_queue_counts'), (snapshot) => {
+    const raw = snapshot.val();
+    pendingPhotos = getQueueNumber(raw, ['pendingPhotos', 'photos', 'communityPhotos', 'pending_photos']);
+    pendingInviteRequests = getQueueNumber(raw, ['pendingInviteRequests', 'inviteRequests', 'invite_requests', 'pending_invites']);
+    emit();
+  }, (error) => onError?.(error)));
+
+  unsubscribers.push(onValue(ref(database, 'stats/moderation_avg_hours'), (snapshot) => {
+    moderationAvgHours = getNumber(snapshot.val());
     emit();
   }, (error) => onError?.(error)));
 

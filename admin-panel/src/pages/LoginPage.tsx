@@ -99,17 +99,17 @@ export const LoginPage = ({ deniedError }: LoginPageProps) => {
 
         {(error || deniedError) ? <p className="formError">{error || deniedError}</p> : null}
 
-        <button className="secondaryButton" type="button" disabled={busy} onClick={() => void handleGoogleLogin()}>
-          {busy ? 'Проверка...' : 'Войти через Google'}
-        </button>
-
-        {!googleOnly ? <div className="divider" /> : null}
-
         {!googleOnly ? (
           <button className="primaryButton" type="submit" disabled={busy}>
             {busy ? 'Проверка...' : 'Войти по email'}
           </button>
         ) : null}
+
+        {!googleOnly ? <div className="divider" /> : null}
+
+        <button className="secondaryButton" type="button" disabled={busy} onClick={() => void handleGoogleLogin()}>
+          {busy ? 'Проверка...' : 'Войти через Google'}
+        </button>
       </form>
     </main>
   );

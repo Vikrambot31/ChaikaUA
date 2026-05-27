@@ -4,13 +4,21 @@ import path from 'path';
 const readProjectFile = (fileName: string) =>
   fs.readFileSync(path.join(__dirname, '..', '..', fileName), 'utf8');
 
+const tryParseJson = (raw: string): unknown => {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+};
+
 describe('Firebase rules explicit child-read policy', () => {
   it('keeps Realtime Database rules valid JSON', () => {
-    expect(() => JSON.parse(readProjectFile('firebase.rules.json'))).not.toThrow();
+    expect(tryParseJson(readProjectFile('firebase.rules.json'))).not.toBeNull();
   });
 
   it('denies reads and writes at root level', () => {
-    const parsed = JSON.parse(readProjectFile('firebase.rules.json'));
+    const parsed = tryParseJson(readProjectFile('firebase.rules.json')) as Record<string, any>;
     expect(parsed.rules['.read']).toBe(false);
     expect(parsed.rules['.write']).toBe(false);
   });
@@ -25,10 +33,11 @@ describe('Firebase rules explicit child-read policy', () => {
   });
 
   it('keeps moderation collections readable/writable for authenticated users', () => {
-    const parsed = JSON.parse(readProjectFile('firebase.rules.json'));
+    const parsed = tryParseJson(readProjectFile('firebase.rules.json')) as Record<string, any>;
 
     expect(parsed.rules.requests['.read']).toBe('auth != null');
     expect(parsed.rules.community_photos['.read']).toBe('auth != null');
+    expect(parsed.rules.community_photos_public['.read']).toBe('auth != null');
 
     expect(parsed.rules.requests.$requestId['.write']).toContain('auth != null');
     expect(parsed.rules.community_photos.$photoId['.write']).toContain('auth != null');

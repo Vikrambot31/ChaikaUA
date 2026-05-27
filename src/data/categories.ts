@@ -9,6 +9,89 @@ export interface CategoryGroup {
   subcategories: Subcategory[];
 }
 
+/** Supported UI languages. */
+export type AppLanguage = 'ua' | 'ru' | 'en';
+
+/**
+ * Multilingual display labels for every CATEGORY_GROUPS group and subcategory.
+ * Keys are the `.value` fields used as DB keys — never change those.
+ * The `ua` values match the existing Ukrainian labels in CATEGORY_GROUPS.
+ */
+export const CATEGORY_LABELS: Record<string, { ua: string; ru: string; en: string }> = {
+  // ── Group labels ────────────────────────────────────────────────────────────
+  foodsharing:        { ua: '🛒 ФУДШЕРИНГ',              ru: 'Фудшеринг',              en: 'Foodsharing' },
+  transport:          { ua: '🚗 ТРАНСПОРТ І ПОЇЗДКИ',    ru: 'Транспорт и поездки',    en: 'Transport & Trips' },
+  repair:             { ua: '🔧 РЕМОНТ І ТЕХНІКА',       ru: 'Ремонт и техника',       en: 'Repair & Tech' },
+  household:          { ua: '🏠 ПОБУТ І ПРИБИРАННЯ',     ru: 'Быт и уборка',           en: 'Household & Cleaning' },
+  care:               { ua: '👨‍👩‍👧 ТУРБОТА І ДОПОМОГА',    ru: 'Забота и помощь',        en: 'Care & Help' },
+  pets:               { ua: '🐾 ТВАРИНИ',                ru: 'Животные',               en: 'Pets' },
+  exchange:           { ua: '📦 ОБМІН І РЕЧІ',           ru: 'Обмен и вещи',           en: 'Exchange & Items' },
+  building_issues:    { ua: '🏗️ ПРОБЛЕМИ ЖК',           ru: 'Проблемы ЖК',            en: 'Building Issues' },
+  education_services: { ua: '🎓 НАВЧАННЯ І ПОСЛУГИ',     ru: 'Обучение и услуги',      en: 'Education & Services' },
+
+  // ── Subcategory labels ──────────────────────────────────────────────────────
+  // foodsharing
+  going_shopping:        { ua: 'Іду в магазин — хто хоче замовити?', ru: 'Иду в магазин — кто хочет заказать?', en: 'Going shopping — anyone want to order?' },
+
+  // transport
+  ride_share:            { ua: 'Їду — хто зі мною? (підвезу)',        ru: 'Еду — кто со мной? (подвезу)',         en: 'Going somewhere — need a ride?' },
+  need_ride:             { ua: 'Потрібна машина / таксі',              ru: 'Нужна машина / такси',                 en: 'Need a car / taxi' },
+  parking_help:          { ua: 'Допомога з паркуванням',               ru: 'Помощь с парковкой',                   en: 'Parking help' },
+  parcel_delivery:       { ua: 'Доставка посилки / речей',             ru: 'Доставка посылки / вещей',             en: 'Parcel / item delivery' },
+
+  // repair
+  plumbing:              { ua: 'Сантехніка',                           ru: 'Сантехника',                           en: 'Plumbing' },
+  electrical:            { ua: 'Електрика',                            ru: 'Электрика',                            en: 'Electrical' },
+  locks_doors:           { ua: 'Замки і двері',                        ru: 'Замки и двери',                        en: 'Locks & doors' },
+  windows_balconies:     { ua: 'Вікна і балкони',                      ru: 'Окна и балконы',                       en: 'Windows & balconies' },
+  home_appliances:       { ua: 'Побутова техніка',                     ru: 'Бытовая техника',                      en: 'Home appliances' },
+  furniture:             { ua: 'Меблі (зібрати / розібрати)',           ru: 'Мебель (собрать / разобрать)',          en: 'Furniture (assemble / disassemble)' },
+  small_repair:          { ua: 'Дрібний ремонт',                       ru: 'Мелкий ремонт',                        en: 'Small repair' },
+
+  // household
+  cleaning:              { ua: 'Прибирання',                           ru: 'Уборка',                               en: 'Cleaning' },
+  trash_removal:         { ua: 'Вивіз речей / сміття',                 ru: 'Вывоз вещей / мусора',                 en: 'Trash / items removal' },
+  laundry:               { ua: 'Хімчистка і прання',                   ru: 'Химчистка и стирка',                   en: 'Dry cleaning & laundry' },
+  plants:                { ua: 'Рослини (полити / доглянути)',          ru: 'Растения (полить / ухаживать)',         en: 'Plants (water / care)' },
+
+  // care
+  childcare:             { ua: 'Допомога дітям / няня',                ru: 'Помощь детям / няня',                  en: 'Childcare / babysitter' },
+  elderly_help:          { ua: 'Допомога літнім',                      ru: 'Помощь пожилым',                       en: 'Elderly help' },
+  psychological_support: { ua: 'Психологічна підтримка',               ru: 'Психологическая поддержка',            en: 'Psychological support' },
+  medical_consultation:  { ua: 'Медична консультація',                  ru: 'Медицинская консультация',             en: 'Medical consultation' },
+  medicine:              { ua: 'Ліки (позичити / передати)',            ru: 'Лекарства (одолжить / передать)',       en: 'Medicine (borrow / pass on)' },
+
+  // pets
+  dog_walking:           { ua: 'Виходити собаку',                      ru: 'Выгулять собаку',                      en: 'Dog walking' },
+  pet_care:              { ua: 'Нагодувати / доглянути',                ru: 'Покормить / ухаживать',                en: 'Feed / care for pet' },
+  found_pet:             { ua: 'Знайшов тварину',                      ru: 'Нашёл животное',                       en: 'Found a pet' },
+  lost_pet:              { ua: 'Шукаю тварину',                        ru: 'Ищу животное',                         en: 'Lost a pet' },
+
+  // exchange
+  free_items:            { ua: 'Віддам безкоштовно',                   ru: 'Отдам бесплатно',                      en: 'Free items' },
+  borrow_tool:           { ua: 'Позичити інструмент',                  ru: 'Одолжить инструмент',                  en: 'Borrow a tool' },
+  item_exchange:         { ua: 'Обмін речами',                         ru: 'Обмен вещами',                         en: 'Item exchange' },
+  lost_item:             { ua: 'Загублено',                            ru: 'Потеряно',                             en: 'Lost item' },
+  found_item:            { ua: 'Знайдено',                             ru: 'Найдено',                              en: 'Found item' },
+
+  // building_issues
+  noise:                 { ua: 'Шум від сусідів',                      ru: 'Шум от соседей',                       en: 'Noise from neighbours' },
+  elevator:              { ua: 'Проблема з ліфтом',                    ru: 'Проблема с лифтом',                    en: 'Elevator issue' },
+  parking_blocked:       { ua: 'Парковка / перегороджений проїзд',     ru: 'Парковка / перегороженный проезд',     en: 'Parking / blocked passage' },
+  yard_trash:            { ua: 'Смітник / двір',                       ru: 'Мусор / двор',                         en: 'Yard / trash' },
+  yard_lighting:         { ua: 'Освітлення у дворі',                   ru: 'Освещение во дворе',                   en: 'Yard lighting' },
+  management_request:    { ua: 'Звернення до управи',                  ru: 'Обращение в управление',               en: 'Management request' },
+
+  // education_services
+  tutoring:              { ua: 'Репетитор / навчання',                 ru: 'Репетитор / обучение',                 en: 'Tutoring / lessons' },
+  job_search:            { ua: 'Пошук роботи',                        ru: 'Поиск работы',                         en: 'Job search' },
+  sports_company:        { ua: 'Спортивна компанія',                   ru: 'Спортивная компания',                  en: 'Sports partner' },
+  creative_club:         { ua: 'Творчий гурток',                      ru: 'Творческий кружок',                    en: 'Creative club' },
+  master_services:       { ua: 'Майстер (стрижка / фото / масаж)',     ru: 'Мастер (стрижка / фото / массаж)',     en: 'Master (haircut / photo / massage)' },
+  legal_consultation:    { ua: 'Юридична консультація',                ru: 'Юридическая консультация',             en: 'Legal consultation' },
+  documents:             { ua: 'Документи та довідки',                 ru: 'Документы и справки',                  en: 'Documents & certificates' },
+};
+
 export const CATEGORY_GROUPS: CategoryGroup[] = [
   {
     label: '🛒 ФУДШЕРИНГ',
@@ -147,6 +230,32 @@ export const getGroupLabel = (groupValue: string): string =>
 export const getSubcategoryLabel = (groupValue: string, subValue: string): string =>
   getSubcategories(groupValue).find((subcategory) => subcategory.value === subValue)?.label ?? subValue;
 
+/**
+ * Returns the localized display label for a category group.
+ * Falls back to the Ukrainian label (from CATEGORY_GROUPS) if no entry in CATEGORY_LABELS.
+ */
+export const getCategoryGroupLabel = (groupValue: string, lang: AppLanguage): string => {
+  const entry = CATEGORY_LABELS[groupValue];
+  if (entry) return entry[lang];
+  // Fallback: original label from CATEGORY_GROUPS (Ukrainian)
+  return getGroupLabel(groupValue);
+};
+
+/**
+ * Returns the localized display label for a subcategory.
+ * Falls back to the Ukrainian label (from CATEGORY_GROUPS) if no entry in CATEGORY_LABELS.
+ */
+export const getSubcategoryLabelLocalized = (
+  groupValue: string,
+  subValue: string,
+  lang: AppLanguage,
+): string => {
+  const entry = CATEGORY_LABELS[subValue];
+  if (entry) return entry[lang];
+  // Fallback: original label from CATEGORY_GROUPS (Ukrainian)
+  return getSubcategoryLabel(groupValue, subValue);
+};
+
 export const getStoreLabel = (storeValue: string): string =>
   CHAIKA_STORES.find((store) => store.value === storeValue)?.label ?? storeValue;
 
@@ -168,18 +277,9 @@ export const buildRequestText = ({
   timeSlot,
   destination,
 }: BuildRequestTextParams): string => {
-  if (subValue === SPECIAL.FOODSHARING) {
-    const storeLabel = store ? getStoreLabel(store) : '—';
-    const timeLabel = timeSlot ? getTimeLabel(timeSlot) : '—';
-    return `Йду в ${storeLabel} о ${timeLabel}`;
-  }
-
-  if (subValue === SPECIAL.RIDE_SHARE) {
-    const normalizedDestination = destination?.trim();
-    const destinationLabel = normalizedDestination && normalizedDestination.length > 0 ? normalizedDestination : '—';
-    const timeLabel = timeSlot ? getTimeLabel(timeSlot) : '—';
-    return `Їду в ${destinationLabel} о ${timeLabel}`;
-  }
+  void store;
+  void timeSlot;
+  void destination;
 
   return getSubcategoryLabel(groupValue, subValue);
 };

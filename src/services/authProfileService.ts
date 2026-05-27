@@ -1,12 +1,13 @@
 import { User as FirebaseUser } from 'firebase/auth';
 import { get, ref, set, update } from 'firebase/database';
-import { deleteObject, getDownloadURL, ref as storageRef } from 'firebase/storage';
+import { deleteObject, ref as storageRef } from 'firebase/storage';
 import { database, storage } from '../firebase-config';
 import type { User } from '../types/app';
 import { sanitizeStoredText } from '../utils/textUtils';
 import { ensureFirebaseAuth } from '../firebase-auth-session';
 import { safeLogError } from '../utils/errorLogger';
-import { uploadPhotoToNamespace } from './photoUploadService';
+import { START_AVATAR_URI_PREFIX } from '../utils/startAvatars';
+import { photoService } from './photoService';
 
 type ProfileRecord = {
   name?: string;
@@ -23,6 +24,7 @@ type ProfileRecord = {
   photoURL?: string;
   photoURLs?: string[];
   photoStoragePaths?: string[];
+  startAvatarKey?: string;
 };
 
 const MAX_PROFILE_PHOTOS = 3;
@@ -51,6 +53,7 @@ const normalizeRecord = (raw: ProfileRecord | null | undefined): ProfileRecord =
   photoURL: raw?.photoURL,
   photoURLs: normalizeStringArray(raw?.photoURLs),
   photoStoragePaths: normalizeStringArray(raw?.photoStoragePaths),
+  startAvatarKey: sanitizeStoredText(raw?.startAvatarKey || ''),
 });
 
 export const getProfileRefPath = (uid: string) => `${USERS_PATH}/${uid}`;
@@ -100,7 +103,11 @@ export const mapFirebaseUserToAppUser = (
     : normalizedProfile.photoURL
       ? [normalizedProfile.photoURL]
       : [];
-  const primaryPhotoUrl = photoURLs[0] || normalizedProfile.photoURL || firebaseUser.photoURL || undefined;
+  const startAvatarUri = normalizedProfile.startAvatarKey
+    ? `${START_AVATAR_URI_PREFIX}${normalizedProfile.startAvatarKey}`
+    : '';
+  const primaryPhotoUrl = startAvatarUri || photoURLs[0] || normalizedProfile.photoURL || firebaseUser.photoURL || undefined;
+  const resolvedPhotoURLs = startAvatarUri ? [startAvatarUri] : photoURLs;
 
   return {
     id: firebaseUser.uid,
@@ -109,15 +116,17 @@ export const mapFirebaseUserToAppUser = (
     phone: normalizedProfile.phone || firebaseUser.phoneNumber || '',
     daysUsed: 0,
     registeredAt: normalizedProfile.registeredAt
-      ? new Date(normalizedProfile.registeredAt)
-      : firebaseUser.metadata?.creationTime
-        ? new Date(firebaseUser.metadata.creationTime)
-        : new Date(),
+      || firebaseUser.metadata?.creationTime
+      || new Date().toISOString(),
     isActive: registrationStatus === 'complete',
     city: normalizedProfile.building || '',
+    houseNumber: normalizedProfile.houseNumber || undefined,
+    profession: normalizedProfile.profession || undefined,
+    about: normalizedProfile.about || undefined,
     registrationStatus,
     photoURL: primaryPhotoUrl,
-    photoURLs,
+    photoURLs: resolvedPhotoURLs,
+    startAvatarKey: normalizedProfile.startAvatarKey || undefined,
     provider: (normalizedProfile.provider as User['provider']) || (firebaseUser.providerData[0]?.providerId === 'facebook.com'
       ? 'facebook'
       : firebaseUser.providerData[0]?.providerId === 'google.com'
@@ -191,8 +200,14 @@ export const updateProfileRecord = async (uid: string, patch: Partial<ProfileRec
 
         if (historyKeys.length > 10) {
           const toDelete = historyKeys.slice(10);
+          const batchDelete: Record<string, null> = {};
           for (const key of toDelete) {
-            await set(ref(database, `${USERS_PATH}/${uid}/profile_history/${key}`), null);
+            batchDelete[`${USERS_PATH}/${uid}/profile_history/${key}`] = null;
+          }
+          try {
+            await update(ref(database, '/'), batchDelete);
+          } catch (err) {
+            console.error('[authProfileService] profile_history batch delete failed:', err);
           }
         }
       }
@@ -203,19 +218,22 @@ export const updateProfileRecord = async (uid: string, patch: Partial<ProfileRec
 export const uploadProfilePhoto = async (
   localUri: string,
 ): Promise<{ url: string; storagePath: string }> => {
+  const user = await ensureFirebaseAuth();
   try {
-    const upload = await uploadPhotoToNamespace(localUri, {
-      namespace: 'profile_photos',
-      logContext: { source: 'authProfileService.uploadProfilePhoto' },
+    const photo = await photoService.addLocalPhoto(localUri, {
+      userId: user.uid,
+      type: 'avatar',
     });
-    const photoRef = storageRef(storage, upload.storagePath);
-    const url = await getDownloadURL(photoRef);
+    const upload = await photoService.upload(photo.id);
+    if (!upload.imageUrl) {
+      throw new Error('Profile photo URL was not resolved after upload');
+    }
+    const url = upload.imageUrl;
     return { url, storagePath: upload.storagePath };
   } catch (error) {
-    const user = await ensureFirebaseAuth();
     safeLogError('authProfileService.uploadProfilePhoto', error, {
-      stage: 'storage_upload',
-      firebasePath: 'profile_photos/<pending>',
+      stage: 'photo_service_upload',
+      firebasePath: 'uploads/users/<uid>/avatar/<pending>',
       storageBucket: storage.app.options.storageBucket || 'unknown',
       authUid: user.uid,
     });

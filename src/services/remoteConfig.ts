@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { get, onValue, ref } from 'firebase/database';
 import { database } from '../firebase-core';
 import {
@@ -7,10 +6,11 @@ import {
   validateRemoteAppControlConfig,
 } from './securityConfigValidator';
 import { logClientError } from '../utils/errorLogger';
+import { CACHE_TTL, cacheGet, cacheSet, cacheInvalidate } from '../utils/cacheLayer';
 
 const APP_CONTROL_PATH = 'security_config/app_control/current';
-const APP_CONTROL_CACHE_KEY = '@chaika:app_control_config_v1';
-const APP_CONTROL_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const APP_CONTROL_CACHE_KEY = 'security_config:app_control:current';
+const APP_CONTROL_CACHE_MAX_AGE_MS = CACHE_TTL.securityConfig;
 const REMOTE_CONFIG_LOAD_TIMEOUT_MS = 4500;
 
 let remoteConfigInFlightPromise: Promise<RemoteConfigSnapshot> | null = null;
@@ -54,26 +54,21 @@ const setCachedSnapshot = async (snapshot: RemoteConfigSnapshot): Promise<void> 
     config: snapshot.config,
     loadedAt: snapshot.loadedAt,
   };
-  await AsyncStorage.setItem(APP_CONTROL_CACHE_KEY, JSON.stringify(payload));
+  await cacheSet(APP_CONTROL_CACHE_KEY, payload, CACHE_TTL.securityConfig);
 };
 
 export const getCachedRemoteConfigSnapshot = async (): Promise<RemoteConfigSnapshot | null> => {
   try {
-    const raw = await AsyncStorage.getItem(APP_CONTROL_CACHE_KEY);
-    if (!raw) {
-      return null;
-    }
-
-    const parsed = JSON.parse(raw) as Partial<CachedRemoteConfigPayload>;
+    const parsed = await cacheGet<Partial<CachedRemoteConfigPayload>>(APP_CONTROL_CACHE_KEY);
     if (!parsed?.config) {
-      await AsyncStorage.removeItem(APP_CONTROL_CACHE_KEY);
+      await cacheInvalidate(APP_CONTROL_CACHE_KEY);
       return null;
     }
 
     return toSnapshot(parsed.config, 'cache', Number(parsed.loadedAt) || 0);
   } catch {
     try {
-      await AsyncStorage.removeItem(APP_CONTROL_CACHE_KEY);
+      await cacheInvalidate(APP_CONTROL_CACHE_KEY);
     } catch {}
     return null;
   }

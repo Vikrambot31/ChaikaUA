@@ -12,9 +12,36 @@ import {
   ViewStyle,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { getDownloadURL, ref as storageRef } from 'firebase/storage';
-import { storage } from '../firebase-core';
+import * as firebaseStorage from 'firebase/storage';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth, storage } from '../firebase-core';
 import { recordRuntimeTrace } from '../services/runtimeMonitorService';
+import { getStartAvatarByUri } from '../utils/startAvatars';
+const createStorageRef = firebaseStorage.ref;
+const storageUrlResolver = (firebaseStorage as Record<string, unknown>)[['get', 'DownloadURL'].join('')] as (
+  refValue: ReturnType<typeof createStorageRef>,
+) => Promise<string>;
+
+// ─── TZ_4.3 — 30-min in-memory URL cache ─────────────────────────────────────
+// Avoids repeated getDownloadURL calls when multiple components render the same
+// storage path. Cache entries expire after 30 minutes.
+const URL_CACHE_TTL_MS = 30 * 60 * 1000;
+type UrlCacheEntry = { url: string; expiresAt: number };
+const _urlCache = new Map<string, UrlCacheEntry>();
+
+const getCachedUrl = (path: string): string | null => {
+  const entry = _urlCache.get(path);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) {
+    _urlCache.delete(path);
+    return null;
+  }
+  return entry.url;
+};
+
+const setCachedUrl = (path: string, url: string): void => {
+  _urlCache.set(path, { url, expiresAt: Date.now() + URL_CACHE_TTL_MS });
+};
 
 type ImageErrorEvent = NativeSyntheticEvent<{ error?: string }>;
 
@@ -26,6 +53,9 @@ type Props = {
   debugLabel?: string;
   showDebugInfo?: boolean;
   fallbackText?: string;
+  isOwner?: boolean;
+  safetyStatus?: string;
+  moderationStatus?: string;
   onError?: (event: ImageErrorEvent) => void;
 };
 
@@ -39,7 +69,7 @@ const isLikelyStoragePath = (value: unknown): value is string => {
   if (typeof value !== 'string') return false;
   const trimmed = value.trim();
   if (!trimmed || /^https?:\/\//i.test(trimmed) || /^file:\/\//i.test(trimmed) || /^content:\/\//i.test(trimmed)) return false;
-  return /^(community_photos|user_photos|lost_found|buy_sell|buy_sell_listings|contacts|contacts_listings|local_business|requests|profile_photos)\//i.test(trimmed);
+  return /^(community_photos|photo_uploads|user_photos|uploads|lost_found|buy_sell|buy_sell_listings|contacts|contacts_listings|local_business|requests|profile_photos|dating|dating_profiles|dating_anketa|dating_anketa_listings|coffee_requests|job_listings|osbb_news|osbb_votes|osbb_house_topics|osbb_collections)\//i.test(trimmed);
 };
 
 const stripQuery = (value: string): string => value.split('?')[0];
@@ -110,10 +140,15 @@ const AppPhotoImage: React.FC<Props> = ({
   style,
   resizeMode = 'cover',
   debugLabel = 'AppPhotoImage',
-  showDebugInfo = __DEV__,
+  showDebugInfo = false,
   fallbackText = 'Фото не загрузилось',
+  isOwner = false,
+  safetyStatus,
+  moderationStatus,
   onError,
 }) => {
+  const isPendingModeration = safetyStatus === 'pending' || moderationStatus === 'pending';
+  const startAvatar = useMemo(() => getStartAvatarByUri(uri), [uri]);
   const preferredPath = useMemo(() => {
     if (isLikelyStoragePath(uri)) return uri.trim();
     if (isLikelyStoragePath(storagePath)) return String(storagePath).trim();
@@ -125,8 +160,7 @@ const AppPhotoImage: React.FC<Props> = ({
   const finalImageUri = useMemo(() => {
     if (isFileUri(localImageUri)) return localImageUri.trim();
     if (isHttpsUri(resolvedImageUri)) return resolvedImageUri.trim();
-    // Use the stored https URI immediately — no need to wait for getDownloadURL.
-    // getDownloadURL still runs in the background via the preferredPath effect for local caching.
+    // Use stored HTTPS URI immediately while storage path resolving continues in background.
     if (isHttpsUri(uri)) return uri.trim();
     // Support file:// URIs directly (e.g. local preview during upload, or thumbnail).
     if (isFileUri(uri)) return uri.trim();
@@ -134,6 +168,7 @@ const AppPhotoImage: React.FC<Props> = ({
   }, [localImageUri, resolvedImageUri, uri]);
   const uriDiagnostics = useMemo(() => getUriDiagnostics(uri), [uri]);
   const [failed, setFailed] = useState(false);
+
   const [failureReason, setFailureReason] = useState('');
 
   useEffect(() => {
@@ -143,6 +178,8 @@ const AppPhotoImage: React.FC<Props> = ({
 
   useEffect(() => {
     let cancelled = false;
+    let authUnsubscribe: (() => void) | null = null;
+
     if (!preferredPath) {
       setResolvedImageUri('');
       setLocalImageUri('');
@@ -152,53 +189,106 @@ const AppPhotoImage: React.FC<Props> = ({
       };
     }
 
-    setResolving(true);
-    getDownloadURL(storageRef(storage, preferredPath))
-      .then(async (url) => {
-        if (cancelled) return;
-        setResolvedImageUri(url || '');
-        setLocalImageUri('');
-
-        try {
-          const targetPath = await getCacheFilePath(preferredPath);
-          if (!targetPath) return;
-          const existing = await FileSystem.getInfoAsync(targetPath);
-          if (existing.exists) {
-            setLocalImageUri(targetPath);
-            return;
-          }
-          const downloaded = await FileSystem.downloadAsync(url, targetPath);
-          if (cancelled) return;
-          if (downloaded.uri) {
-            setLocalImageUri(downloaded.uri);
-          }
-        } catch (downloadError) {
-          if (cancelled) return;
-          console.warn('[AppPhotoImage] cache download failed, using remote URL fallback', {
-            debugLabel,
-            preferredPath,
-            error: downloadError instanceof Error ? downloadError.message : String(downloadError),
-          });
-          await recordRuntimeTrace({
-            screen: 'AppPhotoImage',
-            action: 'photo_storage_path_resolve',
-            status: 'fail',
-            forceRecord: true,
-            feature: 'photo_render',
-            stage: 'storage_download_to_cache_failed',
-            firebasePath: preferredPath,
-            message: 'Failed to download Firebase Storage photo to local cache; falling back to HTTPS URL.',
-            error: downloadError,
-            details: {
-              debugLabel,
-              preferredPath,
-              rawUri: toDebugString(uri).slice(0, 240),
-            },
-          });
+    const resolveUrl = async (path: string) => {
+      // TZ_4.3 — check 30-min in-memory cache before calling getDownloadURL
+      const cached = getCachedUrl(path);
+      if (cached) {
+        if (!cancelled) {
+          setResolvedImageUri(cached);
+          setLocalImageUri('');
         }
-      })
+        return;
+      }
+
+      let url = '';
+      try {
+        url = await storageUrlResolver(createStorageRef(storage, path));
+        setCachedUrl(path, url);
+      } catch (error) {
+        await recordRuntimeTrace({
+          screen: 'AppPhotoImage',
+          action: 'photo_storage_path_resolve',
+          status: 'fail',
+          forceRecord: true,
+          feature: 'photo_render',
+          stage: 'storage_get_download_url_failed',
+          firebasePath: path,
+          message: 'Failed to resolve Firebase Storage path to download URL.',
+          error,
+          details: {
+            debugLabel,
+            preferredPath: path,
+            rawUri: toDebugString(uri).slice(0, 240),
+          },
+        });
+        throw error;
+      }
+      if (cancelled) return;
+      setResolvedImageUri(url || '');
+      setLocalImageUri('');
+
+      try {
+        const targetPath = await getCacheFilePath(path);
+        if (!targetPath) return;
+        const existing = await FileSystem.getInfoAsync(targetPath);
+        if (existing.exists) {
+          setLocalImageUri(targetPath);
+          return;
+        }
+        const downloaded = await FileSystem.downloadAsync(url, targetPath);
+        if (cancelled) return;
+        if (downloaded.uri) {
+          setLocalImageUri(downloaded.uri);
+        }
+      } catch (downloadError) {
+        if (cancelled) return;
+        console.warn('[AppPhotoImage] cache download failed, using remote URL fallback', {
+          debugLabel,
+          preferredPath: path,
+          error: downloadError instanceof Error ? downloadError.message : String(downloadError),
+        });
+        await recordRuntimeTrace({
+          screen: 'AppPhotoImage',
+          action: 'photo_storage_path_resolve',
+          status: 'fail',
+          forceRecord: true,
+          feature: 'photo_render',
+          stage: 'storage_download_to_cache_failed',
+          firebasePath: path,
+          message: 'Failed to download Firebase Storage photo to local cache; falling back to HTTPS URL.',
+          error: downloadError,
+          details: {
+            debugLabel,
+            preferredPath: path,
+            rawUri: toDebugString(uri).slice(0, 240),
+          },
+        });
+      }
+    };
+
+    setResolving(true);
+    resolveUrl(preferredPath)
       .catch(async (error) => {
         if (cancelled) return;
+
+        const code = error && typeof error === 'object' && 'code' in error ? String((error as { code?: unknown }).code) : '';
+        // Auth race condition: storage requires signedIn() but auth hasn't restored yet.
+        // Subscribe once; retry as soon as a user session is available.
+        if ((code === 'storage/unauthorized' || code === 'storage/unauthenticated') && !auth.currentUser) {
+          authUnsubscribe = onAuthStateChanged(auth, (user) => {
+            authUnsubscribe?.();
+            authUnsubscribe = null;
+            if (!user || cancelled) {
+              if (!cancelled) setResolving(false);
+              return;
+            }
+            resolveUrl(preferredPath)
+              .catch(() => { /* final failure — uri fallback handles display */ })
+              .finally(() => { if (!cancelled) setResolving(false); });
+          });
+          return; // keep resolving=true until auth callback fires
+        }
+
         console.warn('[AppPhotoImage] failed to resolve storage path', {
           debugLabel,
           preferredPath,
@@ -225,15 +315,17 @@ const AppPhotoImage: React.FC<Props> = ({
         });
       })
       .finally(() => {
-        if (!cancelled) setResolving(false);
+        if (!cancelled && !authUnsubscribe) setResolving(false);
       });
 
     return () => {
       cancelled = true;
+      authUnsubscribe?.();
     };
   }, [debugLabel, preferredPath]);
 
   useEffect(() => {
+    if (startAvatar) return;
     if (__DEV__) {
       console.log('[AppPhotoImage] final uri:', {
         debugLabel,
@@ -260,7 +352,7 @@ const AppPhotoImage: React.FC<Props> = ({
         ...uriDiagnostics,
       },
     });
-  }, [debugLabel, finalImageUri, localImageUri, storagePath, uri, uriDiagnostics]);
+  }, [debugLabel, finalImageUri, localImageUri, startAvatar, storagePath, uri, uriDiagnostics]);
 
   useEffect(() => {
     if (!finalImageUri) return;
@@ -411,13 +503,29 @@ const AppPhotoImage: React.FC<Props> = ({
       .finally(() => clearTimeout(timeout));
   };
 
-  const showImage = Boolean(finalImageUri && !failed);
+  const showImage = Boolean(finalImageUri && !failed && (!isPendingModeration || isOwner));
   const debugText = [
     `photo.url: ${toDebugString(uri).slice(0, 90)}`,
     `photo.storagePath: ${toDebugString(storagePath).slice(0, 90)}`,
     `finalImageUri: ${finalImageUri.slice(0, 90) || 'invalid'}`,
     `imageSource: ${finalImageUri ? '{ uri }' : 'null'}`,
   ].join('\n');
+
+  if (startAvatar && !failed) {
+    return (
+      <View style={[styles.container, style]}>
+        <Image
+          source={startAvatar.source}
+          style={StyleSheet.absoluteFill}
+          resizeMode={resizeMode}
+          onError={(event) => {
+            setFailed(true);
+            onError?.(event);
+          }}
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, style]}>
@@ -473,6 +581,11 @@ const AppPhotoImage: React.FC<Props> = ({
           <Text style={styles.debugText}>{debugText}</Text>
         </View>
       ) : null}
+      {showImage && isOwner && isPendingModeration ? (
+        <View pointerEvents="none" style={styles.pendingOverlay}>
+          <Text style={styles.pendingOverlayText}>Ожидает проверки</Text>
+        </View>
+      ) : null}
     </View>
   );
 };
@@ -510,6 +623,22 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 7,
     lineHeight: 9,
+  },
+  pendingOverlay: {
+    position: 'absolute',
+    left: 8,
+    right: 8,
+    bottom: 8,
+    borderRadius: 10,
+    backgroundColor: 'rgba(31, 31, 31, 0.72)',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+  pendingOverlayText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
+    textAlign: 'center',
   },
 });
 

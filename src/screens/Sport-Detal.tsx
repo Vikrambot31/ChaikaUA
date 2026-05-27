@@ -100,10 +100,12 @@ const SportDetailScreen: React.FC = () => {
       setShowTimeSlots(!myTime);
       setLoading(false);
     });
+    const loadingFallback = setTimeout(() => setLoading(false), 8000);
 
     return () => {
       unsubscribePlayers();
       unsubscribeToday();
+      clearTimeout(loadingFallback);
     };
   }, [sportKey, user?.id]);
 

@@ -1,6 +1,7 @@
 import { GoogleAuthProvider, FacebookAuthProvider, OAuthProvider, signInWithPopup, signInWithCredential, User as FirebaseUser } from 'firebase/auth';
 import { ref, onValue, push, update, query, orderByChild, get, remove, limitToLast, equalTo, endBefore, DatabaseReference, Query } from 'firebase/database';
-import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import * as firebaseStorage from 'firebase/storage';
+import { uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as Notifications from 'expo-notifications';
 import * as Crypto from 'expo-crypto';
 import { Platform } from 'react-native';
@@ -14,9 +15,21 @@ import { auth, database, storage } from './firebase-core';
 import { ensureFirebaseAuth, isModeratorUser } from './firebase-auth-session';
 import { Request as AppRequest, CommunityPhoto as AppPhoto, AudioAttachment } from './types/app';
 import { resolveMediaAccessUrls } from './services/mediaAccess';
+import { assertTextMatchesLanguage, normalizeAppLang } from './utils/contentLanguageGuard';
 
 
 export { auth, database, storage };
+
+const createStorageRef = firebaseStorage.ref;
+const removeStorageObject = firebaseStorage.deleteObject;
+const uploadStorageBinary = uploadBytes as (
+  refValue: ReturnType<typeof createStorageRef>,
+  data: Blob | Uint8Array | ArrayBuffer,
+  metadata: { contentType?: string } | undefined,
+) => Promise<unknown>;
+const resolveStorageUrl = getDownloadURL as (
+  refValue: ReturnType<typeof createStorageRef>,
+) => Promise<string>;
 
 // ─── Connection monitor ────────────────────────────────────────────────────────
 
@@ -100,6 +113,8 @@ interface DbRequestValue {
   topics?: unknown;
   photoUri?: unknown;
   photoStoragePath?: unknown;
+  userPhotoURL?: unknown;
+  startAvatarKey?: unknown;
   expires_at?: unknown;
   moderatedAt?: unknown;
   moderatedBy?: unknown;
@@ -124,6 +139,9 @@ interface DbPhotoValue {
   storagePath?: unknown;
   uploadedBy?: unknown;
   uploadedByEmail?: unknown;
+  sourceScreen?: unknown;
+  sourceScreenLabel?: unknown;
+  sourceFeature?: unknown;
   createdAt?: unknown;
   uploadedAt?: unknown;
   status?: unknown;
@@ -157,6 +175,7 @@ interface DbUserValue {
 interface ModerationMeta {
   moderationPriority: 'low' | 'standard' | 'high';
   moderationQueue: 'feedback' | 'standard' | 'urgent';
+  status_priority: string;
 }
 
 /** The payload accepted by firebaseChatAPI.addRequest. */
@@ -165,6 +184,7 @@ interface AddRequestPayload {
   phone?: string;
   description?: string;
   text?: string;
+  language?: 'ua' | 'ru' | 'en';
   category?: string;
   group?: string;
   subcategory?: string;
@@ -175,6 +195,8 @@ interface AddRequestPayload {
   audio?: AudioAttachment;
   photoUri?: string;
   photoStoragePath?: string;
+  userPhotoURL?: string;
+  startAvatarKey?: string;
 }
 
 /** The payload accepted by photoAPI.addPhoto. */
@@ -185,6 +207,9 @@ interface AddPhotoPayload {
   storagePath?: string;
   uploadedBy?: string;
   target?: 'gallery_public';
+  sourceScreen?: string;
+  sourceScreenLabel?: string;
+  sourceFeature?: string;
   locationLabel?: string;
   locationType?: 'building' | 'place';
 }
@@ -236,7 +261,7 @@ type ApiVoidResult = SuccessVoid | FailResult;
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
-const getRequestModerationMeta = (category: unknown): ModerationMeta => {
+const getRequestPriorityParts = (category: unknown) => {
   const normalizedCategory =
     typeof category === 'string' ? category.trim().toLowerCase() : 'other';
 
@@ -244,6 +269,8 @@ const getRequestModerationMeta = (category: unknown): ModerationMeta => {
     return {
       moderationPriority: 'low',
       moderationQueue: 'feedback',
+      priorityNumber: '03',
+      priorityKey: 'low',
     };
   }
 
@@ -251,12 +278,26 @@ const getRequestModerationMeta = (category: unknown): ModerationMeta => {
     return {
       moderationPriority: 'high',
       moderationQueue: 'urgent',
+      priorityNumber: '01',
+      priorityKey: normalizedCategory,
     };
   }
 
   return {
     moderationPriority: 'standard',
     moderationQueue: 'standard',
+    priorityNumber: '02',
+    priorityKey: 'standard',
+  };
+};
+
+const getRequestModerationMeta = (category: unknown, status = 'pending'): ModerationMeta => {
+  const parts = getRequestPriorityParts(category);
+  const normalizedStatus = status.trim().toLowerCase() || 'pending';
+  return {
+    moderationPriority: parts.moderationPriority,
+    moderationQueue: parts.moderationQueue,
+    status_priority: `${normalizedStatus}_${parts.priorityNumber}_${parts.priorityKey}`,
   };
 };
 
@@ -314,7 +355,7 @@ const deleteStoragePathQuietly = async (storagePath: string): Promise<void> => {
   }
 
   try {
-    await deleteObject(storageRef(storage, storagePath));
+    await removeStorageObject(createStorageRef(storage, storagePath));
   } catch (error: unknown) {
     void logClientError('storage.deleteStoragePathQuietly', error, {
       storagePath,
@@ -401,7 +442,7 @@ const mapDbRequestToAppRequest = (id: string, value: unknown): AppRequest => {
       status === 'approved' || status === 'rejected' || status === 'pending'
         ? status
         : 'pending',
-    createdAt: new Date(createdAt),
+    createdAt,
     timestamp,
     expires_at:
       typeof v?.expires_at === 'number' ? v.expires_at : undefined,
@@ -424,6 +465,8 @@ const mapDbRequestToAppRequest = (id: string, value: unknown): AppRequest => {
     audio,
     photoUri: typeof v?.photoUri === 'string' ? v.photoUri : undefined,
     photoStoragePath: typeof v?.photoStoragePath === 'string' ? v.photoStoragePath : undefined,
+    userPhotoURL: typeof v?.userPhotoURL === 'string' ? v.userPhotoURL : undefined,
+    startAvatarKey: typeof v?.startAvatarKey === 'string' ? v.startAvatarKey : undefined,
   };
 };
 
@@ -450,19 +493,19 @@ const countCurrentDayItemsByUser = async (
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const uploadBytesWithRetry = async (
-  photoRef: ReturnType<typeof storageRef>,
+const uploadBinaryWithRetry = async (
+  photoRef: ReturnType<typeof createStorageRef>,
   blob: Blob | Uint8Array | ArrayBuffer,
-  metadata: Parameters<typeof uploadBytes>[2],
+  metadata: { contentType?: string } | undefined,
   sourceLabel: string,
   retries = 3,
-): Promise<Awaited<ReturnType<typeof uploadBytes>>> => {
+): Promise<unknown> => {
   let lastError: unknown;
 
   for (let attempt = 0; attempt < retries; attempt += 1) {
     try {
       return await safePromiseTimeout(
-        uploadBytes(photoRef, blob as Blob, metadata),
+        uploadStorageBinary(photoRef, blob as Blob, metadata),
         STORAGE_UPLOAD_TIMEOUT_MS,
         `${sourceLabel}:attempt_${attempt + 1}`,
       );
@@ -511,6 +554,12 @@ const mapDbPhotoToAppPhoto = (id: string, value: unknown): AppPhoto => {
     createdAt: new Date(createdAt),
     status,
     target: v?.target === 'my_photos' ? 'my_photos' : 'gallery_public',
+    sourceScreen:
+      typeof v?.sourceScreen === 'string' ? v.sourceScreen : undefined,
+    sourceScreenLabel:
+      typeof v?.sourceScreenLabel === 'string' ? v.sourceScreenLabel : undefined,
+    sourceFeature:
+      typeof v?.sourceFeature === 'string' ? v.sourceFeature : undefined,
     likes: typeof v?.likes === 'number' ? v.likes : 0,
     locationLabel:
       typeof v?.locationLabel === 'string' ? v.locationLabel : undefined,
@@ -609,11 +658,15 @@ export const firebaseChatAPI = {
         requestData.description || requestData.text,
         MAX_REQUEST_TEXT_LENGTH,
       );
+      const requestLanguage = normalizeAppLang(requestData.language, 'ua');
       const normalizedName = normalizeText(requestData.name || 'No name', 60);
       const normalizedPhone = normalizeText(requestData.phone || '', 30);
       const category = requestData.category || 'other';
       const phoneRequired = category !== 'app_suggestion';
-      const moderationMeta: ModerationMeta = getRequestModerationMeta(category);
+      const isElectricity = category === 'electricity';
+      const isHelpNeighbors = (requestData.group || '') === 'help_neighbors';
+      const autoApprove = isElectricity || isHelpNeighbors;
+      const moderationMeta: ModerationMeta = getRequestModerationMeta(category, autoApprove ? 'approved' : 'pending');
 
       if (
         !normalizedDescription ||
@@ -623,8 +676,9 @@ export const firebaseChatAPI = {
         throw new Error('Invalid request payload');
       }
 
+      assertTextMatchesLanguage(normalizedDescription, requestLanguage);
+
       // Electricity status reports are factual community data — auto-approve immediately.
-      const isElectricity = category === 'electricity';
       const nowIso = new Date().toISOString();
 
       const newRequest = {
@@ -651,11 +705,12 @@ export const firebaseChatAPI = {
             : 'Чайка',
         text: normalizedDescription,
         description: normalizedDescription,
-        status: isElectricity ? 'approved' : 'pending',
-        isApproved: isElectricity,
+        language: requestLanguage,
+        status: autoApprove ? 'approved' : 'pending',
+        isApproved: autoApprove,
         isCensored: false,
-        requiresManualModeration: !isElectricity,
-        ...(isElectricity
+        requiresManualModeration: !autoApprove,
+        ...(autoApprove
           ? { moderatedAt: nowIso, moderatedBy: 'auto' }
           : { submittedForModerationAt: nowIso }),
         ...moderationMeta,
@@ -668,6 +723,12 @@ export const firebaseChatAPI = {
               photoUri: '',
               photoStoragePath: normalizeText(requestData.photoStoragePath || requestData.photoUri || '', 500),
             }
+          : {}),
+        ...(typeof requestData.userPhotoURL === 'string' && requestData.userPhotoURL.trim().length > 0
+          ? { userPhotoURL: normalizeText(requestData.userPhotoURL, 500) }
+          : {}),
+        ...(typeof requestData.startAvatarKey === 'string' && requestData.startAvatarKey.trim().length > 0
+          ? { startAvatarKey: normalizeText(requestData.startAvatarKey, 120) }
           : {}),
       };
 
@@ -1008,11 +1069,7 @@ export const photoAPI = {
       const hasExtendedAccess = await isModeratorUser();
       const photosRef: DatabaseReference | Query = hasExtendedAccess
         ? ref(database, 'community_photos')
-        : query(
-            ref(database, 'community_photos'),
-            orderByChild('status'),
-            equalTo('approved'),
-          );
+        : ref(database, 'community_photos_public');
       const snapshot = await get(photosRef);
       const data: Record<string, unknown> | null = snapshot.val();
       const photos: AppPhoto[] = [];
@@ -1102,43 +1159,59 @@ export const photoAPI = {
         photoData.locationLabel || '',
         120,
       );
+      const normalizedSourceScreen = normalizeText(photoData.sourceScreen || '', 80);
+      const normalizedSourceScreenLabel = normalizeText(photoData.sourceScreenLabel || '', 120);
+      const normalizedSourceFeature = normalizeText(photoData.sourceFeature || '', 80);
       const normalizedLocationType: 'building' | 'place' | undefined =
         photoData.locationType === 'building' ||
         photoData.locationType === 'place'
           ? photoData.locationType
           : undefined;
 
-      if (!normalizedTitle || !normalizedImageUri) {
-        throw new Error('Invalid photo payload');
-      }
-
       const resolvedStoragePath =
         photoData.storagePath ||
         (normalizedImageUri.startsWith('community_photos/') ? normalizedImageUri : '') ||
         extractStoragePathFromUrl(normalizedImageUri);
+      const effectiveImageUri = normalizedImageUri || resolvedStoragePath;
+
+      if (!normalizedTitle || !effectiveImageUri || !resolvedStoragePath) {
+        throw new Error('Invalid photo payload: imageUri/storagePath required');
+      }
 
       const now = Date.now();
-      await push(ref(database, 'community_photos'), {
-        title: normalizedTitle,
-        description: normalizedDescription,
-        imageUri: normalizedImageUri,
-        uploadedBy: normalizedUploadedBy,
-        ...(normalizedUploadedByEmail ? { uploadedByEmail: normalizedUploadedByEmail } : {}),
-        createdAt: now,
-        uploadedAt: now,
-        status: 'approved',
-        target: photoData.target || 'gallery_public',
-        safetyStatus: 'approved',
-        likes: 0,
-        userId: user.uid,
-        ...(resolvedStoragePath ? { storagePath: resolvedStoragePath } : {}),
-        ...(normalizedLocationLabel
-          ? {
-              locationLabel: normalizedLocationLabel,
-              locationType: normalizedLocationType,
-            }
-          : {}),
-      });
+      try {
+        await push(ref(database, 'community_photos'), {
+          title: normalizedTitle,
+          description: normalizedDescription,
+          imageUri: effectiveImageUri,
+          ...(effectiveImageUri.startsWith('https://') ? { downloadUrl: effectiveImageUri } : {}),
+          uploadedBy: normalizedUploadedBy,
+          ...(normalizedUploadedByEmail ? { uploadedByEmail: normalizedUploadedByEmail } : {}),
+          createdAt: now,
+          uploadedAt: now,
+          status: 'pending',
+          target: photoData.target || 'gallery_public',
+          ...(normalizedSourceScreen ? { sourceScreen: normalizedSourceScreen } : {}),
+          ...(normalizedSourceScreenLabel ? { sourceScreenLabel: normalizedSourceScreenLabel } : {}),
+          ...(normalizedSourceFeature ? { sourceFeature: normalizedSourceFeature } : {}),
+          safetyStatus: 'pending',
+          likes: 0,
+          userId: user.uid,
+          storagePath: resolvedStoragePath,
+          ...(normalizedLocationLabel
+            ? {
+                locationLabel: normalizedLocationLabel,
+                locationType: normalizedLocationType,
+              }
+            : {}),
+        });
+      } catch (error: unknown) {
+        void logClientError('photoAPI.addPhoto.pushCommunityPhoto', error, {
+          firebasePath: 'community_photos',
+          stage: 'write_photo_moderation',
+        });
+        throw error;
+      }
 
       void logClientEvent('photo_added', { title: normalizedTitle });
       return { success: true };
@@ -1172,21 +1245,37 @@ export const photoAPI = {
         : {};
 
       if (status === 'approved') {
-        const snapshot = await get(ref(database, `community_photos/${photoId}`));
-        const current = snapshot.val() as { safetyStatus?: string } | null;
-        if (current?.safetyStatus && canPublishImage(current.safetyStatus)) {
-          safetyUpdate.safetyStatus = current.safetyStatus as 'passed' | 'manual_reviewed';
+        try {
+          const snapshot = await get(ref(database, `community_photos/${photoId}`));
+          const current = snapshot.val() as { safetyStatus?: string } | null;
+          if (current?.safetyStatus && canPublishImage(current.safetyStatus)) {
+            safetyUpdate.safetyStatus = current.safetyStatus as 'passed' | 'manual_reviewed';
+          }
+        } catch (error: unknown) {
+          void logClientError('photoAPI.moderatePhoto.readPhotoSafety', error, {
+            firebasePath: `community_photos/${photoId}`,
+            stage: 'read_photo_safety',
+          });
+          throw error;
         }
       }
 
-      await update(ref(database, `community_photos/${photoId}`), {
-        status,
-        moderatedAt: Date.now(),
-        moderatedBy: user.uid,
-        moderationReason: status === 'rejected' ? 'default_rejected' : null,
-        rejectionReason: status === 'rejected' ? 'default_rejected' : null,
-        ...safetyUpdate,
-      });
+      try {
+        await update(ref(database, `community_photos/${photoId}`), {
+          status,
+          moderatedAt: Date.now(),
+          moderatedBy: user.uid,
+          moderationReason: status === 'rejected' ? 'default_rejected' : null,
+          rejectionReason: status === 'rejected' ? 'default_rejected' : null,
+          ...safetyUpdate,
+        });
+      } catch (error: unknown) {
+        void logClientError('photoAPI.moderatePhoto.updatePhotoStatus', error, {
+          firebasePath: `community_photos/${photoId}`,
+          stage: 'write_photo_moderation',
+        });
+        throw error;
+      }
 
       return { success: true };
     } catch (error: unknown) {
@@ -1556,14 +1645,22 @@ export const audioAPI = {
         throw new Error(`Файл завеликий: ${(blob.size / 1024 / 1024).toFixed(1)} МБ. Максимум 5 МБ.`);
       }
       const fileName = `voice_messages/${user.uid}/${uniqueId()}.m4a`;
-      const audioStorageRef = storageRef(storage, fileName);
-      await uploadBytesWithRetry(
+      const audioStorageRef = createStorageRef(storage, fileName);
+      await uploadBinaryWithRetry(
         audioStorageRef,
         blob,
         { contentType: 'audio/mp4' },
         `audioAPI.uploadAudio:${fileName}`,
       );
-      const url = await getDownloadURL(audioStorageRef);
+      let url = '';
+      try {
+        url = await resolveStorageUrl(audioStorageRef);
+      } catch (error) {
+        void logClientError('audioAPI.uploadAudio.getDownloadURL', error, {
+          storagePath: fileName,
+        });
+        throw error;
+      }
       return {
         success: true,
         data: {
@@ -1651,3 +1748,4 @@ export const socialAuthAPI = {
     }
   },
 };
+

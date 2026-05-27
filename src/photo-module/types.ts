@@ -1,16 +1,40 @@
 export type PhotoUploadStatus = 'queued' | 'uploading' | 'uploaded' | 'error';
 
+/**
+ * TZ_4 engine-level states covering the full lifecycle:
+ * pick → validate → upload → RTDB pending → moderation
+ */
+export type EngineUploadState =
+  | 'picking'
+  | 'validating'
+  | 'uploading'
+  | 'pending'    // uploaded + RTDB written, awaiting moderator
+  | 'approved'   // moderator approved
+  | 'rejected'   // moderator rejected
+  | 'failed';    // upload failed after all retries
+
 export type UserPhoto = {
   id: string;
+  userId?: string;
   localUri: string;
   imageUrl: string;
   status: PhotoUploadStatus;
   thumbnail: string;
+  fileName?: string;
+  filePath?: string;
+  previewPath?: string;
+  type?: string;
+  width?: number;
+  height?: number;
+  size?: number;
+  moderationStatus?: 'pending' | 'approved' | 'rejected';
+  deleted?: boolean;
   storagePath?: string;
   createdAt: number;
   updatedAt: number;
   error?: string;
   retryCount?: number;
+  progress?: number;
 };
 
 /** Optional metadata passed through the upload queue for RTDB entry creation. */
@@ -25,6 +49,9 @@ export type PhotoUploadMetadata = {
 export type PhotoUploadTask = {
   photoId: string;
   localUri: string;
+  /** Storage/RTDB collection, e.g. 'community_photos' or 'user_photos'. */
+  collection?: string;
+  uid?: string;
   retryCount: number;
   createdAt: number;
   updatedAt: number;

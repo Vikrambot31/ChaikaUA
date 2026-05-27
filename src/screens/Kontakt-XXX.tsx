@@ -21,9 +21,35 @@ import ContactReasonModal from '../components/ContactReasonModal';
 import { pickUserAvatarUri } from '../utils/userAvatar';
 import { safeOpenViber } from '../utils/communicationActions';
 import type { DetailItemData } from '../utils/detailViewTypes';
+import UploadedPhotosGrid from '../components/UploadedPhotosGrid';
+import InlineFieldHint from '../components/InlineFieldHint';
+import { FormFieldError } from '../components/ValidationErrorMessage';
+import { useSoftToast } from '../hooks/useSoftToast';
+import UserCardActionBar from '../components/UserCardActionBar';
 
 const CONTACT_LISTING_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-const CONTACT_LIKES_PATH = 'contact_likes';
+const PROFILE_CACHE_TTL_MS = 5 * 60 * 1000;
+const PROFILE_FETCH_TIMEOUT_MS = 5_000;
+const MAX_PROFILE_CACHE_SIZE = 500;
+const DRAFT_SAVE_DEBOUNCE_MS = 900;
+const CONTACTS_DRAFT_KEY = '@chaika:contacts_draft';
+
+type ContactProfile = { name?: string; avatarUri?: string };
+type ContactProfileCacheEntry = ContactProfile & { fetchedAt: number };
+
+const contactProfileCache = new Map<string, ContactProfileCacheEntry>();
+
+function upsertProfileCache(uid: string, entry: ContactProfileCacheEntry): void {
+  if (!contactProfileCache.has(uid) && contactProfileCache.size >= MAX_PROFILE_CACHE_SIZE) {
+    let oldestKey: string | undefined;
+    let oldestTime = Infinity;
+    contactProfileCache.forEach((e, k) => {
+      if (e.fetchedAt < oldestTime) { oldestTime = e.fetchedAt; oldestKey = k; }
+    });
+    if (oldestKey !== undefined) contactProfileCache.delete(oldestKey);
+  }
+  contactProfileCache.set(uid, entry);
+}
 
 const CONTACT_LEGACY_CATEGORY_VALUES = [
   'furniture',
@@ -113,7 +139,14 @@ const UI_TEXT = {
     noSearchResults: 'Нікого не знайдено',
     noSearchResultsSub: 'Спробуйте прибрати частину фільтрів.',
     showPhoneToggle: 'Показувати телефон на картці',
-    live: 'LIVE',
+    categoryHint: 'Оберіть, як ви хочете представитись іншим мешканцям.',
+    conditionHint: 'Оберіть, для чого ви шукаєте контакт.',
+    ageHint: 'Вкажіть реальний вік. Це допомагає людям краще зрозуміти анкету.',
+    phoneHint: "Залиште номер, за яким з вами можна зв'язатися.",
+    descriptionHint: 'Коротко напишіть про себе або кого шукаєте.',
+    descriptionRequired: 'Додайте кілька слів про себе.',
+    authRequired: 'Для публікації контакту потрібна реєстрація.',
+    live: 'НАЖИВО',
     liveCount: (count: number) => `всього ${count} людей шукають знайомств`,
   },
   ru: {
@@ -185,7 +218,14 @@ const UI_TEXT = {
     noSearchResults: 'Никого не найдено',
     noSearchResultsSub: 'Попробуйте убрать часть фильтров.',
     showPhoneToggle: 'Показывать телефон на карточке',
-    live: 'LIVE',
+    categoryHint: 'Выберите, как вы хотите представиться другим жителям.',
+    conditionHint: 'Выберите, для чего вы ищете контакт.',
+    ageHint: 'Укажите реальный возраст. Это помогает людям лучше понять анкету.',
+    phoneHint: 'Оставьте номер, по которому с вами можно связаться.',
+    descriptionHint: 'Коротко напишите о себе или кого ищете.',
+    descriptionRequired: 'Добавьте несколько слов о себе.',
+    authRequired: 'Для публикации контакта требуется регистрация.',
+    live: 'В ЭФИРЕ',
     liveCount: (count: number) => `всего ${count} людей ищут знакомства`,
   },
   en: {
@@ -257,6 +297,13 @@ const UI_TEXT = {
     noSearchResults: 'No people found',
     noSearchResultsSub: 'Try removing some filters.',
     showPhoneToggle: 'Show phone on card',
+    categoryHint: 'Choose how you want to introduce yourself to neighbors.',
+    conditionHint: 'Choose what kind of contact you are looking for.',
+    ageHint: 'Enter your real age. It helps people understand the profile better.',
+    phoneHint: 'Leave a number people can use to contact you.',
+    descriptionHint: 'Briefly write about yourself or who you are looking for.',
+    descriptionRequired: 'Add a few words about yourself.',
+    authRequired: 'Registration is required to publish a contact.',
     live: 'LIVE',
     liveCount: (count: number) => `${count} people looking for contacts`,
   },
@@ -264,10 +311,12 @@ const UI_TEXT = {
 
 const KontaktiChaikyScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
+  const navLock = useRef(false);
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const user = useSelector((state: RootState) => state.auth.user);
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const text = UI_TEXT[language];
+  const toast = useSoftToast();
   const [category, setCategory] = useState('');
   const [condition, setCondition] = useState('');
   const [price, setPrice] = useState('');
@@ -276,9 +325,9 @@ const KontaktiChaikyScreen: React.FC = () => {
   const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
   const [showPhoneOnCard, setShowPhoneOnCard] = useState(true);
   const [listings, setListings] = useState<ContactListing[]>([]);
-  const [profileByUserId, setProfileByUserId] = useState<Record<string, { name?: string; avatarUri?: string }>>({});
-  const [likeMap, setLikeMap] = useState<Record<string, Record<string, true>>>({});
-  const [likeBusyId, setLikeBusyId] = useState<string | null>(null);
+  const [profileByUserId, setProfileByUserId] = useState<Record<string, ContactProfile>>({});
+  const [contactLikes, setContactLikes] = useState<Record<string, Record<string, true>>>({});
+  const [likeBusyById, setLikeBusyById] = useState<Record<string, boolean>>({});
   const [selectedFilterCategory, setSelectedFilterCategory] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [addFormVisible, setAddFormVisible] = useState(false);
@@ -290,8 +339,13 @@ const KontaktiChaikyScreen: React.FC = () => {
   const [searchPriceTo, setSearchPriceTo] = useState('');
   const [searchContact, setSearchContact] = useState('');
   const [searchDescription, setSearchDescription] = useState('');
+  const [submitAttempted, setSubmitAttempted] = useState(false);
   const blinkAnim = useRef(new Animated.Value(1)).current;
   const pickerActiveRef = useRef(false);
+  const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestDraftRef = useRef({ category, condition, price, description, phone, addFormVisible });
+  const previousAddFormVisibleRef = useRef(addFormVisible);
+  const skipNextDraftFlushRef = useRef(false);
 
   const getCategoryLabel = useCallback(
     (value: string) => text.categories[value as ContactLegacyCategoryValue] ?? value,
@@ -304,7 +358,14 @@ const KontaktiChaikyScreen: React.FC = () => {
 
   const handleRequestCloseModal = useCallback(() => {
     if (pickerActiveRef.current) return;
-    setAddFormVisible(false);
+    Alert.alert(
+      'Закрити форму?',
+      'Ви ще не надіслали заявку. Закрити?',
+      [
+        { text: 'Ні', style: 'cancel' },
+        { text: 'Так', onPress: () => setAddFormVisible(false) },
+      ],
+    );
   }, []);
 
   useEffect(() => {
@@ -313,7 +374,7 @@ const KontaktiChaikyScreen: React.FC = () => {
     // Restore draft if Android restarted the activity while picker was open
     (async () => {
       try {
-        const raw = await AsyncStorage.getItem('@chaika:contacts_draft');
+        const raw = await AsyncStorage.getItem(CONTACTS_DRAFT_KEY);
         if (!isMounted || !raw) return;
         const draft = JSON.parse(raw) as Partial<{ category: string; condition: string; price: string; description: string; phone: string; addFormVisible: boolean }>;
         if (draft.category) setCategory(draft.category);
@@ -322,7 +383,7 @@ const KontaktiChaikyScreen: React.FC = () => {
         if (draft.description) setDescription(draft.description);
         if (draft.phone) setPhone(draft.phone);
         if (draft.addFormVisible) setAddFormVisible(true);
-        await AsyncStorage.removeItem('@chaika:contacts_draft');
+        await AsyncStorage.removeItem(CONTACTS_DRAFT_KEY);
       } catch { /* ignore */ }
     })();
     return () => {
@@ -332,28 +393,101 @@ const KontaktiChaikyScreen: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!addFormVisible) return;
+    latestDraftRef.current = { category, condition, price, description, phone, addFormVisible };
+  }, [addFormVisible, category, condition, description, phone, price]);
+
+  const saveDraftNow = useCallback((visible = latestDraftRef.current.addFormVisible) => {
+    if (!visible) return;
+    const { category: draftCategory, condition: draftCondition, price: draftPrice, description: draftDescription, phone: draftPhone } = latestDraftRef.current;
     void AsyncStorage.setItem(
-      '@chaika:contacts_draft',
-      JSON.stringify({ category, condition, price, description, phone, addFormVisible: true }),
+      CONTACTS_DRAFT_KEY,
+      JSON.stringify({ category: draftCategory, condition: draftCondition, price: draftPrice, description: draftDescription, phone: draftPhone, addFormVisible: true }),
     ).catch(() => {});
-  }, [addFormVisible, category, condition, price, description, phone]);
+  }, []);
 
   useEffect(() => {
+    const wasVisible = previousAddFormVisibleRef.current;
+    previousAddFormVisibleRef.current = addFormVisible;
+    if (!wasVisible || addFormVisible) return;
+    if (skipNextDraftFlushRef.current) {
+      skipNextDraftFlushRef.current = false;
+      return;
+    }
+    saveDraftNow(true);
+  }, [addFormVisible, saveDraftNow]);
+
+  useEffect(() => {
+    if (draftSaveTimerRef.current) {
+      clearTimeout(draftSaveTimerRef.current);
+      draftSaveTimerRef.current = null;
+    }
+    if (!addFormVisible) return;
+    draftSaveTimerRef.current = setTimeout(() => {
+      draftSaveTimerRef.current = null;
+      saveDraftNow(true);
+    }, DRAFT_SAVE_DEBOUNCE_MS);
+    return () => {
+      if (draftSaveTimerRef.current) {
+        clearTimeout(draftSaveTimerRef.current);
+        draftSaveTimerRef.current = null;
+      }
+    };
+  }, [addFormVisible, category, condition, description, phone, price, saveDraftNow]);
+
+  useEffect(() => () => {
+    if (draftSaveTimerRef.current) {
+      clearTimeout(draftSaveTimerRef.current);
+      draftSaveTimerRef.current = null;
+    }
+    saveDraftNow();
+  }, [saveDraftNow]);
+
+  const listingUserIdsKey = useMemo(() => {
     const userIds = Array.from(new Set(listings.map((item) => item.userId).filter((id): id is string => Boolean(id))));
-    if (userIds.length === 0) return;
+    return userIds.sort().join('|');
+  }, [listings]);
+
+  useEffect(() => {
+    if (!listingUserIdsKey) return;
+    const userIds = listingUserIdsKey.split('|').filter(Boolean);
+    const now = Date.now();
+    const cachedProfiles: Record<string, ContactProfile> = {};
+    const missingUserIds = userIds.filter((uid) => {
+      const cached = contactProfileCache.get(uid);
+      if (cached && now - cached.fetchedAt < PROFILE_CACHE_TTL_MS) {
+        cachedProfiles[uid] = { name: cached.name, avatarUri: cached.avatarUri };
+        return false;
+      }
+      return true;
+    });
+
+    if (Object.keys(cachedProfiles).length > 0) {
+      setProfileByUserId((prev) => ({ ...prev, ...cachedProfiles }));
+    }
+    if (missingUserIds.length === 0) return;
+
     let cancelled = false;
     void (async () => {
       const resolved = await Promise.all(
-        userIds.map(async (uid) => {
+        missingUserIds.map(async (uid) => {
           try {
-            const snap = await get(ref(database, `users/${uid}`));
+            const snap = await Promise.race([
+              get(ref(database, `users/${uid}`)),
+              new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error('profile-timeout')), PROFILE_FETCH_TIMEOUT_MS)
+              ),
+            ]);
             const data = snap.val() as Record<string, unknown> | null;
-            const photo = pickUserAvatarUri(data);
-            const name = typeof data?.name === 'string' ? data.name.trim() : '';
-            return [uid, { name, avatarUri: photo }] as const;
+            const profile = {
+              avatarUri: pickUserAvatarUri(data),
+              name: typeof data?.name === 'string' ? data.name.trim() : '',
+            } satisfies ContactProfile;
+            upsertProfileCache(uid, { ...profile, fetchedAt: Date.now() });
+            return [uid, profile] as const;
           } catch {
-            return [uid, {}] as const;
+            const profile = {} satisfies ContactProfile;
+            upsertProfileCache(uid, { ...profile, fetchedAt: Date.now() });
+            return [uid, profile] as const;
           }
         }),
       );
@@ -365,14 +499,46 @@ const KontaktiChaikyScreen: React.FC = () => {
       });
     })();
     return () => { cancelled = true; };
-  }, [listings]);
+  }, [listingUserIdsKey]);
 
   useEffect(() => {
-    const unsubscribe = onValue(ref(database, CONTACT_LIKES_PATH), (snapshot) => {
-      setLikeMap((snapshot.val() as Record<string, Record<string, true>> | null) ?? {});
+    const unsubscribe = onValue(ref(database, 'feed_likes/contacts'), (snapshot) => {
+      const value = snapshot.val() as Record<string, unknown> | null;
+      const next: Record<string, Record<string, true>> = {};
+      if (value && typeof value === 'object') {
+        Object.entries(value).forEach(([listingId, likes]) => {
+          if (!likes || typeof likes !== 'object') return;
+          const normalizedLikes: Record<string, true> = {};
+          Object.entries(likes as Record<string, unknown>).forEach(([uid, liked]) => {
+            if (liked === true) normalizedLikes[uid] = true;
+          });
+          next[listingId] = normalizedLikes;
+        });
+      }
+      setContactLikes(next);
     });
     return unsubscribe;
   }, []);
+
+  const handleContactLike = useCallback((listingId: string) => {
+    if (!user?.id || likeBusyById[listingId]) return;
+    const uid = user.id;
+    setLikeBusyById((prev) => ({ ...prev, [listingId]: true }));
+    void runTransaction(ref(database, `feed_likes/contacts/${listingId}/${uid}`), (current) => (current ? null : true))
+      .catch(() => {
+        toast.showError(
+          { ua: 'Не вдалося зберегти', ru: 'Не удалось сохранить', en: 'Could not save' }[language],
+          { ua: 'Натисніть лайк ще раз, щоб повторити', ru: 'Нажмите лайк ещё раз, чтобы повторить', en: 'Tap like again to retry' }[language],
+        );
+      })
+      .finally(() => {
+        setLikeBusyById((prev) => {
+          const next = { ...prev };
+          delete next[listingId];
+          return next;
+        });
+      });
+  }, [language, likeBusyById, toast, user?.id]);
 
   useEffect(() => {
     const anim = Animated.loop(
@@ -385,25 +551,8 @@ const KontaktiChaikyScreen: React.FC = () => {
     return () => anim.stop();
   }, [blinkAnim]);
 
-  const ACCENT = '#7A1E5C';
-
   const handleViber = (phoneRaw: string) => {
     void safeOpenViber(phoneRaw, language);
-  };
-
-  const toggleLike = async (id: string) => {
-    if (!user?.id || likeBusyId) return;
-    setLikeBusyId(id);
-    try {
-      await runTransaction(ref(database, `${CONTACT_LIKES_PATH}/${id}/${user.id}`), (current: boolean | null) => {
-        if (current === true) return null;
-        return true;
-      });
-    } catch {
-      // Like failures are non-blocking for the contact card.
-    } finally {
-      setLikeBusyId(null);
-    }
   };
 
   const filteredListings = useMemo(() => {
@@ -471,33 +620,40 @@ const KontaktiChaikyScreen: React.FC = () => {
   };
 
   const resetForm = () => {
+    skipNextDraftFlushRef.current = true;
+    if (draftSaveTimerRef.current) {
+      clearTimeout(draftSaveTimerRef.current);
+      draftSaveTimerRef.current = null;
+    }
     setCategory('');
     setCondition('');
     setPrice('');
     setDescription('');
     setPhone('+380');
     setFormPhotos([]);
-    void AsyncStorage.removeItem('@chaika:contacts_draft').catch(() => {});
+    setSubmitAttempted(false);
+    void AsyncStorage.removeItem(CONTACTS_DRAFT_KEY).catch(() => {});
   };
 
   const handleSubmit = async () => {
-    if (!user) {
-      navigation.navigate('LoginScreen');
+    setSubmitAttempted(true);
+    if (!user?.id) {
+      toast.showWarning(text.errorTitle, text.authRequired);
       return;
     }
     const normalizedPrice = price.replace(',', '.').replace(/[^\d.]/g, '');
     const numericPrice = Number(normalizedPrice);
 
     if (!category || !condition || !description.trim() || !phone.trim() || !normalizedPrice) {
-      Alert.alert(text.errorTitle, text.errorFill);
+      toast.showWarning(text.errorTitle, text.errorFill);
       return;
     }
     if (!Number.isFinite(numericPrice) || numericPrice <= 0) {
-      Alert.alert(text.errorTitle, text.priceError);
+      toast.showWarning(text.errorTitle, text.priceError);
       return;
     }
     if (phone.replace(/\D/g, '').length < 7) {
-      Alert.alert(text.errorTitle, text.errorPhone);
+      toast.showWarning(text.errorTitle, text.errorPhone);
       return;
     }
 
@@ -527,13 +683,15 @@ const KontaktiChaikyScreen: React.FC = () => {
         expiresAt: new Date(createdAt.getTime() + CONTACT_LISTING_TTL_MS).toISOString(),
         userId: user?.id || '',
         showPhone: showPhoneOnCard,
+        language,
       });
 
-      Alert.alert(text.successTitle, text.successMsg);
+      toast.showSuccess(text.successTitle, text.successMsg);
       resetForm();
       setAddFormVisible(false);
     } catch (error) {
-      showUserError(language, 'send', error);
+      toast.showError(text.errorTitle, text.errorSave);
+      void error;
     } finally {
       setSubmitting(false);
     }
@@ -712,10 +870,7 @@ const KontaktiChaikyScreen: React.FC = () => {
             ) : (
               filteredListings.map((item) => {
                 const profile = item.userId ? profileByUserId[item.userId] : undefined;
-                const avatarUri = pickUserAvatarUri(
-                  item,
-                  profile?.avatarUri ? { photoURL: profile.avatarUri } : undefined,
-                );
+                const avatarUri = profile?.avatarUri || '';
                 const isOwn = item.userId === user?.id;
                 const showPhone = !!(item.phone && item.showPhone !== false);
                 const conditionLabel = text.conditionLabels[item.condition as keyof typeof text.conditionLabels] ?? item.condition;
@@ -723,16 +878,15 @@ const KontaktiChaikyScreen: React.FC = () => {
                 const categoryLabel = getCategoryLabel(item.category);
                 const descriptionText = item.description?.trim() || text.noDesc;
                 const displayName = profile?.name || item.itemName;
-                const likes = Object.keys(likeMap[item.id] ?? {}).length;
-                const hasLiked = !!(user?.id && likeMap[item.id]?.[user.id]);
                 const modMsg = getModerationUserMessage(language, item.moderationStatus, item.rejectionReason || item.moderationReason);
                 const showModInfo = isOwn && item.moderationStatus !== 'approved';
+                const likes = contactLikes[item.id] ?? {};
 
                 return (
                   <TouchableOpacity
                     key={item.id}
                     style={styles.kCard}
-                    onPress={() => navigation.navigate('ItemDetailScreen', { item: mapToDetailData(item) })}
+                    onPress={() => { if (navLock.current) return; navLock.current = true; navigation.navigate('ItemDetailScreen', { item: mapToDetailData(item) }); setTimeout(() => { navLock.current = false; }, 800); }}
                     activeOpacity={0.86}
                   >
                     <View style={styles.kCardTop}>
@@ -741,7 +895,7 @@ const KontaktiChaikyScreen: React.FC = () => {
                           uri={item.photoUri}
                           storagePath={item.photoStoragePath}
                           style={styles.kPhoto}
-                          resizeMode="cover"
+                          resizeMode="contain"
                           debugLabel={`Contact:${item.id}`}
                         />
                       ) : (
@@ -786,65 +940,28 @@ const KontaktiChaikyScreen: React.FC = () => {
                       </View>
                     </View>
 
-                    {/* Actions row */}
-                    <View style={styles.kActionsRow}>
-                      {item.userId ? (
-                        <TouchableOpacity
-                          style={styles.kBtnOutlined}
-                          onPress={() => navigation.navigate('ViewUserProfile', { userId: item.userId as string })}
-                          activeOpacity={0.8}
-                        >
-                          <MaterialCommunityIcons name="badge-account-horizontal-outline" size={13} color={ACCENT} />
-                          <Text style={styles.kBtnOutlinedText}>
-                            {language === 'en' ? 'Profile' : language === 'ru' ? 'Профиль' : 'Профіль'}
-                          </Text>
-                        </TouchableOpacity>
-                      ) : null}
-
-                      <TouchableOpacity
-                        style={[styles.kBtnLike, hasLiked && styles.kBtnLikeActive, (!user?.id || likeBusyId === item.id) && styles.kBtnDisabled]}
-                        onPress={() => void toggleLike(item.id)}
-                        disabled={!user?.id || likeBusyId === item.id}
-                        activeOpacity={0.8}
-                      >
-                        {likeBusyId === item.id ? (
-                          <ActivityIndicator size="small" color="#fff" />
-                        ) : (
-                          <>
-                            <MaterialCommunityIcons name={hasLiked ? 'heart' : 'heart-outline'} size={14} color="#fff" />
-                            <Text style={styles.kBtnLikeText}>{likes}</Text>
-                          </>
-                        )}
+                    <UserCardActionBar
+                      avatarUri={avatarUri || ''}
+                      name={displayName}
+                      userId={item.userId}
+                      currentUserId={user?.id}
+                      language={language}
+                      onProfile={item.userId ? () => { if (navLock.current) return; navLock.current = true; navigation.navigate('ViewUserProfile', { userId: item.userId as string }); setTimeout(() => { navLock.current = false; }, 800); } : undefined}
+                      onContact={item.userId && item.userId !== user?.id ? () => openContactModal({ userId: item.userId as string, name: item.itemName ?? 'Unknown', sourceType: 'lyudi', sourceId: item.id, sourceTitle: item.itemName }) : showPhone ? () => handleViber(item.phone) : undefined}
+                      contactDisabled={!showPhone && (!item.userId || item.userId === user?.id)}
+                      likePath="feed_likes/contacts"
+                      likeId={item.id}
+                      liked={Boolean(user?.id && likes[user.id])}
+                      likeCount={Object.keys(likes).length}
+                      likeBusy={Boolean(likeBusyById[item.id])}
+                      onLike={user?.id ? () => handleContactLike(item.id) : undefined}
+                    />
+                    {isOwn ? (
+                      <TouchableOpacity style={styles.kDeleteLink} onPress={() => handleDelete(item.id)} activeOpacity={0.8}>
+                        <MaterialCommunityIcons name="trash-can-outline" size={14} color="#C0392B" />
+                        <Text style={styles.kDeleteLinkText}>{text.deleteText}</Text>
                       </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[styles.kBtnViber, !showPhone && styles.kBtnViberDisabled]}
-                        onPress={() => showPhone && handleViber(item.phone)}
-                        disabled={!showPhone}
-                        activeOpacity={0.8}
-                      >
-                        <MaterialCommunityIcons name="message-text-outline" size={13} color="#fff" />
-                        <Text style={styles.kBtnViberText}>Viber</Text>
-                      </TouchableOpacity>
-
-                      {isOwn ? (
-                        <TouchableOpacity
-                          style={styles.kBtnRoundDelete}
-                          onPress={() => handleDelete(item.id)}
-                          activeOpacity={0.8}
-                        >
-                          <MaterialCommunityIcons name="trash-can-outline" size={16} color="#fff" />
-                        </TouchableOpacity>
-                      ) : item.userId && item.userId !== user?.id ? (
-                        <TouchableOpacity
-                          style={styles.kBtnRoundContact}
-                          onPress={() => openContactModal({ userId: item.userId as string, name: item.itemName ?? 'Unknown', sourceType: 'lyudi', sourceId: item.id, sourceTitle: item.itemName })}
-                          activeOpacity={0.8}
-                        >
-                          <MaterialCommunityIcons name="account-arrow-right-outline" size={16} color="#fff" />
-                        </TouchableOpacity>
-                      ) : null}
-                    </View>
+                    ) : null}
                   </TouchableOpacity>
                 );
               })
@@ -853,7 +970,13 @@ const KontaktiChaikyScreen: React.FC = () => {
         )}
       </ScrollView>
       <View style={styles.addBar}>
-        <TouchableOpacity style={styles.addBarBtn} onPress={() => setAddFormVisible(true)} activeOpacity={0.85}>
+        <TouchableOpacity style={styles.addBarBtn} onPress={() => {
+          if (!user?.id) {
+            Alert.alert(text.errorTitle, text.authRequired);
+            return;
+          }
+          setAddFormVisible(true);
+        }} activeOpacity={0.85}>
           <Text style={styles.addBarBtnText}>{text.addRequest}</Text>
         </TouchableOpacity>
       </View>
@@ -865,7 +988,7 @@ const KontaktiChaikyScreen: React.FC = () => {
             <View style={styles.sheetHandle} />
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>{text.formTitle}</Text>
-              <TouchableOpacity onPress={() => setAddFormVisible(false)} style={styles.sheetCloseBtn} activeOpacity={0.7}>
+              <TouchableOpacity onPress={handleRequestCloseModal} style={styles.sheetCloseBtn} activeOpacity={0.7}>
                 <Text style={styles.sheetCloseTxt}>✕</Text>
               </TouchableOpacity>
             </View>
@@ -884,6 +1007,8 @@ const KontaktiChaikyScreen: React.FC = () => {
                   ))}
                 </Picker>
               </View>
+              <InlineFieldHint message={text.categoryHint} type={category ? 'success' : 'hint'} />
+              <FormFieldError error={!category && submitAttempted ? text.errorFill : undefined} />
 
               <Text style={styles.formLabel}>{text.conditionLabel}</Text>
               <View style={styles.pickerWrapper}>
@@ -894,6 +1019,8 @@ const KontaktiChaikyScreen: React.FC = () => {
                   ))}
                 </Picker>
               </View>
+              <InlineFieldHint message={text.conditionHint} type={condition ? 'success' : 'hint'} />
+              <FormFieldError error={!condition && submitAttempted ? text.errorFill : undefined} />
 
               <Text style={styles.formLabel}>{text.priceLabel}</Text>
               <TextInput
@@ -904,6 +1031,8 @@ const KontaktiChaikyScreen: React.FC = () => {
                 style={styles.input}
                 placeholderTextColor="#A0938D"
               />
+              <InlineFieldHint message={text.ageHint} type={price.trim() ? 'success' : 'hint'} />
+              <FormFieldError error={submitAttempted && (!price.trim() || Number(price) <= 0) ? text.priceError : undefined} />
 
               <Text style={styles.formLabel}>{text.descriptionLabel}</Text>
               <TextInput
@@ -915,9 +1044,13 @@ const KontaktiChaikyScreen: React.FC = () => {
                 multiline
                 maxLength={260}
               />
+              <InlineFieldHint message={text.descriptionHint} type={description.trim() ? 'success' : 'hint'} />
+              <FormFieldError error={submitAttempted && !description.trim() ? text.descriptionRequired : undefined} />
 
               <Text style={styles.formLabel}>{text.phoneLabel}</Text>
               <TextInput placeholder="+380..." value={phone} onChangeText={(value) => setPhone(normalizePhoneText(value))} keyboardType="phone-pad" style={styles.input} placeholderTextColor="#A0938D" />
+              <InlineFieldHint message={text.phoneHint} type={phone.replace(/\D/g, '').length >= 7 ? 'success' : 'hint'} />
+              <FormFieldError error={submitAttempted && phone.replace(/\D/g, '').length < 7 ? text.errorPhone : undefined} />
 
               <Text style={styles.formLabel}>{text.photoLabel}</Text>
               <PhotoUploadField
@@ -928,6 +1061,7 @@ const KontaktiChaikyScreen: React.FC = () => {
                 onPhotosChange={(photos) => setFormPhotos(photos.filter((p) => p.status === 'done'))}
                 onPickerOpenChange={handlePickerOpenChange}
               />
+              <UploadedPhotosGrid />
 
               <View style={styles.toggleRow}>
                 <Text style={styles.formLabel}>{text.showPhoneToggle}</Text>
@@ -1043,7 +1177,6 @@ const styles = StyleSheet.create({
   listingDescription: { color: SCREEN_THEME.textSecondary, lineHeight: 18, marginBottom: 8 },
   listingPhoto: { width: '100%', height: 170, borderRadius: 16, marginBottom: 8, backgroundColor: '#FFF3E0' },
   moderationInfo: { color: '#5F5043', backgroundColor: '#FFF8EA', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 8, fontSize: 12, lineHeight: 17, fontWeight: '700' },
-  phoneAction: { marginTop: 8, alignItems: 'flex-start' },
   // New card styles (incoming-style layout)
   kCard: {
     backgroundColor: '#F7F3EE',
@@ -1155,93 +1288,22 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     fontWeight: '700',
   },
-  kActionsRow: {
-    flexDirection: 'row',
-    gap: 6,
-    alignItems: 'center',
-  },
-  kBtnOutlined: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    borderWidth: 1,
-    borderColor: '#D4B9A8',
-    borderRadius: 12,
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-    backgroundColor: 'transparent',
-  },
-  kBtnOutlinedText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#7A1E5C',
-  },
-  kBtnDisabled: {
-    opacity: 0.45,
-  },
-  kBtnDisabledText: {
-    color: '#B0A090',
-  },
-  kBtnLike: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    minWidth: 46,
-    backgroundColor: '#7A1E5C',
-  },
-  kBtnLikeActive: {
-    backgroundColor: '#B13A70',
-  },
-  kBtnLikeText: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: '#fff',
-  },
-  kBtnViber: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    borderRadius: 12,
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-    backgroundColor: '#7360F2',
-  },
-  kBtnViberDisabled: {
-    backgroundColor: '#CCBEB2',
-  },
-  kBtnViberText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#fff',
-  },
-  kBtnRoundContact: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#7A1E5C',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 'auto' as const,
-  },
   kPhoto: {
     width: 92,
     height: 108,
     borderRadius: 14,
     backgroundColor: '#FFF3E0',
   },
-  kBtnRoundDelete: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#C0392B',
+  kDeleteLink: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 'auto' as const,
+    gap: 4,
+    alignSelf: 'flex-end',
+    marginTop: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
+  kDeleteLinkText: { color: '#C0392B', fontSize: 11, fontWeight: '800' },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1319,11 +1381,3 @@ const styles = StyleSheet.create({
 });
 
 export default KontaktiChaikyScreen;
-
-
-
-
-
-
-
-

@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Clipboard } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
+import Toast from 'react-native-toast-message';
 import type { RootState } from '../redux/store';
 import { ErrorHandler, AppError, ErrorType } from '../utils/errorHandler';
 import { captureCrashException } from '../services/crashReporting';
@@ -9,6 +10,7 @@ import { recordRuntimeMonitorError } from '../services/runtimeMonitorService';
 import { getBreadcrumbs } from '../services/breadcrumbService';
 import { captureStateSnapshot } from '../services/stateSnapshotService';
 import { normalizeLanguage } from '../redux/slices/languageSlice';
+import { saveLastCrash } from '../services/crashDiagnosticsService';
 
 type Lang = 'ua' | 'ru' | 'en';
 
@@ -113,6 +115,16 @@ export class ErrorBoundary extends React.Component<Props, State> {
     });
     ErrorHandler.reportError(appError);
 
+    // Store crash diagnostic to AsyncStorage for offline viewing
+    void saveLastCrash({
+      timestamp: Date.now(),
+      message: error.message,
+      stack: error.stack,
+      componentStack: truncatedStack,
+      errorType: appError.type,
+      errorCode: appError.code,
+    });
+
     if (this.props.onError) {
       this.props.onError(appError);
     }
@@ -130,6 +142,26 @@ export class ErrorBoundary extends React.Component<Props, State> {
       error: null,
       errorCount: prev.errorCount + 1,
     }));
+  };
+
+  handleCopyStack = async () => {
+    const stack = (this.state.error?.details as any)?.stack || '';
+    if (stack) {
+      try {
+        await Clipboard.setString(stack);
+        Toast.show({
+          type: 'success',
+          text1: 'Stack copied',
+          text2: 'Full stack trace copied to clipboard',
+        });
+      } catch (error) {
+        Toast.show({
+          type: 'error',
+          text1: 'Copy failed',
+          text2: 'Could not copy to clipboard',
+        });
+      }
+    }
   };
 
   getErrorIcon = (type: ErrorType): string => {
@@ -192,8 +224,8 @@ export class ErrorBoundary extends React.Component<Props, State> {
             <Text style={styles.suggestionText}>{String(suggestion)}</Text>
           </View>
 
-          {/* Debug Information (development only) */}
-          {__DEV__ && this.props.showDetails && (
+          {/* Debug Information */}
+          {this.props.showDetails && (
             <View style={styles.debugBox}>
               <Text style={styles.debugTitle}>{text.debugTitle}</Text>
               <Text style={styles.debugText}>{text.debugMsg}: {error.message}</Text>
@@ -207,6 +239,28 @@ export class ErrorBoundary extends React.Component<Props, State> {
                   {text.debugDetails}: {debugDetails}
                 </Text>
               )}
+            </View>
+          )}
+
+          {/* Stack Trace (if available) */}
+          {(error.details as any)?.stack && (
+            <View style={styles.stackBox}>
+              <View style={styles.stackHeader}>
+                <Text style={styles.stackTitle}>Stack Trace</Text>
+                <TouchableOpacity
+                  onPress={this.handleCopyStack}
+                  style={styles.copyButton}
+                >
+                  <MaterialCommunityIcons name="content-copy" size={16} color="#7A1E5C" />
+                  <Text style={styles.copyButtonText}>Copy</Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView
+                style={styles.stackScroll}
+                nestedScrollEnabled={true}
+              >
+                <Text style={styles.stackText}>{(error.details as any).stack}</Text>
+              </ScrollView>
             </View>
           )}
 
@@ -322,6 +376,55 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     fontFamily: 'monospace',
     marginBottom: 4,
+  },
+  stackBox: {
+    backgroundColor: '#1F2937',
+    borderRadius: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#374151',
+    width: '100%',
+    maxHeight: 240,
+    overflow: 'hidden',
+  },
+  stackHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#374151',
+  },
+  stackTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#F3F4F6',
+  },
+  copyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    gap: 4,
+  },
+  copyButtonText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#7A1E5C',
+  },
+  stackScroll: {
+    maxHeight: 180,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  stackText: {
+    fontSize: 10,
+    color: '#9CA3AF',
+    fontFamily: 'monospace',
+    lineHeight: 16,
   },
   warningBox: {
     backgroundColor: '#FEF08A',

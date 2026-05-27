@@ -151,6 +151,7 @@ const AppInfoScreen: React.FC = () => {
         phone: authUser?.phone || '',
         text: cleanText,
         userId: authUser?.id,
+        language,
       });
 
       const raw = await AsyncStorage.getItem(SUGGESTIONS_ARCHIVE_KEY);
@@ -190,7 +191,7 @@ const AppInfoScreen: React.FC = () => {
 
         <View style={styles.logoCard}>
           <View style={styles.logoFrame}>
-            <Image source={require('../../assets/WEBP-version/Logo-Chaika LIFE.webp')} style={styles.logo} resizeMode="contain" />
+            <Image source={require('../../assets/WEBP-version/Logo-Chaika-LIFE.webp')} style={styles.logo} resizeMode="contain" />
           </View>
         </View>
 
@@ -340,7 +341,6 @@ const styles = StyleSheet.create({
 });
 
 export default AppInfoScreen;
-
 
 
 

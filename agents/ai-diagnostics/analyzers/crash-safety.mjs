@@ -45,27 +45,19 @@ export function analyze(files) {
       });
     }
 
-    // 2. unhandled-promise-rejection (HIGH)
+    // 2. unhandled-promise-rejection (MEDIUM)
+    // Only flag exported top-level async functions — heuristic, many false positives with HIGH
     lines.forEach((line, i) => {
-      if (/^\s*(?:export\s+)?(?:async\s+)?function\s+\w+|^\s*(?:export\s+)?const\s+\w+\s*=\s*async/.test(line)) {
-        // Found an async function definition at top level
-        const isAsync = /async/.test(line);
-        if (isAsync) {
-          const funcBlock = lines.slice(i, Math.min(i + 30, lines.length)).join('\n');
-          // Find the function body
-          if (!/try\s*\{/.test(funcBlock.slice(0, 200))) {
-            // No try/catch near the start of the function
-            // Check if there's any error handling at all
-            if (!/\.catch|catch\s*\(/.test(funcBlock.slice(0, 300))) {
-              findings.push(createFinding({
-                severity: 'HIGH', file: relativePath, line: i + 1, rule: 'unhandled-promise-rejection', scanner: SCANNER,
-                why: 'Top-level async function without try/catch',
-                risk: 'Unhandled promise rejection crashes the app in production',
-                uxImpact: 'high', perfImpact: 'none', memoryImpact: 'none',
-                suggestion: 'Wrap async function body in try/catch with proper error handling',
-              }));
-            }
-          }
+      if (/^\s*export\s+(?:default\s+)?async\s+function\s+\w+/.test(line)) {
+        const funcBlock = lines.slice(i, Math.min(i + 30, lines.length)).join('\n');
+        if (!/try\s*\{/.test(funcBlock.slice(0, 200)) && !/\.catch|catch\s*\(/.test(funcBlock.slice(0, 300))) {
+          findings.push(createFinding({
+            severity: 'MEDIUM', file: relativePath, line: i + 1, rule: 'unhandled-promise-rejection', scanner: SCANNER,
+            why: 'Exported async function without try/catch',
+            risk: 'Unhandled promise rejection may crash the app if called without error handling at the call site',
+            uxImpact: 'medium', perfImpact: 'none', memoryImpact: 'none',
+            suggestion: 'Wrap async function body in try/catch with proper error handling',
+          }));
         }
       }
     });
@@ -73,7 +65,8 @@ export function analyze(files) {
     // 3. unsafe-json-parse (HIGH)
     lines.forEach((line, i) => {
       if (/JSON\.parse\s*\(/.test(line)) {
-        const contextWindow = lines.slice(Math.max(0, i - 3), Math.min(i + 4, lines.length)).join('\n');
+        // Wider window (±10) to catch wrapping try/catch that spans multiple JSON.parse calls
+        const contextWindow = lines.slice(Math.max(0, i - 10), Math.min(i + 6, lines.length)).join('\n');
         if (!/try\s*\{|\.catch|catch\s*\(/.test(contextWindow)) {
           findings.push(createFinding({
             severity: 'HIGH', file: relativePath, line: i + 1, rule: 'unsafe-json-parse', scanner: SCANNER,
@@ -86,57 +79,57 @@ export function analyze(files) {
       }
     });
 
-    // 4. unsafe-optional-chain (MEDIUM)
+    // 4. unsafe-optional-chain (LOW)
+    // Heuristic with high false-positive rate — lowered to LOW
     lines.forEach((line, i) => {
       // Match deep property access a.b.c.d (4+ levels) without optional chaining
       const deepAccess = line.match(/\b(\w+)\.(\w+)\.(\w+)\.(\w+)\b/g);
       if (deepAccess) {
         for (const access of deepAccess) {
-          // Skip if it uses optional chaining
-          if (/\?\.\w+\?\.\w+/.test(line)) continue;
-          // Skip common safe patterns (imports, console, React, process, module)
-          if (/^(console|React|process|module|exports|require|window|document|Math|Object|Array|String|Number|Date|JSON|Promise|Error)\b/.test(access)) continue;
-          // Skip if the full chain uses optional chaining somewhere
-          const chainStart = access.split('.')[0];
-          const lineContext = line;
-          if (new RegExp(`${chainStart}\\?\\.`).test(lineContext)) continue;
+          // Skip if ANY optional chaining is present on this line
+          if (/\?\./.test(line)) continue;
+          // Skip common safe patterns (imports, console, React, process, module, StyleSheet, styles, Platform)
+          if (/^(console|React|process|module|exports|require|window|document|Math|Object|Array|String|Number|Date|JSON|Promise|Error|StyleSheet|styles|Platform|Animated|Easing|Keyboard|AppState)\b/.test(access)) continue;
+          // Skip import/require lines
+          if (/import\s|require\s*\(/.test(line)) continue;
+          // Skip lines that are type annotations or declarations
+          if (/:\s*\w+\.\w+\.\w+|interface\s|type\s/.test(line)) continue;
 
           findings.push(createFinding({
-            severity: 'MEDIUM', file: relativePath, line: i + 1, rule: 'unsafe-optional-chain', scanner: SCANNER,
+            severity: 'LOW', file: relativePath, line: i + 1, rule: 'unsafe-optional-chain', scanner: SCANNER,
             why: `Deep property access "${access}" without optional chaining`,
             risk: 'TypeError: Cannot read property of undefined if any intermediate value is null',
-            uxImpact: 'high', perfImpact: 'none', memoryImpact: 'none',
+            uxImpact: 'low', perfImpact: 'none', memoryImpact: 'none',
             suggestion: `Use optional chaining: ${access.split('.').join('?.')}`,
           }));
         }
       }
     });
 
-    // 5. missing-null-check (MEDIUM)
+    // 5. missing-null-check (LOW)
+    // Heuristic with high false-positive rate (useState initialises arrays safely) — lowered to LOW
     lines.forEach((line, i) => {
-      // Match array methods called without null check
       const arrayMethodMatch = line.match(/(\w+)\.(map|filter|forEach|find|some|every|reduce|flatMap|includes)\s*\(/);
       if (arrayMethodMatch) {
         const varName = arrayMethodMatch[1];
         // Skip common safe objects
-        if (/^(Array|Object|String|console|Math|JSON|React|Promise|this|props|state|styles)$/.test(varName)) return;
-        // Skip if preceded by null check or optional chain
+        if (/^(Array|Object|String|console|Math|JSON|React|Promise|this|props|state|styles|Object|results|items|data)$/.test(varName)) return;
+        // Skip if optional chaining or && guard is present on the same line
         if (new RegExp(`${varName}\\?\\.`).test(line)) return;
         if (new RegExp(`${varName}\\s*&&\\s*${varName}\\.`).test(line)) return;
+        // Skip if variable was initialised as array via useState([]) or const x = []
+        if (new RegExp(`use[Ss]tate\\s*\\(\\s*\\[|const\\s+${varName}\\s*=\\s*\\[`).test(content)) return;
 
-        // Check if there's a null check in the preceding lines
+        // Check if there's a null/length check in the preceding 5 lines
         const contextBefore = lines.slice(Math.max(0, i - 5), i).join('\n');
-        if (!new RegExp(`if\\s*\\(\\s*!?${varName}\\b|${varName}\\s*&&|${varName}\\s*\\?\\.|\\?\\?`).test(contextBefore)) {
-          // Check if the variable is initialized as array in the component
-          if (!new RegExp(`(const|let|var)\\s+${varName}\\s*=\\s*\\[`).test(content.slice(0, content.indexOf(line)))) {
-            findings.push(createFinding({
-              severity: 'MEDIUM', file: relativePath, line: i + 1, rule: 'missing-null-check', scanner: SCANNER,
-              why: `Array method .${arrayMethodMatch[2]}() called on "${varName}" without null check`,
-              risk: 'TypeError if variable is null/undefined, crashes the component',
-              uxImpact: 'high', perfImpact: 'none', memoryImpact: 'none',
-              suggestion: `Add null check: ${varName}?.${arrayMethodMatch[2]}(...) or (${varName} || []).${arrayMethodMatch[2]}(...)`,
-            }));
-          }
+        if (!new RegExp(`if\\s*\\(\\s*!?${varName}\\b|${varName}\\s*&&|${varName}\\s*\\?\\.|\\?\\?|Array\\.isArray`).test(contextBefore)) {
+          findings.push(createFinding({
+            severity: 'LOW', file: relativePath, line: i + 1, rule: 'missing-null-check', scanner: SCANNER,
+            why: `Array method .${arrayMethodMatch[2]}() called on "${varName}" without null guard`,
+            risk: 'TypeError if variable is null/undefined at runtime',
+            uxImpact: 'low', perfImpact: 'none', memoryImpact: 'none',
+            suggestion: `Add null check: ${varName}?.${arrayMethodMatch[2]}(...) or (${varName} || []).${arrayMethodMatch[2]}(...)`,
+          }));
         }
       }
     });

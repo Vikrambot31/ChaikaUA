@@ -11,7 +11,8 @@ export function analyze(files) {
     // 1. missing-upload-catch (HIGH)
     lines.forEach((line, i) => {
       if (/upload(Bytes|BytesResumable|String)|putFile/.test(line)) {
-        const contextWindow = lines.slice(Math.max(0, i - 3), Math.min(i + 6, lines.length)).join('\n');
+        // Wider context window (±8) to catch wrapping try/catch blocks
+        const contextWindow = lines.slice(Math.max(0, i - 8), Math.min(i + 8, lines.length)).join('\n');
         if (!/\.catch|catch\s*\(|try\s*\{/.test(contextWindow)) {
           findings.push(createFinding({
             severity: 'HIGH', file: relativePath, line: i + 1, rule: 'missing-upload-catch', scanner: SCANNER,
@@ -75,7 +76,8 @@ export function analyze(files) {
     // 5. storage-url-no-error (HIGH)
     lines.forEach((line, i) => {
       if (/getDownloadURL/.test(line)) {
-        const contextWindow = lines.slice(Math.max(0, i - 3), Math.min(i + 6, lines.length)).join('\n');
+        // Wider context window (±8) to catch wrapping try/catch blocks
+        const contextWindow = lines.slice(Math.max(0, i - 8), Math.min(i + 8, lines.length)).join('\n');
         if (!/\.catch|catch\s*\(|try\s*\{/.test(contextWindow)) {
           findings.push(createFinding({
             severity: 'HIGH', file: relativePath, line: i + 1, rule: 'storage-url-no-error', scanner: SCANNER,
@@ -105,14 +107,17 @@ export function analyze(files) {
       }
     });
 
-    // 7. modal-race-condition (HIGH)
+    // 7. modal-race-condition (MEDIUM)
+    // Lowered from HIGH: pattern is too broad — many valid patterns trigger it
+    // Only flag if modal toggle is inside an async callback without any guard or try/catch
     lines.forEach((line, i) => {
       if (/set(Visible|Show|Open|Modal)\s*\(\s*(true|false)/.test(line)) {
-        const funcBlock = lines.slice(Math.max(0, i - 10), Math.min(i + 10, lines.length)).join('\n');
-        if (/upload|Upload|putFile|uploadBytes/.test(funcBlock) && !/mounted|cancelled|isMounted|aborted/.test(funcBlock)) {
+        const funcBlock = lines.slice(Math.max(0, i - 15), Math.min(i + 15, lines.length)).join('\n');
+        if (/upload|Upload|putFile|uploadBytes/.test(funcBlock) &&
+            !/mounted|cancelled|isMounted|aborted|try\s*\{|\.catch/.test(funcBlock)) {
           findings.push(createFinding({
-            severity: 'HIGH', file: relativePath, line: i + 1, rule: 'modal-race-condition', scanner: SCANNER,
-            why: 'Modal state change near async upload without mount/cancel guard',
+            severity: 'MEDIUM', file: relativePath, line: i + 1, rule: 'modal-race-condition', scanner: SCANNER,
+            why: 'Modal state change near async upload without error guard',
             risk: 'setState on unmounted component if user closes modal during upload',
             uxImpact: 'medium', perfImpact: 'none', memoryImpact: 'low',
             suggestion: 'Add isMounted ref or AbortController check before state updates after async ops',
@@ -137,20 +142,24 @@ export function analyze(files) {
       }
     });
 
-    // 9. stuck-upload-state (HIGH)
+    // 9. stuck-upload-state (MEDIUM)
+    // Lowered from HIGH: 25-line window often misses finally blocks in longer functions
+    // Extended window to 60 lines; downgraded severity since detection is heuristic
     lines.forEach((line, i) => {
       const match = line.match(/set(Uploading|Loading|Saving|Submitting)\s*\(\s*true\s*\)/);
       if (match) {
-        const context = lines.slice(i, Math.min(i + 25, lines.length)).join('\n');
+        const context = lines.slice(i, Math.min(i + 60, lines.length)).join('\n');
         const setterName = `set${match[1]}`;
         const hasCatchReset = new RegExp(`(catch|finally)[\\s\\S]*?${setterName}\\s*\\(\\s*false`).test(context);
         const hasFinally = /finally\s*\{/.test(context);
-        if (!hasCatchReset && !hasFinally) {
+        // Also skip if there's a general finally reset pattern (any setter false in finally)
+        const hasFinallyAnyReset = /finally\s*\{[\s\S]*?set\w+\s*\(\s*false/.test(context);
+        if (!hasCatchReset && !hasFinally && !hasFinallyAnyReset) {
           findings.push(createFinding({
-            severity: 'HIGH', file: relativePath, line: i + 1, rule: 'stuck-upload-state', scanner: SCANNER,
-            why: `${setterName}(true) without guaranteed ${setterName}(false) in catch/finally`,
-            risk: 'Loading spinner stuck forever if operation fails, user cannot retry',
-            uxImpact: 'high', perfImpact: 'none', memoryImpact: 'none',
+            severity: 'MEDIUM', file: relativePath, line: i + 1, rule: 'stuck-upload-state', scanner: SCANNER,
+            why: `${setterName}(true) without detected ${setterName}(false) in catch/finally`,
+            risk: 'Loading spinner may get stuck if operation fails and no reset is guaranteed',
+            uxImpact: 'medium', perfImpact: 'none', memoryImpact: 'none',
             suggestion: `Add finally block with ${setterName}(false) to guarantee state reset`,
           }));
         }

@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, FlatList, Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { useSelector } from 'react-redux';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import MiniTabBar from '../components/MiniTabBar';
+import AppPhotoImage from '../components/AppPhotoImage';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import TactileIcon from '../components/TactileIcon';
 import MiniUserAvatar from '../components/MiniUserAvatar';
@@ -13,11 +14,14 @@ import { getModerationLabel } from '../utils/moderation';
 import { jobService, JobListing } from '../services/jobService';
 import { showUserError } from '../utils/userFacingErrors';
 import { database } from '../firebase-config';
-import { pickUserAvatarUri, resolveUserAvatarMap } from '../utils/userAvatar';
+import { resolveUserAvatarMap } from '../utils/userAvatar';
 import { useContactRequest } from '../hooks/useContactRequest';
 import ContactReasonModal from '../components/ContactReasonModal';
 import { safeCallPhone } from '../utils/communicationActions';
 import type { DetailItemData } from '../utils/detailViewTypes';
+import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField';
+import { getDonePhotos, getRequiredPhotoLabel, validateSubmissionRequirements } from '../utils/submissionRequirements';
+import UserCardActionBar from '../components/UserCardActionBar';
 
 const TWO_MONTHS_MS = 60 * 24 * 60 * 60 * 1000;
 type AppLanguage = 'ua' | 'ru' | 'en';
@@ -101,7 +105,7 @@ const UI_TEXT = {
     clearSearch: 'Скинути пошук',
     noSearchResults: 'Нічого не знайдено за критеріями',
     noSearchResultsSub: 'Спробуйте прибрати частину фільтрів.',
-    live: 'LIVE',
+    live: 'НАЖИВО',
     liveCount: () => 'активних публікацій про роботу на сьогодні',
     formTypeLabel: 'Що публікуємо?',
     resumeOption: 'Резюме',
@@ -113,6 +117,7 @@ const UI_TEXT = {
     postedAt: 'Розміщено',
     viewProfile: 'Переглянути профіль',
     contactUser: "Зв'язатися",
+    authRequired: 'Увійдіть в акаунт, щоб опублікувати оголошення.',
   },
   ru: {
     workTypes: [
@@ -191,7 +196,7 @@ const UI_TEXT = {
     clearSearch: 'Сбросить поиск',
     noSearchResults: 'Ничего не найдено по критериям',
     noSearchResultsSub: 'Попробуйте убрать часть фильтров.',
-    live: 'LIVE',
+    live: 'В ЭФИРЕ',
     liveCount: () => 'активных публикаций о работе на сегодня',
     formTypeLabel: 'Что публикуем?',
     resumeOption: 'Резюме',
@@ -203,6 +208,7 @@ const UI_TEXT = {
     postedAt: 'Размещено',
     viewProfile: 'Просмотреть профиль',
     contactUser: 'Связаться',
+    authRequired: 'Войдите в аккаунт, чтобы опубликовать объявление.',
   },
   en: {
     workTypes: [
@@ -293,6 +299,7 @@ const UI_TEXT = {
     postedAt: 'Posted',
     viewProfile: 'View profile',
     contactUser: 'Contact',
+    authRequired: 'Sign in to publish a listing.',
   },
 } as const;
 
@@ -316,16 +323,19 @@ const formatListingDate = (value: string, language: AppLanguage): string => {
 
 const JobSearchScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
+  const navLock = useRef(false);
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as AppLanguage;
   const user = useSelector((state: RootState) => state.auth.user);
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const text = UI_TEXT[language];
+  const requiredPhotoLabel = getRequiredPhotoLabel(language);
   const [listingKind, setListingKind] = useState<JobListingKind>('resume');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('+380');
   const [age, setAge] = useState('');
   const [workType, setWorkType] = useState('');
   const [about, setAbout] = useState('');
+  const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
   const [listings, setListings] = useState<JobListing[]>([]);
   const [avatarByUserId, setAvatarByUserId] = useState<Record<string, string>>({});
   const [selectedFilter, setSelectedFilter] = useState('');
@@ -396,6 +406,8 @@ const JobSearchScreen: React.FC = () => {
     () => Boolean(searchName.trim() || searchContact.trim() || searchAge || searchWorkType || searchAbout.trim()),
     [searchAge, searchAbout, searchContact, searchName, searchWorkType],
   );
+  const hasUploadingPhotos = formPhotos.some((p) => p.status === 'uploading');
+  const hasPhotoErrors = formPhotos.some((p) => p.status === 'error');
   const filteredListings = useMemo(() => {
     const queryName = searchName.trim().toLowerCase();
     const queryContact = searchContact.trim().toLowerCase();
@@ -444,6 +456,8 @@ const JobSearchScreen: React.FC = () => {
       ? `${text.vacancyTitlePrefix}: ${item.workType || text.defaultWork}`
       : item.name,
     description: item.about,
+    photoUri: item.photoUri,
+    photoStoragePath: item.photoStoragePath,
     phone: item.phone,
     category: item.workType,
     price: getListingKind(item) === 'resume' && item.age ? `${item.age} ${text.years}` : undefined,
@@ -455,11 +469,6 @@ const JobSearchScreen: React.FC = () => {
   });
 
   const handleSubmit = async () => {
-    if (!user) {
-      navigation.navigate('LoginScreen');
-      return;
-    }
-
     const isVacancy = listingKind === 'vacancy';
     if (!name.trim() || !phone.trim() || !workType || (!isVacancy && !age.trim()) || (isVacancy && !about.trim())) {
       Alert.alert(text.alertFormTitle, isVacancy ? text.alertVacancyFormBody : text.alertFormBody);
@@ -474,6 +483,18 @@ const JobSearchScreen: React.FC = () => {
       Alert.alert(text.alertErrorTitle, isVacancy ? text.alertVacancyValidationBody : text.alertValidationBody);
       return;
     }
+    if (hasUploadingPhotos) {
+      Alert.alert(text.alertErrorTitle, language === 'ru' ? 'Дождитесь завершения загрузки фото.' : language === 'en' ? 'Wait until photo upload is complete.' : 'Дочекайтесь завершення завантаження фото.');
+      return;
+    }
+    if (hasPhotoErrors) {
+      Alert.alert(text.alertErrorTitle, language === 'ru' ? 'Не удалось загрузить фото. Удалите его или попробуйте ещё раз.' : language === 'en' ? 'Photo upload failed. Remove it or try again.' : 'Не вдалося завантажити фото. Видаліть його або спробуйте ще раз.');
+      return;
+    }
+    if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, photos: formPhotos, navigation })) {
+      return;
+    }
+    const firstPhoto = getDonePhotos(formPhotos)[0];
 
     setSubmitting(true);
     try {
@@ -485,11 +506,14 @@ const JobSearchScreen: React.FC = () => {
         age: isVacancy ? '' : age.trim(),
         workType,
         about: about.trim(),
+        photoUri: firstPhoto?.downloadUrl ?? '',
+        photoStoragePath: firstPhoto?.storagePath ?? '',
         moderationStatus: 'pending',
         submittedForModerationAt: createdAt.toISOString(),
         createdAt: createdAt.toISOString(),
         expiresAt: new Date(createdAt.getTime() + TWO_MONTHS_MS).toISOString(),
         userId: user?.id || '',
+        language,
       });
 
       Alert.alert(text.submittedTitle, isVacancy ? text.submittedVacancyMessage : text.submittedMessage);
@@ -498,6 +522,7 @@ const JobSearchScreen: React.FC = () => {
       setAge('');
       setWorkType('');
       setAbout('');
+      setFormPhotos([]);
       setListingKind('resume');
       setIsPublishFormVisible(false);
     } catch (error) {
@@ -598,208 +623,240 @@ const JobSearchScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.headerCard}>
-          <View style={styles.headerImageFrame}>
-            <Image
-              source={require('../../assets/WEBP-version/workChaika.webp')}
-              style={styles.headerImage}
-              resizeMode="contain"
-            />
-          </View>
-          <Text style={styles.headerTitle}>{text.headerTitle}</Text>
-          <Text style={styles.headerSubtitle}>{text.headerSubtitle}</Text>
-          <View style={styles.livePanel}>
-            <View style={styles.liveBadge}>
-              <Animated.Text style={[styles.liveDot, { opacity: blinkAnim }]}>•</Animated.Text>
-              <Text style={styles.liveText}>{text.live}</Text>
-            </View>
-            <View style={styles.liveCountBlock}>
-              <Text style={styles.liveNumber}>{listings.length}</Text>
-              <Text style={styles.liveCount}>{text.liveCount()}</Text>
-            </View>
-          </View>
-        </View>
-
-        <TouchableOpacity
-          style={styles.publishToggleBtn}
-          onPress={() => setIsPublishFormVisible(true)}
-          activeOpacity={0.86}
-        >
-          <Text style={styles.publishToggleBtnText}>{text.addPost}</Text>
-        </TouchableOpacity>
-
-        {isPublishFormVisible ? (
-          <View style={styles.formCard}>
-            <Text style={styles.formLabel}>{text.formTypeLabel}</Text>
-            <View style={styles.kindSwitcher}>
-              <TouchableOpacity
-                style={[styles.kindOption, listingKind === 'resume' && styles.kindOptionActive]}
-                onPress={() => setListingKind('resume')}
-                activeOpacity={0.82}
-              >
-                <Text style={[styles.kindOptionText, listingKind === 'resume' && styles.kindOptionTextActive]}>{text.resumeOption}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.kindOption, listingKind === 'vacancy' && styles.kindOptionActive]}
-                onPress={() => setListingKind('vacancy')}
-                activeOpacity={0.82}
-              >
-                <Text style={[styles.kindOptionText, listingKind === 'vacancy' && styles.kindOptionTextActive]}>{text.vacancyOption}</Text>
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.formLabel}>{isVacancyForm ? text.labelContactName : text.labelName}</Text>
-            <TextInput
-              placeholder={isVacancyForm ? text.placeholderContactName : text.placeholderName}
-              value={name}
-              onChangeText={(value) => setName(normalizePersonName(value))}
-              style={styles.input}
-              placeholderTextColor="#A0938D"
-            />
-
-            <Text style={styles.formLabel}>{text.labelPhone}</Text>
-            <TextInput placeholder="+380..." value={phone} onChangeText={(value) => setPhone(normalizePhoneText(value))} keyboardType="phone-pad" style={styles.input} placeholderTextColor="#A0938D" />
-
-            {!isVacancyForm ? (
-              <>
-                <Text style={styles.formLabel}>{text.labelAge}</Text>
-                <TextInput placeholder={text.placeholderAge} value={age} onChangeText={(value) => setAge(value.replace(/[^0-9]/g, '').slice(0, 2))} keyboardType="number-pad" style={styles.input} placeholderTextColor="#A0938D" />
-              </>
-            ) : null}
-
-            <Text style={styles.formLabel}>{text.labelWorkType}</Text>
-            <View style={styles.pickerWrapper}>
-              <Picker selectedValue={workType} onValueChange={setWorkType} style={styles.picker}>
-                <Picker.Item label={text.searchAnyType} value="" />
-                {text.workTypes.map((item) => (
-                  <Picker.Item key={item} label={item} value={item} />
-                ))}
-              </Picker>
-            </View>
-
-            <Text style={styles.formLabel}>{isVacancyForm ? text.labelVacancyAbout : text.labelAbout}</Text>
-            <TextInput
-              placeholder={isVacancyForm ? text.placeholderVacancyAbout : text.placeholderAbout}
-              value={about}
-              onChangeText={setAbout}
-              style={[styles.input, styles.textarea]}
-              placeholderTextColor="#A0938D"
-              multiline
-              maxLength={180}
-            />
-
-            <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} activeOpacity={0.85} disabled={submitting}>
-              {submitting ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.submitBtnText}>{isVacancyForm ? text.submitVacancy : text.submit}</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        ) : null}
-
-        {listings.length > 0 ? (
-          <View style={styles.listingsSection}>
-            <Text style={styles.formLabel}>{text.filterLabel}</Text>
-            <View style={styles.pickerWrapper}>
-              <Picker selectedValue={selectedFilter} onValueChange={setSelectedFilter} style={styles.picker}>
-                <Picker.Item label={text.filterAll} value="" />
-                {filterOptions.map((option) => (
-                  <Picker.Item key={option} label={option} value={option} />
-                ))}
-              </Picker>
-            </View>
-
-            <View style={styles.listingsHeaderRow}>
-              <Text style={styles.listingsSectionTitle}>{text.listTitleAll} ({filteredListings.length})</Text>
-              <TouchableOpacity style={styles.searchBtn} onPress={() => setSearchModalVisible(true)} activeOpacity={0.82}>
-                <Text style={styles.searchBtnText}>{text.searchButton}</Text>
-              </TouchableOpacity>
-            </View>
-            {hasAdvancedSearch ? (
-              <TouchableOpacity style={styles.clearSearchBtn} onPress={resetSearch} activeOpacity={0.82}>
-                <Text style={styles.clearSearchText}>{text.clearSearch}</Text>
-              </TouchableOpacity>
-            ) : null}
-            {filteredListings.length === 0 ? (
-              <View style={styles.emptyFiltered}>
-                <Text style={styles.emptyFilteredTitle}>{text.noSearchResults}</Text>
-                <Text style={styles.emptyFilteredSub}>{text.noSearchResultsSub}</Text>
+      {/* FlatList replaces the outer ScrollView for virtualized rendering of listing cards */}
+      <FlatList
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        data={listings.length > 0 ? filteredListings : []}
+        keyExtractor={(item) => item.id}
+        initialNumToRender={8}
+        windowSize={5}
+        ListHeaderComponent={
+          <>
+            <View style={styles.headerCard}>
+              <View style={styles.headerImageFrame}>
+                <Image
+                  source={require('../../assets/WEBP-version/workChaika.webp')}
+                  style={styles.headerImage}
+                  resizeMode="contain"
+                />
               </View>
-            ) : (
-              filteredListings.map((item) => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={styles.listingCard}
-                  onPress={() => navigation.navigate('ItemDetailScreen', { item: mapToDetailData(item) })}
-                  activeOpacity={0.85}
-                >
-                  <View style={styles.listingHeader}>
-                    <View style={styles.listingHeaderLeft}>
-                      <MiniUserAvatar uri={(item.userId && avatarByUserId[item.userId]) || pickUserAvatarUri(item)} name={item.name} size={68} borderRadius={20} backgroundColor="#6A8BA5" />
-                      <Text style={styles.listingName}>
-                        {getListingKind(item) === 'vacancy' ? (item.workType || text.defaultWork) : item.name}
-                      </Text>
-                      {item.phone ? (
-                        <TouchableOpacity
-                          style={styles.phoneInlineAction}
-                          onPress={() => void safeCallPhone(item.phone, language)}
-                          activeOpacity={0.75}
-                        >
-                          <TactileIcon icon="phone-outline" size={30} iconSize={13} backgroundColor="#403933" />
-                        </TouchableOpacity>
-                      ) : null}
-                      {item.userId && item.userId !== user?.id ? (
-                        <TouchableOpacity
-                          style={styles.phoneInlineAction}
-                          onPress={() => setActionModal({ visible: true, userId: item.userId as string, userName: item.name ?? 'Unknown' })}
-                          activeOpacity={0.75}
-                        >
-                          <TactileIcon icon="account-arrow-right-outline" size={30} iconSize={13} backgroundColor="#7A1E5C" />
-                        </TouchableOpacity>
-                      ) : null}
-                    </View>
-                    {item.userId === user?.id ? (
-                      <TouchableOpacity onPress={() => handleDelete(item.id)}>
-                        <Text style={styles.deleteText}>{text.delete}</Text>
-                      </TouchableOpacity>
-                    ) : null}
-                  </View>
-                  <Text style={styles.positionTitle}>{item.workType || text.defaultWork}</Text>
-                  <Text style={styles.postedDateText}>
-                    {text.postedAt}: {formatListingDate(item.createdAt, language) || '—'}
-                  </Text>
-                  <View style={styles.badgeRow}>
-                    <Text style={[styles.kindBadge, getListingKind(item) === 'vacancy' && styles.kindBadgeVacancy]}>
-                      {getListingKind(item) === 'vacancy' ? text.vacancyBadge : text.resumeBadge}
-                    </Text>
-                    {getListingKind(item) === 'resume' ? (
-                      <Text style={styles.badge}>{item.age ? `${item.age} ${text.years}` : text.ageMissing}</Text>
-                    ) : (
-                      <Text style={styles.badge}>{text.vacancyContact}: {item.name}</Text>
-                    )}
-                    {item.isArchived ? (
-                      <Text style={styles.archiveBadge}>Архів</Text>
-                    ) : (
-                      <Text style={styles.moderationBadge}>
-                        {getModerationLabel(item.moderationStatus, moderationLabels)}
-                      </Text>
-                    )}
-                  </View>
-                  <Text style={styles.listingAbout}>{item.about || text.aboutMissing}</Text>
+              <Text style={styles.headerTitle}>{text.headerTitle}</Text>
+              <Text style={styles.headerSubtitle}>{text.headerSubtitle}</Text>
+              <View style={styles.livePanel}>
+                <View style={styles.liveBadge}>
+                  <Animated.Text style={[styles.liveDot, { opacity: blinkAnim }]}>•</Animated.Text>
+                  <Text style={styles.liveText}>{text.live}</Text>
+                </View>
+                <View style={styles.liveCountBlock}>
+                  <Text style={styles.liveNumber}>{listings.length}</Text>
+                  <Text style={styles.liveCount}>{text.liveCount()}</Text>
+                </View>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.publishToggleBtn}
+              onPress={() => {
+                if (!user) {
+                  Alert.alert(text.addPost, text.authRequired);
+                  return;
+                }
+                setIsPublishFormVisible(true);
+              }}
+              activeOpacity={0.86}
+            >
+              <Text style={styles.publishToggleBtnText}>{text.addPost}</Text>
+            </TouchableOpacity>
+
+            {isPublishFormVisible ? (
+              <View style={styles.formCard}>
+                <Text style={styles.formLabel}>{text.formTypeLabel}</Text>
+                <View style={styles.kindSwitcher}>
+                  <TouchableOpacity
+                    style={[styles.kindOption, listingKind === 'resume' && styles.kindOptionActive]}
+                    onPress={() => setListingKind('resume')}
+                    activeOpacity={0.82}
+                  >
+                    <Text style={[styles.kindOptionText, listingKind === 'resume' && styles.kindOptionTextActive]}>{text.resumeOption}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.kindOption, listingKind === 'vacancy' && styles.kindOptionActive]}
+                    onPress={() => setListingKind('vacancy')}
+                    activeOpacity={0.82}
+                  >
+                    <Text style={[styles.kindOptionText, listingKind === 'vacancy' && styles.kindOptionTextActive]}>{text.vacancyOption}</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={styles.formLabel}>{isVacancyForm ? text.labelContactName : text.labelName}</Text>
+                <TextInput
+                  placeholder={isVacancyForm ? text.placeholderContactName : text.placeholderName}
+                  value={name}
+                  onChangeText={(value) => setName(normalizePersonName(value))}
+                  style={styles.input}
+                  placeholderTextColor="#A0938D"
+                />
+
+                <Text style={styles.formLabel}>{text.labelPhone}</Text>
+                <TextInput placeholder="+380..." value={phone} onChangeText={(value) => setPhone(normalizePhoneText(value))} keyboardType="phone-pad" style={styles.input} placeholderTextColor="#A0938D" />
+
+                {!isVacancyForm ? (
+                  <>
+                    <Text style={styles.formLabel}>{text.labelAge}</Text>
+                    <TextInput placeholder={text.placeholderAge} value={age} onChangeText={(value) => setAge(value.replace(/[^0-9]/g, '').slice(0, 2))} keyboardType="number-pad" style={styles.input} placeholderTextColor="#A0938D" />
+                  </>
+                ) : null}
+
+                <Text style={styles.formLabel}>{text.labelWorkType}</Text>
+                <View style={styles.pickerWrapper}>
+                  <Picker selectedValue={workType} onValueChange={setWorkType} style={styles.picker}>
+                    <Picker.Item label={text.searchAnyType} value="" />
+                    {text.workTypes.map((item) => (
+                      <Picker.Item key={item} label={item} value={item} />
+                    ))}
+                  </Picker>
+                </View>
+
+                <Text style={styles.formLabel}>{isVacancyForm ? text.labelVacancyAbout : text.labelAbout}</Text>
+                <TextInput
+                  placeholder={isVacancyForm ? text.placeholderVacancyAbout : text.placeholderAbout}
+                  value={about}
+                  onChangeText={setAbout}
+                  style={[styles.input, styles.textarea]}
+                  placeholderTextColor="#A0938D"
+                  multiline
+                  maxLength={180}
+                />
+
+                <Text style={styles.formLabel}>{requiredPhotoLabel}</Text>
+                <PhotoUploadField
+                  uid={user?.id ?? ''}
+                  userName={user?.name ?? ''}
+                  maxPhotos={1}
+                  storagePath="job_listings"
+                  onPhotosChange={setFormPhotos}
+                />
+
+                <TouchableOpacity style={[styles.submitBtn, (submitting || hasUploadingPhotos) && { opacity: 0.65 }]} onPress={handleSubmit} activeOpacity={0.85} disabled={submitting || hasUploadingPhotos}>
+                  {submitting ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.submitBtnText}>{hasUploadingPhotos ? (language === 'ru' ? 'Загрузка фото…' : language === 'en' ? 'Uploading photo…' : 'Завантаження фото…') : isVacancyForm ? text.submitVacancy : text.submit}</Text>
+                  )}
                 </TouchableOpacity>
-              ))
-            )}
-          </View>
-        ) : (
-          <View style={styles.emptyState}>
-            <TactileIcon icon="account-search-outline" size={54} iconSize={26} backgroundColor="#403933" />
-            <Text style={styles.emptyTitle}>{text.emptyTitle}</Text>
-            <Text style={styles.emptySub}>{text.emptySub}</Text>
-          </View>
+              </View>
+            ) : null}
+
+            {listings.length > 0 ? (
+              <View style={styles.listingsSection}>
+                <Text style={styles.formLabel}>{text.filterLabel}</Text>
+                <View style={styles.pickerWrapper}>
+                  <Picker selectedValue={selectedFilter} onValueChange={setSelectedFilter} style={styles.picker}>
+                    <Picker.Item label={text.filterAll} value="" />
+                    {filterOptions.map((option) => (
+                      <Picker.Item key={option} label={option} value={option} />
+                    ))}
+                  </Picker>
+                </View>
+
+                <View style={styles.listingsHeaderRow}>
+                  <Text style={styles.listingsSectionTitle}>{text.listTitleAll} ({filteredListings.length})</Text>
+                  <TouchableOpacity style={styles.searchBtn} onPress={() => setSearchModalVisible(true)} activeOpacity={0.82}>
+                    <Text style={styles.searchBtnText}>{text.searchButton}</Text>
+                  </TouchableOpacity>
+                </View>
+                {hasAdvancedSearch ? (
+                  <TouchableOpacity style={styles.clearSearchBtn} onPress={resetSearch} activeOpacity={0.82}>
+                    <Text style={styles.clearSearchText}>{text.clearSearch}</Text>
+                  </TouchableOpacity>
+                ) : null}
+                {filteredListings.length === 0 ? (
+                  <View style={styles.emptyFiltered}>
+                    <Text style={styles.emptyFilteredTitle}>{text.noSearchResults}</Text>
+                    <Text style={styles.emptyFilteredSub}>{text.noSearchResultsSub}</Text>
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
+          </>
+        }
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={styles.listingCard}
+            onPress={() => { if (navLock.current) return; navLock.current = true; navigation.navigate('ItemDetailScreen', { item: mapToDetailData(item) }); setTimeout(() => { navLock.current = false; }, 800); }}
+            activeOpacity={0.85}
+          >
+            <View style={styles.listingHeader}>
+              <View style={styles.listingHeaderLeft}>
+                {item.photoUri || item.photoStoragePath ? (
+                  <AppPhotoImage
+                    uri={item.photoUri}
+                    storagePath={item.photoStoragePath}
+                    style={styles.listingPhoto}
+                    resizeMode="cover"
+                    debugLabel={`Job:${item.id}`}
+                  />
+                ) : (
+                  <MiniUserAvatar uri={(item.userId && avatarByUserId[item.userId]) || undefined} name={item.name} size={68} borderRadius={20} backgroundColor="#6A8BA5" />
+                )}
+                <Text style={styles.listingName}>
+                  {getListingKind(item) === 'vacancy' ? (item.workType || text.defaultWork) : item.name}
+                </Text>
+              </View>
+              {item.userId === user?.id ? (
+                <TouchableOpacity onPress={() => handleDelete(item.id)}>
+                  <Text style={styles.deleteText}>{text.delete}</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            <Text style={styles.positionTitle}>{item.workType || text.defaultWork}</Text>
+            <Text style={styles.postedDateText}>
+              {text.postedAt}: {formatListingDate(item.createdAt, language) || '—'}
+            </Text>
+            <View style={styles.badgeRow}>
+              <Text style={[styles.kindBadge, getListingKind(item) === 'vacancy' && styles.kindBadgeVacancy]}>
+                {getListingKind(item) === 'vacancy' ? text.vacancyBadge : text.resumeBadge}
+              </Text>
+              {getListingKind(item) === 'resume' ? (
+                <Text style={styles.badge}>{item.age ? `${item.age} ${text.years}` : text.ageMissing}</Text>
+              ) : (
+                <Text style={styles.badge}>{text.vacancyContact}: {item.name}</Text>
+              )}
+              {item.isArchived ? (
+                <Text style={styles.archiveBadge}>Архів</Text>
+              ) : (
+                <Text style={styles.moderationBadge}>
+                  {getModerationLabel(item.moderationStatus, moderationLabels)}
+                </Text>
+              )}
+            </View>
+            <Text style={styles.listingAbout}>{item.about || text.aboutMissing}</Text>
+            <UserCardActionBar
+              avatarUri={(item.userId && avatarByUserId[item.userId]) || undefined}
+              name={item.name}
+              userId={item.userId}
+              currentUserId={user?.id}
+              language={language}
+              onProfile={item.userId ? () => handleViewProfile(item.userId as string) : undefined}
+              onContact={item.userId && item.userId !== user?.id ? () => handleContact(item.userId as string, item.name ?? 'Unknown') : item.phone ? () => void safeCallPhone(item.phone, language) : undefined}
+              contactDisabled={!item.phone && (!item.userId || item.userId === user?.id)}
+              likePath="feed_likes/jobs"
+              likeId={item.id}
+            />
+          </TouchableOpacity>
         )}
-      </ScrollView>
+        ListEmptyComponent={
+          listings.length === 0 ? (
+            <View style={styles.emptyState}>
+              <TactileIcon icon="account-search-outline" size={54} iconSize={26} backgroundColor="#403933" />
+              <Text style={styles.emptyTitle}>{text.emptyTitle}</Text>
+              <Text style={styles.emptySub}>{text.emptySub}</Text>
+            </View>
+          ) : null
+        }
+      />
       <MiniTabBar />
       <Modal
         visible={actionModal.visible}
@@ -999,6 +1056,7 @@ const styles = StyleSheet.create({
   listingCard: { backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 20, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#E4D0AB' },
   listingHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 },
   listingHeaderLeft: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
+  listingPhoto: { width: 68, height: 68, borderRadius: 20, backgroundColor: '#E8EDF8' },
   listingName: { fontWeight: '800', color: SCREEN_THEME.textPrimary, marginLeft: 10, flexShrink: 1, fontSize: 16 },
   phoneInlineAction: { marginLeft: 10, marginTop: 3 },
   positionTitle: {
@@ -1083,8 +1141,3 @@ const styles = StyleSheet.create({
 });
 
 export default JobSearchScreen;
-
-
-
-
-

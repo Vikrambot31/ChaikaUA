@@ -46,6 +46,63 @@ export interface PendingRequestsSummary {
   latestRequestedAtMs: number;
 }
 
+type PendingSummarySubscriber = (summary: PendingRequestsSummary) => void;
+
+type PendingSummarySubscription = {
+  callbacks: Set<PendingSummarySubscriber>;
+  unsubscribe: () => void;
+};
+
+const pendingSummarySubscriptions = new Map<string, PendingSummarySubscription>();
+
+const summarizePendingRequests = (data: Record<string, ProfileViewRequest> | null | undefined): PendingRequestsSummary => {
+  if (!data) {
+    return { count: 0, latestRequestedAtMs: 0 };
+  }
+
+  let count = 0;
+  let latestRequestedAtMs = 0;
+  Object.values(data).forEach((request) => {
+    if (request.status !== 'pending') return;
+    count += 1;
+    const requestedAtMs = typeof request.requestedAt === 'string' ? new Date(request.requestedAt).getTime() : 0;
+    if (Number.isFinite(requestedAtMs) && requestedAtMs > latestRequestedAtMs) {
+      latestRequestedAtMs = requestedAtMs;
+    }
+  });
+
+  return { count, latestRequestedAtMs };
+};
+
+const subscribeToSharedPendingSummary = (userId: string, callback: PendingSummarySubscriber): (() => void) => {
+  let subscription = pendingSummarySubscriptions.get(userId);
+  if (!subscription) {
+    const callbacks = new Set<PendingSummarySubscriber>();
+    const unsubscribe = onValue(ref(database, `profileViewRequests/${userId}`), (snap) => {
+      const data = snap.exists() ? (snap.val() as Record<string, ProfileViewRequest>) : null;
+      const summary = summarizePendingRequests(data);
+      callbacks.forEach((subscriber) => subscriber(summary));
+    }, (error) => {
+      console.error('[profilePermissionService] subscribeToPendingSummary failed:', error);
+      callbacks.forEach((subscriber) => subscriber({ count: 0, latestRequestedAtMs: 0 }));
+    });
+
+    subscription = { callbacks, unsubscribe };
+    pendingSummarySubscriptions.set(userId, subscription);
+  }
+
+  subscription.callbacks.add(callback);
+  return () => {
+    const current = pendingSummarySubscriptions.get(userId);
+    if (!current) return;
+    current.callbacks.delete(callback);
+    if (current.callbacks.size === 0) {
+      current.unsubscribe();
+      pendingSummarySubscriptions.delete(userId);
+    }
+  };
+};
+
 type ArchivedRequestEntry = {
   archived: boolean;
   updatedAt: object | number | null;
@@ -84,18 +141,28 @@ export const profilePermissionService = {
 
   async hideRequestForUser(userId: string, targetUserId: string, requesterId: string): Promise<void> {
     const key = profilePermissionService.requestKey(targetUserId, requesterId);
-    await set(ref(database, `users/${userId}/profileRequestsArchive/${key}`), {
-      archived: true,
-      updatedAt: serverTimestamp(),
-    });
+    try {
+      await set(ref(database, `users/${userId}/profileRequestsArchive/${key}`), {
+        archived: true,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error('[profilePermissionService] hideRequestForUser failed:', err);
+      throw err;
+    }
   },
 
   async unhideRequestForUser(userId: string, targetUserId: string, requesterId: string): Promise<void> {
     const key = profilePermissionService.requestKey(targetUserId, requesterId);
-    await set(ref(database, `users/${userId}/profileRequestsArchive/${key}`), {
-      archived: false,
-      updatedAt: serverTimestamp(),
-    });
+    try {
+      await set(ref(database, `users/${userId}/profileRequestsArchive/${key}`), {
+        archived: false,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error('[profilePermissionService] unhideRequestForUser failed:', err);
+      throw err;
+    }
   },
 
   async getPrivacyMode(userId: string): Promise<ProfilePrivacyMode> {
@@ -108,7 +175,12 @@ export const profilePermissionService = {
   },
 
   async setPrivacyMode(userId: string, mode: ProfilePrivacyMode): Promise<void> {
-    await set(ref(database, `users/${userId}/profilePrivacy`), mode);
+    try {
+      await set(ref(database, `users/${userId}/profilePrivacy`), mode);
+    } catch (err) {
+      console.error('[profilePermissionService] setPrivacyMode failed:', err);
+      throw err;
+    }
   },
 
   async requestView(
@@ -183,7 +255,13 @@ export const profilePermissionService = {
   },
 
   async getAllRequests(userId: string): Promise<ProfileViewRequest[]> {
-    const snap = await get(ref(database, `profileViewRequests/${userId}`));
+    let snap;
+    try {
+      snap = await get(ref(database, `profileViewRequests/${userId}`));
+    } catch (err) {
+      console.error('[profilePermissionService] getAllRequests failed:', err);
+      return [];
+    }
     if (!snap.exists()) return [];
     const data = snap.val() as Record<string, Partial<ProfileViewRequest>>;
     return Object.entries(data)
@@ -209,7 +287,13 @@ export const profilePermissionService = {
   },
 
   async getAllRequestsWithHistory(userId: string): Promise<ProfileViewRequest[]> {
-    const snap = await get(ref(database, `profileViewRequests/${userId}`));
+    let snap;
+    try {
+      snap = await get(ref(database, `profileViewRequests/${userId}`));
+    } catch (err) {
+      console.error('[profilePermissionService] getAllRequestsWithHistory failed:', err);
+      return [];
+    }
     if (!snap.exists()) return [];
     const data = snap.val() as Record<string, Partial<ProfileViewRequest>>;
     return Object.entries(data)
@@ -235,7 +319,13 @@ export const profilePermissionService = {
   },
 
   async getOutgoingRequests(userId: string): Promise<ProfileViewRequest[]> {
-    const indexedSnap = await get(ref(database, `outgoingProfileRequestsByUser/${userId}`));
+    let indexedSnap;
+    try {
+      indexedSnap = await get(ref(database, `outgoingProfileRequestsByUser/${userId}`));
+    } catch (err) {
+      console.error('[profilePermissionService] getOutgoingRequests failed:', err);
+      return [];
+    }
     if (indexedSnap.exists()) {
       const indexed = indexedSnap.val() as Record<string, Partial<ProfileViewRequest>>;
       const out = Object.entries(indexed)
@@ -278,43 +368,24 @@ export const profilePermissionService = {
         sharedContact = '';
       }
     }
-    await update(ref(database), {
-      [`profileViewRequests/${targetUserId}/${requesterId}/status`]: status,
-      [`profileViewRequests/${targetUserId}/${requesterId}/sharedContact`]: sharedContact,
-      [`outgoingProfileRequestsByUser/${requesterId}/${targetUserId}/status`]: status,
-      [`outgoingProfileRequestsByUser/${requesterId}/${targetUserId}/sharedContact`]: sharedContact,
-    });
+    try {
+      await update(ref(database), {
+        [`profileViewRequests/${targetUserId}/${requesterId}/status`]: status,
+        [`profileViewRequests/${targetUserId}/${requesterId}/sharedContact`]: sharedContact,
+        [`outgoingProfileRequestsByUser/${requesterId}/${targetUserId}/status`]: status,
+        [`outgoingProfileRequestsByUser/${requesterId}/${targetUserId}/sharedContact`]: sharedContact,
+      });
+    } catch (err) {
+      console.error('[profilePermissionService] respondToRequest failed:', err);
+      throw err;
+    }
   },
 
   subscribeToPendingCount(userId: string, callback: (count: number) => void): () => void {
-    const unsubFn = onValue(ref(database, `profileViewRequests/${userId}`), (snap) => {
-      if (!snap.exists()) { callback(0); return; }
-      const data = snap.val() as Record<string, ProfileViewRequest>;
-      const count = Object.values(data).filter((r) => r.status === 'pending').length;
-      callback(count);
-    });
-    return unsubFn;
+    return subscribeToSharedPendingSummary(userId, (summary) => callback(summary.count));
   },
 
   subscribeToPendingSummary(userId: string, callback: (summary: PendingRequestsSummary) => void): () => void {
-    const unsubFn = onValue(ref(database, `profileViewRequests/${userId}`), (snap) => {
-      if (!snap.exists()) {
-        callback({ count: 0, latestRequestedAtMs: 0 });
-        return;
-      }
-      const data = snap.val() as Record<string, ProfileViewRequest>;
-      let count = 0;
-      let latestRequestedAtMs = 0;
-      Object.values(data).forEach((request) => {
-        if (request.status !== 'pending') return;
-        count += 1;
-        const requestedAtMs = typeof request.requestedAt === 'string' ? new Date(request.requestedAt).getTime() : 0;
-        if (Number.isFinite(requestedAtMs) && requestedAtMs > latestRequestedAtMs) {
-          latestRequestedAtMs = requestedAtMs;
-        }
-      });
-      callback({ count, latestRequestedAtMs });
-    });
-    return unsubFn;
+    return subscribeToSharedPendingSummary(userId, callback);
   },
 };

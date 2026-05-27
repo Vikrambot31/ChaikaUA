@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, FlatList, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
@@ -7,17 +7,19 @@ import { addHelpRequest, removeHelpRequest, selectAllHelpRequests, selectComplet
 import { selectAllRequests } from '../redux/slices/requestsSlice';
 import { COLORS, SIZES } from '../utils/constants';
 import MiniTabBar from '../components/MiniTabBar';
+import ContactReasonModal from '../components/ContactReasonModal';
+import { useContactRequest } from '../hooks/useContactRequest';
 import type { AppDispatch, RootState } from '../redux/store';
 import { selectUser } from '../redux/slices/authSlice';
 import { createPendingModeration } from '../utils/moderation';
 import { normalizePhoneText } from '../utils/textUtils';
 import type { HelpRequest } from '../types/app';
 import MiniUserAvatar from '../components/MiniUserAvatar';
-import TactileIcon from '../components/TactileIcon';
 import { database } from '../firebase-config';
-import { pickUserAvatarUri, resolveUserAvatarMap } from '../utils/userAvatar';
+import { resolveUserAvatarMap } from '../utils/userAvatar';
 import { safeCallPhone } from '../utils/communicationActions';
 import type { DetailItemData } from '../utils/detailViewTypes';
+import UserCardActionBar from '../components/UserCardActionBar';
 
 type FilterType = 'all' | 'active' | 'completed' | 'today' | 'expired' | 'mine';
 type Lang = 'ua' | 'ru' | 'en';
@@ -196,8 +198,10 @@ const getTimeAgo = (date: Date, text: UiText, nowTs: number): string => {
 const HelpHistoryScreen: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
+  const navLock = useRef(false);
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
   const text = UI_TEXT[language];
+  const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const [filter, setFilter] = useState<FilterType>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
@@ -456,6 +460,7 @@ const HelpHistoryScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <FlatList
+        keyboardShouldPersistTaps="handled"
         data={filteredRequests}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
@@ -472,7 +477,7 @@ const HelpHistoryScreen: React.FC = () => {
             <View style={styles.requestHeader}>
               <View style={styles.userInfo}>
                 <MiniUserAvatar
-                  uri={(item.userId && avatarByUserId[item.userId]) || pickUserAvatarUri(item)}
+                  uri={(item.userId && avatarByUserId[item.userId]) || undefined}
                   name={item.name}
                   size={40}
                   borderRadius={20}
@@ -480,15 +485,6 @@ const HelpHistoryScreen: React.FC = () => {
                 />
                 <View>
                   <Text style={styles.userName}>{item.name}</Text>
-                  {item.phone ? (
-                    <TouchableOpacity
-                      onPress={(event) => { event.stopPropagation(); void safeCallPhone(item.phone, language); }}
-                      activeOpacity={0.75}
-                      style={styles.phoneAction}
-                    >
-                      <TactileIcon icon="phone-outline" size={30} iconSize={13} backgroundColor="#403933" />
-                    </TouchableOpacity>
-                  ) : null}
                 </View>
               </View>
 
@@ -525,6 +521,19 @@ const HelpHistoryScreen: React.FC = () => {
             </View>
 
             <Text style={styles.requestDescription}>{item.description}</Text>
+
+            <UserCardActionBar
+              avatarUri={(item.userId && avatarByUserId[item.userId]) || undefined}
+              name={item.name}
+              userId={item.userId}
+              currentUserId={user?.id}
+              language={language}
+              onProfile={item.userId ? () => { if (navLock.current) return; navLock.current = true; navigation.navigate('ViewUserProfile', { userId: item.userId as string }); setTimeout(() => { navLock.current = false; }, 800); } : undefined}
+              onContact={!isOwnRequest(item) && item.userId ? () => openContactModal({ userId: item.userId as string, name: item.name || 'Unknown', sourceType: 'help', sourceId: item.id, sourceTitle: item.description?.slice(0, 60) }) : item.phone ? () => void safeCallPhone(item.phone, language) : undefined}
+              contactDisabled={!item.phone && (!item.userId || isOwnRequest(item))}
+              likePath="feed_likes/help_history"
+              likeId={item.id}
+            />
 
             <View style={styles.requestFooter}>
               <Text style={styles.requestTime}>
@@ -565,6 +574,13 @@ const HelpHistoryScreen: React.FC = () => {
           </View>
         }
         showsVerticalScrollIndicator={false}
+      />
+      <ContactReasonModal
+        visible={contactModalVisible}
+        pending={contactPending}
+        target={contactTarget}
+        onSelect={(reason) => void sendContactRequest(reason)}
+        onClose={closeContactModal}
       />
       <MiniTabBar />
     </SafeAreaView>
@@ -803,11 +819,6 @@ const styles = StyleSheet.create({
     fontSize: SIZES.fontRegular,
     fontWeight: '900',
     color: COLORS.black,
-  },
-  phoneAction: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 2,
   },
   burningBadge: {
     backgroundColor: '#FF6B4A',

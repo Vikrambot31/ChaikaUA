@@ -1,5 +1,6 @@
 import { off, onValue, ref } from 'firebase/database';
 import { database } from '../firebase/firebase';
+import { LOCAL_MODE, localGet } from '../local/LOCAL_MODE';
 
 export type LiveDiagnosticLevel = 'info' | 'warn' | 'error' | 'fatal';
 
@@ -107,6 +108,25 @@ export const subscribeLiveDiagnostics = (
   onData: (events: LiveDiagnosticEvent[]) => void,
   onError?: (error: Error) => void,
 ): (() => void) => {
+  // LOCAL_MODE: fetch live_diagnostics from local json-server once
+  if (LOCAL_MODE) {
+    const since = Date.now() - DEFAULT_WINDOW_MS;
+    localGet<Array<Record<string, unknown>>>('/live_diagnostics')
+      .then((raw) => {
+        const events = Array.isArray(raw)
+          ? raw
+            .map((item) => normalizeEvent(String(item.id || ''), item))
+            .filter((item): item is LiveDiagnosticEvent => Boolean(item))
+            .filter((item) => item.at >= since)
+            .sort((a, b) => b.at - a.at)
+            .slice(0, MAX_ITEMS)
+          : [];
+        onData(events);
+      })
+      .catch((err: unknown) => onError?.(err instanceof Error ? err : new Error(String(err))));
+    return () => {};
+  }
+
   const dataRef = ref(database, PATH);
 
   const unsubscribe = onValue(dataRef, (snapshot) => {
@@ -133,6 +153,12 @@ export const subscribeRuntimeDiagnosticsControl = (
   onData: (enabled: boolean) => void,
   onError?: (error: Error) => void,
 ): (() => void) => {
+  // LOCAL_MODE: diagnostics always enabled in local mode
+  if (LOCAL_MODE) {
+    onData(true);
+    return () => {};
+  }
+
   const controlRef = ref(database, CONTROL_PATH);
   const unsubscribe = onValue(controlRef, (snapshot) => {
     const raw = snapshot.val() as Record<string, unknown> | null;
@@ -146,6 +172,12 @@ export const subscribeRuntimeDiagnosticsControl = (
 };
 
 export const setRuntimeDiagnosticsControl = async (enabled: boolean): Promise<void> => {
+  // LOCAL_MODE: stub — control toggle is no-op
+  if (LOCAL_MODE) {
+    console.info('[liveDiagnosticsService] LOCAL_MODE: setRuntimeDiagnosticsControl stub, enabled=', enabled);
+    return;
+  }
+
   const { set } = await import('firebase/database');
   await set(ref(database, CONTROL_PATH), {
     enabled,
@@ -273,6 +305,69 @@ export const buildErrorArchiveText = (
     : 'Нет warn/error/fatal событий в выбранном диапазоне.';
 
   return `${title}\n\n${summary}\n\nХронологический список:\n\n${body}\n`;
+};
+
+// ============================================================
+// Shadow Deny Events (ШАГ 1.6)
+// ============================================================
+
+export type ShadowDenyEvent = {
+  id: string;
+  uid: string;
+  targetUid: string;
+  path: string;
+  operation: string;
+  prevValue: string | null;
+  newValue: string | null;
+  timestamp: number;
+  appVersion: string;
+};
+
+const SHADOW_DENY_DB_PATH = 'ops/shadow_deny';
+
+const normalizeShadowDenyEvent = (id: string, value: unknown): ShadowDenyEvent | null => {
+  if (!value || typeof value !== 'object') return null;
+  const raw = value as Record<string, unknown>;
+  return {
+    id,
+    uid: typeof raw.uid === 'string' ? raw.uid : '',
+    targetUid: typeof raw.targetUid === 'string' ? raw.targetUid : '',
+    path: typeof raw.path === 'string' ? raw.path : '',
+    operation: typeof raw.operation === 'string' ? raw.operation : 'unknown',
+    prevValue: raw.prevValue != null ? String(raw.prevValue) : null,
+    newValue: raw.newValue != null ? String(raw.newValue) : null,
+    timestamp: typeof raw.timestamp === 'number' ? raw.timestamp : 0,
+    appVersion: typeof raw.appVersion === 'string' ? raw.appVersion : 'unknown',
+  };
+};
+
+export const subscribeShadowDenyEvents = (
+  onData: (events: ShadowDenyEvent[]) => void,
+  onError?: (error: Error) => void,
+): (() => void) => {
+  if (LOCAL_MODE) {
+    onData([]);
+    return () => {};
+  }
+
+  const dataRef = ref(database, SHADOW_DENY_DB_PATH);
+
+  const unsubscribe = onValue(dataRef, (snapshot) => {
+    const raw = snapshot.val() as Record<string, unknown> | null;
+    const events = raw
+      ? Object.entries(raw)
+        .map(([id, value]) => normalizeShadowDenyEvent(id, value))
+        .filter((item): item is ShadowDenyEvent => Boolean(item))
+        .sort((a, b) => b.timestamp - a.timestamp)
+        .slice(0, 500)
+      : [];
+    onData(events);
+  }, (error) => onError?.(error));
+
+  return () => {
+    off(dataRef);
+    unsubscribe();
+  };
 };
 
 export const buildArchiveFileName = (date = new Date()): string => {

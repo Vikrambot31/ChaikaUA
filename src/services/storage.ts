@@ -7,19 +7,25 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../utils/constants';
 import { secureGet, secureRemove, secureSet } from '../utils/secureStorage';
 
+const logStorageError = (operation: string, error: unknown): void => {
+  console.warn(`[storage] ${operation} failed:`, error);
+};
+
 // --- AUTH TOKEN (encrypted) ---
 
 export const saveToken = async (token: string): Promise<void> => {
   try {
     await secureSet(STORAGE_KEYS.AUTH_TOKEN, token);
-  } catch {
+  } catch (error) {
+    logStorageError('saveToken', error);
   }
 };
 
 export const getToken = async (): Promise<string | null> => {
   try {
     return await secureGet(STORAGE_KEYS.AUTH_TOKEN);
-  } catch {
+  } catch (error) {
+    logStorageError('getToken', error);
     return null;
   }
 };
@@ -27,7 +33,8 @@ export const getToken = async (): Promise<string | null> => {
 export const removeToken = async (): Promise<void> => {
   try {
     await secureRemove(STORAGE_KEYS.AUTH_TOKEN);
-  } catch {
+  } catch (error) {
+    logStorageError('removeToken', error);
   }
 };
 
@@ -38,6 +45,7 @@ export const getDaysUsed = async (): Promise<number> => {
     const days = await AsyncStorage.getItem('@days_used');
     return days ? parseInt(days, 10) : 0;
   } catch (error) {
+    logStorageError('getDaysUsed', error);
     return 0;
   }
 };
@@ -47,6 +55,7 @@ export const incrementDaysUsed = async (): Promise<void> => {
     const currentDays = await getDaysUsed();
     await AsyncStorage.setItem('@days_used', (currentDays + 1).toString());
   } catch (error) {
+    logStorageError('incrementDaysUsed', error);
   }
 };
 
@@ -57,6 +66,7 @@ export const saveSettings = async (settings: object): Promise<void> => {
     const jsonValue = JSON.stringify(settings);
     await AsyncStorage.setItem(STORAGE_KEYS.SETTINGS, jsonValue);
   } catch (error) {
+    logStorageError('saveSettings', error);
   }
 };
 
@@ -65,6 +75,7 @@ export const getSettings = async <T>(): Promise<T | null> => {
     const jsonValue = await AsyncStorage.getItem(STORAGE_KEYS.SETTINGS);
     return jsonValue != null ? JSON.parse(jsonValue) : null;
   } catch (error) {
+    logStorageError('getSettings', error);
     return null;
   }
 };
@@ -75,6 +86,7 @@ export const clearAll = async (): Promise<void> => {
   try {
     await AsyncStorage.clear();
   } catch (error) {
+    logStorageError('clearAll', error);
   }
 };
 

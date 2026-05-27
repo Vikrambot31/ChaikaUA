@@ -35,7 +35,7 @@ const UI_TEXT: Record<'ua' | 'ru' | 'en', SectionedItems> = {
     frequent: [
       { label: 'Світло і повідомлення', desc: 'Що пишуть сусіди у будинку', screen: 'ElectricityStatusScreen', icon: 'lightning-bolt-outline', accent: '#C79C47' },
       { label: 'Місця Чайки', desc: 'Кафе, магазини та послуги поруч', screen: 'PlacesScreen', icon: 'map-marker-multiple', accent: '#00897B' },
-      { label: 'Галерея Чайки', desc: 'Фото від мешканців ЖК', screen: 'GalleryChaikaScreen', icon: 'image-plus', accent: '#5C6BC0' },
+      { label: 'Фото району', desc: 'Галерея фотографій ЖК Чайка', screen: 'FotoRayonaScreen', icon: 'image-plus', accent: '#5C6BC0' },
     ] as BonusItem[],
     community: [
       { label: 'Люди Чайки', desc: 'Мешканці та спільнота', screen: 'TopGirlsBoysScreen', icon: 'account-multiple-outline', accent: '#7B6EB1' },
@@ -56,7 +56,7 @@ const UI_TEXT: Record<'ua' | 'ru' | 'en', SectionedItems> = {
     frequent: [
       { label: 'Свет и сообщения', desc: 'Что пишут соседи в доме', screen: 'ElectricityStatusScreen', icon: 'lightning-bolt-outline', accent: '#C79C47' },
       { label: 'Места Чайки', desc: 'Кафе, магазины и сервисы рядом', screen: 'PlacesScreen', icon: 'map-marker-multiple', accent: '#00897B' },
-      { label: 'Галерея Чайки', desc: 'Фото от жителей ЖК', screen: 'GalleryChaikaScreen', icon: 'image-plus', accent: '#5C6BC0' },
+      { label: 'Фото района', desc: 'Галерея фотографий ЖК Чайка', screen: 'FotoRayonaScreen', icon: 'image-plus', accent: '#5C6BC0' },
     ] as BonusItem[],
     community: [
       { label: 'Люди Чайки', desc: 'Жители и сообщество', screen: 'TopGirlsBoysScreen', icon: 'account-multiple-outline', accent: '#7B6EB1' },
@@ -77,7 +77,7 @@ const UI_TEXT: Record<'ua' | 'ru' | 'en', SectionedItems> = {
     frequent: [
       { label: 'Power reports', desc: 'Neighbor updates by building', screen: 'ElectricityStatusScreen', icon: 'lightning-bolt-outline', accent: '#C79C47' },
       { label: 'Chaika places', desc: 'Cafes, stores, and local services nearby', screen: 'PlacesScreen', icon: 'map-marker-multiple', accent: '#00897B' },
-      { label: 'Chaika Gallery', desc: 'Photos shared by residents', screen: 'GalleryChaikaScreen', icon: 'image-plus', accent: '#5C6BC0' },
+      { label: 'District Photos', desc: 'Photo gallery of Chaika neighborhood', screen: 'FotoRayonaScreen', icon: 'image-plus', accent: '#5C6BC0' },
     ] as BonusItem[],
     community: [
       { label: 'Chaika Life people', desc: 'Residents and community', screen: 'TopGirlsBoysScreen', icon: 'account-multiple-outline', accent: '#7B6EB1' },

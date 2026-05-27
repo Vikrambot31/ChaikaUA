@@ -1,11 +1,14 @@
-import React from 'react';
-import { Image, Linking, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import { ActivityIndicator, Image, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { VersionCheckResult } from '../services/appVersion';
 import { RootState } from '../redux/store';
 import { Language } from '../i18n/translations';
+import { downloadApk, installApk } from '../services/apkInstallService';
+
+type UpdateStatus = 'idle' | 'downloading' | 'downloaded' | 'installing' | 'error';
 
 type ForceUpdateScreenProps = {
   result: VersionCheckResult;
@@ -19,7 +22,13 @@ const uiTextByLanguage = {
     yourVersion: 'Ваша версія',
     requiredVersion: 'Потрібна версія',
     download: 'Оновити застосунок',
+    downloading: 'Завантаження',
+    installing: 'Відкриваємо встановлення...',
+    downloaded: 'Файл завантажено. Підтвердіть встановлення Android.',
     retry: 'Перевірити ще раз',
+    repeat: 'Повторити',
+    missingUrl: 'Посилання на APK недоступне. Спробуйте ще раз пізніше.',
+    downloadError: 'Не вдалося завантажити або відкрити встановлення APK.',
   },
   ru: {
     title: 'Обновите приложение',
@@ -27,7 +36,13 @@ const uiTextByLanguage = {
     yourVersion: 'Ваша версия',
     requiredVersion: 'Требуемая версия',
     download: 'Обновить приложение',
+    downloading: 'Загрузка',
+    installing: 'Открываем установку...',
+    downloaded: 'Файл загружен. Подтвердите установку Android.',
     retry: 'Проверить снова',
+    repeat: 'Повторить',
+    missingUrl: 'Ссылка на APK недоступна. Попробуйте позже.',
+    downloadError: 'Не удалось скачать или открыть установку APK.',
   },
   en: {
     title: 'Update the app',
@@ -35,7 +50,13 @@ const uiTextByLanguage = {
     yourVersion: 'Your version',
     requiredVersion: 'Required version',
     download: 'Update app',
+    downloading: 'Downloading',
+    installing: 'Opening installer...',
+    downloaded: 'File downloaded. Confirm the Android installation.',
     retry: 'Check again',
+    repeat: 'Retry',
+    missingUrl: 'APK link is unavailable. Please try again later.',
+    downloadError: 'Could not download or open APK installation.',
   },
 } as const;
 
@@ -53,17 +74,54 @@ const getNextPatchVersion = (version: string): string => {
 
 const ForceUpdateScreen: React.FC<ForceUpdateScreenProps> = ({ result, onRetry }) => {
   const config = result.config;
-  const downloadUrl = 'https://chaika-life.netlify.app/';
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Language);
   const t = uiTextByLanguage[language];
+  const [status, setStatus] = useState<UpdateStatus>('idle');
+  const [progress, setProgress] = useState(0);
+  const [errorText, setErrorText] = useState<string | null>(null);
 
   const requiredVersion = config?.minSupportedVersion || getNextPatchVersion(result.currentVersion);
   const requiredVersionForDisplay =
     requiredVersion === result.currentVersion ? getNextPatchVersion(result.currentVersion) : requiredVersion;
 
-  const openDownload = () => {
-    void Linking.openURL(downloadUrl);
+  const updateApp = async () => {
+    const androidUrl = config?.androidUrl?.trim();
+    if (!androidUrl) {
+      setStatus('error');
+      setErrorText(t.missingUrl);
+      return;
+    }
+
+    try {
+      setErrorText(null);
+      setProgress(0);
+      setStatus('downloading');
+      const apkUri = await downloadApk({
+        url: androidUrl,
+        fileName: config?.apkFileName,
+        onProgress: setProgress,
+      });
+      setStatus('installing');
+      await installApk(apkUri);
+      setStatus('idle');
+    } catch (error) {
+      if (__DEV__) {
+        console.warn('Unable to install APK update', error);
+      }
+      setStatus('error');
+      setErrorText(t.downloadError);
+    }
   };
+
+  const isBusy = status === 'downloading' || status === 'installing';
+  const statusText =
+    status === 'downloading'
+      ? `${t.downloading}: ${progress}%`
+      : status === 'installing'
+        ? t.installing
+        : status === 'downloaded'
+          ? t.downloaded
+          : errorText;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -81,14 +139,24 @@ const ForceUpdateScreen: React.FC<ForceUpdateScreenProps> = ({ result, onRetry }
           <Text style={styles.versionText}>{t.requiredVersion}: {requiredVersionForDisplay}</Text>
         </View>
 
-        <TouchableOpacity style={styles.primaryBtn} onPress={openDownload} activeOpacity={0.86}>
-          <MaterialCommunityIcons name="download" size={20} color="#fff" />
+        {statusText ? <Text style={[styles.statusText, status === 'error' && styles.errorText]}>{statusText}</Text> : null}
+
+        {status === 'downloading' ? (
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${progress}%` }]} />
+          </View>
+        ) : null}
+
+        <TouchableOpacity style={[styles.primaryBtn, isBusy && styles.disabledBtn]} onPress={updateApp} activeOpacity={0.86} disabled={isBusy}>
+          {isBusy ? <ActivityIndicator color="#fff" /> : <MaterialCommunityIcons name="download" size={20} color="#fff" />}
           <Text style={styles.primaryText}>{t.download}</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.secondaryBtn} onPress={onRetry} activeOpacity={0.82}>
-          <Text style={styles.secondaryText}>{t.retry}</Text>
-        </TouchableOpacity>
+        {status === 'error' ? (
+          <TouchableOpacity style={styles.secondaryBtn} onPress={onRetry} activeOpacity={0.82}>
+            <Text style={styles.secondaryText}>{t.repeat}</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
     </SafeAreaView>
   );
@@ -168,6 +236,28 @@ const styles = StyleSheet.create({
     marginTop: 18,
   },
   primaryText: { color: '#fff', fontSize: 16, fontWeight: '900' },
+  disabledBtn: { opacity: 0.72 },
+  statusText: {
+    color: SCREEN_THEME.textSecondary,
+    fontSize: 13,
+    fontWeight: '900',
+    textAlign: 'center',
+    marginTop: 14,
+  },
+  errorText: { color: '#B93A32' },
+  progressTrack: {
+    width: '100%',
+    height: 10,
+    borderRadius: 999,
+    backgroundColor: '#E7D9BF',
+    overflow: 'hidden',
+    marginTop: 10,
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: SCREEN_THEME.woodGreenDark,
+  },
   secondaryBtn: {
     minHeight: 44,
     alignItems: 'center',

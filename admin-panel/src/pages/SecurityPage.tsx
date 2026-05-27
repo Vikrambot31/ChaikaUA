@@ -1,10 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { User } from 'firebase/auth';
 import { InfoHint } from '../components/InfoHint';
 import { useSecurityControl } from '../hooks/useSecurityControl';
 import {
+  getModeratorRoles,
   updateManagedDeviceStatus,
   updateSecurityAppControl,
+  type ModeratorRoleRecord,
   type RemoteAppControlConfig,
 } from '../services/securityService';
 
@@ -82,6 +84,14 @@ export const SecurityPage = ({ user }: SecurityPageProps) => {
   const [minimumVersion, setMinimumVersion] = useState('');
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [optimisticConfig, setOptimisticConfig] = useState<Partial<RemoteAppControlConfig>>({});
+  const [moderatorRoles, setModeratorRoles] = useState<ModeratorRoleRecord[]>([]);
+
+  useEffect(() => {
+    getModeratorRoles()
+      .then(setModeratorRoles)
+      .catch(() => { /* non-critical */ });
+  }, []);
 
   const blockedCount = useMemo(() => devices.filter((device) => device.is_blocked).length, [devices]);
   const onlineCount = useMemo(() => {
@@ -125,15 +135,21 @@ export const SecurityPage = ({ user }: SecurityPageProps) => {
       setMessage(error instanceof Error ? error.message : 'Не удалось обновить конфигурацию безопасности.');
     } finally {
       setBusyAction(null);
+      setOptimisticConfig({});
     }
   };
 
   const toggleConfig = (field: ToggleKey, value: boolean) => {
+    setOptimisticConfig((prev) => ({ ...prev, [field]: value }));
     void patchConfig({ [field]: value }, field);
   };
 
   const saveMinimumVersion = () => {
-    const value = minimumVersion.trim() || config?.minimum_required_version || '0.0.0';
+    const value = minimumVersion.trim();
+    if (!value) {
+      setMessage('Укажите версию в формате X.Y.Z перед сохранением.');
+      return;
+    }
     void patchConfig({ minimum_required_version: value }, 'minimum_version');
   };
 
@@ -204,7 +220,7 @@ export const SecurityPage = ({ user }: SecurityPageProps) => {
                 {(['app_enabled', 'maintenance_mode', 'force_update_required', 'allow_new_devices', 'beta_mode_enabled'] as ToggleKey[]).map((field) => (
                   <ToggleRow
                     key={field}
-                    config={config}
+                    config={{ ...config, ...optimisticConfig }}
                     field={field}
                     busy={Boolean(busyAction)}
                     onToggle={toggleConfig}
@@ -215,7 +231,8 @@ export const SecurityPage = ({ user }: SecurityPageProps) => {
                 <label className="field">
                   <span>Минимальная обязательная версия</span>
                   <input
-                    value={minimumVersion || config.minimum_required_version}
+                    value={minimumVersion}
+                    placeholder={config.minimum_required_version || '0.0.0'}
                     onChange={(event) => setMinimumVersion(event.target.value)}
                   />
                 </label>
@@ -251,6 +268,59 @@ export const SecurityPage = ({ user }: SecurityPageProps) => {
           </div>
         </article>
       </div>
+
+      {/* ── Moderator Online Status ──────────────────────────────────────── */}
+      <article className="panel" style={{ marginBottom: 20 }}>
+        <div className="headingWithHint" style={{ marginBottom: 12 }}>
+          <h3 style={{ margin: 0 }}>Онлайн-статус модераторов</h3>
+          <InfoHint text="Показывает модераторов и администраторов из user_roles. Статус online рассчитывается по last_seen_at устройства (< 5 мин)." />
+        </div>
+        {moderatorRoles.length === 0 ? (
+          <p style={{ color: '#5d6f8b', fontSize: 13 }}>Модераторы не найдены в user_roles. Возможно, у всех роль user.</p>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="dataTable">
+              <thead>
+                <tr>
+                  <th>UID</th>
+                  <th>Роль</th>
+                  <th>Статус</th>
+                  <th>Последний вход</th>
+                  <th>Устройство</th>
+                </tr>
+              </thead>
+              <tbody>
+                {moderatorRoles.map(({ uid, role }) => {
+                  const modDevices = devices.filter((d) => d.uid === uid);
+                  const latestDevice = modDevices.reduce<typeof modDevices[0] | null>((best, d) => {
+                    if (!best) return d;
+                    return (d.last_seen_at || 0) > (best.last_seen_at || 0) ? d : best;
+                  }, null);
+                  const lastSeen = latestDevice?.last_seen_at ?? 0;
+                  const isOnline = lastSeen > 0 && Date.now() - lastSeen < 5 * 60 * 1000;
+                  const isRecent = !isOnline && lastSeen > 0 && Date.now() - lastSeen < 30 * 60 * 1000;
+                  const onlineBadge = isOnline
+                    ? <span className="pill good">● Онлайн</span>
+                    : isRecent
+                    ? <span className="pill warning">○ Недавно</span>
+                    : <span className="pill">○ Офлайн</span>;
+                  return (
+                    <tr key={uid}>
+                      <td><small style={{ fontFamily: 'monospace' }}>{uid.slice(0, 16)}…</small></td>
+                      <td>
+                        <span className={role === 'admin' ? 'pill good' : 'pill warning'}>{role}</span>
+                      </td>
+                      <td>{onlineBadge}</td>
+                      <td style={{ color: '#5d6f8b', fontSize: 12 }}>{lastSeen ? dateTime(lastSeen) : '—'}</td>
+                      <td style={{ color: '#5d6f8b', fontSize: 12 }}>{latestDevice?.platform ?? '—'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </article>
 
       <article className="panel tablePanel">
         <div className="headingWithHint">

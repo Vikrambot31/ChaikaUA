@@ -1,4 +1,5 @@
 import { get, ref, type Database } from 'firebase/database';
+import { START_AVATAR_URI_PREFIX } from './startAvatars';
 
 const pickFirstNonEmpty = (values: unknown[]): string => {
   for (const value of values) {
@@ -11,6 +12,11 @@ export const pickUserAvatarUri = (...sources: unknown[]): string => {
   for (const source of sources) {
     if (!source || typeof source !== 'object') continue;
     const record = source as Record<string, unknown>;
+    const startAvatarKey = record.startAvatarKey;
+    if (typeof startAvatarKey === 'string' && startAvatarKey.trim().length > 0) {
+      return `${START_AVATAR_URI_PREFIX}${startAvatarKey.trim()}`;
+    }
+
     const direct = pickFirstNonEmpty([
       record.photoURL,
       record.photoUri,

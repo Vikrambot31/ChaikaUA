@@ -41,7 +41,7 @@ export default function PremiumPromoNotice({ visible, onClose }: PremiumPromoNot
           <View style={styles.glow} />
           <View style={styles.card}>
             <View style={styles.logoWrap}>
-              <Image source={require('../../assets/WEBP-version/Logo-Chaika LIFE.webp')} style={styles.logo} resizeMode="contain" />
+              <Image source={require('../../assets/WEBP-version/Logo-Chaika-LIFE.webp')} style={styles.logo} resizeMode="contain" />
             </View>
 
             <View style={styles.badge}>

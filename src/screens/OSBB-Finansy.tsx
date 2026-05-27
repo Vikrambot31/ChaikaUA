@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   SafeAreaView,
   ScrollView,
@@ -24,6 +23,8 @@ import {
 } from '../services/osbbCollections';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { useOsbbMembership } from '../hooks/useOsbbMembership';
+import InlineFieldHint from '../components/InlineFieldHint';
+import { useSoftToast } from '../hooks/useSoftToast';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -71,6 +72,8 @@ const UI_TEXT = {
     paymentMarked: 'Оплату відмічено',
     paymentError: 'Помилка при збереженні',
     invalidAmount: 'Введіть коректну суму',
+    amountHint: 'Введіть суму більше 0. Можна використовувати кому або крапку.',
+    payerHint: "Ім'я або квартира допоможуть правлінню швидше звірити оплату.",
     loading: 'Завантаження...',
     errorLoad: 'Не вдалося завантажити дані',
     retry: 'Спробувати знову',
@@ -104,6 +107,8 @@ const UI_TEXT = {
     paymentMarked: 'Оплата отмечена',
     paymentError: 'Ошибка при сохранении',
     invalidAmount: 'Введите корректную сумму',
+    amountHint: 'Введите сумму больше 0. Можно использовать запятую или точку.',
+    payerHint: 'Имя или квартира помогут правлению быстрее сверить оплату.',
     loading: 'Загрузка...',
     errorLoad: 'Не удалось загрузить данные',
     retry: 'Попробовать снова',
@@ -136,6 +141,8 @@ const UI_TEXT = {
     paymentMarked: 'Payment marked',
     paymentError: 'Error saving payment',
     invalidAmount: 'Enter a valid amount',
+    amountHint: 'Enter an amount greater than 0. You can use comma or dot.',
+    payerHint: 'Name or apartment helps the board match the payment faster.',
     loading: 'Loading...',
     errorLoad: 'Failed to load data',
     retry: 'Retry',
@@ -173,6 +180,7 @@ const MarkPaymentModal: React.FC<MarkPaymentModalProps> = ({
   const [payerName, setPayerName] = useState('');
   const [amount, setAmount] = useState('');
   const [saving, setSaving] = useState(false);
+  const toast = useSoftToast();
 
   const reset = () => {
     setPayerName('');
@@ -189,7 +197,7 @@ const MarkPaymentModal: React.FC<MarkPaymentModalProps> = ({
 
     const numericAmount = Number(amount.replace(',', '.'));
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
-      Alert.alert(t.markPaymentTitle, t.invalidAmount);
+      toast.showWarning(t.markPaymentTitle, t.invalidAmount);
       return;
     }
 
@@ -213,11 +221,11 @@ const MarkPaymentModal: React.FC<MarkPaymentModalProps> = ({
       });
 
       // Keep local log of payments for display within this session
-      Alert.alert(t.markPaymentTitle, t.paymentMarked);
+      toast.showSuccess(t.paymentMarked);
       reset();
       onClose();
     } catch {
-      Alert.alert(t.markPaymentTitle, t.paymentError);
+      toast.showError(t.markPaymentTitle, t.paymentError);
     } finally {
       setSaving(false);
     }
@@ -243,6 +251,7 @@ const MarkPaymentModal: React.FC<MarkPaymentModalProps> = ({
             placeholder={t.payerNamePlaceholder}
             placeholderTextColor={SCREEN_THEME.textMuted}
           />
+          <InlineFieldHint message={t.payerHint} type={payerName.trim() ? 'success' : 'hint'} />
           <TextInput
             style={modalStyles.input}
             value={amount}
@@ -251,6 +260,7 @@ const MarkPaymentModal: React.FC<MarkPaymentModalProps> = ({
             placeholderTextColor={SCREEN_THEME.textMuted}
             keyboardType="decimal-pad"
           />
+          <InlineFieldHint message={t.amountHint} type={amount.trim() ? 'success' : 'warning'} />
           <View style={modalStyles.btnRow}>
             <TouchableOpacity
               style={[modalStyles.btn, modalStyles.cancelBtn]}
@@ -396,13 +406,20 @@ const OsbbFinansyScreen: React.FC = () => {
     setIsLoading(true);
     setHasError(false);
 
+    const fallback = setTimeout(() => setIsLoading(false), 8000);
+
     try {
       const unsubscribe = subscribeOsbbCollections(buildingId, (items) => {
+        clearTimeout(fallback);
         setCollections(items);
         setIsLoading(false);
       });
-      return unsubscribe;
+      return () => {
+        clearTimeout(fallback);
+        unsubscribe();
+      };
     } catch {
+      clearTimeout(fallback);
       setHasError(true);
       setIsLoading(false);
       return () => {};

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -120,6 +120,7 @@ const mapToDetailData = (item: OsbbCollection): DetailItemData => ({
 
 const OsbbSborScreen: React.FC = () => {
   const navigation = useNavigation<AppNav>();
+  const navLock = useRef(false);
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
   const text = UI_TEXT[language];
   const buildingId = useSelector((state: RootState) => state.osbb.buildingId);
@@ -196,6 +197,9 @@ const OsbbSborScreen: React.FC = () => {
       RATE_LIMITERS.osbbCollection.recordSubmit();
       setSuccessMsg(text.successMsg);
       setTimeout(() => setSuccessMsg(''), 4000);
+    } catch (err) {
+      console.error('[OsbbSborScreen] addOsbbCollection failed:', err);
+      Alert.alert(text.alertTitle, err instanceof Error ? err.message : String(err));
     } finally {
       setIsSaving(false);
     }
@@ -296,7 +300,7 @@ const OsbbSborScreen: React.FC = () => {
             <TouchableOpacity
               key={item.id}
               style={styles.collectionCard}
-              onPress={() => navigation.navigate('ItemDetailScreen', { item: mapToDetailData(item) })}
+              onPress={() => { if (navLock.current) return; navLock.current = true; navigation.navigate('ItemDetailScreen', { item: mapToDetailData(item) }); setTimeout(() => { navLock.current = false; }, 800); }}
               activeOpacity={0.86}
             >
               <Text style={styles.collectionTitle}>{item.title}</Text>

@@ -35,18 +35,6 @@ const TYPE_CONFIG = {
     titleFields: ['itemName', 'category', 'description'],
     secondaryFields: ['price', 'phone'],
   },
-  coffee_requests: {
-    path: () => 'coffee_requests',
-    statusField: 'moderationStatus',
-    titleFields: ['name', 'goal', 'street'],
-    secondaryFields: ['phone', 'age'],
-  },
-  dating_profiles: {
-    path: () => 'dating_profiles',
-    statusField: 'moderationStatus',
-    titleFields: ['name', 'profession', 'sphere'],
-    secondaryFields: ['phone', 'age'],
-  },
   osbb_news: {
     path: (options) => `osbb_news/${requireBuilding(options)}`,
     statusField: 'moderationStatus',
@@ -154,7 +142,7 @@ async function dbPatch(databaseURL, dbPath, idToken, payload) {
 
 function normalizeType(type) {
   if (!type) {
-    throw new Error('Укажи тип. Пример: coffee_requests, dating_profiles, buy_sell_listings');
+    throw new Error('Укажи тип. Пример: buy_sell_listings, job_listings, lost_found');
   }
 
   const normalized = String(type).trim();

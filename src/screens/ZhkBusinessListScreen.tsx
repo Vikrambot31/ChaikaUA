@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -39,6 +39,8 @@ import { normalizeUkrainianPhoneStrict } from '../utils/validators';
 import { safeLogError } from '../utils/errorLogger';
 import StarRatingModal from '../components/StarRatingModal';
 import { DailyRatingUsage, canUseDailyRating, recordDailyRatingUse } from '../utils/monthlyRating';
+import UploadedPhotosGrid from '../components/UploadedPhotosGrid';
+import { getDonePhotos, getRequiredPhotoLabel, validateSubmissionRequirements } from '../utils/submissionRequirements';
 
 // --- Types --------------------------------------------------------------------
 
@@ -412,11 +414,13 @@ function getMyRequestStatusText(status: string | undefined, text: typeof UI_TEXT
 
 export default function ZhkBusinessListScreen() {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
+  const navLock = useRef(false);
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const user = useSelector((state: RootState) => state.auth.user);
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const t = UI_TEXT[language];
+  const requiredPhotoLabel = getRequiredPhotoLabel(language);
 
   const [items, setItems] = useState<BusinessItem[]>([]);
   const [dailyRatingUsage, setDailyRatingUsage] = useState<DailyRatingUsage | null>(null);
@@ -536,7 +540,7 @@ export default function ZhkBusinessListScreen() {
     void resolveUserAvatarMap(database, userIds).then((resolved) => {
       if (cancelled) return;
       setAvatarByUserId((prev) => ({ ...prev, ...resolved }));
-    });
+    }).catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -615,11 +619,6 @@ export default function ZhkBusinessListScreen() {
   }), [t.pendingSoftGuardCancel, t.pendingSoftGuardText, t.pendingSoftGuardTitle, t.pendingSoftGuardUpdate]);
 
   const handleSubmitBusiness = useCallback(async () => {
-    if (!user?.id) {
-      Alert.alert(t.errorTitle, t.signInToSubmit);
-      navigation.navigate('LoginScreen');
-      return;
-    }
     if (!isSubmitFormValid || !selectedFormCategory || !selectedFormSubcategory) {
       logSubmitError(new Error('Business submit validation failed: missing required fields'), 'validate');
       Alert.alert(t.errorTitle, t.errorFill);
@@ -631,9 +630,12 @@ export default function ZhkBusinessListScreen() {
       Alert.alert(t.errorTitle, t.phoneInvalidStrict);
       return;
     }
+    if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, photos: formPhotos, navigation })) {
+      return;
+    }
 
     setSubmitting(true);
-    let uidForLog = user.id;
+    let uidForLog = user?.id ?? '';
     let existingStatusForLog: string | undefined;
     try {
       const firebaseUser = await ensureFirebaseAuth();
@@ -659,7 +661,7 @@ export default function ZhkBusinessListScreen() {
         }
       }
 
-      const firstPhoto = formPhotos.find((photo) => photo.status === 'done');
+      const firstPhoto = getDonePhotos(formPhotos)[0];
       const previousVersion = typeof existing?.version === 'number' ? existing.version : (existing ? 1 : 0);
       const now = new Date().toISOString();
       const entry = {
@@ -669,7 +671,7 @@ export default function ZhkBusinessListScreen() {
         categoryLabel: selectedFormCategory[language],
         subcategoryKey: formSubcategoryKey,
         subcategoryLabel: selectedFormSubcategory[language],
-        contactName: contactName.trim() || user.name || selectedFormSubcategory[language],
+        contactName: contactName.trim() || user?.name || selectedFormSubcategory[language],
         phone: normalizedPhone,
         description: description.trim(),
         photoStoragePath: firstPhoto?.storagePath ?? '',
@@ -724,7 +726,6 @@ export default function ZhkBusinessListScreen() {
     t.errorLoad,
     t.errorTitle,
     t.phoneInvalidStrict,
-    t.signInToSubmit,
     t.successMsg,
     t.successTitle,
     user?.id,
@@ -1029,7 +1030,7 @@ export default function ZhkBusinessListScreen() {
                 />
                 <Text style={styles.charCount}>{description.length}/{DESC_MAX} {t.charCount}</Text>
 
-                <Text style={styles.formLabel}>{t.photoLabel}</Text>
+                <Text style={styles.formLabel}>{requiredPhotoLabel}</Text>
                 <PhotoUploadField
                   uid={user?.id ?? ''}
                   userName={user?.name ?? ''}
@@ -1038,6 +1039,7 @@ export default function ZhkBusinessListScreen() {
                   onPhotosChange={(photos) => setFormPhotos(photos.filter((photo) => photo.status === 'done'))}
                   onPickerOpenChange={handlePickerOpenChange}
                 />
+                <UploadedPhotosGrid />
 
                 <TouchableOpacity
                   style={[styles.submitBtn, (!isSubmitFormValid || submitting) && styles.submitBtnDisabled]}
@@ -1118,7 +1120,7 @@ function BusinessCard({
 
   return (
     <TouchableWithoutFeedback
-      onPress={() => navigation.navigate('ItemDetailScreen', { item: mapToDetailData(item, t) })}
+      onPress={() => { if (navLock.current) return; navLock.current = true; navigation.navigate('ItemDetailScreen', { item: mapToDetailData(item, t) }); setTimeout(() => { navLock.current = false; }, 800); }}
     >
       <View style={card.wrap}>
 
@@ -1129,7 +1131,7 @@ function BusinessCard({
             uri={item.photoUri}
             storagePath={item.photoStoragePath}
             style={card.businessPhoto}
-            resizeMode="cover"
+            resizeMode="contain"
             debugLabel={`Business:${item.id}`}
           />
         ) : (
@@ -1559,5 +1561,3 @@ const card = StyleSheet.create({
     fontWeight: '900',
   },
 });
-
-

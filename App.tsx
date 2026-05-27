@@ -1,13 +1,18 @@
 import 'react-native-gesture-handler';
 import React, { useEffect, useState } from 'react';
-import { AppState, Image, Platform } from 'react-native';
+import { AppState, Image, Platform, StyleSheet, Text, View } from 'react-native';
 import { Provider, useDispatch, useSelector } from 'react-redux';
 import { onAuthStateChanged } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Toast from 'react-native-toast-message';
+import Toast, { BaseToast, ErrorToast, ToastConfig } from 'react-native-toast-message';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { auth, fcmAPI } from './src/firebase-config';
-import { ensureFirebaseAuth, isAnonymousFirebaseUser } from './src/firebase-auth-session';
+import {
+  bootstrapAuth,
+  isAnonymousFirebaseUser,
+  isAuthBootstrapTimeoutError,
+  resetAuthBootstrap,
+} from './src/firebase-auth-session';
 import { setUser, logout, selectAuthBootstrapped, selectUser, setAuthBootstrapped } from './src/redux/slices/authSlice';
 import { useFCMToken } from './src/hooks/useFCMToken';
 import { useNetworkMonitor } from './src/hooks/useNetworkMonitor';
@@ -27,11 +32,13 @@ import { identifyCrashUser, initCrashReporting } from './src/services/crashRepor
 import { logClientError } from './src/utils/errorLogger';
 import { initRuntimeMonitorGlobalHandlers, recordRuntimeTrace } from './src/services/runtimeMonitorService';
 import { flushLiveDiagnostics, initLiveDiagnostics } from './src/services/liveDiagnosticsService';
+import { initConsoleErrorCapture } from './src/services/crashDiagnosticsService';
 import { signOutPrimarySession } from './src/services/authSessionService';
 import AppAccessGuard from './src/components/AppAccessGuard';
 import AccountResumeScreen from './src/components/AccountResumeScreen';
 import StartupSyncBanner from './src/components/StartupSyncBanner';
 import SoftInviteAccessGate from './src/components/SoftInviteAccessGate';
+import TactileButton from './src/components/TactileButton';
 import {
   createDefaultRemoteConfigSnapshot,
   loadRemoteConfigSnapshot,
@@ -40,6 +47,8 @@ import {
 import { beginStartupSync, markStartupTaskReady } from './src/services/startupSync';
 import { isSafePromiseTimeoutError, safePromiseTimeout } from './src/utils/safePromiseTimeout';
 import { UploadQueue } from './src/photo-module';
+import { LOCAL_MODE, getCurrentLocalUser } from './src/local/LOCAL_MODE';
+import type { User } from './src/types/app';
 
 const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
@@ -101,13 +110,54 @@ const ensureBase64Polyfills = (): void => {
 
 ensureBase64Polyfills();
 
-try { beginStartupSync(); } catch {}
-try { initCrashReporting(); } catch {}
-try { initRuntimeMonitorGlobalHandlers(); } catch {}
-try { initLiveDiagnostics(); } catch {}
+try { beginStartupSync(); } catch (e) { console.warn('[startup] beginStartupSync failed:', e); }
+try { initCrashReporting(); } catch (e) { console.warn('[startup] initCrashReporting failed:', e); }
+try { initRuntimeMonitorGlobalHandlers(); } catch (e) { console.warn('[startup] initRuntimeMonitorGlobalHandlers failed:', e); }
+try { initLiveDiagnostics(); } catch (e) { console.warn('[startup] initLiveDiagnostics failed:', e); }
+try { initConsoleErrorCapture(); } catch (e) { console.warn('[startup] initConsoleErrorCapture failed:', e); }
 
 const STARTUP_SECURITY_LOAD_TIMEOUT_MS = 8000;
 const PROFILE_LOAD_TIMEOUT_MS = 8000;
+const AUTH_BOOTSTRAP_TIMEOUT_MS = 8000;
+
+const toastConfig: ToastConfig = {
+  success: (props) => (
+    <BaseToast
+      {...props}
+      style={{ borderLeftColor: '#2F8F46' }}
+      contentContainerStyle={{ paddingHorizontal: 14 }}
+      text1Style={{ fontSize: 14, fontWeight: '800' }}
+      text2Style={{ fontSize: 12, fontWeight: '600' }}
+    />
+  ),
+  error: (props) => (
+    <ErrorToast
+      {...props}
+      style={{ borderLeftColor: '#B93A32' }}
+      contentContainerStyle={{ paddingHorizontal: 14 }}
+      text1Style={{ fontSize: 14, fontWeight: '800' }}
+      text2Style={{ fontSize: 12, fontWeight: '600' }}
+    />
+  ),
+  info: (props) => (
+    <BaseToast
+      {...props}
+      style={{ borderLeftColor: '#3B6C8F' }}
+      contentContainerStyle={{ paddingHorizontal: 14 }}
+      text1Style={{ fontSize: 14, fontWeight: '800' }}
+      text2Style={{ fontSize: 12, fontWeight: '600' }}
+    />
+  ),
+  warning: (props) => (
+    <BaseToast
+      {...props}
+      style={{ borderLeftColor: '#C78116' }}
+      contentContainerStyle={{ paddingHorizontal: 14 }}
+      text1Style={{ fontSize: 14, fontWeight: '800' }}
+      text2Style={{ fontSize: 12, fontWeight: '600' }}
+    />
+  ),
+};
 
 // Register the background FCM handler once at startup.
 if (Platform.OS !== 'web') {
@@ -132,11 +182,29 @@ type AppWithAuthSyncProps = {
   onRemoteConfigSnapshot: (snapshot: RemoteConfigSnapshot) => void;
 };
 
+function AuthOfflineScreen({ onRetry }: { onRetry: () => void }) {
+  return (
+    <View style={styles.authOfflineRoot}>
+      <View style={styles.authOfflinePanel}>
+        <Text style={styles.authOfflineTitle}>Нет подключения</Text>
+        <Text style={styles.authOfflineText}>Проверьте подключение к интернету</Text>
+        <TactileButton
+          title="Повторить подключение"
+          onPress={onRetry}
+          style={styles.authOfflineButton}
+        />
+      </View>
+    </View>
+  );
+}
+
 function AppWithAuthSync({ remoteConfigSnapshot, onRemoteConfigSnapshot }: AppWithAuthSyncProps) {
   const dispatch = useDispatch();
   const currentUser = useSelector(selectUser);
   const authBootstrapped = useSelector(selectAuthBootstrapped);
   const [resumeDecisionMade, setResumeDecisionMade] = useState(false);
+  const [authOffline, setAuthOffline] = useState(false);
+  const [authRetryKey, setAuthRetryKey] = useState(0);
 
   // Register the FCM token and subscribe to refreshes.
   useFCMToken(currentUser?.id);
@@ -195,10 +263,73 @@ function AppWithAuthSync({ remoteConfigSnapshot, onRemoteConfigSnapshot }: AppWi
   }, [currentUser?.id, dispatch]);
 
   useEffect(() => {
-    dispatch(setAuthBootstrapped(false));
-    let active = true;
+    // ─── LOCAL_MODE: пропускаем Firebase Auth, читаем currentUser из localhost:3001 ──
+    if (LOCAL_MODE) {
+      dispatch(setAuthBootstrapped(false));
+      let cancelled = false;
 
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      const loadLocalUser = () => {
+        getCurrentLocalUser()
+          .then((u) => {
+            if (cancelled) return;
+            const localUser: User = {
+              id: u.id,
+              name: u.name,
+              email: u.email,
+              phone: u.phone || '',
+              daysUsed: 0,
+              registeredAt: new Date().toISOString(),
+              isActive: true,
+              city: u.building || '',
+              registrationStatus: 'complete',
+              photoURL: undefined,
+              photoURLs: [],
+              provider: 'email',
+              providerId: u.id,
+            };
+            dispatch(setUser(localUser));
+            dispatch(setAuthBootstrapped(true));
+          })
+          .catch(() => {
+            if (cancelled) return;
+            console.warn('[LOCAL_MODE] Сервер недоступен — запусти: cd local-server && npm start');
+            dispatch(setAuthBootstrapped(true));
+          });
+      };
+
+      loadLocalUser();
+      const timer = setInterval(loadLocalUser, 3000);
+      return () => {
+        cancelled = true;
+        clearInterval(timer);
+      };
+    }
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    dispatch(setAuthBootstrapped(false));
+    setAuthOffline(false);
+    let active = true;
+    let unsubscribe: (() => void) | null = null;
+
+    const startAuthSync = async () => {
+      try {
+        await bootstrapAuth({ timeoutMs: AUTH_BOOTSTRAP_TIMEOUT_MS, force: authRetryKey > 0 });
+      } catch (error) {
+        if (isAuthBootstrapTimeoutError(error)) {
+          if (active) {
+            setAuthOffline(true);
+          }
+          return;
+        }
+
+        void logClientError('auth.bootstrapAuth', error);
+      }
+
+      if (!active) {
+        return;
+      }
+
+      unsubscribe = onAuthStateChanged(auth, async (user) => {
       void recordRuntimeTrace({
         screen: 'AppAuthSync',
         action: 'firebase_auth_state_changed',
@@ -218,9 +349,6 @@ function AppWithAuthSync({ remoteConfigSnapshot, onRemoteConfigSnapshot }: AppWi
       if (!user) {
         identifyCrashUser(null);
         dispatch(logout());
-        void ensureFirebaseAuth().catch((error: unknown) => {
-          void logClientError('auth.ensureGuestSession', error);
-        });
         return;
       }
 
@@ -372,19 +500,34 @@ function AppWithAuthSync({ remoteConfigSnapshot, onRemoteConfigSnapshot }: AppWi
           dispatch(setUser(mapFirebaseUserToAppUser(user, null)));
         }
       }
-    });
+      });
+    };
+
+    void startAuthSync();
 
     return () => {
       active = false;
-      unsubscribe();
+      unsubscribe?.();
     };
-  }, [dispatch]);
+  }, [authRetryKey, dispatch]);
 
   useEffect(() => {
     if (authBootstrapped) {
       markStartupTaskReady('auth');
     }
   }, [authBootstrapped]);
+
+  if (authOffline) {
+    return (
+      <AuthOfflineScreen
+        onRetry={() => {
+          resetAuthBootstrap();
+          setAuthOffline(false);
+          setAuthRetryKey((value) => value + 1);
+        }}
+      />
+    );
+  }
 
   if (!resumeDecisionMade && currentUser !== null) {
     return (
@@ -419,7 +562,7 @@ function AppWithAuthSync({ remoteConfigSnapshot, onRemoteConfigSnapshot }: AppWi
       </ErrorBoundary>
       <OfflineBanner />
       <StartupSyncBanner />
-      <Toast />
+      <Toast config={toastConfig} />
     </>
   );
 }
@@ -441,7 +584,7 @@ export default function App() {
     const preloadStartupImages = async () => {
       try {
         const sources = [
-          require('./assets/WEBP-version/Logo-Chaika LIFE.webp'),
+          require('./assets/WEBP-version/Logo-Chaika-LIFE.webp'),
           require('./assets/WEBP-version/intro1.webp'),
           require('./assets/WEBP-version/intro2.webp'),
           require('./assets/WEBP-version/intro3.webp'),
@@ -567,3 +710,44 @@ export default function App() {
     </SafeAreaProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  authOfflineRoot: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F7F2E8',
+    padding: 24,
+  },
+  authOfflinePanel: {
+    width: '100%',
+    maxWidth: 420,
+    alignItems: 'center',
+    borderRadius: 18,
+    backgroundColor: '#FFFDF7',
+    paddingHorizontal: 22,
+    paddingVertical: 28,
+    shadowColor: 'rgba(74, 61, 43, 0.28)',
+    shadowOpacity: 0.28,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
+  },
+  authOfflineTitle: {
+    color: '#2D2A24',
+    fontSize: 22,
+    fontWeight: '900',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  authOfflineText: {
+    color: '#6E6558',
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 22,
+    textAlign: 'center',
+  },
+  authOfflineButton: {
+    alignSelf: 'stretch',
+  },
+});

@@ -6,10 +6,12 @@ import { SCREEN_THEME } from '../utils/screenTheme';
 import { pickUserAvatarUri } from '../utils/userAvatar';
 import TactileCard from './TactileCard';
 import MiniUserAvatar from './MiniUserAvatar';
+import UserCardActionBar from './UserCardActionBar';
 
 interface RequestItemProps {
   request: Request;
   avatarUri?: string;
+  currentUserId?: string;
   onPress?: () => void;
   isOwn?: boolean;
   onDelete?: () => void;
@@ -23,7 +25,7 @@ interface RequestItemProps {
   language?: 'ua' | 'ru' | 'en';
 }
 
-const formatDateShort = (date: Date | string): string => {
+const formatDateShort = (date: Date | string | number): string => {
   const value = date instanceof Date ? date : new Date(date);
   const day = String(value.getDate()).padStart(2, '0');
   const month = String(value.getMonth() + 1).padStart(2, '0');
@@ -35,6 +37,7 @@ const TOPIC_LABELS = {
     medical: 'Медицина',
     repair: 'Ремонт',
     care: 'Допомога',
+    household: 'Побут',
     job: 'Робота',
     buySell: 'Куплю / продам',
     contacts: 'Контакти',
@@ -50,6 +53,7 @@ const TOPIC_LABELS = {
     medical: 'Медицина',
     repair: 'Ремонт',
     care: 'Помощь',
+    household: 'Быт',
     job: 'Работа',
     buySell: 'Куплю / продам',
     contacts: 'Контакты',
@@ -65,6 +69,7 @@ const TOPIC_LABELS = {
     medical: 'Medical',
     repair: 'Repair',
     care: 'Help',
+    household: 'Household',
     job: 'Work',
     buySell: 'Buy / sell',
     contacts: 'Contacts',
@@ -78,34 +83,98 @@ const TOPIC_LABELS = {
   },
 } as const;
 
+/**
+ * Maps a request to a topic icon + localized label for display in the feed card.
+ * Matching order: explicit subcategory values first, then broader group/category tokens.
+ * Every subcategory value from categories.ts is covered so no card falls back to the
+ * generic "Заявка / Request" label unless the data is genuinely unknown.
+ */
 const getTopicVisual = (
   request: Request,
   language: keyof typeof TOPIC_LABELS,
 ): { icon: keyof typeof MaterialCommunityIcons.glyphMap; label: string } => {
   const labels = TOPIC_LABELS[language] ?? TOPIC_LABELS.ua;
-  const category = String(request.category ?? '').toLocaleLowerCase('uk-UA');
-  const group = String(request.group ?? '').toLocaleLowerCase('uk-UA');
-  const subcategory = String(request.subcategory ?? '').toLocaleLowerCase('uk-UA');
-  const hay = `${category} ${group} ${subcategory}`;
+  const category  = String(request.category   ?? '').toLowerCase();
+  const group     = String(request.group       ?? '').toLowerCase();
+  const subcategory = String(request.subcategory ?? '').toLowerCase();
 
-  if (hay.includes('medical') || hay.includes('medicine')) return { icon: 'medical-bag', label: labels.medical };
-  if (hay.includes('repair') || hay.includes('plumb') || hay.includes('electric')) return { icon: 'wrench-outline', label: labels.repair };
-  if (hay.includes('care') || hay.includes('child') || hay.includes('elder')) return { icon: 'heart-outline', label: labels.care };
-  if (hay.includes('job') || hay.includes('education_services')) return { icon: 'briefcase-outline', label: labels.job };
+  // Helper: test whether any of the three fields equals an exact value.
+  const eq = (...values: string[]) =>
+    values.some((v) => category === v || group === v || subcategory === v);
+
+  // ── Medical / medicine ──────────────────────────────────────────────────────
+  if (eq('medical', 'medical_consultation', 'medicine')) return { icon: 'medical-bag', label: labels.medical };
+
+  // ── Repair & tech: all repair subcategories ─────────────────────────────────
+  if (eq('repair', 'plumbing', 'electrical', 'locks_doors', 'windows_balconies',
+         'home_appliances', 'furniture', 'small_repair'))
+    return { icon: 'wrench-outline', label: labels.repair };
+
+  // ── Care & help ─────────────────────────────────────────────────────────────
+  if (eq('care', 'childcare', 'elderly_help', 'psychological_support'))
+    return { icon: 'heart-outline', label: labels.care };
+
+  // ── Education & services, job search ────────────────────────────────────────
+  if (eq('education_services', 'tutoring', 'job_search', 'sports_company',
+         'creative_club', 'master_services', 'legal_consultation', 'documents'))
+    return { icon: 'briefcase-outline', label: labels.job };
+
+  // ── Buy / sell and exchange ─────────────────────────────────────────────────
+  if (eq('buy_sell', 'exchange', 'free_items', 'borrow_tool', 'item_exchange'))
+    return { icon: 'shopping-outline', label: labels.buySell };
+
+  // ── Lost & found (items and pets) ───────────────────────────────────────────
+  if (eq('lost_found', 'lost_item', 'found_item', 'lost_pet', 'found_pet'))
+    return { icon: 'map-marker-question-outline', label: labels.lostFound };
+
+  // ── Pets ────────────────────────────────────────────────────────────────────
+  if (eq('pets', 'dog_walking', 'pet_care'))
+    return { icon: 'paw-outline', label: labels.pets };
+
+  // ── Contacts ────────────────────────────────────────────────────────────────
+  if (eq('contacts')) return { icon: 'account-group-outline', label: labels.contacts };
+
+  // ── Electricity / power ─────────────────────────────────────────────────────
+  if (eq('electricity', 'power')) return { icon: 'lightning-bolt-outline', label: labels.electricity };
+
+  // ── Transport: all transport subcategories ──────────────────────────────────
+  if (eq('transport', 'ride_share', 'need_ride', 'parking_help', 'parcel_delivery'))
+    return { icon: 'car-outline', label: labels.transport };
+
+  // ── Foodsharing ─────────────────────────────────────────────────────────────
+  if (eq('foodsharing', 'going_shopping')) return { icon: 'basket-outline', label: labels.foodsharing };
+
+  // ── Household & cleaning ────────────────────────────────────────────────────
+  if (eq('household', 'cleaning', 'trash_removal', 'laundry', 'plants'))
+    return { icon: 'broom', label: labels.household };
+
+  // ── Building issues ─────────────────────────────────────────────────────────
+  if (eq('building_issues', 'noise', 'elevator', 'parking_blocked',
+         'yard_trash', 'yard_lighting', 'management_request'))
+    return { icon: 'home-alert-outline', label: labels.problem };
+
+  // ── Broad substring fallbacks (for legacy / free-text category values) ──────
+  const hay = `${category} ${group} ${subcategory}`;
+  if (hay.includes('medical') || hay.includes('medicine'))   return { icon: 'medical-bag',              label: labels.medical };
+  if (hay.includes('repair')  || hay.includes('plumb') || hay.includes('electric')) return { icon: 'wrench-outline', label: labels.repair };
+  if (hay.includes('care')    || hay.includes('child') || hay.includes('elder'))    return { icon: 'heart-outline',  label: labels.care };
+  if (hay.includes('job')     || hay.includes('education'))                         return { icon: 'briefcase-outline', label: labels.job };
   if (hay.includes('buy_sell') || hay.includes('exchange') || hay.includes('sale')) return { icon: 'shopping-outline', label: labels.buySell };
-  if (hay.includes('contacts')) return { icon: 'account-group-outline', label: labels.contacts };
-  if (hay.includes('lost_found') || hay.includes('found') || hay.includes('lost')) return { icon: 'map-marker-question-outline', label: labels.lostFound };
-  if (hay.includes('electricity') || hay.includes('power')) return { icon: 'lightning-bolt-outline', label: labels.electricity };
-  if (hay.includes('transport') || hay.includes('ride')) return { icon: 'car-outline', label: labels.transport };
-  if (hay.includes('foodsharing') || hay.includes('shopping')) return { icon: 'basket-outline', label: labels.foodsharing };
-  if (hay.includes('pets') || hay.includes('pet')) return { icon: 'paw-outline', label: labels.pets };
-  if (hay.includes('problem') || hay.includes('building_issues')) return { icon: 'home-alert-outline', label: labels.problem };
+  if (hay.includes('contacts'))                                                     return { icon: 'account-group-outline', label: labels.contacts };
+  if (hay.includes('lost')    || hay.includes('found'))                             return { icon: 'map-marker-question-outline', label: labels.lostFound };
+  if (hay.includes('electricity') || hay.includes('power'))                         return { icon: 'lightning-bolt-outline', label: labels.electricity };
+  if (hay.includes('transport') || hay.includes('ride'))                            return { icon: 'car-outline', label: labels.transport };
+  if (hay.includes('foodsharing') || hay.includes('shopping'))                      return { icon: 'basket-outline', label: labels.foodsharing };
+  if (hay.includes('pet'))                                                          return { icon: 'paw-outline', label: labels.pets };
+  if (hay.includes('problem') || hay.includes('building'))                          return { icon: 'home-alert-outline', label: labels.problem };
+
   return { icon: 'clipboard-text-outline', label: labels.request };
 };
 
 const RequestItem: React.FC<RequestItemProps> = ({
   request,
   avatarUri,
+  currentUserId,
   onPress,
   isOwn,
   onDelete,
@@ -127,7 +196,6 @@ const RequestItem: React.FC<RequestItemProps> = ({
     return { label: language === 'ru' ? 'Ожидает' : language === 'en' ? 'Pending' : 'Очікує', bg: '#fff2cc', color: '#8a5b00' };
   }, [language, request.isApproved, request.status]);
 
-  const hasActions = !isOwn && (onProfile || onContact);
   const hasModActions = isModerator && (onApprove || onReject || onModDelete);
   const resolvedAvatarUri = useMemo(() => pickUserAvatarUri({ photoURL: avatarUri }, request), [avatarUri, request]);
 
@@ -179,27 +247,21 @@ const RequestItem: React.FC<RequestItemProps> = ({
           </View>
         </View>
 
-        {/* Actions row */}
-        {(hasActions || hasModActions || (isOwn && onDelete)) ? (
-          <View style={styles.actionsRow}>
-            {/* Left: user action buttons */}
-            <View style={styles.actionsLeft}>
-              {onProfile ? (
-                <TouchableOpacity style={styles.actionBtnOutlined} onPress={onProfile} activeOpacity={0.8}>
-                  <MaterialCommunityIcons name="badge-account-horizontal-outline" size={13} color="#7A1E5C" />
-                  <Text style={styles.actionBtnOutlinedText}>{L.profile}</Text>
-                </TouchableOpacity>
-              ) : null}
-              {onContact ? (
-                <TouchableOpacity style={styles.actionBtnOutlined} onPress={onContact} activeOpacity={0.8}>
-                  <MaterialCommunityIcons name="account-arrow-right-outline" size={13} color="#7A1E5C" />
-                  <Text style={styles.actionBtnOutlinedText}>{L.contact}</Text>
-                </TouchableOpacity>
-              ) : null}
-            </View>
+        <UserCardActionBar
+          avatarUri={resolvedAvatarUri}
+          name={request.name ?? ''}
+          userId={request.userId}
+          currentUserId={currentUserId}
+          language={language}
+          onProfile={onProfile}
+          onContact={onContact}
+          contactDisabled={!onContact}
+          likePath="feed_likes/requests"
+          likeId={request.id}
+        />
 
-            {/* Right: mod actions + own delete */}
-            <View style={styles.actionsRight}>
+        {(hasModActions || (isOwn && onDelete)) ? (
+          <View style={styles.modActionsRow}>
               {hasModActions ? (
                 <>
                   {onApprove && !request.isApproved && request.status !== 'approved' ? (
@@ -228,7 +290,6 @@ const RequestItem: React.FC<RequestItemProps> = ({
                   <MaterialCommunityIcons name="trash-can-outline" size={16} color="#fff" />
                 </TouchableOpacity>
               ) : null}
-            </View>
           </View>
         ) : null}
       </TactileCard>
@@ -359,25 +420,11 @@ const styles = StyleSheet.create({
     color: '#7A6D64',
     lineHeight: 17,
   },
-  actionsRow: {
+  modActionsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    borderTopWidth: 1,
-    borderTopColor: '#EDE5D8',
-    paddingTop: 6,
-    paddingBottom: 6,
-    gap: 6,
-  },
-  actionsLeft: {
-    flex: 1,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  actionsRight: {
-    flexDirection: 'row',
+    justifyContent: 'flex-end',
     gap: 4,
+    marginTop: 6,
   },
   actionBtnOutlined: {
     flexDirection: 'row',

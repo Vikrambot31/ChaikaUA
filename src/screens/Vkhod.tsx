@@ -27,7 +27,9 @@ import TactileButton from '../components/TactileButton';
 import { FormFieldError } from '../components/ValidationErrorMessage';
 import { normalizeEmailText } from '../utils/textUtils';
 import { validateEmail } from '../utils/validators';
+import { formatCountdown, getRateLimitRetryAfterSeconds } from '../utils/userFacingErrors';
 import { resolveAppUserFromFirebase } from '../services/authProfileService';
+import { ensureFirebaseAuth } from '../firebase-auth-session';
 
 // RootState type for language selector
 interface LangState { language?: { current?: string } }
@@ -201,6 +203,8 @@ const LoginScreen: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [appleSignInAvailable, setAppleSignInAvailable] = useState(false);
+  const [loginRateLimitUntil, setLoginRateLimitUntil] = useState(0);
+  const [now, setNow] = useState(Date.now());
   const loading = useSelector(selectAuthLoading);
   const error = useSelector(selectAuthError);
 
@@ -208,6 +212,7 @@ const LoginScreen: React.FC = () => {
   const isEmailValid = validateEmail(normalizedEmail);
   const isPasswordValid = password.length >= 6;
   const isFormValid = isEmailValid && isPasswordValid;
+  const loginRateLimitSeconds = Math.max(0, Math.ceil((loginRateLimitUntil - now) / 1000));
 
   const mapSocialAuthError = useCallback(
     (rawError: string | undefined, provider: 'google' | 'facebook' | 'apple') => {
@@ -250,17 +255,14 @@ const LoginScreen: React.FC = () => {
         }
         navigation.navigate('MainTabs', { screen: 'HomeTab' });
       } else {
-        navigation.navigate('RegisterScreenFull', {
-          name: appUser.name,
-          email: appUser.email,
-          phone: appUser.phone,
-          redirectTo: route.params?.redirectTo,
-          redirectParams: route.params?.redirectParams,
-          redirectMode: route.params?.redirectMode,
-        });
+        if (route.params?.redirectTo) {
+          navigation.reset({ index: 0, routes: [{ name: route.params.redirectTo as never, params: route.params.redirectParams as never }] });
+          return;
+        }
+        navigation.navigate('RegisterScreenFull');
       }
     },
-    [dispatch, navigation]
+    [dispatch, navigation, route.params]
   );
 
   useEffect(() => {
@@ -293,6 +295,12 @@ const LoginScreen: React.FC = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (loginRateLimitUntil <= Date.now()) return undefined;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [loginRateLimitUntil]);
+
   const handleLogin = useCallback(async () => {
     setSubmitAttempted(true);
     if (!isFormValid) {
@@ -304,6 +312,7 @@ const LoginScreen: React.FC = () => {
     try {
       const lock = await readLoginLock(normalizedEmail);
       if (lock.lockedUntil > Date.now()) {
+        setLoginRateLimitUntil(lock.lockedUntil);
         Alert.alert(text.errorLoginTitle, text.loginLocked);
         return;
       }
@@ -311,6 +320,11 @@ const LoginScreen: React.FC = () => {
       try {
         userCredential = await signInWithServerRateLimit(normalizedEmail, password);
       } catch (serverError) {
+        const retryAfterSeconds = getRateLimitRetryAfterSeconds(serverError);
+        if (retryAfterSeconds) {
+          setLoginRateLimitUntil(Date.now() + retryAfterSeconds * 1000);
+          throw serverError;
+        }
         if (!__DEV__) {
           throw serverError;
         }
@@ -318,25 +332,33 @@ const LoginScreen: React.FC = () => {
       }
       await clearLoginLock(normalizedEmail);
       await completeLogin(userCredential.user, 'email');
-    } catch {
+    } catch (loginError) {
       const lock = await recordLoginFailure(normalizedEmail);
-      const message = text.errorLogin;
+      const retryAfterSeconds = getRateLimitRetryAfterSeconds(loginError);
+      const message = retryAfterSeconds
+        ? `Слишком много попыток входа. Кнопка заблокирована на ${formatCountdown(retryAfterSeconds)}.`
+        : text.errorLogin;
+      if (retryAfterSeconds) {
+        setLoginRateLimitUntil(Date.now() + retryAfterSeconds * 1000);
+      }
       dispatch(setError(message));
       Alert.alert(text.errorLoginTitle, lock.lockedUntil > Date.now() ? text.loginLocked : message);
     } finally {
       dispatch(setLoading(false));
     }
-  }, [isFormValid, normalizedEmail, password, dispatch, completeLogin, text, text.loginLocked]);
+  }, [isFormValid, normalizedEmail, password, dispatch, completeLogin, text]);
 
   const handleGoogleLogin = useCallback(async () => {
     dispatch(setLoading(true));
     try {
       const result = await socialAuthAPI.signInWithGoogle();
-      if (!result.success) {
-        Alert.alert(text.errorLoginTitle, mapSocialAuthError(result.error, 'google'));
+      const socialUser = 'data' in result ? result.data : null;
+      if (!socialUser) {
+        const rawError = 'error' in result ? result.error : undefined;
+        Alert.alert(text.errorLoginTitle, mapSocialAuthError(rawError, 'google'));
         return;
       }
-      await completeLogin(result.data, 'google', true);
+      await completeLogin(socialUser, 'google', true);
     } catch {
       Alert.alert(text.errorLoginTitle, text.googleLoginFailed);
     } finally {
@@ -345,30 +367,23 @@ const LoginScreen: React.FC = () => {
   }, [dispatch, completeLogin, mapSocialAuthError, text]);
 
   const handleFacebookLogin = useCallback(async () => {
-    dispatch(setLoading(true));
-    try {
-      const result = await socialAuthAPI.signInWithFacebook();
-      if (!result.success) {
-        Alert.alert(text.errorLoginTitle, mapSocialAuthError(result.error, 'facebook'));
-        return;
-      }
-      await completeLogin(result.data, 'facebook', true);
-    } catch {
-      Alert.alert(text.errorLoginTitle, text.facebookLoginFailed);
-    } finally {
-      dispatch(setLoading(false));
-    }
-  }, [dispatch, completeLogin, mapSocialAuthError, text]);
+    Alert.alert(
+      text.errorLoginTitle,
+      'Facebook вхід буде доступний після появи застосунку в Google Play Store. Будь ласка, використовуйте вхід через Email або Google.'
+    );
+  }, [text]);
 
   const handleAppleLogin = useCallback(async () => {
     dispatch(setLoading(true));
     try {
       const result = await socialAuthAPI.signInWithApple();
-      if (!result.success) {
-        Alert.alert(text.errorLoginTitle, mapSocialAuthError(result.error, 'apple'));
+      const socialUser = 'data' in result ? result.data : null;
+      if (!socialUser) {
+        const rawError = 'error' in result ? result.error : undefined;
+        Alert.alert(text.errorLoginTitle, mapSocialAuthError(rawError, 'apple'));
         return;
       }
-      await completeLogin(result.data, 'apple', true);
+      await completeLogin(socialUser, 'apple', true);
     } catch {
       Alert.alert(text.errorLoginTitle, text.appleLoginFailed);
     } finally {
@@ -392,6 +407,18 @@ const LoginScreen: React.FC = () => {
       dispatch(setLoading(false));
     }
   }, [dispatch, isEmailValid, normalizedEmail, text]);
+
+  const handleQuickRegister = useCallback(async () => {
+    dispatch(setLoading(true));
+    try {
+      await ensureFirebaseAuth();
+      navigation.navigate('RegisterScreenFull');
+    } catch {
+      Alert.alert(text.errorTitle, text.errorLogin);
+    } finally {
+      dispatch(setLoading(false));
+    }
+  }, [dispatch, navigation, text]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -432,9 +459,9 @@ const LoginScreen: React.FC = () => {
 
           <View style={styles.btnSpacing}>
             <TactileButton
-              title={text.loginBtn}
+              title={loginRateLimitSeconds > 0 ? `${text.loginBtn} (${formatCountdown(loginRateLimitSeconds)})` : text.loginBtn}
               onPress={handleLogin}
-              disabled={!isFormValid || loading}
+              disabled={!isFormValid || loading || loginRateLimitSeconds > 0}
               variant="primary"
               style={styles.loginButtonStyle}
               textStyle={styles.loginButtonText}
@@ -474,7 +501,7 @@ const LoginScreen: React.FC = () => {
 
         <View style={styles.signupRow}>
           <Text style={styles.signupText}>{text.noAccount}</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('RegisterScreenFull', route.params)} disabled={loading}>
+          <TouchableOpacity onPress={() => void handleQuickRegister()} disabled={loading}>
             <Text style={styles.signupLink}>{text.register}</Text>
           </TouchableOpacity>
         </View>

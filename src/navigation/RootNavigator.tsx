@@ -1,6 +1,6 @@
-import React, { Suspense, useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import React, { Suspense, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { NavigationContainer, createNavigationContainerRef, getStateFromPath as getNavigationStateFromPath, type LinkingOptions, useNavigation, useRoute } from '@react-navigation/native';
+import { NavigationContainer, createNavigationContainerRef, getStateFromPath as getNavigationStateFromPath, useNavigation, type LinkingOptions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -65,12 +65,12 @@ import SportNaChaykeScreen from '../screens/Sport-Na-Chayke';
 import SportDetailScreen from '../screens/Sport-Detal';
 import ProfileRequestsScreen from '../screens/ProfileRequestsScreen';
 import AppVersionInfoScreen from '../screens/AppVersionInfoScreen';
+import CrashDiagnosticsScreen from '../screens/CrashDiagnosticsScreen';
+import AppMonitorScreen from '../screens/AppMonitorScreen';
 import type { Request, Place } from '../types/app';
 import type { NewsItem as OsbbEditableNewsItem } from '../screens/OSBB-AddNews';
 import { selectAuthBootstrapped, selectIsAuthenticated } from '../redux/selectors';
 import { subscribeCurrentUserSecurityRole, type SecurityRole } from '../services/securityRoles';
-import { TrustedAccessContext } from '../contexts/TrustedAccessContext';
-import AccessRestrictedScreen from '../screens/AccessRestrictedScreen';
 import { recordScreenOpenDiagnostic } from '../services/liveDiagnosticsService';
 import { addBreadcrumb } from '../services/breadcrumbService';
 import { setSnapshotCurrentScreen } from '../services/stateSnapshotService';
@@ -138,6 +138,7 @@ export type RootStackParamList = {
   } | undefined;
   ServerStatusScreen: undefined;
   AuthDiagnosticScreen: undefined;
+  CrashDiagnosticsScreen: undefined;
   SecurityControlScreen: undefined;
   SectionScreen: undefined;
   TopCafeScreen: undefined;
@@ -160,7 +161,7 @@ export type RootStackParamList = {
   OsbbAddNewsScreen: { editItem?: OsbbEditableNewsItem } | undefined;
   OsbbAdminScreen: undefined;
   ChaikaBonusPlusScreen: undefined;
-  GalleryChaikaScreen: undefined;
+  FotoRayonaScreen: undefined;
   LostAndFoundScreen: undefined;
   ImportantNewsScreen: undefined;
   NotificationSettingsScreen: undefined;
@@ -170,7 +171,10 @@ export type RootStackParamList = {
   ProfileRequestsScreen: undefined;
   MyPhotosScreen: undefined;
   MyApprovedPhotosScreen: undefined;
+  PhotoUploadScreen: undefined;
+  StartAvatarPickerScreen: RedirectRouteParams | undefined;
   AppVersionInfoScreen: undefined;
+  AppMonitorScreen: undefined;
   ViewUserProfile: { userId: string };
 };
 
@@ -219,10 +223,14 @@ const linking: LinkingOptions<RootStackParamList> = {
        OsbbNovostyScreen: 'screen/osbb/news',
        NotificationSettingsScreen: 'screen/notifications',
        MyPhotosScreen: 'screen/my-photos',
-       GalleryChaikaScreen: 'screen/gallery-chaika',
+       FotoRayonaScreen: 'screen/foto-rayona',
+       PhotoUploadScreen: 'screen/photo-upload',
+       StartAvatarPickerScreen: 'screen/start-avatar',
        ZhkBusinessListScreen: 'screen/business/list',
       SportNaChaykeScreen: 'screen/sports',
       SportDetailScreen: 'screen/sports/detail',
+      CrashDiagnosticsScreen: 'screen/crash-diagnostics',
+      AppMonitorScreen: 'screen/app-monitor',
     },
   },
 };
@@ -270,6 +278,7 @@ const ROUTE_FILE_MAP: Record<string, string> = {
   ServiceModerationIssuesScreen: 'ServiceModerationIssuesScreen.tsx',
   ServerStatusScreen: 'ServerStatusScreen.tsx',
   AuthDiagnosticScreen: 'AuthDiagnosticScreen.tsx',
+  CrashDiagnosticsScreen: 'CrashDiagnosticsScreen.tsx',
   SecurityControlScreen: 'SecurityControlScreen.tsx',
   SectionScreen: 'Razdel.tsx',
   TopCafeScreen: 'Top-Kafe.tsx',
@@ -292,7 +301,9 @@ const ROUTE_FILE_MAP: Record<string, string> = {
   OsbbAddNewsScreen: 'OSBB-AddNews.tsx',
   OsbbAdminScreen: 'OSBB-AdminPanel.tsx',
   ChaikaBonusPlusScreen: 'Chaika-Bonus-Plus.tsx',
-  GalleryChaikaScreen: 'Galereya-Chayki.tsx',
+  FotoRayonaScreen: 'Foto-Rayona.tsx',
+  PhotoUploadScreen: 'Zagruzka-Foto.tsx',
+  StartAvatarPickerScreen: 'StartAvatarPickerScreen.tsx',
   LostAndFoundScreen: 'Kto-Poteryal.tsx',
   ImportantNewsScreen: 'Vazhnye-Novosti-Chayki.tsx',
   NotificationSettingsScreen: 'Nalashtuvannya-Spovishchen.tsx',
@@ -303,6 +314,7 @@ const ROUTE_FILE_MAP: Record<string, string> = {
   MyPhotosScreen: 'photo-module/MyPhotosScreen.tsx',
   MyApprovedPhotosScreen: 'MyApprovedPhotosScreen.tsx',
   AppVersionInfoScreen: 'AppVersionInfoScreen.tsx',
+  AppMonitorScreen: 'AppMonitorScreen.tsx',
   ViewUserProfile: 'ViewUserProfileScreen.tsx',
 };
 
@@ -366,39 +378,17 @@ function GuardedScreen({
   children: React.ReactElement;
   mode: 'auth' | 'complete' | 'admin' | 'moderator' | 'trusted';
 }) {
-  const navigation = useNavigation<import('@react-navigation/native').NavigationProp<Record<string, object | undefined>> & { replace: (name: string, params?: object) => void }>();
-  const route = useRoute<import('@react-navigation/native').RouteProp<Record<string, { [key: string]: unknown } | undefined>, string>>();
   const isBootstrapped = useSelector(selectAuthBootstrapped);
   const isAuthenticated = useSelector(selectIsAuthenticated);
 
-  // roleStatus is used for:
-  //   admin/moderator — checks if user has the required platform role
-  //   trusted         — checks if user is admin/mod (bypass) or falls through to context
   const [roleStatus, setRoleStatus] = useState<'loading' | 'allowed' | 'denied'>(
     mode === 'admin' || mode === 'moderator' || mode === 'trusted' ? 'loading' : 'allowed',
   );
 
+  const navigation = useNavigation();
+
   // TrustedAccessContext is provided by SoftInviteAccessGate and reflects
   // the user's invite/sponsor status loaded from the server.
-  const { isTrusted, isLoading: isTrustedLoading, hasPendingInvite, openInviteAccess } = useContext(TrustedAccessContext);
-
-  useEffect(() => {
-    if (!isBootstrapped) {
-      return;
-    }
-
-    if (!isAuthenticated) {
-      navigation.replace('LoginScreen', {
-        redirectTo: route.name,
-        redirectParams: route.params,
-        redirectMode: 'auth',
-      });
-      return;
-    }
-
-    // Registration-complete redirect disabled during development.
-  }, [isAuthenticated, isBootstrapped, navigation, route.name, route.params]);
-
   useEffect(() => {
     if (mode !== 'admin' && mode !== 'moderator' && mode !== 'trusted') {
       return;
@@ -420,48 +410,12 @@ function GuardedScreen({
   }, [mode, isAuthenticated, isBootstrapped]);
 
   useEffect(() => {
-    // For admin/moderator modes: redirect to MainTabs when role is insufficient.
-    // For trusted mode: do NOT redirect — show AccessRestrictedScreen inline instead.
     if (roleStatus === 'denied' && mode !== 'trusted') {
       navigation.replace('MainTabs' as never);
     }
   }, [roleStatus, navigation, mode]);
 
-  if (!isBootstrapped) {
-    return <GuardFallback />;
-  }
-
-  if (!isAuthenticated) {
-    return <GuardFallback />;
-  }
-
-  // ── Trusted mode ────────────────────────────────────────────────────────
-  if (mode === 'trusted') {
-    if (roleStatus === 'loading') {
-      return <GuardFallback />;
-    }
-    // Admin/mod bypass — always allowed regardless of invite status
-    if (roleStatus === 'allowed') {
-      return children;
-    }
-    // Not admin/mod: check invite/sponsor status from context
-    if (isTrustedLoading) {
-      return <GuardFallback />;
-    }
-    if (!isTrusted) {
-      return (
-        <AccessRestrictedScreen
-          pendingInvite={hasPendingInvite}
-          onOpenInviteAccess={hasPendingInvite ? undefined : openInviteAccess}
-          onGoBack={() => navigation.goBack()}
-        />
-      );
-    }
-    return children;
-  }
-
-  // ── Admin / Moderator / Auth modes ──────────────────────────────────────
-  if (roleStatus === 'loading' || roleStatus === 'denied') {
+  if (roleStatus === 'loading' && (mode === 'admin' || mode === 'moderator')) {
     return <GuardFallback />;
   }
 
@@ -505,10 +459,12 @@ const AdminUserErrorsScreen = createLazyScreen(() => import('../screens/AdminUse
 const ServerStatusScreen = createLazyScreen(() => import('../screens/ServerStatusScreen'), 'LazyServerStatusScreen');
 const AuthDiagnosticScreen = createLazyScreen(() => import('../screens/AuthDiagnosticScreen'), 'LazyAuthDiagnosticScreen');
 const SecurityControlScreen = createLazyScreen(() => import('../screens/admin/SecurityControlScreen'), 'LazySecurityControlScreen');
-const GalleryChaikaScreen = createLazyScreen(() => import('../screens/Galereya-Chayki'), 'LazyGalleryChaikaScreen');
+const FotoRayonaScreen = createLazyScreen(() => import('../screens/Foto-Rayona'), 'LazyFotoRayonaScreen');
 const PlacesScreen = createLazyScreen(() => import('../screens/Mesta-Chayki'), 'LazyPlacesScreen');
 const MyPhotosScreen = createLazyScreen(() => import('../photo-module/MyPhotosScreen'), 'LazyMyPhotosScreen');
 const MyApprovedPhotosScreen = createLazyScreen(() => import('../screens/MyApprovedPhotosScreen'), 'LazyMyApprovedPhotosScreen');
+const PhotoUploadScreen = createLazyScreen(() => import('../screens/Zagruzka-Foto'), 'LazyPhotoUploadScreen');
+const StartAvatarPickerScreen = createLazyScreen(() => import('../screens/StartAvatarPickerScreen'), 'LazyStartAvatarPickerScreen');
 
 const withGuard = <P extends object>(
   Component: React.ComponentType<P>,
@@ -665,7 +621,7 @@ function AuthNavigation() {
       'OsbbNovostyScreen',
       'OsbbSetupScreen',
       'OsbbAddNewsScreen',
-      'GalleryChaikaScreen',
+      'FotoRayonaScreen',
       'LostAndFoundScreen',
       'JobSearchScreen',
       'BuySellScreen',
@@ -771,6 +727,7 @@ function AuthNavigation() {
         <Stack.Screen name="ServiceModerationIssuesScreen" component={withGuard(ServiceModerationIssuesScreen, 'moderator')} />
         <Stack.Screen name="ServerStatusScreen" component={withGuard(ServerStatusScreen, 'admin')} />
         <Stack.Screen name="AuthDiagnosticScreen" component={withGuard(AuthDiagnosticScreen, 'auth')} />
+        <Stack.Screen name="CrashDiagnosticsScreen" component={CrashDiagnosticsScreen} />
         <Stack.Screen name="SecurityControlScreen" component={withGuard(SecurityControlScreen, 'admin')} />
         <Stack.Screen name="SectionScreen" component={SectionScreen} />
         <Stack.Screen name="TopCafeScreen" component={TopCafeScreen} />
@@ -794,7 +751,9 @@ function AuthNavigation() {
         <Stack.Screen name="OsbbAddNewsScreen" component={withGuard(OsbbAddNewsScreen, 'trusted')} />
         <Stack.Screen name="OsbbAdminScreen" component={withGuard(OsbbAdminScreen, 'auth')} />
         <Stack.Screen name="ChaikaBonusPlusScreen" component={ChaikaBonusPlusScreen} />
-        <Stack.Screen name="GalleryChaikaScreen" component={withGuard(GalleryChaikaScreen, 'trusted')} />
+        <Stack.Screen name="FotoRayonaScreen" component={withGuard(FotoRayonaScreen, 'trusted')} />
+        <Stack.Screen name="PhotoUploadScreen" component={withGuard(PhotoUploadScreen, 'trusted')} options={{ headerShown: false }} />
+        <Stack.Screen name="StartAvatarPickerScreen" component={StartAvatarPickerScreen} options={{ headerShown: false }} />
         <Stack.Screen name="LostAndFoundScreen" component={withGuard(LostAndFoundScreen, 'trusted')} />
         <Stack.Screen name="ImportantNewsScreen" component={ImportantNewsScreen} />
         <Stack.Screen name="NotificationSettingsScreen" component={withGuard(NotificationSettingsScreen, 'auth')} />
@@ -805,6 +764,7 @@ function AuthNavigation() {
         <Stack.Screen name="MyPhotosScreen" component={withGuard(MyPhotosScreen, 'trusted')} options={{ headerShown: false }} />
         <Stack.Screen name="MyApprovedPhotosScreen" component={withGuard(MyApprovedPhotosScreen, 'trusted')} options={{ headerShown: false }} />
         <Stack.Screen name="AppVersionInfoScreen" component={AppVersionInfoScreen} />
+        <Stack.Screen name="AppMonitorScreen" component={withGuard(AppMonitorScreen, 'auth')} />
       </Stack.Navigator>
       <ScreenFileInfoOverlay />
     </NavigationContainer>

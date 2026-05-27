@@ -10,4 +10,4 @@ export async function preflightImageSafety(_localUri: string): Promise<ImageSafe
 }
 
 export const canPublishImage = (status?: string): boolean =>
-  status === 'passed' || status === 'manual_reviewed' || status === 'pending';
+  status === 'passed' || status === 'manual_reviewed';

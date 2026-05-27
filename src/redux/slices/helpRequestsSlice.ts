@@ -63,9 +63,9 @@ const helpRequestsSlice = createSlice({
     },
     syncFromRequests: (state, action: PayloadAction<Request[]>) => {
       const mapped = action.payload
-        .filter((item) => item.category === 'help')
+        .filter((item) => item.group === 'help_neighbors' || item.category === 'help')
         .map((item) => {
-          const createdAt = item.createdAt instanceof Date ? item.createdAt : new Date(item.createdAt);
+          const createdAt = new Date(item.createdAt);
           const expiresAt = typeof item.expires_at === 'number'
             ? new Date(item.expires_at)
             : new Date(createdAt.getTime() + 24 * 60 * 60 * 1000);

@@ -402,7 +402,7 @@ const AuthDiagnosticScreen: React.FC = () => {
         {isAdmin && (
           <View style={[styles.adminBadge, { backgroundColor: theme.success + '20' }]}>
             <Text style={[styles.adminBadgeText, { color: theme.success }]}>
-              вњ“ ADMIN PERMISSIONS
+              вњ" ADMIN PERMISSIONS
             </Text>
           </View>
         )}
@@ -410,7 +410,7 @@ const AuthDiagnosticScreen: React.FC = () => {
         {isModerator && (
           <View style={[styles.modBadge, { backgroundColor: theme.primary + '20' }]}>
             <Text style={[styles.modBadgeText, { color: theme.primary }]}>
-              вњ“ MODERATOR PERMISSIONS
+              вњ" MODERATOR PERMISSIONS
             </Text>
           </View>
         )}

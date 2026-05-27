@@ -1,8 +1,9 @@
-import { get, ref } from 'firebase/database';
+import { get, limitToFirst, query, ref } from 'firebase/database';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { database, firebaseApp } from '../firebase/firebase';
 import { resolveMediaUrl } from './mediaService';
 import { MODERATION_PATHS } from './securityPaths';
+import { LOCAL_MODE, localGet, localPatch } from '../local/LOCAL_MODE';
 
 export type ModerationStatus = 'pending' | 'approved' | 'rejected' | 'expired';
 
@@ -10,9 +11,6 @@ export type ModerationSectionKey =
   | 'requests'
   | 'appSuggestions'
   | 'communityPhotos'
-  | 'datingProfiles'
-  | 'datingAnketaListings'
-  | 'coffeeRequests'
   | 'buySell'
   | 'contactsListings'
   | 'localBusiness'
@@ -37,6 +35,9 @@ export type ModerationItem = {
   timestampLabel: string;
   photoUrl: string;
   mediaUrl: string;
+  priority: 'urgent' | 'standard' | 'low';
+  priorityRank: number;
+  statusPriority: string;
   raw: Record<string, unknown>;
 };
 
@@ -61,6 +62,7 @@ type AdminModerationPayload = {
   path: string;
   currentStatus: ModerationStatus;
   action: AdminModerationAction;
+  reason?: string;
 };
 
 type CallableResult = {
@@ -71,9 +73,6 @@ export const MODERATION_SECTIONS: SectionConfig[] = [
   { key: 'requests', label: 'Заявки', path: MODERATION_PATHS.requests, statusField: 'status', approvedValue: 'approved', rejectedValue: 'rejected' },
   { key: 'appSuggestions', label: 'Предложения по приложению', path: MODERATION_PATHS.appSuggestions, statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
   { key: 'communityPhotos', label: 'Фото сообщества', path: MODERATION_PATHS.communityPhotos, statusField: 'status', approvedValue: 'approved', rejectedValue: 'rejected' },
-  { key: 'datingProfiles', label: 'Профили знакомств', path: MODERATION_PATHS.datingProfiles, statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
-  { key: 'datingAnketaListings', label: 'Анкеты знакомств', path: MODERATION_PATHS.datingAnketaListings, statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
-  { key: 'coffeeRequests', label: 'Кофе-заявки', path: MODERATION_PATHS.coffeeRequests, statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
   { key: 'buySell', label: 'Куплю/Продам', path: MODERATION_PATHS.buySell, statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
   { key: 'contactsListings', label: 'Хочу связаться', path: MODERATION_PATHS.contactsListings, statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
   { key: 'localBusiness', label: 'Локальный бизнес', path: MODERATION_PATHS.localBusiness, statusField: 'status', approvedValue: 'active', rejectedValue: 'rejected' },
@@ -85,7 +84,7 @@ export const MODERATION_SECTIONS: SectionConfig[] = [
   { key: 'osbbCollections', label: 'OSBB сборы', path: MODERATION_PATHS.osbbCollections, statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected', nested: true },
 ];
 
-const functions = getFunctions(firebaseApp);
+const functions = LOCAL_MODE ? null : getFunctions(firebaseApp);
 
 const getString = (value: unknown): string => typeof value === 'string' ? value : '';
 
@@ -118,28 +117,30 @@ const getTimestamp = (value: Record<string, unknown>): number => {
   return isValidTimestamp(parsed) ? parsed : 0;
 };
 
-const getTitle = (config: SectionConfig, value: Record<string, unknown>, id: string): string =>
-  getString(value.title) ||
-  getString(value.name) ||
-  getString(value.itemName) ||
-  getString(value.category) ||
-  getString(value.text).slice(0, 60) ||
-  config.label.replace(/s$/, '') ||
-  id;
+const getTitle = (config: SectionConfig, value: Record<string, unknown>, id: string): string => {
+  if (config.key === 'requests') {
+    return (
+      getString(value.text).slice(0, 60) ||
+      getString(value.description).slice(0, 60) ||
+      getString(value.title) ||
+      getString(value.name) ||
+      id
+    );
+  }
+  return (
+    getString(value.title) ||
+    getString(value.contactName) ||
+    getString(value.name) ||
+    getString(value.itemName) ||
+    getString(value.categoryLabel) ||
+    getString(value.category) ||
+    getString(value.text).slice(0, 60) ||
+    config.label ||
+    id
+  );
+};
 
 const getSubtitle = (config: SectionConfig, value: Record<string, unknown>): string | null => {
-  if (config.key === 'datingAnketaListings') {
-    const parts: string[] = [];
-    const age = getString(value.age);
-    const condition = getString(value.condition);
-    const phone = getString(value.phone);
-    const description = getString(value.description);
-    if (age) parts.push(`Вік: ${age}`);
-    if (condition) parts.push(condition);
-    if (phone) parts.push(phone);
-    if (description) parts.push(description);
-    return parts.length ? parts.join(' | ') : null;
-  }
   return (
     getString(value.description) ||
     getString(value.text) ||
@@ -156,6 +157,22 @@ const getPhotoUrl = (value: Record<string, unknown>): string =>
   getString(value.photoStoragePath) ||
   getString(value.storagePath);
 
+const URGENT_CATEGORIES = new Set(['medical', 'electricity', 'care', 'repair']);
+const LOW_PRIORITY_CATEGORIES = new Set(['feedback', 'suggestions', 'app_suggestion', 'appSuggestions']);
+
+const getPriority = (value: Record<string, unknown>): Pick<ModerationItem, 'priority' | 'priorityRank' | 'statusPriority'> => {
+  const rawCategory = getString(value.category) || getString(value.type) || getString(value.section);
+  const normalized = rawCategory.trim().toLowerCase();
+  const statusPriority = getString(value.status_priority);
+  if (statusPriority.includes('_01_') || URGENT_CATEGORIES.has(normalized)) {
+    return { priority: 'urgent', priorityRank: 1, statusPriority };
+  }
+  if (statusPriority.includes('_03_') || LOW_PRIORITY_CATEGORIES.has(normalized)) {
+    return { priority: 'low', priorityRank: 3, statusPriority };
+  }
+  return { priority: 'standard', priorityRank: 2, statusPriority };
+};
+
 const normalizeItem = (
   config: SectionConfig,
   id: string,
@@ -163,6 +180,7 @@ const normalizeItem = (
   value: Record<string, unknown>,
 ): ModerationItem => {
   const timestamp = getTimestamp(value);
+  const priority = getPriority(value);
   return {
     id,
     section: config.key,
@@ -177,6 +195,7 @@ const normalizeItem = (
     timestampLabel: timestamp ? new Date(timestamp).toLocaleString() : '-',
     photoUrl: getPhotoUrl(value),
     mediaUrl: '',
+    ...priority,
     raw: value,
   };
 };
@@ -197,10 +216,16 @@ const flattenNested = (config: SectionConfig, raw: Record<string, unknown> | nul
 };
 
 export const loadModerationItems = async (): Promise<ModerationItem[]> => {
+  // LOCAL_MODE: fetch moderation_items from local json-server
+  if (LOCAL_MODE) {
+    const raw = await localGet<ModerationItem[]>('/moderation_items');
+    return Array.isArray(raw) ? raw : [];
+  }
+
   const snapshots = await Promise.all(
     MODERATION_SECTIONS.map(async (config) => ({
       config,
-      snapshot: await get(ref(database, config.path)),
+      snapshot: await get(query(ref(database, config.path), limitToFirst(500))),
     })),
   );
 
@@ -215,7 +240,10 @@ export const loadModerationItems = async (): Promise<ModerationItem[]> => {
     });
   });
 
-  items.sort((left, right) => right.timestamp - left.timestamp);
+  items.sort((left, right) =>
+    left.priorityRank - right.priorityRank ||
+    right.timestamp - left.timestamp,
+  );
 
   return Promise.all(
     items.map(async (item) => ({
@@ -236,9 +264,17 @@ export const getModerationSummary = (items: ModerationItem[]): ModerationSummary
 export const moderateItem = async (
   item: ModerationItem,
   status: 'approved' | 'rejected',
+  reason?: string,
 ): Promise<void> => {
+  // LOCAL_MODE: patch status on local json-server record
+  if (LOCAL_MODE) {
+    await localPatch(`/moderation_items/${item.id}`, { status, moderationReason: reason?.trim() || undefined });
+    return;
+  }
+
   const config = MODERATION_SECTIONS.find((section) => section.key === item.section);
   if (!config) throw new Error('Неизвестный раздел модерации.');
+  if (!functions) throw new Error('Firebase Functions не инициализированы.');
 
   const callable = httpsCallable<AdminModerationPayload, CallableResult>(functions, 'adminModerateContentItem');
   await callable({
@@ -246,12 +282,19 @@ export const moderateItem = async (
     path: item.path,
     currentStatus: item.status,
     action: status,
+    reason: reason?.trim() || undefined,
   });
 };
 
 export const deleteModerationItem = async (item: ModerationItem): Promise<void> => {
+  // LOCAL_MODE: stub — returns ok without deleting from local server
+  if (LOCAL_MODE) {
+    return;
+  }
+
   const config = MODERATION_SECTIONS.find((section) => section.key === item.section);
   if (!config) throw new Error('Неизвестный раздел модерации.');
+  if (!functions) throw new Error('Firebase Functions не инициализированы.');
 
   const callable = httpsCallable<AdminModerationPayload, CallableResult>(functions, 'adminModerateContentItem');
   await callable({

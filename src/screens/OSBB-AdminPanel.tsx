@@ -208,7 +208,7 @@ const OsbbAdminScreen: React.FC = () => {
 
   useEffect(() => {
     if (!userId) return;
-    void getUserRole(userId).then((role) => setIsAdmin(role === 'admin'));
+    void getUserRole(userId).then((role) => setIsAdmin(role === 'admin')).catch(() => {});
   }, [userId]);
 
   const stats = useMemo(() => ({
@@ -283,7 +283,7 @@ const OsbbAdminScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* в”Ђв”Ђ Header в”Ђв”Ђ */}
+      {/* в"Ђв"Ђ Header в"Ђв"Ђ */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backBtn}
@@ -312,7 +312,7 @@ const OsbbAdminScreen: React.FC = () => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* в”Ђв”Ђ Building info card в”Ђв”Ђ */}
+        {/* в"Ђв"Ђ Building info card в"Ђв"Ђ */}
         <View style={styles.buildingCard}>
           <View style={styles.buildingCardHeader}>
             <MaterialCommunityIcons
@@ -343,7 +343,7 @@ const OsbbAdminScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* в”Ђв”Ђ Quick stats в”Ђв”Ђ */}
+        {/* в"Ђв"Ђ Quick stats в"Ђв"Ђ */}
         <Text style={styles.sectionTitle}>{t.statsTitle}</Text>
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
@@ -375,7 +375,7 @@ const OsbbAdminScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* в”Ђв”Ђ Actions card в”Ђв”Ђ */}
+        {/* в"Ђв"Ђ Actions card в"Ђв"Ђ */}
         <Text style={styles.sectionTitle}>{t.actionsTitle}</Text>
         <View style={styles.actionsCard}>
           {ACTION_ITEMS.map((item, index) => (
@@ -401,7 +401,7 @@ const OsbbAdminScreen: React.FC = () => {
           ))}
         </View>
 
-        {/* в”Ђв”Ђ Moderator list в”Ђв”Ђ */}
+        {/* в"Ђв"Ђ Moderator list в"Ђв"Ђ */}
         <Text style={styles.sectionTitle}>{t.moderatorsTitle}</Text>
         <View style={styles.moderatorsCard}>
           {moderators.length === 0 ? (
@@ -472,7 +472,7 @@ const OsbbAdminScreen: React.FC = () => {
           ) : null}
         </View>
 
-        {/* в”Ђв”Ђ Role management note card в”Ђв”Ђ */}
+        {/* в"Ђв"Ђ Role management note card в"Ђв"Ђ */}
         <View style={styles.roleNoteCard}>
           <View style={styles.roleNoteHeader}>
             <MaterialCommunityIcons

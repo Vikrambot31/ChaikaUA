@@ -1,7 +1,6 @@
 import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,7 +13,6 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import MiniTabBar from '../components/MiniTabBar';
 import { photoAPI } from '../firebase-config';
-import AlertHelper from '../utils/alertHelper';
 import ErrorHandler from '../utils/errorHandler';
 import { normalizePersonName } from '../utils/textUtils';
 import { RootState } from '../redux/store';
@@ -22,6 +20,9 @@ import { BUILDINGS, getFullAddress } from '../data/buildings';
 import { chaykaPlaces } from '../services/chaykaPlacesData';
 import { safeLogError } from '../utils/errorLogger';
 import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField';
+import UploadedPhotosGrid from '../components/UploadedPhotosGrid';
+import InlineFieldHint from '../components/InlineFieldHint';
+import { useSoftToast } from '../hooks/useSoftToast';
 
 const UI_TEXT = {
   ua: {
@@ -50,6 +51,14 @@ const UI_TEXT = {
     hintDesc: 'Необов\'язково — короткий опис',
     hintPhoto: 'Обов\'язково — фото з галереї або камери',
     moderationSuccess: 'Фото завантажено, чекає перевірки адміна',
+    signInRequired: 'Увійдіть в акаунт, щоб надіслати фото на модерацію.',
+    addPhotoWarning: 'Додайте хоча б одне фото перед надсиланням.',
+    addTitleWarning: 'Додайте коротку назву фото.',
+    waitUploadWarning: 'Дочекайтесь завершення завантаження фото.',
+    fixPhotoWarning: 'Одне з фото не завантажилось. Видаліть його або спробуйте ще раз.',
+    saveError: 'Не вдалося надіслати фото. Перевірте інтернет і спробуйте ще раз.',
+    photoUploading: 'Фото завантажується...',
+    photoUploadError: 'Помилка завантаження фото',
     categories: {
       building: 'Будинок',
       place: 'Місце',
@@ -85,6 +94,14 @@ const UI_TEXT = {
     hintDesc: 'Необязательно — краткое описание',
     hintPhoto: 'Обязательно — фото из галереи или камеры',
     moderationSuccess: 'Фото загружено, ожидает проверки админа',
+    signInRequired: 'Войдите в аккаунт, чтобы отправить фото на модерацию.',
+    addPhotoWarning: 'Добавьте хотя бы одно фото перед отправкой.',
+    addTitleWarning: 'Добавьте короткое название фото.',
+    waitUploadWarning: 'Дождитесь завершения загрузки фото.',
+    fixPhotoWarning: 'Одно из фото не загрузилось. Удалите его или попробуйте ещё раз.',
+    saveError: 'Не удалось отправить фото. Проверьте интернет и попробуйте ещё раз.',
+    photoUploading: 'Фото загружается...',
+    photoUploadError: 'Ошибка загрузки фото',
     categories: {
       building: 'Дом',
       place: 'Место',
@@ -120,6 +137,14 @@ const UI_TEXT = {
     hintDesc: 'Optional — short description',
     hintPhoto: 'Required — photo from gallery or camera',
     moderationSuccess: 'Photo uploaded and waiting for admin review',
+    signInRequired: 'Sign in to submit a photo for moderation.',
+    addPhotoWarning: 'Add at least one photo before submitting.',
+    addTitleWarning: 'Add a short photo title.',
+    waitUploadWarning: 'Wait until photo upload is complete.',
+    fixPhotoWarning: 'One photo failed to upload. Remove it or try again.',
+    saveError: 'Failed to submit the photo. Check your internet connection and try again.',
+    photoUploading: 'Photo is uploading...',
+    photoUploadError: 'Photo upload error',
     categories: {
       building: 'Building',
       place: 'Place',
@@ -166,8 +191,9 @@ const PLACE_LOCATIONS: PhotoLocation[] = chaykaPlaces.map((p) => ({
 
 const PhotoUploadScreen: React.FC = () => {
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
-const user = useSelector((state: RootState) => state.auth.user);
+  const user = useSelector((state: RootState) => state.auth.user);
   const text = UI_TEXT[language];
+  const toast = useSoftToast();
   const [author, setAuthor] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -179,12 +205,18 @@ const user = useSelector((state: RootState) => state.auth.user);
 
   useEffect(() => {
     ErrorHandler.setLanguage(language);
-    AlertHelper.setAlertLanguage(language);
   }, [language]);
 
   useEffect(() => {
     if (user?.name) setAuthor(normalizePersonName(user.name));
   }, [user?.name]);
+
+  // Clear draft when leaving the screen without submitting
+  useEffect(() => {
+    return () => {
+      void AsyncStorage.removeItem(PHOTO_UPLOAD_DRAFT_KEY).catch(() => {});
+    };
+  }, []);
 
   useEffect(() => {
     // Restore draft if Android restarts activity while picker/camera is open.
@@ -214,10 +246,14 @@ const user = useSelector((state: RootState) => state.auth.user);
     void AsyncStorage.setItem(PHOTO_UPLOAD_DRAFT_KEY, JSON.stringify(draft)).catch(() => {});
   }, [title, description, selectedCategory, locationSearch]);
 
-  // location is optional — title and photo required
+  const donePhotos = useMemo(() => formPhotos.filter((photo) => photo.status === 'done'), [formPhotos]);
+  const hasUploadingPhotos = formPhotos.some((photo) => photo.status === 'uploading');
+  const hasPhotoErrors = formPhotos.some((photo) => photo.status === 'error');
+
+  // location is optional — title and completed photo required
   const canSubmit = useMemo(
-    () => Boolean(title.trim()) && formPhotos.length > 0 && !uploading,
-    [formPhotos.length, title, uploading]
+    () => Boolean(title.trim()) && donePhotos.length > 0 && !hasUploadingPhotos && !hasPhotoErrors && !uploading,
+    [donePhotos.length, hasPhotoErrors, hasUploadingPhotos, title, uploading]
   );
 
   const locationOptions = useMemo(() => {
@@ -246,22 +282,14 @@ const user = useSelector((state: RootState) => state.auth.user);
   const submit = useCallback(async () => {
     if (!canSubmit) return;
     if (!user?.id) {
-      Alert.alert(
-        text.permissionError,
-        language === 'ru'
-          ? 'Войдите в аккаунт, чтобы отправить фото на модерацию.'
-          : language === 'en'
-            ? 'Sign in to submit a photo for moderation.'
-            : 'Увійдіть в акаунт, щоб надіслати фото на модерацію.'
-      );
+      toast.showWarning(text.permissionError, text.signInRequired);
       return;
     }
-    if (formPhotos.length === 0) return;
     setUploading(true);
     try {
       const uploadedBy = normalizePersonName(author || user?.name || user?.email || 'Anonymous');
       const results = await Promise.all(
-        formPhotos.map((photo) =>
+        donePhotos.map((photo) =>
           photoAPI.addPhoto({
             title: title.trim(),
             description: description.trim(),
@@ -269,6 +297,9 @@ const user = useSelector((state: RootState) => state.auth.user);
             imageUri: photo.downloadUrl,
             storagePath: photo.storagePath,
             target: 'gallery_public',
+            sourceScreen: 'PhotoUploadScreen',
+            sourceScreenLabel: 'Добавить фото',
+            sourceFeature: 'gallery_full_form',
             locationLabel: selectedLocation?.label,
             locationType: selectedLocation?.type,
           }),
@@ -283,10 +314,10 @@ const user = useSelector((state: RootState) => state.auth.user);
           firebasePath: 'community_photos',
           failedCount: failed.length,
         });
-        Alert.alert(text.permissionError, saveError);
+        toast.showError(text.permissionError, saveError || text.saveError);
         return;
       }
-      AlertHelper.success(text.moderationSuccess);
+      toast.showSuccess(text.moderationSuccess);
       void AsyncStorage.removeItem(PHOTO_UPLOAD_DRAFT_KEY).catch(() => {});
       setTitle('');
       setDescription('');
@@ -299,11 +330,11 @@ const user = useSelector((state: RootState) => state.auth.user);
         feature: 'gallery',
         stage: 'unexpected',
       });
-      Alert.alert(text.permissionError, error instanceof Error ? error.message : String(error));
+      toast.showError(text.permissionError, error instanceof Error ? error.message : text.saveError);
     } finally {
       setUploading(false);
     }
-  }, [author, canSubmit, description, formPhotos, language, selectedLocation, text.moderationSuccess, text.permissionError, title, user?.email, user?.id, user?.name]);
+  }, [author, canSubmit, description, donePhotos, selectedLocation, text, title, toast, user?.email, user?.id, user?.name]);
 
   const needsLocationList = selectedCategory === 'building' || selectedCategory === 'place';
 
@@ -321,10 +352,14 @@ const user = useSelector((state: RootState) => state.auth.user);
             userName={user?.name ?? ''}
             maxPhotos={5}
             storagePath="community_photos"
-            onPhotosChange={(photos) => setFormPhotos(photos.filter((p) => p.status === 'done'))}
+            onPhotosChange={setFormPhotos}
           />
+          <UploadedPhotosGrid />
         </View>
         <Text style={styles.fieldHint}>{text.hintPhoto}</Text>
+        <InlineFieldHint message={text.addPhotoWarning} type="warning" visible={donePhotos.length === 0} />
+        <InlineFieldHint message={text.waitUploadWarning} type="hint" visible={hasUploadingPhotos} />
+        <InlineFieldHint message={text.fixPhotoWarning} type="error" visible={hasPhotoErrors} />
 
         <View style={styles.card}>
           <TextInput
@@ -344,6 +379,7 @@ const user = useSelector((state: RootState) => state.auth.user);
             maxLength={80}
           />
           <Text style={styles.fieldHint}>{text.hintTitle}</Text>
+          <InlineFieldHint message={text.addTitleWarning} type="warning" visible={!title.trim()} />
           <TextInput
             placeholder={text.descPlaceholder}
             placeholderTextColor="#8a8178"
@@ -430,7 +466,7 @@ const user = useSelector((state: RootState) => state.auth.user);
             disabled={!canSubmit}
             activeOpacity={0.85}
           >
-            {uploading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{text.send}</Text>}
+            {uploading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{hasUploadingPhotos ? text.photoUploading : hasPhotoErrors ? text.photoUploadError : text.send}</Text>}
           </TouchableOpacity>
         </View>
       </ScrollView>

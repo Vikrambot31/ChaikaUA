@@ -28,12 +28,16 @@ const MESSAGES = {
     auth: 'Не вдалося виконати вхід. Перевірте дані або спробуйте інший спосіб входу.',
     network: "Немає з'єднання з Інтернетом. Перевірте мережу та спробуйте ще раз.",
     validation: 'Перевірте заповнення форми: деякі поля пропущені або заповнені неправильно.',
-    missingRequiredFields: 'Перевірте обов’язкові поля форми.',
+    missingRequiredFields: "Перевірте обов'язкові поля форми.",
     cooldownActive: 'Ви надсилаєте заявки занадто часто. Зачекайте трохи й спробуйте ще раз.',
     uploadFailed: 'Не вдалося завантажити файл. Перевірте інтернет і спробуйте ще раз.',
     photoUploadFailed: 'Не вдалося завантажити фото. Перевірте права доступу, фото та інтернет.',
     loginRequired: 'Потрібно увійти або зареєструватися, щоб надіслати цю форму.',
     noPermission: 'Не вдалося виконати дію. Перевірте інтернет і спробуйте ще раз.',
+    permissionDenied: 'Немає доступу. Спробуйте перезайти в акаунт.',
+    unavailable: 'Сервер тимчасово недоступний. Спробуйте пізніше.',
+    unauthenticated: 'Потрібно увійти в акаунт.',
+    notFound: 'Запис не знайдено або його було видалено.',
     invalidPrice: 'Вкажіть коректну ціну від 0.01 до 99 999 999.99.',
     rateLimit: 'Ви надсилаєте заявки занадто часто. Зачекайте трохи й спробуйте ще раз.',
     imageBlocked: 'Фото не пройшло перевірку безпеки. Оберіть інше фото без забороненого або чутливого контенту.',
@@ -66,6 +70,10 @@ const MESSAGES = {
     photoUploadFailed: 'Не удалось загрузить фото. Проверьте права доступа, фото и интернет.',
     loginRequired: 'Нужно войти или зарегистрироваться, чтобы отправить эту форму.',
     noPermission: 'Не удалось выполнить действие. Проверьте интернет и попробуйте ещё раз.',
+    permissionDenied: 'Нет доступа. Попробуйте перезайти в аккаунт.',
+    unavailable: 'Сервер временно недоступен. Попробуйте позже.',
+    unauthenticated: 'Необходимо войти в аккаунт.',
+    notFound: 'Запись не найдена или была удалена.',
     invalidPrice: 'Укажите корректную цену от 0.01 до 99 999 999.99.',
     rateLimit: 'Вы отправляете заявки слишком часто. Подождите немного и попробуйте снова.',
     imageBlocked: 'Фото не прошло проверку безопасности. Выберите другое фото без запрещённого или чувствительного контента.',
@@ -98,6 +106,10 @@ const MESSAGES = {
     photoUploadFailed: 'Could not upload the photo. Check permissions, the photo, and your internet connection.',
     loginRequired: 'You need to sign in or register to submit this form.',
     noPermission: 'Could not complete the action. Check your internet connection and try again.',
+    permissionDenied: 'No access. Try signing in again.',
+    unavailable: 'The server is temporarily unavailable. Try again later.',
+    unauthenticated: 'You need to sign in.',
+    notFound: 'The item was not found or has been deleted.',
     invalidPrice: 'Enter a valid price from 0.01 to 99,999,999.99.',
     rateLimit: 'You are sending requests too often. Please wait a moment and try again.',
     imageBlocked: 'The photo did not pass the safety check. Choose another photo without prohibited or sensitive content.',
@@ -130,6 +142,15 @@ export const getUserErrorMessage = (
   if (raw.includes('auth/network-request-failed') || raw.includes('network') || raw.includes('offline') || raw.includes('fetch') || raw.includes('internet')) {
     return MESSAGES[language].network;
   }
+  if (raw.includes('unavailable')) {
+    return MESSAGES[language].unavailable;
+  }
+  if (raw.includes('unauthenticated')) {
+    return MESSAGES[language].unauthenticated;
+  }
+  if (raw.includes('not-found')) {
+    return MESSAGES[language].notFound;
+  }
   if (raw.includes('authentication required') || raw.includes('not authenticated') || raw.includes('login required') || raw.includes('sign in')) {
     return MESSAGES[language].loginRequired;
   }
@@ -143,7 +164,7 @@ export const getUserErrorMessage = (
     if (context === 'upload') {
       return MESSAGES[language].upload;
     }
-    return MESSAGES[language][context];
+    return MESSAGES[language].permissionDenied;
   }
   if (context === 'upload' && (raw.includes('upload') || raw.includes('storage') || raw.includes('blob'))) {
     return MESSAGES[language].uploadFailed;
@@ -176,6 +197,91 @@ export const showUserError = (
   rawError?: unknown,
 ): void => {
   Alert.alert(getErrorTitle(language), getUserErrorMessage(language, context, rawError));
+};
+
+export type InviteFieldError = {
+  field: 'sponsorPhone' | 'text' | null;
+  message: string;
+  retryAfterSeconds?: number;
+};
+
+export const readUserFacingErrorCode = (error: unknown): string => {
+  if (!error || typeof error !== 'object') return '';
+  const record = error as Record<string, unknown>;
+  return String(record.code || record.name || '').toLowerCase();
+};
+
+export const readUserFacingErrorDetails = (error: unknown): Record<string, unknown> => {
+  if (!error || typeof error !== 'object') return {};
+  const record = error as Record<string, unknown>;
+  const direct = record.details;
+  if (direct && typeof direct === 'object') return direct as Record<string, unknown>;
+  const custom = record.customData || record._customData;
+  if (custom && typeof custom === 'object') {
+    const customRecord = custom as Record<string, unknown>;
+    if (customRecord.details && typeof customRecord.details === 'object') {
+      return customRecord.details as Record<string, unknown>;
+    }
+    return customRecord;
+  }
+  return {};
+};
+
+export const formatRetryAfter = (seconds?: number): string => {
+  const value = Math.max(0, Math.ceil(Number(seconds || 0)));
+  if (!Number.isFinite(value) || value <= 0) return 'Спробуйте повторити трохи пізніше.';
+  const minutes = Math.max(1, Math.ceil(value / 60));
+  if (minutes < 60) return `Следующая заявка возможна через ${minutes} мин.`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return `Следующая заявка возможна через ${hours} ч${rest ? ` ${rest} мин` : ''}.`;
+};
+
+export const formatCountdown = (seconds?: number): string => {
+  const value = Math.max(0, Math.ceil(Number(seconds || 0)));
+  const minutes = Math.floor(value / 60);
+  const restSeconds = value % 60;
+  return `${minutes}:${String(restSeconds).padStart(2, '0')}`;
+};
+
+export const getRateLimitRetryAfterSeconds = (error: unknown): number | undefined => {
+  const code = readUserFacingErrorCode(error);
+  const details = readUserFacingErrorDetails(error);
+  const retryAfterSeconds = Number(details.retryAfterSeconds || details.retry_after_seconds || 0);
+  if (!code.includes('resource-exhausted') && !String(details.error || details.code || '').includes('rate_limit')) {
+    return undefined;
+  }
+  return Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0 ? Math.ceil(retryAfterSeconds) : undefined;
+};
+
+export const mapInviteCFErrorToField = (error: unknown): InviteFieldError => {
+  const code = readUserFacingErrorCode(error);
+  const details = readUserFacingErrorDetails(error);
+  const field = String(details.field || '').toLowerCase();
+  const reason = String(details.reason || details.code || '').toLowerCase();
+  const retryAfterSeconds = Number(details.retryAfterSeconds || details.retry_after_seconds || 0);
+
+  if (code.includes('resource-exhausted')) {
+    return {
+      field: null,
+      message: formatRetryAfter(retryAfterSeconds),
+      retryAfterSeconds: Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0 ? retryAfterSeconds : undefined,
+    };
+  }
+
+  if (code.includes('not-found') && reason === 'sponsor_not_found') {
+    return { field: 'sponsorPhone', message: 'Поручитель не найден. Проверьте номер.' };
+  }
+
+  if (code.includes('invalid-argument') && (field === 'sponsor_phone' || field === 'sponsorphone')) {
+    return { field: 'sponsorPhone', message: 'Телефон поручителя должен быть в формате +380XXXXXXXXX.' };
+  }
+
+  if (code.includes('invalid-argument') && field === 'text') {
+    return { field: 'text', message: 'Напишите причину от 20 до 280 символов.' };
+  }
+
+  return { field: null, message: getUserErrorMessage('ru', 'send', error) };
 };
 
 export const getModerationUserMessage = (

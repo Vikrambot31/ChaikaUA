@@ -62,6 +62,7 @@ $ProjectRoot   = Split-Path -Parent $PSScriptRoot
 $AndroidDir    = Join-Path $ProjectRoot 'android'
 $ApkDir        = Join-Path $AndroidDir 'app\build\outputs\apk\release'
 $ReleaseDir    = Join-Path $ProjectRoot 'release'
+$SiteReleaseDir = Join-Path $ProjectRoot 'chaika-site\release'
 $BuildLogsDir  = Join-Path $ProjectRoot 'build-logs'
 $LaunchDir     = @(
   (Join-Path $ProjectRoot 'ЗАПУСК АПК'),
@@ -76,6 +77,7 @@ $ScriptsDir    = $PSScriptRoot
 
 $ProjectReleaseApk = Join-Path $ReleaseDir 'app-release.apk'
 $LaunchReleaseApk  = Join-Path $LaunchDir 'app-release.apk'
+$SiteVersionedApkPath = ''
 
 $StaleBundle     = Join-Path $AndroidDir 'app\src\main\assets\index.android.bundle'
 $StaleBundleMeta = "$StaleBundle.meta"
@@ -493,29 +495,37 @@ try {
     }
 
     # ── STEP 18: Copy APK to release locations ─────────────────────────
-    Write-Step 'COPY' 'Copy APK to release/ and script folder'
+    Write-Step 'COPY' 'Copy APK to release locations'
     Set-Location $ProjectRoot
     New-Item -ItemType Directory -Force -Path $ReleaseDir | Out-Null
+    New-Item -ItemType Directory -Force -Path $SiteReleaseDir | Out-Null
 
     $safeName = "ChaikaLife-v$($AppVersion -replace '[\s:/\\]','-')-$($BuildStamp -replace '[\s:/\\]','-')"
     $VersionedApkPath = Join-Path $ReleaseDir "$safeName.apk"
+    $SiteVersionedApkPath = Join-Path $SiteReleaseDir "$safeName.apk"
 
     Remove-FileSafe $VersionedApkPath
+    Remove-FileSafe $SiteVersionedApkPath
     Remove-FileSafe $ProjectReleaseApk
     Remove-FileSafe $LaunchReleaseApk
 
     Copy-Item -LiteralPath $BuiltApkPath -Destination $VersionedApkPath -Force
+    Copy-Item -LiteralPath $BuiltApkPath -Destination $SiteVersionedApkPath -Force
     Copy-Item -LiteralPath $BuiltApkPath -Destination $ProjectReleaseApk -Force
     Copy-Item -LiteralPath $BuiltApkPath -Destination $LaunchReleaseApk  -Force
 
     if (-not (Test-Path -LiteralPath $VersionedApkPath)) {
       throw "Versioned APK was not created: $VersionedApkPath"
     }
+    if (-not (Test-Path -LiteralPath $SiteVersionedApkPath)) {
+      throw "Site release APK was not created: $SiteVersionedApkPath"
+    }
     Write-StepOk 'COPY' "Versioned: $VersionedApkPath"
+    Write-StepOk 'COPY' "Site: $SiteVersionedApkPath"
 
     # ── STEP 19: Final freshness verification ──────────────────────────
     Write-Step 'FINAL' 'Verify all final APK copies are fresh'
-    foreach ($path in @($ProjectReleaseApk, $LaunchReleaseApk, $VersionedApkPath)) {
+    foreach ($path in @($ProjectReleaseApk, $LaunchReleaseApk, $VersionedApkPath, $SiteVersionedApkPath)) {
       $t = (Get-Item -LiteralPath $path).LastWriteTime
       if ($t -lt $markerTime) {
         throw "Stale final APK: $path ($t < $markerTime)"
@@ -538,6 +548,25 @@ try {
         "`"$OtaCheckMode`""
       ) -join ' '
       $null = Invoke-Cmd -CommandLine "node `"$reportScript`" $reportArgs" -StepName 'REPORT' -ContinueOnError -SuccessMsg 'Build report generated'
+      $reportPath = Join-Path $ReleaseDir 'build-report.json'
+      if (Test-Path $reportPath) {
+        $report = Get-Content $reportPath -Raw | ConvertFrom-Json
+        foreach ($versionPath in @((Join-Path $ProjectRoot 'app-version.json'), (Join-Path $ProjectRoot 'chaika-site\app-version.json'))) {
+          $versionJson = Get-Content $versionPath -Raw | ConvertFrom-Json
+          $versionJson | Add-Member -NotePropertyName 'apkFileName' -NotePropertyValue "$safeName.apk" -Force
+          $versionJson | Add-Member -NotePropertyName 'apkSha256' -NotePropertyValue $report.apk.sha256 -Force
+          $versionJson | Add-Member -NotePropertyName 'apkSizeMB' -NotePropertyValue $report.apk.sizeMB -Force
+          Set-Content -LiteralPath $versionPath -Value ($versionJson | ConvertTo-Json -Depth 10) -Encoding UTF8
+        }
+        $latestPath = Join-Path $SiteReleaseDir 'latest.json'
+        if (Test-Path $latestPath) {
+          $latestJson = Get-Content $latestPath -Raw | ConvertFrom-Json
+          $latestJson | Add-Member -NotePropertyName 'apkSha256' -NotePropertyValue $report.apk.sha256 -Force
+          $latestJson | Add-Member -NotePropertyName 'apkSizeMB' -NotePropertyValue $report.apk.sizeMB -Force
+          Set-Content -LiteralPath $latestPath -Value ($latestJson | ConvertTo-Json -Depth 10) -Encoding UTF8
+        }
+        Write-StepOk 'REPORT' 'APK metadata synced to app-version.json'
+      }
     } else {
       Write-StepWarn 'REPORT' 'generate-build-report.cjs not found, skipping'
     }

@@ -78,6 +78,17 @@ const releaseData = {
   createdAt: Date.now(),
 };
 
+function getFirebaseDatabaseURL() {
+  const envValue = String(process.env.FIREBASE_DATABASE_URL || '').trim();
+  if (envValue) return envValue;
+  const appJson = JSON.parse(fs.readFileSync(path.join(root, 'app.json'), 'utf8'));
+  const value = String(appJson?.expo?.extra?.firebaseDatabaseURL || '').trim();
+  if (!value || !/firebaseio\.com/i.test(value)) {
+    throw new Error(`misconfigured_database_url: ${value || 'missing'}`);
+  }
+  return value;
+}
+
 async function registerRelease() {
   let admin;
   try {
@@ -87,7 +98,7 @@ async function registerRelease() {
     return;
   }
 
-  const databaseURL = process.env.FIREBASE_DATABASE_URL || 'https://chaikaua-3cd9d-default-rtdb.firebaseio.com';
+  const databaseURL = getFirebaseDatabaseURL();
 
   try {
     if (!admin.apps.length) {
@@ -117,6 +128,8 @@ async function registerRelease() {
       version: String(report.appVersion || ''),
       buildStamp: String(report.buildStamp || ''),
       apkUrl,
+      apkSha256: String(report.apk?.sha256 || 'unknown'),
+      apkSizeMB: Number(report.apk?.sizeMB) || 0,
       publishedAt: Date.now(),
     });
     console.log(`[REGISTER] Version registry updated: app_version_registry/current`);

@@ -25,6 +25,7 @@ import { jobService, JobListing } from '../services/jobService';
 import { lostFoundService, LostFoundItem } from '../services/lostFoundService';
 import { moderateOsbbNews, OsbbNewsItem } from '../services/osbbNews';
 import { SCREEN_THEME } from '../utils/screenTheme';
+import { logClientError } from '../utils/errorLogger';
 
 type Tab = 'requests' | 'photos' | 'buysell' | 'contacts' | 'jobs' | 'lostfound' | 'osbbnews';
 type Lang = 'ua' | 'ru' | 'en';
@@ -186,57 +187,97 @@ const PhotoModerationScreen: React.FC = () => {
 
       if (tab === 'buysell') {
         loaders.push((async () => {
-          const snap = await get(ref(database, 'buy_sell_listings'));
-          if (snap.exists()) {
-            const raw = snap.val() as Record<string, Record<string, unknown>>;
-            setBuysell(Object.entries(raw).map(([id, d]) => ({ ...(d as Omit<BuySellListing, 'id'>), id })));
+          try {
+            const snap = await get(ref(database, 'buy_sell_listings'));
+            if (snap.exists()) {
+              const raw = snap.val() as Record<string, Record<string, unknown>>;
+              setBuysell(Object.entries(raw).map(([id, d]) => ({ ...(d as Omit<BuySellListing, 'id'>), id })));
+            }
+          } catch (error: unknown) {
+            void logClientError('ModeraciyaFoto.loadBuySell', error, {
+              firebasePath: 'buy_sell_listings',
+              stage: 'read_moderation_list',
+            });
+            throw error;
           }
         })());
       }
 
       if (tab === 'contacts') {
         loaders.push((async () => {
-          const snap = await get(ref(database, 'contacts_listings'));
-          if (snap.exists()) {
-            const raw = snap.val() as Record<string, Record<string, unknown>>;
-            setContacts(Object.entries(raw).map(([id, d]) => ({ ...(d as Omit<ContactListing, 'id'>), id })));
+          try {
+            const snap = await get(ref(database, 'contacts_listings'));
+            if (snap.exists()) {
+              const raw = snap.val() as Record<string, Record<string, unknown>>;
+              setContacts(Object.entries(raw).map(([id, d]) => ({ ...(d as Omit<ContactListing, 'id'>), id })));
+            }
+          } catch (error: unknown) {
+            void logClientError('ModeraciyaFoto.loadContacts', error, {
+              firebasePath: 'contacts_listings',
+              stage: 'read_moderation_list',
+            });
+            throw error;
           }
         })());
       }
 
       if (tab === 'jobs') {
         loaders.push((async () => {
-          const snap = await get(ref(database, 'job_listings'));
-          if (snap.exists()) {
-            const raw = snap.val() as Record<string, Record<string, unknown>>;
-            setJobs(Object.entries(raw).map(([id, d]) => ({ ...(d as Omit<JobListing, 'id'>), id })));
+          try {
+            const snap = await get(ref(database, 'job_listings'));
+            if (snap.exists()) {
+              const raw = snap.val() as Record<string, Record<string, unknown>>;
+              setJobs(Object.entries(raw).map(([id, d]) => ({ ...(d as Omit<JobListing, 'id'>), id })));
+            }
+          } catch (error: unknown) {
+            void logClientError('ModeraciyaFoto.loadJobs', error, {
+              firebasePath: 'job_listings',
+              stage: 'read_moderation_list',
+            });
+            throw error;
           }
         })());
       }
 
       if (tab === 'lostfound') {
         loaders.push((async () => {
-          const snap = await get(ref(database, 'lost_found'));
-          if (snap.exists()) {
-            const raw = snap.val() as Record<string, Record<string, unknown>>;
-            setLostfound(Object.entries(raw).map(([id, d]) => ({ ...(d as Omit<LostFoundItem, 'id'>), id })));
+          try {
+            const snap = await get(ref(database, 'lost_found'));
+            if (snap.exists()) {
+              const raw = snap.val() as Record<string, Record<string, unknown>>;
+              setLostfound(Object.entries(raw).map(([id, d]) => ({ ...(d as Omit<LostFoundItem, 'id'>), id })));
+            }
+          } catch (error: unknown) {
+            void logClientError('ModeraciyaFoto.loadLostFound', error, {
+              firebasePath: 'lost_found',
+              stage: 'read_moderation_list',
+            });
+            throw error;
           }
         })());
       }
 
       if (tab === 'osbbnews') {
         loaders.push((async () => {
-          const snap = await get(ref(database, 'osbb_news'));
-          if (snap.exists()) {
-            const raw = snap.val() as Record<string, Record<string, Record<string, unknown>>>;
-            const items = Object.entries(raw).flatMap(([buildingId, newsById]) =>
-              Object.entries(newsById || {}).map(([id, d]) => ({
-                ...(d as Omit<ModerationOsbbNews, 'id' | 'buildingId'>),
-                id,
-                buildingId,
-              }))
-            );
-            setOsbbNews(items);
+          try {
+            const snap = await get(ref(database, 'osbb_news'));
+            if (snap.exists()) {
+              const raw = snap.val() as Record<string, Record<string, Record<string, unknown>>>;
+              const items = Object.entries(raw).flatMap(([buildingId, newsById]) =>
+                Object.entries(newsById || {}).map(([id, d]) => ({
+                  ...(d as Omit<ModerationOsbbNews, 'id' | 'buildingId'>),
+                  id,
+                  buildingId,
+                }))
+              );
+              setOsbbNews(items);
+            }
+          } catch (error: unknown) {
+            void logClientError('ModeraciyaFoto.loadOsbbNews', error, {
+              firebasePath: 'osbb_news',
+              stage: 'read_moderation_list',
+            });
+            throw error;
           }
         })());
       }

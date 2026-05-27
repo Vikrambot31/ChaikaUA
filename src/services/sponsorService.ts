@@ -1,6 +1,8 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { auth, firebaseApp } from '../firebase-core';
+import { get, onValue, ref } from 'firebase/database';
+import { auth, database, firebaseApp } from '../firebase-core';
+import { CACHE_TTL, cacheGet, cacheSet } from '../utils/cacheLayer';
+import { normalizeSponsorPhoneValue } from '../utils/rulesEngine';
 
 export const SPONSOR_PHONE_RE = /^\+380\d{9}$/;
 
@@ -30,11 +32,15 @@ export type InviteRequestSnapshot = {
   riskScore?: number;
   riskLevel?: string;
   configUpdatedAt?: number;
+  moderationAvgHours?: number;
 };
 
 type SubmitInviteRequestResponse = {
   ok: boolean;
-  status: 'received';
+  status: 'received' | 'pending' | 'pending_sponsor' | 'auto_approved' | 'already_granted' | 'error';
+  requestId?: string;
+  queuePosition?: number;
+  accessStatus?: string;
 };
 
 export type SponsorConfirmationSnapshot = {
@@ -69,11 +75,11 @@ type RawInviteStatusResponse = {
   riskScore?: number;
   riskLevel?: string;
   configUpdatedAt?: number;
+  moderationAvgHours?: number;
 };
 
 const functions = getFunctions(firebaseApp);
-const INVITE_STATUS_CACHE_KEY = '@chaika:invite_access_status_v1';
-const INVITE_STATUS_CACHE_TTL_MS = 5 * 60 * 1000;
+const INVITE_STATUS_CACHE_KEY = 'invite_access:status';
 
 const normalizeStatus = (value: unknown): InviteRequestStatus => {
   if (
@@ -108,27 +114,20 @@ const getInviteStatusCacheKey = (): string =>
 
 const cacheInviteStatus = async (snapshot: InviteRequestSnapshot): Promise<void> => {
   try {
-    await AsyncStorage.setItem(getInviteStatusCacheKey(), JSON.stringify({ snapshot, cachedAt: Date.now() }));
+    await cacheSet(getInviteStatusCacheKey(), snapshot, CACHE_TTL.inviteAccess);
   } catch {}
 };
 
 const getCachedInviteStatus = async (): Promise<InviteRequestSnapshot | null> => {
   try {
-    const raw = await AsyncStorage.getItem(getInviteStatusCacheKey());
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as { snapshot?: InviteRequestSnapshot; cachedAt?: number };
-    if (!parsed.snapshot || Date.now() - Number(parsed.cachedAt || 0) > INVITE_STATUS_CACHE_TTL_MS) return null;
-    return parsed.snapshot;
+    return await cacheGet<InviteRequestSnapshot>(getInviteStatusCacheKey());
   } catch {
     return null;
   }
 };
 
 export const normalizeSponsorPhone = (value: string): string => {
-  const raw = String(value || '').trim().replace(/[\s().-]/g, '');
-  if (/^0\d{9}$/.test(raw)) return `+38${raw}`;
-  if (/^380\d{9}$/.test(raw)) return `+${raw}`;
-  return raw;
+  return normalizeSponsorPhoneValue(value);
 };
 
 export const isValidSponsorPhone = (value: string): boolean =>
@@ -137,18 +136,28 @@ export const isValidSponsorPhone = (value: string): boolean =>
 export const submitInviteRequest = async (
   requesterPhone: string,
   sponsorPhone: string,
+  payload: { text?: string; apartment?: string } = {},
 ): Promise<SubmitInviteRequestResponse> => {
   const callable = httpsCallable<
-    { requesterPhone: string; sponsorPhone: string },
+    { requesterPhone: string; sponsorPhone: string; text?: string; apartment?: string; comment?: string },
     SubmitInviteRequestResponse
   >(functions, 'submitInviteRequest');
 
   const result = await callable({
     requesterPhone: normalizeSponsorPhone(requesterPhone),
     sponsorPhone: normalizeSponsorPhone(sponsorPhone),
+    text: String(payload.text || '').trim(),
+    apartment: String(payload.apartment || '').trim(),
+    comment: String(payload.text || '').trim(),
   });
 
   return result.data;
+};
+
+export const getModerationAverageHours = async (): Promise<number> => {
+  const snapshot = await get(ref(database, 'stats/moderation_avg_hours'));
+  const value = Number(snapshot.val() || 0);
+  return Number.isFinite(value) && value > 0 ? value : 48;
 };
 
 export const getMyInviteRequestStatus = async (): Promise<InviteRequestSnapshot> => {
@@ -195,9 +204,31 @@ export const getMyInviteRequestStatus = async (): Promise<InviteRequestSnapshot>
     riskScore: Number(result.data.riskScore || 0),
     riskLevel: result.data.riskLevel || '',
     configUpdatedAt: Number(result.data.configUpdatedAt || 0),
+    moderationAvgHours: Number(result.data.moderationAvgHours || 0),
   };
   await cacheInviteStatus(snapshot);
   return snapshot;
+};
+
+export const subscribeMyInviteAccessStatus = (
+  onChanged: () => void,
+): (() => void) => {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return () => {};
+
+  const handler = () => { void onChanged(); };
+
+  // TZ_3.3 — 4th critical onValue: fires immediately when moderator approves the request.
+  // invite_access/{uid} — where the invite request record lives (status field).
+  // user_access/{uid}   — where the access grant is written after approval.
+  // Both paths are watched so whichever the admin panel writes to first triggers a refresh.
+  const unsubInvite = onValue(ref(database, `invite_access/${uid}`), handler);
+  const unsubUserAccess = onValue(ref(database, `user_access/${uid}`), handler);
+
+  return () => {
+    unsubInvite();
+    unsubUserAccess();
+  };
 };
 
 const normalizeConfirmationStatus = (value: unknown): SponsorConfirmationSnapshot['status'] => {

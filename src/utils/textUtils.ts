@@ -70,7 +70,7 @@ export const normalizePersonName = (text: string): string => {
 
   return safeText(text)
     .replace(/\s+/g, ' ')
-    .replace(/[^\p{L}\p{N}'’\-. ]/gu, '')
+    .replace(/[^\p{L}\p{N}''\-. ]/gu, '')
     .trim();
 };
 
@@ -91,7 +91,6 @@ export const ensureUTF8 = (text: string): string => {
   if (!text) return '';
 
   if (typeof TextEncoder === 'undefined' || typeof TextDecoder === 'undefined') {
-    console.warn('[textUtils.ensureUTF8] TextEncoder/TextDecoder unavailable; returning original text.');
     return text;
   }
 

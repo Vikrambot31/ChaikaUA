@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { getReleases, updateReleaseSummary, deleteRelease, type ReleaseRecord } from '../services/releasesService';
+import { getReleases, updateReleaseSummary, updateReleaseControl, deleteRelease, type ReleaseRecord } from '../services/releasesService';
 
 export function useReleases() {
   const [releases, setReleases] = useState<ReleaseRecord[]>([]);
@@ -35,11 +35,27 @@ export function useReleases() {
     setReleases((prev) => prev.filter((r) => r.versionKey !== versionKey));
   }, []);
 
+  const handleUpdateControl = useCallback(async (
+    versionKey: string,
+    control: {
+      minimumRequiredVersion: string;
+      forceUpdateRequired: boolean;
+      maintenanceMessage: string;
+      betaModeEnabled: boolean;
+    },
+  ) => {
+    await updateReleaseControl(versionKey, control);
+    setReleases((prev) =>
+      prev.map((r) => (r.versionKey === versionKey ? { ...r, ...control } : r)),
+    );
+  }, []);
+
   return {
     releases,
     loading,
     error,
     updateSummary: handleUpdateSummary,
+    updateControl: handleUpdateControl,
     deleteRelease: handleDeleteRelease,
     refresh,
   };

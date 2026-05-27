@@ -1,4 +1,5 @@
-const functions = require('firebase-functions');
+﻿const functions = require('firebase-functions');
+const functionsV1 = require('firebase-functions/v1');
 const admin = require('firebase-admin');
 const crypto = require('crypto');
 const { createInviteAccessFunctions } = require('./inviteAccess');
@@ -17,7 +18,7 @@ const PREMIUM_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 const PREMIUM_PLANS = new Set(['premium', 'premium_plus']);
 const MEDIA_ACCESS_TTL_MS = 15 * 60 * 1000;
 const MEDIA_DATA_URL_MAX_BYTES = 8 * 1024 * 1024;
-const MEDIA_PATH_RE = /^(community_photos|lost_found|buy_sell|buy_sell_listings|profile_photos|local_business|requests)\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp|heic|heif)$/i;
+const MEDIA_PATH_RE = /^(?:(?:community_photos|lost_found|buy_sell|buy_sell_listings|profile_photos|local_business|requests)\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+|uploads\/users\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+)\.(jpg|jpeg|png|webp|heic|heif)$/i;
 
 const redactText = (value = '') =>
   String(value || '')
@@ -64,9 +65,10 @@ const sendTelegramMessage = async (text, options = {}) => {
 };
 
 const normalizeNewsText = (value = '') => String(value || '').replace(/\s+/g, ' ').trim();
+const sanitizeText = (value = '', maxLength = 500) => normalizeNewsText(value).slice(0, maxLength);
 const HIGH_PRIORITY_REQUEST_CATEGORIES = new Set(['medical', 'electricity', 'care', 'repair']);
 
-const getRequestModerationMeta = (category = '') => {
+const getRequestPriorityParts = (category = '') => {
   const normalizedCategory = normalizeNewsText(category).toLowerCase();
 
   if (normalizedCategory === 'app_suggestion') {
@@ -74,6 +76,8 @@ const getRequestModerationMeta = (category = '') => {
       moderationPriority: 'low',
       moderationQueue: 'feedback',
       requiresManualModeration: true,
+      priorityNumber: '03',
+      priorityKey: 'low',
     };
   }
 
@@ -82,6 +86,8 @@ const getRequestModerationMeta = (category = '') => {
       moderationPriority: 'high',
       moderationQueue: 'urgent',
       requiresManualModeration: true,
+      priorityNumber: '01',
+      priorityKey: normalizedCategory,
     };
   }
 
@@ -89,6 +95,24 @@ const getRequestModerationMeta = (category = '') => {
     moderationPriority: 'standard',
     moderationQueue: 'standard',
     requiresManualModeration: true,
+    priorityNumber: '02',
+    priorityKey: 'standard',
+  };
+};
+
+const getRequestStatusPriority = (status = 'pending', category = '') => {
+  const parts = getRequestPriorityParts(category);
+  const normalizedStatus = normalizeNewsText(status).toLowerCase() || 'pending';
+  return `${normalizedStatus}_${parts.priorityNumber}_${parts.priorityKey}`;
+};
+
+const getRequestModerationMeta = (category = '', status = 'pending') => {
+  const parts = getRequestPriorityParts(category);
+  return {
+    moderationPriority: parts.moderationPriority,
+    moderationQueue: parts.moderationQueue,
+    requiresManualModeration: parts.requiresManualModeration,
+    status_priority: getRequestStatusPriority(status, category),
   };
 };
 
@@ -146,6 +170,11 @@ const writeOpsError = async (functionName, error, payload = {}) => {
 };
 
 const PRIMARY_SERVICE_EMAIL = 'vikramsave@ukr.net';
+const ADMIN_BACKUP_UID = String(process.env.ADMIN_BACKUP_UID || '').trim();
+const EMERGENCY_ACCESS_PATH = 'security_config/emergency_access/current';
+const EMERGENCY_ADMIN_LOG_PATH = 'security_logs/admin_actions';
+const EMERGENCY_DEFAULT_TTL_MS = 2 * 60 * 60 * 1000;
+const EMERGENCY_MAX_TTL_MS = 6 * 60 * 60 * 1000;
 const AUTH_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const AUTH_RATE_LIMIT_MAX_ATTEMPTS = 5;
 const USER_CONTENT_COLLECTIONS = [
@@ -168,9 +197,10 @@ const STORAGE_USER_PREFIXES = [
 
 const isPrimaryServiceOwnerContext = (context) =>
   Boolean(
-    context?.auth?.token?.email &&
+    (ADMIN_BACKUP_UID && context?.auth?.uid === ADMIN_BACKUP_UID) ||
+    (context?.auth?.token?.email &&
     String(context.auth.token.email).toLowerCase() === PRIMARY_SERVICE_EMAIL &&
-    context?.auth?.token?.email_verified === true,
+    context?.auth?.token?.email_verified === true),
   );
 
 const isAdminRoleContext = async (context) => {
@@ -183,6 +213,55 @@ const getRoleForUid = async (uid) => {
   if (!uid) return '';
   const snapshot = await admin.database().ref(`user_roles/${uid}/role`).once('value');
   return String(snapshot.val() || '');
+};
+
+const getVerifiedActorEmail = (context) => {
+  const email = String(context?.auth?.token?.email || '').trim().toLowerCase();
+  const emailVerified = context?.auth?.token?.email_verified === true;
+  return email && emailVerified ? email : '';
+};
+
+const assertEmergencyDebugActor = async (context) => {
+  if (!context.auth?.uid) {
+    throw new functionsV1.https.HttpsError('unauthenticated', 'Authentication required');
+  }
+
+  const actorEmail = getVerifiedActorEmail(context);
+  if (!actorEmail) {
+    throw new functionsV1.https.HttpsError('permission-denied', 'Verified email is required');
+  }
+
+  const role = await getRoleForUid(context.auth.uid);
+  const isPrimaryOwner = actorEmail === PRIMARY_SERVICE_EMAIL;
+  const isAdmin = role === 'admin';
+  if (!isPrimaryOwner && !isAdmin) {
+    throw new functionsV1.https.HttpsError('permission-denied', 'Primary owner or admin access required');
+  }
+
+  return {
+    uid: context.auth.uid,
+    email: actorEmail,
+    role: isPrimaryOwner ? 'primary_owner' : role,
+  };
+};
+
+const setCustomClaimMerged = async (uid, key, value) => {
+  if (!uid) return;
+  const userRecord = await admin.auth().getUser(uid);
+  const claims = { ...(userRecord.customClaims || {}) };
+  if (value === undefined || value === null || value === false) {
+    delete claims[key];
+  } else {
+    claims[key] = value;
+  }
+  await admin.auth().setCustomUserClaims(uid, claims);
+};
+
+const writeEmergencyAdminActionLog = async (payload) => {
+  await admin.database().ref(EMERGENCY_ADMIN_LOG_PATH).push({
+    ...payload,
+    at: payload.at || Date.now(),
+  });
 };
 
 Object.assign(exports, createInviteAccessFunctions({
@@ -217,11 +296,11 @@ const userHasBuildingAccess = async (uid, buildingId) => {
 
 const assertOsbbManagerAccess = async (context, buildingId) => {
   if (!context.auth?.uid) {
-    throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+    throw new functionsV1.https.HttpsError('unauthenticated', 'Authentication required');
   }
 
   if (!buildingId) {
-    throw new functions.https.HttpsError('invalid-argument', 'buildingId is required');
+    throw new functionsV1.https.HttpsError('invalid-argument', 'buildingId is required');
   }
 
   if (isPrimaryServiceOwnerContext(context)) {
@@ -237,16 +316,16 @@ const assertOsbbManagerAccess = async (context, buildingId) => {
     return { uid: context.auth.uid, role };
   }
 
-  throw new functions.https.HttpsError('permission-denied', 'OSBB manager access required');
+  throw new functionsV1.https.HttpsError('permission-denied', 'OSBB manager access required');
 };
 
 const assertOsbbResidentAccess = async (context, buildingId) => {
   if (!context.auth?.uid) {
-    throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+    throw new functionsV1.https.HttpsError('unauthenticated', 'Authentication required');
   }
 
   if (!buildingId) {
-    throw new functions.https.HttpsError('invalid-argument', 'buildingId is required');
+    throw new functionsV1.https.HttpsError('invalid-argument', 'buildingId is required');
   }
 
   if (isPrimaryServiceOwnerContext(context)) {
@@ -262,7 +341,7 @@ const assertOsbbResidentAccess = async (context, buildingId) => {
     return { uid: context.auth.uid, role: role || 'resident' };
   }
 
-  throw new functions.https.HttpsError('permission-denied', 'OSBB building membership required');
+  throw new functionsV1.https.HttpsError('permission-denied', 'OSBB building membership required');
 };
 
 const normalizeOsbbVoteStatus = (status, deadline) => {
@@ -325,7 +404,7 @@ const getUserRoleRecord = async (uid) => {
 const assertSafeMediaPath = (storagePath) => {
   const value = String(storagePath || '').trim();
   if (!MEDIA_PATH_RE.test(value)) {
-    throw new functions.https.HttpsError('invalid-argument', 'Invalid media path');
+    throw new functionsV1.https.HttpsError('invalid-argument', 'Invalid media path');
   }
   return value;
 };
@@ -417,7 +496,7 @@ const getExistingMediaFile = async (storagePath) => {
   }
 
   if (lastError) throw lastError;
-  throw new functions.https.HttpsError('not-found', 'Media file not found in Storage');
+  throw new functionsV1.https.HttpsError('not-found', 'Media file not found in Storage');
 };
 
 const getMediaRecordRef = (collection, itemId) => {
@@ -427,7 +506,7 @@ const getMediaRecordRef = (collection, itemId) => {
   if (collection === 'lost_found') return db.ref(`lost_found/${itemId}`);
   if (collection === 'buy_sell_listings') return db.ref(`buy_sell_listings/${itemId}`);
   if (collection === 'local_business') return db.ref(`local_business/${itemId}`);
-  throw new functions.https.HttpsError('invalid-argument', 'Unsupported media collection');
+  throw new functionsV1.https.HttpsError('invalid-argument', 'Unsupported media collection');
 };
 
 const getRecordMediaPath = (record) => String(
@@ -437,7 +516,7 @@ const getRecordMediaPath = (record) => String(
 const getRecordOwnerId = (collection, itemId, record) => {
   const ownerId = String(record?.userId || '').trim();
   if (!ownerId) {
-    throw new functions.https.HttpsError('failed-precondition', 'Media record owner is missing');
+    throw new functionsV1.https.HttpsError('failed-precondition', 'Media record owner is missing');
   }
   return ownerId;
 };
@@ -515,7 +594,7 @@ const assertAuthAttemptAllowed = async (email, ip) => {
   const now = Date.now();
 
   if (current.lockedUntil && current.lockedUntil > now) {
-    throw new functions.https.HttpsError('resource-exhausted', 'Too many sign-in attempts. Try again later.');
+    throw new functionsV1.https.HttpsError('resource-exhausted', 'Too many sign-in attempts. Try again later.');
   }
 
   return { ref, current, now };
@@ -534,17 +613,19 @@ const recordAuthFailure = async (rateLimit) => {
   });
 };
 
-const signInWithEmailRateLimitedHandler = functions.https.onCall(async (data, context) => {
+const signInWithEmailRateLimitedHandler = functionsV1
+  .runWith({ minInstances: 1 })
+  .https.onCall(async (data, context) => {
   const email = normalizeNewsText(data?.email || '').toLowerCase();
   const password = String(data?.password || '');
   if (!email || !password || password.length > 256) {
-    throw new functions.https.HttpsError('invalid-argument', 'Email and password are required');
+    throw new functionsV1.https.HttpsError('invalid-argument', 'Email and password are required');
   }
 
   const rateLimit = await assertAuthAttemptAllowed(email, context.rawRequest?.ip);
   const apiKey = process.env.FIREBASE_API_KEY || '';
   if (!apiKey) {
-    throw new functions.https.HttpsError('failed-precondition', 'Server sign-in API key is not configured');
+    throw new functionsV1.https.HttpsError('failed-precondition', 'Server sign-in API key is not configured');
   }
 
   const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`, {
@@ -555,41 +636,41 @@ const signInWithEmailRateLimitedHandler = functions.https.onCall(async (data, co
 
   if (!response.ok) {
     await recordAuthFailure(rateLimit);
-    throw new functions.https.HttpsError('unauthenticated', 'Invalid email or password');
+    throw new functionsV1.https.HttpsError('unauthenticated', 'Invalid email or password');
   }
 
   const body = await response.json();
   await rateLimit.ref.remove();
   const customToken = await admin.auth().createCustomToken(body.localId);
   return { customToken };
-});
+  });
 
 exports.signInWithEmailRateLimited = signInWithEmailRateLimitedHandler;
 // Backward-compatible alias for legacy callable name typo used in some deploy/client flows.
 exports.signalWithEmailRateLimited = signInWithEmailRateLimitedHandler;
 
-exports.getMediaAccessUrl = functions.https.onCall(async (data, context) => {
+exports.getMediaAccessUrl = functionsV1.https.onCall(async (data, context) => {
   try {
     if (!context.auth?.uid) {
-      throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+      throw new functionsV1.https.HttpsError('unauthenticated', 'Authentication required');
     }
 
     const collection = String(data?.collection || '').trim();
     const itemId = String(data?.itemId || '').trim();
     const storagePath = assertSafeMediaPath(data?.storagePath);
     if (!itemId) {
-      throw new functions.https.HttpsError('invalid-argument', 'itemId is required');
+      throw new functionsV1.https.HttpsError('invalid-argument', 'itemId is required');
     }
 
     const snapshot = await getMediaRecordRef(collection, itemId).once('value');
     if (!snapshot.exists()) {
-      throw new functions.https.HttpsError('not-found', 'Media record not found');
+      throw new functionsV1.https.HttpsError('not-found', 'Media record not found');
     }
 
     const record = snapshot.val() || {};
     const recordPath = getRecordMediaPath(record);
     if (recordPath !== storagePath) {
-      throw new functions.https.HttpsError('permission-denied', 'Media path is not attached to this record');
+      throw new functionsV1.https.HttpsError('permission-denied', 'Media path is not attached to this record');
     }
 
     const roleRecord = await getUserRoleRecord(context.auth.uid);
@@ -598,7 +679,7 @@ exports.getMediaAccessUrl = functions.https.onCall(async (data, context) => {
     const isOwner = ownerId === context.auth.uid;
     const isPublicApproved = getRecordModerationStatus(record) === 'approved';
     if (!isOwner && !isPublicApproved && !isModeratorRole(role) && !isPrimaryServiceOwnerContext(context)) {
-      throw new functions.https.HttpsError('permission-denied', 'Media is not available');
+      throw new functionsV1.https.HttpsError('permission-denied', 'Media is not available');
     }
 
     const expiresAt = Date.now() + MEDIA_ACCESS_TTL_MS;
@@ -620,7 +701,7 @@ exports.getMediaAccessUrl = functions.https.onCall(async (data, context) => {
       const [metadata] = await file.getMetadata();
       const size = Number(metadata?.size || 0);
       if (size > MEDIA_DATA_URL_MAX_BYTES) {
-        throw new functions.https.HttpsError('resource-exhausted', 'Media file is too large for inline data URL fallback');
+        throw new functionsV1.https.HttpsError('resource-exhausted', 'Media file is too large for inline data URL fallback');
       }
 
       const [buffer] = await file.download();
@@ -637,38 +718,38 @@ exports.getMediaAccessUrl = functions.https.onCall(async (data, context) => {
 
     return { url, expiresAt };
   } catch (error) {
-    if (error instanceof functions.https.HttpsError) throw error;
+    if (error instanceof functionsV1.https.HttpsError) throw error;
     await writeOpsError('getMediaAccessUrl', error, {
       uid: context.auth?.uid || null,
       collection: data?.collection || null,
       itemId: data?.itemId || null,
     });
-    throw new functions.https.HttpsError('internal', 'Failed to issue media access URL');
+    throw new functionsV1.https.HttpsError('internal', 'Failed to issue media access URL');
   }
 });
 
-exports.getMediaDataUrl = functions.https.onCall(async (data, context) => {
+exports.getMediaDataUrl = functionsV1.https.onCall(async (data, context) => {
   try {
     if (!context.auth?.uid) {
-      throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+      throw new functionsV1.https.HttpsError('unauthenticated', 'Authentication required');
     }
 
     const collection = String(data?.collection || '').trim();
     const itemId = String(data?.itemId || '').trim();
     const storagePath = assertSafeMediaPath(data?.storagePath);
     if (!itemId) {
-      throw new functions.https.HttpsError('invalid-argument', 'itemId is required');
+      throw new functionsV1.https.HttpsError('invalid-argument', 'itemId is required');
     }
 
     const snapshot = await getMediaRecordRef(collection, itemId).once('value');
     if (!snapshot.exists()) {
-      throw new functions.https.HttpsError('not-found', 'Media record not found');
+      throw new functionsV1.https.HttpsError('not-found', 'Media record not found');
     }
 
     const record = snapshot.val() || {};
     const recordPath = getRecordMediaPath(record);
     if (recordPath !== storagePath) {
-      throw new functions.https.HttpsError('permission-denied', 'Media path is not attached to this record');
+      throw new functionsV1.https.HttpsError('permission-denied', 'Media path is not attached to this record');
     }
 
     const roleRecord = await getUserRoleRecord(context.auth.uid);
@@ -677,14 +758,14 @@ exports.getMediaDataUrl = functions.https.onCall(async (data, context) => {
     const isOwner = ownerId === context.auth.uid;
     const isPublicApproved = getRecordModerationStatus(record) === 'approved';
     if (!isOwner && !isPublicApproved && !isModeratorRole(role) && !isPrimaryServiceOwnerContext(context)) {
-      throw new functions.https.HttpsError('permission-denied', 'Media is not available');
+      throw new functionsV1.https.HttpsError('permission-denied', 'Media is not available');
     }
 
     const { file, bucketName } = await getExistingMediaFile(storagePath);
     const [metadata] = await file.getMetadata();
     const size = Number(metadata?.size || 0);
     if (size > MEDIA_DATA_URL_MAX_BYTES) {
-      throw new functions.https.HttpsError('resource-exhausted', 'Media file is too large for inline data URL fallback');
+      throw new functionsV1.https.HttpsError('resource-exhausted', 'Media file is too large for inline data URL fallback');
     }
 
     const [buffer] = await file.download();
@@ -696,17 +777,17 @@ exports.getMediaDataUrl = functions.https.onCall(async (data, context) => {
       bucketName,
     };
   } catch (error) {
-    if (error instanceof functions.https.HttpsError) throw error;
+    if (error instanceof functionsV1.https.HttpsError) throw error;
     await writeOpsError('getMediaDataUrl', error, {
       uid: context.auth?.uid || null,
       collection: data?.collection || null,
       itemId: data?.itemId || null,
     });
-    throw new functions.https.HttpsError('internal', 'Failed to read media data');
+    throw new functionsV1.https.HttpsError('internal', 'Failed to read media data');
   }
 });
 
-exports.getMediaDataUrlHttp = functions.https.onRequest(async (req, res) => {
+exports.getMediaDataUrlHttp = functionsV1.https.onRequest(async (req, res) => {
   const allowedOrigins = new Set([
     'http://localhost:5173',
     'http://localhost:5174',
@@ -847,7 +928,7 @@ const SAFE_RTDB_PATH_RE = /^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+){1,2}$/;
 
 const assertAdminModerationAccess = async (context) => {
   if (!context.auth?.uid) {
-    throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+    throw new functionsV1.https.HttpsError('unauthenticated', 'Authentication required');
   }
   if (isPrimaryServiceOwnerContext(context)) {
     return { uid: context.auth.uid, role: 'owner' };
@@ -856,23 +937,23 @@ const assertAdminModerationAccess = async (context) => {
   if (role === 'admin' || role === 'moderator') {
     return { uid: context.auth.uid, role };
   }
-  throw new functions.https.HttpsError('permission-denied', 'Moderator access required');
+  throw new functionsV1.https.HttpsError('permission-denied', 'Moderator access required');
 };
 
 const assertModerationTargetPath = (data, config) => {
   const rawPath = String(data?.path || '').trim();
   if (!SAFE_RTDB_PATH_RE.test(rawPath)) {
-    throw new functions.https.HttpsError('invalid-argument', 'Invalid moderation path');
+    throw new functionsV1.https.HttpsError('invalid-argument', 'Invalid moderation path');
   }
 
   const parts = rawPath.split('/');
   if (parts[0] !== config.path || parts.length !== (config.nested ? 3 : 2)) {
-    throw new functions.https.HttpsError('invalid-argument', 'Moderation path does not match section');
+    throw new functionsV1.https.HttpsError('invalid-argument', 'Moderation path does not match section');
   }
   return rawPath;
 };
 
-exports.adminModerateContentItem = functions.https.onCall(async (data, context) => {
+exports.adminModerateContentItem = functionsV1.https.onCall(async (data, context) => {
   try {
     const actor = await assertAdminModerationAccess(context);
     const section = String(data?.section || '').trim();
@@ -881,10 +962,10 @@ exports.adminModerateContentItem = functions.https.onCall(async (data, context) 
     const config = ADMIN_MODERATION_SECTIONS[section];
 
     if (!config) {
-      throw new functions.https.HttpsError('invalid-argument', 'Unknown moderation section');
+      throw new functionsV1.https.HttpsError('invalid-argument', 'Unknown moderation section');
     }
     if (action !== 'approved' && action !== 'rejected' && action !== 'delete') {
-      throw new functions.https.HttpsError('invalid-argument', 'Unsupported moderation action');
+      throw new functionsV1.https.HttpsError('invalid-argument', 'Unsupported moderation action');
     }
 
     const targetPath = assertModerationTargetPath(data, config);
@@ -892,26 +973,35 @@ exports.adminModerateContentItem = functions.https.onCall(async (data, context) 
     const targetRef = db.ref(targetPath);
     const snapshot = await targetRef.once('value');
     if (!snapshot.exists()) {
-      throw new functions.https.HttpsError('not-found', 'Moderation item not found');
+      throw new functionsV1.https.HttpsError('not-found', 'Moderation item not found');
     }
 
     const now = Date.now();
     if (action === 'delete') {
       await targetRef.remove();
     } else {
+      const target = snapshot.val() || {};
+      const nextStatusValue = action === 'approved' ? config.approvedValue : config.rejectedValue;
+      const reason = sanitizeText(data?.reason || '', 200);
+
+      if (action === 'rejected' && (reason.length < 10 || reason.length > 200)) {
+        throw new functionsV1.https.HttpsError('invalid-argument', 'Rejection reason must be 10-200 characters');
+      }
+
       const patch = {
-        [config.statusField]: action === 'approved' ? config.approvedValue : config.rejectedValue,
+        [config.statusField]: nextStatusValue,
         moderatedAt: now,
         moderatedBy: actor.uid,
       };
 
       if (section === 'requests') {
         patch.isApproved = action === 'approved';
+        patch.status_priority = getRequestStatusPriority(nextStatusValue, target.category);
       }
 
       if (action === 'rejected') {
-        patch.moderationReason = 'default_rejected';
-        patch.rejectionReason = 'default_rejected';
+        patch.moderationReason = reason;
+        patch.rejectionReason = reason;
       } else {
         patch.moderationReason = null;
         patch.rejectionReason = null;
@@ -946,14 +1036,15 @@ exports.adminModerateContentItem = functions.https.onCall(async (data, context) 
 
     return { ok: true };
   } catch (error) {
-    if (error instanceof functions.https.HttpsError) throw error;
+    if (error instanceof functionsV1.https.HttpsError) throw error;
+    console.error('[adminModerateContentItem] unexpected error:', error?.message || error, error?.stack);
     await writeOpsError('adminModerateContentItem', error, {
       uid: context.auth?.uid || null,
       section: data?.section || null,
       action: data?.action || null,
       path: data?.path || null,
     });
-    throw new functions.https.HttpsError('internal', 'Failed to apply moderation action');
+    throw new functionsV1.https.HttpsError('internal', 'Failed to apply moderation action');
   }
 });
 
@@ -1080,13 +1171,13 @@ const cleanupExpiredRecordsHandler = async () => {
 };
 
 // Legacy export name kept for existing schedules/deployments. It now archives first, then deletes old archive records.
-exports.cleanupExpiredRequests = functions.pubsub
+exports.cleanupExpiredRequests = functionsV1.pubsub
   .schedule('every 24 hours')
   .timeZone('Europe/Kiev')
   .onRun(cleanupExpiredRecordsHandler);
 
 // Відправка сповіщення модераторам про нову заявку
-exports.notifyModeratorsOnNewRequest = functions.database
+exports.notifyModeratorsOnNewRequest = functionsV1.database
   .ref('/requests/{requestId}')
   .onCreate(async (snapshot, context) => {
     const request = snapshot.val();
@@ -1159,7 +1250,7 @@ exports.notifyModeratorsOnNewRequest = functions.database
   });
 
 // Автоматична модерація (базова фільтрація)
-exports.autoModerateRequest = functions.database
+exports.autoModerateRequest = functionsV1.database
   .ref('/requests/{requestId}')
   .onCreate(async (snapshot, context) => {
     const request = snapshot.val();
@@ -1190,7 +1281,7 @@ exports.autoModerateRequest = functions.database
         isApproved: false,
         moderatedAt: Date.now(),
         moderatedBy: 'auto-moderator',
-        ...moderationMeta,
+        ...getRequestModerationMeta(request.category, 'rejected'),
       });
       return null;
     }
@@ -1205,7 +1296,7 @@ exports.autoModerateRequest = functions.database
     return null;
   });
 
-const buildModerationNotification = (status, kind) => {
+const buildModerationNotification = (status, kind, reason = '') => {
   if (status === 'approved') {
     return {
       title: 'Chaika Life: матеріал схвалено',
@@ -1213,9 +1304,12 @@ const buildModerationNotification = (status, kind) => {
     };
   }
   if (status === 'rejected') {
+    const cleanReason = sanitizeText(reason, 160);
     return {
       title: 'Chaika Life: матеріал відхилено',
-      body: `${kind} не пройшло модерацію. Перевірте правила публікації.`,
+      body: cleanReason
+        ? `${kind} не пройшло модерацію. Причина: ${cleanReason}`
+        : `${kind} не пройшло модерацію. Перевірте правила публікації.`,
     };
   }
   return null;
@@ -1232,7 +1326,7 @@ const notifyOwnerOnModerationChange = async (change, context, options) => {
   }
 
   const uid = String(after.userId || after.uid || after.createdBy || '');
-  const notification = buildModerationNotification(afterStatus, options.kind);
+  const notification = buildModerationNotification(afterStatus, options.kind, after.moderationReason || after.rejectionReason || '');
   if (!uid || !notification) return null;
 
   const result = await sendUserNotification(uid, notification, {
@@ -1240,6 +1334,7 @@ const notifyOwnerOnModerationChange = async (change, context, options) => {
     status: afterStatus,
     collection: options.collection,
     itemId: String(context.params[options.paramName] || ''),
+    reason: String(after.moderationReason || after.rejectionReason || ''),
   });
 
   await writeOpsEvent('moderation_result_notification', {
@@ -1253,7 +1348,55 @@ const notifyOwnerOnModerationChange = async (change, context, options) => {
   return null;
 };
 
-exports.notifyRequestOwnerOnModeration = functions.database
+const buildPublicCommunityPhoto = (photo) => {
+  const status = String(photo.status || '').toLowerCase();
+  const target = String(photo.target || 'gallery_public');
+  const title = String(photo.title || '').trim();
+  const imageUri = String(photo.imageUri || photo.downloadUrl || photo.storagePath || '').trim();
+  const storagePath = String(photo.storagePath || '').trim();
+  if (status !== 'approved' || target === 'my_photos' || (!imageUri && !storagePath)) return null;
+
+  const publicPhoto = {
+    title: title || 'Photo',
+    description: String(photo.description || '').trim(),
+    imageUri: imageUri || storagePath,
+    uploadedBy: String(photo.uploadedBy || photo.userName || 'Anonymous').trim(),
+    createdAt: Number(photo.createdAt || photo.uploadedAt || Date.now()),
+    uploadedAt: Number(photo.uploadedAt || photo.createdAt || Date.now()),
+    status: 'approved',
+    target: 'gallery_public',
+    likes: Number(photo.likes || 0),
+  };
+
+  if (storagePath) publicPhoto.storagePath = storagePath;
+  if (typeof photo.userId === 'string' && photo.userId.trim()) publicPhoto.userId = photo.userId.trim();
+  if (typeof photo.locationLabel === 'string' && photo.locationLabel.trim()) publicPhoto.locationLabel = photo.locationLabel.trim();
+  if (photo.locationType === 'building' || photo.locationType === 'place') publicPhoto.locationType = photo.locationType;
+  if (Number.isFinite(Number(photo.moderatedAt))) publicPhoto.moderatedAt = Number(photo.moderatedAt);
+
+  return publicPhoto;
+};
+
+exports.syncPublicCommunityPhoto = functionsV1.database
+  .ref('/community_photos/{photoId}')
+  .onWrite(async (change, context) => {
+    const publicRef = admin.database().ref(`/community_photos_public/${context.params.photoId}`);
+    if (!change.after.exists()) {
+      await publicRef.remove();
+      return null;
+    }
+
+    const publicPhoto = buildPublicCommunityPhoto(change.after.val() || {});
+    if (!publicPhoto) {
+      await publicRef.remove();
+      return null;
+    }
+
+    await publicRef.set(publicPhoto);
+    return null;
+  });
+
+exports.notifyRequestOwnerOnModeration = functionsV1.database
   .ref('/requests/{requestId}')
   .onUpdate((change, context) => notifyOwnerOnModerationChange(change, context, {
     collection: 'requests',
@@ -1262,15 +1405,16 @@ exports.notifyRequestOwnerOnModeration = functions.database
     statusField: 'status',
   }));
 
-exports.notifyPhotoOwnerOnModeration = functions.database
+exports.notifyPhotoOwnerOnModeration = functionsV1.database
   .ref('/community_photos/{photoId}')
   .onUpdate((change, context) => notifyOwnerOnModerationChange(change, context, {
     collection: 'community_photos',
     paramName: 'photoId',
     kind: 'Фото',
+    statusField: 'status',
   }));
 
-exports.notifyListingOwnerOnModeration = functions.database
+exports.notifyListingOwnerOnModeration = functionsV1.database
   .ref('/buy_sell_listings/{itemId}')
   .onUpdate((change, context) => notifyOwnerOnModerationChange(change, context, {
     collection: 'buy_sell_listings',
@@ -1278,7 +1422,7 @@ exports.notifyListingOwnerOnModeration = functions.database
     kind: 'Оголошення',
   }));
 
-exports.notifyLostFoundOwnerOnModeration = functions.database
+exports.notifyLostFoundOwnerOnModeration = functionsV1.database
   .ref('/lost_found/{itemId}')
   .onUpdate((change, context) => notifyOwnerOnModerationChange(change, context, {
     collection: 'lost_found',
@@ -1290,7 +1434,7 @@ exports.notifyLostFoundOwnerOnModeration = functions.database
 // Сохраняет метаданные аудио в RTDB под путём voice_messages/{encodedPath}
 // Для транскрипции подключите Google Cloud Speech-to-Text API:
 //   GOOGLE_CLOUD_STT_KEY нужно добавить в firebase functions config
-exports.processVoiceMessage = functions.storage
+exports.processVoiceMessage = functionsV1.storage
   .object()
   .onFinalize(async (object) => {
     const filePath = object.name || '';
@@ -1319,7 +1463,7 @@ exports.processVoiceMessage = functions.storage
     }
   });
 
-exports.stripImageMetadataOnUpload = functions.storage
+exports.stripImageMetadataOnUpload = functionsV1.storage
   .object()
   .onFinalize(async (object) => {
     const filePath = String(object.name || '');
@@ -1375,7 +1519,7 @@ exports.stripImageMetadataOnUpload = functions.storage
   });
 
 // Статистика заявок
-exports.updateRequestStats = functions.database
+exports.updateRequestStats = functionsV1.database
   .ref('/requests/{requestId}')
   .onWrite(async (change, context) => {
     const db = admin.database();
@@ -1429,7 +1573,7 @@ exports.updateRequestStats = functions.database
   });
 
 // Публикація новин Чайки в Telegram-групу/канал
-exports.publishChaykaNewsToTelegram = functions.database
+exports.publishChaykaNewsToTelegram = functionsV1.database
   .ref('/chayka_news/publications/{publicationId}')
   .onCreate(async (snapshot, context) => {
     const publicationId = context.params.publicationId;
@@ -1483,7 +1627,7 @@ exports.publishChaykaNewsToTelegram = functions.database
     }
   });
 
-exports.addOsbbVote = functions.https.onCall(async (data, context) => {
+exports.addOsbbVote = functionsV1.https.onCall(async (data, context) => {
   const buildingId = String(data?.buildingId || '').trim();
   const title = normalizeNewsText(data?.title || '');
   const question = normalizeNewsText(data?.question || title);
@@ -1491,7 +1635,7 @@ exports.addOsbbVote = functions.https.onCall(async (data, context) => {
   const { uid } = await assertOsbbManagerAccess(context, buildingId);
 
   if (!title || !question) {
-    throw new functions.https.HttpsError('invalid-argument', 'title and question are required');
+    throw new functionsV1.https.HttpsError('invalid-argument', 'title and question are required');
   }
 
   const now = Date.now();
@@ -1522,21 +1666,21 @@ exports.addOsbbVote = functions.https.onCall(async (data, context) => {
     return { id: newRef.key || null };
   } catch (error) {
     await writeOpsError('addOsbbVote', error, { buildingId, createdBy: uid });
-    throw new functions.https.HttpsError('internal', 'Failed to create OSBB vote');
+    throw new functionsV1.https.HttpsError('internal', 'Failed to create OSBB vote');
   }
 });
 
-exports.castOsbbVote = functions.https.onCall(async (data, context) => {
+exports.castOsbbVote = functionsV1.https.onCall(async (data, context) => {
   const buildingId = String(data?.buildingId || '').trim();
   const voteId = String(data?.voteId || '').trim();
   const optionId = normalizeOsbbVoteOptionId(data?.optionId);
 
   if (!context.auth?.uid) {
-    throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+    throw new functionsV1.https.HttpsError('unauthenticated', 'Authentication required');
   }
 
   if (!buildingId || !voteId) {
-    throw new functions.https.HttpsError('invalid-argument', 'buildingId and voteId are required');
+    throw new functionsV1.https.HttpsError('invalid-argument', 'buildingId and voteId are required');
   }
 
   await assertOsbbResidentAccess(context, buildingId);
@@ -1597,11 +1741,11 @@ exports.castOsbbVote = functions.https.onCall(async (data, context) => {
     });
 
     if (blockReason) {
-      throw new functions.https.HttpsError('failed-precondition', blockReason);
+      throw new functionsV1.https.HttpsError('failed-precondition', blockReason);
     }
 
     if (!result.committed) {
-      throw new functions.https.HttpsError('aborted', 'vote-not-committed');
+      throw new functionsV1.https.HttpsError('aborted', 'vote-not-committed');
     }
 
     await writeOpsEvent('osbb_vote_cast', {
@@ -1613,7 +1757,7 @@ exports.castOsbbVote = functions.https.onCall(async (data, context) => {
 
     return { ok: true };
   } catch (error) {
-    if (error instanceof functions.https.HttpsError) {
+    if (error instanceof functionsV1.https.HttpsError) {
       throw error;
     }
     await writeOpsError('castOsbbVote', error, {
@@ -1621,11 +1765,11 @@ exports.castOsbbVote = functions.https.onCall(async (data, context) => {
       voteId,
       votedBy: context.auth?.uid || null,
     });
-    throw new functions.https.HttpsError('internal', 'Failed to cast OSBB vote');
+    throw new functionsV1.https.HttpsError('internal', 'Failed to cast OSBB vote');
   }
 });
 
-exports.closeExpiredOsbbVotes = functions.pubsub
+exports.closeExpiredOsbbVotes = functionsV1.pubsub
   .schedule('every 15 minutes')
   .timeZone('Europe/Kiev')
   .onRun(async () => {
@@ -1665,10 +1809,10 @@ exports.closeExpiredOsbbVotes = functions.pubsub
     }
   });
 
-exports.getUserSubscription = functions.https.onCall(async (_data, context) => {
+exports.getUserSubscription = functionsV1.https.onCall(async (_data, context) => {
   try {
     if (!context.auth?.uid) {
-      throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+      throw new functionsV1.https.HttpsError('unauthenticated', 'Authentication required');
     }
 
     const snapshot = await admin.database().ref(`user_subscription/${context.auth.uid}`).once('value');
@@ -1692,15 +1836,15 @@ exports.getUserSubscription = functions.https.onCall(async (_data, context) => {
   }
 });
 
-exports.activatePromoPremium = functions.https.onCall(async (data, context) => {
+exports.activatePromoPremium = functionsV1.https.onCall(async (data, context) => {
   try {
     if (!context.auth?.uid) {
-      throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+      throw new functionsV1.https.HttpsError('unauthenticated', 'Authentication required');
     }
 
     const plan = PREMIUM_PLANS.has(data?.plan) ? data.plan : null;
     if (!plan) {
-      throw new functions.https.HttpsError('invalid-argument', 'Unsupported premium plan');
+      throw new functionsV1.https.HttpsError('invalid-argument', 'Unsupported premium plan');
     }
 
     const db = admin.database();
@@ -1741,7 +1885,7 @@ exports.activatePromoPremium = functions.https.onCall(async (data, context) => {
       : FREE_PREMIUM_LIMIT;
 
     if (!counterResult.committed || nextValue > FREE_PREMIUM_LIMIT) {
-      throw new functions.https.HttpsError('resource-exhausted', 'Free promo limit reached');
+      throw new functionsV1.https.HttpsError('resource-exhausted', 'Free promo limit reached');
     }
 
     const nowIso = new Date().toISOString();
@@ -1770,10 +1914,10 @@ exports.activatePromoPremium = functions.https.onCall(async (data, context) => {
   }
 });
 
-exports.cancelUserSubscription = functions.https.onCall(async (_data, context) => {
+exports.cancelUserSubscription = functionsV1.https.onCall(async (_data, context) => {
   try {
     if (!context.auth?.uid) {
-      throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+      throw new functionsV1.https.HttpsError('unauthenticated', 'Authentication required');
     }
 
     await admin.database().ref(`user_subscription/${context.auth.uid}`).set({
@@ -1798,14 +1942,116 @@ exports.cancelUserSubscription = functions.https.onCall(async (_data, context) =
   }
 });
 
-exports.deleteCommunityUserFully = functions.https.onCall(async (data, context) => {
+exports.enableEmergencyDebugUnlock = functionsV1.https.onCall(async (data, context) => {
+  const actor = await assertEmergencyDebugActor(context);
+  const reason = normalizeNewsText(data?.reason || '').slice(0, 300);
+  if (!reason) {
+    throw new functionsV1.https.HttpsError('invalid-argument', 'reason is required');
+  }
+
+  const requestedTtlMs = Number(data?.ttlMs || Number(data?.ttlMinutes || 0) * 60 * 1000 || EMERGENCY_DEFAULT_TTL_MS);
+  const ttlMs = Number.isFinite(requestedTtlMs)
+    ? Math.min(Math.max(requestedTtlMs, 5 * 60 * 1000), EMERGENCY_MAX_TTL_MS)
+    : EMERGENCY_DEFAULT_TTL_MS;
+
+  if (requestedTtlMs > EMERGENCY_MAX_TTL_MS) {
+    throw new functionsV1.https.HttpsError('invalid-argument', 'ttl exceeds maximum emergency debug duration');
+  }
+
+  const now = Date.now();
+  const expiresAt = now + ttlMs;
+  const payload = {
+    enabled: true,
+    mode: 'owner_debug_unlock',
+    reason,
+    enabledByUid: actor.uid,
+    enabledByEmail: actor.email,
+    enabledAt: now,
+    expiresAt,
+    allowAnonymousRead: false,
+    bypassDeviceAuthorization: true,
+    bypassForceUpdate: true,
+    bypassMaintenance: true,
+    bypassInviteAccess: true,
+    bypassUserAccess: true,
+    bypassDiagnosticsRestrictions: true,
+  };
+
+  await admin.database().ref(EMERGENCY_ACCESS_PATH).set(payload);
+  await setCustomClaimMerged(actor.uid, 'emergencyDebug', true);
+  await setCustomClaimMerged(actor.uid, 'emergencyDebugExpiresAt', expiresAt);
+  await writeEmergencyAdminActionLog({
+    action: 'enable_emergency_debug_unlock',
+    actorUid: actor.uid,
+    actorEmail: actor.email,
+    at: now,
+    expiresAt,
+    reason,
+  });
+  await writeOpsEvent('enable_emergency_debug_unlock', {
+    actorUid: actor.uid,
+    actorEmail: actor.email,
+    expiresAt,
+  });
+
+  return { ok: true, current: payload };
+});
+
+exports.disableEmergencyDebugUnlock = functionsV1.https.onCall(async (data, context) => {
+  const actor = await assertEmergencyDebugActor(context);
+  const now = Date.now();
+  const reason = normalizeNewsText(data?.reason || 'Protection restored').slice(0, 300);
+  const currentRef = admin.database().ref(EMERGENCY_ACCESS_PATH);
+  const currentSnapshot = await currentRef.once('value');
+  const current = currentSnapshot.val() || {};
+  const enabledByUid = String(current.enabledByUid || '').trim();
+
+  await currentRef.update({
+    enabled: false,
+    disabledByUid: actor.uid,
+    disabledByEmail: actor.email,
+    disabledAt: now,
+    disabledReason: reason,
+  });
+
+  const claimUids = Array.from(new Set([actor.uid, enabledByUid].filter(Boolean)));
+  await Promise.all(claimUids.flatMap((uid) => [
+    setCustomClaimMerged(uid, 'emergencyDebug', false),
+    setCustomClaimMerged(uid, 'emergencyDebugExpiresAt', false),
+  ]));
+  await writeEmergencyAdminActionLog({
+    action: 'disable_emergency_debug_unlock',
+    actorUid: actor.uid,
+    actorEmail: actor.email,
+    at: now,
+    reason,
+  });
+  await writeOpsEvent('disable_emergency_debug_unlock', {
+    actorUid: actor.uid,
+    actorEmail: actor.email,
+  });
+
+  return {
+    ok: true,
+    current: {
+      ...current,
+      enabled: false,
+      disabledByUid: actor.uid,
+      disabledByEmail: actor.email,
+      disabledAt: now,
+      disabledReason: reason,
+    },
+  };
+});
+
+exports.deleteCommunityUserFully = functionsV1.https.onCall(async (data, context) => {
   if (!context.auth || !(isPrimaryServiceOwnerContext(context) || await isAdminRoleContext(context))) {
-    throw new functions.https.HttpsError('permission-denied', 'Primary service owner or admin access required');
+    throw new functionsV1.https.HttpsError('permission-denied', 'Primary service owner or admin access required');
   }
 
   const uid = String(data?.uid || '').trim();
   if (!uid) {
-    throw new functions.https.HttpsError('invalid-argument', 'User uid is required');
+    throw new functionsV1.https.HttpsError('invalid-argument', 'User uid is required');
   }
 
   const db = admin.database();
@@ -1879,13 +2125,13 @@ exports.deleteCommunityUserFully = functions.https.onCall(async (data, context) 
       targetUid: uid,
       deletedBy: context.auth.uid,
     });
-    throw new functions.https.HttpsError('internal', 'Failed to delete user fully');
+    throw new functionsV1.https.HttpsError('internal', 'Failed to delete user fully');
   }
 });
 
 // When an admin assigns a role in user_roles/{uid}, sync moderator custom claim
 // so Storage rules can check request.auth.token.moderator == true
-exports.onRoleChanged = functions.database
+exports.onRoleChanged = functionsV1.database
   .ref('user_roles/{userId}')
   .onWrite(async (change, context) => {
     const uid = context.params.userId;
@@ -1893,13 +2139,13 @@ exports.onRoleChanged = functions.database
     const role = newValue?.role ?? null;
     const isMod = role === 'admin' || role === 'moderator';
     try {
-      await admin.auth().setCustomUserClaims(uid, { moderator: isMod });
+      await setCustomClaimMerged(uid, 'moderator', isMod);
     } catch (error) {
       console.error('[onRoleChanged] setCustomUserClaims failed', uid, error?.message);
     }
   });
 
-exports.sendChaykaTelegramTest = functions.https.onRequest(async (req, res) => {
+exports.sendChaykaTelegramTest = functionsV1.https.onRequest(async (req, res) => {
   try {
     const configuredSecret = process.env.TELEGRAM_TEST_SECRET || '';
     const providedSecret = req.get('x-telegram-test-secret') || req.query.secret || '';
@@ -1929,7 +2175,7 @@ exports.sendChaykaTelegramTest = functions.https.onRequest(async (req, res) => {
 const ALERT_COOLDOWN_MS = 15 * 60 * 1000;
 const ALERT_COOLDOWN_PATH = 'diagnostics/alert_cooldown';
 
-exports.alertCriticalRuntimeError = functions.database
+exports.alertCriticalRuntimeError = functionsV1.database
   .ref('diagnostics/runtime/{entryId}')
   .onCreate(async (snap) => {
     try {
@@ -1991,20 +2237,20 @@ exports.alertCriticalRuntimeError = functions.database
 
 // Sync user_roles/{uid}/role changes to Firebase Auth custom claims
 // This allows storage.rules to check request.auth.token.admin === true
-exports.syncRoleToAuthCustomClaim = functions.database
+exports.syncRoleToAuthCustomClaim = functionsV1.database
   .ref('/user_roles/{userId}/role')
   .onWrite(async (change, context) => {
     const { userId } = context.params;
     const newRole = change.after.val();
 
-    try {
-      if (newRole === 'admin') {
-        await admin.auth().setCustomUserClaims(userId, { admin: true });
-        console.log(`[syncRoleToAuthCustomClaim] Set admin:true for ${userId}`);
-      } else {
-        await admin.auth().setCustomUserClaims(userId, { admin: false });
-        console.log(`[syncRoleToAuthCustomClaim] Set admin:false for ${userId}`);
-      }
+  try {
+    if (newRole === 'admin') {
+      await setCustomClaimMerged(userId, 'admin', true);
+      console.log(`[syncRoleToAuthCustomClaim] Set admin:true for ${userId}`);
+    } else {
+      await setCustomClaimMerged(userId, 'admin', false);
+      console.log(`[syncRoleToAuthCustomClaim] Set admin:false for ${userId}`);
+    }
     } catch (err) {
       console.error(`[syncRoleToAuthCustomClaim] Error for ${userId}:`, err.message);
     }
@@ -2012,19 +2258,19 @@ exports.syncRoleToAuthCustomClaim = functions.database
 
 // Callable function to set a user's role (admin/moderator/user)
 // Only the primary owner (vikramsave@ukr.net) or existing admin can call this
-exports.setUserRole = functions.https.onCall(async (data, context) => {
+exports.setUserRole = functionsV1.https.onCall(async (data, context) => {
   if (!context.auth || !(isPrimaryServiceOwnerContext(context) || await isAdminRoleContext(context))) {
-    throw new functions.https.HttpsError('permission-denied', 'Primary service owner or admin access required');
+    throw new functionsV1.https.HttpsError('permission-denied', 'Primary service owner or admin access required');
   }
 
   const targetUid = String(data?.uid || '').trim();
   const newRole = String(data?.role || '').trim().toLowerCase();
 
   if (!targetUid) {
-    throw new functions.https.HttpsError('invalid-argument', 'target uid is required');
+    throw new functionsV1.https.HttpsError('invalid-argument', 'target uid is required');
   }
   if (!['admin', 'moderator', 'user', null, ''].includes(newRole)) {
-    throw new functions.https.HttpsError('invalid-argument', 'Role must be admin, moderator, or user');
+    throw new functionsV1.https.HttpsError('invalid-argument', 'Role must be admin, moderator, or user');
   }
 
   try {
@@ -2039,9 +2285,9 @@ exports.setUserRole = functions.https.onCall(async (data, context) => {
 
     // Sync auth custom claim (handles admin role for storage rules)
     if (effectiveRole === 'admin') {
-      await admin.auth().setCustomUserClaims(targetUid, { admin: true });
+      await setCustomClaimMerged(targetUid, 'admin', true);
     } else {
-      await admin.auth().setCustomUserClaims(targetUid, { admin: false });
+      await setCustomClaimMerged(targetUid, 'admin', false);
     }
 
     await writeOpsEvent('set_user_role', {
@@ -2053,6 +2299,140 @@ exports.setUserRole = functions.https.onCall(async (data, context) => {
     return { success: true, uid: targetUid, role: effectiveRole };
   } catch (err) {
     console.error('[setUserRole] Error:', err.message);
-    throw new functions.https.HttpsError('internal', 'Failed to set user role');
+    throw new functionsV1.https.HttpsError('internal', 'Failed to set user role');
   }
+});
+
+// ============================================================
+// SHADOW-MODE — ШАГ 1.2
+// Логирует попытки записи в user_roles/{uid}/role из клиента.
+// Admin SDK обходит правила, поэтому CF-записи сюда не попадают.
+// ============================================================
+const SHADOW_DENY_PATH = 'ops/shadow_deny';
+const SHADOW_DENY_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 дней
+
+// Триггер: любая запись в user_roles/{uid}/role
+// (до enforcement .write:false в rules — ловит «клиентские» попытки)
+exports.shadowLogUserRoleWrite = functionsV1.database
+  .ref('/user_roles/{uid}/role')
+  .onWrite(async (change, context) => {
+    // Запись через Admin SDK (CF setUserRole) не имеет context.auth — пропускаем
+    if (!context.auth) return null;
+
+    const uid = context.auth.uid;
+    const targetUid = context.params.uid;
+    const prevVal = change.before.val();
+    const newVal = change.after.val();
+    const key = `${Date.now()}_${uid}`;
+
+    try {
+      await admin.database().ref(`${SHADOW_DENY_PATH}/${key}`).set({
+        uid,
+        targetUid,
+        path: `user_roles/${targetUid}/role`,
+        operation: 'write',
+        prevValue: prevVal,
+        newValue: newVal,
+        timestamp: Date.now(),
+        appVersion: context.params.appVersion || 'unknown',
+      });
+    } catch (err) {
+      console.error('[shadowLogUserRoleWrite] Failed to log:', err.message);
+    }
+    return null;
+  });
+
+// Плановая очистка shadow_deny старше 7 дней (запускается каждые 24ч)
+exports.cleanupShadowDenyLogs = functionsV1.pubsub
+  .schedule('every 24 hours')
+  .onRun(async () => {
+    const db = admin.database();
+    const cutoff = Date.now() - SHADOW_DENY_TTL_MS;
+
+    try {
+      const snapshot = await db.ref(SHADOW_DENY_PATH)
+        .orderByChild('timestamp')
+        .endAt(cutoff)
+        .once('value');
+
+      if (!snapshot.exists()) return null;
+
+      const updates = {};
+      snapshot.forEach((child) => {
+        updates[child.key] = null; // удалить
+      });
+
+      await db.ref(SHADOW_DENY_PATH).update(updates);
+      console.log(`[cleanupShadowDenyLogs] Removed ${Object.keys(updates).length} entries older than 7 days`);
+    } catch (err) {
+      console.error('[cleanupShadowDenyLogs] Error:', err.message);
+    }
+    return null;
+  });
+
+// ============================================================
+// createRequest — ШАГ 1.5
+// Rate-limit 60с между созданием заявок одним пользователем.
+// Возвращает HttpsError('resource-exhausted') с оставшимся временем.
+// ============================================================
+const REQUEST_RATE_LIMIT_MS = 60 * 1000;
+
+exports.createRequest = functionsV1.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functionsV1.https.HttpsError('unauthenticated', 'Требуется авторизация');
+  }
+
+  const uid = context.auth.uid;
+  const db = admin.database();
+
+  // Проверяем timestamp последней заявки пользователя
+  const lastRequestSnap = await db.ref('requests')
+    .orderByChild('userId')
+    .equalTo(uid)
+    .limitToLast(1)
+    .once('value');
+
+  if (lastRequestSnap.exists()) {
+    let lastAt = 0;
+    lastRequestSnap.forEach((child) => {
+      const createdAt = child.val()?.createdAt;
+      if (typeof createdAt === 'number' && createdAt > lastAt) {
+        lastAt = createdAt;
+      }
+    });
+    const elapsed = Date.now() - lastAt;
+    if (elapsed < REQUEST_RATE_LIMIT_MS) {
+      const remaining = Math.ceil((REQUEST_RATE_LIMIT_MS - elapsed) / 1000);
+      throw new functionsV1.https.HttpsError(
+        'resource-exhausted',
+        `Подождите ${remaining} сек. перед созданием следующей заявки`,
+      );
+    }
+  }
+
+  // Валидация полей
+  const category = String(data?.category || '').trim();
+  const description = String(data?.description || '').trim();
+  if (!category) {
+    throw new functionsV1.https.HttpsError('invalid-argument', 'Поле category обязательно');
+  }
+  if (!description) {
+    throw new functionsV1.https.HttpsError('invalid-argument', 'Поле description обязательно');
+  }
+
+  const newRequestRef = db.ref('requests').push();
+  const requestData = {
+    ...sanitizePayload(data),
+    userId: uid,
+    status: 'pending',
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    ...getRequestModerationMeta(category),
+  };
+
+  await newRequestRef.set(requestData);
+
+  await writeOpsEvent('create_request', { uid, requestId: newRequestRef.key, category });
+
+  return { success: true, requestId: newRequestRef.key };
 });

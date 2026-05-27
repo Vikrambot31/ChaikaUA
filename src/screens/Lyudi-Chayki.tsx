@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -25,6 +25,7 @@ import { ProfileViewRequestModal, PermissionModalState } from '../components/Pro
 import { useContactRequest } from '../hooks/useContactRequest';
 import ContactReasonModal from '../components/ContactReasonModal';
 import type { DetailItemData } from '../utils/detailViewTypes';
+import UserCardActionBar from '../components/UserCardActionBar';
 
 const CACHE_KEY = '@chaika:community_users_cache_v1';
 const PRIMARY = '#7A1E5C';
@@ -167,6 +168,7 @@ const mapCurrentUser = (user: User | null, text: UiText): CommunityUser | null =
 
 export default function TopGirlsBoysScreen() {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
+  const navLock = useRef(false);
   const user = useSelector(selectUser);
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
   const text = UI_TEXT[language];
@@ -336,6 +338,7 @@ export default function TopGirlsBoysScreen() {
       </View>
 
       <ScrollView
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.scroll}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void loadPeople()} />}
         showsVerticalScrollIndicator={false}
@@ -402,12 +405,13 @@ export default function TopGirlsBoysScreen() {
             const avatarColor = AVATAR_COLORS[index % AVATAR_COLORS.length];
             const isCurrentUser = person.id === user?.id;
             return (
-              <TouchableOpacity key={person.id} style={[styles.personCard, isCurrentUser && styles.personCardCurrent]} onPress={() => { if (!isCurrentUser) openPersonDetails(person); }} activeOpacity={0.88} disabled={isCurrentUser}>
-                <View style={styles.rankBox}>
-                  <Text style={styles.rankText}>#{index + 1}</Text>
-                </View>
+              <TouchableOpacity key={person.id} style={[styles.personCard, isCurrentUser && styles.personCardCurrent]} onPress={() => { if (isCurrentUser || navLock.current) return; navLock.current = true; openPersonDetails(person); setTimeout(() => { navLock.current = false; }, 800); }} activeOpacity={0.88} disabled={isCurrentUser}>
+                <View style={styles.personCardMain}>
+                  <View style={styles.rankBox}>
+                    <Text style={styles.rankText}>#{index + 1}</Text>
+                  </View>
 
-                <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
+                  <View style={[styles.avatar, { backgroundColor: avatarColor }]}> 
                   {person.photoURL && !failedImages[person.id] ? (
                     <AppPhotoImage
                       uri={person.photoURL}
@@ -419,9 +423,9 @@ export default function TopGirlsBoysScreen() {
                   ) : (
                     <MaterialCommunityIcons name="account" size={28} color="#fff" />
                   )}
-                </View>
+                  </View>
 
-                <View style={styles.personInfo}>
+                  <View style={styles.personInfo}>
                   <View style={styles.nameRow}>
                     <Text style={styles.personName} numberOfLines={1}>{person.name}</Text>
                     {isCurrentUser ? <Text style={styles.youBadge}>{text.you}</Text> : null}
@@ -435,22 +439,26 @@ export default function TopGirlsBoysScreen() {
                       <Text style={styles.metricText}>{text.level} {person.level}</Text>
                     </View>
                   </View>
-                </View>
-
-                <View style={styles.actionsColumn}>
-                  <View style={styles.levelBadge}>
-                    <Text style={styles.levelName} numberOfLines={2}>{person.levelName}</Text>
                   </View>
-                  {!isCurrentUser ? (
-                    <TouchableOpacity
-                      style={styles.contactBtn}
-                      onPress={() => openContactModal({ userId: person.id, name: person.name, sourceType: 'lyudi', sourceId: person.id, sourceTitle: person.name })}
-                      activeOpacity={0.82}
-                    >
-                      <MaterialCommunityIcons name="account-arrow-right-outline" size={16} color="#fff" />
-                    </TouchableOpacity>
-                  ) : null}
+
+                  <View style={styles.actionsColumn}>
+                    <View style={styles.levelBadge}>
+                      <Text style={styles.levelName} numberOfLines={2}>{person.levelName}</Text>
+                    </View>
+                  </View>
                 </View>
+                <UserCardActionBar
+                  avatarUri={person.photoURL || ''}
+                  name={person.name}
+                  userId={person.id}
+                  currentUserId={user?.id}
+                  language={language}
+                  onProfile={!isCurrentUser ? () => navigation.navigate('ViewUserProfile', { userId: person.id }) : undefined}
+                  onContact={!isCurrentUser ? () => openContactModal({ userId: person.id, name: person.name, sourceType: 'lyudi', sourceId: person.id, sourceTitle: person.name }) : undefined}
+                  contactDisabled={isCurrentUser}
+                  likePath="feed_likes/people"
+                  likeId={person.id}
+                />
               </TouchableOpacity>
             );
           })
@@ -549,9 +557,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingVertical: 9,
     paddingHorizontal: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
     marginBottom: 8,
     borderWidth: 1,
     borderColor: '#E4D0AB',
@@ -561,6 +566,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
+  personCardMain: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   personCardCurrent: { borderColor: PRIMARY, backgroundColor: '#FFF8FC' },
   rankBox: { width: 26, alignItems: 'center' },
   rankText: { color: '#A0938D', fontSize: 11, fontWeight: '900' },
@@ -591,6 +597,4 @@ const styles = StyleSheet.create({
   levelName: { color: PRIMARY, fontSize: 10, fontWeight: '900', textAlign: 'center', lineHeight: 12 },
   contactBtn: { width: 32, height: 28, borderRadius: 10, backgroundColor: PRIMARY, alignItems: 'center', justifyContent: 'center' },
 });
-
-
 

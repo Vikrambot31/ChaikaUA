@@ -16,7 +16,8 @@ export function analyze(files) {
     // 1. missing-catch-firebase (HIGH)
     lines.forEach((line, i) => {
       if (/\b(get|set|update|push|remove)\s*\(\s*ref\s*\(/.test(line)) {
-        const contextWindow = lines.slice(Math.max(0, i - 3), Math.min(i + 6, lines.length)).join('\n');
+        // Wide context window (±35 lines) to catch wrapping try/catch blocks in longer functions
+        const contextWindow = lines.slice(Math.max(0, i - 35), Math.min(i + 35, lines.length)).join('\n');
         if (!/\.catch|catch\s*\(|try\s*\{/.test(contextWindow)) {
           findings.push(createFinding({
             severity: 'HIGH', file: relativePath, line: i + 1, rule: 'missing-catch-firebase', scanner: SCANNER,
@@ -52,17 +53,22 @@ export function analyze(files) {
     // 3. leaked-listener (HIGH)
     lines.forEach((line, i) => {
       if (/useEffect\s*\(/.test(line)) {
-        // Find the effect body — scan forward for the closing of the effect
-        const effectBlock = lines.slice(i, Math.min(i + 40, lines.length)).join('\n');
+        // Wider window (60 lines) to capture cleanup in longer effects
+        const effectBlock = lines.slice(i, Math.min(i + 60, lines.length)).join('\n');
         if (/on(?:Value|ChildAdded|ChildChanged|ChildRemoved)\s*\(/.test(effectBlock)) {
-          if (!/return\s*\(\s*\)\s*=>|return\s*\(\)\s*=>|return\s*\w+;|off\s*\(|unsubscribe|unsub/.test(effectBlock)) {
-            findings.push(createFinding({
-              severity: 'HIGH', file: relativePath, line: i + 1, rule: 'leaked-listener', scanner: SCANNER,
-              why: 'Firebase RTDB listener in useEffect without cleanup/unsubscribe',
-              risk: 'Memory leak and zombie listeners processing data after component unmounts',
-              uxImpact: 'none', perfImpact: 'medium', memoryImpact: 'high',
-              suggestion: 'Return a cleanup function that calls off() or the unsubscribe callback',
-            }));
+          // Check for cleanup: return arrow, off(), unsubscribe, or variable assigned then returned
+          if (!/return\s*\(\s*\)\s*=>|return\s*\(\)\s*=>|return\s*\w+\s*;|off\s*\(|unsubscribe|unsub/.test(effectBlock)) {
+            // Also skip if the file has a general off() or unsubscribe anywhere nearby (component-level cleanup)
+            const fileContext = lines.slice(Math.max(0, i - 5), Math.min(i + 60, lines.length)).join('\n');
+            if (!/off\s*\(|unsubscribe|unsub/.test(fileContext)) {
+              findings.push(createFinding({
+                severity: 'HIGH', file: relativePath, line: i + 1, rule: 'leaked-listener', scanner: SCANNER,
+                why: 'Firebase RTDB listener in useEffect without cleanup/unsubscribe',
+                risk: 'Memory leak and zombie listeners processing data after component unmounts',
+                uxImpact: 'none', perfImpact: 'medium', memoryImpact: 'high',
+                suggestion: 'Return a cleanup function that calls off() or the unsubscribe callback',
+              }));
+            }
           }
         }
       }
@@ -94,14 +100,16 @@ export function analyze(files) {
     });
 
     // 5. unsafe-retry-loop (CRITICAL)
+    // Only flag while() loops — for...of / for...in / for(let i=0;...) are iteration, not retry.
+    // True retry patterns use while(true), while(shouldRetry), while(attempts < max), etc.
     lines.forEach((line, i) => {
-      if (/\b(while|for)\s*\(/.test(line)) {
+      if (/\bwhile\s*\(/.test(line)) {
         const loopBlock = lines.slice(i, Math.min(i + 15, lines.length)).join('\n');
         if (/\b(set|update|push|remove)\s*\(\s*ref\s*\(/.test(loopBlock)) {
           if (!/break|maxRetries|retryCount|attempt|MAX_RETRIES/.test(loopBlock)) {
             findings.push(createFinding({
               severity: 'CRITICAL', file: relativePath, line: i + 1, rule: 'unsafe-retry-loop', scanner: SCANNER,
-              why: 'Firebase write operation inside loop without retry limit',
+              why: 'Firebase write operation inside while loop without retry limit',
               risk: 'Infinite retry loop on persistent errors, drains battery and bandwidth',
               uxImpact: 'high', perfImpact: 'high', memoryImpact: 'none',
               suggestion: 'Add maximum retry count and exponential backoff to the loop',
@@ -111,35 +119,39 @@ export function analyze(files) {
       }
     });
 
-    // 6. no-offline-handling (MEDIUM)
-    if (/\b(get|set|update|push)\s*\(\s*ref\s*\(/.test(content)) {
-      if (!/goOnline|goOffline|\.info\/connected|NetInfo|isConnected|onLine/.test(content)) {
-        findings.push(createFinding({
-          severity: 'MEDIUM', file: relativePath, line: 1, rule: 'no-offline-handling', scanner: SCANNER,
-          why: 'Firebase operations without offline/connectivity awareness',
-          risk: 'Operations queue silently offline, user thinks data is saved but it is not synced',
-          uxImpact: 'medium', perfImpact: 'none', memoryImpact: 'none',
-          suggestion: 'Check network connectivity before critical writes, show offline indicator',
-        }));
+    // 6. no-offline-handling (LOW)
+    // Lowered from MEDIUM: per-file check produces many false positives for utility/service files
+    // Only flag screen/component files (not services, not hooks)
+    if (/src\/(screens|components)\//i.test(relativePath)) {
+      if (/\b(get|set|update|push)\s*\(\s*ref\s*\(/.test(content)) {
+        if (!/goOnline|goOffline|\.info\/connected|NetInfo|isConnected|onLine/.test(content)) {
+          findings.push(createFinding({
+            severity: 'LOW', file: relativePath, line: 1, rule: 'no-offline-handling', scanner: SCANNER,
+            why: 'Firebase operations without offline/connectivity awareness',
+            risk: 'Operations queue silently offline, user thinks data is saved but it is not synced',
+            uxImpact: 'low', perfImpact: 'none', memoryImpact: 'none',
+            suggestion: 'Check network connectivity before critical writes, show offline indicator',
+          }));
+        }
       }
     }
 
-    // 7. transaction-missing (HIGH)
+    // 7. transaction-missing (MEDIUM)
+    // Lowered from HIGH: read-then-write is often intentional; true race conditions require specific concurrency patterns
     lines.forEach((line, i) => {
       if (/\bget\s*\(\s*ref\s*\(/.test(line)) {
         const afterRead = lines.slice(i + 1, Math.min(i + 12, lines.length)).join('\n');
-        // Check if same ref path is used in a subsequent set/update
         const pathMatch = line.match(/ref\s*\(\s*\w+\s*,\s*['"`]([^'"`]+)['"`]/);
         if (pathMatch) {
           const pathEscaped = pathMatch[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
           if (new RegExp(`(set|update)\\s*\\(\\s*ref\\s*\\(\\s*\\w+\\s*,\\s*['"\`]${pathEscaped}`).test(afterRead)) {
             if (!/runTransaction|transaction/.test(lines.slice(i, Math.min(i + 12, lines.length)).join('\n'))) {
               findings.push(createFinding({
-                severity: 'HIGH', file: relativePath, line: i + 1, rule: 'transaction-missing', scanner: SCANNER,
+                severity: 'MEDIUM', file: relativePath, line: i + 1, rule: 'transaction-missing', scanner: SCANNER,
                 why: `Read-then-write on "${pathMatch[1]}" without runTransaction`,
-                risk: 'Race condition: concurrent writes overwrite each other, data loss',
+                risk: 'Potential race condition under concurrent writes — review if atomic update is required',
                 uxImpact: 'none', perfImpact: 'none', memoryImpact: 'none',
-                suggestion: 'Use runTransaction() for atomic read-modify-write operations',
+                suggestion: 'Use runTransaction() for atomic read-modify-write operations if concurrency is possible',
               }));
             }
           }

@@ -8,8 +8,11 @@ export interface ElectricityReport {
   buildingId: string;
   status: ElectricityStatus;
   createdAt: Date;
+  userId?: string;
   userName: string;
   userPhone: string;
+  userPhotoURL?: string;
+  startAvatarKey?: string;
   moderationStatus?: 'pending' | 'approved' | 'rejected' | 'expired';
   submittedForModerationAt?: string;
 }

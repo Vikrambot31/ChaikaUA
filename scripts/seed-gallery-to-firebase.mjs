@@ -4,10 +4,10 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { getDatabase, get, push, ref, set, update } from 'firebase/database';
 import { getStorage, ref as storageRef, uploadBytes } from 'firebase/storage';
+import { getFirebaseScriptConfig } from './firebase-config.mjs';
 
 const ROOT = 'C:/ChaikaUA/mobile-app-short';
 const GALLERY_DIR = path.join(ROOT, 'assets', 'Chaika foto galary');
-const APP_JSON_PATH = path.join(ROOT, 'app.json');
 
 function parseArgs(argv) {
   const options = {};
@@ -24,37 +24,6 @@ function parseArgs(argv) {
     }
   }
   return options;
-}
-
-function readExpoExtra() {
-  const raw = fs.readFileSync(APP_JSON_PATH, 'utf8');
-  const parsed = JSON.parse(raw);
-  return parsed?.expo?.extra || {};
-}
-
-function getEnvOrExtra(extra, envKey, extraKey) {
-  return process.env[envKey] || extra?.[extraKey] || '';
-}
-
-function buildFirebaseConfig(extra) {
-  return {
-    apiKey: getEnvOrExtra(extra, 'FIREBASE_API_KEY', 'firebaseApiKey'),
-    authDomain: getEnvOrExtra(extra, 'FIREBASE_AUTH_DOMAIN', 'firebaseAuthDomain'),
-    databaseURL: getEnvOrExtra(extra, 'FIREBASE_DATABASE_URL', 'firebaseDatabaseURL'),
-    projectId: getEnvOrExtra(extra, 'FIREBASE_PROJECT_ID', 'firebaseProjectId'),
-    storageBucket: getEnvOrExtra(extra, 'FIREBASE_STORAGE_BUCKET', 'firebaseStorageBucket'),
-    messagingSenderId: getEnvOrExtra(extra, 'FIREBASE_MESSAGING_SENDER_ID', 'firebaseMessagingSenderId'),
-    appId: getEnvOrExtra(extra, 'FIREBASE_APP_ID', 'firebaseAppId'),
-    measurementId: getEnvOrExtra(extra, 'FIREBASE_MEASUREMENT_ID', 'firebaseMeasurementId'),
-  };
-}
-
-function validateFirebaseConfig(config) {
-  const required = ['apiKey', 'authDomain', 'databaseURL', 'projectId', 'storageBucket', 'appId'];
-  const missing = required.filter((key) => !config[key]);
-  if (missing.length > 0) {
-    throw new Error(`Не хватает Firebase-конфига: ${missing.join(', ')}.`);
-  }
 }
 
 function listSeedImages() {
@@ -90,9 +59,7 @@ async function loadExistingByStoragePath(db) {
 }
 
 async function uploadAndSeed({ email, password, dryRun }) {
-  const extra = readExpoExtra();
-  const firebaseConfig = buildFirebaseConfig(extra);
-  validateFirebaseConfig(firebaseConfig);
+  const firebaseConfig = getFirebaseScriptConfig();
 
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);

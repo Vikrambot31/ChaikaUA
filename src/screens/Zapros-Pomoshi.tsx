@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
+import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import MiniTabBar from '../components/MiniTabBar';
 import FormSectionLabel from '../components/FormSectionLabel';
@@ -11,6 +12,8 @@ import { validateName, validatePhone } from '../utils/validators';
 import { firebaseChatAPI } from '../firebase-config';
 import { RATE_LIMITERS } from '../utils/rateLimiter';
 import { showUserError } from '../utils/userFacingErrors';
+import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField';
+import { getDonePhotos, getRequiredPhotoLabel, validateSubmissionRequirements } from '../utils/submissionRequirements';
 
 // RootState type for language selector
 interface LangState { language?: { current?: string } }
@@ -19,6 +22,9 @@ const UI_TEXT = {
   ua: {
     heroTitle: 'Запросити допомогу',
     heroSubtitle: 'Опишіть ситуацію, і сусіди побачать ваш запит у відповідній категорії.',
+    authNoticeTitle: 'Потрібна реєстрація',
+    authNoticeBody: 'Щоб надіслати заявку, увійдіть або зареєструйтесь. Це займе 1 хвилину.',
+    authNoticeBtn: 'Увійти / Зареєструватись',
     labelName: 'Ім\'я',
     labelPhone: 'Телефон',
     labelHelpType: 'Тип допомоги',
@@ -44,6 +50,9 @@ const UI_TEXT = {
   ru: {
     heroTitle: 'Запросить помощь',
     heroSubtitle: 'Опишите ситуацию, и соседи увидят ваш запрос в подходящей категории.',
+    authNoticeTitle: 'Нужна регистрация',
+    authNoticeBody: 'Чтобы отправить заявку, войдите или зарегистрируйтесь. Это займёт 1 минуту.',
+    authNoticeBtn: 'Войти / Зарегистрироваться',
     labelName: 'Имя',
     labelPhone: 'Телефон',
     labelHelpType: 'Тип помощи',
@@ -68,6 +77,9 @@ const UI_TEXT = {
   },
   en: {
     heroTitle: 'Request help',
+    authNoticeTitle: 'Registration required',
+    authNoticeBody: 'To send a request, sign in or register. It takes 1 minute.',
+    authNoticeBtn: 'Sign in / Register',
     heroSubtitle: 'Describe the situation and neighbors will see your request in the right category.',
     labelName: 'Name',
     labelPhone: 'Phone',
@@ -235,14 +247,18 @@ const HELP_SUBTYPES: Record<string, { label: string; value: string }[]> = {
 };
 
 const HelpRequestScreen: React.FC = () => {
+  const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const language = useSelector((state: LangState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
+  const user = useSelector((state: { auth?: { user?: { id?: string; name?: string; photoURL?: string } } }) => state.auth?.user);
   const text = UI_TEXT[language];
+  const requiredPhotoLabel = getRequiredPhotoLabel(language);
   const helpTypeLabels = HELP_TYPES_LABELS[language];
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('+380');
   const [helpType, setHelpType] = useState('');
   const [subType, setSubType] = useState('');
   const [description, setDescription] = useState('');
+  const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{
     name?: string;
@@ -265,9 +281,10 @@ const HelpRequestScreen: React.FC = () => {
       validatePhone(normalizedPhone) &&
       Boolean(helpType) &&
       (!hasSubtypes || Boolean(subType)) &&
-      description.trim().length >= 10
+      description.trim().length >= 10 &&
+      getDonePhotos(formPhotos).length > 0
     );
-  }, [hasSubtypes, helpType, name, phone, subType, description]);
+  }, [hasSubtypes, helpType, name, phone, subType, description, formPhotos]);
   const isNameComplete = useMemo(() => validateName(normalizePersonName(name)), [name]);
   const isPhoneComplete = useMemo(() => validatePhone(normalizePhoneText(phone)), [phone]);
   const isHelpTypeComplete = Boolean(helpType);
@@ -317,6 +334,10 @@ const HelpRequestScreen: React.FC = () => {
     }
 
     setFieldErrors({});
+    if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, photos: formPhotos, navigation })) {
+      return;
+    }
+    const firstPhoto = getDonePhotos(formPhotos)[0];
 
     const secsLeft = RATE_LIMITERS.helpRequest.cooldownSecondsLeft();
     if (secsLeft > 0) {
@@ -336,7 +357,7 @@ const HelpRequestScreen: React.FC = () => {
     const categoryLabel = subLabel ? `${helpLabel} • ${subLabel}` : helpLabel;
     const finalText = sanitizeStoredText(description.trim() || categoryLabel);
     const finalDescription = sanitizeStoredText(
-      description.trim() ? `[${categoryLabel}] ${description.trim()}` : categoryLabel
+      description.trim() ? description.trim() : categoryLabel
     );
 
     setSubmitting(true);
@@ -344,12 +365,15 @@ const HelpRequestScreen: React.FC = () => {
       const result = await firebaseChatAPI.addRequest({
         name: normalizedName,
         phone: normalizedPhone,
+        language,
         category,
         group: 'care',
         subcategory: helpType,
         building: 'Чайка',
         text: finalText,
         description: finalDescription,
+        photoUri: firstPhoto?.downloadUrl ?? '',
+        photoStoragePath: firstPhoto?.storagePath ?? '',
       });
 
       if (!result.success) {
@@ -369,6 +393,7 @@ const HelpRequestScreen: React.FC = () => {
       setHelpType('');
       setSubType('');
       setDescription('');
+      setFormPhotos([]);
     } catch (error) {
       showUserError(language, 'send', error);
     } finally {
@@ -389,6 +414,20 @@ const HelpRequestScreen: React.FC = () => {
           <Text style={styles.heroTitle}>{text.heroTitle}</Text>
           <Text style={styles.heroSubtitle}>{text.heroSubtitle}</Text>
         </View>
+
+        {!user && (
+          <View style={styles.authNoticeCard}>
+            <Text style={styles.authNoticeTitle}>{text.authNoticeTitle}</Text>
+            <Text style={styles.authNoticeBody}>{text.authNoticeBody}</Text>
+            <TouchableOpacity
+              style={styles.authNoticeBtn}
+              activeOpacity={0.85}
+              onPress={() => navigation.navigate('LoginScreen', {})}
+            >
+              <Text style={styles.authNoticeBtnText}>{text.authNoticeBtn}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         <View style={styles.formCard}>
           <FormSectionLabel label={text.labelName} completed={isNameComplete} containerStyle={styles.labelRow} labelStyle={styles.label} />
@@ -458,6 +497,15 @@ const HelpRequestScreen: React.FC = () => {
             {description.length}/{MAX_DESCRIPTION_LENGTH} {text.charsLeft}
           </Text>
           <FormFieldError error={fieldErrors.description} />
+
+          <FormSectionLabel label={requiredPhotoLabel} completed={getDonePhotos(formPhotos).length > 0} containerStyle={styles.labelRow} labelStyle={styles.label} />
+          <PhotoUploadField
+            uid={user?.id ?? ''}
+            userName={user?.name ?? ''}
+            maxPhotos={3}
+            storagePath="requests"
+            onPhotosChange={setFormPhotos}
+          />
 
           <TouchableOpacity style={[styles.submitBtn, (!canSubmit || submitting) && styles.submitBtnDisabled]} onPress={handleSubmit} activeOpacity={0.88} disabled={!canSubmit || submitting}>
             {submitting ? (
@@ -537,6 +585,22 @@ const styles = StyleSheet.create({
   },
   submitBtnDisabled: { opacity: 0.5 },
   submitBtnText: { color: '#FFF9EE', fontWeight: '900', fontSize: 16 },
+  authNoticeCard: {
+    backgroundColor: '#FFF8E7',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#F0C96B',
+  },
+  authNoticeTitle: { fontSize: 15, fontWeight: '900', color: '#7A5C00', marginBottom: 6 },
+  authNoticeBody: { fontSize: 13, color: '#7A5C00', lineHeight: 19, marginBottom: 12 },
+  authNoticeBtn: {
+    backgroundColor: SCREEN_THEME.terracotta,
+    borderRadius: 14,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  authNoticeBtnText: { color: '#FFF9EE', fontWeight: '900', fontSize: 14 },
 });
 
 export default HelpRequestScreen;

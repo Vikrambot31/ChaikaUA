@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import {
+  ActivityIndicator,
   Alert,
+  FlatList,
   Image,
   SafeAreaView,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -19,31 +20,38 @@ import { HelpRequest } from '../types/app';
 import { addHelpRequest, selectTodayHelpRequests, syncFromRequests } from '../redux/slices/helpRequestsSlice';
 import MiniTabBar from '../components/MiniTabBar';
 import MiniUserAvatar from '../components/MiniUserAvatar';
-import TactileIcon from '../components/TactileIcon';
+import ContactReasonModal from '../components/ContactReasonModal';
+import { useContactRequest } from '../hooks/useContactRequest';
 import ErrorHandler from '../utils/errorHandler';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { safeCallPhone } from '../utils/communicationActions';
 import { firebaseChatAPI } from '../firebase-config';
 import { normalizePersonName, normalizePhoneText, sanitizeStoredText } from '../utils/textUtils';
 import { validateName, validatePhone } from '../utils/validators';
-import { createPendingModeration } from '../utils/moderation';
 import { getRequests } from '../services/api';
 import { showUserError } from '../utils/userFacingErrors';
+import { RATE_LIMITERS } from '../utils/rateLimiter';
 import { database } from '../firebase-config';
-import { pickUserAvatarUri, resolveUserAvatarMap } from '../utils/userAvatar';
+import { resolveUserAvatarMap } from '../utils/userAvatar';
 import type { DetailItemData } from '../utils/detailViewTypes';
+import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField';
+import { getDonePhotos, getRequiredPhotoLabel, validateSubmissionRequirements } from '../utils/submissionRequirements';
+import UserCardActionBar from '../components/UserCardActionBar';
 
 const HELP_NEIGHBORS_SPLASH_KEY = '@help_neighbors_first_visit_splash_seen';
 
 const UI_TEXT = {
   ua: {
-    headerTitle: 'Нужна помощь',
+    headerTitle: 'Потрібна допомога',
     headerSubtitle: 'Термінові прохання мешканців ЖК Чайка',
     formTitle: 'Залишити заявку',
     namePlaceholder: "Ваше ім'я",
     phonePlaceholder: 'Ваш телефон',
     helpTypePlaceholder: 'Оберіть тип допомоги...',
     descriptionPlaceholder: 'Коротко опишіть, яка допомога потрібна',
+    ownTextRequiredTitle: 'Додайте свій текст',
+    ownTextRequiredBody: 'Щоб опублікувати прохання, опишіть ситуацію своїми словами (мінімум 10 символів).',
+    ownTextRequiredAction: 'Додати опис',
     submitButton: 'Відправити прохання',
     listTitle: 'Термінові запити',
     emptyTitle: 'Сьогодні все спокійно',
@@ -55,6 +63,9 @@ const UI_TEXT = {
     errorMessage: 'Заповніть усі поля',
     saveErrorMessage: 'Не вдалося додати прохання',
     splash: 'Зробимо Чайку місцем підтримки один для одного',
+    authNoticeTitle: 'Потрібна реєстрація',
+    authNoticeBody: 'Щоб надіслати прохання про допомогу, увійдіть або зареєструйтесь.',
+    authNoticeBtn: 'Увійти / Зареєструватись',
     helpTypes: [
       { label: 'Медична допомога', value: 'medical' },
       { label: 'Дрібний ремонт', value: 'repair' },
@@ -75,6 +86,9 @@ const UI_TEXT = {
     phonePlaceholder: 'Ваш телефон',
     helpTypePlaceholder: 'Выберите тип помощи...',
     descriptionPlaceholder: 'Кратко опишите, какая помощь нужна',
+    ownTextRequiredTitle: 'Добавьте свой текст',
+    ownTextRequiredBody: 'Чтобы опубликовать просьбу, опишите ситуацию своими словами (минимум 10 символов).',
+    ownTextRequiredAction: 'Добавить описание',
     submitButton: 'Отправить просьбу',
     listTitle: 'Срочные запросы',
     emptyTitle: 'Сегодня все спокойно',
@@ -86,6 +100,9 @@ const UI_TEXT = {
     errorMessage: 'Заполните все поля',
     saveErrorMessage: 'Не удалось добавить просьбу',
     splash: 'Сделаем Чайку друг для друга местом поддержки',
+    authNoticeTitle: 'Нужна регистрация',
+    authNoticeBody: 'Чтобы отправить просьбу о помощи, войдите или зарегистрируйтесь.',
+    authNoticeBtn: 'Войти / Зарегистрироваться',
     helpTypes: [
       { label: 'Медицинская помощь', value: 'medical' },
       { label: 'Мелкий ремонт', value: 'repair' },
@@ -106,6 +123,9 @@ const UI_TEXT = {
     phonePlaceholder: 'Your phone',
     helpTypePlaceholder: 'Select help type...',
     descriptionPlaceholder: 'Briefly describe what help is needed',
+    ownTextRequiredTitle: 'Add your own text',
+    ownTextRequiredBody: 'To publish the request, describe your situation in your own words (at least 10 characters).',
+    ownTextRequiredAction: 'Add description',
     submitButton: 'Send request',
     listTitle: 'Urgent requests',
     emptyTitle: 'Everything is calm today',
@@ -117,6 +137,9 @@ const UI_TEXT = {
     errorMessage: 'Fill in all fields',
     saveErrorMessage: 'Failed to add the request',
     splash: "Let's make Chaika Life a place of support for one another",
+    authNoticeTitle: 'Registration required',
+    authNoticeBody: 'To send a help request, sign in or register.',
+    authNoticeBtn: 'Sign in / Register',
     helpTypes: [
       { label: 'Medical help', value: 'medical' },
       { label: 'Small repair', value: 'repair' },
@@ -131,25 +154,33 @@ const UI_TEXT = {
   },
 } as const;
 
-const formatTimeLeft = (expiresAt: Date, expiredLabel: string) => {
+const formatTimeLeft = (expiresAt: Date, expiredLabel: string, language: 'ua' | 'ru' | 'en') => {
   const diff = expiresAt.getTime() - Date.now();
   if (diff <= 0) return expiredLabel;
   const hours = Math.floor(diff / (1000 * 60 * 60));
   const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-  return `${hours}h ${minutes}m`;
+  if (language === 'en') return `${hours}h ${minutes}m`;
+  if (language === 'ru') return `${hours}ч ${minutes}м`;
+  return `${hours}г ${minutes}хв`;
 };
 
 const HelpNeighborsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
+  const navLock = useRef(false);
   const dispatch = useDispatch<AppDispatch>();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const user = useSelector((state: RootState) => state.auth.user);
   const text = UI_TEXT[language];
+  const requiredPhotoLabel = getRequiredPhotoLabel(language);
+  const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [helpType, setHelpType] = useState('');
+  const [description, setDescription] = useState('');
+  const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
   const [showHelpSplash, setShowHelpSplash] = useState(false);
   const [isReady, setIsReady] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [avatarByUserId, setAvatarByUserId] = useState<Record<string, string>>({});
 
   const todayRequests = useSelector((state: RootState) => selectTodayHelpRequests(state)) as HelpRequest[];
@@ -165,7 +196,7 @@ const HelpNeighborsScreen: React.FC = () => {
     void resolveUserAvatarMap(database, userIds).then((resolved) => {
       if (cancelled) return;
       setAvatarByUserId((prev) => ({ ...prev, ...resolved }));
-    });
+    }).catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -214,10 +245,6 @@ const HelpNeighborsScreen: React.FC = () => {
   }, []);
 
   const handleSubmit = async () => {
-    if (!user) {
-      navigation.navigate('LoginScreen');
-      return;
-    }
     const normalizedName = normalizePersonName(name);
     const normalizedPhone = normalizePhoneText(phone);
 
@@ -231,15 +258,44 @@ const HelpNeighborsScreen: React.FC = () => {
       return;
     }
 
-    const helpTypeLabel = text.helpTypes.find((type) => type.value === helpType)?.label || helpType;
+    const userDescription = description.trim();
+    if (userDescription.length < 10) {
+      Alert.alert(
+        text.ownTextRequiredTitle,
+        text.ownTextRequiredBody,
+        [{ text: text.ownTextRequiredAction }]
+      );
+      return;
+    }
+    if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, photos: formPhotos, navigation })) {
+      return;
+    }
 
+    const secsLeft = RATE_LIMITERS.helpRequest.cooldownSecondsLeft();
+    if (secsLeft > 0) {
+      Alert.alert(text.errorTitle, language === 'ru'
+        ? `Следующий запрос можно отправить через ${secsLeft} сек.`
+        : language === 'en'
+          ? `Please wait ${secsLeft} seconds before sending another request.`
+          : `Наступний запит можна надіслати через ${secsLeft} сек.`);
+      return;
+    }
+
+    const firstPhoto = getDonePhotos(formPhotos)[0];
+    const payloadDescription = sanitizeStoredText(userDescription);
+
+    setSubmitting(true);
     try {
       const serverResult = await firebaseChatAPI.addRequest({
         name: normalizedName,
         phone: normalizedPhone,
-        description: sanitizeStoredText(`[${helpTypeLabel}]`),
-        category: helpType,
+        language,
+        description: payloadDescription,
+        category: 'help',
+        subcategory: helpType,
         group: 'help_neighbors',
+        photoUri: firstPhoto?.downloadUrl ?? '',
+        photoStoragePath: firstPhoto?.storagePath ?? '',
       });
 
       if (!serverResult.success) {
@@ -248,17 +304,19 @@ const HelpNeighborsScreen: React.FC = () => {
 
       const newRequest: HelpRequest = {
         id: serverResult.data?.id || `help-${Date.now()}`,
-        userId: user.id,
+        userId: user?.id ?? '',
         name: normalizedName,
         phone: normalizedPhone,
-        description: sanitizeStoredText(`[${helpTypeLabel}]`),
+        description: payloadDescription,
         createdAt: new Date(),
         expiresAt: new Date(new Date().setHours(23, 59, 59, 999)),
         isBurning: true,
-        ...createPendingModeration(),
+        moderationStatus: 'approved',
+        moderatedAt: new Date().toISOString(),
       };
 
       dispatch(addHelpRequest(newRequest));
+      RATE_LIMITERS.helpRequest.recordSubmit();
       const requestsResponse = await getRequests();
       if (requestsResponse.success && requestsResponse.data) {
         dispatch(syncFromRequests(requestsResponse.data));
@@ -266,10 +324,18 @@ const HelpNeighborsScreen: React.FC = () => {
       setName('');
       setPhone('');
       setHelpType('');
+      setDescription('');
+      setFormPhotos([]);
       Alert.alert(text.successTitle, text.successMessage);
     } catch (err) {
-      ErrorHandler.createError(err, 'HelpNeighborsScreen: addHelpRequest');
+      const errMessage =
+        err instanceof Error && err.message
+          ? `HelpNeighborsScreen: addHelpRequest: ${err.message}`
+          : 'HelpNeighborsScreen: addHelpRequest';
+      ErrorHandler.createError(err, errMessage);
       showUserError(language, 'send', err);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -278,7 +344,7 @@ const HelpNeighborsScreen: React.FC = () => {
     title: item.name,
     description: item.description,
     phone: item.phone,
-    category: item.description.match(/^\[(.*?)\]/)?.[1],
+    category: undefined,
     status: item.isBurning && item.expiresAt > new Date() ? text.listTitle : text.expired,
     userId: item.userId,
     createdAt: item.createdAt.toISOString(),
@@ -302,91 +368,146 @@ const HelpNeighborsScreen: React.FC = () => {
         </View>
       ) : null}
 
+      {/* FlatList replaces the outer ScrollView for virtualized rendering of help request cards */}
       {isReady ? (
-        <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-          <View style={styles.headerCard}>
-            <Image source={require('../../assets/WEBP-version/Sosedi pomogaut.webp')} style={styles.headerImage} resizeMode="cover" />
-          </View>
+        <FlatList
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+          data={burningRequests}
+          keyExtractor={(item) => item.id}
+          initialNumToRender={8}
+          windowSize={5}
+          ListHeaderComponent={
+            <>
+              <View style={styles.headerCard}>
+                <Image source={require('../../assets/WEBP-version/Sosedi-pomogaut.webp')} style={styles.headerImage} resizeMode="cover" />
+              </View>
 
-          <View style={styles.formCard}>
-            <Text style={styles.formTitle}>{text.formTitle}</Text>
+              {!user && (
+                <View style={styles.authNoticeCard}>
+                  <Text style={styles.authNoticeTitle}>{text.authNoticeTitle}</Text>
+                  <Text style={styles.authNoticeBody}>{text.authNoticeBody}</Text>
+                  <TouchableOpacity
+                    style={styles.authNoticeBtn}
+                    activeOpacity={0.85}
+                    onPress={() => navigation.navigate('LoginScreen', {})}
+                  >
+                    <Text style={styles.authNoticeBtnText}>{text.authNoticeBtn}</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
 
-            <TextInput
-              placeholder={text.namePlaceholder}
-              placeholderTextColor="#A0938D"
-              value={name}
-              onChangeText={(value) => setName(normalizePersonName(value))}
-              style={styles.input}
-            />
-            <TextInput
-              placeholder={text.phonePlaceholder}
-              placeholderTextColor="#A0938D"
-              value={phone}
-              onChangeText={(value) => setPhone(normalizePhoneText(value))}
-              keyboardType="phone-pad"
-              style={styles.input}
-            />
+              <View style={styles.formCard}>
+                <Text style={styles.formTitle}>{text.formTitle}</Text>
 
-            <View style={styles.pickerWrapper}>
-              <Picker selectedValue={helpType} onValueChange={(itemValue: string) => setHelpType(itemValue)} style={styles.picker}>
-                <Picker.Item label={text.helpTypePlaceholder} value="" />
-                {text.helpTypes.map((type) => (
-                  <Picker.Item key={type.value} label={type.label} value={type.value} />
-                ))}
-              </Picker>
-            </View>
+                <TextInput
+                  placeholder={text.namePlaceholder}
+                  placeholderTextColor="#A0938D"
+                  value={name}
+                  onChangeText={(value) => setName(normalizePersonName(value))}
+                  style={styles.input}
+                />
+                <TextInput
+                  placeholder={text.phonePlaceholder}
+                  placeholderTextColor="#A0938D"
+                  value={phone}
+                  onChangeText={(value) => setPhone(normalizePhoneText(value))}
+                  keyboardType="phone-pad"
+                  style={styles.input}
+                />
 
-            <TouchableOpacity style={styles.submitButton} onPress={() => { void handleSubmit(); }} activeOpacity={0.85}>
-              <Text style={styles.submitButtonText}>{text.submitButton}</Text>
+                <View style={styles.pickerWrapper}>
+                  <Picker selectedValue={helpType} onValueChange={(itemValue: string) => setHelpType(itemValue)} style={styles.picker}>
+                    <Picker.Item label={text.helpTypePlaceholder} value="" />
+                    {text.helpTypes.map((type) => (
+                      <Picker.Item key={type.value} label={type.label} value={type.value} />
+                    ))}
+                  </Picker>
+                </View>
+
+                <TextInput
+                  placeholder={text.descriptionPlaceholder}
+                  placeholderTextColor="#A0938D"
+                  value={description}
+                  onChangeText={setDescription}
+                  style={[styles.input, styles.textArea]}
+                  multiline
+                  textAlignVertical="top"
+                  maxLength={500}
+                />
+                <Text style={styles.charCount}>{description.trim().length}/500</Text>
+
+                <Text style={styles.fieldLabel}>{requiredPhotoLabel}</Text>
+                <PhotoUploadField
+                  uid={user?.id ?? ''}
+                  userName={user?.name ?? ''}
+                  maxPhotos={3}
+                  storagePath="requests"
+                  onPhotosChange={setFormPhotos}
+                />
+
+                <TouchableOpacity style={[styles.submitButton, submitting && { opacity: 0.6 }]} onPress={() => { if (!submitting) void handleSubmit(); }} activeOpacity={0.85} disabled={submitting}>
+                  {submitting ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.submitButtonText}>{text.submitButton}</Text>}
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.listHeader}>
+                <Text style={styles.listTitle}>{text.listTitle}</Text>
+                <View style={styles.listCountBadge}>
+                  <Text style={styles.listCount}>{burningRequests.length}</Text>
+                </View>
+              </View>
+            </>
+          }
+          renderItem={({ item }) => (
+            <TouchableOpacity style={styles.requestCard} onPress={() => { if (navLock.current) return; navLock.current = true; openDetail(item); setTimeout(() => { navLock.current = false; }, 800); }} activeOpacity={0.86}>
+              <View style={styles.requestHeader}>
+                <MiniUserAvatar
+                  uri={(item.userId && avatarByUserId[item.userId]) || undefined}
+                  name={item.name}
+                  size={34}
+                  borderRadius={11}
+                  backgroundColor="#6A8BA5"
+                />
+                <View style={[styles.userInfo, { marginLeft: 8 }]}>
+                  <Text style={styles.userName}>{item.name}</Text>
+                </View>
+                <View style={styles.timeBadge}>
+                  <Text style={styles.timeText}>{formatTimeLeft(item.expiresAt, text.expired, language)}</Text>
+                </View>
+              </View>
+              <Text style={styles.requestDescription}>{item.description}</Text>
+              <UserCardActionBar
+                avatarUri={(item.userId && avatarByUserId[item.userId]) || undefined}
+                name={item.name}
+                userId={item.userId}
+                currentUserId={user?.id}
+                language={language}
+                onProfile={item.userId ? () => { if (navLock.current) return; navLock.current = true; navigation.navigate('ViewUserProfile', { userId: item.userId as string }); setTimeout(() => { navLock.current = false; }, 800); } : undefined}
+                onContact={item.userId && item.userId !== user?.id ? () => openContactModal({ userId: item.userId as string, name: item.name || 'Unknown', sourceType: 'help', sourceId: item.id, sourceTitle: item.description?.slice(0, 60) }) : item.phone ? () => void safeCallPhone(item.phone, language) : undefined}
+                contactDisabled={!item.phone && (!item.userId || item.userId === user?.id)}
+                likePath="feed_likes/help_neighbors"
+                likeId={item.id}
+              />
             </TouchableOpacity>
-          </View>
-
-          <View style={styles.listHeader}>
-            <Text style={styles.listTitle}>{text.listTitle}</Text>
-            <View style={styles.listCountBadge}>
-              <Text style={styles.listCount}>{burningRequests.length}</Text>
-            </View>
-          </View>
-
-          {burningRequests.length === 0 ? (
+          )}
+          ListEmptyComponent={
             <View style={styles.emptyState}>
               <Text style={styles.emptyText}>{text.emptyTitle}</Text>
               <Text style={styles.emptySubtext}>{text.emptySubtitle}</Text>
             </View>
-          ) : (
-            burningRequests.map((item: HelpRequest) => (
-              <TouchableOpacity key={item.id} style={styles.requestCard} onPress={() => openDetail(item)} activeOpacity={0.86}>
-                <View style={styles.requestHeader}>
-                  <MiniUserAvatar
-                    uri={(item.userId && avatarByUserId[item.userId]) || pickUserAvatarUri(item)}
-                    name={item.name}
-                    size={34}
-                    borderRadius={11}
-                    backgroundColor="#6A8BA5"
-                  />
-                  <View style={[styles.userInfo, { marginLeft: 8 }]}>
-                    <Text style={styles.userName}>{item.name}</Text>
-                  </View>
-                  {item.phone ? (
-                    <TouchableOpacity
-                      onPress={(event) => { event.stopPropagation(); void safeCallPhone(item.phone, language); }}
-                      activeOpacity={0.75}
-                      style={styles.phoneAction}
-                    >
-                      <TactileIcon icon="phone-outline" size={30} iconSize={13} backgroundColor="#403933" />
-                    </TouchableOpacity>
-                  ) : null}
-                  <View style={styles.timeBadge}>
-                    <Text style={styles.timeText}>{formatTimeLeft(item.expiresAt, text.expired)}</Text>
-                  </View>
-                </View>
-                <Text style={styles.requestDescription}>{item.description}</Text>
-              </TouchableOpacity>
-            ))
-          )}
-        </ScrollView>
+          }
+        />
       ) : null}
 
+      <ContactReasonModal
+        visible={contactModalVisible}
+        pending={contactPending}
+        target={contactTarget}
+        onSelect={(reason) => void sendContactRequest(reason)}
+        onClose={closeContactModal}
+      />
       <MiniTabBar />
     </SafeAreaView>
   );
@@ -448,6 +569,7 @@ const styles = StyleSheet.create({
     borderColor: '#E4D0AB',
   },
   formTitle: { fontSize: 16, fontWeight: '900', color: SCREEN_THEME.textPrimary, marginBottom: 14 },
+  fieldLabel: { color: SCREEN_THEME.textPrimary, fontWeight: '900', marginBottom: 8 },
   input: {
     backgroundColor: '#F7F3EE',
     borderRadius: 16,
@@ -469,7 +591,7 @@ const styles = StyleSheet.create({
   picker: { color: SCREEN_THEME.textPrimary, height: 50 },
   textArea: { minHeight: 80, textAlignVertical: 'top' },
   charCount: { fontSize: 12, color: SCREEN_THEME.textSecondary, textAlign: 'right', marginBottom: 10, fontWeight: '700' },
-  submitButton: { backgroundColor: SCREEN_THEME.terracotta, borderRadius: 16, paddingVertical: 14, alignItems: 'center' },
+  submitButton: { backgroundColor: SCREEN_THEME.terracotta, borderRadius: 16, paddingVertical: 14, alignItems: 'center', marginTop: 16 },
   submitButtonText: { color: '#FFFFFF', fontWeight: '800' },
   listHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, marginTop: 8 },
   listTitle: { fontSize: 18, fontWeight: '900', color: SCREEN_THEME.textPrimary },
@@ -486,13 +608,29 @@ const styles = StyleSheet.create({
   requestHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
   userInfo: { flex: 1 },
   userName: { fontWeight: '900', color: SCREEN_THEME.textPrimary },
-  phoneAction: { alignItems: 'center', justifyContent: 'center', marginHorizontal: 6 },
   timeBadge: { backgroundColor: SCREEN_THEME.terracotta, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
   timeText: { color: '#FFFFFF', fontWeight: '800', fontSize: 12 },
   requestDescription: { color: SCREEN_THEME.textPrimary, lineHeight: 20 },
   emptyState: { alignItems: 'center', paddingVertical: 40 },
   emptyText: { fontWeight: '900', color: SCREEN_THEME.textPrimary, marginTop: 12 },
   emptySubtext: { color: SCREEN_THEME.textSecondary, marginTop: 4 },
+  authNoticeCard: {
+    backgroundColor: '#FFF8E7',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#F0C96B',
+  },
+  authNoticeTitle: { fontSize: 15, fontWeight: '900', color: '#7A5C00', marginBottom: 6 },
+  authNoticeBody: { fontSize: 13, color: '#7A5C00', lineHeight: 19, marginBottom: 12 },
+  authNoticeBtn: {
+    backgroundColor: SCREEN_THEME.terracotta,
+    borderRadius: 14,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  authNoticeBtnText: { color: '#FFF9EE', fontWeight: '900', fontSize: 14 },
 });
 
 export default HelpNeighborsScreen;

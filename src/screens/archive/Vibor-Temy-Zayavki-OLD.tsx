@@ -16,7 +16,7 @@ import { selectIsPremium, selectIsPremiumPlus } from '../redux/slices/subscripti
 const PRIMARY = '#7A1E5C';
 const GOLD = '#CFA060';
 
-// в”Ђв”Ђв”Ђ Всі типи заявок в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+// в"Ђв"Ђв"Ђ Всі типи заявок в"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђ
 type TopicItem = {
   icon: React.ComponentProps<typeof MaterialCommunityIcons>['name'];
   label: string;
@@ -120,7 +120,7 @@ const TOPICS: TopicItem[] = [
   },
 ];
 
-// в”Ђв”Ђв”Ђ Компонент >4=VTW кнопки в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+// в"Ђв"Ђв"Ђ Компонент >4=VTW кнопки в"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђ
 function TopicButton({ item, onPress }: { item: TopicItem; onPress: () => void }) {
   return (
     <TouchableOpacity
@@ -132,7 +132,7 @@ function TopicButton({ item, onPress }: { item: TopicItem; onPress: () => void }
       onPress={onPress}
       activeOpacity={0.8}
     >
-      {/* Р“Р»СЏРЅРµС†СЊ */}
+      {/* Р"Р»СЏРЅРµС†СЊ */}
       <View style={styles.btnGloss} />
 
       <View style={styles.topicBtnInner}>
@@ -150,7 +150,7 @@ function TopicButton({ item, onPress }: { item: TopicItem; onPress: () => void }
             <MaterialCommunityIcons name="lock-outline" size={14} color="rgba(255,255,255,0.6)" />
           )}
           {item.premiumRequired === 'premium_plus' && (
-            <Text style={styles.premiumBadge}>рџ‘‘+</Text>
+            <Text style={styles.premiumBadge}>рџ''+</Text>
           )}
           {item.premiumRequired === 'premium' && (
             <Text style={styles.premiumBadge}>в­ђ</Text>
@@ -167,7 +167,7 @@ function TopicButton({ item, onPress }: { item: TopicItem; onPress: () => void }
   );
 }
 
-// в”Ђв”Ђв”Ђ Головний екран в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+// в"Ђв"Ђв"Ђ Головний екран в"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђ
 export default function RequestTopicScreen() {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const isAuthenticated = useSelector(selectIsAuthenticated);
@@ -195,7 +195,7 @@ export default function RequestTopicScreen() {
       {/* РЁР°РїРєР° */}
       <View style={styles.header}>
         <MaterialCommunityIcons name="clipboard-list-outline" size={24} color="#fff" />
-        <Text style={styles.headerTitle}>Р’РР‘Р РђРўР РўР•РњРЈ Р—РђРЇР’РљР</Text>
+        <Text style={styles.headerTitle}>Р'РР'Р РђРўР РўР•РњРЈ Р—РђРЇР'РљР</Text>
       </View>
 
       <ScrollView
@@ -211,7 +211,7 @@ export default function RequestTopicScreen() {
         </View>
 
         {/* !5:FVO: РўРµСЂРјС–РЅРѕРІС– */}
-        <Text style={styles.sectionTitle}>рџ”ґ РўРµСЂРјС–РЅРѕРІС–</Text>
+        <Text style={styles.sectionTitle}>рџ"ґ РўРµСЂРјС–РЅРѕРІС–</Text>
         {TOPICS.filter((t) => t.elevated).map((item) => (
           <TopicButton key={item.label} item={item} onPress={() => handlePress(item)} />
         ))}
@@ -223,7 +223,7 @@ export default function RequestTopicScreen() {
         ))}
 
         {/* !5:FVO: РћРіРѕР»РѕС€РµРЅРЅСЏ */}
-        <Text style={styles.sectionTitle}>рџ“ў РћРіРѕР»РѕС€РµРЅРЅСЏ С‚Р° Р°СЂС…С–РІ</Text>
+        <Text style={styles.sectionTitle}>рџ"ў РћРіРѕР»РѕС€РµРЅРЅСЏ С‚Р° Р°СЂС…С–РІ</Text>
         {TOPICS.filter((t) =>
           ['AnnouncementsScreen', 'HelpHistoryScreen'].includes(t.screen)
         ).map((item) => (
@@ -231,16 +231,16 @@ export default function RequestTopicScreen() {
         ))}
 
         {/* !5:FVO: Premium */}
-        <Text style={styles.sectionTitle}>рџ’Ћ Premium функції</Text>
+        <Text style={styles.sectionTitle}>рџ'Ћ Premium функції</Text>
         <View style={styles.premiumBanner}>
           <Text style={styles.premiumBannerText}>
-            в­ђ РџСЂРµРјС–СѓРј вЂ” $1/РјС–СЃ В· рџ‘‘ РџСЂРµРјС–СѓРј+ вЂ” $4/РјС–СЃ
+            в­ђ РџСЂРµРјС–СѓРј вЂ" $1/РјС–СЃ В· рџ'' РџСЂРµРјС–СѓРј+ вЂ" $4/РјС–СЃ
           </Text>
           <TouchableOpacity
             onPress={() => navigation.navigate('SubscriptionScreen')}
             style={styles.premiumBannerBtn}
           >
-            <Text style={styles.premiumBannerBtnText}>РџРµСЂРµРіР»СЏРЅСѓС‚Рё в†’</Text>
+            <Text style={styles.premiumBannerBtnText}>РџРµСЂРµРіР»СЏРЅСѓС‚Рё в†'</Text>
           </TouchableOpacity>
         </View>
         {TOPICS.filter((t) => !!t.premiumRequired).map((item) => (
@@ -251,7 +251,7 @@ export default function RequestTopicScreen() {
   );
 }
 
-// в”Ђв”Ђв”Ђ !B8;V в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+// в"Ђв"Ђв"Ђ !B8;V в"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђ
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F7F3EE' },
 

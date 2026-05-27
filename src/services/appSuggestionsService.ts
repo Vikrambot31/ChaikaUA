@@ -3,6 +3,7 @@ import { database } from '../firebase-core';
 import { createPendingModeration, ModerationStatus } from '../utils/moderation';
 import { sanitizeStoredText } from '../utils/textUtils';
 import { ensureFirebaseAuth, getCurrentUser } from '../firebase-auth-session';
+import { assertTextMatchesLanguage, normalizeAppLang, type AppLang } from '../utils/contentLanguageGuard';
 
 export interface AppSuggestion {
   id: string;
@@ -30,7 +31,8 @@ const resolveSuggestionUserId = async (fallbackUserId?: string): Promise<string>
   try {
     const user = await ensureFirebaseAuth();
     return user.uid;
-  } catch {
+  } catch (error) {
+    console.warn('[appSuggestionsService] resolveSuggestionUserId using guest fallback:', error);
     return sanitizeStoredText(fallbackUserId || `guest_${Date.now()}`).slice(0, 64);
   }
 };
@@ -105,11 +107,15 @@ const migrateLegacySuggestions = async (): Promise<void> => {
     .filter(([, value]) => value?.category === 'app_suggestion');
 
   for (const [id, value] of legacyEntries) {
-    const currentSuggestionSnap = await get(ref(database, `${PATH}/${id}`));
-    if (!currentSuggestionSnap.exists()) {
-      await set(ref(database, `${PATH}/${id}`), mapLegacySuggestion(id, value));
+    try {
+      const currentSuggestionSnap = await get(ref(database, `${PATH}/${id}`));
+      if (!currentSuggestionSnap.exists()) {
+        await set(ref(database, `${PATH}/${id}`), mapLegacySuggestion(id, value));
+      }
+      await remove(ref(database, `requests/${id}`));
+    } catch (err) {
+      console.error('[appSuggestionsService] migrateLegacySuggestions failed for item:', id, err);
     }
-    await remove(ref(database, `requests/${id}`));
   }
 };
 
@@ -126,53 +132,77 @@ export const appSuggestionsService = {
         .map(([id, value]) => mapSuggestion(id, value))
         .reverse();
       callback(items);
+    }, (error) => {
+      console.error('[appSuggestionsService] subscribe failed:', error);
+      callback([]);
     });
     return unsubscribe;
   },
 
   async getSuggestionsOnce(): Promise<AppSuggestion[]> {
-    await migrateLegacySuggestions();
-    const snapshot = await get(ref(database, PATH));
-    const raw = snapshot.val();
-    if (!raw) return [];
-    return Object.entries(raw as Record<string, Record<string, unknown>>)
-      .map(([id, value]) => mapSuggestion(id, value))
-      .reverse();
+    try {
+      await migrateLegacySuggestions();
+      const snapshot = await get(ref(database, PATH));
+      const raw = snapshot.val();
+      if (!raw) return [];
+      return Object.entries(raw as Record<string, Record<string, unknown>>)
+        .map(([id, value]) => mapSuggestion(id, value))
+        .reverse();
+    } catch (error) {
+      console.error('[appSuggestionsService] getSuggestionsOnce failed:', error);
+      return [];
+    }
   },
 
-  async addSuggestion(input: { name?: string; phone?: string; text: string; userId?: string }): Promise<string> {
-    const cleanText = sanitizeStoredText(input.text).slice(0, MAX_TEXT_LENGTH);
-    if (!cleanText) {
-      throw new Error('Invalid suggestion text');
-    }
-    const resolvedUserId = await resolveSuggestionUserId(input.userId);
+  async addSuggestion(input: { name?: string; phone?: string; text: string; userId?: string; language?: AppLang }): Promise<string> {
+    try {
+      const cleanText = sanitizeStoredText(input.text).slice(0, MAX_TEXT_LENGTH);
+      if (!cleanText) {
+        throw new Error('Invalid suggestion text');
+      }
+      assertTextMatchesLanguage(cleanText, normalizeAppLang(input.language, 'ua'));
+      const resolvedUserId = await resolveSuggestionUserId(input.userId);
 
-    const pendingModeration = createPendingModeration();
-    const createdAt = new Date().toISOString();
-    const payload = {
-      text: cleanText,
-      name: sanitizeStoredText(input.name || 'Guest').slice(0, 60),
-      phone: sanitizeStoredText(input.phone || '').slice(0, 30),
-      userId: resolvedUserId,
-      moderationStatus: pendingModeration.moderationStatus,
-      submittedForModerationAt: pendingModeration.submittedForModerationAt,
-      createdAt,
-    };
-    const newRef = push(ref(database, PATH));
-    await set(ref(database, `${PATH}/${newRef.key}`), payload);
-    return newRef.key!;
+      const pendingModeration = createPendingModeration();
+      const createdAt = new Date().toISOString();
+      const payload = {
+        text: cleanText,
+        name: sanitizeStoredText(input.name || 'Guest').slice(0, 60),
+        phone: sanitizeStoredText(input.phone || '').slice(0, 30),
+        userId: resolvedUserId,
+        moderationStatus: pendingModeration.moderationStatus,
+        submittedForModerationAt: pendingModeration.submittedForModerationAt,
+        createdAt,
+      };
+      const newRef = push(ref(database, PATH));
+      await set(ref(database, `${PATH}/${newRef.key}`), payload);
+      return newRef.key!;
+    } catch (error) {
+      console.error('[appSuggestionsService] addSuggestion failed:', error);
+      throw error;
+    }
   },
 
   async moderateSuggestion(id: string, status: 'approved' | 'rejected'): Promise<void> {
-    await update(ref(database, `${PATH}/${id}`), {
-      moderationStatus: status,
-      moderatedAt: new Date().toISOString(),
-      moderationReason: status === 'rejected' ? 'default_rejected' : null,
-      rejectionReason: status === 'rejected' ? 'default_rejected' : null,
-    });
+    try {
+      await update(ref(database, `${PATH}/${id}`), {
+        moderationStatus: status,
+        moderatedAt: new Date().toISOString(),
+        moderationReason: status === 'rejected' ? 'default_rejected' : null,
+        rejectionReason: status === 'rejected' ? 'default_rejected' : null,
+      });
+    } catch (error) {
+      console.error('[appSuggestionsService] moderateSuggestion failed:', error);
+      throw error;
+    }
   },
 
   async deleteSuggestion(id: string): Promise<void> {
-    await remove(ref(database, `${PATH}/${id}`));
+    try {
+      await remove(ref(database, `${PATH}/${id}`));
+    } catch (error) {
+      console.error('[appSuggestionsService] deleteSuggestion failed:', error);
+      throw error;
+    }
   },
 };

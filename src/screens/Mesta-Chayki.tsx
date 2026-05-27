@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -60,6 +60,15 @@ type BusinessItem = {
 };
 
 type PlacesScreenRouteParams = { tab?: LegacyTabKey; section?: SectionKey };
+
+const parseStoredJson = <T,>(raw: string | null, fallback: T): T => {
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+};
 
 const UI_TEXT = {
   ua: {
@@ -243,7 +252,7 @@ const PlaceRow: React.FC<PlaceRowProps> = ({ place, idx, section, ratings, onRat
     <TouchableOpacity
       style={styles.card}
       activeOpacity={0.82}
-      onPress={() => navigation.navigate('MainTabs', { screen: 'MapTab', params: getMapFocusPlaceParams(place) })}
+      onPress={() => { if (navLock.current) return; navLock.current = true; navigation.navigate('MainTabs', { screen: 'MapTab', params: getMapFocusPlaceParams(place) }); setTimeout(() => { navLock.current = false; }, 800); }}
     >
       <View style={[styles.rank, { backgroundColor: cfg.accent }]}>
         <Text style={styles.rankText}>#{idx + 1}</Text>
@@ -290,6 +299,7 @@ const PlaceRow: React.FC<PlaceRowProps> = ({ place, idx, section, ratings, onRat
 
 const PlacesScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
+  const navLock = useRef(false);
   const route = useRoute<import('@react-navigation/native').RouteProp<Record<string, PlacesScreenRouteParams>, string>>();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as Lang;
   const text = UI_TEXT[language];
@@ -317,11 +327,11 @@ const PlacesScreen: React.FC = () => {
           AsyncStorage.getItem(STORE_USER_RATINGS_KEY),
           AsyncStorage.getItem(DAILY_USAGE_KEY),
         ]);
-        if (rr) setRestaurantRatings(JSON.parse(rr) as RatingsByPlace);
-        if (rur) setRestaurantUserRatings(JSON.parse(rur) as UserRatingMap);
-        if (sr) setStoreRatings(JSON.parse(sr) as RatingsByPlace);
-        if (sur) setStoreUserRatings(JSON.parse(sur) as UserRatingMap);
-        if (du) setDailyUsage(JSON.parse(du) as DailyRatingUsage);
+        setRestaurantRatings(parseStoredJson<RatingsByPlace>(rr, {}));
+        setRestaurantUserRatings(parseStoredJson<UserRatingMap>(rur, {}));
+        setStoreRatings(parseStoredJson<RatingsByPlace>(sr, {}));
+        setStoreUserRatings(parseStoredJson<UserRatingMap>(sur, {}));
+        setDailyUsage(parseStoredJson<DailyRatingUsage | null>(du, null));
       } catch {}
     };
     void load();
@@ -573,11 +583,6 @@ const PlacesScreen: React.FC = () => {
 
         {activeSection === 'resident_goods' || activeSection === 'resident_services' ? (
           renderResidentAction()
-        ) : residentDataLoading && (activeSection === 'stores' || activeSection === 'restaurants') ? (
-          <View style={styles.emptyCard}>
-            <ActivityIndicator size="small" color={SCREEN_THEME.terracottaDark} />
-            <Text style={styles.emptyText}>{text.loading}</Text>
-          </View>
         ) : items.length === 0 ? (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyText}>{text.noData}</Text>

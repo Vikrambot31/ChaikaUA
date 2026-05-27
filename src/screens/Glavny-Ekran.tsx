@@ -44,7 +44,7 @@ const GRID_CELL_W = Math.floor((SCREEN_W - GRID_HORIZONTAL_PADDING * 2) / 2) - 4
 const BTN_ASPECT = 138 / 150;
 const BTN_W = Math.round(GRID_CELL_W * (IS_NARROW_SCREEN ? 0.79 : 0.85));
 const BTN_H = Math.round(BTN_W * BTN_ASPECT);
-const PANEL2_H = Math.round(SCREEN_W * 1.524);
+const PANEL2_H = Math.round((SCREEN_W - GRID_HORIZONTAL_PADDING * 2) * 1080 / 713);
 const PANEL2_IMAGE = require('../../assets/WEBP-version/Panel2.webp');
 
 type HomeButtonConfig = {
@@ -85,7 +85,7 @@ type LiveFeedItem = {
 const FEED_UI = {
   ua: {
     liveTitle: 'Активність зараз',
-    live: '● Наживо',
+    live: '● Live',
     help: 'Потрібна допомога',
     request: 'Запит',
     news: 'Новини',
@@ -99,7 +99,7 @@ const FEED_UI = {
   },
   ru: {
     liveTitle: 'Активность сейчас',
-    live: '● Прямо',
+    live: '● Live',
     help: 'Нужна помощь',
     request: 'Запрос',
     news: 'Новости',
@@ -565,7 +565,7 @@ const HomeScreen: React.FC = () => {
     void resolveUserAvatarMap(database, userIds).then((resolved) => {
       if (cancelled) return;
       setAvatarByUserId((prev) => ({ ...prev, ...resolved }));
-    });
+    }).catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -626,7 +626,7 @@ const HomeScreen: React.FC = () => {
         badge: badge.badge,
         badgeBg: badge.badgeBg,
         badgeColor: badge.badgeColor,
-        avatarUri: (req.userId && avatarByUserId[req.userId]) || pickAvatarUri(req),
+        avatarUri: (req.userId && avatarByUserId[req.userId]) || pickAvatarUri({ userPhotoURL: req.userPhotoURL, startAvatarKey: req.startAvatarKey }),
         typeLabel: getRequestTypeLabel(req, language),
         name: req.name,
         text: getRequestPreviewText(req, language),
@@ -646,7 +646,7 @@ const HomeScreen: React.FC = () => {
         badge: badge.badge,
         badgeBg: badge.badgeBg,
         badgeColor: badge.badgeColor,
-        avatarUri: undefined,
+        avatarUri: pickAvatarUri(report),
         typeLabel: feedText.electricityLabel,
         text: `${report.status === 'on' ? feedText.powerOn : feedText.powerOff} • ${report.buildingId}`.slice(0, 72),
         screen: 'ElectricityStatusScreen',
@@ -674,7 +674,6 @@ const HomeScreen: React.FC = () => {
   const TOP_INFO: TopInfoItem[] = [
     { id: 'news', icon: 'newspaper-variant-outline', titleKey: 'importantNews', subtitleKey: 'importantNewsSub', screen: 'ImportantNewsScreen' },
     { id: 'coffee-dating', icon: 'coffee-outline', titleKey: 'coffeeDating', subtitleKey: 'coffeeDatingSub', screen: 'KontaktiChaikyScreen' },
-    { id: 'electricity', icon: 'lightning-bolt-outline', titleKey: 'electricityStatus', subtitleKey: 'electricityStatusSub', screen: 'ElectricityStatusScreen' },
     { id: 'telegram', icon: 'send-circle-outline', titleKey: 'viberGroup', subtitleKey: 'viberGroupSub', url: 'https://t.me/Chaika_ua_APP' },
     { id: 'problem', icon: 'home-alert-outline', titleKey: 'tellProblem', subtitleKey: 'tellProblemSub', screen: 'ChaikaProblemsScreen' },
     { id: 'best-coffee', icon: 'coffee-to-go-outline', titleKey: 'bestCoffee', subtitleKey: 'bestCoffeeSub', screen: 'PlacesScreen', params: { tab: 'cafe' } },
@@ -732,7 +731,7 @@ const HomeScreen: React.FC = () => {
       <StatusBar barStyle="dark-content" backgroundColor={SCREEN_THEME.appBg} />
       {showOnboarding && <OnboardingSlides language={language} onDone={handleOnboardingDone} />}
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
           <TouchableOpacity onPress={() => setMenuVisible(true)} style={styles.menuBtn} activeOpacity={0.72}>
             <View style={styles.menuLines}>
@@ -749,7 +748,7 @@ const HomeScreen: React.FC = () => {
           </View>
 
           <View style={styles.logoWrap}>
-            <Image source={require('../../assets/WEBP-version/Logo-Chaika LIFE.webp')} style={styles.logoImg} resizeMode="contain" />
+            <Image source={require('../../assets/WEBP-version/Logo-Chaika-LIFE.webp')} style={styles.logoImg} resizeMode="contain" />
           </View>
         </View>
 
@@ -786,7 +785,7 @@ const HomeScreen: React.FC = () => {
           {showIntroVideo ? (
             <View style={[styles.panel1Shadow, { height: panelBodyHeight }]}> 
               <Video
-                source={require('../../assets/CHAIKA panel-1.mp4')}
+                source={require('../../assets/CHAIKA-panel-1.mp4')}
                 style={{ width: SCREEN_W - 48, height: panelBodyHeight }}
                 resizeMode={ResizeMode.CONTAIN}
                 shouldPlay
@@ -809,8 +808,12 @@ const HomeScreen: React.FC = () => {
           ) : (
             <Animated.View style={[styles.panel1Feed, { opacity: feedFadeAnim, minHeight: panelBodyHeight }]}> 
               <View style={styles.feedHeader}>
-                <Text style={styles.feedTitle}>{feedText.liveTitle}</Text>
-                <Animated.Text style={[styles.feedLiveBadge, { opacity: blinkAnim }]}>{feedText.live}</Animated.Text>
+                <Text style={styles.feedTitle} numberOfLines={1}>
+                  {feedText.liveTitle}
+                </Text>
+                <Animated.Text style={[styles.feedLiveBadge, { opacity: blinkAnim }]} numberOfLines={1}>
+                  {feedText.live}
+                </Animated.Text>
               </View>
               {liveFeedItems.length === 0 ? (
                 <View style={styles.feedEmpty}>
@@ -1054,23 +1057,35 @@ const styles = StyleSheet.create({
   },
   feedHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
+    gap: 8,
     marginBottom: 5,
     paddingBottom: 6,
     borderBottomWidth: 1,
     borderBottomColor: SCREEN_THEME.borderSoft,
   },
   feedTitle: {
-    fontSize: 18,
+    flex: 1,
+    minWidth: 0,
+    flexShrink: 1,
+    fontSize: IS_NARROW_SCREEN ? 14 : 16,
+    lineHeight: IS_NARROW_SCREEN ? 18 : 20,
     fontWeight: '900',
     color: SCREEN_THEME.textPrimary,
-    letterSpacing: 0.2,
+    letterSpacing: 0.1,
   },
   feedLiveBadge: {
-    fontSize: 15,
+    flexShrink: 0,
+    alignSelf: 'center',
+    fontSize: IS_NARROW_SCREEN ? 12 : 14,
+    lineHeight: IS_NARROW_SCREEN ? 16 : 18,
     fontWeight: '900',
     color: SCREEN_THEME.woodGreenDark,
+    backgroundColor: 'rgba(122, 167, 112, 0.12)',
+    borderRadius: 999,
+    paddingHorizontal: IS_NARROW_SCREEN ? 7 : 9,
+    paddingVertical: 4,
   },
   feedRow: {
     flexDirection: 'row',

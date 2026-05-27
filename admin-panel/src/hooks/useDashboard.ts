@@ -17,6 +17,15 @@ const initialState: DashboardState = {
     approved: 0,
     rejected: 0,
     expired: 0,
+    activeUsersToday: 0,
+    permissionDenied24h: 0,
+    activeSubscriptions: 0,
+    pendingPhotos: 0,
+    pendingInviteRequests: 0,
+    moderationAvgHours: 0,
+    rulesEnforcementLevel: 'UNKNOWN',
+    rulesOpenPaths: [],
+    rulesCheckedAt: 0,
   },
 };
 

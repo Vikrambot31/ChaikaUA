@@ -1,4 +1,5 @@
-const crypto = require('crypto');
+﻿const crypto = require('crypto');
+const functionsV1 = require('firebase-functions/v1');
 
 const PHONE_RE = /^\+380\d{9}$/;
 const FEATURE_FLAG_PATH = 'feature_flags/invite_access/current';
@@ -84,7 +85,7 @@ const DEFAULT_INVITE_CONFIG = {
   max_denied_before_block: 5,
   max_sponsors_per_30_days: 3,
   guest_access_enabled: false,
-  guest_access_hours: 48,
+  guest_access_hours: 0,
   guest_write_restricted: true,
   fallback_mode: 'open',
   whitelist_uids: [],
@@ -119,7 +120,7 @@ const assertPhone = (functions, value, fieldName) => {
   const phone = normalizePhone(value);
   if (!PHONE_RE.test(phone)) {
     const code = fieldName === 'sponsorPhone' ? 'INVALID_SPONSOR_PHONE' : 'INVALID_REQUESTER_PHONE';
-    throw new functions.https.HttpsError('invalid-argument', code, {
+    throw new functionsV1.https.HttpsError('invalid-argument', code, {
       code,
       field: fieldName,
     });
@@ -133,7 +134,7 @@ const toCanonicalPhone = (value) => {
 };
 
 const controlledError = (functions, firebaseCode, code, details = {}) =>
-  new functions.https.HttpsError(firebaseCode, code, {
+  new functionsV1.https.HttpsError(firebaseCode, code, {
     code,
     ...details,
   });
@@ -143,7 +144,7 @@ const maskPhone = (phone) => `${phone.slice(0, 4)}***${phone.slice(-3)}`;
 const assertSafePathKey = (functions, value, fieldName) => {
   const key = sanitizeText(value, 128);
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(key)) {
-    throw new functions.https.HttpsError('invalid-argument', `${fieldName} is invalid`);
+    throw new functionsV1.https.HttpsError('invalid-argument', `${fieldName} is invalid`);
   }
   return key;
 };
@@ -151,7 +152,7 @@ const assertSafePathKey = (functions, value, fieldName) => {
 const assertPhoneHash = (functions, value, fieldName) => {
   const key = sanitizeText(value, 128);
   if (!/^[a-f0-9]{64}$/.test(key)) {
-    throw new functions.https.HttpsError('invalid-argument', `${fieldName} is invalid`);
+    throw new functionsV1.https.HttpsError('invalid-argument', `${fieldName} is invalid`);
   }
   return key;
 };
@@ -167,7 +168,7 @@ const getHashSecret = (functions) => {
 const assertHashSecret = (functions) => {
   const secret = getHashSecret(functions);
   if (!secret) {
-    throw new functions.https.HttpsError('failed-precondition', 'Invite access is not configured');
+    throw new functionsV1.https.HttpsError('failed-precondition', 'Invite access is not configured');
   }
   return secret;
 };
@@ -188,22 +189,11 @@ const isInviteEnabled = async (db) => {
 };
 
 const normalizeInviteMode = (value, enabled) => {
-  if (value === 'soft' || value === 'medium' || value === 'hard') return value;
-  return enabled ? 'soft' : 'disabled';
+  if (value === 'soft' || value === 'medium') return value;
+  return enabled ? 'medium' : 'disabled';
 };
 
 const modeDefaults = (mode) => {
-  if (mode === 'hard') {
-    return {
-      enabled: true,
-      mandatory_sections_enabled: true,
-      auto_approve_enabled: false,
-      sponsor_confirmation_required: true,
-      cascade_block_policy: 'block',
-      cooldown_after_denied_hours: 72,
-      max_invites_per_sponsor: { depth_0: 999, depth_1: 5, depth_2: 1, depth_3_plus: 0 },
-    };
-  }
   if (mode === 'medium') {
     return {
       enabled: true,
@@ -266,7 +256,7 @@ const toPublicInviteConfig = (config) => ({
   mandatory_sections_enabled: config.mandatory_sections_enabled === true,
   soft_banner_enabled: config.mode === 'soft',
   guest_access_enabled: config.guest_access_enabled === true,
-  guest_access_hours: Number(config.guest_access_hours || 48),
+  guest_access_hours: Number(config.guest_access_hours || 0),
   fallback_mode: config.fallback_mode || 'open',
   updatedAt: Number(config.updatedAt || Date.now()),
 });
@@ -360,8 +350,7 @@ const publicUserAccess = (userAccess) => ({
 const createGuestAccessIfMissing = async (db, uid, config, now) => {
   if (!uid || config.mode === 'disabled') return { created: false, reason: 'disabled' };
 
-  const guestHours = Math.max(1, Number(config.guest_access_hours || DEFAULT_INVITE_CONFIG.guest_access_hours));
-  const guestExpiresAt = now + guestHours * 60 * 60 * 1000;
+  const guestExpiresAt = 0;
   const accessRef = db.ref(`${USER_ACCESS_PATH}/${uid}`);
   const result = await accessRef.transaction((current) => {
     if (current && typeof current === 'object' && current.status) return current;
@@ -450,7 +439,6 @@ const calculateRisk = ({ sponsor, userAccess, config }) => {
 
 const canAutoApprove = ({ config, sponsor, riskLevel }) => {
   if (config.auto_approve_enabled !== true) return false;
-  if (config.mode === 'hard') return false;
   if (!sponsor || sponsor.source !== 'trust_tree') return false;
   if (riskLevel !== 'low') return false;
   const node = sponsor.node || {};
@@ -565,7 +553,7 @@ const sendSponsorConfirmationNotification = async (admin, db, requestId, request
 
 const assertAuthenticated = (functions, context) => {
   if (!context.auth?.uid) {
-    throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+    throw new functionsV1.https.HttpsError('unauthenticated', 'Authentication required');
   }
 };
 
@@ -574,7 +562,7 @@ const assertAdminAccess = async (functions, context, helpers) => {
   if (helpers.isPrimaryServiceOwnerContext(context) || await helpers.isAdminRoleContext(context)) {
     return { uid: context.auth.uid, role: 'admin' };
   }
-  throw new functions.https.HttpsError('permission-denied', 'Admin access required');
+  throw new functionsV1.https.HttpsError('permission-denied', 'Admin access required');
 };
 
 const assertModeratorAccess = async (functions, context, helpers) => {
@@ -586,7 +574,7 @@ const assertModeratorAccess = async (functions, context, helpers) => {
   if (role === 'admin' || role === 'moderator') {
     return { uid: context.auth.uid, role };
   }
-  throw new functions.https.HttpsError('permission-denied', 'Moderator access required');
+  throw new functionsV1.https.HttpsError('permission-denied', 'Moderator access required');
 };
 
 const recordRateLimitAttempt = async (db, bucket, key, config, now) => {
@@ -727,11 +715,11 @@ const findActiveRequestForUid = async (db, uid) => {
 };
 
 const handleUnexpectedError = async (functions, helpers, functionName, error, payload = {}) => {
-  if (error instanceof functions.https.HttpsError) {
+  if (error instanceof functionsV1.https.HttpsError) {
     throw error;
   }
   await helpers.writeOpsError(functionName, error, payload);
-  throw new functions.https.HttpsError('internal', 'Invite access operation failed');
+  throw new functionsV1.https.HttpsError('internal', 'Invite access operation failed');
 };
 
 const createInviteAccessFunctions = (deps) => {
@@ -753,7 +741,7 @@ const createInviteAccessFunctions = (deps) => {
     getRoleForUid,
   };
 
-  const initializeGuestAccessOnUserCreate = functions.auth.user().onCreate(async (user) => {
+  const initializeGuestAccessOnUserCreate = functionsV1.auth.user().onCreate(async (user) => {
     const uid = user.uid;
     try {
       const db = admin.database();
@@ -775,7 +763,7 @@ const createInviteAccessFunctions = (deps) => {
     }
   });
 
-  const processExpiredGuestAccess = functions.pubsub.schedule('every 60 minutes').onRun(async () => {
+  const processExpiredGuestAccess = functionsV1.pubsub.schedule('every 60 minutes').onRun(async () => {
     const db = admin.database();
     const now = Date.now();
     try {
@@ -819,7 +807,7 @@ const createInviteAccessFunctions = (deps) => {
     }
   });
 
-  const grantTemporaryAccess = functions.https.onCall(async (data, context) => {
+  const grantTemporaryAccess = functionsV1.https.onCall(async (data, context) => {
     try {
       const actor = await assertAdminAccess(functions, context, helpers);
       const uid = assertSafePathKey(functions, data?.uid, 'uid');
@@ -827,10 +815,10 @@ const createInviteAccessFunctions = (deps) => {
       const reason = sanitizeText(data?.reason || '', 200);
 
       if (!Number.isFinite(durationHours) || durationHours < TEMPORARY_ACCESS_MIN_HOURS || durationHours > TEMPORARY_ACCESS_MAX_HOURS) {
-        throw new functions.https.HttpsError('invalid-argument', 'durationHours must be between 1 and 168');
+        throw new functionsV1.https.HttpsError('invalid-argument', 'durationHours must be between 1 and 168');
       }
       if (!reason) {
-        throw new functions.https.HttpsError('invalid-argument', 'reason is required');
+        throw new functionsV1.https.HttpsError('invalid-argument', 'reason is required');
       }
 
       const db = admin.database();
@@ -839,16 +827,27 @@ const createInviteAccessFunctions = (deps) => {
       const accessRef = db.ref(`${USER_ACCESS_PATH}/${uid}`);
       const accessSnapshot = await accessRef.once('value');
       const current = accessSnapshot.val() && typeof accessSnapshot.val() === 'object' ? accessSnapshot.val() : {};
+      const currentRequestId = sanitizeText(current.current_request_id || data?.requestId || '', 128);
 
-      await accessRef.update({
-        status: 'temporary_access',
-        temp_expires_at: tempExpiresAt,
-        manual_grant_reason: reason,
-        manual_grant_by: actor.uid,
-        manual_grant_at: now,
-        updatedAt: now,
-        version: Number(current.version || 0) + 1,
-      });
+      const updates = {
+        [`${USER_ACCESS_PATH}/${uid}/status`]: 'temporary_access',
+        [`${USER_ACCESS_PATH}/${uid}/temp_expires_at`]: tempExpiresAt,
+        [`${USER_ACCESS_PATH}/${uid}/manual_grant_reason`]: reason,
+        [`${USER_ACCESS_PATH}/${uid}/manual_grant_by`]: actor.uid,
+        [`${USER_ACCESS_PATH}/${uid}/manual_grant_at`]: now,
+        [`${USER_ACCESS_PATH}/${uid}/updatedAt`]: now,
+        [`${USER_ACCESS_PATH}/${uid}/version`]: Number(current.version || 0) + 1,
+      };
+      if (currentRequestId) {
+        updates[`${USER_ACCESS_PATH}/${uid}/current_request_id`] = currentRequestId;
+        updates[`${INVITE_REQUESTS_PATH}/${currentRequestId}/status`] = 'temporary_access';
+        updates[`${INVITE_REQUESTS_PATH}/${currentRequestId}/temp_expires_at`] = tempExpiresAt;
+        updates[`${INVITE_REQUESTS_PATH}/${currentRequestId}/moderationReason`] = reason;
+        updates[`${INVITE_REQUESTS_PATH}/${currentRequestId}/updatedAt`] = now;
+        updates[`${INVITE_REQUESTS_PATH}/${currentRequestId}/moderatedAt`] = now;
+        updates[`${INVITE_REQUESTS_PATH}/${currentRequestId}/moderatedBy`] = actor.uid;
+      }
+      await db.ref().update(updates);
 
       await writeOpsEvent('temporary_access_granted', {
         targetUid: uid,
@@ -874,7 +873,7 @@ const createInviteAccessFunctions = (deps) => {
     }
   });
 
-  const processExpiredTemporaryAccess = functions.pubsub.schedule('every 60 minutes').onRun(async () => {
+  const processExpiredTemporaryAccess = functionsV1.pubsub.schedule('every 60 minutes').onRun(async () => {
     const db = admin.database();
     const now = Date.now();
     try {
@@ -887,10 +886,16 @@ const createInviteAccessFunctions = (deps) => {
         const expiresAt = Number(value.temp_expires_at || 0);
         if (expiresAt > 0 && expiresAt < now) {
           const uid = child.key;
+          const currentRequestId = sanitizeText(value.current_request_id || '', 128);
           updates[`${USER_ACCESS_PATH}/${uid}/status`] = 'needs_manual_review';
           updates[`${USER_ACCESS_PATH}/${uid}/temp_expires_at`] = null;
           updates[`${USER_ACCESS_PATH}/${uid}/updatedAt`] = now;
           updates[`${USER_ACCESS_PATH}/${uid}/version`] = Number(value.version || 0) + 1;
+          if (currentRequestId) {
+            updates[`${INVITE_REQUESTS_PATH}/${currentRequestId}/status`] = 'needs_manual_review';
+            updates[`${INVITE_REQUESTS_PATH}/${currentRequestId}/temp_expires_at`] = null;
+            updates[`${INVITE_REQUESTS_PATH}/${currentRequestId}/updatedAt`] = now;
+          }
           expired.push({ uid, expiresAt });
         }
       });
@@ -919,7 +924,9 @@ const createInviteAccessFunctions = (deps) => {
     }
   });
 
-  const submitInviteRequest = functions.https.onCall(async (data, context) => {
+  const submitInviteRequest = functionsV1
+    .runWith({ minInstances: 1 })
+    .https.onCall(async (data, context) => {
     let db;
     let uid = context.auth?.uid || null;
     let lockRequestId = '';
@@ -933,10 +940,17 @@ const createInviteAccessFunctions = (deps) => {
       const profilePhone = await getUserPhone(db, context.auth.uid);
       const requesterPhone = assertPhone(functions, data?.requesterPhone || profilePhone, 'requesterPhone');
       const sponsorPhone = assertPhone(functions, data?.sponsorPhone, 'sponsorPhone');
-      const comment = sanitizeText(data?.comment || data?.source || '', 200);
+      const text = sanitizeText(data?.text || data?.comment || '', 280);
+      const apartment = sanitizeText(data?.apartment || '', 80);
+      const comment = text;
 
       if (requesterPhone === sponsorPhone) {
         throw controlledError(functions, 'invalid-argument', 'SELF_SPONSOR_NOT_ALLOWED');
+      }
+      if (text.length < 20 || text.length > 280) {
+        throw controlledError(functions, 'invalid-argument', 'INVALID_INVITE_TEXT', {
+          field: 'text',
+        });
       }
 
       const now = Date.now();
@@ -1046,7 +1060,10 @@ const createInviteAccessFunctions = (deps) => {
           sponsorPhoneHash,
           blockedBuckets: blocked.map((item) => item.bucket),
         });
-        return GENERIC_SUBMIT_RESPONSE;
+        const retryAfterSeconds = Math.max(60, Math.ceil(Math.max(...blocked.map((item) => Number(item.lockedUntil || 0))) - now) / 1000);
+        throw controlledError(functions, 'resource-exhausted', 'INVITE_RATE_LIMIT', {
+          retryAfterSeconds,
+        });
       }
 
       const sponsor = await findSponsorNode(db, sponsorPhoneHash);
@@ -1075,6 +1092,8 @@ const createInviteAccessFunctions = (deps) => {
         sponsorPhoneMasked: maskPhone(sponsorPhone),
         sponsorTrusted,
         comment,
+        text,
+        apartment,
         status: initialStatus,
         modeAtCreation: config.mode,
         riskScore,
@@ -1173,7 +1192,11 @@ const createInviteAccessFunctions = (deps) => {
         reason: requestData.decisionReason,
       });
 
-      return GENERIC_SUBMIT_RESPONSE;
+      return {
+        ok: true,
+        status: autoApprove && !requiresSponsorConfirmation ? 'auto_approved' : initialStatus === 'pending_sponsor' ? 'pending_sponsor' : 'pending',
+        requestId: requestRef.key,
+      };
     } catch (error) {
       return handleUnexpectedError(functions, helpers, 'submitInviteRequest', error, {
         uid,
@@ -1187,9 +1210,9 @@ const createInviteAccessFunctions = (deps) => {
         }
       }
     }
-  });
+    });
 
-  const getMyInviteRequestStatus = functions.https.onCall(async (_data, context) => {
+  const getMyInviteRequestStatus = functionsV1.https.onCall(async (_data, context) => {
     try {
       assertAuthenticated(functions, context);
       const db = admin.database();
@@ -1234,7 +1257,7 @@ const createInviteAccessFunctions = (deps) => {
     }
   });
 
-  const adminCreateTrustedSponsor = functions.https.onCall(async (data, context) => {
+  const adminCreateTrustedSponsor = functionsV1.https.onCall(async (data, context) => {
     try {
       const actor = await assertAdminAccess(functions, context, helpers);
       const secret = assertHashSecret(functions);
@@ -1278,7 +1301,7 @@ const createInviteAccessFunctions = (deps) => {
     }
   });
 
-  const adminUpdateTrustedSponsor = functions.https.onCall(async (data, context) => {
+  const adminUpdateTrustedSponsor = functionsV1.https.onCall(async (data, context) => {
     try {
       const actor = await assertAdminAccess(functions, context, helpers);
       const secret = assertHashSecret(functions);
@@ -1291,14 +1314,14 @@ const createInviteAccessFunctions = (deps) => {
       const status = data?.status === undefined ? undefined : sanitizeText(data.status, 32);
 
       if (status !== undefined && status !== 'active' && status !== 'disabled') {
-        throw new functions.https.HttpsError('invalid-argument', 'status must be active or disabled');
+        throw new functionsV1.https.HttpsError('invalid-argument', 'status must be active or disabled');
       }
 
       const db = admin.database();
       const sponsorRef = db.ref(`${TRUSTED_SPONSORS_PATH}/${sponsorPhoneHash}`);
       const existingSnapshot = await sponsorRef.once('value');
       if (!existingSnapshot.exists()) {
-        throw new functions.https.HttpsError('not-found', 'Trusted sponsor not found');
+        throw new functionsV1.https.HttpsError('not-found', 'Trusted sponsor not found');
       }
 
       const patch = {
@@ -1336,14 +1359,14 @@ const createInviteAccessFunctions = (deps) => {
     }
   });
 
-  const adminGrantRootAccessByPhones = functions.https.onCall(async (data, context) => {
+  const adminGrantRootAccessByPhones = functionsV1.https.onCall(async (data, context) => {
     try {
       const actor = await assertAdminAccess(functions, context, helpers);
       const secret = assertHashSecret(functions);
       const rawPhones = Array.isArray(data?.phones) ? data.phones : [];
       const requestedPhones = [...new Set(rawPhones.map((phone) => sanitizeText(phone, 64)).filter(Boolean))];
       if (requestedPhones.length === 0) {
-        throw new functions.https.HttpsError('invalid-argument', 'phones is required');
+        throw new functionsV1.https.HttpsError('invalid-argument', 'phones is required');
       }
 
       const db = admin.database();
@@ -1450,7 +1473,7 @@ const createInviteAccessFunctions = (deps) => {
     }
   });
 
-  const adminModerateInviteRequest = functions.https.onCall(async (data, context) => {
+  const adminModerateInviteRequest = functionsV1.https.onCall(async (data, context) => {
     try {
       const actor = await assertModeratorAccess(functions, context, helpers);
       const requestId = assertSafePathKey(functions, data?.requestId, 'requestId');
@@ -1458,21 +1481,22 @@ const createInviteAccessFunctions = (deps) => {
       const status = decision === 'approve' ? 'approved' : decision === 'deny' ? 'denied' : decision;
 
       if (status !== 'approved' && status !== 'denied') {
-        throw new functions.https.HttpsError('invalid-argument', 'status must be approved or denied');
+        throw new functionsV1.https.HttpsError('invalid-argument', 'status must be approved or denied');
       }
 
       const db = admin.database();
       const requestRef = db.ref(`${INVITE_REQUESTS_PATH}/${requestId}`);
       const requestSnapshot = await requestRef.once('value');
       if (!requestSnapshot.exists()) {
-        throw new functions.https.HttpsError('not-found', 'Invite request not found');
+        throw new functionsV1.https.HttpsError('not-found', 'Invite request not found');
       }
 
       const request = requestSnapshot.val() || {};
       const now = Date.now();
+      const moderationReason = sanitizeText(data?.reason || '', 280);
       const previousStatus = String(request.status || 'pending');
       if (previousStatus !== 'pending' && previousStatus !== 'pending_sponsor' && previousStatus !== 'needs_manual_review') {
-        throw new functions.https.HttpsError('failed-precondition', 'Invite request was already decided');
+        throw new functionsV1.https.HttpsError('failed-precondition', 'Invite request was already decided');
       }
 
       const transactionResult = await requestRef.transaction((current) => {
@@ -1485,14 +1509,14 @@ const createInviteAccessFunctions = (deps) => {
           updatedAt: now,
           moderatedAt: now,
           moderatedBy: actor.uid,
-          moderationReason: sanitizeText(data?.reason || '', 280),
+          moderationReason,
           decisionSource: 'manual_admin',
-          decisionReason: sanitizeText(data?.reason || '', 280),
+          decisionReason: moderationReason,
           version: Number(current.version || 0) + 1,
         };
       });
       if (!transactionResult.committed) {
-        throw new functions.https.HttpsError('failed-precondition', 'Invite request was already decided');
+        throw new functionsV1.https.HttpsError('failed-precondition', 'Invite request was already decided');
       }
 
       const currentAccess = await readUserAccess(db, request.requesterUid);
@@ -1559,8 +1583,40 @@ const createInviteAccessFunctions = (deps) => {
         sponsorPhoneHash: request.sponsorPhoneHash || null,
         actorType: actor.role === 'moderator' ? 'moderator' : 'admin',
         actorUid: actor.uid,
-        reason: sanitizeText(data?.reason || '', 280),
+        reason: moderationReason,
       });
+
+      try {
+        const notificationTitle = status === 'approved'
+          ? 'Ваша заявка одобрена'
+          : 'Заявка на доступ отклонена';
+        const notificationBody = status === 'approved'
+          ? 'Добро пожаловать в Чайку. Полный доступ открыт.'
+          : (moderationReason || 'Вы можете подать новую заявку с уточнёнными данными.');
+
+        await writeInAppNotification(db, request.requesterUid, {
+          type: 'invite_access_result',
+          title: notificationTitle,
+          body: notificationBody,
+          requestId,
+          status,
+          reason: moderationReason,
+        });
+        await sendOptionalPush(admin, db, request.requesterUid, {
+          title: `Chaika Life: ${notificationTitle}`,
+          body: notificationBody,
+        }, {
+          type: 'invite_access_result',
+          requestId,
+          status,
+        });
+      } catch (notificationError) {
+        await writeOpsEvent('invite_result_notification_warning', {
+          requestId,
+          requesterUid: request.requesterUid || null,
+          message: String(notificationError?.message || notificationError || 'notification_failed'),
+        });
+      }
 
       return { ok: true, requestId, status };
     } catch (error) {
@@ -1571,7 +1627,7 @@ const createInviteAccessFunctions = (deps) => {
     }
   });
 
-  const listMySponsorConfirmations = functions.https.onCall(async (_data, context) => {
+  const listMySponsorConfirmations = functionsV1.https.onCall(async (_data, context) => {
     try {
       assertAuthenticated(functions, context);
       const db = admin.database();
@@ -1642,19 +1698,19 @@ const createInviteAccessFunctions = (deps) => {
 
     const nextConfirmation = txResult.snapshot.val() || {};
     if (!txResult.committed && !nextConfirmation.requestId) {
-      throw new functions.https.HttpsError('not-found', 'Sponsor confirmation not found');
+      throw new functionsV1.https.HttpsError('not-found', 'Sponsor confirmation not found');
     }
     if (String(nextConfirmation.sponsorUid || '') !== sponsorUid) {
-      throw new functions.https.HttpsError('permission-denied', 'Only the sponsor can respond');
+      throw new functionsV1.https.HttpsError('permission-denied', 'Only the sponsor can respond');
     }
     if (!txResult.committed) {
-      throw new functions.https.HttpsError('failed-precondition', 'Sponsor confirmation is already closed');
+      throw new functionsV1.https.HttpsError('failed-precondition', 'Sponsor confirmation is already closed');
     }
     if (String(nextConfirmation.status || '') === 'expired') {
-      throw new functions.https.HttpsError('failed-precondition', 'Sponsor confirmation has expired');
+      throw new functionsV1.https.HttpsError('failed-precondition', 'Sponsor confirmation has expired');
     }
     if (String(nextConfirmation.status || '') !== 'processing' || String(nextConfirmation.processingResponse || '') !== responseStatus) {
-      throw new functions.https.HttpsError('failed-precondition', 'Sponsor confirmation is already closed');
+      throw new functionsV1.https.HttpsError('failed-precondition', 'Sponsor confirmation is already closed');
     }
 
     const requestId = String(nextConfirmation.requestId || confirmationId);
@@ -1666,11 +1722,11 @@ const createInviteAccessFunctions = (deps) => {
     try {
       const requestSnapshot = await requestRef.once('value');
       if (!requestSnapshot.exists()) {
-        throw new functions.https.HttpsError('not-found', 'Invite request not found');
+        throw new functionsV1.https.HttpsError('not-found', 'Invite request not found');
       }
       request = requestSnapshot.val() || {};
       if (String(request.status || '') !== 'pending_sponsor') {
-        throw new functions.https.HttpsError('failed-precondition', 'Invite request is no longer waiting for sponsor confirmation');
+        throw new functionsV1.https.HttpsError('failed-precondition', 'Invite request is no longer waiting for sponsor confirmation');
       }
       requesterUid = String(request.requesterUid || nextConfirmation.requesterUid || '');
       nextRequestStatus = responseStatus === 'approved' ? 'approved' : 'denied';
@@ -1758,7 +1814,7 @@ const createInviteAccessFunctions = (deps) => {
     return { ok: true, confirmationId, requestId, status: nextRequestStatus };
   };
 
-  const approveSponsorConfirmation = functions.https.onCall(async (data, context) => {
+  const approveSponsorConfirmation = functionsV1.https.onCall(async (data, context) => {
     try {
       assertAuthenticated(functions, context);
       return await respondToSponsorConfirmation(data, context, 'approved');
@@ -1770,7 +1826,7 @@ const createInviteAccessFunctions = (deps) => {
     }
   });
 
-  const denySponsorConfirmation = functions.https.onCall(async (data, context) => {
+  const denySponsorConfirmation = functionsV1.https.onCall(async (data, context) => {
     try {
       assertAuthenticated(functions, context);
       return await respondToSponsorConfirmation(data, context, 'denied');
@@ -1782,7 +1838,7 @@ const createInviteAccessFunctions = (deps) => {
     }
   });
 
-  const processExpiredSponsorConfirmations = functions.pubsub.schedule('every 60 minutes').onRun(async () => {
+  const processExpiredSponsorConfirmations = functionsV1.pubsub.schedule('every 60 minutes').onRun(async () => {
     const db = admin.database();
     const now = Date.now();
     try {
@@ -1907,11 +1963,11 @@ const createInviteAccessFunctions = (deps) => {
     }
   });
 
-  const adminSetInviteAccessEnabled = functions.https.onCall(async (data, context) => {
+  const adminSetInviteAccessEnabled = functionsV1.https.onCall(async (data, context) => {
     try {
       const actor = await assertAdminAccess(functions, context, helpers);
       if (typeof data?.enabled !== 'boolean') {
-        throw new functions.https.HttpsError('invalid-argument', 'enabled must be a boolean');
+        throw new functionsV1.https.HttpsError('invalid-argument', 'enabled must be a boolean');
       }
 
       if (data.enabled) {
@@ -1964,12 +2020,12 @@ const createInviteAccessFunctions = (deps) => {
     }
   });
 
-  const adminSetInviteAccessMode = functions.https.onCall(async (data, context) => {
+  const adminSetInviteAccessMode = functionsV1.https.onCall(async (data, context) => {
     try {
       const actor = await assertAdminAccess(functions, context, helpers);
       const mode = sanitizeText(data?.mode, 20);
-      if (mode !== 'disabled' && mode !== 'soft' && mode !== 'medium' && mode !== 'hard') {
-        throw new functions.https.HttpsError('invalid-argument', 'mode must be disabled, soft, medium or hard');
+      if (mode !== 'disabled' && mode !== 'soft' && mode !== 'medium') {
+        throw new functionsV1.https.HttpsError('invalid-argument', 'mode must be disabled, soft or medium');
       }
       if (mode !== 'disabled') {
         assertHashSecret(functions);
@@ -2016,7 +2072,7 @@ const createInviteAccessFunctions = (deps) => {
     }
   });
 
-  const initializeInviteAccessRoot = functions.https.onCall(async (data, context) => {
+  const initializeInviteAccessRoot = functionsV1.https.onCall(async (data, context) => {
     try {
       const actor = await assertAdminAccess(functions, context, helpers);
       const secret = assertHashSecret(functions);

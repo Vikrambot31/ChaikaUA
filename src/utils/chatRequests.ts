@@ -3,6 +3,8 @@ export type ChatRequestLike = {
   userId?: string;
   name: string;
   photoUri?: string;
+  userPhotoURL?: string;
+  startAvatarKey?: string;
   text?: string;
   description?: string;
   category?: string;

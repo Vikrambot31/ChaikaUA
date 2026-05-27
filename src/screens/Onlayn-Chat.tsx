@@ -314,24 +314,64 @@ const formatTopicLabel = (key: string, language: keyof typeof TOPIC_LABELS) => {
     .replace(/^\w/, (char) => char.toUpperCase()) || labels.other;
 };
 
+const TECHNICAL_DESCRIPTION_PREFIXES = new Set(['text', 'description', 'desc', 'category', 'subcategory', 'group', 'topic']);
+
+const isKnownTopicKey = (key?: string | null) => {
+  const normalized = normalizeTopicKey(key);
+  if (!normalized) return false;
+  return Object.values(TOPIC_LABELS).some((labels) => normalized in labels);
+};
+
+const stripChatDescriptionPrefix = (value: string) => {
+  const raw = value.trim();
+  const bracketMatch = raw.match(/^\[([^\]]+)]\s*(.*)$/);
+  if (!bracketMatch) return raw;
+
+  const prefixKey = normalizeTopicKey(bracketMatch[1]);
+  const rest = (bracketMatch[2] || '').trim();
+  const shouldStripPrefix = TECHNICAL_DESCRIPTION_PREFIXES.has(prefixKey) || isKnownTopicKey(prefixKey);
+
+  return shouldStripPrefix ? rest : raw;
+};
+
 const splitChatTopic = (item: ChatRequest, language: keyof typeof TOPIC_LABELS) => {
   const rawText = String(item.description || item.text || '').trim();
   const bracketMatch = rawText.match(/^\[([^\]]+)]\s*(.*)$/);
-  const explicitTopic = bracketMatch?.[1]?.trim();
-  const cleanDescription = (bracketMatch?.[2] || rawText).trim();
-  const topicKey = normalizeTopicKey(explicitTopic || item.subcategory || item.category || item.group || 'other');
+  const explicitTopic = isKnownTopicKey(bracketMatch?.[1]) ? bracketMatch?.[1]?.trim() : undefined;
+  const cleanDescription = stripChatDescriptionPrefix(rawText);
+  const topicKey = normalizeTopicKey(item.subcategory || item.category || item.group || explicitTopic || 'other');
   return {
     topic: formatTopicLabel(topicKey, language),
-    description: cleanDescription || rawText,
+    description: cleanDescription,
   };
 };
 
 const OnlineChatScreen = () => {
   const navigation = useNavigation<ChatNavigation>();
+  const navLock = useRef(false);
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const currentUser = useSelector((state: RootState) => state.auth.user);
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const text = UI_TEXT[language];
+  const currentUserAvatarUri = pickUserAvatarUri(currentUser);
+  const hasCurrentUserAvatar = Boolean(currentUserAvatarUri);
+  const avatarRequiredText = language === 'en'
+    ? {
+        title: 'Avatar required',
+        body: 'Add a profile photo before creating a request in chat.',
+        action: 'Open profile',
+      }
+    : language === 'ru'
+      ? {
+          title: 'Нужна аватарка',
+          body: 'Добавьте фото профиля перед созданием заявки в чате.',
+          action: 'Открыть профиль',
+        }
+      : {
+          title: 'Потрібна аватарка',
+          body: 'Додайте фото профілю перед створенням заявки в чаті.',
+          action: 'Відкрити профіль',
+        };
   const deleteText = language === 'en'
     ? {
         action: 'Delete',
@@ -364,6 +404,7 @@ const OnlineChatScreen = () => {
   const [searchText, setSearchText] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const addRequestNavLock = useRef(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -520,14 +561,8 @@ const OnlineChatScreen = () => {
   };
 
   const isOwnRequest = (item: ChatRequest) => {
-    if (!currentUser) return false;
-    // Primary: compare Firebase userId (phone is masked in Firebase so digits comparison is unreliable)
-    if (item.userId && currentUser.id) {
-      return item.userId === currentUser.id;
-    }
-    // Fallback: name match
-    const sameName = Boolean(currentUser.name?.trim()) && currentUser.name.trim().toLowerCase() === (item.name || '').trim().toLowerCase();
-    return sameName;
+    if (!currentUser?.id) return false;
+    return Boolean(item.userId) && item.userId === currentUser.id;
   };
 
   const handleDeleteRequest = useCallback(async (requestId: string) => {
@@ -641,6 +676,7 @@ const OnlineChatScreen = () => {
         </TactileCard>
       ) : (
         <FlatList
+          keyboardShouldPersistTaps="handled"
           data={filteredRequests}
           keyExtractor={(item) => item.id}
           removeClippedSubviews
@@ -699,22 +735,31 @@ const OnlineChatScreen = () => {
             const { topic, description } = splitChatTopic(item, language);
             const timeAgo = getTimeAgo(timestamp);
             const own = isOwnRequest(item);
+            const avatarUri = item.userId
+              ? ((item.userId && avatarByUserId[item.userId]) || pickUserAvatarUri(item))
+              : '';
 
             return (
               <TouchableOpacity
                 style={styles.chatCard}
-                onPress={() => navigation.navigate('RequestDetail', { request: item })}
+                onPress={() => { if (navLock.current) return; navLock.current = true; navigation.navigate('RequestDetail', { request: item }); setTimeout(() => { navLock.current = false; }, 800); }}
                 activeOpacity={0.88}
               >
                 {/* TOP: avatar + name/info block */}
                 <View style={styles.chatCardTop}>
-                  <MiniUserAvatar
-                    uri={(item.userId && avatarByUserId[item.userId]) || pickUserAvatarUri(item)}
-                    name={item.name}
-                    size={56}
-                    borderRadius={14}
-                    backgroundColor="#6A8BA5"
-                  />
+                  {avatarUri ? (
+                    <MiniUserAvatar
+                      uri={avatarUri}
+                      name={item.name}
+                      size={56}
+                      borderRadius={14}
+                      backgroundColor="#6A8BA5"
+                    />
+                  ) : (
+                    <View style={styles.botAvatar}>
+                      <MaterialCommunityIcons name="robot-outline" size={28} color="#FFF9EE" />
+                    </View>
+                  )}
                   <View style={styles.chatCardRight}>
                     {/* Name row */}
                     <View style={styles.chatNameRow}>
@@ -854,7 +899,19 @@ const OnlineChatScreen = () => {
 
       <TactileButton
         title={text.add}
-        onPress={() => navigation.navigate('AddRequest')}
+        onPress={() => {
+          if (addRequestNavLock.current) return;
+          if (!hasCurrentUserAvatar) {
+            Alert.alert(avatarRequiredText.title, avatarRequiredText.body, [
+              { text: avatarRequiredText.action, onPress: () => navigation.navigate(currentUser?.id ? 'EditProfileScreen' : 'LoginScreen') },
+              { text: language === 'en' ? 'Cancel' : language === 'ru' ? 'Отмена' : 'Скасувати', style: 'cancel' },
+            ]);
+            return;
+          }
+          addRequestNavLock.current = true;
+          navigation.navigate('AddRequest');
+          setTimeout(() => { addRequestNavLock.current = false; }, 800);
+        }}
         variant="primary"
         style={{ marginHorizontal: 16, marginTop: 10, marginBottom: 14 }}
         icon={<MaterialCommunityIcons name="plus-circle-outline" size={20} color="#FFFFFF" />}
@@ -873,7 +930,7 @@ const OnlineChatScreen = () => {
             </TouchableOpacity>
             <TouchableOpacity style={styles.actionSecondaryBtn} onPress={() => handleContact(actionModal.userId, actionModal.userName)} activeOpacity={0.86}>
               <MaterialCommunityIcons name="arrow-right-circle-outline" size={18} color={SCREEN_THEME.textPrimary} />
-              <Text style={styles.actionSecondaryText}>{language === 'ru' ? 'Связаться' : language === 'en' ? 'Contact' : 'Зв\'язаться'}</Text>
+              <Text style={styles.actionSecondaryText}>{language === 'ru' ? 'Связаться' : language === 'en' ? 'Contact' : "Зв'язатись"}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.actionCancelBtn} onPress={() => setActionModal({ visible: false, userId: '', userName: '' })} activeOpacity={0.8}>
               <Text style={styles.actionCancelText}>{language === 'ru' ? 'Отмена' : language === 'en' ? 'Cancel' : 'Скасувати'}</Text>
@@ -1088,6 +1145,16 @@ const styles = StyleSheet.create({
     gap: 10,
     alignItems: 'flex-start',
     marginBottom: 8,
+  },
+  botAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#6A8BA5',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.65)',
   },
   chatCardRight: {
     flex: 1,

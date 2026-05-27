@@ -80,25 +80,24 @@ export function analyze(files) {
       }
     });
 
-    // 4. unresolved-promise (HIGH)
+    // 4. unresolved-promise (MEDIUM)
+    // Lowered from HIGH: broad regex produces false positives; only flag explicit fire-and-forget patterns
     lines.forEach((line, i) => {
-      // Look for async function calls without await, .then, or .catch
-      // Detect common patterns: functionName() on its own line returning a promise
-      if (/^\s*\w+\s*\(.*\)\s*;?\s*$/.test(line) && !/await|\.then|\.catch|console\.|return|const|let|var|=/.test(line)) {
-        // Check if the function is likely async
+      // Stricter: standalone function call on its own line (no assignment, no return, no await)
+      if (/^\s*\w+\s*\([^)]*\)\s*;?\s*$/.test(line) && !/await|\.then|\.catch|console\.|return\s|const\s|let\s|var\s|=/.test(line)) {
         const funcName = line.match(/^\s*(\w+)\s*\(/)?.[1];
-        if (funcName) {
-          // Search for async definition of this function in the file
-          const asyncDef = new RegExp(`async\\s+(function\\s+)?${funcName}\\b`);
-          if (asyncDef.test(content)) {
-            findings.push(createFinding({
-              severity: 'HIGH', file: relativePath, line: i + 1, rule: 'unresolved-promise', scanner: SCANNER,
-              why: `Async function "${funcName}" called without await or error handling`,
-              risk: 'Unhandled promise rejection may crash the app in production',
-              uxImpact: 'high', perfImpact: 'none', memoryImpact: 'none',
-              suggestion: 'Add await keyword or .catch() handler to the async call',
-            }));
-          }
+        // Skip common non-async patterns: component lifecycle, hooks, navigation calls
+        if (!funcName || /^(console|render|setState|dispatch|navigate|push|replace|goBack|log|warn|error|info)$/.test(funcName)) return;
+        if (funcName.length < 3) return; // skip single-letter or very short names
+        const asyncDef = new RegExp(`async\\s+(function\\s+)?${funcName}\\b`);
+        if (asyncDef.test(content)) {
+          findings.push(createFinding({
+            severity: 'MEDIUM', file: relativePath, line: i + 1, rule: 'unresolved-promise', scanner: SCANNER,
+            why: `Async function "${funcName}" called without await or error handling`,
+            risk: 'Unhandled promise rejection may go unnoticed in production',
+            uxImpact: 'medium', perfImpact: 'none', memoryImpact: 'none',
+            suggestion: 'Add await keyword or .catch() handler to the async call',
+          }));
         }
       }
     });
@@ -119,20 +118,20 @@ export function analyze(files) {
       }
     });
 
-    // 6. setstate-after-unmount (MEDIUM)
+    // 6. setstate-after-unmount (LOW)
+    // Lowered from MEDIUM: very common React pattern, usually not a real crash — just a warning
     lines.forEach((line, i) => {
-      // Look for setState inside .then() or after await in async callbacks
       if (/\.then\s*\(\s*(?:async\s*)?\(?.*?\)?\s*=>\s*\{?/.test(line) || /await\s+/.test(line)) {
         const thenBlock = lines.slice(i, Math.min(i + 10, lines.length)).join('\n');
         if (/\bset[A-Z]\w*\s*\(/.test(thenBlock)) {
           const funcContext = lines.slice(Math.max(0, i - 20), Math.min(i + 15, lines.length)).join('\n');
           if (!/isMounted|mounted|cancelled|aborted|useRef.*mounted/.test(funcContext)) {
             findings.push(createFinding({
-              severity: 'MEDIUM', file: relativePath, line: i + 1, rule: 'setstate-after-unmount', scanner: SCANNER,
+              severity: 'LOW', file: relativePath, line: i + 1, rule: 'setstate-after-unmount', scanner: SCANNER,
               why: 'setState in async callback without isMounted guard',
-              risk: 'React warning or crash if component unmounts before async completes',
+              risk: 'React warning if component unmounts before async completes (not a hard crash)',
               uxImpact: 'none', perfImpact: 'none', memoryImpact: 'low',
-              suggestion: 'Add isMounted ref check before setState calls in async callbacks',
+              suggestion: 'Add isMounted ref check before setState calls in async callbacks if needed',
             }));
           }
         }
@@ -183,9 +182,9 @@ export function analyze(files) {
 
       // setState directly in render body (not inside hooks or handlers)
       if (/^\s*set[A-Z]\w*\s*\(/.test(line)) {
-        const context = lines.slice(Math.max(0, i - 10), i).join('\n');
-        // If not inside useEffect, useCallback, handler function, or event handler
-        if (!/useEffect|useCallback|useMemo|handle|on[A-Z]|function\s+\w+|=>\s*\{/.test(context)) {
+        const context = lines.slice(Math.max(0, i - 15), i).join('\n');
+        // Skip if inside any function, callback, hook, or conditional — broader exclusion to reduce false positives
+        if (!/useEffect|useCallback|useMemo|handle|on[A-Z]|function\s+\w+|=>\s*\{|if\s*\(|else\s*\{|\?\s*$/.test(context)) {
           findings.push(createFinding({
             severity: 'HIGH', file: relativePath, line: i + 1, rule: 'infinite-rerender-risk', scanner: SCANNER,
             why: 'setState call appears to be in render body',

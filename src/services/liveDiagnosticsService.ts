@@ -5,6 +5,7 @@ import * as Application from 'expo-application';
 import { auth, database } from '../firebase-core';
 import { ref, push, onValue, off } from 'firebase/database';
 import { getSessionId } from './sessionService';
+import { isEmergencyAccessActive, subscribeEmergencyAccess } from './emergencyAccess';
 
 export type LiveDiagnosticLevel = 'info' | 'warn' | 'error' | 'fatal';
 
@@ -74,7 +75,10 @@ let lastFingerprint = '';
 let lastFingerprintAt = 0;
 let appStateSubscription: { remove: () => void } | null = null;
 let diagnosticsEnabled = false;
+let runtimeControlEnabled = false;
+let emergencyDiagnosticsEnabled = false;
 let controlUnsubscribe: (() => void) | null = null;
+let emergencyUnsubscribe: (() => void) | null = null;
 
 const redactString = (value: string): string =>
   value
@@ -234,6 +238,21 @@ export const flushLiveDiagnostics = async (): Promise<void> => {
   }
 };
 
+const updateDiagnosticsEnabled = (source: string): void => {
+  const nextEnabled = runtimeControlEnabled || emergencyDiagnosticsEnabled;
+  const changed = nextEnabled !== diagnosticsEnabled;
+  diagnosticsEnabled = nextEnabled;
+  if (changed && diagnosticsEnabled) {
+    void recordLiveDiagnostic({
+      eventType: 'app_start',
+      level: 'info',
+      message: `Live diagnostics enabled from ${source}`,
+      details: { appState: AppState.currentState },
+    });
+    void flushLiveDiagnostics();
+  }
+};
+
 export const recordLiveDiagnostic = async (input: LiveDiagnosticInput): Promise<void> => {
   if (!diagnosticsEnabled) {
     return;
@@ -279,18 +298,8 @@ export const initLiveDiagnostics = (): void => {
   if (!controlUnsubscribe) {
     const controlRef = ref(database, 'diagnostics/runtime_control');
     const unsubscribe = onValue(controlRef, (snapshot) => {
-      const enabled = Boolean((snapshot.val() as { enabled?: unknown } | null)?.enabled);
-      const changed = enabled !== diagnosticsEnabled;
-      diagnosticsEnabled = enabled;
-      if (changed && diagnosticsEnabled) {
-        void recordLiveDiagnostic({
-          eventType: 'app_start',
-          level: 'info',
-          message: 'Live diagnostics enabled from admin panel',
-          details: { appState: AppState.currentState },
-        });
-        void flushLiveDiagnostics();
-      }
+      runtimeControlEnabled = Boolean((snapshot.val() as { enabled?: unknown } | null)?.enabled);
+      updateDiagnosticsEnabled('admin panel');
     }, () => {
       // Permission denied or connection error — non-fatal, diagnostics remain disabled.
     });
@@ -298,6 +307,19 @@ export const initLiveDiagnostics = (): void => {
       off(controlRef);
       unsubscribe();
     };
+  }
+
+  if (!emergencyUnsubscribe) {
+    emergencyUnsubscribe = subscribeEmergencyAccess((current) => {
+      emergencyDiagnosticsEnabled = Boolean(
+        isEmergencyAccessActive(current) &&
+        current?.bypassDiagnosticsRestrictions,
+      );
+      updateDiagnosticsEnabled('emergency debug');
+    }, () => {
+      emergencyDiagnosticsEnabled = false;
+      updateDiagnosticsEnabled('emergency debug');
+    });
   }
 
   if (appStateSubscription) {

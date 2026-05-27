@@ -45,69 +45,56 @@ export default function TactileButton({
   const v = VARIANTS[variant];
   const disabledTextColor = variant === 'primary' || variant === 'social' ? '#FFFFFF' : SCREEN_THEME.textPrimary;
   const scaleVal = useRef(new Animated.Value(1)).current;
-  const shadowOffsetY = useRef(new Animated.Value(5)).current;
-  const shadowOpacity = useRef(new Animated.Value(0.32)).current;
-  const [elevationNum, setElevationNum] = useState(6);
-  const insetShadowOpacity = useRef(new Animated.Value(0)).current;
   const translateYVal = useRef(new Animated.Value(0)).current;
+  const [elevationNum, setElevationNum] = useState(6);
 
-  const animatedShadow = {
+  const staticShadow = {
     shadowColor: v.shadowColor,
-    shadowOpacity,
+    shadowOpacity: 0.32,
     shadowRadius: 6,
-    shadowOffset: { width: 1, height: shadowOffsetY },
+    shadowOffset: { width: 1, height: 5 },
     elevation: elevationNum,
   };
 
   const handlePressIn = () => {
     if (disabled) return;
     setElevationNum(2);
-    Animated.parallel([
-      Animated.timing(scaleVal, { toValue: 0.96, duration: 80, useNativeDriver: true }),
-      Animated.timing(translateYVal, { toValue: 2, duration: 80, useNativeDriver: true }),
-      Animated.timing(shadowOffsetY, { toValue: 1, duration: 80, useNativeDriver: false }),
-      Animated.timing(shadowOpacity, { toValue: 0.08, duration: 80, useNativeDriver: false }),
-      Animated.timing(insetShadowOpacity, { toValue: 0.18, duration: 80, useNativeDriver: false }),
-    ]).start();
+    Animated.timing(scaleVal, { toValue: 0.96, duration: 80, useNativeDriver: true }).start();
+    Animated.timing(translateYVal, { toValue: 2, duration: 80, useNativeDriver: true }).start();
   };
 
   const handlePressOut = () => {
     if (disabled) return;
     setElevationNum(6);
-    Animated.parallel([
-      Animated.timing(scaleVal, { toValue: 1, duration: 150, useNativeDriver: true }),
-      Animated.timing(translateYVal, { toValue: 0, duration: 150, useNativeDriver: true }),
-      Animated.timing(shadowOffsetY, { toValue: 5, duration: 150, useNativeDriver: false }),
-      Animated.timing(shadowOpacity, { toValue: 0.32, duration: 150, useNativeDriver: false }),
-      Animated.timing(insetShadowOpacity, { toValue: 0, duration: 150, useNativeDriver: false }),
-    ]).start();
+    Animated.timing(scaleVal, { toValue: 1, duration: 150, useNativeDriver: true }).start();
+    Animated.timing(translateYVal, { toValue: 0, duration: 150, useNativeDriver: true }).start();
   };
 
   return (
-    <Animated.View style={[
-      { transform: [{ scale: scaleVal }, { translateY: translateYVal }] },
-      disabled && styles.disabledWrap,
-    ]}>
+    <Animated.View
+      style={[
+        styles.shell,
+        {
+          backgroundColor: v.bg,
+          borderColor: v.border,
+        },
+        staticShadow,
+        { transform: [{ scale: scaleVal }, { translateY: translateYVal }] },
+        disabled && styles.disabledBtn,
+        style,
+      ]}
+    >
       <Pressable
         onPress={onPress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         disabled={disabled}
-        style={[
-          styles.shell,
-          {
-            backgroundColor: v.bg,
-            borderColor: v.border,
-          },
-          animatedShadow as any,
-          disabled && styles.disabledBtn,
-          style,
-        ]}
+        style={styles.pressableContent}
       >
         <View style={styles.bevelTopLeft} />
         <View style={styles.bevelBottom} />
         <View style={styles.gloss} />
-        <Animated.View style={[styles.insetShadow, { opacity: insetShadowOpacity }]} />
+        <View style={styles.insetShadow} />
         <View style={styles.innerContent}>
           {icon}
           <Text style={[styles.title, { color: disabled ? disabledTextColor : v.text }, textStyle]}>{title}</Text>
@@ -121,11 +108,13 @@ const styles = StyleSheet.create({
   shell: {
     borderRadius: 16,
     borderWidth: 1,
+    overflow: 'hidden',
+  },
+  pressableContent: {
     paddingVertical: 14,
     paddingHorizontal: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
   },
   bevelTopLeft: {
     position: 'absolute',
@@ -176,8 +165,5 @@ const styles = StyleSheet.create({
   },
   disabledBtn: {
     opacity: 0.7,
-  },
-  disabledWrap: {
-    opacity: 1,
   },
 });

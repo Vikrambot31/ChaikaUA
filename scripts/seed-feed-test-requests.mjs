@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import admin from 'firebase-admin';
+import { getFirebaseAdminConfig } from './firebase-config.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -67,7 +68,7 @@ const main = async () => {
   const serviceAccount = await import(pathToFileURL(SERVICE_ACCOUNT_PATH).href, { with: { type: 'json' } });
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount.default),
-    databaseURL: process.env.FIREBASE_DATABASE_URL || 'https://chaikaua-3cd9d-default-rtdb.firebaseio.com',
+    ...getFirebaseAdminConfig(),
   });
 
   const db = admin.database();

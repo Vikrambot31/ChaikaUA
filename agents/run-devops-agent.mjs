@@ -221,6 +221,101 @@ function stepChangedFiles() {
   } catch { addStep('GIT', 'SKIP'); }
 }
 
+// ─── GRADLE PROGRESS BAR ──────────────────────────────────────────────────
+// Ищем ТОЛЬКО строки вида "> Task :app:xxx" — они появляются в момент выполнения,
+// а не в конце (где все задачи перечисляются разом в итоге).
+const GRADLE_MILESTONES = [
+  { task: '> Task :app:preBuild',                        label: 'Pre-build',              weight: 3  },
+  { task: '> Task :app:generateReleaseBuildConfig',      label: 'Generate config',        weight: 3  },
+  { task: '> Task :app:compileReleaseKotlin',            label: 'Compile Kotlin',         weight: 14 },
+  { task: '> Task :app:javaPreCompileRelease',           label: 'Java pre-compile',       weight: 4  },
+  { task: '> Task :app:compileReleaseJavaWithJavac',     label: 'Compile Java',           weight: 6  },
+  { task: '> Task :app:bundleReleaseJsAndAssets',        label: 'Bundle JS + assets',     weight: 20 },
+  { task: '> Task :app:processReleaseResources',         label: 'Process resources',      weight: 8  },
+  { task: '> Task :app:mergeReleaseResources',           label: 'Merge resources',        weight: 6  },
+  { task: '> Task :app:mergeReleaseJavaResource',        label: 'Merge Java resources',   weight: 5  },
+  { task: '> Task :app:mergeReleaseAssets',              label: 'Merge assets',           weight: 5  },
+  { task: '> Task :app:mergeReleaseNativeLibs',          label: 'Merge native libs',      weight: 5  },
+  { task: '> Task :app:dexBuilderRelease',               label: 'DEX compile',            weight: 12 },
+  { task: '> Task :app:packageRelease',                  label: 'Package APK',            weight: 6  },
+  { task: '> Task :app:assembleRelease',                 label: 'Assemble APK',           weight: 3  },
+];
+const GRADLE_TOTAL_WEIGHT = GRADLE_MILESTONES.reduce((s, m) => s + m.weight, 0);
+
+function makeBuildProgressUI(gradleLogPath) {
+  const SPIN = ['|', '/', '-', '\\'];
+  let spinIdx = 0;
+  let completedWeight = 0;
+  let currentLabel = 'Подготовка...';
+  let gradleActive = false;
+  let lastLogSize = 0;
+  const seenTasks = new Set();
+  const startTime = Date.now();
+
+  function elapsed() {
+    const s = Math.round((Date.now() - startTime) / 1000);
+    if (s < 60) return `${s}s`;
+    return `${Math.floor(s / 60)}m${String(s % 60).padStart(2, '0')}s`;
+  }
+
+  function renderBar() {
+    const pct = Math.min(100, Math.round(completedWeight / GRADLE_TOTAL_WEIGHT * 100));
+    const BAR_W = 32;
+    const filled = Math.round(pct / 100 * BAR_W);
+    const bar = '\u2588'.repeat(filled) + '\u2591'.repeat(BAR_W - filled);
+    const label = currentLabel.slice(0, 28).padEnd(28);
+    process.stdout.write(
+      `\r  ${C.cyan}[GRADLE]${C.reset} ${C.green}${bar}${C.reset} ${String(pct).padStart(3)}%  ${C.gray}${label}  ${elapsed()}${C.reset}  `
+    );
+  }
+
+  function renderSpinner() {
+    spinIdx = (spinIdx + 1) % SPIN.length;
+    process.stdout.write(
+      `\r  ${C.cyan}[BUILD] ${C.reset}${SPIN[spinIdx]}  ${C.gray}${currentLabel.padEnd(36)} ${elapsed()}${C.reset}  `
+    );
+  }
+
+  function clearLine() {
+    process.stdout.write('\r' + ' '.repeat(80) + '\r');
+  }
+
+  function checkGradleLog() {
+    try {
+      if (!fs.existsSync(gradleLogPath)) return false;
+      const size = fs.statSync(gradleLogPath).size;
+      if (size === lastLogSize) { if (gradleActive) renderBar(); return gradleActive; }
+
+      // Читаем только новый кусок файла (инкрементально)
+      let newChunk = '';
+      const fd = fs.openSync(gradleLogPath, 'r');
+      const toRead = size - lastLogSize;
+      const buf = Buffer.alloc(toRead);
+      fs.readSync(fd, buf, 0, toRead, lastLogSize);
+      fs.closeSync(fd);
+      newChunk = buf.toString('utf8');
+      lastLogSize = size;
+      gradleActive = true;
+
+      for (const m of GRADLE_MILESTONES) {
+        if (!seenTasks.has(m.task) && newChunk.includes(m.task)) {
+          seenTasks.add(m.task);
+          completedWeight += m.weight;
+          currentLabel = m.label;
+        }
+      }
+      renderBar();
+      return true;
+    } catch { return gradleActive; }
+  }
+
+  function tick() {
+    if (!checkGradleLog()) renderSpinner();
+  }
+
+  return { tick, clearLine, renderBar, setLabel: (l) => { currentLabel = l; } };
+}
+
 // ─── STABLE APK BUILD ──────────────────────────────────────────────────────
 async function stepStableBuild() {
   tee(`\n${C.cyan}[STABLE BUILD] Запуск STABLE APK BUILD.bat...${C.reset}`);
@@ -233,7 +328,10 @@ async function stepStableBuild() {
   }
 
   logInfo(`Запуск: ${batPath}`);
-  tee(`${C.gray}  Это может занять 5-15 минут...${C.reset}\n`);
+  tee(`${C.gray}  Прогресс Gradle отображается в реальном времени ниже...${C.reset}\n`);
+
+  const gradleLogPath = path.join(ROOT, 'release', 'gradle-release-build.log');
+  const ui = makeBuildProgressUI(gradleLogPath);
 
   return new Promise((resolve) => {
     const env = { ...process.env, DEPLOY_NO_PAUSE: '1', NO_PAUSE: '1', BUILD_MODE_FORCE: 'RELEASE' };
@@ -244,7 +342,33 @@ async function stepStableBuild() {
     proc.stdout.on('data', (data) => {
       const txt = data.toString();
       stdout += txt;
-      if (VERBOSE) process.stdout.write(C.gray + txt + C.reset);
+      // Показываем значимые строки из bat (STEP/WARN/ERROR/SUCCESS)
+      // Фильтруем: пропускаем строки-команды bat при echo ON
+      // (они начинаются с "echo ", "if ", промпта "C:\..." или содержат errorlevel)
+      for (const line of txt.split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        // Исключаем bat-команды с включённым echo: "echo [ERROR]...", "if errorlevel...", "C:\...>"
+        const isBatCommand = /^echo\s/i.test(trimmed)
+                          || /^if\s/i.test(trimmed)
+                          || /^for\s/i.test(trimmed)
+                          || /^set\s/i.test(trimmed)
+                          || /^call\s/i.test(trimmed)
+                          || /errorlevel/i.test(trimmed)
+                          || /^[A-Z]:\\.+>/.test(trimmed);
+        if (isBatCommand) continue;
+
+        if (/\[(STEP|ERROR|WARN|SUCCESS)\]/.test(trimmed)) {
+          ui.clearLine();
+          const color = /\[ERROR\]/.test(trimmed) ? C.red
+                      : /\[WARN\]/.test(trimmed)  ? C.yellow
+                      : /\[SUCCESS\]/.test(trimmed) ? C.green
+                      : C.gray;
+          process.stdout.write(`  ${color}${trimmed}${C.reset}\n`);
+        } else if (VERBOSE) {
+          process.stdout.write(C.gray + '  ' + trimmed + C.reset + '\n');
+        }
+      }
     });
     proc.stderr.on('data', (data) => {
       const txt = data.toString();
@@ -252,9 +376,14 @@ async function stepStableBuild() {
       if (VERBOSE) process.stderr.write(C.yellow + txt + C.reset);
     });
 
+    // Живой тик прогресс-бара каждые 600ms
+    const ticker = setInterval(() => ui.tick(), 600);
+
     proc.on('close', (code) => {
+      clearInterval(ticker);
+      ui.clearLine();
+
       const output = stdout + stderr;
-      // "B U I L D   D O N E" — bat печатает буквы с пробелами
       const hasBuildDone = code === 0 || /B\s*U\s*I\s*L\s*D\s+D\s*O\s*N\s*E/i.test(output);
       const hasErrors = /\[ERROR\]/.test(output) && !/Netlify|token/i.test(output);
 
@@ -299,6 +428,8 @@ async function stepStableBuild() {
     });
 
     proc.on('error', (err) => {
+      clearInterval(ticker);
+      ui.clearLine();
       logFail('BUILD', `Ошибка запуска: ${err.message}`);
       addError('CRITICAL', 'bat', err.message);
       addStep('BUILD:APK', 'FAIL');
@@ -394,17 +525,34 @@ function stepBackupRules() {
 
 // ─── FIREBASE DEPLOY ──────────────────────────────────────────────────────
 async function stepFirebaseDeploy() {
-  tee(`\n${C.cyan}[DEPLOY] Деплой Firebase Rules...${C.reset}`);
-  const result = runCmd('firebase deploy --only database,storage', { ignoreError: true });
-  if (result.success || /Deploy complete/i.test(result.output)) {
-    logOk('DEPLOY', 'Firebase Rules задеплоены');
-    state.deployedTo.push('Firebase (Database + Storage)');
-    addStep('DEPLOY', 'OK');
+  tee(`\n${C.cyan}[DEPLOY:RULES] Деплой Firebase Rules (Database + Storage)...${C.reset}`);
+  const result = runCmd('firebase deploy --only database,storage --project chaikaua-3cd9d', { ignoreError: true });
+  if (result.success || /Deploy complete/i.test(result.output + result.stderr)) {
+    logOk('DEPLOY:RULES', 'Firebase Rules задеплоены (DB + Storage)');
+    state.deployedTo.push('Firebase Rules (Database + Storage)');
+    addStep('DEPLOY:RULES', 'OK');
     return true;
   } else {
-    logFail('DEPLOY', 'Ошибка при деплое');
-    addError('HIGH', 'firebase deploy', result.output.slice(0, 200));
-    addStep('DEPLOY', 'FAIL');
+    logFail('DEPLOY:RULES', 'Ошибка при деплое правил');
+    addError('HIGH', 'firebase deploy --only database,storage', result.output.slice(0, 200));
+    addStep('DEPLOY:RULES', 'FAIL');
+    return false;
+  }
+}
+
+async function stepFirebaseFunctionsDeploy() {
+  tee(`\n${C.cyan}[DEPLOY:FUNCTIONS] Деплой Cloud Functions...${C.reset}`);
+  const result = runCmd('firebase deploy --only functions --project chaikaua-3cd9d', { ignoreError: true });
+  if (result.success || /Deploy complete/i.test(result.output + result.stderr)) {
+    logOk('DEPLOY:FUNCTIONS', 'Cloud Functions задеплоены');
+    state.deployedTo.push('Firebase Functions');
+    addStep('DEPLOY:FUNCTIONS', 'OK');
+    return true;
+  } else {
+    // Functions могут упасть из-за lint — предупреждение, не блокируем
+    logWarn('DEPLOY:FUNCTIONS', 'Деплой Functions завершился с ошибкой (non-blocking)');
+    addWarning('Firebase Functions deploy failed — проверь functions/src на lint ошибки');
+    addStep('DEPLOY:FUNCTIONS', 'WARN');
     return false;
   }
 }
@@ -488,6 +636,8 @@ async function main() {
   if (MODE === 'stable') {
     stepVersionCheck();
     stepFirebaseRules();
+    // Firebase deploy выполняется отдельно в Phase 1 FULL-DEPLOY-ALL.bat
+    // В stable режиме только валидация правил + сборка APK
     await stepStableBuild();
   }
 

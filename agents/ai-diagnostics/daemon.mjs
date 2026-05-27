@@ -19,12 +19,20 @@ const ROOT = path.resolve(__dirname, '../..');
 
 // Firebase Admin init
 const serviceAccountPath = path.join(ROOT, 'serviceAccountKey.json');
+const DB_URL = 'https://chaikaua-3cd9d-default-rtdb.firebaseio.com';
 let firebaseApp;
 if (fs.existsSync(serviceAccountPath)) {
-  firebaseApp = initializeApp({ credential: cert(serviceAccountPath), databaseURL: 'https://chaikaua-3cd9d-default-rtdb.europe-west1.firebasedatabase.app' });
+  firebaseApp = initializeApp({ credential: cert(serviceAccountPath), databaseURL: DB_URL });
 } else {
-  // fallback: use GOOGLE_APPLICATION_CREDENTIALS or ADC
-  firebaseApp = initializeApp({ credential: applicationDefault(), databaseURL: 'https://chaikaua-3cd9d-default-rtdb.europe-west1.firebasedatabase.app' });
+  const gcpCredsEnv = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  if (!gcpCredsEnv) {
+    console.error('\x1b[31m[ERROR]\x1b[0m serviceAccountKey.json not found and GOOGLE_APPLICATION_CREDENTIALS is not set.');
+    console.error('\x1b[33m[FIX]\x1b[0m  Download a service account key from Firebase Console:');
+    console.error('        Project Settings → Service accounts → Generate new private key');
+    console.error(`        Save as: ${serviceAccountPath}`);
+    process.exit(1);
+  }
+  firebaseApp = initializeApp({ credential: applicationDefault(), databaseURL: DB_URL });
 }
 const db = getDatabase(firebaseApp);
 
@@ -33,6 +41,7 @@ const TRIGGER_REF = db.ref(`${BASE}/_audit_trigger`);
 const STATUS_REF = db.ref(`${BASE}/_audit_status`);
 const LOGS_REF = db.ref(`${BASE}/_audit_logs`);
 const HISTORY_REF = db.ref(`${BASE}/_audit_history`);
+const HEARTBEAT_REF = db.ref(`${BASE}/_daemon_heartbeat`);
 
 const AUDIT_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes max
 
@@ -182,24 +191,41 @@ async function handleAgentMessage(msg) {
       });
       break;
 
-    case 'complete':
+    case 'complete': {
+      const completedAt = Date.now();
       await updateStatus({
         status: 'completed',
-        completedAt: Date.now(),
+        completedAt,
         duration: msg.duration || 0,
         healthScore: msg.healthScore || 0,
+        verifiedScore: msg.verifiedScore ?? null,
         severityCounts: msg.severityCounts || {},
         summary: msg.summary || '',
         findingsCount: msg.findingsCount || 0,
         progress: { currentStep: 'done', stepNum: msg.totalSteps || 6, totalSteps: msg.totalSteps || 6, percent: 100, message: 'Audit complete' },
       });
+      // Read findings from disk file (agent writes findings.json)
+      if (msg.findingsFile && fs.existsSync(msg.findingsFile)) {
+        try {
+          const raw = fs.readFileSync(msg.findingsFile, 'utf8');
+          const findings = JSON.parse(raw);
+          if (Array.isArray(findings) && findings.length > 0) {
+            await STATUS_REF.child('findings').set(findings);
+            log(`Saved ${findings.length} findings to Firebase from ${msg.findingsFile}`, C.green);
+          }
+        } catch (err) { log(`findings.json read/upload error: ${err.message}`, C.red); }
+      } else {
+        log('findings.json not found — skipping findings upload', C.yellow);
+      }
       await addHistoryEntry({
-        completedAt: Date.now(),
+        completedAt,
         healthScore: msg.healthScore || 0,
+        verifiedScore: msg.verifiedScore ?? null,
         severityCounts: msg.severityCounts || {},
         duration: msg.duration || 0,
       });
       break;
+    }
 
     case 'log':
       await pushLog({ message: msg.message, severity: msg.severity || 'info', scanner: msg.scanner || '', at: Date.now() });
@@ -223,17 +249,50 @@ async function cancelCurrentAudit() {
   agentProcess = null;
 }
 
+// Recover stale 'running' status from a previous crashed daemon
+async function recoverStaleStatus() {
+  try {
+    const snap = await STATUS_REF.once('value');
+    const s = snap.val();
+    if (s && s.status === 'running' && s.startedAt) {
+      const staleMs = 15 * 60 * 1000; // 15 minutes
+      if (Date.now() - s.startedAt > staleMs) {
+        log('Found stale running audit (>15 min), marking as failed', C.yellow);
+        await updateStatus({ status: 'failed', completedAt: Date.now(), duration: Date.now() - s.startedAt });
+        await pushLog({ message: 'Audit marked failed: daemon restarted and found stale running status', severity: 'error', scanner: 'daemon', at: Date.now() });
+      }
+    }
+  } catch (err) {
+    log(`recoverStaleStatus error: ${err.message}`, C.red);
+  }
+}
+
+// Heartbeat: write to Firebase every 30s so UI can detect daemon online/offline
+function startHeartbeat() {
+  const writeHeartbeat = async () => {
+    try { await HEARTBEAT_REF.set({ at: Date.now(), pid: process.pid }); } catch { /* ignore */ }
+  };
+  writeHeartbeat();
+  return setInterval(writeHeartbeat, 30_000);
+}
+
 // Watch for triggers
 log('AI Diagnostics Daemon started', C.cyan);
 log(`Watching ${BASE}/_audit_trigger for commands...`, C.gray);
+
+await recoverStaleStatus();
+startHeartbeat();
 
 TRIGGER_REF.on('value', async (snapshot) => {
   const trigger = snapshot.val();
   if (!trigger || typeof trigger !== 'object') return;
 
   if (trigger.action === 'start') {
+    // Clear trigger first to prevent re-run if daemon restarts mid-audit
+    await TRIGGER_REF.remove();
     await runAudit(trigger.requestedBy || 'unknown');
   } else if (trigger.action === 'cancel') {
+    await TRIGGER_REF.remove();
     await cancelCurrentAudit();
   }
 });

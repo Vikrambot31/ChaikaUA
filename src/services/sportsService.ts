@@ -34,33 +34,53 @@ const toList = <T extends { id: string }>(value: unknown): T[] => {
 
 export const sportsService = {
   getPlayers: async (sport: SportKey): Promise<SportPlayer[]> => {
-    const snap = await get(ref(database, `sports/${sport}/players`));
-    return toList<SportPlayer>(snap.val()).sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+    try {
+      const snap = await get(ref(database, `sports/${sport}/players`));
+      return toList<SportPlayer>(snap.val()).sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+    } catch (err) {
+      console.error(`[sportsService] getPlayers failed for ${sport}:`, err);
+      return [];
+    }
   },
 
   savePlayer: async (sport: SportKey, player: Omit<SportPlayer, 'addedAt'>): Promise<void> => {
-    const existingSnap = await get(ref(database, `sports/${sport}/players/${player.id}`));
-    const existing = existingSnap.val() as Partial<SportPlayer> | null;
-    await set(ref(database, `sports/${sport}/players/${player.id}`), {
-      name: player.name,
-      phone: player.phone || '',
-      rating: player.rating ?? existing?.rating ?? 0,
-      addedAt: new Date().toISOString(),
-    });
+    try {
+      const existingSnap = await get(ref(database, `sports/${sport}/players/${player.id}`));
+      const existing = existingSnap.val() as Partial<SportPlayer> | null;
+      await set(ref(database, `sports/${sport}/players/${player.id}`), {
+        name: player.name,
+        phone: player.phone || '',
+        rating: player.rating ?? existing?.rating ?? 0,
+        addedAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error(`[sportsService] savePlayer failed for ${sport}:`, err);
+      throw err;
+    }
   },
 
   getTodayEntries: async (sport: SportKey): Promise<SportTodayEntry[]> => {
-    const snap = await get(ref(database, `sports/${sport}/days/${todayKey()}`));
-    return toList<SportTodayEntry>(snap.val()).sort((a, b) => a.time.localeCompare(b.time));
+    try {
+      const snap = await get(ref(database, `sports/${sport}/days/${todayKey()}`));
+      return toList<SportTodayEntry>(snap.val()).sort((a, b) => a.time.localeCompare(b.time));
+    } catch (err) {
+      console.error(`[sportsService] getTodayEntries failed for ${sport}:`, err);
+      return [];
+    }
   },
 
   saveTodayEntry: async (sport: SportKey, entry: Omit<SportTodayEntry, 'updatedAt'>): Promise<void> => {
-    await set(ref(database, `sports/${sport}/days/${todayKey()}/${entry.id}`), {
-      name: entry.name,
-      phone: entry.phone || '',
-      time: entry.time,
-      updatedAt: new Date().toISOString(),
-    });
+    try {
+      await set(ref(database, `sports/${sport}/days/${todayKey()}/${entry.id}`), {
+        name: entry.name,
+        phone: entry.phone || '',
+        time: entry.time,
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error(`[sportsService] saveTodayEntry failed for ${sport}:`, err);
+      throw err;
+    }
   },
 
   subscribePlayers: (sport: SportKey, onChange: (items: SportPlayer[]) => void): Unsubscribe => {

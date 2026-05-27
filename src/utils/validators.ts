@@ -1,3 +1,5 @@
+import { validatePhone as validatePhoneResult } from './rulesEngine';
+
 /**
  * УТИЛИТЫ ДЛЯ ВАЛИДАЦИИ ДАННЫХ — Chaika Life
  * Источник: Gemini Coding Partner
@@ -10,10 +12,7 @@ export const validateEmail = (email: string): boolean => {
 };
 
 export const validatePhone = (phone: string): boolean => {
-  const cleaned = phone.replace(/[^\d+]/g, '');
-  const internationalPhoneRegex = /^\+[1-9]\d{7,14}$/;
-  const ukrainianLocalRegex = /^0\d{9}$/;
-  return internationalPhoneRegex.test(cleaned) || ukrainianLocalRegex.test(cleaned);
+  return validatePhoneResult(phone).valid;
 };
 
 export const normalizeUkrainianPhoneStrict = (phone: string): string | null => {
@@ -50,4 +49,3 @@ export const validateRequestDescription = (text: string): boolean => {
   const trimmed = text.trim();
   return trimmed.length > 0 && trimmed.length <= 130;
 };
-

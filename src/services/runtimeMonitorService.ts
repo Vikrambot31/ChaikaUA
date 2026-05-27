@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import { classifyStartupTransientIssue } from './startupSync';
 import { getSessionId } from './sessionService';
 import { getBreadcrumbs } from './breadcrumbService';
+import { recordCrashBreadcrumb, setCrashContext } from './crashReporting';
 
 declare const require: any;
 
@@ -611,6 +612,22 @@ const buildFingerprint = (entry: RuntimeMonitorEntry): string =>
   ].join('|');
 
 const appendEntry = async (entry: RuntimeMonitorEntry): Promise<void> => {
+  recordCrashBreadcrumb(`runtime:${entry.screen}:${entry.action ?? entry.shortType}:${entry.status ?? entry.severity}`, {
+    severity: entry.severity,
+    feature: entry.feature,
+    stage: entry.stage,
+    code: entry.code ?? entry.firebaseCode,
+    androidVersion: entry.androidVersion,
+  });
+  setCrashContext({
+    lastRuntimeScreen: entry.screen,
+    lastRuntimeAction: entry.action ?? entry.shortType,
+    lastRuntimeStatus: entry.status ?? entry.severity,
+    lastRuntimeStage: entry.stage ?? '',
+    lastRuntimeFeature: entry.feature ?? '',
+    lastRuntimeAt: new Date(entry.at).toISOString(),
+  });
+
   const existingIndex = entries.findIndex((item) => buildFingerprint(item) === buildFingerprint(entry));
   if (existingIndex >= 0) {
     const existing = entries[existingIndex];

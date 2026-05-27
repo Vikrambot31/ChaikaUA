@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, AppStateStatus } from 'react-native';
+import { AppState, AppStateStatus, StyleSheet, Text, View } from 'react-native';
 import { useSelector } from 'react-redux';
+import Constants from 'expo-constants';
 import SplashAnimation from './SplashAnimation';
 import MaintenanceScreen from './MaintenanceScreen';
 import ForceUpdateScreen from './ForceUpdateScreen';
@@ -26,6 +27,11 @@ import {
   subscribeCurrentUserUpdateLock,
   type UserUpdateLockRecord,
 } from '../services/securityAdminService';
+import {
+  isEmergencyAccessActive,
+  subscribeEmergencyAccess,
+  type EmergencyAccessCurrent,
+} from '../services/emergencyAccess';
 
 type AppAccessGuardProps = {
   children: React.ReactNode;
@@ -114,6 +120,7 @@ const AppAccessGuard: React.FC<AppAccessGuardProps> = ({
   const [isRemoteReady, setIsRemoteReady] = useState(Boolean(initialRemoteConfigSnapshot));
   const [deviceStatus, setDeviceStatus] = useState<DeviceAuthorizationStatus>(createUnknownDeviceStatus());
   const [personalUpdateLock, setPersonalUpdateLock] = useState<UserUpdateLockRecord | null>(null);
+  const [emergencyAccess, setEmergencyAccess] = useState<EmergencyAccessCurrent | null>(null);
   const deviceUnsubscribeRef = useRef<null | (() => void)>(null);
   const updateLockUnsubscribeRef = useRef<null | (() => void)>(null);
   const mountedRef = useRef(true);
@@ -123,6 +130,15 @@ const AppAccessGuard: React.FC<AppAccessGuardProps> = ({
   const deviceSubscriptionUidRef = useRef<string | null>(null);
   const deviceRefreshRequestIdRef = useRef(0);
   const lastForegroundRefreshAtRef = useRef(0);
+  const emergencyBypassActive = isBypassUser && isEmergencyAccessActive(emergencyAccess);
+
+  useEffect(() => {
+    const unsubscribe = subscribeEmergencyAccess(
+      setEmergencyAccess,
+      () => setEmergencyAccess(null),
+    );
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     if (!initialRemoteConfigSnapshot) {
@@ -235,6 +251,19 @@ const AppAccessGuard: React.FC<AppAccessGuardProps> = ({
     deviceRefreshRequestIdRef.current = requestId;
 
     try {
+      if (emergencyBypassActive && emergencyAccess?.bypassDeviceAuthorization) {
+        deviceUnsubscribeRef.current?.();
+        deviceUnsubscribeRef.current = null;
+        deviceSubscriptionUidRef.current = null;
+        setDeviceStatus({
+          deviceId: null,
+          status: 'allowed',
+          record: null,
+          usesSecureStore: false,
+        });
+        return;
+      }
+
       const synced = await withTimeout(
         ensureAuthorizedDeviceSession({
           allowNewDevices: allowNewDevicesRef.current,
@@ -294,7 +323,7 @@ const AppAccessGuard: React.FC<AppAccessGuardProps> = ({
       deviceUnsubscribeRef.current = null;
       deviceSubscriptionUidRef.current = null;
     };
-  }, [currentUser?.id, remoteSnapshot.config.allow_new_devices]);
+  }, [currentUser?.id, remoteSnapshot.config.allow_new_devices, emergencyBypassActive, emergencyAccess?.bypassDeviceAuthorization]);
 
   useEffect(() => {
     updateLockUnsubscribeRef.current?.();
@@ -347,10 +376,13 @@ const AppAccessGuard: React.FC<AppAccessGuardProps> = ({
       }
 
       const now = Date.now();
-      if (now - lastForegroundRefreshAtRef.current < FOREGROUND_REFRESH_THROTTLE_MS) {
+      const msSinceLast = now - lastForegroundRefreshAtRef.current;
+      if (msSinceLast < FOREGROUND_REFRESH_THROTTLE_MS) {
+        console.log(`[AAG] foreground→active suppressed (throttle ${msSinceLast}ms < ${FOREGROUND_REFRESH_THROTTLE_MS}ms)`);
         return;
       }
 
+      console.log(`[AAG] foreground→active: triggering remoteConfig + deviceStatus refresh at ${new Date().toISOString()}`);
       lastForegroundRefreshAtRef.current = now;
       void refreshRemoteConfig();
       void refreshDeviceStatus();
@@ -388,10 +420,13 @@ const AppAccessGuard: React.FC<AppAccessGuardProps> = ({
   }, [deviceStatus.status]);
 
   if (!isRemoteReady) {
+    console.log(`[AAG] render→SplashAnimation (remoteConfig not ready yet)`);
     return <SplashAnimation />;
   }
 
-  if (!isBypassUser && personalUpdateLock && requiresPersonalUpdate) {
+  const shouldBypassRestrictions = __DEV__ && Constants.expoConfig?.extra?.devBypassGuards === true;
+
+  if (!shouldBypassRestrictions && personalUpdateLock && requiresPersonalUpdate) {
     return (
       <ForceUpdateScreen
         result={toPersonalUpdateResult(personalUpdateLock)}
@@ -402,7 +437,7 @@ const AppAccessGuard: React.FC<AppAccessGuardProps> = ({
     );
   }
 
-  if (!isBypassUser && requiresPersonalDeviceUpdate) {
+  if (!shouldBypassRestrictions && requiresPersonalDeviceUpdate) {
     return (
       <ForceUpdateScreen
         result={toPersonalDeviceUpdateResult(currentUser?.id ?? null, deviceStatus.deviceId)}
@@ -413,29 +448,7 @@ const AppAccessGuard: React.FC<AppAccessGuardProps> = ({
     );
   }
 
-  if (!isBypassUser && remoteSnapshot.config.app_enabled === false) {
-    return (
-      <MaintenanceScreen
-        message={remoteSnapshot.config.maintenance_message || 'The application is temporarily disabled.'}
-        onRetry={() => {
-          void refreshRemoteConfig();
-        }}
-      />
-    );
-  }
-
-  if (!isBypassUser && remoteSnapshot.config.maintenance_mode) {
-    return (
-      <MaintenanceScreen
-        message={remoteSnapshot.config.maintenance_message || 'Maintenance is in progress.'}
-        onRetry={() => {
-          void refreshRemoteConfig();
-        }}
-      />
-    );
-  }
-
-  if (!isBypassUser && requiresRemoteForceUpdate) {
+  if (!shouldBypassRestrictions && requiresRemoteForceUpdate) {
     return (
       <ForceUpdateScreen
         result={toVersionCheckResult(remoteSnapshot)}
@@ -446,11 +459,74 @@ const AppAccessGuard: React.FC<AppAccessGuardProps> = ({
     );
   }
 
-  // Device pending/blocked checks are disabled during development.
-  // Re-enable for production by restoring the original blocks here.
+  if (!shouldBypassRestrictions && remoteSnapshot.config.maintenance_mode) {
+    return (
+      <MaintenanceScreen
+        message={remoteSnapshot.config.maintenance_message || 'Maintenance is in progress.'}
+        onRetry={() => {
+          void refreshRemoteConfig();
+        }}
+      />
+    );
+  }
+
+  if (!shouldBypassRestrictions && (deviceStatus.status === 'blocked' || deviceStatus.status === 'pending')) {
+    return (
+      <MaintenanceScreen
+        message={deviceStatus.status === 'blocked'
+          ? 'Этот девайс заблокирован администратором.'
+          : 'Этот девайс ожидает разрешения администратора.'}
+        onRetry={() => {
+          void refreshDeviceStatus();
+        }}
+      />
+    );
+  }
+
+  if (!shouldBypassRestrictions && remoteSnapshot.config.app_enabled === false) {
+    return (
+      <MaintenanceScreen
+        message={remoteSnapshot.config.maintenance_message || 'The application is temporarily disabled.'}
+        onRetry={() => {
+          void refreshRemoteConfig();
+        }}
+      />
+    );
+  }
+
+  if (emergencyBypassActive) {
+    return (
+      <View style={styles.emergencyRoot}>
+        {children}
+        <View pointerEvents="none" style={styles.emergencyBanner}>
+          <Text style={styles.emergencyBannerText}>Emergency Debug ON</Text>
+        </View>
+      </View>
+    );
+  }
 
   return <>{children}</>;
 };
 
-export default AppAccessGuard;
+const styles = StyleSheet.create({
+  emergencyRoot: {
+    flex: 1,
+  },
+  emergencyBanner: {
+    position: 'absolute',
+    right: 12,
+    top: 42,
+    borderRadius: 10,
+    backgroundColor: 'rgba(217, 72, 31, 0.92)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    elevation: 4,
+  },
+  emergencyBannerText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+});
 
+export default AppAccessGuard;

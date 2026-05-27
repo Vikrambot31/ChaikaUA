@@ -34,6 +34,7 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
   const [loading, setLoading] = useState(true);
   const [busyActions, setBusyActions] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<string | null>(null);
+  const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewTitle, setPreviewTitle] = useState('');
   const [previewBroken, setPreviewBroken] = useState(false);
@@ -43,6 +44,7 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
     setMessage(null);
     try {
       setItems(await loadModerationItems());
+      setSelectedPaths(new Set());
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Не удалось загрузить данные модерации.');
     } finally {
@@ -83,9 +85,16 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
   );
 
   const visibleItems = filteredItems.slice(0, visibleLimit);
+  const selectedItems = visibleItems.filter((item) => selectedPaths.has(item.path));
+  const approvableSelectedItems = selectedItems.filter((item) => item.status !== 'approved');
+  const deletableSelectedItems = selectedItems;
 
-  const runAction = async (item: ModerationItem, action: 'approved' | 'rejected' | 'delete') => {
-    if (action === 'delete') {
+  const runAction = async (
+    item: ModerationItem,
+    action: 'approved' | 'rejected' | 'delete',
+    options?: { skipDeleteConfirm?: boolean },
+  ) => {
+    if (action === 'delete' && !options?.skipDeleteConfirm) {
       const confirmed = window.confirm(`Удалить запись "${item.title}" из раздела ${sectionLabel(item.section)}?`);
       if (!confirmed) return;
     }
@@ -101,11 +110,49 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
         await moderateItem(item, action);
         setMessage(action === 'approved' ? 'Запись одобрена.' : 'Запись отклонена.');
       }
-      await refresh();
+      setItems((current) => current.filter((candidate) => candidate.path !== item.path));
+      setSelectedPaths((current) => {
+        const next = new Set(current);
+        next.delete(item.path);
+        return next;
+      });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Не удалось выполнить действие модерации.');
     } finally {
       setBusyActions((prev) => { const next = new Set(prev); next.delete(actionId); return next; });
+    }
+  };
+
+  const toggleSelected = (item: ModerationItem) => {
+    setSelectedPaths((current) => {
+      const next = new Set(current);
+      if (next.has(item.path)) next.delete(item.path);
+      else next.add(item.path);
+      return next;
+    });
+  };
+
+  const approveSelected = async () => {
+    if (!approvableSelectedItems.length) {
+      setMessage('Нет выбранных записей для одобрения.');
+      return;
+    }
+    const confirmed = window.confirm(`Одобрить все выбранные записи: ${approvableSelectedItems.length}?`);
+    if (!confirmed) return;
+    for (const item of approvableSelectedItems) {
+      await runAction(item, 'approved');
+    }
+  };
+
+  const deleteSelected = async () => {
+    if (!deletableSelectedItems.length) {
+      setMessage('Нет выбранных записей для удаления.');
+      return;
+    }
+    const confirmed = window.confirm(`Удалить все выбранные записи: ${deletableSelectedItems.length}?`);
+    if (!confirmed) return;
+    for (const item of deletableSelectedItems) {
+      await runAction(item, 'delete', { skipDeleteConfirm: true });
     }
   };
 
@@ -201,10 +248,46 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
           </div>
           <span>{Math.min(visibleItems.length, filteredItems.length)} показано</span>
         </div>
+        <div className="moderationBatchBar">
+          <span>Выбрано: {selectedPaths.size}</span>
+          <button
+            type="button"
+            className="smallButton"
+            disabled={!filteredItems.length || busyActions.size > 0}
+            onClick={() => setSelectedPaths(new Set(filteredItems.map((item) => item.path)))}
+          >
+            Выбрать все
+          </button>
+          <button
+            type="button"
+            className="smallButton"
+            disabled={selectedPaths.size === 0 || busyActions.size > 0}
+            onClick={() => setSelectedPaths(new Set())}
+          >
+            Снять выбор
+          </button>
+          <button
+            type="button"
+            className="smallButton"
+            disabled={!approvableSelectedItems.length || busyActions.size > 0}
+            onClick={() => void approveSelected()}
+          >
+            Одобрить все
+          </button>
+          <button
+            type="button"
+            className="smallButton dangerButton"
+            disabled={!deletableSelectedItems.length || busyActions.size > 0}
+            onClick={() => void deleteSelected()}
+          >
+            Удалить все
+          </button>
+        </div>
         <div className="tableWrap">
           <table>
             <thead>
               <tr>
+                <th>Выбор</th>
                 <th>Запись</th>
                 <th>Раздел</th>
                 <th>Пользователь</th>
@@ -217,6 +300,15 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
             <tbody>
               {visibleItems.map((item) => (
                 <tr key={item.path}>
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={selectedPaths.has(item.path)}
+                      onChange={() => toggleSelected(item)}
+                      disabled={busyActions.size > 0}
+                      aria-label={`Выбрать ${item.title}`}
+                    />
+                  </td>
                   <td>
                     <strong>{item.title}</strong>
                     <small>{item.subtitle || item.id}</small>
@@ -273,7 +365,7 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
                 </tr>
               ))}
               {!loading && !filteredItems.length ? (
-                <tr><td colSpan={7}>Записей по фильтру не найдено.</td></tr>
+                <tr><td colSpan={8}>Записей по фильтру не найдено.</td></tr>
               ) : null}
             </tbody>
           </table>

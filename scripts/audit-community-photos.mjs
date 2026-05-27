@@ -1,26 +1,10 @@
 import admin from 'firebase-admin';
+import { getFirebaseAdminConfig } from './firebase-config.mjs';
 
 const argLimit = Number(process.argv.find((a) => a.startsWith('--limit='))?.split('=')[1] || 0);
 const LIMIT = Number.isFinite(argLimit) && argLimit > 0 ? Math.floor(argLimit) : 0;
 
-const bucketName =
-  process.env.FIREBASE_STORAGE_BUCKET ||
-  process.env.STORAGE_BUCKET ||
-  process.env.GCLOUD_STORAGE_BUCKET ||
-  '';
-
-const databaseURL =
-  process.env.FIREBASE_DATABASE_URL ||
-  process.env.DATABASE_URL ||
-  '';
-
-if (!databaseURL) {
-  throw new Error('Missing FIREBASE_DATABASE_URL (or DATABASE_URL)');
-}
-
-if (!bucketName) {
-  throw new Error('Missing FIREBASE_STORAGE_BUCKET (or STORAGE_BUCKET)');
-}
+const { databaseURL, storageBucket: bucketName } = getFirebaseAdminConfig();
 
 admin.initializeApp({
   databaseURL,

@@ -5,6 +5,7 @@ import { sanitizeStoredText } from '../utils/textUtils';
 import { resolveMediaAccessUrls } from './mediaAccess';
 import { publishApprovedActivity } from './activityMirror';
 import { ensureFirebaseAuth } from '../firebase-auth-session';
+import { assertTextMatchesLanguage, normalizeAppLang, type AppLang } from '../utils/contentLanguageGuard';
 
 export interface ContactListing {
   id: string;
@@ -26,6 +27,7 @@ export interface ContactListing {
   rejectionReason?: string;
   showPhone?: boolean;
   isArchived?: boolean;
+  language?: AppLang;
 }
 
 const PATH = 'contacts_listings';
@@ -34,6 +36,7 @@ const ACTIVE_LIMIT = 100;
 const ACTIVE_LIMIT_BUFFER = 20;
 const FEED_MINIMUM = 10;
 const ARCHIVED_FALLBACK_LIMIT = 20;
+const INITIAL_PHOTO_RESOLVE_LIMIT = 25;
 const normalizePrice = (value: string): string => {
   const sanitized = value.replace(',', '.').replace(/[^\d.]/g, '');
   const numeric = Number(sanitized);
@@ -68,8 +71,49 @@ const mapContactItem = (id: string, data: any, isArchived?: boolean): ContactLis
 export const contactsService = {
   subscribe(callback: (items: ContactListing[]) => void): () => void {
     const listRef = query(ref(database, PATH), orderByChild('moderationStatus'), equalTo('approved'), limitToLast(ACTIVE_LIMIT + ACTIVE_LIMIT_BUFFER));
+    let requestId = 0;
+    let disposed = false;
+
+    const resolvePhotosInBackground = (items: ContactListing[], currentRequestId: number): void => {
+      const resolvedPhotoUris = new Map<string, string>();
+      const publishResolvedPhotos = () => {
+        if (disposed || currentRequestId !== requestId) return;
+        callback(items.map((item) => {
+          const photoUri = resolvedPhotoUris.get(item.id);
+          return photoUri ? { ...item, photoUri } : item;
+        }));
+      };
+
+      const resolveChunk = async (chunk: ContactListing[]) => {
+        const resolved = await resolveMediaAccessUrls(
+          chunk,
+          'contacts_listings',
+          (item) => item.photoStoragePath || item.photoUri || '',
+          (item, url) => ({ ...item, photoUri: url }),
+          { profile: 'list' },
+        );
+        if (disposed || currentRequestId !== requestId) return;
+        resolved.forEach((item) => {
+          if (item.photoUri) {
+            resolvedPhotoUris.set(item.id, item.photoUri);
+          }
+        });
+        publishResolvedPhotos();
+      };
+
+      void resolveChunk(items.slice(0, INITIAL_PHOTO_RESOLVE_LIMIT)).then(async () => {
+        for (let index = INITIAL_PHOTO_RESOLVE_LIMIT; index < items.length; index += INITIAL_PHOTO_RESOLVE_LIMIT) {
+          if (disposed || currentRequestId !== requestId) return;
+          await resolveChunk(items.slice(index, index + INITIAL_PHOTO_RESOLVE_LIMIT));
+        }
+      }).catch((error) => {
+        console.warn('[contactsService] media resolve failed:', error);
+      });
+    };
 
     const unsubscribe = onValue(listRef, (snapshot) => {
+      requestId += 1;
+      const currentRequestId = requestId;
       const raw = snapshot.val();
       const now = Date.now();
       const active: ContactListing[] = raw
@@ -84,90 +128,124 @@ export const contactsService = {
         : [];
 
       if (active.length >= FEED_MINIMUM) {
-        void resolveMediaAccessUrls(active, 'contacts_listings', (item) => item.photoStoragePath || item.photoUri || '', (item, url) => ({ ...item, photoUri: url })).then(callback);
+        callback(active);
+        resolvePhotosInBackground(active, currentRequestId);
         return;
       }
 
+      callback(active);
+
       void get(query(ref(database, PATH), orderByChild('moderationStatus'), equalTo('expired'), limitToLast(ARCHIVED_FALLBACK_LIMIT))).then((expiredSnapshot) => {
+        if (disposed || currentRequestId !== requestId) return;
         const expiredRaw = expiredSnapshot.val();
         const archived: ContactListing[] = expiredRaw
           ? Object.entries(expiredRaw as Record<string, any>)
               .map(([id, data]) => mapContactItem(id, data, true))
               .reverse()
           : [];
-        void resolveMediaAccessUrls([...active, ...archived], 'contacts_listings', (item) => item.photoStoragePath || item.photoUri || '', (item, url) => ({ ...item, photoUri: url })).then(callback);
-      }).catch(() => {
-        void resolveMediaAccessUrls(active, 'contacts_listings', (item) => item.photoStoragePath || item.photoUri || '', (item, url) => ({ ...item, photoUri: url })).then(callback);
+        const items = [...active, ...archived];
+        callback(items);
+        resolvePhotosInBackground(items, currentRequestId);
+      }).catch((error) => {
+        console.warn('[contactsService] expired fallback load failed:', error);
+        if (disposed || currentRequestId !== requestId) return;
+        resolvePhotosInBackground(active, currentRequestId);
       });
     });
 
-    return unsubscribe;
+    return () => {
+      disposed = true;
+      requestId += 1;
+      unsubscribe();
+    };
   },
 
   async add(item: Omit<ContactListing, 'id'>): Promise<string> {
-    const listRef = ref(database, PATH);
-    const user = await ensureFirebaseAuth();
-    const pendingModeration = createPendingModeration();
-    const expiresAt = item.expiresAt || new Date(Date.now() + CONTACT_LISTING_TTL_MS).toISOString();
-    const photoStoragePath = item.photoStoragePath || item.photoUri;
-    const sanitized = {
-      ...item,
-      itemName: sanitizeStoredText(item.itemName),
-      category: sanitizeStoredText(item.category),
-      condition: sanitizeStoredText(item.condition),
-      price: normalizePrice(item.price),
-      description: sanitizeStoredText(item.description),
-      phone: sanitizeStoredText(item.phone),
-      userId: user.uid,
-      photoStoragePath,
-      photoUri: '',
-      photoId: sanitizeStoredText(item.photoId || ''),
-      expiresAt,
-      moderationStatus: pendingModeration.moderationStatus,
-      submittedForModerationAt: pendingModeration.submittedForModerationAt,
-    };
-    const newRef = await push(listRef, sanitized);
-    return newRef.key!;
+    try {
+      const listRef = ref(database, PATH);
+      const user = await ensureFirebaseAuth();
+      const pendingModeration = createPendingModeration();
+      const expiresAt = item.expiresAt || new Date(Date.now() + CONTACT_LISTING_TTL_MS).toISOString();
+      const photoStoragePath = item.photoStoragePath || item.photoUri;
+      const sanitized = {
+        ...item,
+        itemName: sanitizeStoredText(item.itemName),
+        category: sanitizeStoredText(item.category),
+        condition: sanitizeStoredText(item.condition),
+        price: normalizePrice(item.price),
+        description: sanitizeStoredText(item.description),
+        phone: sanitizeStoredText(item.phone),
+        userId: user.uid,
+        photoStoragePath,
+        photoUri: '',
+        photoId: sanitizeStoredText(item.photoId || ''),
+        expiresAt,
+        moderationStatus: pendingModeration.moderationStatus,
+        submittedForModerationAt: pendingModeration.submittedForModerationAt,
+        language: normalizeAppLang(item.language, 'ua'),
+      };
+      assertTextMatchesLanguage(`${sanitized.itemName} ${sanitized.description}`.trim(), sanitized.language);
+      const newRef = await push(listRef, sanitized);
+      return newRef.key!;
+    } catch (error) {
+      console.error('[contactsService] add failed:', error);
+      throw error;
+    }
   },
 
   async remove(id: string): Promise<void> {
-    const user = await ensureFirebaseAuth();
-    const snapshot = await get(ref(database, `${PATH}/${id}`));
-    const existing = snapshot.exists() ? snapshot.val() as Partial<ContactListing> : null;
-    if (!existing || existing.userId !== user.uid) {
-      throw new Error('permission-denied');
+    try {
+      const user = await ensureFirebaseAuth();
+      const snapshot = await get(ref(database, `${PATH}/${id}`));
+      const existing = snapshot.exists() ? snapshot.val() as Partial<ContactListing> : null;
+      if (!existing || existing.userId !== user.uid) {
+        throw new Error('permission-denied');
+      }
+      await remove(ref(database, `${PATH}/${id}`));
+    } catch (error) {
+      console.error('[contactsService] remove failed:', error);
+      throw error;
     }
-    await remove(ref(database, `${PATH}/${id}`));
   },
 
   async attachPhotoStoragePath(id: string, photoStoragePath: string, photoId?: string): Promise<void> {
     if (!id || !photoStoragePath) return;
-    await update(ref(database, `${PATH}/${id}`), {
-      photoStoragePath,
-      photoUri: '',
-      ...(photoId ? { photoId: sanitizeStoredText(photoId) } : {}),
-    });
+    try {
+      await update(ref(database, `${PATH}/${id}`), {
+        photoStoragePath,
+        photoUri: '',
+        ...(photoId ? { photoId: sanitizeStoredText(photoId) } : {}),
+      });
+    } catch (error) {
+      console.error('[contactsService] attachPhotoStoragePath failed:', error);
+      throw error;
+    }
   },
 
   async moderate(id: string, status: Exclude<ModerationStatus, 'pending'>): Promise<void> {
-    const snapshot = await get(ref(database, `${PATH}/${id}`));
-    const existing = snapshot.exists() ? ({ ...(snapshot.val() as Omit<ContactListing, 'id'>), id }) : null;
-    await update(ref(database, `${PATH}/${id}`), {
-      moderationStatus: status,
-      moderatedAt: new Date().toISOString(),
-      moderationReason: status === 'rejected' ? 'default_rejected' : null,
-      rejectionReason: status === 'rejected' ? 'default_rejected' : null,
-    });
-    if (status === 'approved' && existing) {
-      await publishApprovedActivity({
-        userId: existing.userId,
-        name: existing.itemName,
-        phone: existing.phone,
-        category: 'contacts',
-        group: 'contacts',
-        subcategory: existing.category,
-        text: `[Контакти Чайки] ${existing.itemName}: ${existing.description || existing.price}`,
+    try {
+      const snapshot = await get(ref(database, `${PATH}/${id}`));
+      const existing = snapshot.exists() ? ({ ...(snapshot.val() as Omit<ContactListing, 'id'>), id }) : null;
+      await update(ref(database, `${PATH}/${id}`), {
+        moderationStatus: status,
+        moderatedAt: new Date().toISOString(),
+        moderationReason: status === 'rejected' ? 'default_rejected' : null,
+        rejectionReason: status === 'rejected' ? 'default_rejected' : null,
       });
+      if (status === 'approved' && existing) {
+        await publishApprovedActivity({
+          userId: existing.userId,
+          name: existing.itemName,
+          phone: existing.phone,
+          category: 'contacts',
+          group: 'contacts',
+          subcategory: existing.category,
+          text: `[Контакти Чайки] ${existing.itemName}: ${existing.description || existing.price}`,
+        });
+      }
+    } catch (error) {
+      console.error('[contactsService] moderate failed:', error);
+      throw error;
     }
   },
 

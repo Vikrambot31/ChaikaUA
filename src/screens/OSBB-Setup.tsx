@@ -20,6 +20,9 @@ import { database } from '../firebase-config';
 import { selectUser } from '../redux/selectors';
 import { getBuildingsByStreet, getStreets } from '../data/buildings';
 import { SCREEN_THEME } from '../utils/screenTheme';
+import { logClientError } from '../utils/errorLogger';
+import InlineFieldHint from '../components/InlineFieldHint';
+import { useSoftToast } from '../hooks/useSoftToast';
 
 interface Props {
   onDone?: () => void;
@@ -48,6 +51,11 @@ const UI_TEXT = {
     managerPhone: 'Телефон для підтвердження',
     enterOsbb: 'Увійти в ОСББ',
     housePrefix: 'Будинок',
+    apartmentHint: "Вкажіть номер квартири, щоб ОСББ розуміло ваш будинок і під'їзд.",
+    managerHint: "Якщо ви представник правління, залиште ПІБ і телефон для м'якої перевірки модератором.",
+    completeRequired: 'Заповніть вулицю, будинок і квартиру — після цього кнопка стане активною.',
+    saved: 'Дані ОСББ збережено',
+    saveError: 'Не вдалося зберегти дані ОСББ. Перевірте інтернет і спробуйте ще раз.',
   },
   ru: {
     title: 'Вход в раздел ОСББ',
@@ -69,6 +77,11 @@ const UI_TEXT = {
     managerPhone: 'Телефон для подтверждения',
     enterOsbb: 'Войти в ОСББ',
     housePrefix: 'Дом',
+    apartmentHint: 'Укажите номер квартиры, чтобы ОСББ понимало ваш дом и подъезд.',
+    managerHint: 'Если вы представитель правления, оставьте ФИО и телефон для мягкой проверки модератором.',
+    completeRequired: 'Заполните улицу, дом и квартиру — после этого кнопка станет активной.',
+    saved: 'Данные ОСББ сохранены',
+    saveError: 'Не удалось сохранить данные ОСББ. Проверьте интернет и попробуйте ещё раз.',
   },
   en: {
     title: 'Enter OSBB Section',
@@ -90,6 +103,11 @@ const UI_TEXT = {
     managerPhone: 'Phone for verification',
     enterOsbb: 'Enter OSBB',
     housePrefix: 'Building',
+    apartmentHint: 'Enter your apartment number so OSBB can link you to the right building.',
+    managerHint: 'If you are a board representative, leave your full name and phone for moderator verification.',
+    completeRequired: 'Fill street, building and apartment — then the button will become active.',
+    saved: 'OSBB data saved',
+    saveError: 'Failed to save OSBB data. Check your internet connection and try again.',
   },
 } as const;
 
@@ -97,6 +115,7 @@ const OsbbSetupScreen: React.FC<Props> = ({ onDone }) => {
   const dispatch = useDispatch();
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
   const text = UI_TEXT[language];
+  const toast = useSoftToast();
   const [selectedStreet, setSelectedStreet] = useState<string | null>(null);
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null);
   const [selectedHouseNumber, setSelectedHouseNumber] = useState<string | null>(null);
@@ -126,16 +145,25 @@ const OsbbSetupScreen: React.FC<Props> = ({ onDone }) => {
   const handleConfirm = async () => {
     if (!selectedBuildingId || !selectedStreet || !selectedHouseNumber || !isConfirmEnabled) return;
     if (user?.id) {
-      await set(ref(database, `osbb_members/${selectedBuildingId}/${user.id}`), {
-        uid: user.id,
-        buildingId: selectedBuildingId,
-        apartment: apartment.trim(),
-        role: isManager ? 'manager' : 'resident',
-        status: isManager ? 'pending' : 'approved',
-        managerName: isManager ? managerName.trim() : null,
-        managerPhone: isManager ? managerPhone.trim() : null,
-        updatedAt: new Date().toISOString(),
-      });
+      try {
+        await set(ref(database, `osbb_members/${selectedBuildingId}/${user.id}`), {
+          uid: user.id,
+          buildingId: selectedBuildingId,
+          apartment: apartment.trim(),
+          role: isManager ? 'manager' : 'resident',
+          status: isManager ? 'pending' : 'approved',
+          managerName: isManager ? managerName.trim() : null,
+          managerPhone: isManager ? managerPhone.trim() : null,
+          updatedAt: new Date().toISOString(),
+        });
+      } catch (error: unknown) {
+        void logClientError('OsbbSetup.saveMember', error, {
+          firebasePath: `osbb_members/${selectedBuildingId}/${user.id}`,
+          stage: 'write_osbb_member',
+        });
+        toast.showError(text.title, text.saveError);
+        return;
+      }
     }
     dispatch(
       setOsbbBuilding({
@@ -148,6 +176,7 @@ const OsbbSetupScreen: React.FC<Props> = ({ onDone }) => {
         managerPhone: isManager ? managerPhone.trim() : undefined,
       })
     );
+    toast.showSuccess(text.saved);
     onDone?.();
   };
 
@@ -223,6 +252,7 @@ const OsbbSetupScreen: React.FC<Props> = ({ onDone }) => {
               keyboardType="numeric"
               maxLength={5}
             />
+            <InlineFieldHint message={text.apartmentHint} type={apartment.trim() ? 'success' : 'hint'} />
           </View>
 
           <View style={styles.card}>
@@ -265,8 +295,11 @@ const OsbbSetupScreen: React.FC<Props> = ({ onDone }) => {
                 placeholderTextColor={SCREEN_THEME.textMuted}
                 keyboardType="phone-pad"
               />
+              <InlineFieldHint message={text.managerHint} type={managerName.trim() && managerPhone.trim() ? 'success' : 'hint'} />
             </View>
           ) : null}
+
+          <InlineFieldHint message={text.completeRequired} type="warning" visible={!isConfirmEnabled} />
 
           <TouchableOpacity
             style={[styles.confirm, !isConfirmEnabled && styles.confirmDisabled]}
@@ -361,4 +394,3 @@ const styles = StyleSheet.create({
 });
 
 export default OsbbSetupScreen;
-

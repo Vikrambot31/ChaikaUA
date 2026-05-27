@@ -21,7 +21,7 @@ type InviteAccessPageProps = {
   role: SecurityRole;
 };
 
-type RequestFilter = 'pending' | 'needs_manual_review' | 'approved' | 'denied';
+type RequestFilter = 'pending' | 'temporary_access' | 'needs_manual_review' | 'approved' | 'denied';
 type DateFilter = 'all' | 'today' | 'yesterday' | 'week' | 'month';
 
 const emptyState: InviteAccessState = {
@@ -64,7 +64,7 @@ const statusClass = (enabled: boolean): string => (enabled ? 'status active' : '
 const requestTone = (status: InviteRequestStatus): string => {
   if (status === 'approved') return 'pill good';
   if (status === 'denied') return 'pill danger';
-  if (status === 'needs_manual_review' || status === 'pending_sponsor') return 'pill warning';
+  if (status === 'temporary_access' || status === 'needs_manual_review' || status === 'pending_sponsor') return 'pill warning';
   return 'pill';
 };
 
@@ -78,6 +78,7 @@ const requestStatusLabel = (status: InviteRequestStatus): string => {
   if (status === 'needs_manual_review') return 'ручная проверка';
   if (status === 'pending_sponsor') return 'ждёт поручителя';
   if (status === 'auto_denied') return 'авто-отклонена';
+  if (status === 'temporary_access') return 'временный доступ';
   return 'ожидает';
 };
 
@@ -87,6 +88,7 @@ const sponsorStatusLabel = (status: TrustedSponsor['status']): string =>
 const requestFilterLabel = (status: RequestFilter): string => {
   if (status === 'approved') return 'одобренные';
   if (status === 'denied') return 'отклоненные';
+  if (status === 'temporary_access') return 'временный доступ';
   if (status === 'needs_manual_review') return 'ручная проверка';
   return 'ожидающие';
 };
@@ -102,7 +104,6 @@ const matchesRequestFilter = (item: InviteRequest, filter: RequestFilter): boole
 const modeLabel = (mode: InviteAccessMode): string => {
   if (mode === 'soft') return 'SOFT';
   if (mode === 'medium') return 'MEDIUM';
-  if (mode === 'hard') return 'HARD';
   return 'DISABLED';
 };
 
@@ -127,6 +128,7 @@ export const InviteAccessPage = ({ role }: InviteAccessPageProps) => {
   const [tempAccessHours, setTempAccessHours] = useState(24);
   const [tempAccessReason, setTempAccessReason] = useState('');
   const [loading, setLoading] = useState(true);
+  const [dataLoaded, setDataLoaded] = useState(false);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -141,9 +143,14 @@ export const InviteAccessPage = ({ role }: InviteAccessPageProps) => {
     setLoading(true);
     setMessage(null);
     try {
-      setState(await loadInviteAccessState());
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Firebase не ответил за 10 секунд — проверьте соединение.')), 10_000),
+      );
+      const freshState = await Promise.race([loadInviteAccessState(), timeout]);
+      setState(freshState);
+      setDataLoaded(true);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Не удалось загрузить данные приглашений.');
+      setMessage(`Не удалось загрузить данные: ${error instanceof Error ? error.message : 'Firebase недоступен'}`);
     } finally {
       setLoading(false);
     }
@@ -168,6 +175,7 @@ export const InviteAccessPage = ({ role }: InviteAccessPageProps) => {
     sponsorsActive: state.sponsors.filter((item) => item.status === 'active').length,
     pending: state.requests.filter((item) => isOpenRequestStatus(item.status)).length,
     manualReview: state.requests.filter((item) => item.status === 'needs_manual_review').length,
+    temporaryAccess: state.requests.filter((item) => item.status === 'temporary_access').length,
     approved: state.requests.filter((item) => item.status === 'approved').length,
     denied: state.requests.filter((item) => item.status === 'denied').length,
   }), [state.requests, state.sponsors]);
@@ -210,7 +218,12 @@ export const InviteAccessPage = ({ role }: InviteAccessPageProps) => {
   };
 
   const changeMode = (mode: InviteAccessMode) => {
-    if (mode === state.flag.mode) return;
+    if (mode === state.flag.mode) {
+      setMessage(dataLoaded
+        ? `Режим уже установлен: ${modeLabel(mode)}.`
+        : `Данные не загружены — Firebase офлайн. Обновите страницу после восстановления соединения.`);
+      return;
+    }
     const confirmed = window.confirm(`Переключить режим на ${modeLabel(mode)}? Изменения применятся сразу.`);
     if (!confirmed) return;
 
@@ -250,12 +263,17 @@ export const InviteAccessPage = ({ role }: InviteAccessPageProps) => {
   };
 
   const moderate = (request: InviteRequest, status: 'approved' | 'denied') => {
+    const reason = moderationReason.trim();
+    if (status === 'denied' && (reason.length < 10 || reason.length > 200)) {
+      setMessage('Для отклонения укажите причину от 10 до 200 символов. Пользователь увидит её вместо пустого экрана.');
+      return;
+    }
     const confirmed = window.confirm(`${status === 'approved' ? 'Одобрить' : 'Отклонить'} заявку ${request.id}?`);
     if (!confirmed) return;
 
     void runAction(
       `request:${request.id}:${status}`,
-      () => moderateInviteRequest(request.id, status, moderationReason),
+      () => moderateInviteRequest(request.id, status, reason),
       status === 'approved' ? 'Заявка одобрена.' : 'Заявка отклонена.',
     );
   };
@@ -296,7 +314,7 @@ export const InviteAccessPage = ({ role }: InviteAccessPageProps) => {
 
     void runAction(
       `request:${request.id}:temporary_access`,
-      () => grantTemporaryAccess(request.requesterUid, hours, reason),
+      () => grantTemporaryAccess(request.requesterUid, hours, reason, request.id),
       'Временный доступ выдан без одобрения и без изменения trust_tree.',
     );
   };
@@ -320,10 +338,19 @@ export const InviteAccessPage = ({ role }: InviteAccessPageProps) => {
       </div>
 
       {message ? <p className="infoMessage">{message}</p> : null}
+      {!loading && !dataLoaded && (
+        <div style={{
+          background: '#3a1a00', color: '#ffcc80', padding: '12px 16px', borderRadius: 6,
+          marginBottom: 16, fontSize: 13, fontWeight: 600,
+        }}>
+          {'Данные не загружены — Firebase RTDB недоступен. Проверьте соединение и нажмите «Обновить».'}
+        </div>
+      )}
 
       <div className="statsGrid">
         <article className="metric metric-primary"><span>Активные поручители</span><strong>{counts.sponsorsActive}</strong></article>
         <article className="metric metric-warning"><span>Ожидают</span><strong>{counts.pending}</strong></article>
+        <article className="metric metric-warning"><span>Временный доступ</span><strong>{counts.temporaryAccess}</strong></article>
         <article className="metric metric-warning"><span>Ручная проверка</span><strong>{counts.manualReview}</strong></article>
         <article className="metric metric-success"><span>Одобрены</span><strong>{counts.approved}</strong></article>
         <article className="metric metric-danger"><span>Отклонены</span><strong>{counts.denied}</strong></article>
@@ -358,7 +385,7 @@ export const InviteAccessPage = ({ role }: InviteAccessPageProps) => {
           </div>
           {!canManageSponsors ? <p className="mutedText">Только администратор может менять флаг системы приглашений.</p> : null}
           <div className="segmented" style={{ marginTop: 12 }}>
-            {(['disabled', 'soft', 'medium', 'hard'] as InviteAccessMode[]).map((mode) => (
+            {(['disabled', 'soft', 'medium'] as InviteAccessMode[]).map((mode) => (
               <button
                 key={mode}
                 type="button"
@@ -376,23 +403,37 @@ export const InviteAccessPage = ({ role }: InviteAccessPageProps) => {
                 <p className="modeHintTitle">Как работают режимы</p>
                 <div className="modeHintList">
                   <div className="modeHintItem">
+                    <span className="modeBadge mode-soft">Права доступа</span>
+                    <p>
+                      <strong>admin:</strong> может включать/выключать систему, переключать режимы, управлять поручителями и модерировать заявки.<br />
+                      <strong>moderator:</strong> может только модерировать заявки (approve/deny/temporary access), без изменения флага, режима и списка поручителей.
+                    </p>
+                  </div>
+                </div>
+                <div className="modeHintList">
+                  <div className="modeHintItem">
                     <span className="modeBadge mode-disabled">DISABLED</span>
-                    <p>Система отключена: новые заявки не принимаются.</p>
+                    <p>
+                      Система отключена: новые заявки не принимаются.
+                      Текущие заявки и история остаются доступными для просмотра и ручной обработки.
+                    </p>
                   </div>
                   <div className="modeHintItem">
                     <span className="modeBadge mode-soft">SOFT</span>
-                    <p>Мягкий запуск: допускается гостевой поток, авто-одобрение включено.</p>
+                    <p>
+                      Мягкий запуск: допускается гостевой поток, авто-одобрение включено.
+                      Подходит для старта функции и низкого риска.
+                    </p>
                   </div>
                   <div className="modeHintItem">
                     <span className="modeBadge mode-medium">MEDIUM</span>
-                    <p>Обязательная проверка заявки, безопасные случаи одобряются автоматически.</p>
-                  </div>
-                  <div className="modeHintItem">
-                    <span className="modeBadge mode-hard">HARD</span>
-                    <p>Строгий контроль: нужен поручитель, авто-одобрение отключено.</p>
+                    <p>
+                      Обязательная проверка заявки, безопасные случаи одобряются автоматически.
+                      Для неоднозначных кейсов заявка уходит в ручную модерацию.
+                    </p>
                   </div>
                 </div>
-                <p className="modeHintNote">Подсказка: двигайтесь по шагам SOFT -&gt; MEDIUM -&gt; HARD, когда растет нагрузка или риски.</p>
+                <p className="modeHintNote">Подсказка: рекомендуемый режим MEDIUM. Строгий блокирующий режим удалён, чтобы пользователи не попадали на пустой экран.</p>
               </div>
             )}
           />
@@ -492,7 +533,7 @@ export const InviteAccessPage = ({ role }: InviteAccessPageProps) => {
             <InfoHint text="Одобрение и отклонение вызывают adminModerateInviteRequest. Эта страница не меняет механизм доступа в мобильном приложении." />
           </div>
           <div className="segmented">
-            {(['pending', 'needs_manual_review', 'approved', 'denied'] as RequestFilter[]).map((status) => (
+            {(['pending', 'temporary_access', 'needs_manual_review', 'approved', 'denied'] as RequestFilter[]).map((status) => (
               <button
                 key={status}
                 type="button"
@@ -521,7 +562,7 @@ export const InviteAccessPage = ({ role }: InviteAccessPageProps) => {
           <input
             value={moderationReason}
             onChange={(event) => setModerationReason(event.target.value)}
-            placeholder="Необязательная причина одобрения или отклонения"
+            placeholder="Для отклонения обязательно: 10-200 символов"
           />
         </label>
         <div className="grid twoColumnGrid">
@@ -576,6 +617,7 @@ export const InviteAccessPage = ({ role }: InviteAccessPageProps) => {
                   <td>{dateTime(request.createdAt)}</td>
                   <td>
                     <span>{dateTime(request.moderatedAt)}</span>
+                    {request.temp_expires_at ? <small>истекает: {dateTime(request.temp_expires_at)}</small> : null}
                     {request.moderatedBy ? <small>{request.moderatedBy}</small> : null}
                   </td>
                   <td className="moderationActions">

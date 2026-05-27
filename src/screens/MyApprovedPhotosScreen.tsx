@@ -20,6 +20,7 @@ import { onValue, ref } from 'firebase/database';
 import { database } from '../firebase-core';
 import { selectUser } from '../redux/slices/authSlice';
 import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField';
+import AppPhotoImage from '../components/AppPhotoImage';
 import type { RootState } from '../redux/store';
 
 type Lang = 'ua' | 'ru' | 'en';
@@ -91,9 +92,10 @@ type PhotoRecord = {
   uploadedAt: number;
   downloadUrl: string;
   thumbUrl: string;
+  storagePath?: string;
   status: ApprovalStatus;
   note?: string;
-  reviewedAt?: number;
+  reviewedAt?: number; // stored as moderatedAt in community_photos
 };
 
 const STATUS_LABEL_BY_LANG: Record<Lang, Record<ApprovalStatus, string>> = {
@@ -153,7 +155,7 @@ export default function MyApprovedPhotosScreen() {
       setLoading(false);
       return;
     }
-    const dbRef = ref(database, 'photo_uploads');
+    const dbRef = ref(database, 'community_photos');
     const unsub = onValue(
       dbRef,
       (snap) => {
@@ -163,18 +165,33 @@ export default function MyApprovedPhotosScreen() {
           .reduce<PhotoRecord[]>((acc, [key, val]) => {
             if (!val || typeof val !== 'object') return acc;
             const v = val as Record<string, unknown>;
-            if (v.uid !== user.id) return acc;
+            // community_photos uses uid OR userId
+            const recordUid = String(v.uid ?? v.userId ?? '');
+            if (recordUid !== user.id) return acc;
+            const imageUri = String(v.imageUri ?? v.downloadUrl ?? '');
+            const httpsUrl = typeof v.downloadUrl === 'string' && v.downloadUrl.startsWith('https://')
+              ? v.downloadUrl
+              : imageUri.startsWith('https://')
+                ? imageUri
+                : '';
             acc.push({
               firebaseKey: key,
-              uid: String(v.uid ?? ''),
-              userName: String(v.userName ?? ''),
-              uploadedAt: Number(v.uploadedAt ?? 0),
-              downloadUrl: String(v.downloadUrl ?? ''),
-              thumbUrl: String(v.thumbUrl ?? v.downloadUrl ?? ''),
+              uid: recordUid,
+              userName: String(v.uploadedBy ?? v.userName ?? ''),
+              uploadedAt: Number(v.uploadedAt ?? v.createdAt ?? 0),
+              downloadUrl: httpsUrl,
+              thumbUrl: typeof v.thumbnailUrl === 'string' && v.thumbnailUrl.startsWith('https://')
+                ? v.thumbnailUrl
+                : typeof v.thumbUrl === 'string' && v.thumbUrl.startsWith('https://')
+                  ? v.thumbUrl
+                  : httpsUrl,
+              storagePath: typeof v.storagePath === 'string' ? v.storagePath : undefined,
               status: (['pending','approved','rejected'].includes(String(v.status))
                 ? v.status : 'pending') as ApprovalStatus,
               note: typeof v.note === 'string' ? v.note : undefined,
-              reviewedAt: typeof v.reviewedAt === 'number' ? v.reviewedAt : undefined,
+              // admin panel writes moderatedAt on approve/reject
+              reviewedAt: typeof v.moderatedAt === 'number' ? v.moderatedAt
+                : typeof v.reviewedAt === 'number' ? v.reviewedAt : undefined,
             });
             return acc;
           }, [])
@@ -281,14 +298,17 @@ export default function MyApprovedPhotosScreen() {
           ))}
           {shown.map((photo) => (
             <View key={photo.firebaseKey} style={styles.card}>
-              <Image
-                source={{ uri: photo.thumbUrl || photo.downloadUrl }}
+              <AppPhotoImage
+                uri={photo.thumbUrl || photo.downloadUrl || photo.storagePath}
+                storagePath={photo.storagePath}
                 style={[
                   styles.thumb,
                   photo.status === 'pending' && styles.thumbPending,
                   photo.status === 'rejected' && styles.thumbRejected,
                 ]}
                 resizeMode="cover"
+                debugLabel="MyApprovedPhotosScreen"
+                showDebugInfo={false}
               />
               <View style={styles.cardBody}>
                 {/* Status badge */}

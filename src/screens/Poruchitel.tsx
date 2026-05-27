@@ -191,12 +191,13 @@ const PoruchitelScreen: React.FC = () => {
       } else {
         await denySponsorConfirmation(confirmationId);
       }
-      await loadConfirmations();
     } catch {
       setLoadError(language === 'ua' ? 'Не вдалося надіслати відповідь. Оновіть і спробуйте ще раз.' : language === 'ru' ? 'Не удалось отправить ответ. Обновите и попробуйте ещё раз.' : 'Could not send your answer. Refresh and try again.');
-    } finally {
       setBusyConfirmationId(null);
+      return;
     }
+    setBusyConfirmationId(null);
+    void loadConfirmations();
   };
 
   return (

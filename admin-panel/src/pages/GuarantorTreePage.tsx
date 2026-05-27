@@ -9,8 +9,8 @@ import { ROOT_GUARANTOR_PHONE } from '../services/guarantorTreeService';
 import type { GuarantorTreePageProps, ManualRootGrantResult } from '../types/guarantorTree';
 
 const UI_TEXT = {
-  title: 'Дерево поручителей',
-  hint: 'Выберите пользователя чтобы увидеть его цепочку приглашений',
+  title: 'Дерево доверия',
+  hint: 'Выберите пользователя, чтобы увидеть живую цепочку приглашений',
 };
 
 export const GuarantorTreePage = ({ user, role, onNavigate }: GuarantorTreePageProps) => {
@@ -115,7 +115,15 @@ export const GuarantorTreePage = ({ user, role, onNavigate }: GuarantorTreePageP
 
       {!tree.loading && tree.selectedUser ? (
         <>
-          <ChainVisualization chain={tree.chain} selectedUserUid={tree.selectedUser.uid} onUserClick={(uid) => void tree.selectUser(uid)} />
+          <ChainVisualization
+            chain={tree.chain}
+            selectedUserUid={tree.selectedUser.uid}
+            userAccess={tree.userAccess}
+            childrenNodes={tree.childrenNodes}
+            childrenUsers={tree.childrenUsers}
+            totalUsers={tree.totalUsers}
+            onUserClick={(uid) => void tree.selectUser(uid)}
+          />
           {tree.userAccess ? (
             <StatusCard
               status={tree.userAccess.status}

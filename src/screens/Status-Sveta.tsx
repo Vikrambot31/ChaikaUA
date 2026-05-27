@@ -2,7 +2,6 @@ import React, { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
   FlatList,
-  Image,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -39,6 +38,24 @@ import { pickUserAvatarUri } from '../utils/userAvatar';
 const RATE_LIMIT_KEY = 'electricity_report_timestamps';
 const MAX_PER_DAY = 2;
 const MIN_INTERVAL_MS = 4 * 60 * 60 * 1000; // 4 hours
+
+const getTs = (value: Date | string): number => {
+  if (value instanceof Date) return value.getTime();
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const parseNumberArray = (raw: string | null): number[] => {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed)
+      ? parsed.filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
+      : [];
+  } catch {
+    return [];
+  }
+};
 
 const UI_TEXT = {
   ua: {
@@ -169,22 +186,12 @@ const ElectricityStatusScreen: React.FC = () => {
   );
 
   const latestReports = useMemo(() => {
-    const getTs = (value: Date | string) => {
-      if (value instanceof Date) return value.getTime();
-      const parsed = new Date(value).getTime();
-      return Number.isFinite(parsed) ? parsed : 0;
-    };
     return [...todayReports]
       .sort((a, b) => getTs(b.createdAt) - getTs(a.createdAt))
       .slice(0, 10);
   }, [todayReports]);
 
   const bottomFeedReports = useMemo(() => {
-    const getTs = (value: Date | string) => {
-      if (value instanceof Date) return value.getTime();
-      const parsed = new Date(value).getTime();
-      return Number.isFinite(parsed) ? parsed : 0;
-    };
     return [...todayReports]
       .sort((a, b) => getTs(b.createdAt) - getTs(a.createdAt))
       .slice(0, 5);
@@ -228,8 +235,8 @@ const ElectricityStatusScreen: React.FC = () => {
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
       const stored = await AsyncStorage.getItem(RATE_LIMIT_KEY);
-      const timestamps: number[] = stored ? JSON.parse(stored) : [];
-      const todayTs = timestamps.filter((ts) => ts >= todayStart.getTime());
+      const timestamps = parseNumberArray(stored);
+      const todayTs = timestamps.filter((ts) => ts >= todayStart.getTime()).sort((a, b) => a - b);
       if (todayTs.length >= MAX_PER_DAY) {
         Alert.alert(text.errorTitle, text.errorDailyLimit);
         return;
@@ -246,8 +253,11 @@ const ElectricityStatusScreen: React.FC = () => {
           buildingId: selectedBuildingId,
           status: status as 'on' | 'off',
           createdAt: new Date(),
+          userId: user.id,
           userName: user?.name || text.resident,
           userPhone: user?.phone || '',
+          userPhotoURL: user.photoURL || '',
+          startAvatarKey: user.startAvatarKey,
           ...createPendingModeration(),
         };
 
@@ -263,12 +273,15 @@ const ElectricityStatusScreen: React.FC = () => {
         void firebaseChatAPI.addRequest({
           name: user?.name || text.resident,
           phone: user?.phone || '',
+          language,
           category: 'electricity',
           group: 'electricity',
           subcategory: status === 'on' ? 'power_on' : 'power_off',
           building: address,
           text: chatText,
           description: chatText,
+          userPhotoURL: user?.photoURL || '',
+          startAvatarKey: user?.startAvatarKey || '',
         });
 
         Alert.alert(
@@ -281,7 +294,7 @@ const ElectricityStatusScreen: React.FC = () => {
         setSubmitting(false);
       }
     },
-    [selectedStreet, selectedBuildingId, selectedBuilding, dispatch, user?.name, user?.phone, language]
+    [selectedStreet, selectedBuildingId, selectedBuilding, dispatch, user?.id, user?.name, user?.phone, user?.photoURL, user?.startAvatarKey, language]
   );
 
   if (error) {
@@ -299,14 +312,12 @@ const ElectricityStatusScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Image source={require('../../assets/daliSvet.png')} style={styles.daliSvetImage} resizeMode="cover" />
-
         <TactileCard elevated style={styles.statusCard} pressable={false}>
           <Text style={styles.cardTitle}>{text.selectStatus}</Text>
 
           <View style={styles.statusButtonsRow}>
             <TactileCard
-              onPress={() => handleStatusSubmit('on')}
+              onPress={() => { if (!submitting) void handleStatusSubmit('on'); }}
               style={styles.statusButtonOn}
             >
               {submitting ? (
@@ -325,7 +336,7 @@ const ElectricityStatusScreen: React.FC = () => {
             </TactileCard>
 
             <TactileCard
-              onPress={() => handleStatusSubmit('off')}
+              onPress={() => { if (!submitting) void handleStatusSubmit('off'); }}
               style={styles.statusButtonOff}
             >
               {submitting ? (
@@ -502,7 +513,7 @@ const ElectricityStatusScreen: React.FC = () => {
               const statusColor = isOn ? '#2E7D32' : '#EF8E18';
               const statusBg = isOn ? '#E8F5E9' : '#FFF3E0';
               const statusText = isOn ? text.lightOnShort : text.lightOffShort;
-              const avatarUri = pickUserAvatarUri(item as unknown as Record<string, unknown>);
+              const avatarUri = pickUserAvatarUri(item);
 
               return (
                 <View key={`mini-feed-${item.id}`} style={styles.residentItemCard}>
@@ -552,14 +563,6 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingTop: 24,
     paddingBottom: 32,
-  },
-  daliSvetImage: {
-    width: '100%',
-    height: 160,
-    marginTop: 0,
-    marginBottom: 14,
-    borderBottomLeftRadius: 16,
-    borderBottomRightRadius: 16,
   },
   ledIndicatorOn: {
     position: 'absolute',

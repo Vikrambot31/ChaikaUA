@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { COLORS } from '../utils/constants';
 import {
+  getModerationAverageHours,
   getMyInviteRequestStatus,
   type InviteRequestSnapshot,
 } from '../services/sponsorService';
@@ -57,6 +58,7 @@ export default function PendingApprovalScreen({
   const [snapshot, setSnapshot] = useState(initialStatus);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [avgHours, setAvgHours] = useState<number>(initialStatus.moderationAvgHours || 48);
 
   const refresh = async () => {
     setLoading(true);
@@ -75,6 +77,14 @@ export default function PendingApprovalScreen({
   useEffect(() => {
     setSnapshot(initialStatus);
   }, [initialStatus]);
+
+  useEffect(() => {
+    let active = true;
+    void getModerationAverageHours().then((hours) => {
+      if (active) setAvgHours(hours);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     if (snapshot.status !== 'pending' && snapshot.status !== 'pending_sponsor' && snapshot.status !== 'needs_manual_review') {
@@ -104,8 +114,17 @@ export default function PendingApprovalScreen({
           ]}>
             {getStatusLabel(snapshot.status)}
           </Text>
+          {snapshot.createdAt ? <Text style={styles.meta}>Подана: {new Date(snapshot.createdAt).toLocaleDateString('ru-RU')}</Text> : null}
+          <Text style={styles.meta}>Среднее время рассмотрения: ~{Math.max(1, Math.ceil(avgHours / 24))} дн.</Text>
           {snapshot.updatedAt ? <Text style={styles.meta}>Оновлено: {new Date(snapshot.updatedAt).toLocaleString('uk-UA')}</Text> : null}
           {snapshot.moderationReason ? <Text style={styles.meta}>{snapshot.moderationReason}</Text> : null}
+        </View>
+
+        <View style={styles.allowedBox}>
+          <Text style={styles.allowedTitle}>Что доступно сейчас</Text>
+          <Text style={styles.allowedItem}>Просматривать объявления</Text>
+          <Text style={styles.allowedItem}>Читать новости</Text>
+          <Text style={styles.allowedItem}>Настроить профиль</Text>
         </View>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -186,6 +205,25 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#D8E4F4',
     marginBottom: 14,
+  },
+  allowedBox: {
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: '#FFF8E8',
+    borderWidth: 1,
+    borderColor: '#F1D48A',
+    marginBottom: 14,
+  },
+  allowedTitle: {
+    color: '#40516A',
+    fontSize: 13,
+    fontWeight: '900',
+    marginBottom: 8,
+  },
+  allowedItem: {
+    color: '#40516A',
+    lineHeight: 21,
+    fontWeight: '700',
   },
   statusLabel: {
     color: '#607594',

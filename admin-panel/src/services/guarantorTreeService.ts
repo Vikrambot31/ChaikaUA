@@ -1,6 +1,7 @@
 import { equalTo, get, limitToFirst, orderByChild, query, ref } from 'firebase/database';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { database, firebaseApp } from '../firebase/firebase';
+import { LOCAL_MODE, localGet } from '../local/LOCAL_MODE';
 import type {
   ChainEntry,
   InviteRequestBrief,
@@ -20,7 +21,7 @@ const MAX_CHAIN_DEPTH = 20;
 export const ROOT_GUARANTOR_PHONE = '+380509000127';
 export const ROOT_GUARANTOR_UID = 'LfqIMCAyEzLAb7TNc83lYGW9RiV2';
 const LEGACY_ROOT_GUARANTOR_UID = `root:${ROOT_GUARANTOR_PHONE}`;
-const functions = getFunctions(firebaseApp);
+const functions = LOCAL_MODE ? null : getFunctions(firebaseApp);
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -160,7 +161,34 @@ export const searchUsers = async (queryText: string): Promise<SearchResultItem[]
   const trimmed = queryText.trim();
   if (trimmed.length < 2) return [];
 
-  const snapshot = await get(query(ref(database, USERS_PATH), limitToFirst(100)));
+  // LOCAL_MODE: search users list from local json-server
+  if (LOCAL_MODE) {
+    const users = await localGet<Array<Record<string, unknown>>>('/users');
+    if (!Array.isArray(users)) return [];
+    const lower = trimmed.toLowerCase();
+    const cleanQuery = trimmed.replace(/[^0-9a-zA-Zа-яА-ЯіїєґІЇЄҐ]/g, '').toLowerCase();
+    const scored: Array<SearchResultItem & { score: number }> = [];
+    for (const value of users) {
+      const uid = String(value.id || '');
+      const user = normalizeUserProfile(uid, value);
+      if (!user) continue;
+      const uidLower = uid.toLowerCase();
+      const nameLower = user.name.toLowerCase();
+      const phoneClean = user.phone.replace(/\D/g, '');
+      let matchField: SearchResultItem['matchField'] | null = null;
+      let score = 0;
+      if (uidLower === lower) { matchField = 'uid'; score = 100; }
+      else if (uidLower.startsWith(lower)) { matchField = 'uid'; score = 80; }
+      else if (phoneClean.startsWith(cleanQuery)) { matchField = 'phone'; score = 75; }
+      else if (phoneClean.includes(cleanQuery)) { matchField = 'phone'; score = 60; }
+      else if (nameLower.startsWith(lower)) { matchField = 'name'; score = 55; }
+      else if (nameLower.includes(lower)) { matchField = 'name'; score = 40; }
+      if (matchField) scored.push({ ...user, matchField, score });
+    }
+    return scored.sort((a, b) => b.score - a.score).slice(0, 10);
+  }
+
+  const snapshot = await get(query(ref(database, USERS_PATH), limitToFirst(500)));
   const raw = snapshot.val() as Record<string, unknown> | null;
   if (!raw) return [];
 
@@ -193,11 +221,32 @@ export const searchUsers = async (queryText: string): Promise<SearchResultItem[]
 
 export const loadUserProfile = async (uid: string): Promise<UserProfile | null> => {
   if (uid === ROOT_GUARANTOR_UID) return makeRootGuarantorUser();
+
+  // LOCAL_MODE: fetch user by id from local json-server
+  if (LOCAL_MODE) {
+    try {
+      const user = await localGet<Record<string, unknown>>(`/users/${uid}`);
+      return normalizeUserProfile(uid, user);
+    } catch {
+      return null;
+    }
+  }
+
   const snapshot = await get(ref(database, `${USERS_PATH}/${uid}`));
   return normalizeUserProfile(uid, snapshot.val());
 };
 
 export const loadUserAccess = async (uid: string): Promise<UserAccessRecord | null> => {
+  // LOCAL_MODE: fetch user_access entry by uid from local json-server
+  if (LOCAL_MODE) {
+    try {
+      const record = await localGet<Record<string, unknown>>(`/user_access/${uid}`);
+      return normalizeUserAccess(uid, record);
+    } catch {
+      return null;
+    }
+  }
+
   const snapshot = await get(ref(database, `${ACCESS_PATH}/${uid}`));
   return normalizeUserAccess(uid, snapshot.val());
 };
@@ -205,11 +254,25 @@ export const loadUserAccess = async (uid: string): Promise<UserAccessRecord | nu
 export const loadTrustNodeByChild = async (uid: string): Promise<TrustChainNode | null> => {
   if (uid === ROOT_GUARANTOR_UID) return null;
 
+  // LOCAL_MODE: fetch trust_tree node by childUid from local json-server
+  if (LOCAL_MODE) {
+    try {
+      const nodes = await localGet<Array<Record<string, unknown>>>('/trust_tree');
+      if (!Array.isArray(nodes)) return null;
+      const node = nodes.find((n) => n.childUid === uid || n.uid === uid || n.userUid === uid);
+      if (!node) return null;
+      const id = String(node.id || uid);
+      return normalizeTrustNode(id, node);
+    } catch {
+      return null;
+    }
+  }
+
   const directSnapshot = await get(ref(database, `${TRUST_TREE_PATH}/${uid}`));
   const directNode = normalizeTrustNode(uid, directSnapshot.val());
   if (directNode?.childUid === uid) return directNode;
 
-  const snapshot = await get(query(ref(database, TRUST_TREE_PATH), orderByChild('childUid'), equalTo(uid)));
+  const snapshot = await get(query(ref(database, TRUST_TREE_PATH), orderByChild('userUid'), equalTo(uid)));
   const raw = snapshot.val() as Record<string, unknown> | null;
   const nodes = Object.entries(raw ?? {})
     .map(([id, value]) => normalizeTrustNode(id, value))
@@ -238,13 +301,31 @@ export const loadTrustPath = async (selectedUid: string): Promise<TrustChainNode
 };
 
 export const loadChildrenNodes = async (uid: string): Promise<TrustChainNode[]> => {
-  const parentRefs = uid === ROOT_GUARANTOR_UID
+  // LOCAL_MODE: fetch trust_tree nodes by parentUid/sponsorUid from local json-server
+  if (LOCAL_MODE) {
+    try {
+      const nodes = await localGet<Array<Record<string, unknown>>>('/trust_tree');
+      if (!Array.isArray(nodes)) return [];
+      const sponsorUids = uid === ROOT_GUARANTOR_UID
+        ? [ROOT_GUARANTOR_UID, LEGACY_ROOT_GUARANTOR_UID, ROOT_GUARANTOR_PHONE, normalizePhoneDigits(ROOT_GUARANTOR_PHONE)]
+        : [uid];
+      return nodes
+        .filter((n) => sponsorUids.includes(String(n.parentUid || n.sponsorUid || '')))
+        .map((n) => normalizeTrustNode(String(n.id || ''), n))
+        .filter((n): n is TrustChainNode => n !== null)
+        .sort((a, b) => b.approvedAt - a.approvedAt)
+        .slice(0, 50);
+    } catch {
+      return [];
+    }
+  }
+
+  const sponsorRefs = uid === ROOT_GUARANTOR_UID
     ? [ROOT_GUARANTOR_UID, LEGACY_ROOT_GUARANTOR_UID, ROOT_GUARANTOR_PHONE, normalizePhoneDigits(ROOT_GUARANTOR_PHONE)]
     : [uid];
-  const snapshots = await Promise.all(parentRefs.flatMap((parentUid) => [
-    get(query(ref(database, TRUST_TREE_PATH), orderByChild('parentUid'), equalTo(parentUid))),
-    get(query(ref(database, TRUST_TREE_PATH), orderByChild('sponsorUid'), equalTo(parentUid))),
-  ]));
+  const snapshots = await Promise.all(sponsorRefs.map((sponsorUid) =>
+    get(query(ref(database, TRUST_TREE_PATH), orderByChild('sponsorUid'), equalTo(sponsorUid))),
+  ));
   const entries = snapshots.flatMap((snapshot) => Object.entries((snapshot.val() as Record<string, unknown> | null) ?? {}));
   return entries
     .map(([id, value]) => normalizeTrustNode(id, value))
@@ -254,6 +335,22 @@ export const loadChildrenNodes = async (uid: string): Promise<TrustChainNode[]> 
 };
 
 export const loadInviteRequest = async (uid: string): Promise<InviteRequestBrief | null> => {
+  // LOCAL_MODE: find invite_request by requesterUid from local json-server
+  if (LOCAL_MODE) {
+    try {
+      const requests = await localGet<Array<Record<string, unknown>>>('/invite_requests');
+      if (!Array.isArray(requests)) return null;
+      const approved = requests
+        .filter((r) => r.requesterUid === uid && r.status === 'approved')
+        .map((r) => normalizeInviteRequest(String(r.id || ''), r))
+        .filter((r): r is InviteRequestBrief => r !== null)
+        .sort((a, b) => b.createdAt - a.createdAt);
+      return approved[0] ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   const snapshot = await get(query(ref(database, INVITE_REQUESTS_PATH), orderByChild('requesterUid'), equalTo(uid)));
   const raw = snapshot.val() as Record<string, unknown> | null;
   const approved = Object.entries(raw ?? {})
@@ -301,7 +398,17 @@ export const buildChainEntries = (selectedUid: string, path: TrustChainNode[], u
 };
 
 export const loadUsersTotal = async (): Promise<number> => {
-  const snapshot = await get(query(ref(database, USERS_PATH), limitToFirst(1000)));
+  // LOCAL_MODE: count users from local json-server
+  if (LOCAL_MODE) {
+    try {
+      const users = await localGet<unknown[]>('/users');
+      return Array.isArray(users) ? users.length : 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  const snapshot = await get(query(ref(database, USERS_PATH), limitToFirst(10000)));
   const raw = snapshot.val() as Record<string, unknown> | null;
   return Object.keys(raw ?? {}).length;
 };
@@ -312,6 +419,25 @@ export const logAudit = (action: string, details: Record<string, unknown>): void
 
 export const findUsersByPhones = async (phones: string[]): Promise<Map<string, UserProfile>> => {
   const targets = new Set(phones.map(normalizePhoneDigits).filter(Boolean));
+
+  // LOCAL_MODE: search users by phone in local json-server
+  if (LOCAL_MODE) {
+    const map = new Map<string, UserProfile>();
+    try {
+      const users = await localGet<Array<Record<string, unknown>>>('/users');
+      if (Array.isArray(users)) {
+        for (const value of users) {
+          const uid = String(value.id || '');
+          const user = normalizeUserProfile(uid, value);
+          if (!user) continue;
+          const normalized = normalizePhoneDigits(user.phone);
+          if (targets.has(normalized)) map.set(normalized, user);
+        }
+      }
+    } catch { /* empty */ }
+    return map;
+  }
+
   const snapshot = await get(ref(database, USERS_PATH));
   const raw = snapshot.val() as Record<string, unknown> | null;
   const map = new Map<string, UserProfile>();
@@ -330,10 +456,16 @@ export const grantRootAccessByPhones = async (phones: string[], adminUid: string
   const normalizedPhones = [...new Set(phones.map((phone) => phone.trim()).filter(Boolean))];
   if (!normalizedPhones.length) return [];
 
+  // LOCAL_MODE: stub — return ok for each phone
+  if (LOCAL_MODE) {
+    logAudit('manual_root_grant_local_stub', { adminUid, phones: normalizedPhones.map(maskPhone) });
+    return normalizedPhones.map((phone) => ({ status: 'granted', phone, uid: '' } as ManualRootGrantResult));
+  }
+
   const callable = httpsCallable<
     { phones: string[]; adminUid?: string },
     { ok: boolean; results: ManualRootGrantResult[] }
-  >(functions, 'adminGrantRootAccessByPhones');
+  >(functions!, 'adminGrantRootAccessByPhones');
   const response = await callable({ phones: normalizedPhones, adminUid });
   const results = response.data.results;
   results

@@ -1,14 +1,15 @@
 import { endBefore, get, limitToLast, orderByChild, query, ref } from 'firebase/database';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { database, firebaseApp } from '../firebase/firebase';
+import { LOCAL_MODE, LOCAL_API } from '../local/LOCAL_MODE';
 
 const FEATURE_FLAG_PATH = 'feature_flags/invite_access/current';
 const TRUSTED_SPONSORS_PATH = 'trusted_sponsors';
 const INVITE_REQUESTS_PATH = 'invite_requests';
 const PAGE_SIZE = 100;
 
-export type InviteAccessMode = 'disabled' | 'soft' | 'medium' | 'hard';
-export type InviteRequestStatus = 'pending' | 'pending_sponsor' | 'approved' | 'denied' | 'cancelled' | 'needs_manual_review' | 'auto_denied';
+export type InviteAccessMode = 'disabled' | 'soft' | 'medium';
+export type InviteRequestStatus = 'pending' | 'pending_sponsor' | 'approved' | 'denied' | 'cancelled' | 'needs_manual_review' | 'auto_denied' | 'temporary_access';
 export type TrustedSponsorStatus = 'active' | 'disabled';
 
 export type InviteFeatureFlag = {
@@ -52,6 +53,7 @@ export type InviteRequest = {
   riskLevel: string;
   decisionSource: string;
   decisionReason: string;
+  temp_expires_at: number;
 };
 
 export type InviteAccessState = {
@@ -65,7 +67,7 @@ type CallableResult = {
   ok: boolean;
 };
 
-const functions = getFunctions(firebaseApp);
+const functions = LOCAL_MODE ? null : getFunctions(firebaseApp);
 
 const getString = (value: unknown): string => (typeof value === 'string' ? value : '');
 const getNumber = (value: unknown): number => (Number.isFinite(Number(value)) ? Number(value) : 0);
@@ -81,14 +83,15 @@ const normalizeRequestStatus = (value: unknown): InviteRequestStatus => {
     value === 'denied' ||
     value === 'cancelled' ||
     value === 'needs_manual_review' ||
-    value === 'auto_denied'
+    value === 'auto_denied' ||
+    value === 'temporary_access'
   ) return value;
   return 'pending';
 };
 
 const normalizeMode = (value: unknown, enabled: boolean): InviteAccessMode => {
-  if (value === 'soft' || value === 'medium' || value === 'hard') return value;
-  return enabled ? 'soft' : 'disabled';
+  if (value === 'soft' || value === 'medium') return value;
+  return enabled ? 'medium' : 'disabled';
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -143,10 +146,51 @@ const normalizeRequest = (id: string, raw: unknown): InviteRequest | null => {
     riskLevel: getString(raw.riskLevel),
     decisionSource: getString(raw.decisionSource),
     decisionReason: getString(raw.decisionReason),
+    temp_expires_at: getNumber(raw.temp_expires_at) || getNumber(raw.tempExpiresAt),
   };
 };
 
 export const loadInviteAccessState = async (): Promise<InviteAccessState> => {
+  if (LOCAL_MODE) {
+    const [invites, config] = await Promise.all([
+      fetch(`${LOCAL_API}/invites`).then(r => r.json()) as Promise<Array<Record<string, unknown>>>,
+      fetch(`${LOCAL_API}/config`).then(r => r.json()) as Promise<Record<string, unknown>>,
+    ]);
+    const requests: InviteRequest[] = invites.map(raw => ({
+      id: String(raw.id),
+      requesterUid: String(raw.sponsorId ?? ''),
+      requesterPhoneMasked: '+380XX',
+      requesterPhoneHash: '',
+      sponsorPhoneMasked: '+380XX',
+      sponsorPhoneHash: '',
+      sponsorTrusted: raw.status === 'trusted',
+      status: normalizeRequestStatus(raw.status),
+      createdAt: Number(raw.createdAt ?? 0),
+      updatedAt: Number(raw.createdAt ?? 0),
+      moderatedAt: 0,
+      moderatedBy: '',
+      moderationReason: '',
+      source: 'local',
+      modeAtCreation: 'soft',
+      riskScore: 0,
+      riskLevel: 'low',
+      decisionSource: 'local',
+      decisionReason: '',
+      temp_expires_at: Number(raw.temp_expires_at ?? raw.tempExpiresAt ?? 0),
+    }));
+    return {
+      flag: {
+        enabled: Boolean(config.inviteAccessEnabled),
+        mode: (config.inviteAccessMode as InviteAccessMode) ?? 'soft',
+        updatedAt: Date.now(),
+        updatedBy: 'local',
+        version: 1,
+      },
+      sponsors: [],
+      requests,
+      hasMore: false,
+    };
+  }
   const [flagSnapshot, sponsorsSnapshot, requestsSnapshot] = await Promise.all([
     get(ref(database, FEATURE_FLAG_PATH)),
     get(ref(database, TRUSTED_SPONSORS_PATH)),
@@ -187,17 +231,41 @@ export const loadMoreRequests = async (oldestCreatedAt: number): Promise<{ reque
 };
 
 export const setInviteAccessEnabled = async (enabled: boolean): Promise<void> => {
-  const callable = httpsCallable<{ enabled: boolean }, CallableResult>(functions, 'adminSetInviteAccessEnabled');
+  if (LOCAL_MODE) {
+    await fetch(`${LOCAL_API}/config`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ inviteAccessEnabled: enabled }),
+    });
+    return;
+  }
+  const callable = httpsCallable<{ enabled: boolean }, CallableResult>(functions!, 'adminSetInviteAccessEnabled');
   await callable({ enabled });
 };
 
 export const setInviteAccessMode = async (mode: InviteAccessMode): Promise<void> => {
-  const callable = httpsCallable<{ mode: InviteAccessMode }, CallableResult>(functions, 'adminSetInviteAccessMode');
+  if (LOCAL_MODE) {
+    await fetch(`${LOCAL_API}/config`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ inviteAccessMode: mode }),
+    });
+    return;
+  }
+  const callable = httpsCallable<{ mode: InviteAccessMode }, CallableResult>(functions!, 'adminSetInviteAccessMode');
   await callable({ mode });
 };
 
 export const createTrustedSponsor = async (sponsorPhone: string, note: string): Promise<void> => {
-  const callable = httpsCallable<{ sponsorPhone: string; note?: string }, CallableResult>(functions, 'adminCreateTrustedSponsor');
+  if (LOCAL_MODE) {
+    await fetch(`${LOCAL_API}/trusted_sponsors`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sponsorPhone, note: note.trim() || undefined, createdAt: Date.now(), status: 'active' }),
+    });
+    return;
+  }
+  const callable = httpsCallable<{ sponsorPhone: string; note?: string }, CallableResult>(functions!, 'adminCreateTrustedSponsor');
   await callable({ sponsorPhone, note: note.trim() || undefined });
 };
 
@@ -206,10 +274,18 @@ export const updateTrustedSponsorStatus = async (
   status: TrustedSponsorStatus,
   note?: string,
 ): Promise<void> => {
+  if (LOCAL_MODE) {
+    await fetch(`${LOCAL_API}/trusted_sponsors/${sponsorPhoneHash}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status, note, updatedAt: Date.now() }),
+    });
+    return;
+  }
   const callable = httpsCallable<
     { sponsorPhoneHash: string; status: TrustedSponsorStatus; note?: string },
     CallableResult
-  >(functions, 'adminUpdateTrustedSponsor');
+  >(functions!, 'adminUpdateTrustedSponsor');
   await callable({ sponsorPhoneHash, status, note });
 };
 
@@ -218,10 +294,18 @@ export const moderateInviteRequest = async (
   status: Extract<InviteRequestStatus, 'approved' | 'denied'>,
   reason: string,
 ): Promise<void> => {
+  if (LOCAL_MODE) {
+    await fetch(`${LOCAL_API}/invites/${requestId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status, moderationReason: reason.trim() || undefined }),
+    });
+    return;
+  }
   const callable = httpsCallable<
     { requestId: string; status: 'approved' | 'denied'; reason?: string },
     CallableResult
-  >(functions, 'adminModerateInviteRequest');
+  >(functions!, 'adminModerateInviteRequest');
   await callable({ requestId, status, reason: reason.trim() || undefined });
 };
 
@@ -229,10 +313,19 @@ export const grantTemporaryAccess = async (
   uid: string,
   durationHours: number,
   reason: string,
+  requestId?: string,
 ): Promise<void> => {
+  if (LOCAL_MODE) {
+    await fetch(`${LOCAL_API}/temporary_access`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid, durationHours, reason: reason.trim(), requestId, grantedAt: Date.now() }),
+    });
+    return;
+  }
   const callable = httpsCallable<
-    { uid: string; durationHours: number; reason: string },
+    { uid: string; durationHours: number; reason: string; requestId?: string },
     CallableResult
-  >(functions, 'grantTemporaryAccess');
-  await callable({ uid, durationHours, reason: reason.trim() });
+  >(functions!, 'grantTemporaryAccess');
+  await callable({ uid, durationHours, reason: reason.trim(), requestId });
 };

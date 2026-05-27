@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { SecurityRole } from '../services/authService';
 import { InfoHint } from '../components/InfoHint';
 import {
@@ -27,6 +27,13 @@ import {
   type ManagedAuthorizedDevice,
 } from '../services/securityService';
 import {
+  disableEmergencyDebugUnlock,
+  enableEmergencyDebugUnlock,
+  isEmergencyAccessActive,
+  subscribeEmergencyAccess,
+  type EmergencyAccessCurrent,
+} from '../services/emergencyDebugService';
+import {
   getApkDownloads,
   getCurrentVersionRegistry,
   type ApkDownloadRecord,
@@ -38,7 +45,6 @@ type AccessControlPageProps = {
   role: SecurityRole;
   onNavigateToInvites: () => void;
 };
-
 type RequestFilter = 'all' | 'needs_manual_review' | 'pending' | 'approved' | 'denied';
 
 const emptyState: InviteAccessState = {
@@ -69,12 +75,21 @@ const filterLabel = (filter: RequestFilter): string => {
 };
 
 const formatInviteError = (error: unknown): string => {
-  const message = error instanceof Error ? error.message : String(error || '');
-  if (message.toLowerCase().includes('invite access is not configured')) {
+  const err = error as { code?: unknown; message?: unknown };
+  const code = typeof err?.code === 'string' ? err.code.toLowerCase() : '';
+  const message = error instanceof Error ? error.message : typeof err?.message === 'string' ? err.message : String(error || '');
+  const normalized = `${code} ${message}`.toLowerCase();
+  if (normalized.includes('invite access is not configured')) {
     return 'Не удалось выполнить: backend не настроен (INVITE_ACCESS_HASH_SECRET).';
   }
-  if (message.toLowerCase().includes('admin access required') || message.toLowerCase().includes('permission-denied')) {
+  if (normalized.includes('admin access required') || normalized.includes('permission-denied')) {
     return 'Требуется доступ администратора.';
+  }
+  if (normalized.includes('not-found')) {
+    return 'Серверная функция ещё не задеплоена. Нужно обновить Firebase Functions.';
+  }
+  if (normalized.includes('internal')) {
+    return 'Сервер вернул внутреннюю ошибку. Обычно это значит, что функция не задеплоена или упала на backend.';
   }
   return message || 'Действие не выполнено.';
 };
@@ -82,7 +97,6 @@ const formatInviteError = (error: unknown): string => {
 const modeLabel = (mode: InviteAccessMode): string => {
   if (mode === 'soft') return 'SOFT';
   if (mode === 'medium') return 'MEDIUM';
-  if (mode === 'hard') return 'HARD';
   return 'DISABLED';
 };
 
@@ -97,6 +111,11 @@ export const AccessControlPage = ({ role, onNavigateToInvites }: AccessControlPa
   const [tempUid, setTempUid] = useState('');
   const [tempHours, setTempHours] = useState(48);
   const [tempReason, setTempReason] = useState('');
+  const [emergencyAccess, setEmergencyAccess] = useState<EmergencyAccessCurrent | null>(null);
+  const [emergencyModalOpen, setEmergencyModalOpen] = useState(false);
+  const [emergencyReason, setEmergencyReason] = useState('Ремонт и отладка APK');
+  const [emergencyTtlMinutes, setEmergencyTtlMinutes] = useState(120);
+  const [emergencyConfirmText, setEmergencyConfirmText] = useState('');
 
   const canModerate = role === 'admin' || role === 'moderator';
   const canManage = role === 'admin';
@@ -108,6 +127,8 @@ export const AccessControlPage = ({ role, onNavigateToInvites }: AccessControlPa
   const [apkDownloads, setApkDownloads] = useState<Record<string, ApkDownloadRecord>>({});
   const [versionRegistry, setVersionRegistry] = useState<AppVersionRegistry | null>(null);
   const [versionLoading, setVersionLoading] = useState(true);
+  const [devicesPage, setDevicesPage] = useState(0);
+  const DEVICES_PAGE_SIZE = 20;
 
   const autoRefreshRef = useRef({ loading, busyAction, refresh: async () => {} });
   autoRefreshRef.current.loading = loading;
@@ -132,6 +153,14 @@ export const AccessControlPage = ({ role, onNavigateToInvites }: AccessControlPa
   }, []);
 
   useEffect(() => {
+    const unsubscribe = subscribeEmergencyAccess(
+      setEmergencyAccess,
+      (error) => setMessage(error.message || 'Не удалось загрузить emergency debug статус.'),
+    );
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
     const id = setInterval(() => {
       if (!autoRefreshRef.current.loading && !autoRefreshRef.current.busyAction) {
         void autoRefreshRef.current.refresh();
@@ -147,27 +176,36 @@ export const AccessControlPage = ({ role, onNavigateToInvites }: AccessControlPa
         setApkDownloads(downloads);
         setVersionRegistry(registry);
       })
-      .catch(() => {/* Ignore */})
+      .catch((err: unknown) => console.warn('[AccessControl] Failed to load APK/version data:', err))
       .finally(() => setVersionLoading(false));
 
     const unsub = subscribeManagedAuthorizedDevices(setDevices);
     return unsub;
   }, []);
 
-  const runAction = async (actionId: string, action: () => Promise<unknown>, success: string) => {
+  const runAction = async (
+    actionId: string,
+    action: () => Promise<unknown>,
+    success: string,
+    options?: { alertOnError?: boolean },
+  ) => {
     setBusyAction(actionId);
     setMessage(null);
+    let ok = false;
     try {
       await action();
       setMessage(success);
-      await refresh();
+      ok = true;
     } catch (error) {
       const msg = formatInviteError(error);
       setMessage(msg);
-      window.alert(msg);
+      if (options?.alertOnError !== false) {
+        window.alert(msg);
+      }
     } finally {
       setBusyAction(null);
     }
+    if (ok) await refresh();
   };
 
   const stats = useMemo(() => computeAccessStats(state.requests), [state.requests]);
@@ -221,6 +259,42 @@ export const AccessControlPage = ({ role, onNavigateToInvites }: AccessControlPa
     setTempUid('');
     setTempReason('');
     setTempHours(48);
+  };
+
+  const openEmergencyModal = () => {
+    setEmergencyReason('Ремонт и отладка APK');
+    setEmergencyTtlMinutes(360);
+    setEmergencyConfirmText('');
+    setEmergencyModalOpen(true);
+  };
+
+  const confirmEmergencyEnable = () => {
+    if (!emergencyReason.trim()) {
+      setMessage('Укажите причину включения emergency debug режима.');
+      return;
+    }
+    if (emergencyConfirmText.trim() !== 'DEBUG') {
+      setMessage('Для подтверждения введите DEBUG.');
+      return;
+    }
+
+    void runAction(
+      'emergency_enable',
+      () => enableEmergencyDebugUnlock(emergencyReason.trim(), emergencyTtlMinutes),
+      'Аварийный режим включен. Доступ обновлен, режим выключится автоматически.',
+      { alertOnError: false },
+    );
+    setEmergencyModalOpen(false);
+  };
+
+  const confirmEmergencyDisable = () => {
+    if (!window.confirm('Включить защиту обратно и снять emergency debug claim?')) return;
+    void runAction(
+      'emergency_disable',
+      () => disableEmergencyDebugUnlock(),
+      'Аварийный режим выключен. Защита включена обратно.',
+      { alertOnError: false },
+    );
   };
 
   const cmpVer = (a: string, b: string): number => {
@@ -295,6 +369,8 @@ export const AccessControlPage = ({ role, onNavigateToInvites }: AccessControlPa
     return map;
   }, [state.requests]);
 
+  const emergencyActive = isEmergencyAccessActive(emergencyAccess);
+
   const loadMore = async () => {
     if (!state.hasMore || !state.requests.length) return;
     const oldest = state.requests[state.requests.length - 1].createdAt;
@@ -333,6 +409,207 @@ export const AccessControlPage = ({ role, onNavigateToInvites }: AccessControlPa
       </div>
 
       {message && <p className="infoMessage">{message}</p>}
+
+      <article
+        className="panel"
+        style={{
+          marginBottom: 20,
+          border: emergencyActive ? '2px solid #f06445' : '1px solid #bdd1f2',
+          background: emergencyActive ? '#fff4ed' : '#f5fbff',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <div>
+            <p className="eyebrow" style={{ margin: 0 }}>АВАРИЙНЫЙ РЕЖИМ РЕМОНТА APK</p>
+            <h3 style={{ margin: '6px 0 8px', color: emergencyActive ? '#8f2d1f' : '#17446b' }}>
+              Аварийный режим: {emergencyActive ? 'ВКЛЮЧЕН' : 'ВЫКЛЮЧЕН'}
+            </h3>
+            <div
+              style={{
+                margin: '0 0 12px',
+                padding: '14px 16px',
+                borderRadius: 8,
+                background: emergencyActive ? '#b42318' : '#125e66',
+                color: '#fff',
+                boxShadow: '0 8px 20px rgba(15, 30, 45, 0.14)',
+              }}
+            >
+              <strong style={{ display: 'block', fontSize: 22, lineHeight: 1.15, letterSpacing: 0 }}>
+                {emergencyActive ? 'ЗАЩИТА ДЛЯ РЕМОНТА ОТКЛЮЧЕНА' : 'ЗАЩИТА ВКЛЮЧЕНА'}
+              </strong>
+              <span style={{ display: 'block', marginTop: 6, fontSize: 13, lineHeight: 1.45, color: 'rgba(255,255,255,0.92)' }}>
+                {emergencyActive
+                  ? 'Внутренние блокировки APK временно сняты для владельца/админа. База не открыта всем пользователям.'
+                  : 'Обычные ограничения приложения работают. Пользователи проходят стандартные проверки доступа.'}
+              </span>
+            </div>
+            <p style={{ margin: '0 0 10px', color: '#5d6f8b', fontSize: 12, lineHeight: 1.45 }}>
+              Режим временно снимает внутренние ограничения только для владельца и админов,
+              чтобы быстро починить и проверить APK.
+            </p>
+            <dl className="details compactDetails" style={{ margin: 0 }}>
+              <div><dt>Автоотключение</dt><dd>{emergencyAccess?.expiresAt ? dateTime(emergencyAccess.expiresAt) : '—'}</dd></div>
+              <div><dt>Кто включил</dt><dd>{emergencyAccess?.enabledByEmail || '—'}</dd></div>
+              <div><dt>Причина</dt><dd>{emergencyAccess?.reason || (emergencyActive ? '—' : 'Защита включена')}</dd></div>
+            </dl>
+            <p style={{ margin: '10px 0 0', color: '#5d6f8b', fontSize: 12, lineHeight: 1.45 }}>
+              Автоотключение — когда режим сам выключится. Кто включил — аккаунт администратора. Причина — зачем включали ремонтный доступ.
+            </p>
+            {/* ── Bypass флаги ── */}
+            {emergencyAccess && (
+              <div style={{ marginTop: 14, borderTop: '1px solid rgba(0,0,0,0.1)', paddingTop: 12 }}>
+                <p style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 700, color: emergencyActive ? '#8f2d1f' : '#17446b' }}>
+                  Bypass-флаги аварийного режима:
+                </p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {([
+                    ['bypassDeviceAuthorization', 'Авторизация устройств'],
+                    ['bypassForceUpdate', 'Принуд. обновление'],
+                    ['bypassMaintenance', 'Режим обслуживания'],
+                    ['bypassInviteAccess', 'Система приглашений'],
+                    ['bypassUserAccess', 'Проверка доступа'],
+                    ['bypassDiagnosticsRestrictions', 'Ограничения диагностики'],
+                  ] as [keyof typeof emergencyAccess, string][]).map(([flag, label]) => (
+                    <span
+                      key={flag}
+                      className={emergencyAccess[flag] ? 'pill warning' : 'pill'}
+                      style={{ fontSize: 11 }}
+                    >
+                      {emergencyAccess[flag] ? '⚠ ' : '✓ '}{label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 1fr) minmax(220px, 1fr)', gap: 12, flex: '1 1 520px' }}>
+            <button
+              type="button"
+              className="smallButton"
+              style={{
+                minHeight: 74,
+                fontSize: 15,
+                fontWeight: 800,
+                background: '#d9481f',
+                borderColor: '#a62f18',
+                color: '#fff',
+                whiteSpace: 'normal',
+              }}
+              disabled={!canManage || Boolean(busyAction)}
+              onClick={openEmergencyModal}
+            >
+              ОТКЛЮЧИТЬ ОГРАНИЧЕНИЯ ДЛЯ РЕМОНТА APK
+            </button>
+            <p style={{ margin: '6px 0 0', color: '#5d6f8b', fontSize: 12, lineHeight: 1.4 }}>
+              Включает аварийный режим отладки после подтверждения: причина, время действия и код DEBUG.
+            </p>
+            <button
+              type="button"
+              className="smallButton"
+              style={{
+                minHeight: 74,
+                fontSize: 15,
+                fontWeight: 800,
+                background: '#166a74',
+                borderColor: '#0f4d56',
+                color: '#fff',
+                whiteSpace: 'normal',
+              }}
+              disabled={!canManage || Boolean(busyAction) || !emergencyAccess?.enabled}
+              onClick={confirmEmergencyDisable}
+            >
+              ДЕАКТИВИРОВАТЬ ВСЕ BYPASS-ФЛАГИ
+            </button>
+            <p style={{ margin: '6px 0 0', color: '#5d6f8b', fontSize: 12, lineHeight: 1.4 }}>
+              Немедленно деактивирует все bypass-флаги и возвращает стандартные ограничения.
+            </p>
+          </div>
+        </div>
+      </article>
+
+      {emergencyModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 50,
+            background: 'rgba(6, 20, 35, 0.46)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20,
+          }}
+        >
+          <div className="panel" style={{ width: 'min(620px, 100%)', margin: 0 }}>
+            <h3 style={{ marginTop: 0 }}>Подтвердите аварийный режим ремонта APK</h3>
+            <p style={{ color: '#4f6178', lineHeight: 1.55 }}>
+              Вы включаете аварийный режим отладки. Он временно отключит внутренние ограничения приложения для владельца/админа, чтобы можно было ремонтировать APK. Режим автоматически выключится через выбранное время.
+            </p>
+            <div className="field">
+              <span>Причина включения</span>
+              <small style={{ color: '#5d6f8b' }}>
+                Коротко опишите, что именно ремонтируете (например: "починка запуска APK").
+              </small>
+              <input
+                type="text"
+                value={emergencyReason}
+                onChange={(e) => setEmergencyReason(e.target.value)}
+                disabled={Boolean(busyAction)}
+              />
+            </div>
+            <div className="field">
+              <span>Время действия</span>
+              <small style={{ color: '#5d6f8b' }}>
+                Время действия — сколько режим будет активен до автоотключения.
+              </small>
+              <select
+                value={emergencyTtlMinutes}
+                onChange={(e) => setEmergencyTtlMinutes(Number(e.target.value))}
+                disabled={Boolean(busyAction)}
+              >
+                <option value={30}>30 минут</option>
+                <option value={60}>1 час</option>
+                <option value={120}>2 часа</option>
+                <option value={240}>4 часа</option>
+                <option value={360}>6 часов</option>
+              </select>
+            </div>
+            <div className="field">
+              <span>Подтверждение текстом: DEBUG</span>
+              <small style={{ color: '#5d6f8b' }}>
+                Защита от случайного включения: режим стартует только после ввода DEBUG.
+              </small>
+              <input
+                type="text"
+                value={emergencyConfirmText}
+                onChange={(e) => setEmergencyConfirmText(e.target.value)}
+                disabled={Boolean(busyAction)}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="smallButton"
+                disabled={Boolean(busyAction)}
+                onClick={() => setEmergencyModalOpen(false)}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                className="smallButton"
+                style={{ background: '#d9481f', borderColor: '#a62f18' }}
+                disabled={Boolean(busyAction) || !emergencyReason.trim() || emergencyConfirmText.trim() !== 'DEBUG'}
+                onClick={confirmEmergencyEnable}
+              >
+                {busyAction === 'emergency_enable' ? 'Включаем...' : 'Включить аварийный режим'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Tier Stats ──────────────────────────────────────────────────── */}
       <div className="statsGrid" style={{ gridTemplateColumns: 'repeat(5, minmax(0, 1fr))' }}>
@@ -401,6 +678,27 @@ export const AccessControlPage = ({ role, onNavigateToInvites }: AccessControlPa
           <p style={{ color: '#5d6f8b' }}>{versionLoading ? 'Загрузка данных устройств...' : 'Нет данных об устройствах.'}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, fontSize: 13, color: '#5d6f8b' }}>
+              <span>Всего: {trackedUids.length} · Страница {devicesPage + 1} из {Math.ceil(trackedUids.length / DEVICES_PAGE_SIZE)}</span>
+              <button
+                type="button"
+                className="smallButton"
+                style={{ padding: '2px 10px', minHeight: 28, fontSize: 12 }}
+                disabled={devicesPage === 0}
+                onClick={() => setDevicesPage((p) => p - 1)}
+              >
+                ← Пред
+              </button>
+              <button
+                type="button"
+                className="smallButton"
+                style={{ padding: '2px 10px', minHeight: 28, fontSize: 12 }}
+                disabled={(devicesPage + 1) * DEVICES_PAGE_SIZE >= trackedUids.length}
+                onClick={() => setDevicesPage((p) => p + 1)}
+              >
+                След →
+              </button>
+            </div>
             <table className="dataTable">
               <thead>
                 <tr>
@@ -413,7 +711,7 @@ export const AccessControlPage = ({ role, onNavigateToInvites }: AccessControlPa
                 </tr>
               </thead>
               <tbody>
-                {trackedUids.map((uid) => {
+                {trackedUids.slice(devicesPage * DEVICES_PAGE_SIZE, (devicesPage + 1) * DEVICES_PAGE_SIZE).map((uid) => {
                   const device = latestDeviceByUid.get(uid);
                   const download = apkDownloads[uid];
                   const phone = phoneByUid.get(uid);
@@ -453,7 +751,7 @@ export const AccessControlPage = ({ role, onNavigateToInvites }: AccessControlPa
                                 type="button"
                                 className="smallButton"
                                 style={{ padding: '0 8px', minHeight: 28, fontSize: 11 }}
-                                disabled={Boolean(busyAction)}
+                                disabled={busyAction === `pfu:${uid}:${device.device_id}`}
                                 onClick={() => setDeviceForceUpdate(uid, device.device_id, false)}
                               >
                                 {busyAction === `pfu:${uid}:${device.device_id}` ? '...' : 'Снять форс'}
@@ -463,7 +761,7 @@ export const AccessControlPage = ({ role, onNavigateToInvites }: AccessControlPa
                                 type="button"
                                 className="smallButton"
                                 style={{ background: '#4a1414', borderColor: '#7a2a2a', padding: '0 8px', minHeight: 28, fontSize: 11 }}
-                                disabled={Boolean(busyAction)}
+                                disabled={busyAction === `pfu:${uid}:${device.device_id}`}
                                 onClick={() => setDeviceForceUpdate(uid, device.device_id, true)}
                               >
                                 {busyAction === `pfu:${uid}:${device.device_id}` ? '...' : 'Форс-апд'}
@@ -513,7 +811,7 @@ export const AccessControlPage = ({ role, onNavigateToInvites }: AccessControlPa
 
           {canManage && (
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {(['soft', 'medium', 'hard'] as InviteAccessMode[]).map((m) => (
+              {(['soft', 'medium'] as InviteAccessMode[]).map((m) => (
                 <button
                   key={m}
                   type="button"
@@ -634,7 +932,6 @@ export const AccessControlPage = ({ role, onNavigateToInvites }: AccessControlPa
               </dd>
             </div>
           </dl>
-
           <div style={{ marginTop: 16, padding: '10px 12px', borderRadius: 8, background: '#f0f7ff', border: '1px solid #bdd1f2' }}>
             <strong style={{ fontSize: 13 }}>Trusted статусы:</strong>
             <ul style={{ margin: '6px 0 0', paddingLeft: 18, fontSize: 12, color: '#607594', lineHeight: 1.7 }}>
@@ -694,8 +991,8 @@ export const AccessControlPage = ({ role, onNavigateToInvites }: AccessControlPa
                     const tier = getTierFromStatus(req.status);
                     const isExpanded = expandedRequestId === req.id;
                     return (
-                      <>
-                        <tr key={req.id} style={{ cursor: 'pointer' }} onClick={() => setExpandedRequestId(isExpanded ? null : req.id)}>
+                      <Fragment key={req.id}>
+                        <tr style={{ cursor: 'pointer' }} onClick={() => setExpandedRequestId(isExpanded ? null : req.id)}>
                           <td>
                             <code style={{ fontSize: 12 }}>{req.requesterPhoneMasked || '—'}</code>
                             <small>{req.requesterUid ? req.requesterUid.slice(0, 12) + '...' : ''}</small>
@@ -724,16 +1021,16 @@ export const AccessControlPage = ({ role, onNavigateToInvites }: AccessControlPa
                                     type="button"
                                     className="smallButton"
                                     style={{ background: '#144a2a', borderColor: '#2a7a4a', padding: '0 8px', minHeight: 30 }}
-                                    disabled={Boolean(busyAction)}
+                                    disabled={busyAction === `moderate:${req.id}`}
                                     onClick={(e) => { e.stopPropagation(); moderate(req, 'approved'); }}
                                   >
-                                    ✓
+                                    {busyAction === `moderate:${req.id}` ? '...' : '✓'}
                                   </button>
                                   <button
                                     type="button"
                                     className="smallButton"
                                     style={{ background: '#4a1414', borderColor: '#7a2a2a', padding: '0 8px', minHeight: 30 }}
-                                    disabled={Boolean(busyAction)}
+                                    disabled={busyAction === `moderate:${req.id}`}
                                     onClick={(e) => { e.stopPropagation(); moderate(req, 'denied'); }}
                                   >
                                     ✗
@@ -770,26 +1067,26 @@ export const AccessControlPage = ({ role, onNavigateToInvites }: AccessControlPa
                                     type="button"
                                     className="smallButton"
                                     style={{ background: '#144a2a', borderColor: '#2a7a4a' }}
-                                    disabled={Boolean(busyAction)}
+                                    disabled={busyAction === `moderate:${req.id}`}
                                     onClick={() => moderate(req, 'approved')}
                                   >
-                                    ✓ Одобрить
+                                    {busyAction === `moderate:${req.id}` ? '...' : '✓ Одобрить'}
                                   </button>
                                   <button
                                     type="button"
                                     className="smallButton"
                                     style={{ background: '#4a1414', borderColor: '#7a2a2a' }}
-                                    disabled={Boolean(busyAction)}
+                                    disabled={busyAction === `moderate:${req.id}`}
                                     onClick={() => moderate(req, 'denied')}
                                   >
-                                    ✗ Отклонить
+                                    {busyAction === `moderate:${req.id}` ? '...' : '✗ Отклонить'}
                                   </button>
                                 </div>
                               )}
                             </td>
                           </tr>
                         )}
-                      </>
+                      </Fragment>
                     );
                   })}
                 </tbody>

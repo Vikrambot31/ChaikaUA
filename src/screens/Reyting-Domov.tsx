@@ -381,7 +381,7 @@ const styles = StyleSheet.create({
   explanationTitle: { color: SCREEN_THEME.textPrimary, fontSize: 14, fontWeight: '900', marginBottom: 4 },
   explanationText: { color: SCREEN_THEME.textSecondary, fontSize: 12, lineHeight: 17, fontWeight: '600' },
   buildingCard: { backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 20, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#E4D0AB', overflow: 'hidden' },
-  buildingCardDom: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 72, opacity: 0.13 },
+  buildingCardDom: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 96, opacity: 0.48 },
   buildingCardInner: { flexDirection: 'row', alignItems: 'center' },
   showOnMapBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', marginTop: 8, marginLeft: 44, paddingVertical: 4, paddingHorizontal: 10, borderRadius: 20, backgroundColor: 'rgba(79,131,186,0.1)', borderWidth: 1, borderColor: 'rgba(79,131,186,0.25)' },
   showOnMapText: { fontSize: 11, color: SCREEN_THEME.enamelBlue, fontWeight: '700' },

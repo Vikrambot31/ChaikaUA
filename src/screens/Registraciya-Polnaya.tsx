@@ -30,6 +30,7 @@ import { validateEmail, validateName, validatePassword, validatePhone } from '..
 import { getPasswordBreachCount } from '../utils/passwordBreachCheck';
 import { RootState } from '../redux/store';
 import { loadProfileRecord, mapFirebaseUserToAppUser } from '../services/authProfileService';
+import { clearSelectedStartAvatar, getSelectedStartAvatar } from '../utils/startAvatars';
 
 type QuickRegistrationParams = {
   name?: string;
@@ -245,6 +246,7 @@ const RegisterScreenFull: React.FC = () => {
       await updateProfile(authUser, { displayName: normalizedName });
 
       const uid = authUser.uid;
+      const selectedStartAvatar = await getSelectedStartAvatar();
       await dbSet(dbRef(database, `users/${uid}`), {
         name: normalizedName,
         phone: normalizedPhone,
@@ -256,7 +258,8 @@ const RegisterScreenFull: React.FC = () => {
         addressProtected: true,
         provider: currentUser?.provider || 'email',
         providerId: uid,
-        photoURL: authUser.photoURL || '',
+        photoURL: authUser.photoURL || selectedStartAvatar?.uri || '',
+        ...(selectedStartAvatar ? { startAvatarKey: selectedStartAvatar.key } : {}),
         ...(referrerPhone ? { referrerPhone } : {}),
       });
       if (referrerPhone && referrerVerified) {
@@ -278,6 +281,9 @@ const RegisterScreenFull: React.FC = () => {
       );
 
       await AsyncStorage.removeItem(REGISTRATION_DRAFT_KEY);
+      if (selectedStartAvatar) {
+        await clearSelectedStartAvatar();
+      }
       dispatch(setError(null));
       Toast.show({
         type: 'success',

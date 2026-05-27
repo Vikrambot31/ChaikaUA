@@ -18,6 +18,7 @@ const REQUIRED_ENV_VARS = [
 const missing = REQUIRED_ENV_VARS.filter((key) => !import.meta.env[key]);
 if (missing.length > 0) {
   console.error('[ENV] Missing required environment variables:', missing.join(', '));
+  document.body.innerHTML = `<div style="font-family:sans-serif;padding:2rem;color:#c00"><h2>Ошибка конфигурации</h2><p>Отсутствуют переменные окружения: <code>${missing.join(', ')}</code></p><p>Проверьте файл <code>.env.local</code>.</p></div>`;
   throw new Error(`Отсутствуют обязательные переменные окружения: ${missing.join(', ')}. Проверьте .env.local.`);
 }
 

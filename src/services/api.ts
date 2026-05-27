@@ -250,6 +250,7 @@ export const createRequest = async (data: RequestFormData): Promise<ApiResponse<
   const response = await firebaseChatAPI.addRequest({
     name: data.name,
     phone: data.phone,
+    language: data.language,
     category: data.category || 'other',
     group: data.group || '',
     subcategory: data.subcategory || data.category || '',
@@ -259,6 +260,8 @@ export const createRequest = async (data: RequestFormData): Promise<ApiResponse<
     building: data.building || 'Чайка',
     text: description,
     description,
+    photoUri: data.photoUri || '',
+    photoStoragePath: data.photoStoragePath || '',
   });
   if (!response.success) {
     void logClientError('api.createRequest', response.error);
@@ -276,7 +279,7 @@ export const createRequest = async (data: RequestFormData): Promise<ApiResponse<
     description,
     isCensored: false,
     isApproved: false,
-    createdAt: new Date(),
+    createdAt: Date.now(),
     timestamp: Date.now(),
     text: description,
     category: data.category || 'other',
@@ -286,6 +289,8 @@ export const createRequest = async (data: RequestFormData): Promise<ApiResponse<
     timeSlot: data.timeSlot,
     destination: data.destination,
     building: data.building,
+    photoUri: data.photoUri,
+    photoStoragePath: data.photoStoragePath,
   };
   return ok(request);
 };
@@ -307,6 +312,7 @@ export const deleteRequestById = async (requestId: string): Promise<ApiResponse<
 export const chatAPI = {
   addRequest: async (
     payload: Pick<RequestFormData, 'name' | 'phone'> & {
+      language?: 'ua' | 'ru' | 'en';
       category: string;
       text: string;
       group?: string;
@@ -315,11 +321,14 @@ export const chatAPI = {
       timeSlot?: string;
       destination?: string;
       building?: string;
+      photoUri?: string;
+      photoStoragePath?: string;
     }
   ): Promise<{ success: boolean; error?: string }> => {
     const response = await createRequest({
       name: payload.name,
       phone: payload.phone,
+      language: payload.language,
       category: payload.category,
       description: payload.text,
       text: payload.text,
@@ -329,6 +338,8 @@ export const chatAPI = {
       timeSlot: payload.timeSlot,
       destination: payload.destination,
       building: payload.building,
+      photoUri: payload.photoUri,
+      photoStoragePath: payload.photoStoragePath,
     });
     return response.success ? { success: true } : { success: false, error: response.error };
   },

@@ -934,7 +934,7 @@ const SecurityControlScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Р­РўРђРџ 3 вЂ” Pause mode section */}
+        {/* Р­РўРђРџ 3 вЂ" Pause mode section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{text.pauseMode}</Text>
           <Text style={styles.sectionHint}>{text.pauseModeHint}</Text>
@@ -971,7 +971,7 @@ const SecurityControlScreen: React.FC = () => {
           )}
         </View>
 
-        {/* Р­РўРђРџ 4 вЂ” Global pause section */}
+        {/* Р­РўРђРџ 4 вЂ" Global pause section */}
         <View style={[styles.section, styles.globalPauseSection]}>
           <Text style={styles.sectionTitle}>{text.globalPause}</Text>
           <Text style={styles.sectionHint}>{text.globalPauseHint}</Text>

@@ -8,6 +8,7 @@ import {
   ViewRequestContext,
   profilePermissionService,
 } from '../services/profilePermissionService';
+import { ensureFirebaseAuth } from '../firebase-auth-session';
 import { selectUser } from '../redux/slices/authSlice';
 import type { RootState } from '../redux/store';
 
@@ -31,6 +32,12 @@ const TOAST_TEXT: Record<string, Record<Lang, string>> = {
   no_user: { ua: 'Користувача не знайдено', ru: 'Пользователь не найден', en: 'User not found' },
 };
 
+const GUEST_NAME: Record<Lang, string> = {
+  ua: '\u0413\u0456\u0441\u0442\u044c',
+  ru: '\u0413\u043e\u0441\u0442\u044c',
+  en: 'Guest',
+};
+
 export function useContactRequest() {
   const user = useSelector(selectUser);
   const language = useSelector(
@@ -42,18 +49,21 @@ export function useContactRequest() {
   const [currentTarget, setCurrentTarget] = useState<ContactTarget | null>(null);
 
   const openModal = useCallback(
-    (target: ContactTarget) => {
-      if (!user?.id) {
-        Toast.show({ type: 'error', text1: TOAST_TEXT.no_auth[language] });
-        return;
-      }
+    async (target: ContactTarget) => {
       if (!target.userId) {
         Toast.show({ type: 'error', text1: TOAST_TEXT.no_user[language] });
         return;
       }
-      if (target.userId === user.id) return;
-      setCurrentTarget(target);
-      setModalVisible(true);
+
+      try {
+        const firebaseUser = await ensureFirebaseAuth();
+        const requesterId = user?.id ?? firebaseUser.uid;
+        if (!requesterId || target.userId === requesterId) return;
+        setCurrentTarget(target);
+        setModalVisible(true);
+      } catch {
+        Toast.show({ type: 'error', text1: TOAST_TEXT.error[language] });
+      }
     },
     [user?.id, language],
   );
@@ -65,12 +75,16 @@ export function useContactRequest() {
 
   const sendRequest = useCallback(
     async (reason: ContactReason) => {
-      if (!currentTarget || !user?.id) return;
+      if (!currentTarget) return;
       setPending(true);
       try {
+        const firebaseUser = await ensureFirebaseAuth();
+        const requesterId = user?.id ?? firebaseUser.uid;
+        if (!requesterId || currentTarget.userId === requesterId) return;
+
         let requesterPhone = '';
         try {
-          const snap = await get(ref(database, `users/${user.id}/phone`));
+          const snap = await get(ref(database, `users/${requesterId}/phone`));
           const raw = snap.val();
           requesterPhone = typeof raw === 'string' ? raw.trim() : '';
         } catch {
@@ -79,7 +93,7 @@ export function useContactRequest() {
 
         const result = await profilePermissionService.requestView(
           currentTarget.userId,
-          { id: user.id, name: user.name ?? '', photoURL: user.photoURL ?? '' },
+          { id: requesterId, name: user?.name ?? GUEST_NAME[language], photoURL: user?.photoURL ?? '' },
           currentTarget.sourceType ?? 'lyudi',
           undefined,
           {

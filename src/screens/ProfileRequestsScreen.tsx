@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Animated,
   FlatList,
   SafeAreaView,
   StyleSheet,
@@ -28,8 +27,9 @@ import type { RootState } from '../redux/store';
 import MiniTabBar from '../components/MiniTabBar';
 import AppPhotoImage from '../components/AppPhotoImage';
 import MiniUserAvatar from '../components/MiniUserAvatar';
-import { database } from '../firebase-core';
+import { database } from '../firebase-config';
 import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
+import UserCardActionBar from '../components/UserCardActionBar';
 
 type Lang = 'ua' | 'ru' | 'en';
 type RequestsTab = 'incoming' | 'outgoing' | 'history';
@@ -49,27 +49,6 @@ const PENDING_HINT: Record<Lang, string> = {
   en: 'When a phone icon appears — the user is ready to contact you',
 };
 
-function BlinkingPhoneBtn({ label, onPress }: { label: string; onPress: () => void }) {
-  const opacity = useRef(new Animated.Value(1)).current;
-  useEffect(() => {
-    const anim = Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, { toValue: 0.15, duration: 500, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 1,    duration: 500, useNativeDriver: true }),
-      ])
-    );
-    anim.start();
-    return () => anim.stop();
-  }, [opacity]);
-  return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.8}>
-      <Animated.View style={[styles.blinkPhoneBtn, { opacity }]}>
-        <MaterialCommunityIcons name="phone" size={14} color="#fff" />
-        <Text style={styles.blinkPhoneBtnText}>{label}</Text>
-      </Animated.View>
-    </TouchableOpacity>
-  );
-}
 type StatusFilter = 'all' | ViewRequestStatus;
 type ContextFilter = 'all' | 'lyudi' | 'help' | 'sport' | 'buysell' | 'job';
 
@@ -206,6 +185,7 @@ const UI = {
 
 export default function ProfileRequestsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navLock = useRef(false);
   const user = useSelector(selectUser);
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
   const t = UI[language];
@@ -293,7 +273,10 @@ export default function ProfileRequestsScreen() {
   }, [activeTab, loadIncomingPhones, t.errBody, t.errTitle, user?.id]);
 
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     void (async () => {
       setLoading(true);
@@ -356,6 +339,8 @@ export default function ProfileRequestsScreen() {
       return next;
     });
   }, []);
+
+  const sanitizeFirebaseKey = (key: string) => key.replace(/[.#$[\]]/g, '_');
 
   const formatTimeShort = (iso: string) => {
     const d = new Date(iso);
@@ -522,46 +507,18 @@ export default function ProfileRequestsScreen() {
                     </View>
                   </View>
 
-                  {/* Actions row */}
-                  <View style={styles.incomingActionsRow}>
-                    <TouchableOpacity
-                      style={styles.actionBtnOutlined}
-                      onPress={() => navigation.navigate('ViewUserProfile', { userId: item.requesterId })}
-                      activeOpacity={0.8}
-                    >
-                      <MaterialCommunityIcons name="badge-account-horizontal-outline" size={13} color={ACCENT} />
-                      <Text style={styles.actionBtnOutlinedText}>
-                        {language === 'en' ? 'Profile' : language === 'ru' ? 'Профиль' : 'Профіль'}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.actionBtnOutlined, !phone && styles.actionBtnOutlinedDisabled]}
-                      onPress={() => void handleCall(phone)}
-                      disabled={!phone}
-                      activeOpacity={0.8}
-                    >
-                      <MaterialCommunityIcons name="phone-outline" size={13} color={phone ? ACCENT : '#B0A090'} />
-                      <Text style={[styles.actionBtnOutlinedText, !phone && styles.actionBtnDisabledText]}>
-                        {t.call}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.actionBtnViber, !phone && styles.actionBtnViberDisabled]}
-                      onPress={() => void handleViber(phone)}
-                      disabled={!phone}
-                      activeOpacity={0.8}
-                    >
-                      <MaterialCommunityIcons name="message-text-outline" size={13} color="#fff" />
-                      <Text style={styles.actionBtnViberText}>{t.viber}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.actionBtnHeart}
-                      onPress={() => navigation.navigate('ViewUserProfile', { userId: item.requesterId })}
-                      activeOpacity={0.8}
-                    >
-                      <MaterialCommunityIcons name="heart-outline" size={16} color="#fff" />
-                    </TouchableOpacity>
-                  </View>
+                  <UserCardActionBar
+                    avatarUri={item.requesterPhotoURL || ''}
+                    name={item.requesterName}
+                    userId={item.requesterId}
+                    currentUserId={user?.id}
+                    language={language}
+                    onProfile={() => { if (navLock.current) return; navLock.current = true; navigation.navigate('ViewUserProfile', { userId: item.requesterId }); setTimeout(() => { navLock.current = false; }, 800); }}
+                    onContact={phone ? () => void handleCall(phone) : undefined}
+                    contactDisabled={!phone}
+                    likePath="feed_likes/profile_requests"
+                    likeId={`${item.requesterId}_${sanitizeFirebaseKey(item.requestedAt)}`}
+                  />
                 </View>
               );
             }
@@ -593,8 +550,6 @@ export default function ProfileRequestsScreen() {
               : (item.reason ? t.reasons[item.reason as ContactReason] : item.sourceTitle ?? null);
 
             const callLabel = language === 'en' ? 'Call' : language === 'ru' ? 'Позвонить' : 'Подзвонити';
-            const blinkLabel = language === 'en' ? 'Contact ready!' : language === 'ru' ? 'Контакт готов!' : 'Контакт готовий!';
-
             return (
               <View style={[styles.card, item.status === 'denied' && styles.cardDimmed]}>
                 {/* Top: avatar + info */}
@@ -638,60 +593,29 @@ export default function ProfileRequestsScreen() {
                   </View>
                 </View>
 
-                {/* Actions row */}
-                <View style={styles.incomingActionsRow}>
-                  <TouchableOpacity
-                    style={styles.actionBtnOutlined}
-                    onPress={() => navigation.navigate('ViewUserProfile', { userId: displayId })}
-                    activeOpacity={0.8}
-                  >
-                    <MaterialCommunityIcons name="badge-account-horizontal-outline" size={13} color={ACCENT} />
-                    <Text style={styles.actionBtnOutlinedText}>
-                      {language === 'en' ? 'Profile' : language === 'ru' ? 'Профиль' : 'Профіль'}
-                    </Text>
-                  </TouchableOpacity>
-
-                  {showBlink ? (
-                    <BlinkingPhoneBtn
-                      label={blinkLabel}
-                      onPress={() => {
-                        void markSeen(seenKey);
-                        Alert.alert(
-                          language === 'ru' ? 'Связаться' : language === 'en' ? 'Contact' : "Зв'язатися",
-                          phone,
-                          [
-                            { text: callLabel, onPress: () => void handleCall(phone) },
-                            { text: 'Viber',   onPress: () => void handleViber(phone) },
-                            { text: language === 'ru' ? 'Отмена' : language === 'en' ? 'Cancel' : 'Скасувати', style: 'cancel' },
-                          ]
-                        );
-                      }}
-                    />
-                  ) : (
-                    <>
-                      <TouchableOpacity
-                        style={[styles.actionBtnOutlined, !phone && styles.actionBtnOutlinedDisabled]}
-                        onPress={() => void handleCall(phone)}
-                        disabled={!phone}
-                        activeOpacity={0.8}
-                      >
-                        <MaterialCommunityIcons name="phone-outline" size={13} color={phone ? ACCENT : '#B0A090'} />
-                        <Text style={[styles.actionBtnOutlinedText, !phone && styles.actionBtnDisabledText]}>
-                          {callLabel}
-                        </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.actionBtnViber, !phone && styles.actionBtnViberDisabled]}
-                        onPress={() => void handleViber(phone)}
-                        disabled={!phone}
-                        activeOpacity={0.8}
-                      >
-                        <MaterialCommunityIcons name="message-text-outline" size={13} color="#fff" />
-                        <Text style={styles.actionBtnViberText}>Viber</Text>
-                      </TouchableOpacity>
-                    </>
-                  )}
-                </View>
+                <UserCardActionBar
+                  avatarUri={photo || ''}
+                  name={displayName}
+                  userId={displayId}
+                  currentUserId={user?.id}
+                  language={language}
+                  onProfile={displayId ? () => { if (navLock.current) return; navLock.current = true; navigation.navigate('ViewUserProfile', { userId: displayId }); setTimeout(() => { navLock.current = false; }, 800); } : undefined}
+                  onContact={phone ? () => {
+                    if (showBlink) void markSeen(seenKey);
+                    Alert.alert(
+                      language === 'ru' ? 'Связаться' : language === 'en' ? 'Contact' : "Зв'язатися",
+                      phone,
+                      [
+                        { text: callLabel, onPress: () => void handleCall(phone) },
+                        { text: 'Viber', onPress: () => void handleViber(phone) },
+                        { text: language === 'ru' ? 'Отмена' : language === 'en' ? 'Cancel' : 'Скасувати', style: 'cancel' },
+                      ]
+                    );
+                  } : undefined}
+                  contactDisabled={!phone}
+                  likePath="feed_likes/profile_requests"
+                  likeId={`${displayId}_${sanitizeFirebaseKey(item.requestedAt)}`}
+                />
               </View>
             );
           }}

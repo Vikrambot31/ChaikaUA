@@ -6,7 +6,7 @@ interface IconProps {
   color: string;
 }
 
-// РњРµРіР°С„РѕРЅ - РўР•Р РњР†РќРћР’Рђ Р”РћРџРћРњРћР“Рђ
+// РњРµРіР°С„РѕРЅ - РўР•Р РњР†РќРћР'Рђ Р"РћРџРћРњРћР"Рђ
 export const MegaphoneIcon: React.FC<IconProps> = ({ size, color }) => (
   <Svg width={size} height={size} viewBox="0 0 100 100">
     <Defs>
@@ -30,7 +30,7 @@ export const MegaphoneIcon: React.FC<IconProps> = ({ size, color }) => (
       strokeWidth="3"
       strokeLinecap="round"
     />
-    {/* Р’РѕР»РЅС‹ Р·РІСѓРєР° */}
+    {/* Р'РѕР»РЅС‹ Р·РІСѓРєР° */}
     <Path
       d="M 80 50"
       stroke={color}
@@ -88,7 +88,7 @@ export const MapIcon: React.FC<IconProps> = ({ size, color }) => (
   </Svg>
 );
 
-// РўСЂРµСѓРіРѕР»СЊРЅРёРє РїСЂРµРґСѓРїСЂРµР¶РґРµРЅРёСЏ - РџР РћР‘Р›Р•РњР Р–Рљ
+// РўСЂРµСѓРіРѕР»СЊРЅРёРє РїСЂРµРґСѓРїСЂРµР¶РґРµРЅРёСЏ - РџР РћР'Р›Р•РњР Р–Рљ
 export const WarningIcon: React.FC<IconProps> = ({ size, color }) => (
   <Svg width={size} height={size} viewBox="0 0 100 100">
     <Defs>
@@ -97,7 +97,7 @@ export const WarningIcon: React.FC<IconProps> = ({ size, color }) => (
         <Stop offset="100%" stopColor={color} stopOpacity="0.7" />
       </LinearGradient>
     </Defs>
-    {/* Р’РЅРµС€РЅРёР№ С‚СЂРµСѓРіРѕР»СЊРЅРёРє */}
+    {/* Р'РЅРµС€РЅРёР№ С‚СЂРµСѓРіРѕР»СЊРЅРёРє */}
     <Path
       d="M 50 15 L 85 70 L 15 70 Z"
       fill="url(#warnGrad)"
@@ -105,9 +105,9 @@ export const WarningIcon: React.FC<IconProps> = ({ size, color }) => (
       strokeWidth="2.5"
       strokeLinejoin="round"
     />
-    {/* Р’РѕСЃРєР»РёС†Р°С‚РµР»СЊРЅС‹Р№ Р·РЅР°Рє - С‚РѕС‡РєР° */}
+    {/* Р'РѕСЃРєР»РёС†Р°С‚РµР»СЊРЅС‹Р№ Р·РЅР°Рє - С‚РѕС‡РєР° */}
     <Circle cx="50" cy="58" r="3.5" fill="white" />
-    {/* Р’РѕСЃРєР»РёС†Р°С‚РµР»СЊРЅС‹Р№ Р·РЅР°Рє - Р»РёРЅРёСЏ */}
+    {/* Р'РѕСЃРєР»РёС†Р°С‚РµР»СЊРЅС‹Р№ Р·РЅР°Рє - Р»РёРЅРёСЏ */}
     <Path
       d="M 50 35 L 50 50"
       stroke="white"
@@ -155,7 +155,7 @@ export const ShoppingBagIcon: React.FC<IconProps> = ({ size, color }) => (
       strokeWidth="1.5"
       opacity="0.5"
     />
-    {/* Р’РµСЂС…РЅСЏСЏ С‡Р°СЃС‚СЊ СЃСѓРјРєРё */}
+    {/* Р'РµСЂС…РЅСЏСЏ С‡Р°СЃС‚СЊ СЃСѓРјРєРё */}
     <Path
       d="M 35 25 L 65 25"
       stroke={color}

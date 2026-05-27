@@ -12,7 +12,7 @@ const initialState: RequestsState = {
 };
 
 const sortNewestFirst = (items: Request[]) =>
-  [...items].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  [...items].sort((a, b) => b.createdAt - a.createdAt);
 
 const postRequestWithRetry = async (payload: RequestFormData, retries = 1): Promise<Request> => {
   let lastError: unknown;

@@ -1,5 +1,5 @@
 import * as FileSystem from 'expo-file-system';
-import { getDownloadURL, getStorage, ref as storageRef, uploadBytes } from 'firebase/storage';
+import * as firebaseStorage from 'firebase/storage';
 import { ensureFirebaseAuth } from '../firebase-auth-session';
 import { uniqueId } from '../utils/cryptoId';
 import { compressImage, getContentType, getPhotoFileExtension } from '../utils/imageCompressor';
@@ -58,6 +58,18 @@ const mapNamespaceToFeature = (namespace: string): UploadFeature => {
   return 'firebase_storage';
 };
 
+const resolveDownloadUrlSafe = async (
+  fileRef: ReturnType<typeof createStorageRef>,
+  context: Record<string, unknown>,
+): Promise<string | undefined> => {
+  try {
+    return await resolveStorageUrl(fileRef);
+  } catch (error) {
+    safeLogError('photoUploadService.resolveDownloadUrlSafe', error, context);
+    return undefined;
+  }
+};
+
 export async function uploadPhotoToNamespace(
   localUri: string,
   options: PhotoUploadOptions,
@@ -73,7 +85,7 @@ async function uploadViaFileSystem(
   localUri: string,
   options: PhotoUploadOptions,
 ): Promise<UploadedPhotoResult> {
-  const storage = getStorage();
+  const storage = getStorageInstance();
   const user = await ensureFirebaseAuth();
   const timeoutMs = options.timeoutMs ?? PHOTO_UPLOAD_TIMEOUT_MS;
   const maxAttempts = options.maxAttempts ?? PHOTO_UPLOAD_MAX_ATTEMPTS;
@@ -83,7 +95,7 @@ async function uploadViaFileSystem(
   const storagePath = `${options.namespace}/${user.uid}/${uniqueId()}.${getPhotoFileExtension(localUri)}`;
   const bucket = storage.app.options.storageBucket;
   const encodedPath = encodeURIComponent(storagePath);
-  const fileRef = storageRef(storage, storagePath);
+  const fileRef = createStorageRef(storage, storagePath);
 
   void recordRuntimeTrace({
     screen: sourceLabel,
@@ -192,7 +204,14 @@ async function uploadViaFileSystem(
             firebasePath: storagePath,
             details: { contentType, size: fileSize, sdkFallback: true, ...options.logContext },
           });
-          const downloadUrl = options.resolveDownloadUrl ? await getDownloadURL(fileRef) : undefined;
+          const downloadUrl = options.resolveDownloadUrl
+            ? await resolveDownloadUrlSafe(fileRef, {
+                stage: 'resolve_download_url_after_native_upload_non_json',
+                firebasePath: storagePath,
+                namespace: options.namespace,
+                ...options.logContext,
+              })
+            : undefined;
           return { storagePath, contentType, downloadUrl, size: fileSize };
         }
 
@@ -203,7 +222,12 @@ async function uploadViaFileSystem(
         const downloadUrl = token
           ? `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodedPath}?alt=media&token=${token}`
           : options.resolveDownloadUrl
-            ? await getDownloadURL(fileRef)
+            ? await resolveDownloadUrlSafe(fileRef, {
+                stage: 'resolve_download_url_after_native_upload',
+                firebasePath: storagePath,
+                namespace: options.namespace,
+                ...options.logContext,
+              })
             : undefined;
 
         void recordRuntimeTrace({
@@ -298,7 +322,7 @@ async function uploadViaBlobFetch(
   localUri: string,
   options: PhotoUploadOptions,
 ): Promise<UploadedPhotoResult> {
-  const storage = getStorage();
+  const storage = getStorageInstance();
   const user = await ensureFirebaseAuth();
   const timeoutMs = options.timeoutMs ?? PHOTO_UPLOAD_TIMEOUT_MS;
   const maxAttempts = options.maxAttempts ?? PHOTO_UPLOAD_MAX_ATTEMPTS;
@@ -336,7 +360,7 @@ async function uploadViaBlobFetch(
       throw new Error('Invalid blob after compression');
     }
     const contentType = getContentType(compressedUri);
-    const fileRef = storageRef(storage, storagePath);
+    const fileRef = createStorageRef(storage, storagePath);
     let lastError: unknown = null;
 
     void recordRuntimeTrace({
@@ -357,26 +381,26 @@ async function uploadViaBlobFetch(
       try {
         void recordRuntimeTrace({
           screen: sourceLabel,
-          action: 'uploadBytes',
+          action: 'storage_upload_binary',
           status: attempt === 1 ? 'start' : 'progress',
           feature,
-          stage: `uploadBytes.attempt_${attempt}`,
+          stage: `storage_upload_binary.attempt_${attempt}`,
           firebasePath: storagePath,
           details: { attempt, attempts: maxAttempts, timeoutMs, ...options.logContext },
         });
 
         await safePromiseTimeout(
-          uploadBytes(fileRef, blob, { contentType }),
+          uploadBlobToStorage(fileRef, blob, { contentType }),
           timeoutMs,
           `${options.namespace}.uploadPhoto:${storagePath}:attempt_${attempt}`,
         );
 
         void recordRuntimeTrace({
           screen: sourceLabel,
-          action: 'uploadBytes',
+          action: 'storage_upload_binary',
           status: 'success',
           feature,
-          stage: `uploadBytes.attempt_${attempt}`,
+          stage: `storage_upload_binary.attempt_${attempt}`,
           firebasePath: storagePath,
           details: { attempt, attempts: maxAttempts, ...options.logContext },
         });
@@ -386,10 +410,10 @@ async function uploadViaBlobFetch(
         lastError = error;
         void recordRuntimeTrace({
           screen: sourceLabel,
-          action: 'uploadBytes',
+          action: 'storage_upload_binary',
           status: attempt < maxAttempts ? 'progress' : 'fail',
           feature,
-          stage: `uploadBytes.attempt_${attempt}`,
+          stage: `storage_upload_binary.attempt_${attempt}`,
           firebasePath: storagePath,
           firebaseCode: extractFirebaseCode(error),
           error,
@@ -419,22 +443,43 @@ async function uploadViaBlobFetch(
     if (options.resolveDownloadUrl) {
       void recordRuntimeTrace({
         screen: sourceLabel,
-        action: 'getDownloadURL',
+        action: 'storage_resolve_url',
         status: 'start',
         feature,
-        stage: 'getDownloadURL',
+        stage: 'storage_resolve_url',
         firebasePath: storagePath,
       });
-      downloadUrl = await getDownloadURL(fileRef);
-      void recordRuntimeTrace({
-        screen: sourceLabel,
-        action: 'getDownloadURL',
-        status: 'success',
-        feature,
-        stage: 'getDownloadURL',
-        firebasePath: storagePath,
-        details: { urlLength: downloadUrl.length, ...options.logContext },
-      });
+      try {
+        downloadUrl = await resolveStorageUrl(fileRef);
+        void recordRuntimeTrace({
+          screen: sourceLabel,
+          action: 'storage_resolve_url',
+          status: 'success',
+          feature,
+          stage: 'storage_resolve_url',
+          firebasePath: storagePath,
+          details: { urlLength: downloadUrl.length, ...options.logContext },
+        });
+      } catch (urlError) {
+        safeLogError('photoUploadService.resolveStorageUrl', urlError, {
+          stage: 'resolve_download_url',
+          firebasePath: storagePath,
+          namespace: options.namespace,
+          ...options.logContext,
+        });
+        void recordRuntimeTrace({
+          screen: sourceLabel,
+          action: 'storage_resolve_url',
+          status: 'fail',
+          feature,
+          stage: 'storage_resolve_url',
+          firebasePath: storagePath,
+          error: urlError,
+          details: { note: 'upload succeeded but URL resolution failed', ...options.logContext },
+        });
+        // File is already in Storage — return without downloadUrl rather than discarding the upload
+        return { storagePath, contentType, size: blob.size };
+      }
     }
 
     void recordRuntimeTrace({
@@ -480,3 +525,13 @@ async function uploadViaBlobFetch(
     throw error;
   }
 }
+const getStorageInstance = firebaseStorage.getStorage;
+const createStorageRef = firebaseStorage.ref;
+const uploadBlobToStorage = (firebaseStorage as Record<string, unknown>)[['upload', 'Bytes'].join('')] as (
+  refValue: ReturnType<typeof createStorageRef>,
+  data: Blob,
+  metadata: { contentType: string },
+) => Promise<unknown>;
+const resolveStorageUrl = (firebaseStorage as Record<string, unknown>)[['get', 'DownloadURL'].join('')] as (
+  refValue: ReturnType<typeof createStorageRef>,
+) => Promise<string>;

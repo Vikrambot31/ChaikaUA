@@ -42,7 +42,7 @@ export interface Request {
   isCensored: boolean;
   isApproved: boolean;
   status?: 'pending' | 'approved' | 'rejected' | 'expired';
-  createdAt: Date;
+  createdAt: number;
   timestamp: number;
   text?: string;
   category?: string;
@@ -60,6 +60,8 @@ export interface Request {
   audio?: AudioAttachment;
   photoUri?: string;
   photoStoragePath?: string;
+  userPhotoURL?: string;
+  startAvatarKey?: string;
 }
 
 export interface HelpRequest {
@@ -89,6 +91,9 @@ export interface CommunityPhoto {
   createdAt: Date;
   status: 'pending' | 'approved' | 'rejected';
   target?: 'gallery_public' | 'my_photos';
+  sourceScreen?: string;
+  sourceScreenLabel?: string;
+  sourceFeature?: string;
   likes: number;
   locationLabel?: string;
   locationType?: 'building' | 'place';
@@ -101,13 +106,17 @@ export interface User {
   email: string;
   phone: string;
   name: string;
-  registeredAt: Date;
+  registeredAt: string;
   daysUsed: number;
   isActive: boolean;
   city: string;
+  houseNumber?: string;
+  profession?: string;
+  about?: string;
   registrationStatus: 'partial' | 'complete';
   photoURL?: string;
   photoURLs?: string[];
+  startAvatarKey?: string;
   provider?: 'google' | 'facebook' | 'apple' | 'email';
   providerId?: string;
   referrerPhone?: string;
@@ -167,6 +176,7 @@ export interface RequestFormData {
   name: string;
   phone: string;
   description: string;
+  language?: 'ua' | 'ru' | 'en';
   category?: string;
   text?: string;
   group?: string;
@@ -177,6 +187,8 @@ export interface RequestFormData {
   building?: string;
   audioUri?: string;
   audioDuration?: number;
+  photoUri?: string;
+  photoStoragePath?: string;
 }
 
 export interface ApiError {

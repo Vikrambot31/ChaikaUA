@@ -47,6 +47,9 @@ versionConfig.minSupportedVersion = nextVersion;
 versionConfig.lastVersionDate = buildDate;
 versionConfig.lastBuildStamp = buildStamp;
 versionConfig.androidUrl = `https://chaika-life.netlify.app/${apkRelativeUrl}`;
+versionConfig.apkFileName = apkFileName;
+delete versionConfig.apkSha256;
+delete versionConfig.apkSizeMB;
 writeJson('app-version.json', versionConfig);
 writeJson(path.join('chaika-site', 'app-version.json'), versionConfig);
 
@@ -91,8 +94,13 @@ buildGradle = buildGradle
   .replace(/versionName\s+"[^"]*"/, `versionName "${nextVersion}"`);
 writeText('android/app/build.gradle', buildGradle);
 
+// Sync app.json android.versionCode to match build.gradle
+appJson.expo = appJson.expo || {};
+appJson.expo.android = appJson.expo.android || {};
+appJson.expo.android.versionCode = nextVersionCode;
+writeJson('app.json', appJson);
+
 console.log(`VERSION=${nextVersion}`);
 console.log(`VERSION_CODE=${nextVersionCode}`);
 console.log(`BUILD_DATE=${buildDate}`);
 console.log(`BUILD_STAMP=${buildStamp}`);
-

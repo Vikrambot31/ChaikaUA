@@ -104,7 +104,7 @@ export const scoreChaykaNewsCandidate = (candidate: ChaykaNewsCandidate): Chayka
     ? topics.includes('chaika')
       ? 'Пряма згадка Чайки або ОСББ'
       : topics.includes('bucha')
-        ? 'Пов’язано з Бучанським районом'
+        ? "Пов'язано з Бучанським районом"
         : 'Корисна новина для Києва/області'
     : 'Низька релевантність для Чайки';
 

@@ -1,5 +1,5 @@
 /**
- * Р’Р°Р»РёРґР°С†РёСЏ С„РѕСЂРј Рё СЃРѕРѕР±С‰РµРЅРёСЏ РѕР± РѕС€РёР±РєР°С…
+ * Валидация форм и сообщений об ошибках
  */
 
 import { translations, Language } from '../i18n/translations';
@@ -26,7 +26,7 @@ export class FormValidator {
     return translations[this.language].errors[key];
   }
 
-  // Р’Р°Р»РёРґР°С†РёСЏ РёРјРµРЅРё
+  // Валидация имени
   static validateName(name: string): ValidationError | null {
     if (!name || name.trim().length === 0) {
       return {
@@ -55,7 +55,7 @@ export class FormValidator {
     return null;
   }
 
-  // Р’Р°Р»С–РґР°С†С–СЏ РЅРѕРјРµСЂСѓ С‚РµР»РµС„РѕРЅСѓ
+  // Валідація номеру телефону
   static validatePhone(phone: string): ValidationError | null {
     if (!phone || phone.trim().length === 0) {
       return {
@@ -65,7 +65,7 @@ export class FormValidator {
       };
     }
 
-    // Р’РёРґР°Р»РёС‚Рё РІСЃС– РЅРµ С†РёС„СЂРё
+    // Видалити всі не цифри
     const digitsOnly = phone.replace(/\D/g, '');
 
     if (digitsOnly.length < 10) {
@@ -87,7 +87,7 @@ export class FormValidator {
     return null;
   }
 
-  // Р’Р°Р»С–РґР°С†С–СЏ email
+  // Валідація email
   static validateEmail(email: string): ValidationError | null {
     if (!email || email.trim().length === 0) {
       return {
@@ -109,7 +109,7 @@ export class FormValidator {
     return null;
   }
 
-  // Р’Р°Р»С–РґР°С†С–СЏ РїР°СЂРѕР»СЏ
+  // Валідація пароля
   static validatePassword(password: string): ValidationError | null {
     if (!password || password.length === 0) {
       return {
@@ -150,7 +150,7 @@ export class FormValidator {
     return null;
   }
 
-  // Р’Р°Р»С–РґР°С†С–СЏ РѕРїРёСЃСѓ/РїРѕРІС–РґРѕРјР»РµРЅРЅСЏ
+  // Валідація опису/повідомлення
   static validateDescription(text: string, minLength = 10, maxLength = 500): ValidationError | null {
     if (!text || text.trim().length === 0) {
       return {
@@ -179,7 +179,7 @@ export class FormValidator {
     return null;
   }
 
-  // Р’Р°Р»С–РґР°С†С–СЏ Р·Р°СЏРІРєРё
+  // Валідація заявки
   static validateRequest(data: {
     name?: string;
     phone?: string;
@@ -243,13 +243,13 @@ export class FormValidator {
     };
   }
 
-  // РћС‚СЂРёРјР°С‚Рё РїРµСЂС€Рµ РїРѕРІС–РґРѕРјР»РµРЅРЅСЏ РїСЂРѕ РїРѕРјРёР»РєСѓ
+  // Отримати перше повідомлення про помилку
   static getFirstErrorMessage(errors: ValidationError[]): string | null {
     if (errors.length === 0) return null;
     return errors[0].message;
   }
 
-  // РћС‚СЂРёРјР°С‚Рё РїРѕСЂР°Рґ РґР»СЏ РїРѕР»СЏ
+  // Отримати поради для поля
   static getFieldTip(errors: ValidationError[], field: string): string | null {
     const error = errors.find((e) => e.field === field);
     return error?.tip || null;

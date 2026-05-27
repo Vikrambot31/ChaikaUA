@@ -7,6 +7,8 @@ import {
   normalizeRemoteAppControlConfig,
   type RemoteAppControlConfig,
 } from './securityConfigValidator';
+// TZ_3.6 — security_config reads go through the unified service to avoid duplicate onValue
+import { subscribeRemoteConfigSnapshot } from './remoteConfig';
 
 export const SECURITY_APP_CONTROL_PATH = 'security_config/app_control/current';
 export const SECURITY_AUTHORIZED_DEVICES_PATH = 'authorized_devices';
@@ -109,20 +111,14 @@ export const subscribeSecurityAppControl = (
   onData: (config: RemoteAppControlConfig) => void,
   onError?: (error: Error) => void,
 ): (() => void) => {
-  const appControlRef = ref(database, SECURITY_APP_CONTROL_PATH);
-  const unsubscribe = onValue(
-    appControlRef,
-    (snapshot) => {
-      onData(normalizeRemoteAppControlConfig(snapshot.val() ?? DEFAULT_REMOTE_APP_CONTROL_CONFIG));
-    },
-    (error) => {
-      onError?.(error);
-    },
-  );
-
-  return () => {
-    unsubscribe();
-  };
+  // TZ_3.6 — use the shared subscription from remoteConfig to avoid a second
+  // onValue WebSocket listener on the same security_config/app_control/current path.
+  return subscribeRemoteConfigSnapshot((snapshot) => {
+    if (snapshot.error && onError) {
+      onError(new Error(snapshot.error));
+    }
+    onData(snapshot.config);
+  });
 };
 
 export const subscribeManagedAuthorizedDevices = (

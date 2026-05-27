@@ -13,10 +13,12 @@ export function analyze(files) {
     // 1. empty-catch (HIGH)
     lines.forEach((line, i) => {
       if (/catch\s*\(\s*\w*\s*\)\s*\{/.test(line)) {
-        const catchBody = lines.slice(i + 1, Math.min(i + 5, lines.length)).join('\n').trim();
-        // Check if the next meaningful line is just a closing brace or comment
-        const stripped = catchBody.replace(/\/\/.*|\/\*[\s\S]*?\*\//g, '').trim();
-        if (/^\s*\}/.test(stripped) || stripped === '') {
+        const catchBody = lines.slice(i + 1, Math.min(i + 8, lines.length)).join('\n').trim();
+        // Strip comments and check if body is truly empty (no statements at all)
+        const stripped = catchBody.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '').trim();
+        // Only flag completely empty blocks — must start with } and have nothing else meaningful
+        const firstMeaningfulLine = stripped.split('\n').map(l => l.trim()).find(l => l.length > 0) || '';
+        if (firstMeaningfulLine === '}' || firstMeaningfulLine === '') {
           findings.push(createFinding({
             severity: 'HIGH', file: relativePath, line: i + 1, rule: 'empty-catch', scanner: SCANNER,
             why: 'Empty catch block silently swallows errors',
@@ -101,17 +103,33 @@ export function analyze(files) {
     });
 
     // 6. swallowed-rejection (HIGH)
+    // Whitelist: fire-and-forget patterns where swallowing is intentional and documented.
+    const INTENTIONAL_SWALLOW_PATTERNS = [
+      /AsyncStorage/,
+      /Linking\./,
+      /analytics|Analytics/,
+      /logClientEvent|recordRuntimeTrace|safeLog/,
+      /prefetch|preload|warmup/i,
+      /Notifications\.(schedule|cancel)/,
+      /BackgroundFetch/,
+      /void\s+\w/,  // explicit void cast = intentional fire-and-forget
+    ];
     lines.forEach((line, i) => {
       if (/\.catch\s*\(\s*\(\s*\)\s*=>\s*\{?\s*\}?\s*\)/.test(line) ||
           /\.catch\s*\(\s*\(\s*\w*\s*\)\s*=>\s*(null|undefined|false|\{\s*\})\s*\)/.test(line) ||
           /\.catch\s*\(\s*\(\s*\)\s*=>\s*(null|undefined|false)\s*\)/.test(line)) {
-        findings.push(createFinding({
-          severity: 'HIGH', file: relativePath, line: i + 1, rule: 'swallowed-rejection', scanner: SCANNER,
-          why: 'Promise rejection completely swallowed with empty/noop .catch()',
-          risk: 'Errors silently discarded, failures invisible in production',
-          uxImpact: 'none', perfImpact: 'none', memoryImpact: 'none',
-          suggestion: 'Add error logging inside .catch() handler',
-        }));
+        // Check surrounding context (±3 lines) for intentional fire-and-forget patterns
+        const context = lines.slice(Math.max(0, i - 3), Math.min(i + 3, lines.length)).join('\n');
+        const isIntentional = INTENTIONAL_SWALLOW_PATTERNS.some(p => p.test(context));
+        if (!isIntentional) {
+          findings.push(createFinding({
+            severity: 'HIGH', file: relativePath, line: i + 1, rule: 'swallowed-rejection', scanner: SCANNER,
+            why: 'Promise rejection completely swallowed with empty/noop .catch()',
+            risk: 'Errors silently discarded, failures invisible in production',
+            uxImpact: 'none', perfImpact: 'none', memoryImpact: 'none',
+            suggestion: 'Add error logging inside .catch() handler',
+          }));
+        }
       }
     });
 

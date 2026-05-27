@@ -1,6 +1,7 @@
 import { get, ref, update, remove } from 'firebase/database';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { database, firebaseApp, storage } from '../firebase/firebase';
+import { LOCAL_MODE, LOCAL_API } from '../local/LOCAL_MODE';
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
 
@@ -11,6 +12,10 @@ export type PhotoRecord = {
   imageUri: string;
   storagePath?: string;
   uploadedBy?: string;
+  sourceScreen?: string;
+  sourceScreenLabel?: string;
+  sourceFeature?: string;
+  sourcePathHint?: string;
   status: ApprovalStatus;
   target?: 'gallery_public' | 'my_photos';
   uploadedAt: number;
@@ -28,10 +33,37 @@ const normalizeStatus = (v: unknown): ApprovalStatus => {
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
+const getSourcePathHint = (r: Record<string, unknown>): string | undefined => {
+  const sourceScreen = getString(r.sourceScreen);
+  if (sourceScreen) return sourceScreen;
+
+  const target = getString(r.target);
+  const title = getString(r.title).trim();
+  const storagePath = getString(r.storagePath) || getString(r.photoStoragePath) || getString(r.imageUri);
+
+  if (target === 'my_photos') return 'MyApprovedPhotosScreen';
+  if (title === 'Фото Чайки' || title === 'Р¤РѕС‚Рѕ Р§Р°Р№РєРё') return 'FotoRayonaScreen';
+  if (storagePath.startsWith('community_photos/')) return 'Community photo upload';
+  return undefined;
+};
+
+const getSourceScreenLabel = (r: Record<string, unknown>): string | undefined => {
+  const explicitLabel = getString(r.sourceScreenLabel);
+  if (explicitLabel) return explicitLabel;
+
+  const hint = getSourcePathHint(r);
+  if (hint === 'FotoRayonaScreen') return 'Фото района';
+  if (hint === 'PhotoUploadScreen') return 'Добавить фото';
+  if (hint === 'MyApprovedPhotosScreen') return 'Мои фото';
+  if (hint === 'Community photo upload') return 'Галерея сообщества';
+  return undefined;
+};
+
 const normalizeRecord = (key: string, raw: unknown): PhotoRecord | null => {
   if (!isRecord(raw)) return null;
   const r = raw;
   const imageUri = getString(r.imageUri);
+  const sourcePathHint = getSourcePathHint(r);
   return {
     id: key,
     title: getString(r.title) || undefined,
@@ -39,6 +71,10 @@ const normalizeRecord = (key: string, raw: unknown): PhotoRecord | null => {
     imageUri,
     storagePath: getString(r.storagePath) || getString(r.photoStoragePath) || undefined,
     uploadedBy: getString(r.uploadedBy) || getString(r.userName) || undefined,
+    sourceScreen: getString(r.sourceScreen) || sourcePathHint,
+    sourceScreenLabel: getSourceScreenLabel(r),
+    sourceFeature: getString(r.sourceFeature) || undefined,
+    sourcePathHint,
     status: normalizeStatus(r.status),
     target: r.target === 'my_photos' ? 'my_photos' : 'gallery_public',
     uploadedAt: getNumber(r.uploadedAt) || getNumber(r.createdAt) || getNumber(r.timestamp),
@@ -49,11 +85,25 @@ const normalizeRecord = (key: string, raw: unknown): PhotoRecord | null => {
 
 const isPublicGalleryPhoto = (photo: PhotoRecord): boolean => {
   const title = typeof photo.title === 'string' ? photo.title.trim() : '';
-  const isLegacyPersonalDefault = title === 'Photo' || title === 'Р¤РѕС‚Рѕ';
+  const isLegacyPersonalDefault = title === 'Photo' || title === 'Фото';
   return photo.target === 'gallery_public' && !isLegacyPersonalDefault;
 };
 
 export const loadPhotos = async (): Promise<PhotoRecord[]> => {
+  if (LOCAL_MODE) {
+    const data = await fetch(`${LOCAL_API}/photos`).then(r => r.json()) as Array<Record<string, unknown>>;
+    return data.map(r => ({
+      id: String(r.id),
+      title: r.title ? String(r.title) : undefined,
+      description: r.description ? String(r.description) : undefined,
+      imageUri: String(r.imageUri ?? r.url ?? ''),
+      uploadedBy: r.uploadedBy ? String(r.uploadedBy) : undefined,
+      status: (r.status === 'approved' || r.status === 'rejected') ? r.status : 'pending',
+      target: r.target === 'my_photos' ? 'my_photos' : 'gallery_public',
+      uploadedAt: Number(r.createdAt ?? 0),
+      moderationReason: r.moderationReason ? String(r.moderationReason) : undefined,
+    } as PhotoRecord)).sort((a, b) => b.uploadedAt - a.uploadedAt);
+  }
   const snap = await get(ref(database, 'community_photos'));
   if (!snap.exists()) return [];
   const raw = snap.val() as Record<string, unknown>;
@@ -64,21 +114,41 @@ export const loadPhotos = async (): Promise<PhotoRecord[]> => {
     .sort((a, b) => b.uploadedAt - a.uploadedAt);
 };
 
-export const approvePhoto = (id: string): Promise<void> =>
-  update(ref(database, `community_photos/${id}`), {
-    status: 'approved',
-    moderatedAt: Date.now(),
-  });
+export const approvePhoto = async (id: string): Promise<void> => {
+  if (LOCAL_MODE) {
+    await fetch(`${LOCAL_API}/photos/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'approved', moderatedAt: Date.now() }),
+    });
+    return;
+  }
+  return update(ref(database, `community_photos/${id}`), { status: 'approved', moderatedAt: Date.now() });
+};
 
-export const rejectPhoto = (id: string, reason: string): Promise<void> =>
-  update(ref(database, `community_photos/${id}`), {
+export const rejectPhoto = async (id: string, reason: string): Promise<void> => {
+  if (LOCAL_MODE) {
+    await fetch(`${LOCAL_API}/photos/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'rejected', moderatedAt: Date.now(), moderationReason: reason.trim() || 'rejected' }),
+    });
+    return;
+  }
+  return update(ref(database, `community_photos/${id}`), {
     status: 'rejected',
     moderatedAt: Date.now(),
     moderationReason: reason.trim() || 'rejected',
   });
+};
 
-export const deletePhoto = (id: string): Promise<void> =>
-  remove(ref(database, `community_photos/${id}`));
+export const deletePhoto = async (id: string): Promise<void> => {
+  if (LOCAL_MODE) {
+    await fetch(`${LOCAL_API}/photos/${id}`, { method: 'DELETE' });
+    return;
+  }
+  return remove(ref(database, `community_photos/${id}`));
+};
 
 export const deletePhotos = async (ids: string[]): Promise<void> => {
   await Promise.all(ids.map((id) => deletePhoto(id)));
@@ -147,7 +217,7 @@ const getStoragePath_ = (v: string): string | null => {
   if (!t) return null;
   if (/^https?:\/\//i.test(t)) return null;
   if (t.startsWith('file:') || t.startsWith('content:')) return null;
-  if (/^(community_photos|photo_uploads|test_photos|profile_photos|lost_found|buy_sell|local_business|requests)\//i.test(t))
+  if (/^(community_photos|photo_uploads|profile_photos|lost_found|buy_sell|local_business|requests|uploads)\//i.test(t))
     return t;
   return null;
 };

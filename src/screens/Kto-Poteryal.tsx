@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -18,6 +19,8 @@ import { useSelector } from 'react-redux';
 import MiniTabBar from '../components/MiniTabBar';
 import MiniUserAvatar from '../components/MiniUserAvatar';
 import TactileIcon from '../components/TactileIcon';
+import ContactReasonModal from '../components/ContactReasonModal';
+import { useContactRequest } from '../hooks/useContactRequest';
 import AppPhotoImage from '../components/AppPhotoImage';
 import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField';
 import { SCREEN_THEME } from '../utils/screenTheme';
@@ -27,10 +30,11 @@ import { showUserError } from '../utils/userFacingErrors';
 import { safeCallPhone } from '../utils/communicationActions';
 import { validatePhone } from '../utils/validators';
 import { normalizePhoneText } from '../utils/textUtils';
-import { get, ref } from 'firebase/database';
 import { database } from '../firebase-config';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import type { DetailItemData } from '../utils/detailViewTypes';
+import { getDonePhotos, validateSubmissionRequirements } from '../utils/submissionRequirements';
+import { resolveUserAvatarMap } from '../utils/userAvatar';
 
 type AppLanguage = 'ua' | 'ru' | 'en';
 
@@ -48,6 +52,8 @@ const UI_TEXT = {
     formError: 'Заповніть телефон та категорію.',
     sendErrorTitle: 'Помилка',
     sendError: 'Не вдалося надіслати заявку. Спробуйте ще раз.',
+    photoUploading: 'Дочекайтесь завершення завантаження фото.',
+    photoUploadError: 'Не вдалося завантажити фото. Видаліть його або спробуйте ще раз.',
     authRequired: 'Увійдіть в акаунт, щоб додати заявку.',
     phoneError: 'Введіть коректний номер телефону (+380...).',
     title: 'Хто загубив?',
@@ -60,9 +66,10 @@ const UI_TEXT = {
     empty: 'Поки немає заявок.',
     closeItem: 'Знайдено - закрити',
     closeConfirmTitle: 'Закрити оголошення?',
-    closeConfirmBody: 'Після закриття воно зникне зі списку.',
+    closeConfirmBody: 'Оголошення буде позначено як закрите і зникне з активного списку.',
     cancel: 'Скасувати',
-    photoLabel: 'Фото (необов\'язково)',
+    photoLabel: 'Фото предмету (необов\'язково)',
+    descriptionPlaceholder: 'Опис: колір, особливості, де загублено...',
     contact: 'Подзвонити',
     anonymous: 'Мешканець',
   },
@@ -79,6 +86,8 @@ const UI_TEXT = {
     formError: 'Заполните телефон и категорию.',
     sendErrorTitle: 'Ошибка',
     sendError: 'Не удалось отправить заявку. Попробуйте еще раз.',
+    photoUploading: 'Дождитесь завершения загрузки фото.',
+    photoUploadError: 'Не удалось загрузить фото. Удалите его или попробуйте еще раз.',
     authRequired: 'Войдите в аккаунт, чтобы добавить заявку.',
     phoneError: 'Введите корректный номер телефона (+380...).',
     title: 'Кто потерял?',
@@ -91,9 +100,10 @@ const UI_TEXT = {
     empty: 'Пока нет заявок.',
     closeItem: 'Найдено - закрыть',
     closeConfirmTitle: 'Закрыть объявление?',
-    closeConfirmBody: 'После закрытия оно исчезнет из списка.',
+    closeConfirmBody: 'Объявление будет помечено как закрытое и исчезнет из активного списка.',
     cancel: 'Отмена',
-    photoLabel: 'Фото (необязательно)',
+    photoLabel: 'Фото предмета (необязательно)',
+    descriptionPlaceholder: 'Описание: цвет, особенности, где потеряно...',
     contact: 'Позвонить',
     anonymous: 'Житель',
   },
@@ -110,6 +120,8 @@ const UI_TEXT = {
     formError: 'Fill in phone and category.',
     sendErrorTitle: 'Error',
     sendError: 'Could not send the request. Please try again.',
+    photoUploading: 'Wait until the photo upload is complete.',
+    photoUploadError: 'Photo upload failed. Remove it or try again.',
     authRequired: 'Sign in to add a request.',
     phoneError: 'Enter a valid phone number (+380...).',
     title: 'Who lost it?',
@@ -122,9 +134,10 @@ const UI_TEXT = {
     empty: 'No requests yet.',
     closeItem: 'Found - close',
     closeConfirmTitle: 'Close listing?',
-    closeConfirmBody: 'It will disappear from the list.',
+    closeConfirmBody: 'The listing will be marked as closed and removed from the active list.',
     cancel: 'Cancel',
-    photoLabel: 'Photo (optional)',
+    photoLabel: 'Item photo (optional)',
+    descriptionPlaceholder: 'Description: color, features, where lost...',
     contact: 'Call',
     anonymous: 'Resident',
   },
@@ -155,12 +168,14 @@ const LostAndFoundScreen: React.FC = () => {
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as AppLanguage;
   const user = useSelector((state: RootState) => state.auth.user);
   const text = UI_TEXT[language];
+  const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const [items, setItems] = useState<LostFoundItem[]>([]);
   const [avatarByUserId, setAvatarByUserId] = useState<Record<string, string>>({});
   const [type, setType] = useState<RequestType>('found');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [category, setCategory] = useState('');
+  const [description, setDescription] = useState('');
   const [addFormVisible, setAddFormVisible] = useState(false);
   const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -169,8 +184,21 @@ const LostAndFoundScreen: React.FC = () => {
   const handlePickerOpenChange = useCallback((isOpen: boolean) => {
     pickerActiveRef.current = isOpen;
   }, []);
+  const handleRequestCloseModal = useCallback(() => {
+    if (pickerActiveRef.current) return;
+    Alert.alert(
+      'Закрити форму?',
+      'Ви ще не надіслали заявку. Закрити?',
+      [
+        { text: 'Ні', style: 'cancel' },
+        { text: 'Так', onPress: () => setAddFormVisible(false) },
+      ],
+    );
+  }, []);
   const [closingId, setClosingId] = useState<string | null>(null);
   const [previewPhoto, setPreviewPhoto] = useState<{ uri: string; storagePath?: string } | null>(null);
+  const hasUploadingPhotos = formPhotos.some((photo) => photo.status === 'uploading');
+  const hasPhotoErrors = formPhotos.some((photo) => photo.status === 'error');
 
   const typeLabels = useMemo<Record<RequestType, string>>(
     () => ({ found: text.typeFound, lost: text.typeLost }),
@@ -186,29 +214,10 @@ const LostAndFoundScreen: React.FC = () => {
     const userIds = Array.from(new Set(items.map((item) => item.userId).filter((id): id is string => Boolean(id))));
     if (userIds.length === 0) return;
     let cancelled = false;
-    void (async () => {
-      const resolved = await Promise.all(
-        userIds.map(async (uid) => {
-          try {
-            const snap = await get(ref(database, `users/${uid}`));
-            const data = snap.val() as { photoURL?: unknown; photoURLs?: unknown } | null;
-            const photoURLs = Array.isArray(data?.photoURLs)
-              ? data.photoURLs.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
-              : [];
-            const photo = photoURLs[0] || (typeof data?.photoURL === 'string' ? data.photoURL : '');
-            return [uid, photo] as const;
-          } catch {
-            return [uid, ''] as const;
-          }
-        }),
-      );
+    void resolveUserAvatarMap(database, userIds).then((resolved) => {
       if (cancelled) return;
-      setAvatarByUserId((prev) => {
-        const next = { ...prev };
-        resolved.forEach(([uid, photo]) => { if (photo) next[uid] = photo; });
-        return next;
-      });
-    })();
+      setAvatarByUserId((prev) => ({ ...prev, ...resolved }));
+    }).catch(() => {});
     return () => { cancelled = true; };
   }, [items]);
 
@@ -223,6 +232,7 @@ const LostAndFoundScreen: React.FC = () => {
     setName(user?.name ?? '');
     setPhone('');
     setCategory('');
+    setDescription('');
     setFormPhotos([]);
   };
 
@@ -235,15 +245,22 @@ const LostAndFoundScreen: React.FC = () => {
       Alert.alert(text.sendErrorTitle, text.phoneError);
       return;
     }
-    if (!user?.id) {
-      Alert.alert(text.sendErrorTitle, text.authRequired);
+    if (hasUploadingPhotos) {
+      Alert.alert(text.sendErrorTitle, text.photoUploading);
+      return;
+    }
+    if (hasPhotoErrors) {
+      Alert.alert(text.sendErrorTitle, text.photoUploadError);
+      return;
+    }
+    if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, photos: formPhotos, navigation })) {
       return;
     }
 
     setSubmitting(true);
     try {
       const createdAt = new Date();
-      const donePhotos = formPhotos.filter((p) => p.status === 'done');
+      const donePhotos = getDonePhotos(formPhotos);
       const firstPhoto = donePhotos[0];
 
       await lostFoundService.add({
@@ -251,14 +268,16 @@ const LostAndFoundScreen: React.FC = () => {
         name: name.trim(),
         phone: normalizePhoneText(phone),
         category,
+        description: description.trim(),
         photoUri: firstPhoto?.downloadUrl ?? '',
         photoStoragePath: firstPhoto?.storagePath ?? '',
         userPhotoURL: user?.photoURL || '',
         moderationStatus: 'pending',
         submittedForModerationAt: createdAt.toISOString(),
         createdAt: createdAt.toISOString(),
-        expiresAt: new Date(createdAt.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        expiresAt: new Date(createdAt.getTime() + 15 * 24 * 60 * 60 * 1000).toISOString(),
         userId: user?.id || '',
+        language,
       });
 
       resetForm();
@@ -281,7 +300,7 @@ const LostAndFoundScreen: React.FC = () => {
           void (async () => {
             setClosingId(item.id);
             try {
-              await lostFoundService.remove(item.id);
+              await lostFoundService.close(item.id);
               setItems((prev) => prev.filter((entry) => entry.id !== item.id));
             } catch (error) {
               showUserError(language, 'delete', error);
@@ -318,109 +337,137 @@ const LostAndFoundScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* -- Main scrollable content -- */}
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <Text style={styles.title}>{text.title}</Text>
-          <Text style={styles.subtitle}>{text.subtitle}</Text>
-        </View>
-
-        <View style={styles.listHeader}>
-          <Text style={styles.listTitle}>{text.listTitle}</Text>
-          <Text style={styles.listCount}>{items.length}</Text>
-        </View>
-
-        <View style={styles.list}>
-          {items.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <MaterialCommunityIcons name="magnify" size={28} color={SCREEN_THEME.textMuted} />
-              <Text style={styles.emptyText}>{text.empty}</Text>
+      {/* FlatList replaces the outer ScrollView for virtualized rendering of lost/found cards */}
+      <FlatList
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        data={items}
+        keyExtractor={(item) => item.id}
+        initialNumToRender={8}
+        windowSize={5}
+        ListHeaderComponent={
+          <>
+            <View style={styles.header}>
+              <Text style={styles.title}>{text.title}</Text>
+              <Text style={styles.subtitle}>{text.subtitle}</Text>
             </View>
-          ) : (
-            items.map((item) => {
-              const itemDate = formatItemDate(item.createdAt, language);
-              const hasItemPhoto = Boolean(item.photoUri || item.photoStoragePath);
-              const modIcon = item.moderationStatus === 'approved'
-                ? { name: 'check-circle' as const, color: SCREEN_THEME.woodGreenDark }
-                : item.moderationStatus === 'rejected'
-                  ? { name: 'close-circle' as const, color: SCREEN_THEME.terracottaDark }
-                  : { name: 'clock-outline' as const, color: '#A08860' };
 
-              return (
-                <TouchableOpacity key={item.id} style={styles.card} onPress={() => openDetail(item)} activeOpacity={0.86}>
-                  <TouchableOpacity
-                    style={styles.visualWrap}
-                    onPress={(event) => {
-                      event.stopPropagation();
-                      if (hasItemPhoto) setPreviewPhoto({ uri: item.photoUri, storagePath: item.photoStoragePath });
-                    }}
-                    activeOpacity={hasItemPhoto ? 0.85 : 1}
-                  >
-                    {hasItemPhoto ? (
-                      <AppPhotoImage
-                        uri={item.photoUri}
-                        storagePath={item.photoStoragePath}
-                        style={styles.cardThumb}
-                        resizeMode="cover"
-                        debugLabel={`LostFound:${item.id}`}
-                        showDebugInfo={false}
-                      />
-                    ) : (
-                      <View style={[styles.cardThumb, styles.cardThumbPlaceholder]}>
-                        <MaterialCommunityIcons name={getItemIcon(item.category)} size={26} color="#B8A888" />
-                      </View>
-                    )}
-                    <View style={[styles.typeDot, item.type === 'lost' ? styles.lostDot : styles.foundDot]}>
-                      <MaterialCommunityIcons name={item.type === 'lost' ? 'alert-circle-outline' : 'check-circle-outline'} size={13} color="#fff" />
-                    </View>
-                  </TouchableOpacity>
+            <View style={styles.listHeader}>
+              <Text style={styles.listTitle}>{text.listTitle}</Text>
+              <Text style={styles.listCount}>{items.length}</Text>
+            </View>
+          </>
+        }
+        renderItem={({ item }) => {
+          const itemDate = formatItemDate(item.createdAt, language);
+          const hasItemPhoto = Boolean(item.photoUri || item.photoStoragePath);
+          const authorAvatarUri = (item.userId && avatarByUserId[item.userId]) || undefined;
+          const modIcon = item.moderationStatus === 'approved'
+            ? { name: 'check-circle' as const, color: SCREEN_THEME.woodGreenDark }
+            : item.moderationStatus === 'rejected'
+              ? { name: 'close-circle' as const, color: SCREEN_THEME.terracottaDark }
+              : { name: 'clock-outline' as const, color: '#A08860' };
 
-                  <View style={styles.copy}>
-                    <View style={styles.cardTopRow}>
-                      <Text style={[styles.typeBadge, item.type === 'lost' ? styles.lostBadge : styles.foundBadge]} numberOfLines={1}>
-                        {typeLabels[item.type]}
-                      </Text>
-                      {item.isArchived ? <Text style={styles.archiveBadge}>Архів</Text> : null}
-                      <View style={styles.dateModRow}>
-                        {!!itemDate && <Text style={styles.itemDate}>{itemDate}</Text>}
-                        <MaterialCommunityIcons name={modIcon.name} size={15} color={modIcon.color} />
-                      </View>
-                    </View>
-
-                    <View style={styles.itemTitleBox}>
-                      <Text style={styles.itemTitle} numberOfLines={2}>{item.category}</Text>
-                    </View>
-
-                    <View style={styles.bottomRow}>
-                      <View style={styles.personRow}>
-                        <MiniUserAvatar uri={(item.userId && avatarByUserId[item.userId]) || item.userPhotoURL || ''} name={item.name || text.anonymous} size={28} borderRadius={10} backgroundColor="#6A8BA5" />
-                        <Text style={styles.itemMeta} numberOfLines={1}>{item.name || text.anonymous}</Text>
-                      </View>
-                      <TouchableOpacity style={styles.phoneAction} onPress={(event) => { event.stopPropagation(); void safeCallPhone(item.phone, language); }} activeOpacity={0.75}>
-                        <TactileIcon icon="phone-outline" size={34} iconSize={14} backgroundColor="#403933" />
-                      </TouchableOpacity>
-                    </View>
-
-                    {item.userId === user?.id ? (
-                      <View style={styles.actionRow}>
-                        <TouchableOpacity style={styles.closeBtn} onPress={(event) => { event.stopPropagation(); handleCloseItem(item); }} disabled={closingId === item.id} activeOpacity={0.82}>
-                          {closingId === item.id ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.closeBtnText}>{text.closeItem}</Text>}
-                        </TouchableOpacity>
-                      </View>
-                    ) : null}
+          return (
+            <TouchableOpacity style={styles.card} onPress={() => openDetail(item)} activeOpacity={0.86}>
+              <TouchableOpacity
+                style={styles.visualWrap}
+                onPress={(event) => {
+                  event.stopPropagation();
+                  if (hasItemPhoto) setPreviewPhoto({ uri: item.photoUri, storagePath: item.photoStoragePath });
+                }}
+                activeOpacity={hasItemPhoto ? 0.85 : 1}
+              >
+                {hasItemPhoto ? (
+                  <AppPhotoImage
+                    uri={item.photoUri}
+                    storagePath={item.photoStoragePath}
+                    style={styles.cardThumb}
+                    resizeMode="contain"
+                    debugLabel={`LostFound:${item.id}`}
+                    showDebugInfo={false}
+                  />
+                ) : (
+                  <View style={[styles.cardThumb, styles.cardThumbPlaceholder]}>
+                    <MaterialCommunityIcons name={getItemIcon(item.category)} size={26} color="#B8A888" />
                   </View>
-                </TouchableOpacity>
-              );
-            })
-          )}
-        </View>
-      </ScrollView>
+                )}
+                <View style={[styles.typeDot, item.type === 'lost' ? styles.lostDot : styles.foundDot]}>
+                  <MaterialCommunityIcons name={item.type === 'lost' ? 'alert-circle-outline' : 'check-circle-outline'} size={13} color="#fff" />
+                </View>
+              </TouchableOpacity>
+
+              <View style={styles.copy}>
+                <View style={styles.cardTopRow}>
+                  <Text style={[styles.typeBadge, item.type === 'lost' ? styles.lostBadge : styles.foundBadge]} numberOfLines={1}>
+                    {typeLabels[item.type]}
+                  </Text>
+                  {item.isArchived ? <Text style={styles.archiveBadge}>Архів</Text> : null}
+                  <View style={styles.dateModRow}>
+                    {!!itemDate && <Text style={styles.itemDate}>{itemDate}</Text>}
+                    <MaterialCommunityIcons name={modIcon.name} size={15} color={modIcon.color} />
+                  </View>
+                </View>
+
+                <View style={styles.itemTitleBox}>
+                  <Text style={styles.itemTitle} numberOfLines={2}>{item.category}</Text>
+                  {!!item.description && (
+                    <Text style={styles.itemDescription} numberOfLines={2}>{item.description}</Text>
+                  )}
+                </View>
+
+                <View style={styles.bottomRow}>
+                  <View style={styles.personRow}>
+                    <MiniUserAvatar uri={authorAvatarUri} name={item.name || text.anonymous} size={28} borderRadius={10} backgroundColor="#6A8BA5" />
+                    <Text style={styles.itemMeta} numberOfLines={1}>{item.name || text.anonymous}</Text>
+                  </View>
+                  <TouchableOpacity style={styles.phoneAction} onPress={(event) => { event.stopPropagation(); void safeCallPhone(item.phone, language); }} activeOpacity={0.75}>
+                    <TactileIcon icon="phone-outline" size={34} iconSize={14} backgroundColor="#403933" />
+                  </TouchableOpacity>
+                  {item.userId && item.userId !== user?.id ? (
+                    <TouchableOpacity
+                      style={styles.phoneAction}
+                      onPress={(event) => {
+                        event.stopPropagation();
+                        openContactModal({ userId: item.userId as string, name: item.name || text.anonymous, sourceType: 'help', sourceId: item.id, sourceTitle: item.category });
+                      }}
+                      activeOpacity={0.75}
+                    >
+                      <TactileIcon icon="account-arrow-right-outline" size={34} iconSize={14} backgroundColor="#7A1E5C" />
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+
+                {item.userId === user?.id ? (
+                  <View style={styles.actionRow}>
+                    <TouchableOpacity style={styles.closeBtn} onPress={(event) => { event.stopPropagation(); handleCloseItem(item); }} disabled={closingId === item.id} activeOpacity={0.82}>
+                      {closingId === item.id ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.closeBtnText}>{text.closeItem}</Text>}
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
+              </View>
+            </TouchableOpacity>
+          );
+        }}
+        ListEmptyComponent={
+          <View style={styles.emptyCard}>
+            <MaterialCommunityIcons name="magnify" size={28} color={SCREEN_THEME.textMuted} />
+            <Text style={styles.emptyText}>{text.empty}</Text>
+          </View>
+        }
+      />
 
       {/* -- Fixed "Add request" bar above MiniTabBar (same as Gallery) -- */}
       <View style={styles.addBar}>
         <TouchableOpacity
           style={styles.addBarBtn}
-          onPress={() => setAddFormVisible(true)}
+          onPress={() => {
+            if (!user) {
+              Alert.alert(text.formTitle, text.authRequired);
+              return;
+            }
+            setAddFormVisible(true);
+          }}
           activeOpacity={0.85}
         >
           <Text style={styles.addBarBtnText}>{text.addRequest}</Text>
@@ -428,18 +475,25 @@ const LostAndFoundScreen: React.FC = () => {
       </View>
 
       <MiniTabBar />
+      <ContactReasonModal
+        visible={contactModalVisible}
+        pending={contactPending}
+        target={contactTarget}
+        onSelect={(reason) => void sendContactRequest(reason)}
+        onClose={closeContactModal}
+      />
 
       {/* -- Add request bottom sheet (same pattern as Gallery) -- */}
       <Modal
         visible={addFormVisible}
         transparent
         animationType="slide"
-        onRequestClose={() => { if (!pickerActiveRef.current) setAddFormVisible(false); }}
+        onRequestClose={handleRequestCloseModal}
       >
         <TouchableOpacity
           style={styles.sheetBackdrop}
           activeOpacity={1}
-          onPress={() => setAddFormVisible(false)}
+          onPress={handleRequestCloseModal}
         />
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -452,7 +506,7 @@ const LostAndFoundScreen: React.FC = () => {
             {/* Sheet header */}
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>{text.formTitle}</Text>
-              <TouchableOpacity onPress={() => setAddFormVisible(false)} style={styles.sheetCloseBtn} activeOpacity={0.7}>
+              <TouchableOpacity onPress={handleRequestCloseModal} style={styles.sheetCloseBtn} activeOpacity={0.7}>
                 <Text style={styles.sheetCloseTxt}>✕</Text>
               </TouchableOpacity>
             </View>
@@ -478,6 +532,7 @@ const LostAndFoundScreen: React.FC = () => {
 
               <TextInput value={name} onChangeText={setName} placeholder={text.namePlaceholder} placeholderTextColor={SCREEN_THEME.textMuted} style={styles.input} />
               <TextInput value={phone} onChangeText={setPhone} placeholder={text.phonePlaceholder} placeholderTextColor={SCREEN_THEME.textMuted} keyboardType="phone-pad" style={styles.input} />
+              <TextInput value={description} onChangeText={setDescription} placeholder={text.descriptionPlaceholder} placeholderTextColor={SCREEN_THEME.textMuted} style={[styles.input, styles.inputMultiline]} multiline numberOfLines={3} />
 
               <Text style={styles.fieldLabel}>{text.itemLabel}</Text>
               <View style={styles.categoryGrid}>
@@ -488,25 +543,25 @@ const LostAndFoundScreen: React.FC = () => {
                 ))}
               </View>
 
-              {/* Photo upload - optional, same as Gallery */}
+              {/* Photo upload - optional */}
               <Text style={styles.fieldLabel}>{text.photoLabel}</Text>
               <PhotoUploadField
                 uid={user?.id ?? ''}
                 userName={user?.name ?? ''}
                 maxPhotos={1}
                 storagePath="lost_found"
-                onPhotosChange={(photos) => setFormPhotos(photos.filter((p) => p.status === 'done'))}
+                onPhotosChange={setFormPhotos}
                 onPickerOpenChange={handlePickerOpenChange}
               />
 
               {/* Submit */}
               <TouchableOpacity
-                style={styles.submitButton}
+                style={[styles.submitButton, (submitting || hasUploadingPhotos) && styles.submitButtonDisabled]}
                 onPress={() => { void handleSubmit(); }}
                 activeOpacity={0.86}
-                disabled={submitting}
+                disabled={submitting || hasUploadingPhotos}
               >
-                {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitButtonText}>{text.addRequest}</Text>}
+                {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitButtonText}>{hasUploadingPhotos ? text.photoUploading : text.addRequest}</Text>}
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -656,6 +711,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   itemTitle: { fontSize: 20, lineHeight: 24, fontWeight: '900', color: SCREEN_THEME.textPrimary },
+  itemDescription: { fontSize: 12, lineHeight: 16, color: SCREEN_THEME.textSecondary, fontWeight: '600', marginTop: 4 },
   bottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6, gap: 5 },
   personRow: { flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1, minWidth: 42 },
   itemMeta: { flex: 1, fontSize: 13, lineHeight: 16, color: SCREEN_THEME.textPrimary, fontWeight: '800' },
@@ -758,6 +814,12 @@ const styles = StyleSheet.create({
     color: SCREEN_THEME.textPrimary,
     fontWeight: '800',
   },
+  inputMultiline: {
+    minHeight: 72,
+    paddingTop: 12,
+    paddingBottom: 12,
+    textAlignVertical: 'top',
+  },
   fieldLabel: { color: SCREEN_THEME.textPrimary, fontWeight: '900', marginBottom: 8 },
   categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
   categoryChip: {
@@ -779,6 +841,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 8,
   },
+  submitButtonDisabled: { opacity: 0.65 },
   submitButtonText: { color: '#fff', fontWeight: '900', fontSize: 15 },
 
   // Photo preview modal

@@ -18,50 +18,36 @@ export default function TactileCard({
   pressable = true,
 }: TactileCardProps) {
   const scaleVal = useRef(new Animated.Value(1)).current;
-  const shadowOffsetY = useRef(new Animated.Value(elevated ? 5 : 3)).current;
-  const shadowOpacity = useRef(new Animated.Value(elevated ? 0.28 : 0.14)).current;
-  const shadowRadius = useRef(new Animated.Value(elevated ? 6 : 3)).current;
   const [elevationNum, setElevationNum] = useState(elevated ? 6 : 3);
 
-  const animatedShadow = {
+  const staticShadow = {
     shadowColor: '#5C3A1E',
-    shadowOpacity,
-    shadowRadius,
-    shadowOffset: { width: 2, height: shadowOffsetY },
+    shadowOpacity: elevated ? 0.28 : 0.14,
+    shadowRadius: elevated ? 6 : 3,
+    shadowOffset: { width: 2, height: elevated ? 5 : 3 },
     elevation: elevationNum,
   };
 
   const handlePressIn = () => {
     if (!pressable) return;
     setElevationNum(2);
-    Animated.parallel([
-      Animated.timing(scaleVal, { toValue: 0.97, duration: 80, useNativeDriver: true }),
-      Animated.timing(shadowOffsetY, { toValue: 2, duration: 80, useNativeDriver: false }),
-      Animated.timing(shadowOpacity, { toValue: 0.10, duration: 80, useNativeDriver: false }),
-      Animated.timing(shadowRadius, { toValue: 2, duration: 80, useNativeDriver: false }),
-    ]).start();
+    Animated.timing(scaleVal, { toValue: 0.97, duration: 80, useNativeDriver: true }).start();
   };
 
   const handlePressOut = () => {
     if (!pressable) return;
     setElevationNum(elevated ? 6 : 3);
-    Animated.parallel([
-      Animated.timing(scaleVal, { toValue: 1, duration: 120, useNativeDriver: true }),
-      Animated.timing(shadowOffsetY, { toValue: elevated ? 5 : 3, duration: 120, useNativeDriver: false }),
-      Animated.timing(shadowOpacity, { toValue: elevated ? 0.28 : 0.14, duration: 120, useNativeDriver: false }),
-      Animated.timing(shadowRadius, { toValue: elevated ? 6 : 3, duration: 120, useNativeDriver: false }),
-    ]).start();
+    Animated.timing(scaleVal, { toValue: 1, duration: 120, useNativeDriver: true }).start();
   };
 
   if (onPress) {
-    const flex = (style as any)?.flex;
     return (
-      <Animated.View style={[{ transform: [{ scale: scaleVal }] }, flex !== undefined ? { flex } : null]}>
+      <Animated.View style={[styles.shell, staticShadow, { transform: [{ scale: scaleVal }] }, style] as any}>
         <Pressable
           onPress={onPress}
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
-          style={[styles.shell, animatedShadow, style] as any}
+          style={styles.pressableContent}
         >
           <View style={styles.bevelTopLeft} />
           <View style={styles.bevelBottomRight} />
@@ -73,7 +59,7 @@ export default function TactileCard({
   }
 
   return (
-    <Animated.View style={[styles.shell, animatedShadow, style] as any}>
+    <Animated.View style={[styles.shell, staticShadow, style] as any}>
       <View style={styles.bevelTopLeft} />
       <View style={styles.bevelBottomRight} />
       <View style={styles.gloss} />
@@ -89,6 +75,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: SCREEN_THEME.borderStrong,
     overflow: 'hidden',
+  },
+  pressableContent: {
+    flex: 1,
   },
   bevelTopLeft: {
     position: 'absolute',

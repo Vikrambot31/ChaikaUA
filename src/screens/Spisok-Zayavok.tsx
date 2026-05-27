@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, RefreshControl, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -43,7 +43,7 @@ const UI_TEXT = {
     approveBtn: 'Схвалити',
     rejectBtn: 'Відхилити',
     deleteBtn: 'Видалити',
-    emptySub: 'Список оновиться, коли з’являться нові заявки.',
+    emptySub: "Список оновиться, коли з'являться нові заявки.",
   },
   ru: {
     emptyRequests: 'Нет заявок',
@@ -85,6 +85,7 @@ const PAGE_SIZE = 20;
 const RequestsScreen: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const navigation = useNavigation<RequestsNavigation>();
+  const navLock = useRef(false);
   const user = useSelector(selectUser);
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as AppLanguage;
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
@@ -121,9 +122,9 @@ const RequestsScreen: React.FC = () => {
       const normalized = pageItems
         .map((item) => ({
           ...item,
-          createdAt: item.createdAt instanceof Date ? item.createdAt : new Date(item.createdAt),
+          createdAt: typeof item.createdAt === 'number' ? item.createdAt : new Date(item.createdAt).getTime(),
         }))
-        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+        .sort((a, b) => b.createdAt - a.createdAt);
       const page = normalized.slice(0, PAGE_SIZE);
       const oldest = page.length > 0 ? page[page.length - 1].timestamp : null;
 
@@ -176,7 +177,7 @@ const RequestsScreen: React.FC = () => {
     void resolveUserAvatarMap(database, userIds).then((resolved) => {
       if (cancelled) return;
       setAvatarByUserId((prev) => ({ ...prev, ...resolved }));
-    });
+    }).catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -244,7 +245,7 @@ const RequestsScreen: React.FC = () => {
 
     return [...requests]
       .filter((item) => statusFilter === 'all' || resolveStatus(item) === statusFilter)
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      .sort((a, b) => b.createdAt - a.createdAt);
   }, [requests, statusFilter]);
 
   const emptyMessage = error ?? text.emptyRequests;
@@ -341,10 +342,11 @@ const RequestsScreen: React.FC = () => {
       <RequestItem
         request={item}
         avatarUri={(item.userId && avatarByUserId[item.userId]) || undefined}
+        currentUserId={user?.id}
         isOwn={isOwn}
-        onPress={() => navigation.navigate('RequestDetail', { request: item })}
+        onPress={() => { if (navLock.current) return; navLock.current = true; navigation.navigate('RequestDetail', { request: item }); setTimeout(() => { navLock.current = false; }, 800); }}
         onDelete={isOwn ? () => void removeRequest(item.id) : undefined}
-        onProfile={isOther ? () => navigation.navigate('ViewUserProfile', { userId: item.userId as string }) : undefined}
+        onProfile={isOther ? () => { if (navLock.current) return; navLock.current = true; navigation.navigate('ViewUserProfile', { userId: item.userId as string }); setTimeout(() => { navLock.current = false; }, 800); } : undefined}
         onContact={isOther ? () => openContactModal({ userId: item.userId as string, name: item.name ?? 'Unknown', sourceType: 'help', sourceId: item.id, sourceTitle: item.description?.slice(0, 60) }) : undefined}
         onApprove={isModerator ? () => void moderate(item.id, 'approved') : undefined}
         onReject={isModerator ? () => void moderate(item.id, 'rejected') : undefined}
@@ -359,6 +361,7 @@ const RequestsScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <FlatList
+        keyboardShouldPersistTaps="handled"
         data={sortedRequests}
         keyExtractor={(item: Request) => item.id}
         renderItem={renderItem}
@@ -543,6 +546,4 @@ const styles = StyleSheet.create({
 });
 
 export default RequestsScreen;
-
-
 
