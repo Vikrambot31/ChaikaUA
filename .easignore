@@ -43,3 +43,22 @@ doc_fix_verify/
 doc_fix_verify2/
 deploy_cli_config/
 functions/
+
+# folders with spaces/special chars that break EAS archive
+AI AGENT_NEW/
+local-server/
+.netlify/
+.gradle-user-home/
+.task/
+chaika-site/
+
+# audit/report markdown files
+PHOTO_BUGS_AUDIT_2026-05-27.md
+PHOTO_BUGS_FIXES_2026-05-27.md
+PHOTO_BUGS_SUMMARY_2026-05-27.md
+CRASH_DIAGNOSTICS_SETUP.md
+DEPLOYMENT_REPORT_2026-05-22.md
+FIREBASE_PHOTO_RUNBOOK.md
+TX-AUDIT-APK-NOT-INSTALL.md
+three-brains.md
+PHOTO_BUGS_SUMMARY_2026-05-27.md

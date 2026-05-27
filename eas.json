@@ -3,6 +3,15 @@
     "version": ">= 18.5.0"
   },
   "build": {
+    "preview": {
+      "distribution": "internal",
+      "channel": "preview",
+      "requireCommit": true,
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
+      }
+    },
     "development": {
       "developmentClient": true,
       "distribution": "internal",
@@ -10,14 +19,6 @@
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleDebug"
-      }
-    },
-    "preview": {
-      "distribution": "internal",
-      "channel": "preview",
-      "android": {
-        "buildType": "apk",
-        "gradleCommand": ":app:assembleRelease"
       }
     },
     "production": {
