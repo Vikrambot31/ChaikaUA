@@ -1,12 +1,12 @@
 {
   "cli": {
-    "version": ">= 18.5.0"
+    "version": ">= 18.5.0",
+    "requireCommit": true
   },
   "build": {
     "preview": {
       "distribution": "internal",
       "channel": "preview",
-      "requireCommit": true,
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleRelease"
