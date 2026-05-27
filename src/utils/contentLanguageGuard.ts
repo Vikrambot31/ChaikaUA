@@ -36,8 +36,9 @@ export const getLanguageValidationError = (
 export const assertTextMatchesLanguage = (
   text: string,
   language: AppLang,
+  context?: 'job_listings' | 'general',
 ): void => {
-  const validationError = getLanguageValidationError(text, language);
+  const validationError = getLanguageValidationError(text, language, context);
   if (validationError) {
     throw new Error(validationError);
   }
