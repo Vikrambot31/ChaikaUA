@@ -1,6 +1,7 @@
 # Firebase Admin SDK service account keys — NEVER commit these
 *firebase-adminsdk*.json
 chaikaua-3cd9d-firebase-adminsdk-fbsvc-0d750d2252.json
+serviceAccountKey.json
 
 node_modules/
 .expo/
@@ -63,7 +64,6 @@ Info--/
 Biz-PROCESS-MONITOR/
 admin-panel/.claude/
 admin-panel/WEB-VERSION_ADMIN/
-admin-panel/Test PHOTO - --- )/
 admin-panel/*.txt
 *.docx
 *.txt
@@ -90,3 +90,4 @@ run-maestro.bat
 make_animation.py
 optimize_assets.py
 check_lmstudio.bat
+chaika-site/
