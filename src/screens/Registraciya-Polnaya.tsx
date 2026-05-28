@@ -30,7 +30,7 @@ import { validateEmail, validateName, validatePassword, validatePhone } from '..
 import { getPasswordBreachCount } from '../utils/passwordBreachCheck';
 import { RootState } from '../redux/store';
 import { loadProfileRecord, mapFirebaseUserToAppUser } from '../services/authProfileService';
-import { clearSelectedStartAvatar, getSelectedStartAvatar } from '../utils/startAvatars';
+import { clearSelectedStartAvatar, clearTempProfileData, getSelectedStartAvatar, loadTempProfileData } from '../utils/startAvatars';
 
 type QuickRegistrationParams = {
   name?: string;
@@ -247,8 +247,11 @@ const RegisterScreenFull: React.FC = () => {
 
       const uid = authUser.uid;
       const selectedStartAvatar = await getSelectedStartAvatar();
+      const tempProfile = await loadTempProfileData();
+      const avatarUri = authUser.photoURL || selectedStartAvatar?.uri || (tempProfile ? `start-avatar://${tempProfile.startAvatarKey}` : '');
+      const avatarKey = selectedStartAvatar?.key || tempProfile?.startAvatarKey;
       await dbSet(dbRef(database, `users/${uid}`), {
-        name: normalizedName,
+        name: tempProfile?.name || normalizedName,
         phone: normalizedPhone,
         building: selectedBuilding?.street || '',
         houseNumber: selectedBuilding?.houseNumber || '',
@@ -258,8 +261,10 @@ const RegisterScreenFull: React.FC = () => {
         addressProtected: true,
         provider: currentUser?.provider || 'email',
         providerId: uid,
-        photoURL: authUser.photoURL || selectedStartAvatar?.uri || '',
-        ...(selectedStartAvatar ? { startAvatarKey: selectedStartAvatar.key } : {}),
+        photoURL: avatarUri,
+        ...(avatarKey ? { startAvatarKey: avatarKey } : {}),
+        ...(tempProfile?.gender ? { gender: tempProfile.gender } : {}),
+        ...(tempProfile?.age ? { age: tempProfile.age } : {}),
         ...(referrerPhone ? { referrerPhone } : {}),
       });
       if (referrerPhone && referrerVerified) {
@@ -284,6 +289,7 @@ const RegisterScreenFull: React.FC = () => {
       if (selectedStartAvatar) {
         await clearSelectedStartAvatar();
       }
+      await clearTempProfileData();
       dispatch(setError(null));
       Toast.show({
         type: 'success',
@@ -297,7 +303,7 @@ const RegisterScreenFull: React.FC = () => {
         });
         return;
       }
-      navigation.reset({ index: 0, routes: [{ name: 'MainTabs', params: { screen: 'ProfileTab' } }] });
+      navigation.reset({ index: 0, routes: [{ name: 'ProfileSetupScreen' }] });
     } catch (err: unknown) {
       const authErr = err as { code?: string };
       let message = text.registerFailed;

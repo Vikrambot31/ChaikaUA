@@ -25,6 +25,8 @@ type ProfileRecord = {
   photoURLs?: string[];
   photoStoragePaths?: string[];
   startAvatarKey?: string;
+  gender?: 'male' | 'female';
+  age?: number;
 };
 
 const MAX_PROFILE_PHOTOS = 3;
@@ -54,6 +56,8 @@ const normalizeRecord = (raw: ProfileRecord | null | undefined): ProfileRecord =
   photoURLs: normalizeStringArray(raw?.photoURLs),
   photoStoragePaths: normalizeStringArray(raw?.photoStoragePaths),
   startAvatarKey: sanitizeStoredText(raw?.startAvatarKey || ''),
+  gender: raw?.gender,
+  age: typeof raw?.age === 'number' ? raw.age : undefined,
 });
 
 export const getProfileRefPath = (uid: string) => `${USERS_PATH}/${uid}`;
@@ -127,6 +131,8 @@ export const mapFirebaseUserToAppUser = (
     photoURL: primaryPhotoUrl,
     photoURLs: resolvedPhotoURLs,
     startAvatarKey: normalizedProfile.startAvatarKey || undefined,
+    gender: normalizedProfile.gender,
+    age: normalizedProfile.age,
     provider: (normalizedProfile.provider as User['provider']) || (firebaseUser.providerData[0]?.providerId === 'facebook.com'
       ? 'facebook'
       : firebaseUser.providerData[0]?.providerId === 'google.com'

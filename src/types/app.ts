@@ -117,6 +117,8 @@ export interface User {
   photoURL?: string;
   photoURLs?: string[];
   startAvatarKey?: string;
+  gender?: 'male' | 'female';
+  age?: number;
   provider?: 'google' | 'facebook' | 'apple' | 'email';
   providerId?: string;
   referrerPhone?: string;

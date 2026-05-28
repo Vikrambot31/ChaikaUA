@@ -69,7 +69,7 @@ import CrashDiagnosticsScreen from '../screens/CrashDiagnosticsScreen';
 import AppMonitorScreen from '../screens/AppMonitorScreen';
 import type { Request, Place } from '../types/app';
 import type { NewsItem as OsbbEditableNewsItem } from '../screens/OSBB-AddNews';
-import { selectAuthBootstrapped, selectIsAuthenticated } from '../redux/selectors';
+import { selectAuthBootstrapped, selectIsAuthenticated, selectUser } from '../redux/selectors';
 import { subscribeCurrentUserSecurityRole, type SecurityRole } from '../services/securityRoles';
 import { recordScreenOpenDiagnostic } from '../services/liveDiagnosticsService';
 import { addBreadcrumb } from '../services/breadcrumbService';
@@ -173,6 +173,7 @@ export type RootStackParamList = {
   MyApprovedPhotosScreen: undefined;
   PhotoUploadScreen: undefined;
   StartAvatarPickerScreen: RedirectRouteParams | undefined;
+  ProfileSetupScreen: undefined;
   AppVersionInfoScreen: undefined;
   AppMonitorScreen: undefined;
   ViewUserProfile: { userId: string };
@@ -411,7 +412,7 @@ function GuardedScreen({
 
   useEffect(() => {
     if (roleStatus === 'denied' && mode !== 'trusted') {
-      navigation.replace('MainTabs' as never);
+      navigation.reset({ index: 0, routes: [{ name: 'MainTabs' as never }] });
     }
   }, [roleStatus, navigation, mode]);
 
@@ -465,6 +466,7 @@ const MyPhotosScreen = createLazyScreen(() => import('../photo-module/MyPhotosSc
 const MyApprovedPhotosScreen = createLazyScreen(() => import('../screens/MyApprovedPhotosScreen'), 'LazyMyApprovedPhotosScreen');
 const PhotoUploadScreen = createLazyScreen(() => import('../screens/Zagruzka-Foto'), 'LazyPhotoUploadScreen');
 const StartAvatarPickerScreen = createLazyScreen(() => import('../screens/StartAvatarPickerScreen'), 'LazyStartAvatarPickerScreen');
+const ProfileSetupScreen = createLazyScreen(() => import('../screens/ProfileSetupScreen'), 'LazyProfileSetupScreen');
 
 const withGuard = <P extends object>(
   Component: React.ComponentType<P>,
@@ -568,13 +570,43 @@ class NavErrorBoundary extends React.Component<
 
 function AuthNavigation() {
   const isAuthenticated = useSelector(selectIsAuthenticated);
+  const isBootstrapped = useSelector(selectAuthBootstrapped);
+  const currentUser = useSelector(selectUser);
   const [navReady, setNavReady] = useState(false);
+  const [navigationContainerReady, setNavigationContainerReady] = useState(false);
   const [navKey, setNavKey] = useState(0);
   const navErrorCountRef = useRef(0);
+  const profileSetupShownRef = useRef(false);
 
   useEffect(() => {
     setNavReady(true);
   }, []);
+
+  useEffect(() => {
+    if (!navigationContainerReady || !isBootstrapped || !isAuthenticated || !currentUser) {
+      console.log('[ProfileSetup] Guard check failed:', {
+        containerReady: navigationContainerReady,
+        bootstrapped: isBootstrapped,
+        authenticated: isAuthenticated,
+        hasUser: !!currentUser,
+      });
+      return;
+    }
+    if (profileSetupShownRef.current) {
+      console.log('[ProfileSetup] Already shown, skipping');
+      return;
+    }
+    console.log('[ProfileSetup] User profile check:', {
+      gender: currentUser.gender,
+      age: currentUser.age,
+      needsSetup: !currentUser.gender || !currentUser.age,
+    });
+    if (!currentUser.gender || !currentUser.age) {
+      profileSetupShownRef.current = true;
+      console.log('[ProfileSetup] Navigating to ProfileSetupScreen');
+      navigationRef.navigate('ProfileSetupScreen');
+    }
+  }, [navigationContainerReady, isBootstrapped, isAuthenticated, currentUser]);
 
   const handleNavError = useCallback(() => {
     navErrorCountRef.current += 1;
@@ -684,6 +716,7 @@ function AuthNavigation() {
       linking={guardedLinking}
       onReady={() => {
         navErrorCountRef.current = 0;
+        setNavigationContainerReady(true);
         const routeName = navigationRef.getCurrentRoute()?.name;
         if (routeName) {
           recordScreenOpenDiagnostic(routeName);
@@ -754,6 +787,7 @@ function AuthNavigation() {
         <Stack.Screen name="FotoRayonaScreen" component={withGuard(FotoRayonaScreen, 'trusted')} />
         <Stack.Screen name="PhotoUploadScreen" component={withGuard(PhotoUploadScreen, 'trusted')} options={{ headerShown: false }} />
         <Stack.Screen name="StartAvatarPickerScreen" component={StartAvatarPickerScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="ProfileSetupScreen" component={ProfileSetupScreen} options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen name="LostAndFoundScreen" component={withGuard(LostAndFoundScreen, 'trusted')} />
         <Stack.Screen name="ImportantNewsScreen" component={ImportantNewsScreen} />
         <Stack.Screen name="NotificationSettingsScreen" component={withGuard(NotificationSettingsScreen, 'auth')} />

@@ -44,3 +44,43 @@ export const saveSelectedStartAvatar = async (key: string): Promise<StartAvatar 
 export const clearSelectedStartAvatar = async (): Promise<void> => {
   await AsyncStorage.removeItem(START_AVATAR_STORAGE_KEY);
 };
+
+export const PROFILE_SETUP_TEMP_KEY = '@chaika:profile_setup_temp:v1';
+
+export type TempProfileData = {
+  name: string;
+  gender: 'male' | 'female';
+  age: number;
+  startAvatarKey: string;
+};
+
+export const saveTempProfileData = async (data: TempProfileData): Promise<void> => {
+  await AsyncStorage.setItem(PROFILE_SETUP_TEMP_KEY, JSON.stringify(data));
+};
+
+export const loadTempProfileData = async (): Promise<TempProfileData | null> => {
+  const raw = await AsyncStorage.getItem(PROFILE_SETUP_TEMP_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as TempProfileData;
+  } catch {
+    return null;
+  }
+};
+
+export const clearTempProfileData = async (): Promise<void> => {
+  await AsyncStorage.removeItem(PROFILE_SETUP_TEMP_KEY);
+};
+
+export const getDefaultAvatarKey = (gender?: 'male' | 'female', age?: number): string => {
+  const a = age ?? 35;
+  if (gender === 'female') {
+    if (a < 35) return '2';
+    if (a < 55) return '5';
+    return '6';
+  }
+  // default male
+  if (a < 35) return '3';
+  if (a < 55) return '1';
+  return '4';
+};

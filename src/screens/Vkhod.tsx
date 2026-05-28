@@ -193,6 +193,7 @@ const LoginScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<{
     MainTabs: { screen: 'HomeTab' };
     RegisterScreenFull: { name?: string; email?: string; phone?: string; redirectTo?: string; redirectParams?: object; redirectMode?: 'auth' | 'complete' } | undefined;
+    ProfileSetupScreen: undefined;
   }>>();
   const route = useRoute<import('@react-navigation/native').RouteProp<Record<string, { redirectTo?: string; redirectParams?: object; redirectMode?: 'auth' | 'complete' } | undefined>, string>>();
   const dispatch = useDispatch();
@@ -251,6 +252,10 @@ const LoginScreen: React.FC = () => {
       if (appUser.registrationStatus === 'complete') {
         if (route.params?.redirectTo) {
           navigation.reset({ index: 0, routes: [{ name: route.params.redirectTo as never, params: route.params.redirectParams as never }] });
+          return;
+        }
+        if (!appUser.gender || !appUser.age) {
+          navigation.navigate('ProfileSetupScreen');
           return;
         }
         navigation.navigate('MainTabs', { screen: 'HomeTab' });

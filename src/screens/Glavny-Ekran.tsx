@@ -662,6 +662,7 @@ const HomeScreen: React.FC = () => {
   const handleOnboardingDone = () => {
     setShowOnboarding(false);
     void AsyncStorage.setItem(ONBOARDING_KEY, '1');
+    navigation.navigate('ProfileSetupScreen' as never);
   };
 
   const BUTTONS: HomeButtonConfig[] = [
