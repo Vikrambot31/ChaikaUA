@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-05-28",
+      "publishedAt": "2026-05-28T07:51:39.351Z",
+      "key": "https://bigkyiv.com.ua/vidoma-tiktok-blogerka-vikunciy-razom-z-pomichnyczeyu-zagynuly-u-dtp/"
+    },
+    {
       "type": "places",
       "date": "2026-05-27",
       "publishedAt": "2026-05-27T11:27:31.870Z",
