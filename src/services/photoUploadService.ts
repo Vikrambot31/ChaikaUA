@@ -98,7 +98,10 @@ async function uploadViaFileSystem(
   const sourceLabel = options.sourceLabel ?? 'photoUploadService.uploadPhotoToNamespace';
   const feature = options.feature ?? mapNamespaceToFeature(options.namespace);
   const storagePath = `${options.namespace}/${user.uid}/${uniqueId()}.${getPhotoFileExtension(localUri)}`;
-  const bucket = storage.app.options.storageBucket;
+  // Firebase Storage REST API v1 requires GCS bucket name (*.appspot.com),
+  // not the new Firebase domain (*.firebasestorage.app).
+  const rawBucket = storage.app.options.storageBucket ?? '';
+  const bucket = rawBucket.replace(/\.firebasestorage\.app$/i, '.appspot.com');
   const encodedPath = encodeURIComponent(storagePath);
   const fileRef = createStorageRef(storage, storagePath);
 
