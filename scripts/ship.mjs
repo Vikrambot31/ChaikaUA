@@ -46,17 +46,25 @@ const pushRequested = has('--push');
 const deployArg = valueOf('--deploy', has('--deploy') ? 'all' : '');
 const message = valueOf('--message', valueOf('-m', 'Ship project updates')).trim() || 'Ship project updates';
 
+const shellQuote = (value) => {
+  const text = String(value);
+  if (!/[\s"&()^|<>]/.test(text)) return text;
+  return `"${text.replace(/"/g, '\\"')}"`;
+};
+
 const run = (command, commandArgs = [], options = {}) => {
   const pretty = [command, ...commandArgs].join(' ');
   console.log(`\n$ ${pretty}`);
   if (dryRun && !options.readonly) return '';
 
-  const result = spawnSync(command, commandArgs, {
+  const spawnOptions = {
     stdio: options.capture ? ['ignore', 'pipe', 'pipe'] : 'inherit',
-    shell: process.platform === 'win32',
     encoding: 'utf8',
     ...options.spawn,
-  });
+  };
+  const result = process.platform === 'win32'
+    ? spawnSync([command, ...commandArgs].map(shellQuote).join(' '), { ...spawnOptions, shell: true })
+    : spawnSync(command, commandArgs, spawnOptions);
 
   if (result.status !== 0) {
     if (options.capture && result.stderr) process.stderr.write(result.stderr);
