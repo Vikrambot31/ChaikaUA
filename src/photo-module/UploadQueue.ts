@@ -263,6 +263,7 @@ export const UploadQueue = {
             localUri: task.localUri,
             uid,
             collection,
+            compressedUri: task.compressedUri,
             metadata: task.metadata
               ? {
                   uploadedBy: task.metadata.uploadedBy,
@@ -277,6 +278,11 @@ export const UploadQueue = {
               void ImageStorage.updatePhoto(task.photoId, { progress: percent });
             },
           });
+
+          // Cache compressed file path in the task so retries skip re-compression
+          if (result.compressedUri && result.compressedUri !== task.compressedUri) {
+            await updateTask({ ...task, compressedUri: result.compressedUri });
+          }
 
           void recordRuntimeTrace({
             screen: 'UploadQueue.process',

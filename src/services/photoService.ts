@@ -3,6 +3,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LOCAL_API, LOCAL_MODE } from '../local/LOCAL_MODE';
 import { ImageStorage } from '../photo-module/ImageStorage';
+import { UploadQueue } from '../photo-module/UploadQueue';
 import type { PhotoModerationStatus, PhotoUploadMetadata, UserPhoto } from '../photo-module/types';
 import { uniqueId } from '../utils/cryptoId';
 import { getContentType, getPhotoFileExtension, compressImage } from '../utils/imageCompressor';
@@ -286,6 +287,7 @@ export const photoService = {
   },
 
   async delete(photoId: string): Promise<void> {
+    await UploadQueue.remove(photoId);
     await ImageStorage.updatePhoto(photoId, { deleted: true });
     if (LOCAL_MODE) {
       const response = await fetch(`${LOCAL_API}/photos/${encodeURIComponent(photoId)}`, {

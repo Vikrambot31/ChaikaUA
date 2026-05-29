@@ -6,7 +6,7 @@ export const NATIVE_UPLOAD_NAMESPACES = new Set<string>([
   // 'buy_sell',
   // 'contacts',
   // 'lost_found',
-  // 'requests',
+  'requests',
   // 'local_business',
 ]);
 

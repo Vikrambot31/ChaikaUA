@@ -27,6 +27,8 @@ export interface UploadedPhotoResult {
   contentType: string;
   downloadUrl?: string;
   size?: number;
+  /** Local path of the compressed file — caller can cache this to skip re-compression on retry. */
+  compressedUri?: string;
 }
 
 export interface PhotoUploadOptions {
@@ -38,6 +40,8 @@ export interface PhotoUploadOptions {
   feature?: UploadFeature;
   backoffMs?: number;
   resolveDownloadUrl?: boolean;
+  /** Pre-compressed file URI from a previous attempt — skips compressImage() if file still exists. */
+  compressedUri?: string;
 }
 
 const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
@@ -116,11 +120,21 @@ async function uploadViaFileSystem(
   });
 
   try {
-    const compressedUri = await compressImage(localUri, {
-      maxWidth: 1920,
-      maxHeight: 1920,
-      quality: 0.82,
-    });
+    // Use cached compressed file from a previous attempt if it still exists on disk.
+    let compressedUri = '';
+    if (options.compressedUri) {
+      const cachedInfo = await FileSystem.getInfoAsync(options.compressedUri);
+      if (cachedInfo.exists && (cachedInfo.size ?? 0) > 0) {
+        compressedUri = options.compressedUri;
+      }
+    }
+    if (!compressedUri) {
+      compressedUri = await compressImage(localUri, {
+        maxWidth: 1920,
+        maxHeight: 1920,
+        quality: 0.82,
+      });
+    }
     const contentType = getContentType(compressedUri);
     const fileInfo = await FileSystem.getInfoAsync(compressedUri);
     const fileSize = fileInfo.exists ? (fileInfo.size ?? 0) : 0;
@@ -213,7 +227,7 @@ async function uploadViaFileSystem(
                 ...options.logContext,
               })
             : undefined;
-          return { storagePath, contentType, downloadUrl, size: fileSize };
+          return { storagePath, contentType, downloadUrl, size: fileSize, compressedUri };
         }
 
         const downloadTokens = typeof responseData.downloadTokens === 'string'
@@ -261,6 +275,7 @@ async function uploadViaFileSystem(
           contentType,
           downloadUrl,
           size: fileSize,
+          compressedUri,
         };
       } catch (error) {
         lastError = error;
@@ -351,11 +366,21 @@ async function uploadViaBlobFetch(
   });
 
   try {
-    const compressedUri = await compressImage(localUri, {
-      maxWidth: 1920,
-      maxHeight: 1920,
-      quality: 0.82,
-    });
+    // Use cached compressed file from a previous attempt if it still exists on disk.
+    let compressedUri = '';
+    if (options.compressedUri) {
+      const cachedInfo = await FileSystem.getInfoAsync(options.compressedUri);
+      if (cachedInfo.exists && (cachedInfo.size ?? 0) > 0) {
+        compressedUri = options.compressedUri;
+      }
+    }
+    if (!compressedUri) {
+      compressedUri = await compressImage(localUri, {
+        maxWidth: 1920,
+        maxHeight: 1920,
+        quality: 0.82,
+      });
+    }
     const response = await fetch(compressedUri);
     const blob = await response.blob();
     if (!blob || blob.size <= 0) {
@@ -480,7 +505,7 @@ async function uploadViaBlobFetch(
           details: { note: 'upload succeeded but URL resolution failed', ...options.logContext },
         });
         // File is already in Storage — return without downloadUrl rather than discarding the upload
-        return { storagePath, contentType, size: blob.size };
+        return { storagePath, contentType, size: blob.size, compressedUri };
       }
     }
 
@@ -504,6 +529,7 @@ async function uploadViaBlobFetch(
       contentType,
       downloadUrl,
       size: blob.size,
+      compressedUri,
     };
   } catch (error) {
     void recordRuntimeTrace({

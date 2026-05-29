@@ -52,6 +52,8 @@ export type PhotoUploadMetadata = {
 export type PhotoUploadTask = {
   photoId: string;
   localUri: string;
+  /** Cached compressed file URI from a previous attempt (avoids re-compression on retry). */
+  compressedUri?: string;
   /** Storage/RTDB collection, e.g. 'community_photos' or 'user_photos'. */
   collection?: string;
   uid?: string;

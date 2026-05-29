@@ -62,6 +62,8 @@ export interface EngineUploadOptions {
   };
   /** Called with 0–100 as upload progresses. */
   onProgress?: (percent: number) => void;
+  /** Cached compressed file from a previous attempt — passed through to photoUploadService. */
+  compressedUri?: string;
 }
 
 export interface EngineUploadResult {
@@ -69,6 +71,8 @@ export interface EngineUploadResult {
   /** Push-key of the newly created RTDB record. */
   rtdbId: string;
   downloadUrl?: string;
+  /** Local path of the compressed file — UploadQueue caches this in the task for retries. */
+  compressedUri?: string;
 }
 
 // ─── Validation ───────────────────────────────────────────────────────────────
@@ -128,6 +132,7 @@ export async function uploadPhotoWithEngine(
   options: EngineUploadOptions,
 ): Promise<EngineUploadResult> {
   const { localUri, uid, collection, metadata, onProgress } = options;
+  let currentCompressedUri = options.compressedUri;
   const sourceLabel = 'PhotoUploadEngine.uploadPhotoWithEngine';
 
   onProgress?.(0);
@@ -184,10 +189,13 @@ export async function uploadPhotoWithEngine(
         maxAttempts: 1,
         resolveDownloadUrl: true,
         sourceLabel,
+        compressedUri: currentCompressedUri,
         logContext: { uid, collection, engineAttempt: attempt },
       });
       storagePath = result.storagePath;
       downloadUrl = result.downloadUrl;
+      // Cache compressedUri so the next retry skips re-compression
+      if (result.compressedUri) currentCompressedUri = result.compressedUri;
       lastError = null;
 
       void recordRuntimeTrace({
@@ -254,7 +262,7 @@ export async function uploadPhotoWithEngine(
       firebasePath: storagePath,
       details: { storagePath, collection, skippedRtdb: true, skippedThumbnail: true },
     });
-    return { storagePath, rtdbId: '', downloadUrl };
+    return { storagePath, rtdbId: '', downloadUrl, compressedUri: currentCompressedUri };
   }
 
   // ── Step 2.5: generate and upload 360px thumbnail ───────────────────────────
@@ -385,5 +393,5 @@ export async function uploadPhotoWithEngine(
     details: { storagePath, rtdbId, collection },
   });
 
-  return { storagePath, rtdbId, downloadUrl };
+  return { storagePath, rtdbId, downloadUrl, compressedUri: currentCompressedUri };
 }
