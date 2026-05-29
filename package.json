@@ -33,6 +33,8 @@
     "deploy:functions": "firebase deploy --only functions",
     "deploy:prod": "firebase deploy --only database,storage,functions",
     "deploy:prod:checked": "npm run type-check && npm run rules:check && npx jest firebaseRulesSecurity --runInBand && npm run deploy:prod",
+    "ship": "node scripts/ship.mjs",
+    "ship:full": "node scripts/ship.mjs --deploy --push",
     "build:apk": "eas build --platform android --profile preview --local",
     "build:apk:cloud": "eas build --platform android --profile preview",
     "build:production": "eas build --platform android --profile production",
