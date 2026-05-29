@@ -1,17 +1,16 @@
 /**
  * TZ_4.4 — MyPhotosScreen
  *
- * Shows the user's photos in three sections by moderation status:
- *   • «На модерації» — status = 'pending' (blurred preview, badge)
- *   • «Одобрені»     — status = 'approved'
- *   • «Відхилені»    — status = 'rejected' (rejection reason shown)
+ * Shows the user's personal photo library from user_photos/{uid}.
+ * Photos are saved first (moderationStatus = 'not_submitted') and can be
+ * selected later for public approval.
  *
  * In-flight (uploading/queued/error) photos come from local ImageStorage.
- * Moderation-status photos come from a one-time RTDB get() on focus.
+ * Saved/moderation-status photos come from a real-time RTDB listener.
  *
- * TZ_4.5 — Duplicate prevention:
- *   • "Add photo" button is disabled if there are any pending photos.
- *   • A banner is shown: «Ваше фото перевіряється».
+ * TZ_4.5 — Limit and review flow:
+ *   • Up to 10 personal photos.
+ *   • User selects saved/rejected photos and sends them for review manually.
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -29,7 +28,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { get, ref, query, orderByChild, onValue } from 'firebase/database';
+import { get, ref, query, orderByChild, onValue, update } from 'firebase/database';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { RouteProp, useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
@@ -55,13 +54,14 @@ type Navigation = {
 };
 type Route = RouteProp<Record<string, MyPhotosScreenParams | undefined>, string>;
 type PreviewPhoto = { uri: string; storagePath?: string };
+const MAX_USER_PHOTOS = 10;
 
 /** A photo record fetched from RTDB (user_photos/{uid} node). */
 type RtdbPhoto = {
   id: string;
   storagePath: string;
   imageUri: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'not_submitted' | 'pending' | 'approved' | 'rejected';
   uploadedAt: number;
   moderationReason?: string;
   title?: string;
@@ -87,7 +87,11 @@ const UI_TEXT = {
     queued: 'У черзі',
     uploading: 'Завантаження',
     uploaded: 'Готово',
+    saved: 'Збережено',
     error: 'Помилка',
+    limitReached: 'Можна зберегти до 10 фото. Видаліть одне фото, щоб додати нове.',
+    sectionAll: 'Мої фото',
+    sectionSaved: 'Збережено',
     sectionPending: 'На модерації',
     sectionApproved: 'Одобрені',
     sectionRejected: 'Відхилені',
@@ -95,6 +99,9 @@ const UI_TEXT = {
     pendingBanner: 'Ваше фото перевіряється — нові завантаження тимчасово недоступні',
     rejectedReason: 'Причина:',
     moderationNote: 'Видно тільки вам до одобрення',
+    selectForReview: 'Оберіть фото для перевірки',
+    submitForReview: 'Відправити на одобрення',
+    submittingForReview: 'Відправляємо...',
   },
   ru: {
     title: 'Мои фотографии',
@@ -113,7 +120,11 @@ const UI_TEXT = {
     queued: 'В очереди',
     uploading: 'Загрузка',
     uploaded: 'Готово',
+    saved: 'Сохранено',
     error: 'Ошибка',
+    limitReached: 'Можно сохранить до 10 фото. Удалите одно фото, чтобы добавить новое.',
+    sectionAll: 'Мои фото',
+    sectionSaved: 'Сохранено',
     sectionPending: 'На модерации',
     sectionApproved: 'Одобренные',
     sectionRejected: 'Отклонённые',
@@ -121,6 +132,9 @@ const UI_TEXT = {
     pendingBanner: 'Ваше фото проверяется — новые загрузки временно недоступны',
     rejectedReason: 'Причина:',
     moderationNote: 'Видно только вам до одобрения',
+    selectForReview: 'Выберите фото для проверки',
+    submitForReview: 'Отправить на одобрение',
+    submittingForReview: 'Отправляем...',
   },
   en: {
     title: 'My photos',
@@ -139,7 +153,11 @@ const UI_TEXT = {
     queued: 'Queued',
     uploading: 'Uploading',
     uploaded: 'Ready',
+    saved: 'Saved',
     error: 'Error',
+    limitReached: 'You can save up to 10 photos. Delete one photo to add another.',
+    sectionAll: 'My photos',
+    sectionSaved: 'Saved',
     sectionPending: 'Under review',
     sectionApproved: 'Approved',
     sectionRejected: 'Rejected',
@@ -147,6 +165,9 @@ const UI_TEXT = {
     pendingBanner: 'Your photo is being reviewed — new uploads are temporarily unavailable',
     rejectedReason: 'Reason:',
     moderationNote: 'Only visible to you until approved',
+    selectForReview: 'Select photos for review',
+    submitForReview: 'Send for approval',
+    submittingForReview: 'Sending...',
   },
 } as const;
 
@@ -170,9 +191,13 @@ async function fetchUserPhotosFromRtdb(uid: string): Promise<RtdbPhoto[]> {
         id: key,
         storagePath: typeof val.storagePath === 'string' ? val.storagePath : '',
         imageUri: typeof val.imageUri === 'string' ? val.imageUri : '',
-        status: (val.status === 'approved' || val.status === 'rejected')
-          ? (val.status as 'approved' | 'rejected')
-          : ('pending' as const),
+        status: val.moderationStatus === 'not_submitted'
+          ? 'not_submitted'
+          : (val.moderationStatus === 'pending' || val.moderationStatus === 'approved' || val.moderationStatus === 'rejected')
+            ? (val.moderationStatus as 'pending' | 'approved' | 'rejected')
+            : (val.status === 'pending' || val.status === 'approved' || val.status === 'rejected')
+              ? (val.status as 'pending' | 'approved' | 'rejected')
+              : ('not_submitted' as const),
         uploadedAt: typeof val.uploadedAt === 'number' ? val.uploadedAt : 0,
         moderationReason: typeof val.moderationReason === 'string' ? val.moderationReason : undefined,
         title: typeof val.title === 'string' ? val.title : undefined,
@@ -199,57 +224,6 @@ const SectionHeader: React.FC<{ label: string; count: number; color?: string }> 
   </View>
 );
 
-const PendingCard: React.FC<{
-  photo: RtdbPhoto;
-  onPress: () => void;
-  noteText: string;
-}> = ({ photo, onPress, noteText }) => (
-  <TouchableOpacity style={sStyles.rtdbCard} activeOpacity={0.88} onPress={onPress}>
-    {/* Dimmed image — pending photos blurred for other users, dim here to indicate status */}
-    <AppPhotoImage
-      uri={photo.imageUri}
-      storagePath={photo.storagePath}
-      style={[StyleSheet.absoluteFill, { opacity: 0.5 }]}
-      resizeMode="cover"
-      debugLabel="MyPhotosPending"
-    />
-    <View style={sStyles.moderationOverlay}>
-      <MaterialCommunityIcons name="clock-outline" size={16} color="#FFD54F" />
-      <Text style={sStyles.moderationText} numberOfLines={2}>
-        {noteText}
-      </Text>
-    </View>
-  </TouchableOpacity>
-);
-
-const RejectedCard: React.FC<{
-  photo: RtdbPhoto;
-  reasonLabel: string;
-  onPress: () => void;
-}> = ({ photo, reasonLabel, onPress }) => (
-  <TouchableOpacity
-    style={[sStyles.rtdbCard, sStyles.rejectedCard]}
-    activeOpacity={0.88}
-    onPress={onPress}
-  >
-    <AppPhotoImage
-      uri={photo.imageUri}
-      storagePath={photo.storagePath}
-      style={[StyleSheet.absoluteFill, { opacity: 0.4 }]}
-      resizeMode="cover"
-      debugLabel="MyPhotosRejected"
-    />
-    <View style={sStyles.moderationOverlay}>
-      <MaterialCommunityIcons name="close-circle-outline" size={16} color="#EF9A9A" />
-      {photo.moderationReason ? (
-        <Text style={[sStyles.moderationText, { color: '#EF9A9A' }]} numberOfLines={3}>
-          {reasonLabel} {photo.moderationReason}
-        </Text>
-      ) : null}
-    </View>
-  </TouchableOpacity>
-);
-
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 const MyPhotosScreen: React.FC = () => {
@@ -268,19 +242,35 @@ const MyPhotosScreen: React.FC = () => {
   const [rtdbPhotos, setRtdbPhotos] = useState<RtdbPhoto[]>([]);
   const [rtdbLoading, setRtdbLoading] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [selectedForReview, setSelectedForReview] = useState<string[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [previewPhoto, setPreviewPhoto] = useState<PreviewPhoto | null>(null);
 
   const userId = uid || userEmail || 'local-user';
 
   // Derived moderation sections
+  const savedPhotos = useMemo(() => rtdbPhotos.filter((p) => p.status === 'not_submitted'), [rtdbPhotos]);
   const pendingPhotos = useMemo(() => rtdbPhotos.filter((p) => p.status === 'pending'), [rtdbPhotos]);
   const approvedPhotos = useMemo(() => rtdbPhotos.filter((p) => p.status === 'approved'), [rtdbPhotos]);
   const rejectedPhotos = useMemo(() => rtdbPhotos.filter((p) => p.status === 'rejected'), [rtdbPhotos]);
+  const rtdbPhotoKeys = useMemo(() => {
+    const keys = new Set<string>();
+    rtdbPhotos.forEach((photo) => {
+      if (photo.storagePath) keys.add(photo.storagePath);
+      if (photo.imageUri) keys.add(photo.imageUri);
+    });
+    return keys;
+  }, [rtdbPhotos]);
+  const displayedLocalPhotos = useMemo(() => localPhotos.filter((photo) => (
+    photo.status !== 'uploaded' ||
+    !((photo.storagePath && rtdbPhotoKeys.has(photo.storagePath)) || (photo.imageUrl && rtdbPhotoKeys.has(photo.imageUrl)))
+  )), [localPhotos, rtdbPhotoKeys]);
+  const totalPhotoCount = rtdbPhotos.length + displayedLocalPhotos.length;
 
-  // TZ_4.5 — button disabled while any pending photo exists
-  const hasPendingPhotos = pendingPhotos.length > 0;
-  const addButtonDisabled = hasPendingPhotos || adding;
+  const limitReached = totalPhotoCount >= MAX_USER_PHOTOS;
+  const addButtonDisabled = limitReached || adding;
+  const selectedCount = selectedForReview.length;
 
   const handleBack = useCallback(() => {
     if (typeof navigation.canGoBack === 'function' && navigation.canGoBack()) {
@@ -289,17 +279,6 @@ const MyPhotosScreen: React.FC = () => {
     }
     navigation.navigate?.('MainTabs');
   }, [navigation]);
-
-  const loadRtdbPhotos = useCallback(async () => {
-    if (!uid) return;
-    setRtdbLoading(true);
-    try {
-      const photos = await fetchUserPhotosFromRtdb(uid);
-      setRtdbPhotos(photos);
-    } finally {
-      setRtdbLoading(false);
-    }
-  }, [uid]);
 
   useEffect(() => {
     const unsubscribe = ImageStorage.subscribe((items) =>
@@ -321,7 +300,12 @@ const MyPhotosScreen: React.FC = () => {
 
   // Real-time listener for RTDB photos — syncs when moderator approves/rejects
   useEffect(() => {
-    if (!uid) return;
+    if (!uid) {
+      setRtdbPhotos([]);
+      setRtdbLoading(false);
+      return;
+    }
+    setRtdbLoading(true);
 
     const photosRef = query(
       ref(database, `user_photos/${uid}`),
@@ -334,12 +318,15 @@ const MyPhotosScreen: React.FC = () => {
         try {
           const photos = await fetchUserPhotosFromRtdb(uid);
           setRtdbPhotos(photos);
+          setRtdbLoading(false);
         } catch (err) {
           safeLogError('MyPhotosScreen.onValue', err, { uid });
+          setRtdbLoading(false);
         }
       },
       (err) => {
         safeLogError('MyPhotosScreen.realtimeListener', err, { uid });
+        setRtdbLoading(false);
       }
     );
 
@@ -353,9 +340,8 @@ const MyPhotosScreen: React.FC = () => {
         return true;
       });
       void UploadQueue.process();
-      void loadRtdbPhotos();
       return () => subscription.remove();
-    }, [handleBack, loadRtdbPhotos]),
+    }, [handleBack]),
   );
 
   const statusLabels = useMemo<Record<UserPhoto['status'], string>>(
@@ -377,6 +363,7 @@ const MyPhotosScreen: React.FC = () => {
         { uploadedBy: userEmail || userName || userId },
         { collection: 'user_photos', uid },
       );
+      void UploadQueue.process();
       if (selectMode) {
         PhotoSelector.select(photo);
         handleBack();
@@ -416,10 +403,43 @@ const MyPhotosScreen: React.FC = () => {
     ]);
   }, [runAdd, text]);
 
+  const togglePhotoForReview = useCallback((photo: RtdbPhoto) => {
+    if (photo.status !== 'not_submitted' && photo.status !== 'rejected') return;
+    setSelectedForReview((prev) => (
+      prev.includes(photo.id) ? prev.filter((id) => id !== photo.id) : [...prev, photo.id]
+    ));
+  }, []);
+
+  const submitSelectedForReview = useCallback(async () => {
+    if (!uid || selectedForReview.length === 0 || submittingReview) return;
+    setSubmittingReview(true);
+    try {
+      const now = Date.now();
+      await Promise.all(selectedForReview.map((photoId) => update(ref(database, `user_photos/${uid}/${photoId}`), {
+        status: 'pending',
+        moderationStatus: 'pending',
+        submittedAt: now,
+        updatedAt: now,
+        moderationReason: null,
+      })));
+      setSelectedForReview([]);
+    } catch (error) {
+      showUserError(language, 'upload', error);
+    } finally {
+      setSubmittingReview(false);
+    }
+  }, [language, selectedForReview, submittingReview, uid]);
+
   const retryPhoto = useCallback(
     (photo: UserPhoto) => {
       void (async () => {
         try {
+          await ImageStorage.updatePhoto(photo.id, {
+            status: 'queued',
+            error: undefined,
+            retryCount: 0,
+            progress: 0,
+          });
           await UploadQueue.enqueue(photo.id, photo.localUri, undefined, {
             collection: 'user_photos',
             uid,
@@ -492,7 +512,7 @@ const MyPhotosScreen: React.FC = () => {
             uri={displayUri}
             storagePath={item.storagePath}
             style={styles.photo}
-            resizeMode="cover"
+            resizeMode="contain"
           />
         ) : (
           <View style={styles.photoFallback}>
@@ -529,9 +549,63 @@ const MyPhotosScreen: React.FC = () => {
     );
   };
 
+  const renderRtdbPhoto = (photo: RtdbPhoto) => {
+    const selectable = photo.status === 'not_submitted' || photo.status === 'rejected';
+    const selected = selectedForReview.includes(photo.id);
+    const badgeLabel = photo.status === 'pending'
+      ? text.sectionPending
+      : photo.status === 'approved'
+        ? text.sectionApproved
+        : photo.status === 'rejected'
+          ? text.sectionRejected
+          : text.saved;
+    const badgeColor = photo.status === 'pending'
+      ? '#F57F17'
+      : photo.status === 'rejected'
+        ? SCREEN_THEME.terracottaDark
+        : SCREEN_THEME.woodGreenDark;
+
+    return (
+      <TouchableOpacity
+        key={photo.id}
+        style={[sStyles.rtdbCard, selected && styles.selectedCard]}
+        activeOpacity={0.88}
+        onPress={() => {
+          if (selectable) {
+            togglePhotoForReview(photo);
+            return;
+          }
+          setPreviewPhoto({ uri: photo.imageUri, storagePath: photo.storagePath });
+        }}
+        onLongPress={() => setPreviewPhoto({ uri: photo.imageUri, storagePath: photo.storagePath })}
+      >
+        <AppPhotoImage
+          uri={photo.imageUri}
+          storagePath={photo.storagePath}
+          style={StyleSheet.absoluteFill}
+          resizeMode="contain"
+          debugLabel="MyPhotosUnified"
+        />
+        <View style={[styles.savedBadge, { backgroundColor: badgeColor }]}>
+          <Text style={styles.statusText}>{badgeLabel}</Text>
+        </View>
+        {selectable ? (
+          <View style={[styles.reviewSelectBadge, selected && styles.reviewSelectBadgeActive]}>
+            <MaterialCommunityIcons
+              name={selected ? 'check-circle' : 'checkbox-blank-circle-outline'}
+              size={22}
+              color="#fff"
+            />
+          </View>
+        ) : null}
+      </TouchableOpacity>
+    );
+  };
+
   const hasAnyPhotos =
-    localPhotos.length > 0 ||
+    displayedLocalPhotos.length > 0 ||
     pendingPhotos.length > 0 ||
+    savedPhotos.length > 0 ||
     approvedPhotos.length > 0 ||
     rejectedPhotos.length > 0;
 
@@ -548,11 +622,10 @@ const MyPhotosScreen: React.FC = () => {
         </View>
       </View>
 
-      {/* TZ_4.5 — Banner: disabled while photo is pending */}
-      {hasPendingPhotos && !selectMode ? (
+      {limitReached && !selectMode ? (
         <View style={styles.pendingBanner}>
-          <MaterialCommunityIcons name="clock-check-outline" size={18} color="#FFF8E1" />
-          <Text style={styles.pendingBannerText}>{text.pendingBanner}</Text>
+          <MaterialCommunityIcons name="image-multiple-outline" size={18} color="#FFF8E1" />
+          <Text style={styles.pendingBannerText}>{text.limitReached}</Text>
         </View>
       ) : null}
 
@@ -578,89 +651,26 @@ const MyPhotosScreen: React.FC = () => {
           </View>
         ) : null}
 
-        {/* Section: На модерації */}
-        {pendingPhotos.length > 0 ? (
+        {rtdbPhotos.length > 0 ? (
           <View style={styles.section}>
             <SectionHeader
-              label={text.sectionPending}
-              count={pendingPhotos.length}
-              color="#F57F17"
+              label={text.sectionAll}
+              count={rtdbPhotos.length}
+              color={SCREEN_THEME.enamelBlueDark}
             />
+            <Text style={styles.reviewHint}>{text.selectForReview}</Text>
             <View style={styles.grid}>
-              {pendingPhotos.map((photo) => (
-                <PendingCard
-                  key={photo.id}
-                  photo={photo}
-                  onPress={() =>
-                    setPreviewPhoto({ uri: photo.imageUri, storagePath: photo.storagePath })
-                  }
-                  noteText={text.moderationNote}
-                />
-              ))}
-            </View>
-          </View>
-        ) : null}
-
-        {/* Section: Одобрені */}
-        {approvedPhotos.length > 0 ? (
-          <View style={styles.section}>
-            <SectionHeader
-              label={text.sectionApproved}
-              count={approvedPhotos.length}
-              color={SCREEN_THEME.woodGreenDark}
-            />
-            <View style={styles.grid}>
-              {approvedPhotos.map((photo) => (
-                <TouchableOpacity
-                  key={photo.id}
-                  style={sStyles.rtdbCard}
-                  activeOpacity={0.88}
-                  onPress={() =>
-                    setPreviewPhoto({ uri: photo.imageUri, storagePath: photo.storagePath })
-                  }
-                >
-                  <AppPhotoImage
-                    uri={photo.imageUri}
-                    storagePath={photo.storagePath}
-                    style={StyleSheet.absoluteFill}
-                    resizeMode="cover"
-                    debugLabel="MyPhotosApproved"
-                  />
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        ) : null}
-
-        {/* Section: Відхилені */}
-        {rejectedPhotos.length > 0 ? (
-          <View style={styles.section}>
-            <SectionHeader
-              label={text.sectionRejected}
-              count={rejectedPhotos.length}
-              color={SCREEN_THEME.terracottaDark}
-            />
-            <View style={styles.grid}>
-              {rejectedPhotos.map((photo) => (
-                <RejectedCard
-                  key={photo.id}
-                  photo={photo}
-                  reasonLabel={text.rejectedReason}
-                  onPress={() =>
-                    setPreviewPhoto({ uri: photo.imageUri, storagePath: photo.storagePath })
-                  }
-                />
-              ))}
+              {rtdbPhotos.map(renderRtdbPhoto)}
             </View>
           </View>
         ) : null}
 
         {/* Section: Local in-flight uploads */}
-        {localPhotos.length > 0 ? (
+        {displayedLocalPhotos.length > 0 ? (
           <View style={styles.section}>
-            <SectionHeader label={text.sectionUploading} count={localPhotos.length} />
+            <SectionHeader label={text.sectionUploading} count={displayedLocalPhotos.length} />
             <FlatList
-              data={localPhotos}
+              data={displayedLocalPhotos}
               keyExtractor={(item: UserPhoto) => item.id}
               renderItem={renderLocalPhoto}
               numColumns={2}
@@ -672,9 +682,23 @@ const MyPhotosScreen: React.FC = () => {
         ) : null}
       </ScrollView>
 
-      {/* FAB — disabled when pending or adding */}
+      {selectedCount > 0 ? (
+        <TouchableOpacity
+          style={[styles.reviewButton, submittingReview && styles.addButtonDisabled]}
+          onPress={() => void submitSelectedForReview()}
+          activeOpacity={0.88}
+          disabled={submittingReview}
+        >
+          {submittingReview ? <ActivityIndicator color="#fff" /> : <MaterialCommunityIcons name="send-check-outline" size={20} color="#fff" />}
+          <Text style={styles.addButtonText}>
+            {submittingReview ? text.submittingForReview : `${text.submitForReview} (${selectedCount})`}
+          </Text>
+        </TouchableOpacity>
+      ) : null}
+
+      {/* FAB — disabled when the personal gallery limit is reached */}
       <TouchableOpacity
-        style={[styles.addButton, addButtonDisabled && styles.addButtonDisabled]}
+        style={[styles.addButton, selectedCount > 0 && styles.addButtonRaised, addButtonDisabled && styles.addButtonDisabled]}
         onPress={() => void addPhoto()}
         activeOpacity={0.88}
         disabled={addButtonDisabled}
@@ -682,14 +706,10 @@ const MyPhotosScreen: React.FC = () => {
         {adding ? (
           <ActivityIndicator color="#fff" />
         ) : (
-          <MaterialCommunityIcons
-            name={hasPendingPhotos ? 'clock-outline' : 'plus'}
-            size={22}
-            color="#fff"
-          />
+          <MaterialCommunityIcons name={limitReached ? 'image-multiple-outline' : 'plus'} size={22} color="#fff" />
         )}
         <Text style={styles.addButtonText}>
-          {hasPendingPhotos ? text.sectionPending : text.add}
+          {limitReached ? `${totalPhotoCount}/${MAX_USER_PHOTOS}` : text.add}
         </Text>
       </TouchableOpacity>
 
@@ -769,6 +789,13 @@ const styles = StyleSheet.create({
   scrollContent: { paddingHorizontal: 14, paddingBottom: 110 },
   loadingRow: { paddingVertical: 20, alignItems: 'center' },
   section: { marginBottom: 18 },
+  reviewHint: {
+    marginTop: -4,
+    marginBottom: 10,
+    color: SCREEN_THEME.textSecondary,
+    fontSize: 12,
+    fontWeight: '700',
+  },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   gridRow: { gap: 12 },
   photoCard: {
@@ -779,6 +806,10 @@ const styles = StyleSheet.create({
     backgroundColor: SCREEN_THEME.paperStrong,
     borderWidth: 1,
     borderColor: '#E4D0AB',
+  },
+  selectedCard: {
+    borderWidth: 3,
+    borderColor: SCREEN_THEME.enamelBlueDark,
   },
   photo: { width: '100%', height: '100%' },
   photoFallback: {
@@ -798,6 +829,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
+  },
+  savedBadge: {
+    position: 'absolute',
+    left: 8,
+    bottom: 8,
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    backgroundColor: SCREEN_THEME.woodGreenDark,
+  },
+  reviewSelectBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(33, 42, 52, 0.72)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reviewSelectBadgeActive: {
+    backgroundColor: SCREEN_THEME.enamelBlueDark,
   },
   statusText: { color: '#fff', fontSize: 11, fontWeight: '900' },
   deleteButton: {
@@ -863,7 +917,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
+  addButtonRaised: { bottom: 86 },
   addButtonDisabled: { opacity: 0.55 },
+  reviewButton: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: 22,
+    minHeight: 56,
+    borderRadius: 16,
+    backgroundColor: SCREEN_THEME.enamelBlueDark,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
   addButtonText: { color: '#fff', fontSize: 16, fontWeight: '900' },
   previewBackdrop: {
     flex: 1,
@@ -914,25 +982,6 @@ const sStyles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E4D0AB',
     position: 'relative',
-  },
-  rejectedCard: { borderColor: '#EF9A9A' },
-  moderationOverlay: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 6,
-    padding: 8,
-    backgroundColor: 'rgba(0,0,0,0.62)',
-  },
-  moderationText: {
-    flex: 1,
-    color: '#FFD54F',
-    fontSize: 11,
-    fontWeight: '800',
-    lineHeight: 15,
   },
 });
 

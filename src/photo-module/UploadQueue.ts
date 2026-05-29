@@ -31,6 +31,7 @@ const MAX_ERROR_LENGTH = 300;
 // ─── Queue persistence ────────────────────────────────────────────────────────
 
 let processing = false;
+let pendingRerun = false;
 
 const readQueue = async (): Promise<PhotoUploadTask[]> => {
   const raw = await AsyncStorage.getItem(QUEUE_KEY);
@@ -130,6 +131,22 @@ export const UploadQueue = {
         },
         ...queue,
       ]);
+    } else {
+      const nextQueue = queue.map((task) => (
+        task.photoId === photoId || task.localUri === localUri
+          ? {
+              ...task,
+              photoId,
+              localUri,
+              collection: options?.collection ?? task.collection,
+              uid: options?.uid ?? task.uid,
+              retryCount: 0,
+              updatedAt: now,
+              metadata: metadata ?? task.metadata,
+            }
+          : task
+      ));
+      await writeQueue(nextQueue);
     }
 
     void recordRuntimeTrace({
@@ -148,7 +165,14 @@ export const UploadQueue = {
       },
     });
 
-    void this.process().catch((error) => safeLogError('UploadQueue.enqueue.process', error));
+    if (processing) {
+      // process() is already running and has already read the queue snapshot.
+      // Mark that a re-run is needed so the new task is picked up immediately
+      // after the current run finishes — without waiting for the next focus event.
+      pendingRerun = true;
+    } else {
+      void this.process().catch((error) => safeLogError('UploadQueue.enqueue.process', error));
+    }
     return true;
   },
 
@@ -161,7 +185,7 @@ export const UploadQueue = {
    * Uses PhotoUploadEngine for the actual upload + RTDB write.
    */
   async process(): Promise<void> {
-    if (processing) return;
+    if (processing) { pendingRerun = true; return; }
     processing = true;
 
     try {
@@ -181,8 +205,17 @@ export const UploadQueue = {
           continue;
         }
 
-        // Max retries reached — leave as error, don't keep trying
+        // Max retries reached: keep local error state, but free the queue slot.
         if (task.retryCount >= MAX_RETRY_COUNT) {
+          await removeTask(task.photoId);
+          void recordRuntimeTrace({
+            screen: 'UploadQueue.process',
+            action: 'max_retry_evicted',
+            status: 'fail',
+            feature: 'profile',
+            stage: 'max_retry_cleanup',
+            details: { photoId: task.photoId, retryCount: task.retryCount, maxRetry: MAX_RETRY_COUNT },
+          });
           continue;
         }
 
@@ -203,10 +236,29 @@ export const UploadQueue = {
         });
 
         try {
-          // Determine effective uid: from task, from photo record, or fall back
-          const uid = task.uid ?? photo.userId ?? 'unknown';
           const collection = task.collection ?? 'user_photos';
+          const uid = String(task.uid ?? photo.userId ?? '').trim();
+          if (collection !== 'community_photos' && (!uid || uid === 'unknown' || uid === 'local-user')) {
+            const message = 'Sign in is required to upload this photo.';
+            await ImageStorage.updatePhoto(task.photoId, {
+              status: 'error',
+              error: message,
+              retryCount: MAX_RETRY_COUNT,
+            });
+            await removeTask(task.photoId);
+            void recordRuntimeTrace({
+              screen: 'UploadQueue.process',
+              action: 'missing_uid',
+              status: 'fail',
+              feature: 'profile',
+              stage: 'uid_guard',
+              details: { photoId: task.photoId, collection, userId: photo.userId ?? null },
+            });
+            safeLogError('UploadQueue.process.missing_uid', new Error(message), { photoId: task.photoId, collection });
+            continue;
+          }
 
+          const defaultTarget = collection === 'community_photos' ? 'gallery_public' : 'my_photos';
           const result = await uploadPhotoWithEngine({
             localUri: task.localUri,
             uid,
@@ -218,9 +270,9 @@ export const UploadQueue = {
                   description: task.metadata.description,
                   locationLabel: task.metadata.locationLabel,
                   locationType: task.metadata.locationType,
-                  target: 'my_photos',
+                  target: defaultTarget,
                 }
-              : { target: 'my_photos' },
+              : { target: defaultTarget },
             onProgress: (percent) => {
               void ImageStorage.updatePhoto(task.photoId, { progress: percent });
             },
@@ -236,10 +288,29 @@ export const UploadQueue = {
             details: { photoId: task.photoId, storagePath: result.storagePath, rtdbId: result.rtdbId },
           });
 
+          // If Storage upload succeeded but getDownloadURL failed — treat as error.
+          // A localUri stored as imageUrl would be sent to Firebase and shown as
+          // a broken photo to all other users (BUG-PHOTO-01).
+          if (!result.downloadUrl) {
+            const retryCount = task.retryCount + 1;
+            await ImageStorage.updatePhoto(task.photoId, {
+              status: retryCount >= MAX_RETRY_COUNT ? 'error' : 'queued',
+              error: 'Upload succeeded but download URL was not returned. Retrying.',
+              retryCount,
+            });
+            if (retryCount >= MAX_RETRY_COUNT) {
+              await removeTask(task.photoId);
+            } else {
+              await updateTask({ ...task, retryCount, updatedAt: Date.now() });
+            }
+            safeLogError('UploadQueue.process.no_download_url', new Error('downloadUrl missing after upload'), { photoId: task.photoId, storagePath: result.storagePath });
+            continue;
+          }
           await ImageStorage.updatePhoto(task.photoId, {
-            imageUrl: result.downloadUrl ?? '',
+            imageUrl: result.downloadUrl,
             storagePath: result.storagePath,
             status: 'uploaded',
+            moderationStatus: 'not_submitted',
             error: undefined,
             retryCount: task.retryCount,
           });
@@ -268,12 +339,20 @@ export const UploadQueue = {
             error: message,
             retryCount,
           });
-          await updateTask({ ...task, retryCount, updatedAt: Date.now() });
+          if (retryCount >= MAX_RETRY_COUNT) {
+            await removeTask(task.photoId);
+          } else {
+            await updateTask({ ...task, retryCount, updatedAt: Date.now() });
+          }
           safeLogError('UploadQueue.process.upload', error, { photoId: task.photoId, retryCount });
         }
       }
     } finally {
       processing = false;
+      if (pendingRerun) {
+        pendingRerun = false;
+        void this.process().catch((error) => safeLogError('UploadQueue.process.rerun', error));
+      }
     }
   },
 
