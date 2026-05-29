@@ -24,6 +24,7 @@ type Props = {
   likeBusy?: boolean;
   onLike?: () => void;
   avatarBackgroundColor?: string;
+  avatarSize?: number;
 };
 
 const labels = {
@@ -48,6 +49,7 @@ export default function UserCardActionBar({
   likeBusy,
   onLike,
   avatarBackgroundColor = '#6A8BA5',
+  avatarSize = 32,
 }: Props) {
   const [localLikes, setLocalLikes] = useState<Record<string, true>>({});
   const [localBusy, setLocalBusy] = useState(false);
@@ -115,8 +117,8 @@ export default function UserCardActionBar({
       <MiniUserAvatar
         uri={avatarUri || ''}
         name={name || ''}
-        size={32}
-        borderRadius={11}
+        size={avatarSize}
+        borderRadius={avatarSize / 3}
         backgroundColor={avatarBackgroundColor}
       />
 

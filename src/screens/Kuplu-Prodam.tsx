@@ -20,8 +20,8 @@ import { useContactRequest } from '../hooks/useContactRequest';
 import ContactReasonModal from '../components/ContactReasonModal';
 import { safeCallPhone } from '../utils/communicationActions';
 import type { DetailItemData } from '../utils/detailViewTypes';
-import UploadedPhotosGrid from '../components/UploadedPhotosGrid';
-import { getDonePhotos, getRequiredPhotoLabel, validateSubmissionRequirements } from '../utils/submissionRequirements';
+import { getDonePhotos, validateSubmissionRequirements } from '../utils/submissionRequirements';
+import { getLanguageValidationError } from '../utils/contentLanguageGuard';
 import UserCardActionBar from '../components/UserCardActionBar';
 import { resolveUserAvatarMap } from '../utils/userAvatar';
 
@@ -50,7 +50,7 @@ const UI_TEXT = {
     categoryLabel: 'Категорія товару',
     conditionLabel: 'Стан товару',
     priceLabel: 'Ціна',
-    priceError: 'Вкажіть коректну ціну більше 0.',
+    priceError: 'Вкажіть коректну ціну 0 або більше.',
     phoneLabel: 'Телефон для зв\'язку',
     photoLabel: 'Фото товару',
     addPhoto: 'Обрати з Моїх фотографій',
@@ -79,6 +79,15 @@ const UI_TEXT = {
     errorSave: 'Не вдалося зберегти оголошення',
     photoUploading: 'Дочекайтесь завершення завантаження фото.',
     photoUploadError: 'Не вдалося завантажити фото. Видаліть його або спробуйте ще раз.',
+    photoRequired: 'Додайте хоча б одне фото товару.',
+    photoRequiredMark: '(обов\'язкове)',
+    itemNameLabel: 'Назва товару',
+    itemNamePlaceholder: 'Наприклад: велосипед, стіл, куртка...',
+    itemNameError: 'Вкажіть назву товару.',
+    langError: 'У назві або описі знайдено латинські слова. Будь ласка, напишіть текст мовою застосунку.',
+    draftRestoredTitle: 'Форму відновлено',
+    draftRestoredMsg: 'Текст відновлено після перезапуску. Будь ласка, додайте фото знову.',
+    draftRestoredOk: 'Зрозуміло',
     errorTitle: 'Помилка',
     deleteText: 'Видалити',
     conditionLabels: { new: 'Новий', like_new: 'Як новий', good: 'Гарний', fair: 'З недоліками' },
@@ -105,6 +114,7 @@ const UI_TEXT = {
     live: 'НАЖИВО',
     liveCount: (count: number) => `всього ${count} активних оголошень на сьогодні`,
     ok: 'OK',
+    loginBtn: 'Увійти',
     authRequired: 'Увійдіть в акаунт, щоб додати оголошення.',
   },
   ru: {
@@ -113,7 +123,7 @@ const UI_TEXT = {
     categoryLabel: 'Категория товара',
     conditionLabel: 'Состояние товара',
     priceLabel: 'Цена',
-    priceError: 'Укажите корректную цену больше 0.',
+    priceError: 'Укажите корректную цену 0 или больше.',
     phoneLabel: 'Телефон для связи',
     photoLabel: 'Фото товара',
     addPhoto: 'Выбрать из Моих фотографий',
@@ -142,6 +152,15 @@ const UI_TEXT = {
     errorSave: 'Не удалось сохранить объявление',
     photoUploading: 'Дождитесь завершения загрузки фото.',
     photoUploadError: 'Не удалось загрузить фото. Удалите его или попробуйте еще раз.',
+    photoRequired: 'Добавьте хотя бы одно фото товара.',
+    photoRequiredMark: '(обязательное)',
+    itemNameLabel: 'Название товара',
+    itemNamePlaceholder: 'Например: велосипед, стол, куртка...',
+    itemNameError: 'Укажите название товара.',
+    langError: 'В названии или описании найдены латинские слова. Пожалуйста, напишите текст на языке приложения.',
+    draftRestoredTitle: 'Форма восстановлена',
+    draftRestoredMsg: 'Текст восстановлен после перезапуска. Пожалуйста, добавьте фото снова.',
+    draftRestoredOk: 'Понятно',
     errorTitle: 'Ошибка',
     deleteText: 'Удалить',
     conditionLabels: { new: 'Новый', like_new: 'Как новый', good: 'Хороший', fair: 'С недостатками' },
@@ -168,6 +187,7 @@ const UI_TEXT = {
     live: 'В ЭФИРЕ',
     liveCount: (count: number) => `всего ${count} активных объявлений на сегодня`,
     ok: 'OK',
+    loginBtn: 'Войти',
     authRequired: 'Войдите в аккаунт, чтобы добавить объявление.',
   },
   en: {
@@ -176,7 +196,7 @@ const UI_TEXT = {
     categoryLabel: 'Item category',
     conditionLabel: 'Item condition',
     priceLabel: 'Price',
-    priceError: 'Enter a valid price greater than 0.',
+    priceError: 'Enter a valid price 0 or greater.',
     phoneLabel: 'Contact phone',
     photoLabel: 'Item photo',
     addPhoto: 'Choose from My photos',
@@ -205,6 +225,15 @@ const UI_TEXT = {
     errorSave: 'Failed to save listing',
     photoUploading: 'Wait until the photo upload is complete.',
     photoUploadError: 'Photo upload failed. Remove it or try again.',
+    photoRequired: 'Add at least one item photo.',
+    photoRequiredMark: '(required)',
+    itemNameLabel: 'Item name',
+    itemNamePlaceholder: 'E.g.: bicycle, table, jacket...',
+    itemNameError: 'Enter the item name.',
+    langError: 'The name or description contains non-Cyrillic words. Please write in the app language.',
+    draftRestoredTitle: 'Form restored',
+    draftRestoredMsg: 'Your text was restored after restart. Please add photos again.',
+    draftRestoredOk: 'Got it',
     errorTitle: 'Error',
     deleteText: 'Delete',
     conditionLabels: { new: 'New', like_new: 'Like new', good: 'Good', fair: 'With flaws' },
@@ -231,6 +260,7 @@ const UI_TEXT = {
     live: 'LIVE',
     liveCount: (count: number) => `${count} active listings today`,
     ok: 'OK',
+    loginBtn: 'Sign in',
     authRequired: 'Sign in to add a listing.',
   },
 } as const;
@@ -242,12 +272,13 @@ const BuySellScreen: React.FC = () => {
   const user = useSelector((state: RootState) => state.auth.user);
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const text = UI_TEXT[language];
-  const requiredPhotoLabel = getRequiredPhotoLabel(language);
+  const [itemName, setItemName] = useState('');
   const [category, setCategory] = useState('');
   const [condition, setCondition] = useState('');
   const [price, setPrice] = useState('');
   const [description, setDescription] = useState('');
-  const [phone, setPhone] = useState('+380');
+  const [phone, setPhone] = useState(() => (user?.phone ? normalizePhoneText(user.phone) : ''));
+  const draftHadPhotos = useRef(false);
   const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
   const [listings, setListings] = useState<BuySellListing[]>([]);
   const [avatarByUserId, setAvatarByUserId] = useState<Record<string, string>>({});
@@ -277,7 +308,7 @@ const BuySellScreen: React.FC = () => {
     const closeYes = language === 'ru' ? 'Да' : language === 'en' ? 'Yes' : 'Так';
     Alert.alert(closeTitle, closeMsg, [
       { text: closeNo, style: 'cancel' },
-      { text: closeYes, onPress: () => setAddFormVisible(false) },
+      { text: closeYes, onPress: () => { void AsyncStorage.removeItem('@chaika:buy_sell_draft').catch(() => {}); setAddFormVisible(false); } },
     ]);
   }, [language]);
 
@@ -289,13 +320,19 @@ const BuySellScreen: React.FC = () => {
       try {
         const raw = await AsyncStorage.getItem('@chaika:buy_sell_draft');
         if (!isMounted || !raw) return;
-        const draft = JSON.parse(raw) as Partial<{ category: string; condition: string; price: string; description: string; phone: string; addFormVisible: boolean }>;
+        const draft = JSON.parse(raw) as Partial<{ itemName: string; category: string; condition: string; price: string; description: string; phone: string; addFormVisible: boolean; hadPhotos: boolean }>;
+        if (draft.itemName) setItemName(draft.itemName);
         if (draft.category) setCategory(draft.category);
         if (draft.condition) setCondition(draft.condition);
         if (draft.price) setPrice(draft.price);
         if (draft.description) setDescription(draft.description);
         if (draft.phone) setPhone(draft.phone);
-        if (draft.addFormVisible) setAddFormVisible(true);
+        if (draft.addFormVisible) {
+          setAddFormVisible(true);
+          if (draft.hadPhotos) {
+            draftHadPhotos.current = true;
+          }
+        }
         await AsyncStorage.removeItem('@chaika:buy_sell_draft');
       } catch { /* ignore */ }
     })();
@@ -309,9 +346,15 @@ const BuySellScreen: React.FC = () => {
     if (!addFormVisible) return;
     void AsyncStorage.setItem(
       '@chaika:buy_sell_draft',
-      JSON.stringify({ category, condition, price, description, phone, addFormVisible: true }),
+      JSON.stringify({ itemName, category, condition, price, description, phone, addFormVisible: true, hadPhotos: formPhotos.length > 0 }),
     ).catch(() => {});
-  }, [addFormVisible, category, condition, price, description, phone]);
+  }, [addFormVisible, itemName, category, condition, price, description, phone, formPhotos]);
+
+  useEffect(() => {
+    if (!addFormVisible || !draftHadPhotos.current) return;
+    draftHadPhotos.current = false;
+    Alert.alert(text.draftRestoredTitle, text.draftRestoredMsg, [{ text: text.draftRestoredOk }]);
+  }, [addFormVisible, text.draftRestoredTitle, text.draftRestoredMsg, text.draftRestoredOk]);
 
   useEffect(() => {
     const userIds = Array.from(new Set(listings.map((item) => item.userId).filter((id): id is string => Boolean(id))));
@@ -403,11 +446,12 @@ const BuySellScreen: React.FC = () => {
   };
 
   const resetForm = () => {
+    setItemName('');
     setCategory('');
     setCondition('');
     setPrice('');
     setDescription('');
-    setPhone('+380');
+    setPhone(user?.phone ? normalizePhoneText(user.phone) : '');
     setFormPhotos([]);
     void AsyncStorage.removeItem('@chaika:buy_sell_draft').catch(() => {});
   };
@@ -442,19 +486,35 @@ const BuySellScreen: React.FC = () => {
   }, [mapToDetailData, navigation]);
 
   const handleSubmit = async () => {
+    if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, userStartAvatarKey: user?.startAvatarKey, navigation })) {
+      return;
+    }
     const normalizedPrice = price.replace(',', '.').replace(/[^\d.]/g, '');
     const numericPrice = Number(normalizedPrice);
 
-    if (!category || !condition || !description.trim() || !phone.trim() || !normalizedPrice) {
-      Alert.alert(text.errorTitle, text.errorFill);
+    if (!itemName.trim()) {
+      Alert.alert(text.errorTitle, text.itemNameError);
       return;
     }
-    if (!Number.isFinite(numericPrice) || numericPrice <= 0) {
+    if (!normalizedPrice) {
       Alert.alert(text.errorTitle, text.priceError);
+      return;
+    }
+    if (!Number.isFinite(numericPrice) || numericPrice < 0) {
+      Alert.alert(text.errorTitle, text.priceError);
+      return;
+    }
+    if (!category || !condition || !description.trim() || !phone.trim()) {
+      Alert.alert(text.errorTitle, text.errorFill);
       return;
     }
     if (phone.replace(/\D/g, '').length < 7) {
       Alert.alert(text.errorTitle, text.errorPhone);
+      return;
+    }
+    const langError = getLanguageValidationError(`${itemName.trim()} ${description.trim()}`, language as 'ua' | 'ru' | 'en');
+    if (langError) {
+      Alert.alert(text.errorTitle, langError);
       return;
     }
     if (hasUploadingPhotos) {
@@ -465,22 +525,20 @@ const BuySellScreen: React.FC = () => {
       Alert.alert(text.errorTitle, text.photoUploadError);
       return;
     }
-    if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, photos: formPhotos, navigation })) {
+    const donePhotos = getDonePhotos(formPhotos);
+    if (donePhotos.length === 0) {
+      Alert.alert(text.errorTitle, text.photoRequired);
       return;
     }
-
     setSubmitting(true);
     try {
-      const donePhotos = getDonePhotos(formPhotos);
       const resolvedPhotoUri = donePhotos[0]?.downloadUrl ?? '';
       const resolvedStoragePath = donePhotos[0]?.storagePath ?? '';
 
-      const categoryIndex = ITEM_CATEGORY_VALUES.indexOf(category as typeof ITEM_CATEGORY_VALUES[number]);
-      const itemName = categoryIndex >= 0 ? text.categories[categoryIndex] : category;
       const createdAt = new Date();
 
       await buySellService.add({
-        itemName,
+        itemName: itemName.trim(),
         category,
         condition,
         price: Number.isFinite(numericPrice)
@@ -504,6 +562,7 @@ const BuySellScreen: React.FC = () => {
       ]);
     } catch (error) {
       showUserError(language, 'send', error);
+      await AsyncStorage.removeItem('@chaika:buy_sell_draft').catch(() => {});
     } finally {
       setSubmitting(false);
     }
@@ -738,7 +797,10 @@ const BuySellScreen: React.FC = () => {
       <View style={styles.addBar}>
         <TouchableOpacity style={styles.addBarBtn} onPress={() => {
           if (!user) {
-            Alert.alert(text.formTitle, text.authRequired);
+            Alert.alert(text.formTitle, text.authRequired, [
+              { text: text.loginBtn, onPress: () => navigation.navigate('LoginScreen', {}) },
+              { text: text.ok },
+            ]);
             return;
           }
           setAddFormVisible(true);
@@ -764,6 +826,16 @@ const BuySellScreen: React.FC = () => {
               contentContainerStyle={styles.sheetContent}
               style={styles.sheetScroll}
             >
+              <Text style={styles.formLabel}>{text.itemNameLabel}</Text>
+              <TextInput
+                placeholder={text.itemNamePlaceholder}
+                value={itemName}
+                onChangeText={setItemName}
+                style={styles.input}
+                placeholderTextColor="#A0938D"
+                maxLength={80}
+              />
+
               <Text style={styles.formLabel}>{text.categoryLabel}</Text>
               <View style={styles.pickerWrapper}>
                 <Picker selectedValue={category} onValueChange={setCategory} style={styles.picker}>
@@ -808,7 +880,10 @@ const BuySellScreen: React.FC = () => {
               <Text style={styles.formLabel}>{text.phoneLabel}</Text>
               <TextInput placeholder="+380..." value={phone} onChangeText={(value) => setPhone(normalizePhoneText(value))} keyboardType="phone-pad" style={styles.input} placeholderTextColor="#A0938D" />
 
-              <Text style={styles.formLabel}>{requiredPhotoLabel}</Text>
+              <View style={styles.photoLabelRow}>
+                <Text style={styles.formLabel}>{text.photoLabel}</Text>
+                <Text style={styles.requiredMark}>{text.photoRequiredMark}</Text>
+              </View>
               <PhotoUploadField
                 uid={user?.id ?? ''}
                 userName={user?.name ?? ''}
@@ -817,7 +892,6 @@ const BuySellScreen: React.FC = () => {
                 onPhotosChange={setFormPhotos}
                 onPickerOpenChange={handlePickerOpenChange}
               />
-              <UploadedPhotosGrid />
 
               <TouchableOpacity style={[styles.submitBtn, (submitting || hasUploadingPhotos) && styles.submitBtnDisabled]} onPress={handleSubmit} activeOpacity={0.85} disabled={submitting || hasUploadingPhotos}>
                 {submitting ? (
@@ -889,6 +963,8 @@ const styles = StyleSheet.create({
   liveText: { color: '#2D7E4D', fontSize: 11, fontWeight: '900', marginRight: 6 },
   liveCount: { color: SCREEN_THEME.textSecondary, fontSize: 11, fontWeight: '700', textAlign: 'center' },
   formLabel: { fontWeight: '700', color: SCREEN_THEME.textPrimary, marginBottom: 8, marginTop: 8 },
+  photoLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  requiredMark: { fontSize: 11, fontWeight: '700', color: SCREEN_THEME.terracottaDark, marginBottom: 8, marginTop: 8 },
   input: { backgroundColor: '#F7F3EE', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, color: SCREEN_THEME.textPrimary, borderWidth: 1, borderColor: '#E8DDD3' },
   textarea: { minHeight: 80, textAlignVertical: 'top' },
   pickerWrapper: { backgroundColor: '#F7F3EE', borderRadius: 16, borderWidth: 1, borderColor: '#E8DDD3', overflow: 'hidden' },
@@ -922,7 +998,7 @@ const styles = StyleSheet.create({
   listingBadgeText: { fontSize: 11, fontWeight: '700', color: '#7B1FA2' },
   listingPrice: { fontSize: 15, fontWeight: '900', color: '#00897B' },
   statusBadge: { fontSize: 11, fontWeight: '900', color: '#8A5A00', backgroundColor: '#FFF2C7', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
-  listingDescription: { color: SCREEN_THEME.textSecondary, lineHeight: 18, marginBottom: 8 },
+  listingDescription: { color: '#fff', backgroundColor: '#7A1E5C', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 7, lineHeight: 18, marginBottom: 8, fontWeight: '800', overflow: 'hidden' },
   listingPhoto: { width: '100%', height: 220, borderRadius: 16, marginBottom: 8, backgroundColor: '#F0EDE8' },
   listingPhotoPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   moderationInfo: { color: '#5F5043', backgroundColor: '#FFF8EA', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 8, fontSize: 12, lineHeight: 17, fontWeight: '700' },

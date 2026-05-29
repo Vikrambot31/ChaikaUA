@@ -16,7 +16,8 @@
 import * as FileSystem from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { push, ref } from 'firebase/database';
-import { database } from '../firebase-core';
+import { deleteObject, ref as storageRef } from 'firebase/storage';
+import { database, storage } from '../firebase-core';
 import { ensureFirebaseAuth } from '../firebase-auth-session';
 import { uploadPhotoToNamespace } from '../services/photoUploadService';
 import { recordRuntimeTrace } from '../services/runtimeMonitorService';
@@ -107,6 +108,15 @@ export async function validateLocalPhoto(localUri: string): Promise<ValidationRe
 // ─── Upload Engine ────────────────────────────────────────────────────────────
 
 const delay = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
+const deleteUploadedStorageQuietly = async (storagePath: string, context: Record<string, unknown>): Promise<void> => {
+  if (!storagePath) return;
+  try {
+    await deleteObject(storageRef(storage, storagePath));
+  } catch (error) {
+    safeLogError('PhotoUploadEngine.cleanup_storage', error, { storagePath, ...context });
+  }
+};
 
 /**
  * Full lifecycle upload:
@@ -215,10 +225,21 @@ export async function uploadPhotoWithEngine(
     throw lastError ?? new Error('Upload failed');
   }
 
+  // Guard: if Storage accepted the file but getDownloadURL failed, abort here.
+  // Writing an RTDB record with imageUri: storagePath would create an orphan
+  // record that other users cannot render (storagePath is not a public URL).
+  if (!downloadUrl) {
+    const err = new Error('Upload succeeded but download URL could not be resolved.');
+    safeLogError(sourceLabel, err, { uid, collection, storagePath, stage: 'missing_download_url' });
+    await deleteUploadedStorageQuietly(storagePath, { uid, collection, stage: 'missing_download_url_cleanup' });
+    throw err;
+  }
+
   onProgress?.(85);
 
   // ── Step 2.5: generate and upload 360px thumbnail ───────────────────────────
   let thumbnailUrl: string | undefined;
+  let thumbnailStoragePath = '';
   try {
     const thumbResult = await ImageManipulator.manipulateAsync(
       localUri,
@@ -233,6 +254,7 @@ export async function uploadPhotoWithEngine(
       logContext: { uid, collection, role: 'thumbnail' },
     });
     thumbnailUrl = thumbUpload.downloadUrl;
+    thumbnailStoragePath = thumbUpload.storagePath;
     void recordRuntimeTrace({
       screen: sourceLabel,
       action: 'engine_thumbnail',
@@ -255,19 +277,28 @@ export async function uploadPhotoWithEngine(
 
   // ── Step 3: write RTDB pending entry ────────────────────────────────────────
   const now = Date.now();
-  const rtdbCollection = collection === 'community_photos' ? 'community_photos' : `user_photos/${uid}`;
+  const rtdbCollection =
+    collection === 'community_photos' ? 'community_photos' :
+    collection === 'requests'         ? `request_photos/${uid}` :
+                                        `user_photos/${uid}`;
 
+  const isRequestPhoto = collection === 'requests';
+  const isPersonalPhoto = collection !== 'community_photos' && !isRequestPhoto;
   const rtdbPayload: Record<string, unknown> = {
     storagePath,
-    imageUri: downloadUrl ?? storagePath,
-    status: 'pending',
+    imageUri: downloadUrl,
+    status: isPersonalPhoto ? 'saved' : 'pending',
+    uploadStatus: 'saved',
+    moderationStatus: isPersonalPhoto ? 'not_submitted' : 'pending',
     uploadedAt: now,
     createdAt: now,
+    updatedAt: now,
     uid: user.uid,
     userId: user.uid,
     uploadedBy: metadata?.uploadedBy ?? user.email ?? user.uid,
     target: metadata?.target ?? (collection === 'community_photos' ? 'gallery_public' : 'my_photos'),
-    ...(metadata?.title ? { title: metadata.title } : { title: 'Фото' }),
+    ...(isRequestPhoto ? { sourceScreen: 'HelpNeighborsScreen', sourceScreenLabel: 'Помощь соседям' } : {}),
+    ...(metadata?.title ? { title: metadata.title } : {}),
     ...(metadata?.description ? { description: metadata.description } : {}),
     ...(metadata?.sourceScreen ? { sourceScreen: metadata.sourceScreen } : {}),
     ...(metadata?.sourceScreenLabel ? { sourceScreenLabel: metadata.sourceScreenLabel } : {}),
@@ -302,8 +333,8 @@ export async function uploadPhotoWithEngine(
       details: { rtdbId },
     });
   } catch (rtdbErr) {
-    // RTDB write failure is logged but does NOT abort the upload.
-    // The file is in Storage; the user can retry the metadata write later.
+    await deleteUploadedStorageQuietly(storagePath, { uid, collection, stage: 'rtdb_write_failed_cleanup' });
+    await deleteUploadedStorageQuietly(thumbnailStoragePath, { uid, collection, stage: 'rtdb_write_failed_thumbnail_cleanup' });
     safeLogError(`${sourceLabel}.rtdb_write`, rtdbErr, {
       storagePath,
       collection,
@@ -319,6 +350,7 @@ export async function uploadPhotoWithEngine(
       error: rtdbErr,
       details: { storagePath },
     });
+    throw rtdbErr;
   }
 
   onProgress?.(100);

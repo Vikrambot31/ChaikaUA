@@ -18,7 +18,7 @@ const PREMIUM_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 const PREMIUM_PLANS = new Set(['premium', 'premium_plus']);
 const MEDIA_ACCESS_TTL_MS = 15 * 60 * 1000;
 const MEDIA_DATA_URL_MAX_BYTES = 8 * 1024 * 1024;
-const MEDIA_PATH_RE = /^(?:(?:community_photos|lost_found|buy_sell|buy_sell_listings|profile_photos|local_business|requests)\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+|uploads\/users\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+)\.(jpg|jpeg|png|webp|heic|heif)$/i;
+const MEDIA_PATH_RE = /^(?:(?:community_photos|user_photos|lost_found|buy_sell|buy_sell_listings|profile_photos|local_business|requests)\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+|uploads\/users\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+)\.(jpg|jpeg|png|webp|heic|heif)$/i;
 
 const redactText = (value = '') =>
   String(value || '')
@@ -499,9 +499,15 @@ const getExistingMediaFile = async (storagePath) => {
   throw new functionsV1.https.HttpsError('not-found', 'Media file not found in Storage');
 };
 
-const getMediaRecordRef = (collection, itemId) => {
+const getMediaRecordRef = (collection, itemId, ownerUid = '') => {
   const db = admin.database();
   if (collection === 'community_photos') return db.ref(`community_photos/${itemId}`);
+  if (collection === 'user_photos') {
+    if (!ownerUid) {
+      throw new functionsV1.https.HttpsError('invalid-argument', 'ownerUid is required for user_photos');
+    }
+    return db.ref(`user_photos/${ownerUid}/${itemId}`);
+  }
   if (collection === 'requests') return db.ref(`requests/${itemId}`);
   if (collection === 'lost_found') return db.ref(`lost_found/${itemId}`);
   if (collection === 'buy_sell_listings') return db.ref(`buy_sell_listings/${itemId}`);
@@ -521,7 +527,7 @@ const getRecordOwnerId = (collection, itemId, record) => {
   return ownerId;
 };
 
-const getRecordModerationStatus = (record) => String(record?.status || record?.moderationStatus || '').toLowerCase();
+const getRecordModerationStatus = (record) => String(record?.moderationStatus || record?.status || '').toLowerCase();
 
 const sendUserNotification = async (uid, notification, data = {}) => {
   if (!uid) return { sent: false, reason: 'missing-uid' };
@@ -657,12 +663,13 @@ exports.getMediaAccessUrl = functionsV1.https.onCall(async (data, context) => {
 
     const collection = String(data?.collection || '').trim();
     const itemId = String(data?.itemId || '').trim();
+    const ownerUid = String(data?.ownerUid || '').trim();
     const storagePath = assertSafeMediaPath(data?.storagePath);
     if (!itemId) {
       throw new functionsV1.https.HttpsError('invalid-argument', 'itemId is required');
     }
 
-    const snapshot = await getMediaRecordRef(collection, itemId).once('value');
+    const snapshot = await getMediaRecordRef(collection, itemId, ownerUid).once('value');
     if (!snapshot.exists()) {
       throw new functionsV1.https.HttpsError('not-found', 'Media record not found');
     }
@@ -736,12 +743,13 @@ exports.getMediaDataUrl = functionsV1.https.onCall(async (data, context) => {
 
     const collection = String(data?.collection || '').trim();
     const itemId = String(data?.itemId || '').trim();
+    const ownerUid = String(data?.ownerUid || '').trim();
     const storagePath = assertSafeMediaPath(data?.storagePath);
     if (!itemId) {
       throw new functionsV1.https.HttpsError('invalid-argument', 'itemId is required');
     }
 
-    const snapshot = await getMediaRecordRef(collection, itemId).once('value');
+    const snapshot = await getMediaRecordRef(collection, itemId, ownerUid).once('value');
     if (!snapshot.exists()) {
       throw new functionsV1.https.HttpsError('not-found', 'Media record not found');
     }
@@ -782,6 +790,7 @@ exports.getMediaDataUrl = functionsV1.https.onCall(async (data, context) => {
       uid: context.auth?.uid || null,
       collection: data?.collection || null,
       itemId: data?.itemId || null,
+      ownerUid: data?.ownerUid || null,
     });
     throw new functionsV1.https.HttpsError('internal', 'Failed to read media data');
   }
@@ -902,6 +911,7 @@ const ADMIN_MODERATION_SECTIONS = {
   requests: { path: 'requests', statusField: 'status', approvedValue: 'approved', rejectedValue: 'rejected' },
   appSuggestions: { path: 'app_suggestions', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
   communityPhotos: { path: 'community_photos', statusField: 'status', approvedValue: 'approved', rejectedValue: 'rejected' },
+  userPhotos: { path: 'user_photos', statusField: 'status', approvedValue: 'approved', rejectedValue: 'rejected', nested: true },
   datingProfiles: { path: 'dating_profiles', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
   datingAnketaListings: { path: 'dating_anketa_listings', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
   coffeeRequests: { path: 'coffee_requests', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
@@ -1286,6 +1296,12 @@ exports.autoModerateRequest = functionsV1.database
       return null;
     }
 
+    // Skip re-queuing requests that were already auto-approved (e.g. help_neighbors)
+    if (request.isApproved === true || request.status === 'approved') {
+      console.log(`Request ${requestId} already approved — skipping pending override`);
+      return null;
+    }
+
     await snapshot.ref.update({
       ...moderationMeta,
       status: 'pending',
@@ -1409,6 +1425,15 @@ exports.notifyPhotoOwnerOnModeration = functionsV1.database
   .ref('/community_photos/{photoId}')
   .onUpdate((change, context) => notifyOwnerOnModerationChange(change, context, {
     collection: 'community_photos',
+    paramName: 'photoId',
+    kind: 'Фото',
+    statusField: 'status',
+  }));
+
+exports.notifyUserPhotoOwnerOnModeration = functionsV1.database
+  .ref('/user_photos/{uid}/{photoId}')
+  .onUpdate((change, context) => notifyOwnerOnModerationChange(change, context, {
+    collection: 'user_photos',
     paramName: 'photoId',
     kind: 'Фото',
     statusField: 'status',

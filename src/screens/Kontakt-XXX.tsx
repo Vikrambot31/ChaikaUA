@@ -25,6 +25,8 @@ import UploadedPhotosGrid from '../components/UploadedPhotosGrid';
 import InlineFieldHint from '../components/InlineFieldHint';
 import { FormFieldError } from '../components/ValidationErrorMessage';
 import { useSoftToast } from '../hooks/useSoftToast';
+import { validateSubmissionRequirements } from '../utils/submissionRequirements';
+import { getLanguageValidationError } from '../utils/contentLanguageGuard';
 import UserCardActionBar from '../components/UserCardActionBar';
 
 const CONTACT_LISTING_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -321,7 +323,7 @@ const KontaktiChaikyScreen: React.FC = () => {
   const [condition, setCondition] = useState('');
   const [price, setPrice] = useState('');
   const [description, setDescription] = useState('');
-  const [phone, setPhone] = useState('+380');
+  const [phone, setPhone] = useState(() => (user?.phone ? normalizePhoneText(user.phone) : '+380'));
   const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
   const [showPhoneOnCard, setShowPhoneOnCard] = useState(true);
   const [listings, setListings] = useState<ContactListing[]>([]);
@@ -637,8 +639,7 @@ const KontaktiChaikyScreen: React.FC = () => {
 
   const handleSubmit = async () => {
     setSubmitAttempted(true);
-    if (!user?.id) {
-      toast.showWarning(text.errorTitle, text.authRequired);
+    if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, userStartAvatarKey: user?.startAvatarKey, navigation })) {
       return;
     }
     const normalizedPrice = price.replace(',', '.').replace(/[^\d.]/g, '');
@@ -648,7 +649,7 @@ const KontaktiChaikyScreen: React.FC = () => {
       toast.showWarning(text.errorTitle, text.errorFill);
       return;
     }
-    if (!Number.isFinite(numericPrice) || numericPrice <= 0) {
+    if (!Number.isFinite(numericPrice) || numericPrice <= 0 || numericPrice > 120) {
       toast.showWarning(text.errorTitle, text.priceError);
       return;
     }
@@ -657,12 +658,18 @@ const KontaktiChaikyScreen: React.FC = () => {
       return;
     }
 
+    const langError = getLanguageValidationError(description.trim(), language as 'ua' | 'ru' | 'en');
+    if (langError) {
+      toast.showWarning(text.errorTitle, langError);
+      return;
+    }
+
     setSubmitting(true);
     try {
       const resolvedPhotoUri = formPhotos[0]?.downloadUrl ?? '';
       const resolvedStoragePath = formPhotos[0]?.storagePath ?? '';
 
-      const itemName = getCategoryLabel(category);
+      const itemName = user?.name?.trim() || getCategoryLabel(category);
       const createdAt = new Date();
 
       await contactsService.add({
@@ -726,7 +733,7 @@ const KontaktiChaikyScreen: React.FC = () => {
       photoUri: item.photoUri,
       photoStoragePath: item.photoStoragePath,
       category: categoryLabel || conditionLabel,
-      price: item.price ? `${item.price} р.` : undefined,
+      price: item.price ? `${item.price}` : undefined,
       status: conditionLabel,
       userId: item.userId,
       createdAt: item.createdAt,
@@ -874,7 +881,7 @@ const KontaktiChaikyScreen: React.FC = () => {
                 const isOwn = item.userId === user?.id;
                 const showPhone = !!(item.phone && item.showPhone !== false);
                 const conditionLabel = text.conditionLabels[item.condition as keyof typeof text.conditionLabels] ?? item.condition;
-                const ageText = item.price ? `${item.price} р.` : '';
+                const ageText = item.price ? `${item.price}` : '';
                 const categoryLabel = getCategoryLabel(item.category);
                 const descriptionText = item.description?.trim() || text.noDesc;
                 const displayName = profile?.name || item.itemName;
@@ -1266,17 +1273,16 @@ const styles = StyleSheet.create({
     color: '#3D5D87',
   },
   kDescBox: {
-    borderWidth: 1,
-    borderColor: '#E0D5C8',
     borderRadius: 8,
     paddingHorizontal: 9,
     paddingVertical: 5,
-    backgroundColor: '#FAF7F3',
+    backgroundColor: '#7A1E5C',
   },
   kDescText: {
     fontSize: 12,
-    color: '#7A6D64',
+    color: '#fff',
     lineHeight: 17,
+    fontWeight: '800',
   },
   kModInfo: {
     fontSize: 11,

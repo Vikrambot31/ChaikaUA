@@ -144,8 +144,8 @@ const makeProfile = (bot, uid) => ({
   startAvatarKey: bot.avatarKey,
   provider: 'email',
   providerId: uid,
-  photoURL: '',
-  photoURLs: [],
+  photoURL: `start-avatar://${bot.avatarKey}`,
+  photoURLs: [`start-avatar://${bot.avatarKey}`],
   photoStoragePaths: [],
   referrerPhone: '',
 });

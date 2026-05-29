@@ -7,6 +7,10 @@ export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
 
 export type PhotoRecord = {
   id: string;
+  /** UID of the photo owner — set only for user_photos / request_photos. */
+  uid?: string;
+  /** RTDB collection this record lives in. Defaults to community_photos or user_photos. */
+  collection?: 'community_photos' | 'user_photos' | 'request_photos';
   title?: string;
   description?: string;
   imageUri: string;
@@ -29,6 +33,14 @@ const getNumber = (v: unknown): number => (Number.isFinite(Number(v)) ? Number(v
 const normalizeStatus = (v: unknown): ApprovalStatus => {
   if (v === 'approved' || v === 'rejected') return v;
   return 'pending';
+};
+
+const isSubmittedForModeration = (r: Record<string, unknown>): boolean => {
+  const moderationStatus = getString(r.moderationStatus);
+  if (moderationStatus === 'pending' || moderationStatus === 'approved' || moderationStatus === 'rejected') return true;
+  if (moderationStatus === 'not_submitted') return false;
+  const legacyStatus = getString(r.status);
+  return legacyStatus === 'pending' || legacyStatus === 'approved' || legacyStatus === 'rejected';
 };
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -59,13 +71,15 @@ const getSourceScreenLabel = (r: Record<string, unknown>): string | undefined =>
   return undefined;
 };
 
-const normalizeRecord = (key: string, raw: unknown): PhotoRecord | null => {
+const normalizeRecord = (key: string, raw: unknown, uid?: string): PhotoRecord | null => {
   if (!isRecord(raw)) return null;
   const r = raw;
+  if (getString(r.moderationStatus) === 'not_submitted') return null;
   const imageUri = getString(r.imageUri);
   const sourcePathHint = getSourcePathHint(r);
   return {
     id: key,
+    uid,
     title: getString(r.title) || undefined,
     description: getString(r.description) || undefined,
     imageUri,
@@ -75,7 +89,7 @@ const normalizeRecord = (key: string, raw: unknown): PhotoRecord | null => {
     sourceScreenLabel: getSourceScreenLabel(r),
     sourceFeature: getString(r.sourceFeature) || undefined,
     sourcePathHint,
-    status: normalizeStatus(r.status),
+    status: normalizeStatus(getString(r.moderationStatus) || r.status),
     target: r.target === 'my_photos' ? 'my_photos' : 'gallery_public',
     uploadedAt: getNumber(r.uploadedAt) || getNumber(r.createdAt) || getNumber(r.timestamp),
     moderationReason: getString(r.moderationReason) || undefined,
@@ -85,8 +99,18 @@ const normalizeRecord = (key: string, raw: unknown): PhotoRecord | null => {
 
 const isPublicGalleryPhoto = (photo: PhotoRecord): boolean => {
   const title = typeof photo.title === 'string' ? photo.title.trim() : '';
-  const isLegacyPersonalDefault = title === 'Photo' || title === 'Фото';
+  // Only treat as legacy personal default if NONE of the engine-set source fields are present.
+  // New engine uploads always have at least one of: sourceScreen, sourceScreenLabel, sourceFeature.
+  const hasSourceInfo = Boolean(photo.sourceScreen || photo.sourceScreenLabel || photo.sourceFeature);
+  const isLegacyPersonalDefault = (title === 'Photo' || title === 'Фото') && !hasSourceInfo;
   return photo.target === 'gallery_public' && !isLegacyPersonalDefault;
+};
+
+/** Returns the RTDB path for a photo based on its collection. */
+const getPhotoRtdbPath = (id: string, uid?: string, collection?: PhotoRecord['collection']): string => {
+  if (collection === 'request_photos' && uid) return `request_photos/${uid}/${id}`;
+  if (uid) return `user_photos/${uid}/${id}`;
+  return `community_photos/${id}`;
 };
 
 export const loadPhotos = async (): Promise<PhotoRecord[]> => {
@@ -104,17 +128,55 @@ export const loadPhotos = async (): Promise<PhotoRecord[]> => {
       moderationReason: r.moderationReason ? String(r.moderationReason) : undefined,
     } as PhotoRecord)).sort((a, b) => b.uploadedAt - a.uploadedAt);
   }
-  const snap = await get(ref(database, 'community_photos'));
-  if (!snap.exists()) return [];
-  const raw = snap.val() as Record<string, unknown>;
-  return Object.entries(raw)
-    .map(([key, val]) => normalizeRecord(key, val))
-    .filter((x): x is PhotoRecord => x !== null)
-    .filter(isPublicGalleryPhoto)
-    .sort((a, b) => b.uploadedAt - a.uploadedAt);
+
+  // Load community_photos (public gallery)
+  const communitySnap = await get(ref(database, 'community_photos'));
+  const communityPhotos: PhotoRecord[] = communitySnap.exists()
+    ? Object.entries(communitySnap.val() as Record<string, unknown>)
+        .map(([key, val]) => normalizeRecord(key, val))
+        .filter((x): x is PhotoRecord => x !== null)
+        .filter(isPublicGalleryPhoto)
+    : [];
+
+  // Load user_photos (personal photos — all users, all pending/approved/rejected)
+  const userPhotosRootSnap = await get(ref(database, 'user_photos'));
+  const userPhotos: PhotoRecord[] = [];
+  if (userPhotosRootSnap.exists()) {
+    const allUserPhotos = userPhotosRootSnap.val() as Record<string, Record<string, unknown>>;
+    for (const [ownerUid, photos] of Object.entries(allUserPhotos)) {
+      if (typeof photos !== 'object' || photos === null) continue;
+      for (const [photoId, photoData] of Object.entries(photos)) {
+        if (!isRecord(photoData) || !isSubmittedForModeration(photoData)) continue;
+        const record = normalizeRecord(photoId, photoData, ownerUid);
+        if (record) userPhotos.push(record);
+      }
+    }
+  }
+
+  // Load request_photos (photos attached to help_neighbors requests)
+  const requestPhotosRootSnap = await get(ref(database, 'request_photos'));
+  const requestPhotos: PhotoRecord[] = [];
+  if (requestPhotosRootSnap.exists()) {
+    const allRequestPhotos = requestPhotosRootSnap.val() as Record<string, Record<string, unknown>>;
+    for (const [ownerUid, photos] of Object.entries(allRequestPhotos)) {
+      if (typeof photos !== 'object' || photos === null) continue;
+      for (const [photoId, photoData] of Object.entries(photos)) {
+        if (!isRecord(photoData) || !isSubmittedForModeration(photoData)) continue;
+        const record = normalizeRecord(photoId, photoData, ownerUid);
+        if (record) requestPhotos.push({
+          ...record,
+          collection: 'request_photos',
+          sourceScreen: record.sourceScreen || 'HelpNeighborsScreen',
+          sourceScreenLabel: record.sourceScreenLabel || 'Помощь соседям',
+        });
+      }
+    }
+  }
+
+  return [...communityPhotos, ...userPhotos, ...requestPhotos].sort((a, b) => b.uploadedAt - a.uploadedAt);
 };
 
-export const approvePhoto = async (id: string): Promise<void> => {
+export const approvePhoto = async (id: string, uid?: string, collection?: PhotoRecord['collection']): Promise<void> => {
   if (LOCAL_MODE) {
     await fetch(`${LOCAL_API}/photos/${id}`, {
       method: 'PATCH',
@@ -123,10 +185,14 @@ export const approvePhoto = async (id: string): Promise<void> => {
     });
     return;
   }
-  return update(ref(database, `community_photos/${id}`), { status: 'approved', moderatedAt: Date.now() });
+  return update(ref(database, getPhotoRtdbPath(id, uid, collection)), {
+    status: 'approved',
+    moderationStatus: 'approved',
+    moderatedAt: Date.now(),
+  });
 };
 
-export const rejectPhoto = async (id: string, reason: string): Promise<void> => {
+export const rejectPhoto = async (id: string, reason: string, uid?: string, collection?: PhotoRecord['collection']): Promise<void> => {
   if (LOCAL_MODE) {
     await fetch(`${LOCAL_API}/photos/${id}`, {
       method: 'PATCH',
@@ -135,36 +201,38 @@ export const rejectPhoto = async (id: string, reason: string): Promise<void> => 
     });
     return;
   }
-  return update(ref(database, `community_photos/${id}`), {
+  return update(ref(database, getPhotoRtdbPath(id, uid, collection)), {
     status: 'rejected',
+    moderationStatus: 'rejected',
     moderatedAt: Date.now(),
     moderationReason: reason.trim() || 'rejected',
   });
 };
 
-export const deletePhoto = async (id: string): Promise<void> => {
+export const deletePhoto = async (id: string, uid?: string, collection?: PhotoRecord['collection']): Promise<void> => {
   if (LOCAL_MODE) {
     await fetch(`${LOCAL_API}/photos/${id}`, { method: 'DELETE' });
     return;
   }
-  return remove(ref(database, `community_photos/${id}`));
+  return remove(ref(database, getPhotoRtdbPath(id, uid, collection)));
 };
 
-export const deletePhotos = async (ids: string[]): Promise<void> => {
-  await Promise.all(ids.map((id) => deletePhoto(id)));
+export const deletePhotos = async (items: Array<{ id: string; uid?: string; collection?: PhotoRecord['collection'] }>): Promise<void> => {
+  await Promise.all(items.map((item) => deletePhoto(item.id, item.uid, item.collection)));
 };
 
 export const resolvePhotoAccessUrl = async (photo: PhotoRecord | null | undefined): Promise<string> => {
   if (!photo) throw new Error('Photo record is missing. Check the photo id used for diagnostics.');
   if (!photo.storagePath) return photo.imageUri;
   const getMediaAccessUrl = httpsCallable<
-    { collection: 'community_photos'; itemId: string; storagePath: string },
+    { collection: 'community_photos' | 'user_photos'; itemId: string; storagePath: string; ownerUid?: string },
     { url: string; expiresAt: number }
   >(getFunctions(firebaseApp), 'getMediaAccessUrl');
   const result = await getMediaAccessUrl({
-    collection: 'community_photos',
+    collection: photo.uid ? 'user_photos' : 'community_photos',
     itemId: photo.id,
     storagePath: photo.storagePath,
+    ownerUid: photo.uid,
   });
   return result.data.url || photo.imageUri;
 };
@@ -217,7 +285,7 @@ const getStoragePath_ = (v: string): string | null => {
   if (!t) return null;
   if (/^https?:\/\//i.test(t)) return null;
   if (t.startsWith('file:') || t.startsWith('content:')) return null;
-  if (/^(community_photos|photo_uploads|profile_photos|lost_found|buy_sell|local_business|requests|uploads)\//i.test(t))
+  if (/^(community_photos|user_photos|photo_uploads|profile_photos|lost_found|buy_sell|local_business|requests|uploads)\//i.test(t))
     return t;
   return null;
 };
@@ -258,13 +326,14 @@ export const resolvePhotoDataUrl = async (photo: PhotoRecord | null | undefined)
   if (!photo) throw new Error('Photo record is missing. Check the photo id used for diagnostics.');
   if (!photo.storagePath) return photo.imageUri;
   const getMediaAccessUrl = httpsCallable<
-    { collection: 'community_photos'; itemId: string; storagePath: string; inlineDataUrl: true },
+    { collection: 'community_photos' | 'user_photos'; itemId: string; storagePath: string; ownerUid?: string; inlineDataUrl: true },
     { url: string; expiresAt: number; dataUrl?: string; contentType?: string; size?: number; bucketName?: string }
   >(getFunctions(firebaseApp), 'getMediaAccessUrl');
   const result = await getMediaAccessUrl({
-    collection: 'community_photos',
+    collection: photo.uid ? 'user_photos' : 'community_photos',
     itemId: photo.id,
     storagePath: photo.storagePath,
+    ownerUid: photo.uid,
     inlineDataUrl: true,
   });
   return result.data.dataUrl || photo.imageUri;

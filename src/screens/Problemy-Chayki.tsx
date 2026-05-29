@@ -245,17 +245,17 @@ const parseHouseOnly = (building: unknown): string => {
 };
 
 // Дневной лимит репортов о проблемах
-const PROBLEM_DAILY_KEY = 'problem_reports_daily_v1';
 const PROBLEM_MAX_PER_DAY = 3;
 
 type ProblemDailyRecord = { date: string; count: number };
 
 const getTodayStr = () => new Date().toISOString().slice(0, 10);
 
-const loadProblemRecord = async (): Promise<ProblemDailyRecord> => {
+const loadProblemRecord = async (userId: string): Promise<ProblemDailyRecord> => {
   const today = getTodayStr();
+  const key = `problem_reports_daily_v1_${userId}`;
   try {
-    const raw = await AsyncStorage.getItem(PROBLEM_DAILY_KEY);
+    const raw = await AsyncStorage.getItem(key);
     if (!raw) return { date: today, count: 0 };
     const parsed = JSON.parse(raw) as ProblemDailyRecord;
     return parsed.date === today ? parsed : { date: today, count: 0 };
@@ -264,9 +264,10 @@ const loadProblemRecord = async (): Promise<ProblemDailyRecord> => {
   }
 };
 
-const saveProblemRecord = async (record: ProblemDailyRecord): Promise<void> => {
+const saveProblemRecord = async (userId: string, record: ProblemDailyRecord): Promise<void> => {
+  const key = `problem_reports_daily_v1_${userId}`;
   try {
-    await AsyncStorage.setItem(PROBLEM_DAILY_KEY, JSON.stringify(record));
+    await AsyncStorage.setItem(key, JSON.stringify(record));
   } catch { /* ignore */ }
 };
 
@@ -530,18 +531,18 @@ const text = CLEAN_PROBLEMS_TEXT[language];
   }, [navigation, text]);
 
   const addProblem = async () => {
+    if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, userStartAvatarKey: user?.startAvatarKey, navigation })) {
+      return;
+    }
     const cleanTitle = sanitizeStoredText(title.trim());
     if (!cleanTitle) {
       Alert.alert(text.error, text.fillTitle);
       return;
     }
-    if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, photos: formPhotos, navigation })) {
-      return;
-    }
     if (!user?.id) return;
 
     // Перевірка денного ліміту (3 повідомлення на день)
-    const problemRecord = await loadProblemRecord();
+    const problemRecord = await loadProblemRecord(user.id);
     if (problemRecord.count >= PROBLEM_MAX_PER_DAY) {
       Alert.alert(text.problemLimitTitle, text.problemLimitBody, [{ text: 'OK' }]);
       return;
@@ -573,7 +574,7 @@ const text = CLEAN_PROBLEMS_TEXT[language];
       return;
     }
     // Зберегти запис ліміту після успішної відправки
-    await saveProblemRecord({ ...problemRecord, count: problemRecord.count + 1 });
+    await saveProblemRecord(user.id, { ...problemRecord, count: problemRecord.count + 1 });
     setTitle('');
     setFormPhotos([]);
     setIsPublishFormVisible(false);
@@ -1003,16 +1004,14 @@ const styles = StyleSheet.create({
   },
   copy: { flex: 1, minWidth: 0 },
   itemTitleBox: {
-    borderWidth: 1.5,
-    borderColor: '#1E1A17',
     borderRadius: 16,
     paddingHorizontal: 9,
     paddingVertical: 6,
-    backgroundColor: '#FFF8EA',
+    backgroundColor: '#7A1E5C',
     minHeight: 52,
     justifyContent: 'center',
   },
-  itemTitle: { fontSize: 20, lineHeight: 24, fontWeight: '900', color: SCREEN_THEME.textPrimary },
+  itemTitle: { fontSize: 20, lineHeight: 24, fontWeight: '900', color: '#fff' },
   addressRow: {
     marginTop: 5,
     flexDirection: 'row',

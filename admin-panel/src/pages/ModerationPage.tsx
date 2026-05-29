@@ -71,6 +71,7 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
           return [
             item.title,
             item.subtitle,
+            item.userName,
             item.userId,
             item.email,
             item.deviceId,
@@ -228,7 +229,7 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
                 setSearch(value);
               }, 300);
             }}
-            placeholder="Название, userId, email, deviceId"
+            placeholder="Название, имя, userId, email, deviceId"
           />
         </label>
         <label className="field">
@@ -315,7 +316,8 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
                   </td>
                   <td>{sectionLabel(item.section)}</td>
                   <td>
-                    <span>{item.email || item.userId || '-'}</span>
+                    <strong>{item.userName || '-'}</strong>
+                    <small>{item.email || item.userId || '-'}</small>
                     {item.deviceId ? <small>{item.deviceId}</small> : null}
                   </td>
                   <td>{item.timestampLabel}</td>

@@ -1,5 +1,7 @@
 export type PhotoUploadStatus = 'queued' | 'uploading' | 'uploaded' | 'error';
 
+export type PhotoModerationStatus = 'not_submitted' | 'pending' | 'approved' | 'rejected';
+
 /**
  * TZ_4 engine-level states covering the full lifecycle:
  * pick → validate → upload → RTDB pending → moderation
@@ -27,7 +29,7 @@ export type UserPhoto = {
   width?: number;
   height?: number;
   size?: number;
-  moderationStatus?: 'pending' | 'approved' | 'rejected';
+  moderationStatus?: PhotoModerationStatus;
   deleted?: boolean;
   storagePath?: string;
   createdAt: number;

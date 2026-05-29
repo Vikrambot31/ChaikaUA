@@ -20,7 +20,9 @@ export const getLanguageValidationError = (
   const hasLatinWord = LATIN_WORD_RE.test(text);
   const hasCyrillicWord = CYRILLIC_WORD_RE.test(text);
 
-  if ((language === 'ua' || language === 'ru') && hasLatinWord) {
+  // Allow brand names / product names mixed with Cyrillic text.
+  // Only block if the text has NO Cyrillic words at all (i.e. written entirely in the wrong script).
+  if ((language === 'ua' || language === 'ru') && hasLatinWord && !hasCyrillicWord) {
     return language === 'ua'
       ? 'У заявці знайдено англійські слова. Будь ласка, напишіть текст мовою застосунку.'
       : 'В заявке найдены английские слова. Пожалуйста, напишите текст на языке приложения.';

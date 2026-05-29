@@ -28,6 +28,7 @@ export type ModerationItem = {
   status: ModerationStatus;
   title: string;
   subtitle: string;
+  userName: string;
   userId: string;
   email: string;
   deviceId: string;
@@ -151,6 +152,13 @@ const getSubtitle = (config: SectionConfig, value: Record<string, unknown>): str
   );
 };
 
+const getUserName = (value: Record<string, unknown>): string =>
+  getString(value.name) ||
+  getString(value.userName) ||
+  getString(value.displayName) ||
+  getString(value.contactName) ||
+  getString(value.uploadedBy);
+
 const getPhotoUrl = (value: Record<string, unknown>): string =>
   getString(value.imageUri) ||
   getString(value.photoUri) ||
@@ -188,6 +196,7 @@ const normalizeItem = (
     status: getStatus(config, value),
     title: getTitle(config, value, id),
     subtitle: getSubtitle(config, value) || '',
+    userName: getUserName(value),
     userId: getString(value.userId) || getString(value.uid) || id,
     email: getString(value.email),
     deviceId: getString(value.deviceId) || getString(value.device_id),

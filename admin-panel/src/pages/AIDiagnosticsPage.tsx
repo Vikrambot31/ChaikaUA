@@ -51,7 +51,7 @@ const formatShortDate = (ts: number): string => {
   catch { return '–'; }
 };
 
-export const AIDiagnosticsPage = ({ role, userEmail }: Props) => {
+export const AIDiagnosticsPage = ({ userEmail }: Props) => {
   const { status, logs, history, findings, error, daemonOnline } = useAIDiagnostics();
   const { viewMode } = useViewMode();
   const [activeView, setActiveView] = useState<ActiveView>('overview');
@@ -90,21 +90,19 @@ export const AIDiagnosticsPage = ({ role, userEmail }: Props) => {
     return unsub;
   }, []);
 
-  const isAdmin     = role === 'admin';
   const isRunning   = status.status === 'running';
   const isCompleted = status.status === 'completed';
   const isFailed    = status.status === 'failed';
   const isSimple    = viewMode === 'simple';
 
   const handleStart = async () => {
-    if (!isAdmin || triggering) return;
+    if (triggering) return;
     setTriggering(true);
     try { await triggerAudit(userEmail); } catch { /* service handles */ }
     finally { setTriggering(false); }
   };
 
   const handleCancel = async () => {
-    if (!isAdmin) return;
     try { await cancelAudit(userEmail); } catch { /* ignore */ }
   };
 
@@ -169,13 +167,13 @@ export const AIDiagnosticsPage = ({ role, userEmail }: Props) => {
           <button
             className="diagRunBtn"
             onClick={handleStart}
-            disabled={!isAdmin || triggering || !daemonOnline}
-            title={!daemonOnline ? 'Daemon не запущен' : !isAdmin ? 'Только admin' : undefined}
+            disabled={triggering || !daemonOnline}
+            title={!daemonOnline ? 'Daemon не запущен' : undefined}
           >
             {triggering ? 'Запуск…' : 'Запустить аудит'}
           </button>
         ) : (
-          <button className="diagStopBtn" onClick={handleCancel} disabled={!isAdmin}>
+          <button className="diagStopBtn" onClick={handleCancel}>
             Остановить аудит
           </button>
         )}
@@ -187,10 +185,6 @@ export const AIDiagnosticsPage = ({ role, userEmail }: Props) => {
           : status.status === 'cancelled' ? '✕ Отменён'
           : 'Ожидание'}
         </span>
-
-        {!isAdmin && (
-          <span style={{ fontSize: 12, color: '#8a9ab0' }}>Только admin может запускать аудит</span>
-        )}
       </div>
 
       {/* ── Progress ── */}

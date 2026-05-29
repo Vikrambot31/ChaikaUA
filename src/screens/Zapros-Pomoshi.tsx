@@ -13,7 +13,7 @@ import { firebaseChatAPI } from '../firebase-config';
 import { RATE_LIMITERS } from '../utils/rateLimiter';
 import { showUserError } from '../utils/userFacingErrors';
 import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField';
-import { getDonePhotos, getRequiredPhotoLabel, validateSubmissionRequirements } from '../utils/submissionRequirements';
+import { getDonePhotos, validateSubmissionRequirements } from '../utils/submissionRequirements';
 
 // RootState type for language selector
 interface LangState { language?: { current?: string } }
@@ -30,6 +30,7 @@ const UI_TEXT = {
     labelHelpType: 'Тип допомоги',
     labelSubtype: 'Уточнення',
     labelDescription: 'Опис ситуації',
+    labelPhoto: 'Фото (необов\'язково)',
     namePlaceholder: 'Ваше ім\'я',
     phonePlaceholder: 'Телефон',
     descriptionPlaceholder: 'Розкажіть детальніше, що саме потрібно...',
@@ -41,10 +42,12 @@ const UI_TEXT = {
     errorFields: 'Заповніть усі поля.',
     errorValidate: 'Перевірте ім\'я та телефон.',
     errorDescTooShort: 'Опис має бути не менше 10 символів.',
+    descMinHint: 'Мінімум 10 символів.',
     successTitle: 'Готово',
     successMsg: 'Ваш запит на допомогу надіслано сусідам.',
     successRequestId: 'Номер заявки',
     errorSend: 'Не вдалося надіслати запит.',
+    photoErrorMessage: 'Фото не завантажилось. Видаліть його або спробуйте ще раз.',
     charsLeft: 'символів',
   },
   ru: {
@@ -58,6 +61,7 @@ const UI_TEXT = {
     labelHelpType: 'Тип помощи',
     labelSubtype: 'Уточнение',
     labelDescription: 'Описание ситуации',
+    labelPhoto: 'Фото (необязательно)',
     namePlaceholder: 'Ваше имя',
     phonePlaceholder: 'Телефон',
     descriptionPlaceholder: 'Расскажите подробнее, что именно нужно...',
@@ -69,10 +73,12 @@ const UI_TEXT = {
     errorFields: 'Заполните все поля.',
     errorValidate: 'Проверьте имя и телефон.',
     errorDescTooShort: 'Описание должно быть не менее 10 символов.',
+    descMinHint: 'Минимум 10 символов.',
     successTitle: 'Готово',
     successMsg: 'Ваш запрос на помощь отправлен соседям.',
     successRequestId: 'Номер заявки',
     errorSend: 'Не удалось отправить запрос.',
+    photoErrorMessage: 'Фото не загрузилось. Удалите его или попробуйте ещё раз.',
     charsLeft: 'симв.',
   },
   en: {
@@ -86,6 +92,7 @@ const UI_TEXT = {
     labelHelpType: 'Type of help',
     labelSubtype: 'Details',
     labelDescription: 'Situation description',
+    labelPhoto: 'Photo (optional)',
     namePlaceholder: 'Your name',
     phonePlaceholder: 'Phone',
     descriptionPlaceholder: 'Describe in more detail what you need...',
@@ -97,10 +104,12 @@ const UI_TEXT = {
     errorFields: 'Fill in all fields.',
     errorValidate: 'Check name and phone.',
     errorDescTooShort: 'Description must be at least 10 characters.',
+    descMinHint: 'Minimum 10 characters.',
     successTitle: 'Done',
     successMsg: 'Your help request has been sent to neighbors.',
     successRequestId: 'Request ID',
     errorSend: 'Failed to send request.',
+    photoErrorMessage: 'Photo failed to upload. Remove it or try again.',
     charsLeft: 'chars',
   },
 } as const;
@@ -246,15 +255,52 @@ const HELP_SUBTYPES: Record<string, { label: string; value: string }[]> = {
   ],
 };
 
+const HELP_SUBTYPE_LABELS: Record<'ua' | 'en', Record<string, Record<string, string>>> = {
+  ua: {
+    medical: { call_ambulance: 'Викликати швидку', doctor_home: 'Потрібен лікар додому', need_medicine: 'Потрібні ліки', hospital_escort: 'Супроводити до лікарні', other: 'Інше' },
+    repair: { plumbing: 'Сантехніка', electrical: 'Електрика', door_lock: 'Двері / замок', window: 'Вікно / балкон', ceiling_walls: 'Стеля / стіни', furniture: 'Меблі', other: 'Інше' },
+    legal: { lawyer_consult: 'Консультація юриста', write_statement: 'Скласти заяву', housing: 'Житлові питання', labor: 'Трудові питання', other: 'Інше' },
+    documents: { notary: 'Нотаріус', translation: 'Переклад документів', copies: 'Копії та довідки', subsidy: 'Оформлення субсидії', other: 'Інше' },
+    childcare: { babysit: 'Посидіти з дитиною', school_transport: 'Відвести / забрати зі школи', homework: 'Допомога з уроками', other: 'Інше' },
+    elderly_care: { hospital_escort: 'Супроводити до лікарні', grocery: 'Купити продукти', household: 'Допомога по дому', talk: 'Просто поговорити', other: 'Інше' },
+    computer: { pc_setup: "Налаштування комп'ютера", software: 'Встановлення програм', smartphone: 'Допомога зі смартфоном', internet: 'Інтернет / Wi-Fi', other: 'Інше' },
+    moving: { carry: 'Допомогти з перенесенням', car_needed: 'Потрібна машина', packing: 'Допомогти з пакуванням', other: 'Інше' },
+    delivery: { grocery: 'Купити продукти', pharmacy: 'Аптека / ліки', parcel: 'Передати посилку', other: 'Інше' },
+    cleaning: { apartment: 'Прибирання квартири', trash: 'Винести сміття', after_repair: 'Прибирання після ремонту', other: 'Інше' },
+    pets: { dog_walk: 'Вигуляти собаку', feed_pet: 'Погодувати тварину', pet_sit: 'Доглянути за твариною', other: 'Інше' },
+    education: { school_tutor: 'Репетитор (школа)', language: 'Іноземна мова', music: 'Музика', other: 'Інше' },
+    fitness: { running: 'Компанія для бігу', gym: 'Тренування в залі', yoga: 'Йога / розтяжка', other: 'Інше' },
+  },
+  en: {
+    medical: { call_ambulance: 'Call an ambulance', doctor_home: 'Doctor at home needed', need_medicine: 'Medicine needed', hospital_escort: 'Hospital escort', other: 'Other' },
+    repair: { plumbing: 'Plumbing', electrical: 'Electrical', door_lock: 'Door / lock', window: 'Window / balcony', ceiling_walls: 'Ceiling / walls', furniture: 'Furniture', other: 'Other' },
+    legal: { lawyer_consult: 'Lawyer consultation', write_statement: 'Write an application', housing: 'Housing questions', labor: 'Labor questions', other: 'Other' },
+    documents: { notary: 'Notary', translation: 'Document translation', copies: 'Copies and certificates', subsidy: 'Subsidy application', other: 'Other' },
+    childcare: { babysit: 'Babysit', school_transport: 'School drop-off / pickup', homework: 'Homework help', other: 'Other' },
+    elderly_care: { hospital_escort: 'Hospital escort', grocery: 'Buy groceries', household: 'Household help', talk: 'Just talk', other: 'Other' },
+    computer: { pc_setup: 'Computer setup', software: 'Software installation', smartphone: 'Smartphone help', internet: 'Internet / Wi-Fi', other: 'Other' },
+    moving: { carry: 'Help carrying things', car_needed: 'Car needed', packing: 'Help with packing', other: 'Other' },
+    delivery: { grocery: 'Buy groceries', pharmacy: 'Pharmacy / medicine', parcel: 'Deliver a parcel', other: 'Other' },
+    cleaning: { apartment: 'Apartment cleaning', trash: 'Take out trash', after_repair: 'Post-renovation cleaning', other: 'Other' },
+    pets: { dog_walk: 'Walk a dog', feed_pet: 'Feed a pet', pet_sit: 'Pet sitting', other: 'Other' },
+    education: { school_tutor: 'Tutor (school)', language: 'Foreign language', music: 'Music', other: 'Other' },
+    fitness: { running: 'Running partner', gym: 'Gym training', yoga: 'Yoga / stretching', other: 'Other' },
+  },
+};
+
+const getSubtypeLabel = (language: 'ua' | 'ru' | 'en', helpType: string, subtype: { label: string; value: string }) => {
+  if (language === 'ru') return subtype.label;
+  return HELP_SUBTYPE_LABELS[language]?.[helpType]?.[subtype.value] ?? subtype.label;
+};
+
 const HelpRequestScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const language = useSelector((state: LangState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
-  const user = useSelector((state: { auth?: { user?: { id?: string; name?: string; photoURL?: string } } }) => state.auth?.user);
+  const user = useSelector((state: { auth?: { user?: { id?: string; name?: string; phone?: string; photoURL?: string; startAvatarKey?: string } } }) => state.auth?.user);
   const text = UI_TEXT[language];
-  const requiredPhotoLabel = getRequiredPhotoLabel(language);
   const helpTypeLabels = HELP_TYPES_LABELS[language];
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('+380');
+  const [name, setName] = useState(() => (user?.name ? normalizePersonName(user.name) : ''));
+  const [phone, setPhone] = useState(() => (user?.phone ? normalizePhoneText(user.phone) : ''));
   const [helpType, setHelpType] = useState('');
   const [subType, setSubType] = useState('');
   const [description, setDescription] = useState('');
@@ -270,7 +316,13 @@ const HelpRequestScreen: React.FC = () => {
 
   const MAX_DESCRIPTION_LENGTH = 500;
 
-  const subtypes = useMemo(() => HELP_SUBTYPES[helpType] ?? [], [helpType]);
+  const subtypes = useMemo(
+    () => (HELP_SUBTYPES[helpType] ?? []).map((subtype) => ({
+      ...subtype,
+      label: getSubtypeLabel(language, helpType, subtype),
+    })),
+    [helpType, language],
+  );
   const hasSubtypes = subtypes.length > 0;
 
   const canSubmit = useMemo(() => {
@@ -281,10 +333,9 @@ const HelpRequestScreen: React.FC = () => {
       validatePhone(normalizedPhone) &&
       Boolean(helpType) &&
       (!hasSubtypes || Boolean(subType)) &&
-      description.trim().length >= 10 &&
-      getDonePhotos(formPhotos).length > 0
+      description.trim().length >= 10
     );
-  }, [hasSubtypes, helpType, name, phone, subType, description, formPhotos]);
+  }, [hasSubtypes, helpType, name, phone, subType, description]);
   const isNameComplete = useMemo(() => validateName(normalizePersonName(name)), [name]);
   const isPhoneComplete = useMemo(() => validatePhone(normalizePhoneText(phone)), [phone]);
   const isHelpTypeComplete = Boolean(helpType);
@@ -292,6 +343,9 @@ const HelpRequestScreen: React.FC = () => {
   const isDescriptionComplete = description.trim().length >= 10;
 
   const handleSubmit = async () => {
+    if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, userStartAvatarKey: user?.startAvatarKey, navigation })) {
+      return;
+    }
     const nextErrors: {
       name?: string;
       phone?: string;
@@ -334,9 +388,12 @@ const HelpRequestScreen: React.FC = () => {
     }
 
     setFieldErrors({});
-    if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, photos: formPhotos, navigation })) {
+
+    if (formPhotos.some(p => p.status === 'error')) {
+      Alert.alert(text.errorTitle, text.photoErrorMessage);
       return;
     }
+
     const firstPhoto = getDonePhotos(formPhotos)[0];
 
     const secsLeft = RATE_LIMITERS.helpRequest.cooldownSecondsLeft();
@@ -496,16 +553,30 @@ const HelpRequestScreen: React.FC = () => {
           <Text style={styles.counter}>
             {description.length}/{MAX_DESCRIPTION_LENGTH} {text.charsLeft}
           </Text>
+          <Text style={styles.fieldHint}>{text.descMinHint}</Text>
           <FormFieldError error={fieldErrors.description} />
 
-          <FormSectionLabel label={requiredPhotoLabel} completed={getDonePhotos(formPhotos).length > 0} containerStyle={styles.labelRow} labelStyle={styles.label} />
-          <PhotoUploadField
-            uid={user?.id ?? ''}
-            userName={user?.name ?? ''}
-            maxPhotos={3}
-            storagePath="requests"
-            onPhotosChange={setFormPhotos}
-          />
+          <FormSectionLabel label={text.labelPhoto} completed={getDonePhotos(formPhotos).length > 0} containerStyle={styles.labelRow} labelStyle={styles.label} />
+          {user ? (
+            <PhotoUploadField
+              uid={user.id ?? ''}
+              userName={user.name ?? ''}
+              maxPhotos={1}
+              storagePath="requests"
+              onPhotosChange={setFormPhotos}
+            />
+          ) : (
+            <View style={styles.photoAuthBox}>
+              <Text style={styles.photoAuthText}>{text.authNoticeBody}</Text>
+              <TouchableOpacity
+                style={styles.authNoticeBtn}
+                activeOpacity={0.85}
+                onPress={() => navigation.navigate('LoginScreen', {})}
+              >
+                <Text style={styles.authNoticeBtnText}>{text.authNoticeBtn}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           <TouchableOpacity style={[styles.submitBtn, (!canSubmit || submitting) && styles.submitBtnDisabled]} onPress={handleSubmit} activeOpacity={0.88} disabled={!canSubmit || submitting}>
             {submitting ? (
@@ -569,6 +640,7 @@ const styles = StyleSheet.create({
   },
   textArea: { minHeight: 96, textAlignVertical: 'top' },
   counter: { fontSize: 12, color: SCREEN_THEME.textSecondary, marginTop: 6, textAlign: 'right', fontWeight: '700' },
+  fieldHint: { fontSize: 12, color: SCREEN_THEME.textSecondary, marginTop: 4, fontWeight: '700' },
   pickerWrapper: { backgroundColor: '#FFFDF6', borderRadius: 18, borderWidth: 1, borderColor: '#E7D6B3', overflow: 'hidden' },
   picker: { color: SCREEN_THEME.textPrimary, height: 52 },
   submitBtn: {
@@ -601,8 +673,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   authNoticeBtnText: { color: '#FFF9EE', fontWeight: '900', fontSize: 14 },
+  photoAuthBox: {
+    backgroundColor: '#FFF8E7',
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#F0C96B',
+  },
+  photoAuthText: { fontSize: 13, color: '#7A5C00', lineHeight: 19, marginBottom: 10 },
 });
 
 export default HelpRequestScreen;
-
 

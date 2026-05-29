@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -27,7 +28,8 @@ import {
   getDefaultAvatarKey,
   saveTempProfileData,
 } from '../utils/startAvatars';
-import { updateProfileRecord } from '../services/authProfileService';
+import { updateProfileRecord, uploadProfilePhoto } from '../services/authProfileService';
+import { pickPhotoFromLibrary } from '../utils/photoPicker';
 
 const TEXT = {
   ua: {
@@ -36,6 +38,8 @@ const TEXT = {
     nameSection: "Ваше ім'я",
     namePlaceholder: "Як вас звати?",
     avatarSection: 'Фото профілю',
+    uploadAvatar: 'Обрати фото для аватара',
+    temporaryAvatarSection: 'Обрати тимчасовий аватар',
     genderSection: 'Стать',
     ageSection: 'Вік',
     agePlaceholder: 'Ваш вік',
@@ -44,6 +48,13 @@ const TEXT = {
     continue: 'Продовжити',
     ageError: 'Вік має бути від 14 до 100',
     nameError: "Введіть ваше ім'я",
+    missingTitle: 'Ще не все заповнено',
+    missingName: "Введіть ім'я мінімум з 2 символів",
+    missingAvatar: 'Оберіть фото профілю',
+    missingGender: 'Оберіть стать',
+    missingAge: 'Вкажіть вік від 14 до 100',
+    avatarError: 'Не вдалося обрати або зберегти фото. Спробуйте ще раз.',
+    loginRequiredForPhoto: 'Щоб зберегти власне фото, спочатку потрібно увійти в акаунт.',
   },
   ru: {
     title: 'Расскажите о себе',
@@ -51,6 +62,8 @@ const TEXT = {
     nameSection: 'Ваше имя',
     namePlaceholder: 'Как вас зовут?',
     avatarSection: 'Фото профиля',
+    uploadAvatar: 'Выбрать фото для аватара',
+    temporaryAvatarSection: 'Выбрать временный аватар',
     genderSection: 'Пол',
     ageSection: 'Возраст',
     agePlaceholder: 'Ваш возраст',
@@ -59,6 +72,13 @@ const TEXT = {
     continue: 'Продолжить',
     ageError: 'Возраст должен быть от 14 до 100',
     nameError: 'Введите ваше имя',
+    missingTitle: 'Еще не все заполнено',
+    missingName: 'Введите имя минимум из 2 символов',
+    missingAvatar: 'Выберите фото профиля',
+    missingGender: 'Выберите пол',
+    missingAge: 'Укажите возраст от 14 до 100',
+    avatarError: 'Не удалось выбрать или сохранить фото. Попробуйте еще раз.',
+    loginRequiredForPhoto: 'Чтобы сохранить свое фото, сначала нужно войти в аккаунт.',
   },
   en: {
     title: 'Tell us about yourself',
@@ -66,6 +86,8 @@ const TEXT = {
     nameSection: 'Your name',
     namePlaceholder: 'What is your name?',
     avatarSection: 'Profile photo',
+    uploadAvatar: 'Choose photo for avatar',
+    temporaryAvatarSection: 'Choose temporary avatar',
     genderSection: 'Gender',
     ageSection: 'Age',
     agePlaceholder: 'Your age',
@@ -74,6 +96,13 @@ const TEXT = {
     continue: 'Continue',
     ageError: 'Age must be between 14 and 100',
     nameError: 'Please enter your name',
+    missingTitle: 'Not complete yet',
+    missingName: 'Enter a name with at least 2 characters',
+    missingAvatar: 'Choose a profile photo',
+    missingGender: 'Choose gender',
+    missingAge: 'Enter age from 14 to 100',
+    avatarError: 'Could not choose or save the photo. Please try again.',
+    loginRequiredForPhoto: 'To save your own photo, please sign in first.',
   },
 } as const;
 
@@ -88,8 +117,16 @@ export default function ProfileSetupScreen() {
   const [gender, setGender] = useState<'male' | 'female' | null>(user?.gender ?? null);
   const [ageText, setAgeText] = useState(user?.age ? String(user.age) : '');
   const [selectedKey, setSelectedKey] = useState<string>(user?.startAvatarKey || '');
+  const [customAvatarUri, setCustomAvatarUri] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  const trimmedName = name.trim();
+  const parsedAge = parseInt(ageText, 10);
+  const isNameDone = trimmedName.length >= 2;
+  const isAvatarDone = selectedKey !== '' || customAvatarUri !== '';
+  const isGenderDone = gender !== null;
+  const isAgeDone = !isNaN(parsedAge) && parsedAge >= 14 && parsedAge <= 100;
 
   const handleGenderSelect = (g: 'male' | 'female') => {
     setGender(g);
@@ -108,13 +145,56 @@ export default function ProfileSetupScreen() {
     }
   };
 
-  const canSubmit = name.trim().length >= 2 && gender !== null && ageText.trim().length > 0 && selectedKey !== '';
+  const handlePickAvatarPhoto = async () => {
+    if (saving) return;
+    try {
+      const picked = await pickPhotoFromLibrary({ allowsEditing: true, quality: 0.86 });
+      if (!picked) return;
+      setCustomAvatarUri(picked.uri);
+      setSelectedKey('');
+    } catch {
+      Alert.alert(text.missingTitle, text.avatarError);
+    }
+  };
+
+  const canSubmit = isNameDone && isGenderDone && isAgeDone && isAvatarDone;
+
+  const renderSectionLabel = (label: string, done: boolean) => (
+    <View style={styles.sectionHeader}>
+      <Text style={styles.sectionLabel}>{label}</Text>
+      {done ? (
+        <View style={styles.doneBadge}>
+          <MaterialCommunityIcons name="check" size={13} color="#fff" />
+        </View>
+      ) : null}
+    </View>
+  );
+
+  const getMissingMessages = () => {
+    const missing: string[] = [];
+    if (!isNameDone) missing.push(`- ${text.missingName}`);
+    if (!isAvatarDone) missing.push(`- ${text.missingAvatar}`);
+    if (!isGenderDone) missing.push(`- ${text.missingGender}`);
+    if (!isAgeDone) missing.push(`- ${text.missingAge}`);
+    return missing;
+  };
+
+  const handleContinuePress = () => {
+    if (saving) return;
+    const missing = getMissingMessages();
+    if (missing.length > 0) {
+      Alert.alert(text.missingTitle, missing.join('\n'));
+      return;
+    }
+    void confirm().catch(() => {
+      Alert.alert(text.missingTitle, text.avatarError);
+    });
+  };
 
   const confirm = async () => {
     if (!canSubmit || saving) return;
-    const trimmedName = name.trim();
     if (trimmedName.length < 2) { setError(text.nameError); return; }
-    const age = parseInt(ageText, 10);
+    const age = parsedAge;
     if (isNaN(age) || age < 14 || age > 100) { setError(text.ageError); return; }
 
     const avatarKey = selectedKey || getDefaultAvatarKey(gender ?? undefined, age);
@@ -122,16 +202,31 @@ export default function ProfileSetupScreen() {
 
     setSaving(true);
     try {
-      await saveSelectedStartAvatar(avatar.key);
-
       const uid = auth.currentUser?.uid || user?.id;
+      let nextPhotoURL = avatar.uri;
+      let nextPhotoURLs = [avatar.uri];
+      let nextStartAvatarKey = avatar.key;
+
+      if (customAvatarUri) {
+        if (!uid) {
+          Alert.alert(text.missingTitle, text.loginRequiredForPhoto);
+          return;
+        }
+        const uploaded = await uploadProfilePhoto(customAvatarUri, { moderationStatus: 'approved' });
+        nextPhotoURL = uploaded.url;
+        nextPhotoURLs = [uploaded.url];
+        nextStartAvatarKey = '';
+      } else {
+        await saveSelectedStartAvatar(avatar.key);
+      }
+
       if (uid) {
         // Authenticated — save directly to Firebase
         await updateProfileRecord(uid, {
           name: trimmedName,
-          photoURL: avatar.uri,
-          photoURLs: [avatar.uri],
-          startAvatarKey: avatar.key,
+          photoURL: nextPhotoURL,
+          photoURLs: nextPhotoURLs,
+          startAvatarKey: nextStartAvatarKey,
           gender: gender ?? undefined,
           age,
         });
@@ -139,9 +234,9 @@ export default function ProfileSetupScreen() {
           dispatch(setUser({
             ...user,
             name: trimmedName,
-            photoURL: avatar.uri,
-            photoURLs: [avatar.uri],
-            startAvatarKey: avatar.key,
+            photoURL: nextPhotoURL,
+            photoURLs: nextPhotoURLs,
+            startAvatarKey: nextStartAvatarKey || undefined,
             gender: gender ?? undefined,
             age,
           }));
@@ -176,7 +271,7 @@ export default function ProfileSetupScreen() {
           </View>
 
           {/* Name */}
-          <Text style={styles.sectionLabel}>{text.nameSection}</Text>
+          {renderSectionLabel(text.nameSection, isNameDone)}
           <TextInput
             style={styles.textInput}
             value={name}
@@ -187,8 +282,16 @@ export default function ProfileSetupScreen() {
             autoCorrect={false}
           />
 
+          <TouchableOpacity style={styles.photoButton} onPress={() => void handlePickAvatarPhoto()} activeOpacity={0.86}>
+            <MaterialCommunityIcons name="image-plus" size={20} color="#fff" />
+            <Text style={styles.photoButtonText}>{text.uploadAvatar}</Text>
+          </TouchableOpacity>
+          {customAvatarUri ? (
+            <Image source={{ uri: customAvatarUri }} style={styles.customAvatarPreview} resizeMode="cover" />
+          ) : null}
+
           {/* Avatar */}
-          <Text style={styles.sectionLabel}>{text.avatarSection}</Text>
+          {renderSectionLabel(text.temporaryAvatarSection, selectedKey !== '')}
           <View style={styles.grid}>
             {START_AVATARS.map((avatar) => {
               const isSelected = avatar.key === selectedKey;
@@ -196,7 +299,7 @@ export default function ProfileSetupScreen() {
                 <TouchableOpacity
                   key={avatar.key}
                   style={[styles.avatarCard, isSelected && styles.avatarCardSelected]}
-                  onPress={() => setSelectedKey(avatar.key)}
+                  onPress={() => { setSelectedKey(avatar.key); setCustomAvatarUri(''); }}
                   activeOpacity={0.86}
                 >
                   <Image source={avatar.source} style={styles.avatarImage} resizeMode="cover" />
@@ -211,7 +314,7 @@ export default function ProfileSetupScreen() {
           </View>
 
           {/* Gender */}
-          <Text style={styles.sectionLabel}>{text.genderSection}</Text>
+          {renderSectionLabel(text.genderSection, isGenderDone)}
           <View style={styles.genderRow}>
             <TouchableOpacity
               style={[styles.genderChip, gender === 'male' && styles.genderChipActiveMale]}
@@ -244,7 +347,7 @@ export default function ProfileSetupScreen() {
           </View>
 
           {/* Age */}
-          <Text style={styles.sectionLabel}>{text.ageSection}</Text>
+          {renderSectionLabel(text.ageSection, isAgeDone)}
           <TextInput
             style={[styles.textInput, error ? styles.inputError : null]}
             value={ageText}
@@ -263,8 +366,8 @@ export default function ProfileSetupScreen() {
       <View style={styles.footer}>
         <TouchableOpacity
           style={[styles.continueButton, (!canSubmit || saving) && styles.continueButtonDisabled]}
-          onPress={() => void confirm()}
-          disabled={!canSubmit || saving}
+          onPress={handleContinuePress}
+          disabled={saving}
           activeOpacity={0.86}
         >
           {saving
@@ -299,8 +402,21 @@ const styles = StyleSheet.create({
     color: SCREEN_THEME.textPrimary,
     fontSize: 15,
     fontWeight: '700',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
     marginBottom: 10,
     marginTop: 6,
+  },
+  doneBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#2F8F46',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   textInput: {
     height: 52,
@@ -311,6 +427,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     fontSize: 16,
     color: SCREEN_THEME.textPrimary,
+    marginBottom: 18,
+  },
+  photoButton: {
+    minHeight: 50,
+    borderRadius: 14,
+    backgroundColor: SCREEN_THEME.woodGreenDark,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 14,
+  },
+  photoButtonText: { color: '#fff', fontSize: 15, fontWeight: '900' },
+  customAvatarPreview: {
+    alignSelf: 'center',
+    width: 82,
+    height: 82,
+    borderRadius: 41,
+    borderWidth: 3,
+    borderColor: '#2F8F46',
     marginBottom: 18,
   },
   inputError: { borderColor: SCREEN_THEME.terracotta },

@@ -223,12 +223,14 @@ export const updateProfileRecord = async (uid: string, patch: Partial<ProfileRec
 
 export const uploadProfilePhoto = async (
   localUri: string,
+  options: { moderationStatus?: 'not_submitted' | 'pending' | 'approved' | 'rejected' } = {},
 ): Promise<{ url: string; storagePath: string }> => {
   const user = await ensureFirebaseAuth();
   try {
     const photo = await photoService.addLocalPhoto(localUri, {
       userId: user.uid,
       type: 'avatar',
+      moderationStatus: options.moderationStatus,
     });
     const upload = await photoService.upload(photo.id);
     if (!upload.imageUrl) {

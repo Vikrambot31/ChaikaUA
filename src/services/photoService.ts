@@ -3,7 +3,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LOCAL_API, LOCAL_MODE } from '../local/LOCAL_MODE';
 import { ImageStorage } from '../photo-module/ImageStorage';
-import type { PhotoUploadMetadata, UserPhoto } from '../photo-module/types';
+import type { PhotoModerationStatus, PhotoUploadMetadata, UserPhoto } from '../photo-module/types';
 import { uniqueId } from '../utils/cryptoId';
 import { getContentType, getPhotoFileExtension, compressImage } from '../utils/imageCompressor';
 import { pickPhotoFromLibrary, takePhotoWithCamera, type PhotoSource } from '../utils/photoPicker';
@@ -41,7 +41,7 @@ export type LocalServerPhoto = {
   width: number;
   height: number;
   size: number;
-  moderationStatus: 'pending' | 'approved' | 'rejected';
+  moderationStatus: PhotoModerationStatus;
   deleted: boolean;
 };
 
@@ -62,6 +62,7 @@ type AddPhotoOptions = {
   type?: PhotoType | string;
   metadata?: PhotoUploadMetadata;
   source?: PhotoSource;
+  moderationStatus?: PhotoModerationStatus;
 };
 
 type PreparedPhoto = {
@@ -74,6 +75,7 @@ type PreparedPhoto = {
   width?: number;
   height?: number;
   size?: number;
+  moderationStatus?: PhotoModerationStatus;
 };
 
 const safeType = (type?: string): string => (type || 'gallery').replace(/[^a-z0-9_-]/gi, '_').toLowerCase();
@@ -131,6 +133,7 @@ async function preparePhoto(localUri: string, options: AddPhotoOptions): Promise
     width: preview.width,
     height: preview.height,
     size,
+    moderationStatus: options.moderationStatus,
   };
 }
 
@@ -147,7 +150,7 @@ async function createLocalRecord(prepared: PreparedPhoto): Promise<UserPhoto> {
     width: prepared.width,
     height: prepared.height,
     size: prepared.size,
-    moderationStatus: 'pending',
+    moderationStatus: prepared.moderationStatus ?? 'pending',
     deleted: false,
     status: 'queued',
     createdAt: now,
@@ -179,6 +182,7 @@ async function uploadToLocalServer(photo: UserPhoto): Promise<PhotoUploadResult>
       width: photo.width ?? 0,
       height: photo.height ?? 0,
       size: photo.size ?? await getFileInfoSize(localUri),
+      moderationStatus: photo.moderationStatus ?? 'pending',
     }),
   });
 

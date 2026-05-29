@@ -28,7 +28,7 @@ import { RootState } from '../redux/store';
 import { lostFoundService, LostFoundItem, RequestType } from '../services/lostFoundService';
 import { showUserError } from '../utils/userFacingErrors';
 import { safeCallPhone } from '../utils/communicationActions';
-import { validatePhone } from '../utils/validators';
+import { validatePhone, normalizeUkrainianPhoneStrict } from '../utils/validators';
 import { normalizePhoneText } from '../utils/textUtils';
 import { database } from '../firebase-config';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
@@ -50,6 +50,8 @@ const UI_TEXT = {
     rejected: 'Відхилено',
     formTitle: 'Анкета',
     formError: 'Заповніть телефон та категорію.',
+    duplicateTitle: 'Схожа заявка вже є',
+    duplicateBody: 'Ви вже створили схожу активну заявку. Перевірте список перед повторною відправкою.',
     sendErrorTitle: 'Помилка',
     sendError: 'Не вдалося надіслати заявку. Спробуйте ще раз.',
     photoUploading: 'Дочекайтесь завершення завантаження фото.',
@@ -70,6 +72,8 @@ const UI_TEXT = {
     cancel: 'Скасувати',
     photoLabel: 'Фото предмету (необов\'язково)',
     descriptionPlaceholder: 'Опис: колір, особливості, де загублено...',
+    descriptionPlaceholderFound: 'Опис: колір, особливості, де знайдено...',
+    categoryError: 'Оберіть категорію речі.',
     contact: 'Подзвонити',
     anonymous: 'Мешканець',
   },
@@ -84,6 +88,8 @@ const UI_TEXT = {
     rejected: 'Отклонено',
     formTitle: 'Анкета',
     formError: 'Заполните телефон и категорию.',
+    duplicateTitle: 'Похожая заявка уже есть',
+    duplicateBody: 'Вы уже создали похожую активную заявку. Проверьте список перед повторной отправкой.',
     sendErrorTitle: 'Ошибка',
     sendError: 'Не удалось отправить заявку. Попробуйте еще раз.',
     photoUploading: 'Дождитесь завершения загрузки фото.',
@@ -104,6 +110,8 @@ const UI_TEXT = {
     cancel: 'Отмена',
     photoLabel: 'Фото предмета (необязательно)',
     descriptionPlaceholder: 'Описание: цвет, особенности, где потеряно...',
+    descriptionPlaceholderFound: 'Описание: цвет, особенности, где найдено...',
+    categoryError: 'Выберите категорию вещи.',
     contact: 'Позвонить',
     anonymous: 'Житель',
   },
@@ -118,6 +126,8 @@ const UI_TEXT = {
     rejected: 'Rejected',
     formTitle: 'Request',
     formError: 'Fill in phone and category.',
+    duplicateTitle: 'Similar request already exists',
+    duplicateBody: 'You already created a similar active request. Check the list before sending again.',
     sendErrorTitle: 'Error',
     sendError: 'Could not send the request. Please try again.',
     photoUploading: 'Wait until the photo upload is complete.',
@@ -138,6 +148,8 @@ const UI_TEXT = {
     cancel: 'Cancel',
     photoLabel: 'Item photo (optional)',
     descriptionPlaceholder: 'Description: color, features, where lost...',
+    descriptionPlaceholderFound: 'Description: color, features, where found...',
+    categoryError: 'Please select an item category.',
     contact: 'Call',
     anonymous: 'Resident',
   },
@@ -171,9 +183,9 @@ const LostAndFoundScreen: React.FC = () => {
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const [items, setItems] = useState<LostFoundItem[]>([]);
   const [avatarByUserId, setAvatarByUserId] = useState<Record<string, string>>({});
-  const [type, setType] = useState<RequestType>('found');
+  const [type, setType] = useState<RequestType>('lost');
   const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState(() => normalizePhoneText(user?.phone ?? ''));
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
   const [addFormVisible, setAddFormVisible] = useState(false);
@@ -186,6 +198,12 @@ const LostAndFoundScreen: React.FC = () => {
   }, []);
   const handleRequestCloseModal = useCallback(() => {
     if (pickerActiveRef.current) return;
+    // Bug #9 fix: skip confirmation if the form has not been touched
+    const isDirty = category !== '' || description.trim() !== '' || formPhotos.length > 0;
+    if (!isDirty) {
+      setAddFormVisible(false);
+      return;
+    }
     Alert.alert(
       'Закрити форму?',
       'Ви ще не надіслали заявку. Закрити?',
@@ -194,7 +212,7 @@ const LostAndFoundScreen: React.FC = () => {
         { text: 'Так', onPress: () => setAddFormVisible(false) },
       ],
     );
-  }, []);
+  }, [category, description, formPhotos]);
   const [closingId, setClosingId] = useState<string | null>(null);
   const [previewPhoto, setPreviewPhoto] = useState<{ uri: string; storagePath?: string } | null>(null);
   const hasUploadingPhotos = formPhotos.some((photo) => photo.status === 'uploading');
@@ -227,21 +245,37 @@ const LostAndFoundScreen: React.FC = () => {
     }
   }, [name, user?.name]);
 
+  useEffect(() => {
+    if (!phone.trim() && user?.phone) {
+      setPhone(normalizePhoneText(user.phone));
+    }
+  }, [phone, user?.phone]);
+
   const resetForm = () => {
-    setType('found');
+    setType('lost');
     setName(user?.name ?? '');
-    setPhone('');
+    setPhone(normalizePhoneText(user?.phone ?? ''));
     setCategory('');
     setDescription('');
     setFormPhotos([]);
   };
 
   const handleSubmit = async () => {
-    if (!phone.trim() || !category) {
-      Alert.alert(text.formTitle, text.formError);
+    if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, userStartAvatarKey: user?.startAvatarKey, navigation })) {
       return;
     }
-    if (!validatePhone(phone.trim())) {
+    // Bug #3 fix: separate phone and category checks for precise error messages
+    if (!phone.trim()) {
+      Alert.alert(text.sendErrorTitle, text.phoneError);
+      return;
+    }
+    if (!category) {
+      Alert.alert(text.formTitle, text.categoryError);
+      return;
+    }
+    // Bug #4 fix: normalize Ukrainian formats (0XXXXXXXXX, 380XXXXXXXXX) before validation
+    const normalizedPhone = normalizeUkrainianPhoneStrict(phone.trim()) ?? normalizePhoneText(phone);
+    if (!validatePhone(normalizedPhone)) {
       Alert.alert(text.sendErrorTitle, text.phoneError);
       return;
     }
@@ -253,20 +287,29 @@ const LostAndFoundScreen: React.FC = () => {
       Alert.alert(text.sendErrorTitle, text.photoUploadError);
       return;
     }
-    if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, photos: formPhotos, navigation })) {
+    const normalizedDescription = description.trim().toLowerCase();
+    const hasDuplicate = items.some((item) => {
+      if (item.isArchived || item.type !== type || item.category !== category) return false;
+      if (item.userId && user?.id && item.userId !== user.id) return false;
+      const samePhone = (normalizeUkrainianPhoneStrict(item.phone) ?? normalizePhoneText(item.phone)) === normalizedPhone;
+      const sameDescription = (item.description ?? '').trim().toLowerCase() === normalizedDescription;
+      return samePhone && sameDescription;
+    });
+    if (hasDuplicate) {
+      Alert.alert(text.duplicateTitle, text.duplicateBody);
       return;
     }
-
     setSubmitting(true);
     try {
       const createdAt = new Date();
       const donePhotos = getDonePhotos(formPhotos);
       const firstPhoto = donePhotos[0];
 
-      await lostFoundService.add({
+      // Bug #6 fix: capture returned key for optimistic UI update
+      const newId = await lostFoundService.add({
         type,
         name: name.trim(),
-        phone: normalizePhoneText(phone),
+        phone: normalizedPhone,
         category,
         description: description.trim(),
         photoUri: firstPhoto?.downloadUrl ?? '',
@@ -279,6 +322,26 @@ const LostAndFoundScreen: React.FC = () => {
         userId: user?.id || '',
         language,
       });
+
+      // Bug #6 fix: immediately show the pending item in the list for the creator
+      const optimisticItem: LostFoundItem = {
+        id: newId,
+        type,
+        name: name.trim(),
+        phone: normalizedPhone,
+        category,
+        description: description.trim(),
+        photoUri: firstPhoto?.downloadUrl ?? '',
+        photoStoragePath: firstPhoto?.storagePath ?? '',
+        userPhotoURL: user?.photoURL || '',
+        moderationStatus: 'pending',
+        submittedForModerationAt: createdAt.toISOString(),
+        createdAt: createdAt.toISOString(),
+        expiresAt: new Date(createdAt.getTime() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+        userId: user?.id || '',
+        language,
+      };
+      setItems((prev) => [optimisticItem, ...prev]);
 
       resetForm();
       setAddFormVisible(false);
@@ -532,16 +595,20 @@ const LostAndFoundScreen: React.FC = () => {
 
               <TextInput value={name} onChangeText={setName} placeholder={text.namePlaceholder} placeholderTextColor={SCREEN_THEME.textMuted} style={styles.input} />
               <TextInput value={phone} onChangeText={setPhone} placeholder={text.phonePlaceholder} placeholderTextColor={SCREEN_THEME.textMuted} keyboardType="phone-pad" style={styles.input} />
-              <TextInput value={description} onChangeText={setDescription} placeholder={text.descriptionPlaceholder} placeholderTextColor={SCREEN_THEME.textMuted} style={[styles.input, styles.inputMultiline]} multiline numberOfLines={3} />
+              <TextInput value={description} onChangeText={setDescription} placeholder={type === 'lost' ? text.descriptionPlaceholder : text.descriptionPlaceholderFound} placeholderTextColor={SCREEN_THEME.textMuted} style={[styles.input, styles.inputMultiline]} multiline numberOfLines={3} />
 
               <Text style={styles.fieldLabel}>{text.itemLabel}</Text>
-              <View style={styles.categoryGrid}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={true}
+                contentContainerStyle={styles.categoryScroller}
+              >
                 {text.categories.map((item) => (
                   <TouchableOpacity key={item} style={[styles.categoryChip, category === item && styles.categoryChipActive]} onPress={() => setCategory(item)} activeOpacity={0.78}>
                     <Text style={[styles.categoryText, category === item && styles.categoryTextActive]}>{item}</Text>
                   </TouchableOpacity>
                 ))}
-              </View>
+              </ScrollView>
 
               {/* Photo upload - optional */}
               <Text style={styles.fieldLabel}>{text.photoLabel}</Text>
@@ -711,7 +778,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   itemTitle: { fontSize: 20, lineHeight: 24, fontWeight: '900', color: SCREEN_THEME.textPrimary },
-  itemDescription: { fontSize: 12, lineHeight: 16, color: SCREEN_THEME.textSecondary, fontWeight: '600', marginTop: 4 },
+  itemDescription: { fontSize: 12, lineHeight: 16, color: '#fff', fontWeight: '800', marginTop: 4, backgroundColor: '#7A1E5C', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, overflow: 'hidden' },
   bottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6, gap: 5 },
   personRow: { flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1, minWidth: 42 },
   itemMeta: { flex: 1, fontSize: 13, lineHeight: 16, color: SCREEN_THEME.textPrimary, fontWeight: '800' },
@@ -821,7 +888,7 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   fieldLabel: { color: SCREEN_THEME.textPrimary, fontWeight: '900', marginBottom: 8 },
-  categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  categoryScroller: { gap: 8, paddingRight: 20, paddingBottom: 12 },
   categoryChip: {
     borderRadius: 999,
     paddingHorizontal: 12,

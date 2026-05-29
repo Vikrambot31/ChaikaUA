@@ -46,10 +46,10 @@ const BUTTON_LABELS_BY_LANG: Record<Lang, { limit: string; more: string; select:
   en: { limit: 'Photo limit', more: 'Select more photos', select: 'Select photo' },
 };
 
-const AUTH_ALERT_BY_LANG: Record<Lang, { title: string; message: string }> = {
-  ua: { title: 'Потрібен вхід', message: 'Увійдіть в акаунт, щоб завантажити фото.' },
-  ru: { title: 'Требуется вход', message: 'Войдите в аккаунт, чтобы загрузить фото.' },
-  en: { title: 'Sign in required', message: 'Sign in to upload photos.' },
+const AUTH_ALERT_BY_LANG: Record<Lang, { title: string; message: string; loginBtn: string }> = {
+  ua: { title: 'Потрібен вхід', message: 'Увійдіть в акаунт, щоб завантажити фото.', loginBtn: 'Увійти' },
+  ru: { title: 'Требуется вход', message: 'Войдите в аккаунт, чтобы загрузить фото.', loginBtn: 'Войти' },
+  en: { title: 'Sign in required', message: 'Sign in to upload photos.', loginBtn: 'Sign in' },
 };
 
 const QUEUE_FULL_ALERT_BY_LANG: Record<Lang, { title: string; message: string }> = {
@@ -144,17 +144,27 @@ export default function PhotoUploadField({
   const addSelectedPhoto = useCallback((photo: UserPhoto) => {
     if (!uid) {
       const a = AUTH_ALERT_BY_LANG[language] ?? AUTH_ALERT_BY_LANG.ua;
-      Alert.alert(a.title, a.message);
+      Alert.alert(a.title, a.message, [
+        { text: a.loginBtn, onPress: () => navigation.navigate('LoginScreen', {}) },
+        { text: 'OK', style: 'cancel' },
+      ]);
       return;
     }
     setSelected((current) => {
       if (current.some((item) => item.id === photo.id)) return current;
       return maxPhotos > 0 ? [...current, photo].slice(0, maxPhotos) : [...current, photo];
     });
-    void UploadQueue.enqueue(photo.id, photo.localUri, {
-      uploadedBy: userName || uid,
-      title: storagePath,
-    }).then((accepted) => {
+    void UploadQueue.enqueue(
+      photo.id,
+      photo.localUri,
+      {
+        uploadedBy: userName || uid,
+      },
+      {
+        collection: storagePath,
+        uid,
+      },
+    ).then((accepted) => {
       if (!accepted) {
         setSelected((current) => current.filter((item) => item.id !== photo.id));
         const q = QUEUE_FULL_ALERT_BY_LANG[language] ?? QUEUE_FULL_ALERT_BY_LANG.ua;

@@ -26,6 +26,14 @@
       }
     },
 
+    "community_photos_public": {
+      ".read": "auth != null",
+      ".indexOn": "status",
+      "$photoId": {
+        ".write": "auth != null && (!data.exists() || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
+      }
+    },
+
     "contacts_listings": {
       ".read": "auth != null",
       ".indexOn": "moderationStatus",
@@ -44,7 +52,7 @@
 
     "buy_sell_listings": {
       ".read": "auth != null",
-      ".indexOn": "moderationStatus",
+      ".indexOn": ["moderationStatus", "userId"],
       "$itemId": {
         ".write": "auth != null && (!data.exists() || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
       }
@@ -218,15 +226,33 @@
     },
 
     "user_photos": {
-      ".read": "auth != null",
-      ".indexOn": "status",
+      ".read": "auth != null && (root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
+      ".indexOn": ["status", "moderationStatus"],
       "$uid": {
         ".read": "auth != null && (auth.uid === $uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
-        ".write": "auth != null && (auth.uid === $uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
         "$photoId": {
           ".read": "auth != null && (auth.uid === $uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
-          ".write": "auth != null && (auth.uid === $uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
+          ".write": "auth != null && (root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator' || (auth.uid === $uid && newData.child('moderationStatus').val() !== 'approved' && newData.child('moderationStatus').val() !== 'rejected' && newData.child('status').val() !== 'approved' && newData.child('status').val() !== 'rejected'))"
         }
+      }
+    },
+
+    "request_photos": {
+      ".read": "auth != null && (root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
+        ".indexOn": ["status", "moderationStatus"],
+        "$photoId": {
+          ".read": "auth != null && (auth.uid === $uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
+          ".write": "auth != null && (root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator' || (auth.uid === $uid && ((!newData.exists() && data.exists() && data.child('uid').val() === auth.uid && data.child('moderationStatus').val() !== 'approved' && data.child('moderationStatus').val() !== 'rejected' && data.child('status').val() !== 'approved' && data.child('status').val() !== 'rejected') || (newData.exists() && newData.child('uid').val() === auth.uid && newData.child('userId').val() === auth.uid && newData.child('moderationStatus').val() !== 'approved' && newData.child('moderationStatus').val() !== 'rejected' && newData.child('status').val() !== 'approved' && newData.child('status').val() !== 'rejected'))))"
+        }
+      }
+    },
+
+    "rate_limits": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
+        ".write": "auth != null && auth.uid === $uid"
       }
     },
 

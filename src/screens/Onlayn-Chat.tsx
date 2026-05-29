@@ -1203,18 +1203,16 @@ const styles = StyleSheet.create({
     color: '#3D5D87',
   },
   chatDescBox: {
-    borderWidth: 1,
-    borderColor: '#E0D5C8',
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    backgroundColor: '#FAF7F3',
+    backgroundColor: '#7A1E5C',
   },
   chatDescText: {
     fontSize: 13,
-    color: SCREEN_THEME.textSecondary,
+    color: '#fff',
     lineHeight: 18,
-    fontWeight: '600',
+    fontWeight: '800',
   },
   chatActionsRow: {
     flexDirection: 'row',

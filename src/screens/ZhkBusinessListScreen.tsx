@@ -40,7 +40,7 @@ import { safeLogError } from '../utils/errorLogger';
 import StarRatingModal from '../components/StarRatingModal';
 import { DailyRatingUsage, canUseDailyRating, recordDailyRatingUse } from '../utils/monthlyRating';
 import UploadedPhotosGrid from '../components/UploadedPhotosGrid';
-import { getDonePhotos, getRequiredPhotoLabel, validateSubmissionRequirements } from '../utils/submissionRequirements';
+import { getDonePhotos, validateSubmissionRequirements } from '../utils/submissionRequirements';
 
 // --- Types --------------------------------------------------------------------
 
@@ -225,6 +225,7 @@ const UI_TEXT = {
     descriptionLabel: 'Опис',
     descriptionPlaceholder: 'Що саме пропонуєте? Ціни, умови, досвід...',
     photoLabel: 'Фото (необов\'язково)',
+    priceLabelForm: 'Ціна (необов\'язково)',
     selectCategory: 'Оберіть категорію...',
     selectSubcategory: 'Оберіть підкатегорію...',
     submitBtn: 'Надіслати на модерацію',
@@ -273,7 +274,7 @@ const UI_TEXT = {
     priceTo: 'до',
     currencyDefault: '₴',
     noRatings: 'Оценок пока нет',
-    addRequest: 'Расссказать про свои услуги',
+    addRequest: 'Рассказать про свои услуги',
     formTitle: 'Мои услуги',
     categoryLabelForm: 'Направление деятельности',
     subcategoryLabelForm: 'Уточнение',
@@ -284,6 +285,7 @@ const UI_TEXT = {
     descriptionLabel: 'Описание',
     descriptionPlaceholder: 'Что именно предлагаете? Цены, условия, опыт...',
     photoLabel: 'Фото (необязательно)',
+    priceLabelForm: 'Цена (необязательно)',
     selectCategory: 'Выберите категорию...',
     selectSubcategory: 'Выберите подкатегорию...',
     submitBtn: 'Отправить на модерацию',
@@ -343,6 +345,7 @@ const UI_TEXT = {
     descriptionLabel: 'Description',
     descriptionPlaceholder: 'What do you offer? Prices, conditions, experience...',
     photoLabel: 'Photo (optional)',
+    priceLabelForm: 'Price (optional)',
     selectCategory: 'Select category...',
     selectSubcategory: 'Select subcategory...',
     submitBtn: 'Send to moderation',
@@ -414,13 +417,11 @@ function getMyRequestStatusText(status: string | undefined, text: typeof UI_TEXT
 
 export default function ZhkBusinessListScreen() {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
-  const navLock = useRef(false);
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const user = useSelector((state: RootState) => state.auth.user);
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const t = UI_TEXT[language];
-  const requiredPhotoLabel = getRequiredPhotoLabel(language);
 
   const [items, setItems] = useState<BusinessItem[]>([]);
   const [dailyRatingUsage, setDailyRatingUsage] = useState<DailyRatingUsage | null>(null);
@@ -437,6 +438,8 @@ export default function ZhkBusinessListScreen() {
   const [phone, setPhone] = useState('+380');
   const [description, setDescription] = useState('');
   const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
+  const [priceMin, setPriceMin] = useState('');
+  const [priceMax, setPriceMax] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [myRequest, setMyRequest] = useState<MyBusinessRequest>(null);
 
@@ -570,7 +573,7 @@ export default function ZhkBusinessListScreen() {
 
   const selectedFormCategory = BUSINESS_CATEGORIES.find((category) => category.key === formCategoryKey);
   const selectedFormSubcategory = selectedFormCategory?.subs.find((subcategory) => subcategory.key === formSubcategoryKey);
-  const isSubmitFormValid = Boolean(formCategoryKey && formSubcategoryKey && contactName.trim() && phone.trim());
+  const isSubmitFormValid = Boolean(formCategoryKey && formSubcategoryKey && contactName.trim() && normalizeUkrainianPhoneStrict(phone));
 
   const resetAddForm = useCallback(() => {
     setFormCategoryKey('');
@@ -579,6 +582,8 @@ export default function ZhkBusinessListScreen() {
     setPhone('+380');
     setDescription('');
     setFormPhotos([]);
+    setPriceMin('');
+    setPriceMax('');
   }, [user?.name]);
 
   const handlePickerOpenChange = useCallback((isOpen: boolean) => {
@@ -630,7 +635,7 @@ export default function ZhkBusinessListScreen() {
       Alert.alert(t.errorTitle, t.phoneInvalidStrict);
       return;
     }
-    if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, photos: formPhotos, navigation })) {
+    if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, userStartAvatarKey: user?.startAvatarKey, navigation })) {
       return;
     }
 
@@ -664,6 +669,8 @@ export default function ZhkBusinessListScreen() {
       const firstPhoto = getDonePhotos(formPhotos)[0];
       const previousVersion = typeof existing?.version === 'number' ? existing.version : (existing ? 1 : 0);
       const now = new Date().toISOString();
+      const parsedPriceMin = priceMin.trim() ? Number(priceMin.trim()) : undefined;
+      const parsedPriceMax = priceMax.trim() ? Number(priceMax.trim()) : undefined;
       const entry = {
         uid,
         userId: uid,
@@ -685,6 +692,14 @@ export default function ZhkBusinessListScreen() {
         moderatedBy: null,
         moderationReason: null,
         rejectionReason: null,
+        // Preserve social data when updating an existing listing
+        likesByUserId: existing?.likesByUserId ?? {},
+        likeCount: typeof existing?.likeCount === 'number' ? existing.likeCount : 0,
+        ratingByUserId: existing?.ratingByUserId ?? {},
+        // Price (optional)
+        ...(parsedPriceMin != null ? { priceMin: parsedPriceMin } : {}),
+        ...(parsedPriceMax != null ? { priceMax: parsedPriceMax } : {}),
+        ...(parsedPriceMin != null || parsedPriceMax != null ? { currency: '₴' } : {}),
       };
 
       await set(businessRef, entry);
@@ -718,6 +733,8 @@ export default function ZhkBusinessListScreen() {
     logSubmitError,
     navigation,
     phone,
+    priceMin,
+    priceMax,
     resetAddForm,
     selectedFormCategory,
     selectedFormSubcategory,
@@ -996,7 +1013,7 @@ export default function ZhkBusinessListScreen() {
                   </Picker>
                 </View>
 
-                <Text style={styles.formLabel}>{t.nameLabel}</Text>
+                <Text style={styles.formLabel}>{t.nameLabel} *</Text>
                 <TextInput
                   style={styles.input}
                   value={contactName}
@@ -1030,7 +1047,31 @@ export default function ZhkBusinessListScreen() {
                 />
                 <Text style={styles.charCount}>{description.length}/{DESC_MAX} {t.charCount}</Text>
 
-                <Text style={styles.formLabel}>{requiredPhotoLabel}</Text>
+                <Text style={styles.formLabel}>{t.priceLabelForm}</Text>
+                <View style={styles.formPriceRow}>
+                  <TextInput
+                    style={[styles.input, styles.formPriceInputHalf]}
+                    value={priceMin}
+                    onChangeText={setPriceMin}
+                    placeholder={t.priceFrom}
+                    placeholderTextColor={SCREEN_THEME.textMuted}
+                    keyboardType="numeric"
+                    maxLength={8}
+                  />
+                  <Text style={styles.formPriceSep}>–</Text>
+                  <TextInput
+                    style={[styles.input, styles.formPriceInputHalf]}
+                    value={priceMax}
+                    onChangeText={setPriceMax}
+                    placeholder={t.priceTo}
+                    placeholderTextColor={SCREEN_THEME.textMuted}
+                    keyboardType="numeric"
+                    maxLength={8}
+                  />
+                  <Text style={styles.formPriceCurrency}>{t.currencyDefault}</Text>
+                </View>
+
+                <Text style={styles.formLabel}>{t.photoLabel}</Text>
                 <PhotoUploadField
                   uid={user?.id ?? ''}
                   userName={user?.name ?? ''}
@@ -1097,6 +1138,7 @@ function BusinessCard({
   onContact?: () => void;
 }) {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
+  const navLock = useRef(false);
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const t = UI_TEXT[language];
   const likeCount = typeof item.likeCount === 'number' ? item.likeCount : Object.keys(item.likesByUserId || {}).length;
@@ -1361,6 +1403,10 @@ const styles = StyleSheet.create({
   },
   textarea: { minHeight: 92, textAlignVertical: 'top' },
   charCount: { alignSelf: 'flex-end', color: SCREEN_THEME.textMuted, fontSize: 11, marginTop: 4, fontWeight: '700' },
+  formPriceRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  formPriceInputHalf: { flex: 1 },
+  formPriceSep: { fontSize: 16, color: SCREEN_THEME.textMuted, fontWeight: '700' },
+  formPriceCurrency: { fontSize: 16, color: SCREEN_THEME.textSecondary, fontWeight: '800', minWidth: 18 },
   pickerWrapper: {
     backgroundColor: '#F7F3EE',
     borderRadius: 16,
@@ -1481,10 +1527,15 @@ const card = StyleSheet.create({
   // DESCRIPTION
   desc: {
     fontSize: 13,
-    color: SCREEN_THEME.textSecondary,
+    color: '#fff',
+    backgroundColor: '#7A1E5C',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
     lineHeight: 18,
     marginBottom: 8,
-    fontWeight: '600',
+    fontWeight: '800',
+    overflow: 'hidden',
   },
 
   likeRow: {

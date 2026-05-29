@@ -240,9 +240,10 @@ type PlaceRowProps = {
   typeLabel?: string;
   navigation: ReturnType<typeof useNavigation<NavigationProp<Record<string, object | undefined>>>>;
   votesLabel: string;
+  navLock: React.MutableRefObject<boolean>;
 };
 
-const PlaceRow: React.FC<PlaceRowProps> = ({ place, idx, section, ratings, onRatePress, typeLabel, navigation, votesLabel }) => {
+const PlaceRow: React.FC<PlaceRowProps> = ({ place, idx, section, ratings, onRatePress, typeLabel, navigation, votesLabel, navLock }) => {
   const cfg = SECTION_META[section];
   const current = getRating(place, ratings);
   const rounded = Math.round(current.rating);
@@ -599,6 +600,7 @@ const PlacesScreen: React.FC = () => {
               typeLabel={text.typeLabels[place.type]}
               navigation={navigation}
               votesLabel={text.votes}
+              navLock={navLock}
             />
           ))
         )}

@@ -26,6 +26,8 @@ import UserCardActionBar from '../components/UserCardActionBar';
 const TWO_MONTHS_MS = 60 * 24 * 60 * 60 * 1000;
 type AppLanguage = 'ua' | 'ru' | 'en';
 type JobListingKind = 'resume' | 'vacancy';
+const RESUME_WORK_TYPE_INDEXES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
+const VACANCY_WORK_TYPE_INDEXES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
 
 const UI_TEXT = {
   ua: {
@@ -331,7 +333,7 @@ const JobSearchScreen: React.FC = () => {
   const requiredPhotoLabel = getRequiredPhotoLabel(language);
   const [listingKind, setListingKind] = useState<JobListingKind>('resume');
   const [name, setName] = useState('');
-  const [phone, setPhone] = useState('+380');
+  const [phone, setPhone] = useState(() => normalizePhoneText(user?.phone ?? '+380'));
   const [age, setAge] = useState('');
   const [workType, setWorkType] = useState('');
   const [about, setAbout] = useState('');
@@ -378,6 +380,12 @@ const JobSearchScreen: React.FC = () => {
   }, [name, user?.name]);
 
   useEffect(() => {
+    if (!phone.trim() || phone === '+380') {
+      setPhone(normalizePhoneText(user?.phone ?? '+380'));
+    }
+  }, [phone, user?.phone]);
+
+  useEffect(() => {
     const anim = Animated.loop(
       Animated.sequence([
         Animated.timing(blinkAnim, { toValue: 0.2, duration: 850, useNativeDriver: true }),
@@ -398,6 +406,10 @@ const JobSearchScreen: React.FC = () => {
   );
   const isVacancyForm = listingKind === 'vacancy';
   const getListingKind = (item: JobListing): JobListingKind => item.listingKind === 'vacancy' ? 'vacancy' : 'resume';
+  const formWorkTypes = useMemo(() => {
+    const indexes = isVacancyForm ? VACANCY_WORK_TYPE_INDEXES : RESUME_WORK_TYPE_INDEXES;
+    return indexes.map((index) => text.workTypes[index]).filter(Boolean);
+  }, [isVacancyForm, text.workTypes]);
   const filterOptions = useMemo(() => {
     const dynamicValues = listings.map((item) => item.workType).filter(Boolean);
     return Array.from(new Set([...text.workTypes, ...dynamicValues]));
@@ -468,7 +480,10 @@ const JobSearchScreen: React.FC = () => {
     sourceId: item.id,
   });
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (confirmed = false) => {
+    if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, userStartAvatarKey: user?.startAvatarKey, navigation })) {
+      return;
+    }
     const isVacancy = listingKind === 'vacancy';
     if (!name.trim() || !phone.trim() || !workType || (!isVacancy && !age.trim()) || (isVacancy && !about.trim())) {
       Alert.alert(text.alertFormTitle, isVacancy ? text.alertVacancyFormBody : text.alertFormBody);
@@ -491,10 +506,28 @@ const JobSearchScreen: React.FC = () => {
       Alert.alert(text.alertErrorTitle, language === 'ru' ? 'Не удалось загрузить фото. Удалите его или попробуйте ещё раз.' : language === 'en' ? 'Photo upload failed. Remove it or try again.' : 'Не вдалося завантажити фото. Видаліть його або спробуйте ще раз.');
       return;
     }
-    if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, photos: formPhotos, navigation })) {
+    const firstPhoto = getDonePhotos(formPhotos)[0];
+
+    if (!confirmed) {
+      const previewTitle = language === 'ru' ? 'Проверьте данные' : language === 'en' ? 'Review details' : 'Перевірте дані';
+      const previewCancel = language === 'ru' ? 'Назад' : language === 'en' ? 'Back' : 'Назад';
+      const previewSend = language === 'ru' ? 'Отправить' : language === 'en' ? 'Send' : 'Надіслати';
+      const kindLabel = isVacancy ? text.vacancyOption : text.resumeOption;
+      const previewBody = [
+        `${text.formTypeLabel}: ${kindLabel}`,
+        `${isVacancy ? text.labelContactName : text.labelName}: ${normalizePersonName(name)}`,
+        `${text.labelPhone}: ${normalizePhoneText(phone)}`,
+        !isVacancy ? `${text.labelAge}: ${age.trim()}` : '',
+        `${text.labelWorkType}: ${workType}`,
+        `${isVacancy ? text.labelVacancyAbout : text.labelAbout}: ${about.trim() || '—'}`,
+      ].filter(Boolean).join('\n');
+
+      Alert.alert(previewTitle, previewBody, [
+        { text: previewCancel, style: 'cancel' },
+        { text: previewSend, onPress: () => { void handleSubmit(true); } },
+      ]);
       return;
     }
-    const firstPhoto = getDonePhotos(formPhotos)[0];
 
     setSubmitting(true);
     try {
@@ -518,7 +551,7 @@ const JobSearchScreen: React.FC = () => {
 
       Alert.alert(text.submittedTitle, isVacancy ? text.submittedVacancyMessage : text.submittedMessage);
       setName(user?.name ? normalizePersonName(user.name) : '');
-      setPhone('+380');
+      setPhone(normalizePhoneText(user?.phone ?? '+380'));
       setAge('');
       setWorkType('');
       setAbout('');
@@ -584,7 +617,7 @@ const JobSearchScreen: React.FC = () => {
               <TextInput
                 style={styles.input}
                 value={searchAge}
-                onChangeText={(value) => setSearchAge(value.replace(/[^0-9]/g, '').slice(0, 2))}
+                onChangeText={(value) => setSearchAge(value.replace(/[^0-9]/g, '').slice(0, 3))}
                 placeholder={text.searchAnyAge}
                 placeholderTextColor="#A0938D"
                 keyboardType="number-pad"
@@ -676,14 +709,14 @@ const JobSearchScreen: React.FC = () => {
                 <View style={styles.kindSwitcher}>
                   <TouchableOpacity
                     style={[styles.kindOption, listingKind === 'resume' && styles.kindOptionActive]}
-                    onPress={() => setListingKind('resume')}
+                    onPress={() => { setListingKind('resume'); setWorkType(''); }}
                     activeOpacity={0.82}
                   >
                     <Text style={[styles.kindOptionText, listingKind === 'resume' && styles.kindOptionTextActive]}>{text.resumeOption}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.kindOption, listingKind === 'vacancy' && styles.kindOptionActive]}
-                    onPress={() => setListingKind('vacancy')}
+                    onPress={() => { setListingKind('vacancy'); setWorkType(''); }}
                     activeOpacity={0.82}
                   >
                     <Text style={[styles.kindOptionText, listingKind === 'vacancy' && styles.kindOptionTextActive]}>{text.vacancyOption}</Text>
@@ -705,7 +738,7 @@ const JobSearchScreen: React.FC = () => {
                 {!isVacancyForm ? (
                   <>
                     <Text style={styles.formLabel}>{text.labelAge}</Text>
-                    <TextInput placeholder={text.placeholderAge} value={age} onChangeText={(value) => setAge(value.replace(/[^0-9]/g, '').slice(0, 2))} keyboardType="number-pad" style={styles.input} placeholderTextColor="#A0938D" />
+                    <TextInput placeholder={text.placeholderAge} value={age} onChangeText={(value) => setAge(value.replace(/[^0-9]/g, '').slice(0, 3))} keyboardType="number-pad" style={styles.input} placeholderTextColor="#A0938D" />
                   </>
                 ) : null}
 
@@ -713,7 +746,7 @@ const JobSearchScreen: React.FC = () => {
                 <View style={styles.pickerWrapper}>
                   <Picker selectedValue={workType} onValueChange={setWorkType} style={styles.picker}>
                     <Picker.Item label={text.searchAnyType} value="" />
-                    {text.workTypes.map((item) => (
+                    {formWorkTypes.map((item) => (
                       <Picker.Item key={item} label={item} value={item} />
                     ))}
                   </Picker>
@@ -734,12 +767,12 @@ const JobSearchScreen: React.FC = () => {
                 <PhotoUploadField
                   uid={user?.id ?? ''}
                   userName={user?.name ?? ''}
-                  maxPhotos={1}
+                  maxPhotos={3}
                   storagePath="job_listings"
                   onPhotosChange={setFormPhotos}
                 />
 
-                <TouchableOpacity style={[styles.submitBtn, (submitting || hasUploadingPhotos) && { opacity: 0.65 }]} onPress={handleSubmit} activeOpacity={0.85} disabled={submitting || hasUploadingPhotos}>
+                <TouchableOpacity style={[styles.submitBtn, (submitting || hasUploadingPhotos) && { opacity: 0.65 }]} onPress={() => { void handleSubmit(); }} activeOpacity={0.85} disabled={submitting || hasUploadingPhotos}>
                   {submitting ? (
                     <ActivityIndicator color="#fff" />
                   ) : (
@@ -1079,7 +1112,7 @@ const styles = StyleSheet.create({
   kindBadgeVacancy: { backgroundColor: SCREEN_THEME.terracotta },
   badge: { color: SCREEN_THEME.enamelBlueDark, backgroundColor: '#E8F0F3', borderRadius: 999, paddingHorizontal: 9, paddingVertical: 5, fontSize: 11, fontWeight: '900' },
   moderationBadge: { color: '#8A5A00', backgroundColor: '#FFF2C7', borderRadius: 999, paddingHorizontal: 9, paddingVertical: 5, fontSize: 11, fontWeight: '900' },
-  listingAbout: { color: SCREEN_THEME.textSecondary, lineHeight: 18, marginBottom: 8 },
+  listingAbout: { color: '#fff', backgroundColor: '#7A1E5C', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 7, lineHeight: 18, marginBottom: 8, fontWeight: '800', overflow: 'hidden' },
   emptyState: { alignItems: 'center', paddingVertical: 32 },
   emptyTitle: { fontSize: 18, fontWeight: '800', color: SCREEN_THEME.textPrimary, marginTop: 14 },
   emptySub: { color: SCREEN_THEME.textSecondary, marginTop: 6, textAlign: 'center' },

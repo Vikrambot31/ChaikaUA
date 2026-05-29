@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -42,9 +42,9 @@ import { getDonePhotos, getRequiredPhotoLabel, validateSubmissionRequirements } 
 
 const DRAFT_KEY = `${STORAGE_KEYS.SETTINGS}:request-form-draft`;
 const MAX_DESC_LENGTH = 500;
+let guestPromptShownThisSession = false;
 
 // Дневной лимит срочных заявок
-const URGENT_DAILY_KEY = 'urgent_requests_daily_v1';
 const URGENT_MAX_PER_DAY = 3;
 const URGENT_MIN_INTERVAL_MS = 30 * 60 * 1000; // 30 хвилин
 
@@ -52,10 +52,11 @@ type UrgentDailyRecord = { date: string; count: number; lastTime: number };
 
 const getTodayString = () => new Date().toISOString().slice(0, 10);
 
-const loadUrgentRecord = async (): Promise<UrgentDailyRecord> => {
+const loadUrgentRecord = async (userId: string): Promise<UrgentDailyRecord> => {
   const today = getTodayString();
+  const key = `urgent_requests_daily_v1_${userId}`;
   try {
-    const raw = await AsyncStorage.getItem(URGENT_DAILY_KEY);
+    const raw = await AsyncStorage.getItem(key);
     if (!raw) return { date: today, count: 0, lastTime: 0 };
     const parsed = JSON.parse(raw) as UrgentDailyRecord;
     return parsed.date === today ? parsed : { date: today, count: 0, lastTime: 0 };
@@ -64,9 +65,10 @@ const loadUrgentRecord = async (): Promise<UrgentDailyRecord> => {
   }
 };
 
-const saveUrgentRecord = async (record: UrgentDailyRecord): Promise<void> => {
+const saveUrgentRecord = async (userId: string, record: UrgentDailyRecord): Promise<void> => {
+  const key = `urgent_requests_daily_v1_${userId}`;
   try {
-    await AsyncStorage.setItem(URGENT_DAILY_KEY, JSON.stringify(record));
+    await AsyncStorage.setItem(key, JSON.stringify(record));
   } catch { /* ignore */ }
 };
 
@@ -83,6 +85,7 @@ const UI_TEXT = {
     rideError: 'Вкажіть напрямок та час для поїздки',
     detailsError: 'Заповніть усі деталі',
     descTooShort: 'Якщо описуєте ситуацію - вкажіть хоча б 10 символів',
+    descMinHint: 'Мінімум 10 символів, якщо додаєте опис.',
     ownTextRequiredTitle: 'Додайте свій текст',
     ownTextRequiredBody: 'Щоб опублікувати заявку, опишіть ситуацію своїми словами (мінімум 10 символів).',
     ownTextRequiredAction: 'Додати опис',
@@ -121,6 +124,8 @@ const UI_TEXT = {
     guestPromptBody: 'Для подачі заявок потрібна РЕЄСТРАЦІЯ.\n\nХочете пройти швидку реєстрацію за 2 хвилини?',
     guestPromptConfirm: 'Так, зареєструватись',
     guestPromptDecline: 'Ні',
+    authNoticeBody: 'Для подачі заявок потрібна реєстрація. Це займе 1 хвилину.',
+    authNoticeBtn: 'Увійти / Зареєструватись',
   },
   ru: {
     errorTitle: 'Ошибка',
@@ -132,6 +137,7 @@ const UI_TEXT = {
     rideError: 'Укажите направление и время для поездки',
     detailsError: 'Заполните все детали',
     descTooShort: 'Если описываете ситуацию - укажите хотя бы 10 символов',
+    descMinHint: 'Минимум 10 символов, если добавляете описание.',
     ownTextRequiredTitle: 'Добавьте свой текст',
     ownTextRequiredBody: 'Чтобы опубликовать заявку, опишите ситуацию своими словами (минимум 10 символов).',
     ownTextRequiredAction: 'Добавить описание',
@@ -170,6 +176,8 @@ const UI_TEXT = {
     guestPromptBody: 'Для отправки заявок нужна РЕГИСТРАЦИЯ.\n\nХотите пройти быструю регистрацию за 2 минуты?',
     guestPromptConfirm: 'Да, зарегистрироваться',
     guestPromptDecline: 'Нет',
+    authNoticeBody: 'Для отправки заявок нужна регистрация. Это займёт 1 минуту.',
+    authNoticeBtn: 'Войти / Зарегистрироваться',
   },
   en: {
     errorTitle: 'Error',
@@ -181,6 +189,7 @@ const UI_TEXT = {
     rideError: 'Specify direction and time for the ride',
     detailsError: 'Fill in all details',
     descTooShort: 'If you are describing the situation - enter at least 10 characters',
+    descMinHint: 'Minimum 10 characters if you add a description.',
     ownTextRequiredTitle: 'Add your own text',
     ownTextRequiredBody: 'To publish the request, describe your situation in your own words (at least 10 characters).',
     ownTextRequiredAction: 'Add description',
@@ -219,6 +228,8 @@ const UI_TEXT = {
     guestPromptBody: 'To submit requests, REGISTRATION is required.\n\nWould you like to register quickly in 2 minutes?',
     guestPromptConfirm: 'Yes, register',
     guestPromptDecline: 'No',
+    authNoticeBody: 'To submit requests, registration is required. It takes 1 minute.',
+    authNoticeBtn: 'Sign in / Register',
   },
 } as const;
 
@@ -230,8 +241,8 @@ const AddRequestScreen = ({ navigation }: { navigation: NavigationProp<ParamList
   const text = UI_TEXT[language];
   const requiredPhotoLabel = getRequiredPhotoLabel(language);
 
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('+380');
+  const [name, setName] = useState(() => (user?.name ? normalizePersonName(user.name) : ''));
+  const [phone, setPhone] = useState(() => (user?.phone ? normalizePhoneText(user.phone) : ''));
   const [group, setGroup] = useState('');
   const [subcategory, setSubcategory] = useState('');
   const [store, setStore] = useState('');
@@ -252,7 +263,6 @@ const AddRequestScreen = ({ navigation }: { navigation: NavigationProp<ParamList
     special?: string;
     description?: string;
   }>({});
-  const guestPromptShownRef = useRef(false);
 
   const isFoodsharing = subcategory === SPECIAL.FOODSHARING;
   const isRide = subcategory === SPECIAL.RIDE_SHARE;
@@ -291,8 +301,8 @@ const AddRequestScreen = ({ navigation }: { navigation: NavigationProp<ParamList
 
   // Показати гість-підказку один раз при відкритті форми
   useEffect(() => {
-    if (!user?.id && !guestPromptShownRef.current) {
-      guestPromptShownRef.current = true;
+    if (!user?.id && !guestPromptShownThisSession) {
+      guestPromptShownThisSession = true;
       Alert.alert(
         text.guestPromptTitle,
         text.guestPromptBody,
@@ -355,6 +365,10 @@ const AddRequestScreen = ({ navigation }: { navigation: NavigationProp<ParamList
   }, [navigation]);
 
   const handleSubmit = async () => {
+    if (loading) return;
+    if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, userStartAvatarKey: user?.startAvatarKey, navigation })) {
+      return;
+    }
     const nextErrors: {
       name?: string;
       phone?: string;
@@ -410,14 +424,11 @@ const AddRequestScreen = ({ navigation }: { navigation: NavigationProp<ParamList
     }
 
     setFieldErrors({});
-    if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, photos: formPhotos, navigation })) {
-      return;
-    }
     const firstPhoto = getDonePhotos(formPhotos)[0];
 
     // Ограничитель частоты - только для заявок с описанием и не срочных
     if (!isUrgent && showDetails && description.trim().length >= 10) {
-      const secsLeft = RATE_LIMITERS.helpRequest.cooldownSecondsLeft();
+      const secsLeft = RATE_LIMITERS.requestForm.cooldownSecondsLeft();
       if (secsLeft > 0) {
         Alert.alert(
           language === 'ru' ? 'Подождите немного' : language === 'en' ? 'Please wait' : 'Зачекайте трохи',
@@ -435,7 +446,7 @@ const AddRequestScreen = ({ navigation }: { navigation: NavigationProp<ParamList
     try {
       if (isUrgent) {
         // Перевірка денного ліміту та інтервалу між терміновими заявками
-        const urgentRecord = await loadUrgentRecord();
+        const urgentRecord = await loadUrgentRecord(user!.id);
         if (urgentRecord.count >= URGENT_MAX_PER_DAY) {
           Alert.alert(text.urgentLimitTitle, text.urgentLimitBody, [{ text: text.ok }]);
           return;
@@ -472,7 +483,7 @@ const AddRequestScreen = ({ navigation }: { navigation: NavigationProp<ParamList
         }
 
         // Зберегти запис ліміту після успішної відправки
-        await saveUrgentRecord({ ...urgentRecord, count: urgentRecord.count + 1, lastTime: Date.now() });
+        await saveUrgentRecord(user!.id, { ...urgentRecord, count: urgentRecord.count + 1, lastTime: Date.now() });
 
         const newRequest: HelpRequest = {
           id: serverResult.data?.id || `help-${Date.now()}`,
@@ -507,8 +518,7 @@ const AddRequestScreen = ({ navigation }: { navigation: NavigationProp<ParamList
         Alert.alert(text.doneTitle, text.urgentSuccess, [{ text: text.ok, onPress: returnToRequestTopics }]);
       } else {
         // --- Обычный путь ---
-        const finalDescription = sanitizeStoredText(userDescription);
-        const finalText = sanitizeStoredText(userDescription);
+        const finalDescription = showDetails ? sanitizeStoredText(userDescription) : '';
 
         const createdRequest = await sendRequest({
           name: normalizedName,
@@ -522,12 +532,12 @@ const AddRequestScreen = ({ navigation }: { navigation: NavigationProp<ParamList
           destination: destination.trim(),
           building: 'Чайка Life',
           description: finalDescription,
-          text: finalText,
+          text: finalDescription,
           photoUri: firstPhoto?.downloadUrl ?? '',
           photoStoragePath: firstPhoto?.storagePath ?? '',
         });
 
-        RATE_LIMITERS.helpRequest.recordSubmit();
+        RATE_LIMITERS.requestForm.recordSubmit();
 
         const shortRequestId = createdRequest?.id ? String(createdRequest.id).slice(-6).toUpperCase() : null;
         const successMessage = shortRequestId
@@ -535,10 +545,20 @@ const AddRequestScreen = ({ navigation }: { navigation: NavigationProp<ParamList
           : text.doneBody;
 
         await clearDraft();
+        setName('');
+        setPhone('+380');
+        setGroup('');
+        setSubcategory('');
+        setStore('');
+        setTimeSlot('');
+        setDestination('');
+        setDescription('');
+        setShowDetails(false);
         Alert.alert(text.doneTitle, successMessage, [{ text: text.ok, onPress: returnToRequestTopics }]);
       }
     } catch (err: unknown) {
       showUserError(language, 'send', err || text.submitErrorDefault);
+      await clearDraft();
     } finally {
       setLoading(false);
     }
@@ -585,6 +605,21 @@ const AddRequestScreen = ({ navigation }: { navigation: NavigationProp<ParamList
             </View>
           </View>
 
+          {!user && (
+            <View style={styles.authNoticeCard}>
+              <Text style={styles.authNoticeTitle}>{text.guestPromptTitle}</Text>
+              <Text style={styles.authNoticeBody}>{text.authNoticeBody}</Text>
+              <TouchableOpacity
+                style={styles.authNoticeBtn}
+                activeOpacity={0.85}
+                onPress={() => navigation.navigate('LoginScreen' as never)}
+              >
+                <Text style={styles.authNoticeBtnText}>{text.authNoticeBtn}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {user && (<>
           {/* Контакти */}
           <View style={styles.card}>
             <FormSectionLabel label={text.contacts} completed={isContactsComplete} labelStyle={styles.sectionTitle} />
@@ -646,6 +681,7 @@ const AddRequestScreen = ({ navigation }: { navigation: NavigationProp<ParamList
               <Text style={[styles.charCounter, !isDescriptionValid && styles.charCounterError]}>
                 {description.length}/{MAX_DESC_LENGTH} {text.charsLeft}
               </Text>
+              <Text style={styles.fieldHint}>{text.descMinHint}</Text>
               <FormFieldError error={fieldErrors.description} />
             </View>
           ) : null}
@@ -699,6 +735,7 @@ const AddRequestScreen = ({ navigation }: { navigation: NavigationProp<ParamList
               )}
             </TouchableOpacity>
           </View>
+          </>)}
 
         </ScrollView>
       </KeyboardAvoidingView>
@@ -729,8 +766,14 @@ const styles = StyleSheet.create({
   textArea: { minHeight: 100, textAlignVertical: 'top' },
   charCounter: { fontSize: 12, color: SCREEN_THEME.textSecondary, marginTop: 6, textAlign: 'right', fontWeight: '700' },
   charCounterError: { color: SCREEN_THEME.terracotta },
+  fieldHint: { fontSize: 12, color: SCREEN_THEME.textSecondary, marginTop: 4, fontWeight: '700' },
   detailsToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 16, marginHorizontal: 20, paddingVertical: 10, borderRadius: 18, borderWidth: 1, borderColor: '#E4D0AB', backgroundColor: SCREEN_THEME.paperStrong },
   detailsToggleText: { fontSize: 14, fontWeight: '800', color: SCREEN_THEME.textSecondary },
+  authNoticeCard: { marginHorizontal: 20, marginTop: 16, backgroundColor: '#FFF8E1', borderRadius: 26, padding: 18, borderWidth: 1, borderColor: '#F5C842' },
+  authNoticeTitle: { fontSize: 15, fontWeight: '900', color: '#7A5C00', marginBottom: 6 },
+  authNoticeBody: { fontSize: 13, color: '#7A5C00', lineHeight: 19, marginBottom: 12 },
+  authNoticeBtn: { backgroundColor: SCREEN_THEME.woodGreen, borderRadius: 14, paddingVertical: 10, paddingHorizontal: 18, alignSelf: 'flex-start' },
+  authNoticeBtnText: { color: '#FFF9EE', fontWeight: '900', fontSize: 14 },
   footer: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 30 },
   submitButton: { minHeight: 56, borderRadius: 18, backgroundColor: SCREEN_THEME.woodGreen, borderWidth: 1, borderColor: SCREEN_THEME.woodGreenDark, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
   submitButtonUrgent: { backgroundColor: SCREEN_THEME.terracotta, borderColor: SCREEN_THEME.terracottaDark },

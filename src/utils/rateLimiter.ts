@@ -1,14 +1,17 @@
 /**
- * rateLimiter.ts - simple in-memory rate limiting for forms.
+ * rateLimiter.ts - in-memory rate limiting for forms, persisted to AsyncStorage.
  *
- * Stores the last submit timestamp by key. Counters reset after app restart.
+ * Timestamps survive app restarts: recordSubmit() saves to AsyncStorage,
+ * and each limiter restores its timestamp on module load.
  *
  * Usage:
- *   const limiter = useRateLimiter('help_request', 60_000); // 1 min cooldown
- *   if (!limiter.canSubmit()) { ... show cooldown message ... }
- *   await limiter.recordSubmit();
+ *   if (RATE_LIMITERS.helpRequest.cooldownSecondsLeft() > 0) { ... }
+ *   RATE_LIMITERS.helpRequest.recordSubmit();
  */
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const STORAGE_PREFIX = '@chaika:rate_limiter:v1:';
 const lastSubmitTimes: Record<string, number> = {};
 
 export interface RateLimiter {
@@ -26,6 +29,14 @@ export interface RateLimiter {
  * @param cooldownMs Minimum interval between submits, in ms
  */
 export function createRateLimiter(key: string, cooldownMs: number): RateLimiter {
+  // Restore persisted timestamp on module load (fire-and-forget)
+  void AsyncStorage.getItem(STORAGE_PREFIX + key).then((stored) => {
+    if (stored && !lastSubmitTimes[key]) {
+      const ts = Number(stored);
+      if (!isNaN(ts) && ts > 0) lastSubmitTimes[key] = ts;
+    }
+  }).catch(() => {});
+
   return {
     canSubmit() {
       const last = lastSubmitTimes[key];
@@ -39,14 +50,17 @@ export function createRateLimiter(key: string, cooldownMs: number): RateLimiter 
       return remaining > 0 ? Math.ceil(remaining / 1000) : 0;
     },
     recordSubmit() {
-      lastSubmitTimes[key] = Date.now();
+      const now = Date.now();
+      lastSubmitTimes[key] = now;
+      void AsyncStorage.setItem(STORAGE_PREFIX + key, String(now)).catch(() => {});
     },
   };
 }
 
 // Pre-built limiters for known forms
 export const RATE_LIMITERS = {
-  helpRequest: createRateLimiter('help_request', 60_000),      // 1 min
+  helpRequest: createRateLimiter('help_request', 30_000),      // 30 sec
+  requestForm: createRateLimiter('request_form', 60_000),      // 1 min
   lostFound: createRateLimiter('lost_found', 120_000),          // 2 min
   buySell: createRateLimiter('buy_sell', 120_000),              // 2 min
   contacts: createRateLimiter('contacts', 120_000),             // 2 min

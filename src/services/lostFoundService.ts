@@ -139,7 +139,7 @@ export const lostFoundService = {
         submittedForModerationAt: pendingModeration.submittedForModerationAt,
         language: normalizeAppLang(item.language, 'ua'),
       };
-      assertTextMatchesLanguage(`${sanitized.name} ${sanitized.category}`.trim(), sanitized.language);
+      assertTextMatchesLanguage(`${sanitized.category} ${sanitized.description}`.trim(), sanitized.language);
       const newRef = await push(listRef, sanitized);
       return newRef.key!;
     } catch (error) {

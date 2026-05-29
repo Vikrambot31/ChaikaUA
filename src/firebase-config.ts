@@ -295,8 +295,8 @@ const getRequestModerationMeta = (category: unknown, status = 'pending'): Modera
   const parts = getRequestPriorityParts(category);
   const normalizedStatus = status.trim().toLowerCase() || 'pending';
   return {
-    moderationPriority: parts.moderationPriority,
-    moderationQueue: parts.moderationQueue,
+    moderationPriority: parts.moderationPriority as ModerationMeta['moderationPriority'],
+    moderationQueue: parts.moderationQueue as ModerationMeta['moderationQueue'],
     status_priority: `${normalizedStatus}_${parts.priorityNumber}_${parts.priorityKey}`,
   };
 };
@@ -480,14 +480,18 @@ const getCurrentDayStartMs = (): number => {
 const countCurrentDayItemsByUser = async (
   path: 'requests' | 'community_photos',
   userId: string,
+  options?: { group?: string },
 ): Promise<number> => {
   const snapshot = await get(query(ref(database, path), orderByChild('userId'), equalTo(userId)));
-  const raw = snapshot.val() as Record<string, { createdAt?: unknown }> | null;
+  const raw = snapshot.val() as Record<string, { createdAt?: unknown; group?: unknown }> | null;
   if (!raw) return 0;
 
   const dayStart = getCurrentDayStartMs();
   return Object.values(raw).filter(
-    (entry) => typeof entry?.createdAt === 'number' && entry.createdAt >= dayStart,
+    (entry) =>
+      typeof entry?.createdAt === 'number' &&
+      entry.createdAt >= dayStart &&
+      (!options?.group || entry.group === options.group),
   ).length;
 };
 
@@ -665,6 +669,13 @@ export const firebaseChatAPI = {
       const phoneRequired = category !== 'app_suggestion';
       const isElectricity = category === 'electricity';
       const isHelpNeighbors = (requestData.group || '') === 'help_neighbors';
+      if (isHelpNeighbors) {
+        const HELP_NEIGHBORS_DAILY_LIMIT = 3;
+        const dailyHelpCount = await countCurrentDayItemsByUser('requests', user.uid, { group: 'help_neighbors' });
+        if (dailyHelpCount >= HELP_NEIGHBORS_DAILY_LIMIT) {
+          throw new Error(`Daily help_neighbors limit reached (${HELP_NEIGHBORS_DAILY_LIMIT})`);
+        }
+      }
       const autoApprove = isElectricity || isHelpNeighbors;
       const moderationMeta: ModerationMeta = getRequestModerationMeta(category, autoApprove ? 'approved' : 'pending');
 
@@ -684,7 +695,8 @@ export const firebaseChatAPI = {
       const newRequest = {
         userId: user.uid,
         name: normalizedName,
-        phone: maskPhone(normalizedPhone),
+        phone: normalizedPhone,
+        maskedPhone: maskPhone(normalizedPhone),
         category,
         group:
           typeof requestData.group === 'string' ? requestData.group : '',
@@ -1201,7 +1213,7 @@ export const photoAPI = {
           ...(normalizedLocationLabel
             ? {
                 locationLabel: normalizedLocationLabel,
-                locationType: normalizedLocationType,
+                ...(normalizedLocationType ? { locationType: normalizedLocationType } : {}),
               }
             : {}),
         });

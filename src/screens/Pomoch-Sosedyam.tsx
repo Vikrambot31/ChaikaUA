@@ -17,9 +17,8 @@ import { Picker } from '@react-native-picker/picker';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState, AppDispatch } from '../redux/store';
 import { HelpRequest } from '../types/app';
-import { addHelpRequest, selectTodayHelpRequests, syncFromRequests } from '../redux/slices/helpRequestsSlice';
+import { addHelpRequest, selectTodayHelpRequests } from '../redux/slices/helpRequestsSlice';
 import MiniTabBar from '../components/MiniTabBar';
-import MiniUserAvatar from '../components/MiniUserAvatar';
 import ContactReasonModal from '../components/ContactReasonModal';
 import { useContactRequest } from '../hooks/useContactRequest';
 import ErrorHandler from '../utils/errorHandler';
@@ -28,17 +27,19 @@ import { safeCallPhone } from '../utils/communicationActions';
 import { firebaseChatAPI } from '../firebase-config';
 import { normalizePersonName, normalizePhoneText, sanitizeStoredText } from '../utils/textUtils';
 import { validateName, validatePhone } from '../utils/validators';
-import { getRequests } from '../services/api';
 import { showUserError } from '../utils/userFacingErrors';
 import { RATE_LIMITERS } from '../utils/rateLimiter';
 import { database } from '../firebase-config';
+import { ref as dbRef, get as dbGet, set as dbSet, update as dbUpdate } from 'firebase/database';
 import { resolveUserAvatarMap } from '../utils/userAvatar';
 import type { DetailItemData } from '../utils/detailViewTypes';
 import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField';
-import { getDonePhotos, getRequiredPhotoLabel, validateSubmissionRequirements } from '../utils/submissionRequirements';
+import { getDonePhotos, validateSubmissionRequirements } from '../utils/submissionRequirements';
 import UserCardActionBar from '../components/UserCardActionBar';
 
 const HELP_NEIGHBORS_SPLASH_KEY = '@help_neighbors_first_visit_splash_seen';
+const HELP_NEIGHBORS_MAX_PER_DAY = 3;
+const getDailyKey = (userId: string) => `@help_neighbors_daily_limit_v1_${userId}`;
 
 const UI_TEXT = {
   ua: {
@@ -62,10 +63,14 @@ const UI_TEXT = {
     errorTitle: 'Помилка',
     errorMessage: 'Заповніть усі поля',
     saveErrorMessage: 'Не вдалося додати прохання',
+    dailyLimitTitle: 'Ліміт вичерпано',
+    dailyLimitBody: 'Дозволяється лише 3 термінові заявки на день.',
     splash: 'Зробимо Чайку місцем підтримки один для одного',
     authNoticeTitle: 'Потрібна реєстрація',
     authNoticeBody: 'Щоб надіслати прохання про допомогу, увійдіть або зареєструйтесь.',
     authNoticeBtn: 'Увійти / Зареєструватись',
+    photoLabel: 'Фото ситуації (необов\'язково)',
+    photoErrorMessage: 'Фото не завантажилось. Видаліть його або спробуйте ще раз.',
     helpTypes: [
       { label: 'Медична допомога', value: 'medical' },
       { label: 'Дрібний ремонт', value: 'repair' },
@@ -99,10 +104,14 @@ const UI_TEXT = {
     errorTitle: 'Ошибка',
     errorMessage: 'Заполните все поля',
     saveErrorMessage: 'Не удалось добавить просьбу',
+    dailyLimitTitle: 'Лимит исчерпан',
+    dailyLimitBody: 'Допускается не более 3 срочных заявок в день.',
     splash: 'Сделаем Чайку друг для друга местом поддержки',
     authNoticeTitle: 'Нужна регистрация',
     authNoticeBody: 'Чтобы отправить просьбу о помощи, войдите или зарегистрируйтесь.',
     authNoticeBtn: 'Войти / Зарегистрироваться',
+    photoLabel: 'Фото ситуации (необязательно)',
+    photoErrorMessage: 'Фото не загрузилось. Удалите его или попробуйте ещё раз.',
     helpTypes: [
       { label: 'Медицинская помощь', value: 'medical' },
       { label: 'Мелкий ремонт', value: 'repair' },
@@ -136,10 +145,14 @@ const UI_TEXT = {
     errorTitle: 'Error',
     errorMessage: 'Fill in all fields',
     saveErrorMessage: 'Failed to add the request',
+    dailyLimitTitle: 'Daily limit reached',
+    dailyLimitBody: 'Only 3 urgent requests are allowed per day.',
     splash: "Let's make Chaika Life a place of support for one another",
     authNoticeTitle: 'Registration required',
     authNoticeBody: 'To send a help request, sign in or register.',
     authNoticeBtn: 'Sign in / Register',
+    photoLabel: 'Photo (optional)',
+    photoErrorMessage: 'Photo failed to upload. Remove it or try again.',
     helpTypes: [
       { label: 'Medical help', value: 'medical' },
       { label: 'Small repair', value: 'repair' },
@@ -154,14 +167,34 @@ const UI_TEXT = {
   },
 } as const;
 
-const formatTimeLeft = (expiresAt: Date, expiredLabel: string, language: 'ua' | 'ru' | 'en') => {
-  const diff = expiresAt.getTime() - Date.now();
-  if (diff <= 0) return expiredLabel;
-  const hours = Math.floor(diff / (1000 * 60 * 60));
-  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-  if (language === 'en') return `${hours}h ${minutes}m`;
-  if (language === 'ru') return `${hours}ч ${minutes}м`;
-  return `${hours}г ${minutes}хв`;
+const formatPublishedAt = (createdAt: Date) => {
+  const day = String(createdAt.getDate()).padStart(2, '0');
+  const month = String(createdAt.getMonth() + 1).padStart(2, '0');
+  const hours = String(createdAt.getHours()).padStart(2, '0');
+  const minutes = String(createdAt.getMinutes()).padStart(2, '0');
+  return `${day}.${month} ${hours}:${minutes}`;
+};
+
+type DailyLimitRecord = { date: string; count: number };
+
+const getTodayString = () => new Date().toISOString().slice(0, 10);
+
+const loadDailyLimitRecord = async (key: string): Promise<DailyLimitRecord> => {
+  const today = getTodayString();
+  try {
+    const raw = await AsyncStorage.getItem(key);
+    if (!raw) return { date: today, count: 0 };
+    const parsed = JSON.parse(raw) as DailyLimitRecord;
+    return parsed.date === today ? parsed : { date: today, count: 0 };
+  } catch {
+    return { date: today, count: 0 };
+  }
+};
+
+const saveDailyLimitRecord = async (key: string, record: DailyLimitRecord): Promise<void> => {
+  try {
+    await AsyncStorage.setItem(key, JSON.stringify(record));
+  } catch { /* ignore */ }
 };
 
 const HelpNeighborsScreen: React.FC = () => {
@@ -171,10 +204,9 @@ const HelpNeighborsScreen: React.FC = () => {
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const user = useSelector((state: RootState) => state.auth.user);
   const text = UI_TEXT[language];
-  const requiredPhotoLabel = getRequiredPhotoLabel(language);
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
+  const [name, setName] = useState(() => (user?.name ? normalizePersonName(user.name) : ''));
+  const [phone, setPhone] = useState(() => (user?.phone ? normalizePhoneText(user.phone) : ''));
   const [helpType, setHelpType] = useState('');
   const [description, setDescription] = useState('');
   const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
@@ -182,6 +214,13 @@ const HelpNeighborsScreen: React.FC = () => {
   const [isReady, setIsReady] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [avatarByUserId, setAvatarByUserId] = useState<Record<string, string>>({});
+
+  const handleGuestFormTouch = () => {
+    Alert.alert(text.authNoticeTitle, text.authNoticeBody, [
+      { text: text.authNoticeBtn, onPress: () => navigation.navigate('LoginScreen', {}) },
+      { text: 'OK', style: 'cancel' },
+    ]);
+  };
 
   const todayRequests = useSelector((state: RootState) => selectTodayHelpRequests(state)) as HelpRequest[];
   const burningRequests = useMemo(
@@ -267,7 +306,7 @@ const HelpNeighborsScreen: React.FC = () => {
       );
       return;
     }
-    if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, photos: formPhotos, navigation })) {
+    if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, userStartAvatarKey: user?.startAvatarKey, navigation })) {
       return;
     }
 
@@ -281,11 +320,49 @@ const HelpNeighborsScreen: React.FC = () => {
       return;
     }
 
+    if (formPhotos.some(p => p.status === 'uploading')) {
+      Alert.alert(text.errorTitle, language === 'ua'
+        ? 'Зачекайте, фото ще завантажується'
+        : language === 'ru'
+          ? 'Подождите, фото ещё загружается'
+          : 'Please wait, photo is still uploading');
+      return;
+    }
+
+    if (formPhotos.some(p => p.status === 'error')) {
+      Alert.alert(text.errorTitle, text.photoErrorMessage);
+      return;
+    }
+
     const firstPhoto = getDonePhotos(formPhotos)[0];
+
+    // BUG-02: block submit if photo selected but downloadUrl not yet available
+    if (firstPhoto && !firstPhoto.downloadUrl) {
+      Alert.alert(text.errorTitle, language === 'ua'
+        ? 'Зачекайте, посилання на фото ще формується'
+        : language === 'ru'
+          ? 'Подождите, ссылка на фото ещё формируется'
+          : 'Please wait, photo link is being generated');
+      return;
+    }
+
     const payloadDescription = sanitizeStoredText(userDescription);
 
     setSubmitting(true);
     try {
+      // BUG-04: check daily limit from both AsyncStorage and RTDB (cross-device protection)
+      const today = getTodayString();
+      const dailyKey = getDailyKey(user!.id);
+      const dailyLimitRecord = await loadDailyLimitRecord(dailyKey);
+      const rtdbSnap = await dbGet(dbRef(database, `rate_limits/${user!.id}/help_neighbors`)).catch(() => null);
+      const rtdbRecord = rtdbSnap?.val() as { date: string; count: number } | null;
+      const rtdbCount = rtdbRecord?.date === today ? (rtdbRecord.count ?? 0) : 0;
+      const effectiveCount = Math.max(dailyLimitRecord.count, rtdbCount);
+      if (effectiveCount >= HELP_NEIGHBORS_MAX_PER_DAY) {
+        Alert.alert(text.dailyLimitTitle, text.dailyLimitBody);
+        return;
+      }
+
       const serverResult = await firebaseChatAPI.addRequest({
         name: normalizedName,
         phone: normalizedPhone,
@@ -302,25 +379,36 @@ const HelpNeighborsScreen: React.FC = () => {
         throw new Error(serverResult.error || 'Failed to submit help request');
       }
 
+      const requestId = serverResult.data?.id || `help-${Date.now()}`;
+
+      if (firstPhoto?.photoId && user?.id) {
+        void dbUpdate(dbRef(database, `request_photos/${user.id}/${firstPhoto.photoId}`), {
+          requestId,
+          requestPath: `requests/${requestId}`,
+          sourceFeature: 'help_neighbors',
+          updatedAt: Date.now(),
+        }).catch(() => {});
+      }
+
       const newRequest: HelpRequest = {
-        id: serverResult.data?.id || `help-${Date.now()}`,
+        id: requestId,
         userId: user?.id ?? '',
         name: normalizedName,
         phone: normalizedPhone,
         description: payloadDescription,
         createdAt: new Date(),
-        expiresAt: new Date(new Date().setHours(23, 59, 59, 999)),
+        expiresAt: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000),
         isBurning: true,
         moderationStatus: 'approved',
-        moderatedAt: new Date().toISOString(),
       };
 
       dispatch(addHelpRequest(newRequest));
       RATE_LIMITERS.helpRequest.recordSubmit();
-      const requestsResponse = await getRequests();
-      if (requestsResponse.success && requestsResponse.data) {
-        dispatch(syncFromRequests(requestsResponse.data));
-      }
+      // BUG-04: persist counter to both AsyncStorage and RTDB
+      await saveDailyLimitRecord(dailyKey, { ...dailyLimitRecord, count: effectiveCount + 1 });
+      void dbSet(dbRef(database, `rate_limits/${user!.id}/help_neighbors`), { date: today, count: effectiveCount + 1 }).catch(() => {});
+      // BUG-03: removed immediate syncFromRequests — new request is already in Redux via addHelpRequest;
+      // immediate getRequests() risked race-condition where RTDB hadn't propagated yet, causing the card to vanish.
       setName('');
       setPhone('');
       setHelpType('');
@@ -438,11 +526,11 @@ const HelpNeighborsScreen: React.FC = () => {
                 />
                 <Text style={styles.charCount}>{description.trim().length}/500</Text>
 
-                <Text style={styles.fieldLabel}>{requiredPhotoLabel}</Text>
+                <Text style={styles.fieldLabel}>{text.photoLabel}</Text>
                 <PhotoUploadField
                   uid={user?.id ?? ''}
                   userName={user?.name ?? ''}
-                  maxPhotos={3}
+                  maxPhotos={1}
                   storagePath="requests"
                   onPhotosChange={setFormPhotos}
                 />
@@ -450,6 +538,14 @@ const HelpNeighborsScreen: React.FC = () => {
                 <TouchableOpacity style={[styles.submitButton, submitting && { opacity: 0.6 }]} onPress={() => { if (!submitting) void handleSubmit(); }} activeOpacity={0.85} disabled={submitting}>
                   {submitting ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.submitButtonText}>{text.submitButton}</Text>}
                 </TouchableOpacity>
+
+                {!user && (
+                  <TouchableOpacity
+                    style={StyleSheet.absoluteFillObject}
+                    activeOpacity={1}
+                    onPress={handleGuestFormTouch}
+                  />
+                )}
               </View>
 
               <View style={styles.listHeader}>
@@ -463,21 +559,21 @@ const HelpNeighborsScreen: React.FC = () => {
           renderItem={({ item }) => (
             <TouchableOpacity style={styles.requestCard} onPress={() => { if (navLock.current) return; navLock.current = true; openDetail(item); setTimeout(() => { navLock.current = false; }, 800); }} activeOpacity={0.86}>
               <View style={styles.requestHeader}>
-                <MiniUserAvatar
-                  uri={(item.userId && avatarByUserId[item.userId]) || undefined}
-                  name={item.name}
-                  size={34}
-                  borderRadius={11}
-                  backgroundColor="#6A8BA5"
-                />
-                <View style={[styles.userInfo, { marginLeft: 8 }]}>
+                <View style={styles.userInfo}>
                   <Text style={styles.userName}>{item.name}</Text>
                 </View>
                 <View style={styles.timeBadge}>
-                  <Text style={styles.timeText}>{formatTimeLeft(item.expiresAt, text.expired, language)}</Text>
+                  <Text style={styles.timeText}>{formatPublishedAt(item.createdAt)}</Text>
                 </View>
               </View>
               <Text style={styles.requestDescription}>{item.description}</Text>
+              {item.moderationStatus === 'pending' && item.userId === user?.id && (
+                <View style={styles.pendingBadge}>
+                  <Text style={styles.pendingBadgeText}>
+                    {language === 'ru' ? 'Ожидает модерации' : language === 'en' ? 'Awaiting moderation' : 'Очікує модерації'}
+                  </Text>
+                </View>
+              )}
               <UserCardActionBar
                 avatarUri={(item.userId && avatarByUserId[item.userId]) || undefined}
                 name={item.name}
@@ -489,6 +585,7 @@ const HelpNeighborsScreen: React.FC = () => {
                 contactDisabled={!item.phone && (!item.userId || item.userId === user?.id)}
                 likePath="feed_likes/help_neighbors"
                 likeId={item.id}
+                avatarSize={64}
               />
             </TouchableOpacity>
           )}
@@ -610,7 +707,9 @@ const styles = StyleSheet.create({
   userName: { fontWeight: '900', color: SCREEN_THEME.textPrimary },
   timeBadge: { backgroundColor: SCREEN_THEME.terracotta, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
   timeText: { color: '#FFFFFF', fontWeight: '800', fontSize: 12 },
-  requestDescription: { color: SCREEN_THEME.textPrimary, lineHeight: 20 },
+  requestDescription: { color: '#fff', backgroundColor: '#7A1E5C', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 7, lineHeight: 20, marginBottom: 8, fontWeight: '800', overflow: 'hidden' },
+  pendingBadge: { backgroundColor: '#FFF3CD', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, marginBottom: 8, alignSelf: 'flex-start', borderWidth: 1, borderColor: '#F0C96B' },
+  pendingBadgeText: { color: '#7A5C00', fontWeight: '800', fontSize: 12 },
   emptyState: { alignItems: 'center', paddingVertical: 40 },
   emptyText: { fontWeight: '900', color: SCREEN_THEME.textPrimary, marginTop: 12 },
   emptySubtext: { color: SCREEN_THEME.textSecondary, marginTop: 4 },

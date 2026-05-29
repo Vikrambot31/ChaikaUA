@@ -155,7 +155,7 @@ export const PhotoApprovalPage = () => {
     setBusyId(photo.id);
     setActionError('');
     try {
-      await approvePhoto(photo.id);
+      await approvePhoto(photo.id, photo.uid, photo.collection);
       patchStatus(photo.id, 'approved');
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Не удалось одобрить фото.');
@@ -168,7 +168,7 @@ export const PhotoApprovalPage = () => {
     setBusyId(photo.id);
     setActionError('');
     try {
-      await rejectPhoto(photo.id, reason);
+      await rejectPhoto(photo.id, reason, photo.uid, photo.collection);
       patchStatus(photo.id, 'rejected', { moderationReason: reason.trim() || 'rejected' });
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Не удалось отклонить фото.');
@@ -181,7 +181,7 @@ export const PhotoApprovalPage = () => {
     setBusyId(photo.id);
     setActionError('');
     try {
-      await deletePhoto(photo.id);
+      await deletePhoto(photo.id, photo.uid, photo.collection);
       removeLocal(photo.id);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Не удалось удалить фото.');
@@ -195,7 +195,8 @@ export const PhotoApprovalPage = () => {
     setBulkBusy(true);
     setActionError('');
     try {
-      await deletePhotos(selectedInShown);
+      const items = selectedInShown.map((id) => ({ id, uid: idMap.get(id)?.uid, collection: idMap.get(id)?.collection }));
+      await deletePhotos(items);
       selectedInShown.forEach((id) => removeLocal(id));
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Не удалось удалить выбранные фото.');
@@ -216,7 +217,7 @@ export const PhotoApprovalPage = () => {
           <p className="eyebrow">Модерация</p>
           <h2>Одобрение фото</h2>
           <p style={{ color: '#5d6f8b', fontSize: 13, marginTop: 4 }}>
-            Фото из community_photos. Таблица показывает экран-источник каждого фото.
+            Фото из community_photos, user_photos и request_photos. Таблица показывает экран-источник каждого фото.
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

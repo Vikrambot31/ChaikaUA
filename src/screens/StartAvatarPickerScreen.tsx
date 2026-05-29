@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { NavigationProp, useNavigation } from '@react-navigation/native';
+import { CommonActions, NavigationProp, RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../redux/store';
 import { auth } from '../firebase-config';
@@ -57,6 +57,7 @@ const TEXT = {
 
 export default function StartAvatarPickerScreen() {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const route = useRoute<RouteProp<RootStackParamList, 'StartAvatarPickerScreen'>>();
   const dispatch = useDispatch();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const user = useSelector(selectUser);
@@ -159,6 +160,14 @@ export default function StartAvatarPickerScreen() {
               activeOpacity={0.88}
               onPress={() => {
                 setSuccessVisible(false);
+                const redirectTo = route.params?.redirectTo;
+                if (redirectTo) {
+                  navigation.dispatch(CommonActions.navigate({
+                    name: redirectTo,
+                    params: route.params?.redirectParams,
+                  }));
+                  return;
+                }
                 navigation.navigate('MainTabs');
               }}
             >
