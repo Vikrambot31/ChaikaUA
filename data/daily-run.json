@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-05-29",
+      "publishedAt": "2026-05-29T07:50:21.564Z",
+      "key": "https://bigkyiv.com.ua/dorogu-na-vulyczi-synoozernij-zarahuvaly-do-komunalnoyi-vlasnosti-ta-nareshti-vidremontuyut/"
+    },
+    {
       "type": "places",
       "date": "2026-05-28",
       "publishedAt": "2026-05-28T11:27:17.444Z",
