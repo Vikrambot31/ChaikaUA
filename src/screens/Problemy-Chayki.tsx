@@ -763,85 +763,85 @@ const text = CLEAN_PROBLEMS_TEXT[language];
             </ScrollView>
           </>
         }
-        renderItem={({ item: problem }) => (
-          <View style={styles.item}>
-            <TouchableOpacity
-              style={styles.topRow}
-              onPress={() => { if (navLock.current) return; navLock.current = true; navigation.navigate('ItemDetailScreen', { item: mapToDetailData(problem) }); setTimeout(() => { navLock.current = false; }, 800); }}
-              activeOpacity={0.86}
-            >
-              <View style={styles.visualWrap}>
-                {problem.photoUri || problem.photoStoragePath ? (
-                  <AppPhotoImage
-                    uri={problem.photoUri}
-                    storagePath={problem.photoStoragePath}
-                    style={styles.cardPhoto}
-                    resizeMode="cover"
-                    debugLabel={`ProblemsCard:${problem.id}`}
-                    showDebugInfo={false}
-                  />
-                ) : (
-                  <View style={[styles.cardPhoto, styles.cardPhotoPlaceholder]}>
-                    <MaterialCommunityIcons name="image-off-outline" size={26} color="#B8A888" />
+        renderItem={({ item: problem }) => {
+          const hasPhoto = Boolean(problem.photoUri || problem.photoStoragePath);
+
+          return (
+            <View style={[styles.item, !hasPhoto && styles.itemNoPhoto]}>
+              <TouchableOpacity
+                style={[styles.topRow, !hasPhoto && styles.topRowNoPhoto]}
+                onPress={() => { if (navLock.current) return; navLock.current = true; navigation.navigate('ItemDetailScreen', { item: mapToDetailData(problem) }); setTimeout(() => { navLock.current = false; }, 800); }}
+                activeOpacity={0.86}
+              >
+                {hasPhoto ? (
+                  <View style={styles.visualWrap}>
+                    <AppPhotoImage
+                      uri={problem.photoUri}
+                      storagePath={problem.photoStoragePath}
+                      style={styles.cardPhoto}
+                      resizeMode="cover"
+                      debugLabel={`ProblemsCard:${problem.id}`}
+                      showDebugInfo={false}
+                    />
                   </View>
-                )}
-              </View>
+                ) : null}
 
-              <View style={styles.copy}>
-                <View style={styles.itemTitleBox}>
-                  <Text style={styles.itemTitle} numberOfLines={2}>{problem.title}</Text>
-                </View>
+                <View style={[styles.copy, !hasPhoto && styles.copyNoPhoto]}>
+                  <View style={styles.itemTitleBox}>
+                    <Text style={styles.itemTitle} numberOfLines={2}>{problem.title}</Text>
+                  </View>
 
-                <View style={styles.addressRow}>
-                  {!!problem.street && <Text style={styles.addressStreet} numberOfLines={1}>{problem.street}</Text>}
-                  {!!problem.house && <Text style={styles.addressHouse} numberOfLines={1}>{problem.house}</Text>}
+                  <View style={styles.addressRow}>
+                    {!!problem.street && <Text style={styles.addressStreet} numberOfLines={1}>{problem.street}</Text>}
+                    {!!problem.house && <Text style={styles.addressHouse} numberOfLines={1}>{problem.house}</Text>}
+                  </View>
+                  <View style={styles.personMetaRow}>
+                    <Text style={styles.personMetaText} numberOfLines={1}>{problem.category} - {problem.votes} {text.votes}</Text>
+                  </View>
                 </View>
-                <View style={styles.personMetaRow}>
-                  <Text style={styles.personMetaText} numberOfLines={1}>{problem.category} - {problem.votes} {text.votes}</Text>
-                </View>
-              </View>
-            </TouchableOpacity>
+              </TouchableOpacity>
 
-            <View style={styles.bottomActionsRow}>
-              <View style={styles.actionsInnerRow}>
-                <MiniUserAvatar uri={problem.avatarUri || ''} name={problem.name || ''} size={42} borderRadius={14} backgroundColor="#6A8BA5" />
-                <TouchableOpacity
-                  style={[styles.actionPill, styles.profilePill, !problem.userId && styles.actionPillDisabled]}
-                  onPress={(e) => { e.stopPropagation(); if (!problem.userId || navLock.current) return; navLock.current = true; navigation.navigate('ViewUserProfile', { userId: problem.userId }); setTimeout(() => { navLock.current = false; }, 800); }}
-                  disabled={!problem.userId}
-                  activeOpacity={problem.userId ? 0.78 : 1}
-                >
-                  <MaterialCommunityIcons name="badge-account-horizontal-outline" size={15} color="#7A1E5C" />
-                  <Text style={styles.actionPillText} numberOfLines={1}>{profileActionLabel}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.actionPill, styles.contactPill, (!problem.userId && !problem.phone) && styles.actionPillDisabled]}
-                  onPress={() => openContactOptions(problem)}
-                  disabled={!problem.userId && !problem.phone}
-                  activeOpacity={problem.userId || problem.phone ? 0.78 : 1}
-                >
-                  <MaterialCommunityIcons name="message-text-outline" size={15} color="#FFFFFF" />
-                  <Text style={[styles.actionPillText, styles.contactPillText]} numberOfLines={1}>{contactActionLabel}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.voteBtn, problem.hasVoted && styles.voteBtnVoted, votingBusyId === problem.id && styles.voteBtnDisabled]}
-                  onPress={() => { void upvote(problem.id); }}
-                  disabled={votingBusyId === problem.id}
-                  activeOpacity={votingBusyId !== problem.id ? 0.75 : 1}
-                >
-                  {votingBusyId === problem.id ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <>
-                      <MaterialCommunityIcons name={problem.hasVoted ? 'heart' : 'heart-outline'} size={18} color="#FFFFFF" />
-                      <Text style={styles.voteCount}>{problem.votes}</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
+              <View style={styles.bottomActionsRow}>
+                <View style={styles.actionsInnerRow}>
+                  <MiniUserAvatar uri={problem.avatarUri || ''} name={problem.name || ''} size={42} borderRadius={14} backgroundColor="#6A8BA5" />
+                  <TouchableOpacity
+                    style={[styles.actionPill, styles.profilePill, !problem.userId && styles.actionPillDisabled]}
+                    onPress={(e) => { e.stopPropagation(); if (!problem.userId || navLock.current) return; navLock.current = true; navigation.navigate('ViewUserProfile', { userId: problem.userId }); setTimeout(() => { navLock.current = false; }, 800); }}
+                    disabled={!problem.userId}
+                    activeOpacity={problem.userId ? 0.78 : 1}
+                  >
+                    <MaterialCommunityIcons name="badge-account-horizontal-outline" size={15} color="#7A1E5C" />
+                    <Text style={styles.actionPillText} numberOfLines={1}>{profileActionLabel}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.actionPill, styles.contactPill, (!problem.userId && !problem.phone) && styles.actionPillDisabled]}
+                    onPress={() => openContactOptions(problem)}
+                    disabled={!problem.userId && !problem.phone}
+                    activeOpacity={problem.userId || problem.phone ? 0.78 : 1}
+                  >
+                    <MaterialCommunityIcons name="message-text-outline" size={15} color="#FFFFFF" />
+                    <Text style={[styles.actionPillText, styles.contactPillText]} numberOfLines={1}>{contactActionLabel}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.voteBtn, problem.hasVoted && styles.voteBtnVoted, votingBusyId === problem.id && styles.voteBtnDisabled]}
+                    onPress={() => { void upvote(problem.id); }}
+                    disabled={votingBusyId === problem.id}
+                    activeOpacity={votingBusyId !== problem.id ? 0.75 : 1}
+                  >
+                    {votingBusyId === problem.id ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <MaterialCommunityIcons name={problem.hasVoted ? 'heart' : 'heart-outline'} size={18} color="#FFFFFF" />
+                        <Text style={styles.voteCount}>{problem.votes}</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
-          </View>
-        )}
+          );
+        }}
         ListEmptyComponent={
           loading ? (
             <View style={styles.emptyState}>
@@ -985,6 +985,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
+  topRowNoPhoto: {
+    flexDirection: 'column',
+  },
+  itemNoPhoto: {
+    padding: 12,
+  },
   visualWrap: {
     position: 'relative',
     width: '40%',
@@ -1003,6 +1009,9 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   copy: { flex: 1, minWidth: 0 },
+  copyNoPhoto: {
+    width: '100%',
+  },
   itemTitleBox: {
     borderRadius: 16,
     paddingHorizontal: 9,
@@ -1164,9 +1173,5 @@ const styles = StyleSheet.create({
     color: SCREEN_THEME.textSecondary,
   },
 });
-
-
-
-
 
 

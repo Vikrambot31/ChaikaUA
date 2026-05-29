@@ -37,6 +37,8 @@ import { useContactRequest } from '../hooks/useContactRequest';
 import ContactReasonModal from '../components/ContactReasonModal';
 import { safeCallPhone } from '../utils/communicationActions';
 import { openRequestFormWithLimitCheck } from '../utils/requestFormLimitGuard';
+import AppPhotoImage from '../components/AppPhotoImage';
+import UserCardActionBar from '../components/UserCardActionBar';
 
 type ChatRequest = ChatRequestLike;
 
@@ -736,19 +738,31 @@ const OnlineChatScreen = () => {
             const { topic, description } = splitChatTopic(item, language);
             const timeAgo = getTimeAgo(timestamp);
             const own = isOwnRequest(item);
+            const hasPhoto = Boolean(item.photoUri || item.photoStoragePath);
             const avatarUri = item.userId
               ? ((item.userId && avatarByUserId[item.userId]) || pickUserAvatarUri(item))
               : '';
+            const canContact = !own && Boolean(item.userId);
 
             return (
               <TouchableOpacity
-                style={styles.chatCard}
+                style={[styles.chatCard, hasPhoto && styles.chatCardWithPhoto]}
                 onPress={() => { if (navLock.current) return; navLock.current = true; navigation.navigate('RequestDetail', { request: item }); setTimeout(() => { navLock.current = false; }, 800); }}
                 activeOpacity={0.88}
               >
-                {/* TOP: avatar + name/info block */}
-                <View style={styles.chatCardTop}>
-                  {avatarUri ? (
+                <View style={hasPhoto ? styles.chatMediaRow : styles.chatCardTop}>
+                  {hasPhoto ? (
+                    <View style={styles.chatPhotoWrap}>
+                      <AppPhotoImage
+                        uri={item.photoUri}
+                        storagePath={item.photoStoragePath}
+                        style={styles.chatCardPhoto}
+                        resizeMode="cover"
+                        debugLabel={`OnlineChatCard:${item.id}`}
+                        showDebugInfo={false}
+                      />
+                    </View>
+                  ) : avatarUri ? (
                     <MiniUserAvatar
                       uri={avatarUri}
                       name={item.name}
@@ -781,12 +795,12 @@ const OnlineChatScreen = () => {
                   </View>
                 </View>
 
-                {/* ACTIONS ROW */}
-                <View style={styles.chatActionsRow}>
+                {(item.phone || own || canContact) ? (
+                  <View style={styles.chatActionsRow}>
                   {item.phone ? (
                     <TouchableOpacity
                       style={styles.chatActionBtn}
-                      onPress={() => { void safeCallPhone(item.phone as string, language); }}
+                      onPress={(event) => { event.stopPropagation(); void safeCallPhone(item.phone as string, language); }}
                       activeOpacity={0.8}
                     >
                       <MaterialCommunityIcons name="phone-outline" size={13} color={SCREEN_THEME.woodGreenDark} />
@@ -798,7 +812,7 @@ const OnlineChatScreen = () => {
                   {!own && item.userId ? (
                     <TouchableOpacity
                       style={styles.chatActionBtn}
-                      onPress={() => setActionModal({ visible: true, userId: item.userId as string, userName: item.name ?? '' })}
+                      onPress={(event) => { event.stopPropagation(); setActionModal({ visible: true, userId: item.userId as string, userName: item.name ?? '' }); }}
                       activeOpacity={0.8}
                     >
                       <MaterialCommunityIcons name="badge-account-outline" size={13} color={SCREEN_THEME.woodGreenDark} />
@@ -810,7 +824,7 @@ const OnlineChatScreen = () => {
                   {!own && item.userId ? (
                     <TouchableOpacity
                       style={styles.chatActionBtnAccent}
-                      onPress={() => openContactModal({ userId: item.userId as string, name: item.name ?? 'Unknown', sourceType: 'help', sourceId: item.id, sourceTitle: (item.text ?? '').slice(0, 60) })}
+                      onPress={(event) => { event.stopPropagation(); openContactModal({ userId: item.userId as string, name: item.name ?? 'Unknown', sourceType: 'help', sourceId: item.id, sourceTitle: (item.text ?? '').slice(0, 60) }); }}
                       activeOpacity={0.8}
                     >
                       <MaterialCommunityIcons name="arrow-right-circle-outline" size={13} color="#fff" />
@@ -822,7 +836,7 @@ const OnlineChatScreen = () => {
                   {own ? (
                     <TouchableOpacity
                       style={styles.chatActionBtnDelete}
-                      onPress={() => handleDelete(item.id)}
+                      onPress={(event) => { event.stopPropagation(); handleDelete(item.id); }}
                       disabled={deleteBusyId === item.id}
                       activeOpacity={0.8}
                     >
@@ -836,7 +850,22 @@ const OnlineChatScreen = () => {
                       )}
                     </TouchableOpacity>
                   ) : null}
-                </View>
+                  </View>
+                ) : null}
+
+                <UserCardActionBar
+                  avatarUri={avatarUri}
+                  name={item.name}
+                  userId={item.userId}
+                  currentUserId={currentUser?.id}
+                  language={language}
+                  showAvatar={hasPhoto}
+                  avatarSize={hasPhoto ? 36 : 32}
+                  showProfile={false}
+                  showContact={false}
+                  likePath="feed_likes/requests"
+                  likeId={item.id}
+                />
               </TouchableOpacity>
             );
           }}
@@ -1141,11 +1170,32 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
   },
+  chatCardWithPhoto: {
+    padding: 8,
+  },
   chatCardTop: {
     flexDirection: 'row',
     gap: 10,
     alignItems: 'flex-start',
     marginBottom: 8,
+  },
+  chatMediaRow: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'stretch',
+    marginBottom: 8,
+  },
+  chatPhotoWrap: {
+    width: '38%',
+    minWidth: 118,
+    maxWidth: 136,
+    flexShrink: 0,
+  },
+  chatCardPhoto: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: 16,
+    backgroundColor: '#F0E8D8',
   },
   botAvatar: {
     width: 56,

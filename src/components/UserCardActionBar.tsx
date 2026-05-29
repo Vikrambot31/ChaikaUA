@@ -25,6 +25,9 @@ type Props = {
   onLike?: () => void;
   avatarBackgroundColor?: string;
   avatarSize?: number;
+  showAvatar?: boolean;
+  showProfile?: boolean;
+  showContact?: boolean;
 };
 
 const labels = {
@@ -50,6 +53,9 @@ export default function UserCardActionBar({
   onLike,
   avatarBackgroundColor = '#6A8BA5',
   avatarSize = 32,
+  showAvatar = true,
+  showProfile = true,
+  showContact = true,
 }: Props) {
   const [localLikes, setLocalLikes] = useState<Record<string, true>>({});
   const [localBusy, setLocalBusy] = useState(false);
@@ -114,23 +120,29 @@ export default function UserCardActionBar({
 
   return (
     <View style={styles.row}>
-      <MiniUserAvatar
-        uri={avatarUri || ''}
-        name={name || ''}
-        size={avatarSize}
-        borderRadius={avatarSize / 3}
-        backgroundColor={avatarBackgroundColor}
-      />
+      {showAvatar ? (
+        <MiniUserAvatar
+          uri={avatarUri || ''}
+          name={name || ''}
+          size={avatarSize}
+          borderRadius={avatarSize / 3}
+          backgroundColor={avatarBackgroundColor}
+        />
+      ) : null}
 
-      <TouchableOpacity style={[styles.outlined, profileDisabled && styles.disabled]} onPress={(event) => { event.stopPropagation(); onProfile?.(); }} disabled={profileDisabled} activeOpacity={0.8}>
-        <MaterialCommunityIcons name="badge-account-horizontal-outline" size={13} color={profileDisabled ? '#B0A090' : '#7A1E5C'} />
-        <Text style={[styles.outlinedText, profileDisabled && styles.disabledText]}>{t.profile}</Text>
-      </TouchableOpacity>
+      {showProfile ? (
+        <TouchableOpacity style={[styles.outlined, profileDisabled && styles.disabled]} onPress={(event) => { event.stopPropagation(); onProfile?.(); }} disabled={profileDisabled} activeOpacity={0.8}>
+          <MaterialCommunityIcons name="badge-account-horizontal-outline" size={13} color={profileDisabled ? '#B0A090' : '#7A1E5C'} />
+          <Text style={[styles.outlinedText, profileDisabled && styles.disabledText]}>{t.profile}</Text>
+        </TouchableOpacity>
+      ) : null}
 
-      <TouchableOpacity style={[styles.outlined, resolvedContactDisabled && styles.disabled]} onPress={(event) => { event.stopPropagation(); onContact?.(); }} disabled={resolvedContactDisabled} activeOpacity={0.8}>
-        <MaterialCommunityIcons name="message-text-outline" size={13} color={resolvedContactDisabled ? '#B0A090' : '#7A1E5C'} />
-        <Text style={[styles.outlinedText, resolvedContactDisabled && styles.disabledText]}>{t.contact}</Text>
-      </TouchableOpacity>
+      {showContact ? (
+        <TouchableOpacity style={[styles.outlined, resolvedContactDisabled && styles.disabled]} onPress={(event) => { event.stopPropagation(); onContact?.(); }} disabled={resolvedContactDisabled} activeOpacity={0.8}>
+          <MaterialCommunityIcons name="message-text-outline" size={13} color={resolvedContactDisabled ? '#B0A090' : '#7A1E5C'} />
+          <Text style={[styles.outlinedText, resolvedContactDisabled && styles.disabledText]}>{t.contact}</Text>
+        </TouchableOpacity>
+      ) : null}
 
       <TouchableOpacity style={[styles.like, resolvedLiked && styles.likeActive, likeDisabled && styles.disabled]} onPress={(event) => { event.stopPropagation(); handleLike(); }} disabled={likeDisabled} activeOpacity={0.8}>
         {resolvedBusy ? (
