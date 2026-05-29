@@ -909,7 +909,7 @@ const OnlineChatScreen = () => {
             return;
           }
           addRequestNavLock.current = true;
-          navigation.navigate('AddRequest');
+          navigation.navigate('RequestFormScreen');
           setTimeout(() => { addRequestNavLock.current = false; }, 800);
         }}
         variant="primary"

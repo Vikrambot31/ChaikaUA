@@ -31,7 +31,6 @@ import LoginScreen from '../screens/Vkhod';
 import RegisterScreenFull from '../screens/Registraciya-Polnaya';
 import HomeScreen from '../screens/Glavny-Ekran';
 import OnlineChatScreen from '../screens/Onlayn-Chat';
-import AddRequestScreen from '../screens/Dobavit-Zayavku';
 import RequestDetailScreen from '../screens/Detal-Zayavki';
 import ItemDetailScreen from '../screens/ItemDetailScreen';
 import DownloadCodeScreen from '../screens/Ekran-Koda-Zagruzki';
@@ -95,7 +94,6 @@ export type RootStackParamList = {
   MainTabs: undefined;
   OnlineChatTab: undefined;
   OnlineChatList: undefined;
-  AddRequest: undefined;
   RequestDetail: { request: Request };
   ItemDetailScreen: { item: DetailItemData };
   RequestsTab: undefined;
@@ -206,7 +204,6 @@ const linking: LinkingOptions<RootStackParamList> = {
       OnlineChatTab: {
         screens: {
           OnlineChatList: 'screen/chat',
-          AddRequest: 'screen/chat/new',
         },
       },
       RequestFormScreen: 'screen/request-form',
@@ -245,7 +242,6 @@ const ROUTE_FILE_MAP: Record<string, string> = {
   ProfileTab: 'Profil-Polzovatelya.tsx',
   OnlineChatTab: 'Onlayn-Chat.tsx',
   OnlineChatList: 'Onlayn-Chat.tsx',
-  AddRequest: 'Dobavit-Zayavku.tsx',
   RequestDetail: 'Detal-Zayavki.tsx',
   ItemDetailScreen: 'ItemDetailScreen.tsx',
   RequestsTab: 'Vibor-Temy-Zayavki.tsx',
@@ -501,7 +497,6 @@ function OnlineChatNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="OnlineChatList" component={OnlineChatScreen} />
-      <Stack.Screen name="AddRequest" component={AddRequestScreen} />
       <Stack.Screen name="RequestDetail" component={RequestDetailScreen as React.ComponentType<{}>} />
     </Stack.Navigator>
   );

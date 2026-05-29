@@ -174,6 +174,14 @@ const HelpNeighborsScreen: React.FC = () => {
                 <Image source={require('../../assets/WEBP-version/Sosedi-pomogaut.webp')} style={styles.headerImage} resizeMode="cover" />
               </View>
 
+              <TouchableOpacity
+                style={styles.addRequestButton}
+                onPress={() => navigation.navigate('RequestFormScreen')}
+                activeOpacity={0.86}
+              >
+                <Text style={styles.addRequestButtonText}>+ Додати прохання</Text>
+              </TouchableOpacity>
+
               <View style={styles.listHeader}>
                 <Text style={styles.listTitle}>{text.listTitle}</Text>
                 <View style={styles.listCountBadge}>
@@ -283,6 +291,19 @@ const styles = StyleSheet.create({
     borderRadius: 18,
   },
   headerImage: { width: '100%', height: 200, resizeMode: 'cover' },
+  addRequestButton: {
+    marginBottom: 14,
+    borderRadius: 16,
+    paddingVertical: 14,
+    alignItems: 'center',
+    backgroundColor: SCREEN_THEME.terracotta,
+    shadowColor: '#7A3A22',
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 4,
+  },
+  addRequestButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
   listHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, marginTop: 8 },
   listTitle: { fontSize: 18, fontWeight: '900', color: SCREEN_THEME.textPrimary },
   listCountBadge: { backgroundColor: SCREEN_THEME.terracotta, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },

@@ -53,7 +53,6 @@ const SCREEN_NAME_MAP: Array<{ pattern: RegExp; name: string }> = [
   { pattern: /Registraciya-Polnaya/, name: 'Регистрация' },
   { pattern: /Glavny-Ekran/, name: 'Главный экран' },
   { pattern: /Onlayn-Chat/, name: 'Онлайн чат' },
-  { pattern: /Dobavit-Zayavku/, name: 'Добавить заявку' },
   { pattern: /Detal-Zayavki/, name: 'Детали заявки' },
   { pattern: /Ekran-Koda-Zagruzki/, name: 'Экран кода загрузки' },
   { pattern: /Istoriya-Zaprosov/, name: 'История запросов' },
