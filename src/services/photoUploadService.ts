@@ -98,10 +98,10 @@ async function uploadViaFileSystem(
   const sourceLabel = options.sourceLabel ?? 'photoUploadService.uploadPhotoToNamespace';
   const feature = options.feature ?? mapNamespaceToFeature(options.namespace);
   const storagePath = `${options.namespace}/${user.uid}/${uniqueId()}.${getPhotoFileExtension(localUri)}`;
-  // Firebase Storage REST API v1 requires GCS bucket name (*.appspot.com),
-  // not the new Firebase domain (*.firebasestorage.app).
-  const rawBucket = storage.app.options.storageBucket ?? '';
-  const bucket = rawBucket.replace(/\.firebasestorage\.app$/i, '.appspot.com');
+  // Use the bucket exactly as configured in the SDK (chaikaua-3cd9d.firebasestorage.app).
+  // The Firebase Storage REST v0 endpoint expects this bucket name — the legacy
+  // *.appspot.com alias does not exist for this project and returned HTTP 404.
+  const bucket = storage.app.options.storageBucket ?? '';
   const encodedPath = encodeURIComponent(storagePath);
   const fileRef = createStorageRef(storage, storagePath);
 
@@ -167,7 +167,7 @@ async function uploadViaFileSystem(
 
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       try {
-        const uploadUrl = `https://firebasestorage.googleapis.com/upload/storage/v1/b/${bucket}/o?name=${encodedPath}&uploadType=media`;
+        const uploadUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o?name=${encodedPath}`;
         const idToken = await user.getIdToken(attempt > 1);
 
         void recordRuntimeTrace({
@@ -186,7 +186,9 @@ async function uploadViaFileSystem(
             httpMethod: 'POST',
             headers: {
               'Content-Type': contentType,
-              Authorization: `Bearer ${idToken}`,
+              // Firebase Storage REST v0 authenticates with the "Firebase <ID_TOKEN>"
+              // scheme (not OAuth "Bearer"). This is what enforces Storage Rules.
+              Authorization: `Firebase ${idToken}`,
             },
             sessionType: FileSystem.FileSystemSessionType.FOREGROUND,
           }),
