@@ -1188,6 +1188,18 @@ td {
   background: #10161c;
 }
 
+.mediaGallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.previewNav {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
 .previewOverlay {
   position: fixed;
   inset: 0;

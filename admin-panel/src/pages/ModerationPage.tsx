@@ -35,7 +35,8 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
   const [busyActions, setBusyActions] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<string | null>(null);
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  const [previewIndex, setPreviewIndex] = useState(0);
   const [previewTitle, setPreviewTitle] = useState('');
   const [previewBroken, setPreviewBroken] = useState(false);
 
@@ -157,14 +158,17 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
     }
   };
 
-  const openPreview = (item: ModerationItem) => {
+  const openPreview = (item: ModerationItem, startIndex = 0) => {
+    const urls = item.mediaUrls.length > 0 ? item.mediaUrls : (item.mediaUrl ? [item.mediaUrl] : []);
+    setPreviewUrls(urls);
+    setPreviewIndex(startIndex);
     setPreviewTitle(item.title);
-    setPreviewUrl(item.mediaUrl || item.photoUrl || null);
     setPreviewBroken(false);
   };
 
   const closePreview = () => {
-    setPreviewUrl(null);
+    setPreviewUrls([]);
+    setPreviewIndex(0);
     setPreviewTitle('');
     setPreviewBroken(false);
   };
@@ -323,11 +327,14 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
                   <td>{item.timestampLabel}</td>
                   <td><span className={`pill ${item.status === 'approved' ? 'good' : item.status === 'rejected' ? 'danger' : ''}`}>{item.status}</span></td>
                   <td>
-                    {item.mediaUrl ? (
-                      <button type="button" className="mediaPreview" onClick={() => openPreview(item)}>
-                        <img src={item.mediaUrl} alt="" />
-                        <span>Открыть</span>
-                      </button>
+                    {item.mediaUrls.length > 0 ? (
+                      <div className="mediaGallery">
+                        {item.mediaUrls.map((url, idx) => (
+                          <button key={idx} type="button" className="mediaPreview" onClick={() => openPreview(item, idx)}>
+                            <img src={url} alt="" />
+                          </button>
+                        ))}
+                      </div>
                     ) : item.photoUrl ? (
                       <button type="button" className="smallButton" onClick={() => openPreview(item)}>
                         Открыть URL
@@ -382,28 +389,40 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
           </button>
         ) : null}
       </article>
-      {previewUrl ? (
+      {previewUrls.length > 0 ? (
         <div className="previewOverlay" onClick={closePreview}>
           <div className="previewDialog" onClick={(event) => event.stopPropagation()}>
             <div className="previewHeader">
-              <strong>{previewTitle || 'Медиа'}</strong>
+              <strong>{previewTitle || 'Медиа'}{previewUrls.length > 1 ? ` (${previewIndex + 1} / ${previewUrls.length})` : ''}</strong>
               <button type="button" className="smallButton dangerButton" onClick={closePreview}>Закрыть</button>
             </div>
             {!previewBroken ? (
               <>
                 <img
                   className="previewMedia"
-                  src={previewUrl}
+                  src={previewUrls[previewIndex]}
                   alt=""
                   onError={() => setPreviewBroken(true)}
                 />
-                <a className="tableLink" href={previewUrl} target="_blank" rel="noreferrer">Открыть в новой вкладке</a>
+                {previewUrls.length > 1 && (
+                  <div className="previewNav">
+                    <button type="button" className="smallButton" disabled={previewIndex === 0} onClick={() => { setPreviewBroken(false); setPreviewIndex((i) => i - 1); }}>&#8592;</button>
+                    <button type="button" className="smallButton" disabled={previewIndex === previewUrls.length - 1} onClick={() => { setPreviewBroken(false); setPreviewIndex((i) => i + 1); }}>&#8594;</button>
+                  </div>
+                )}
+                <a className="tableLink" href={previewUrls[previewIndex]} target="_blank" rel="noreferrer">Открыть в новой вкладке</a>
               </>
             ) : (
               <div>
                 <p className="formError">Не удалось загрузить медиа в предпросмотре.</p>
-                <a className="tableLink" href={previewUrl} target="_blank" rel="noreferrer">Попробовать открыть напрямую</a>
-                <p><small>{previewUrl}</small></p>
+                {previewUrls.length > 1 && (
+                  <div className="previewNav">
+                    <button type="button" className="smallButton" disabled={previewIndex === 0} onClick={() => { setPreviewBroken(false); setPreviewIndex((i) => i - 1); }}>&#8592;</button>
+                    <button type="button" className="smallButton" disabled={previewIndex === previewUrls.length - 1} onClick={() => { setPreviewBroken(false); setPreviewIndex((i) => i + 1); }}>&#8594;</button>
+                  </div>
+                )}
+                <a className="tableLink" href={previewUrls[previewIndex]} target="_blank" rel="noreferrer">Попробовать открыть напрямую</a>
+                <p><small>{previewUrls[previewIndex]}</small></p>
               </div>
             )}
           </div>

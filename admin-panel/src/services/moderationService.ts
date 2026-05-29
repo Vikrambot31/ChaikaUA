@@ -36,6 +36,8 @@ export type ModerationItem = {
   timestampLabel: string;
   photoUrl: string;
   mediaUrl: string;
+  photoUrls: string[];
+  mediaUrls: string[];
   priority: 'urgent' | 'standard' | 'low';
   priorityRank: number;
   statusPriority: string;
@@ -165,6 +167,21 @@ const getPhotoUrl = (value: Record<string, unknown>): string =>
   getString(value.photoStoragePath) ||
   getString(value.storagePath);
 
+const getPhotoUrls = (value: Record<string, unknown>): string[] => {
+  // Prefer the full array saved by the mobile form (photoUris / photoStoragePaths).
+  const urisField = value.photoUris;
+  if (Array.isArray(urisField) && urisField.length > 0) {
+    return urisField.filter((u): u is string => typeof u === 'string' && u.length > 0);
+  }
+  const pathsField = value.photoStoragePaths;
+  if (Array.isArray(pathsField) && pathsField.length > 0) {
+    return pathsField.filter((u): u is string => typeof u === 'string' && u.length > 0);
+  }
+  // Fall back to single photo fields.
+  const single = getPhotoUrl(value);
+  return single ? [single] : [];
+};
+
 const URGENT_CATEGORIES = new Set(['medical', 'electricity', 'care', 'repair']);
 const LOW_PRIORITY_CATEGORIES = new Set(['feedback', 'suggestions', 'app_suggestion', 'appSuggestions']);
 
@@ -204,6 +221,8 @@ const normalizeItem = (
     timestampLabel: timestamp ? new Date(timestamp).toLocaleString() : '-',
     photoUrl: getPhotoUrl(value),
     mediaUrl: '',
+    photoUrls: getPhotoUrls(value),
+    mediaUrls: [],
     ...priority,
     raw: value,
   };
@@ -255,10 +274,15 @@ export const loadModerationItems = async (): Promise<ModerationItem[]> => {
   );
 
   return Promise.all(
-    items.map(async (item) => ({
-      ...item,
-      mediaUrl: await resolveMediaUrl(item.photoUrl),
-    })),
+    items.map(async (item) => {
+      const mediaUrls = await Promise.all(item.photoUrls.map((url) => resolveMediaUrl(url)));
+      const resolved = mediaUrls.filter(Boolean);
+      return {
+        ...item,
+        mediaUrls: resolved,
+        mediaUrl: resolved[0] ?? '',
+      };
+    }),
   );
 };
 
