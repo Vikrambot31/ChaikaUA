@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as FileSystem from 'expo-file-system';
 import {
   ActivityIndicator,
@@ -170,6 +170,9 @@ const AppPhotoImage: React.FC<Props> = ({
   const [failed, setFailed] = useState(false);
 
   const [failureReason, setFailureReason] = useState('');
+  // Prevent duplicate diagnostic logs when finalImageUri transitions https→file (caching).
+  const loggedUriKeyRef = useRef('');
+  const measuredSizeKeyRef = useRef('');
 
   useEffect(() => {
     setFailed(false);
@@ -326,6 +329,11 @@ const AppPhotoImage: React.FC<Props> = ({
 
   useEffect(() => {
     if (startAvatar) return;
+    // De-duplicate: same photo fires twice when finalImageUri switches https→file (local cache).
+    // Use storagePath as photo identity key; fall back to URI without query string.
+    const uriKey = (typeof storagePath === 'string' && storagePath) || stripQuery(finalImageUri);
+    if (uriKey && loggedUriKeyRef.current === uriKey) return;
+    if (uriKey) loggedUriKeyRef.current = uriKey;
     if (__DEV__) {
       console.log('[AppPhotoImage] final uri:', {
         debugLabel,
@@ -356,6 +364,10 @@ const AppPhotoImage: React.FC<Props> = ({
 
   useEffect(() => {
     if (!finalImageUri) return;
+    // De-duplicate: same photo fires twice when finalImageUri switches https→file (local cache).
+    const sizeKey = (typeof storagePath === 'string' && storagePath) || stripQuery(finalImageUri);
+    if (measuredSizeKeyRef.current === sizeKey) return;
+    measuredSizeKeyRef.current = sizeKey;
     let cancelled = false;
 
     void recordRuntimeTrace({

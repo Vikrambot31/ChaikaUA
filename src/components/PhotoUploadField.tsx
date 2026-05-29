@@ -103,8 +103,22 @@ export default function PhotoUploadField({
 
   useFocusEffect(
     useCallback(() => {
+      // When the form screen regains focus after MyPhotosScreen closes, recover any
+      // photo that was selected but not yet reflected in state. This handles two cases:
+      //   1. The screen was unmounted by the navigator (Android detachInactiveScreens)
+      //      and the direct callback state-update was a no-op on the unmounted component.
+      //   2. The screen stayed mounted but state was reset before the update committed.
+      // Duplicate guard (current.some) prevents adding the same photo twice when the
+      // direct callback path already succeeded.
+      const pending = PhotoSelector.consumePending();
+      if (pending) {
+        setSelected((current) => {
+          if (current.some((item) => item.id === pending.id)) return current;
+          return maxPhotos > 0 ? [...current, pending].slice(0, maxPhotos) : [...current, pending];
+        });
+      }
       onPickerOpenChange?.(false);
-    }, [onPickerOpenChange]),
+    }, [maxPhotos, onPickerOpenChange]),
   );
 
   // При монтировании: восстанавливаем фото если компонент был пересоздан во время навигации
