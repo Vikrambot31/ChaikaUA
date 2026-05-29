@@ -80,6 +80,7 @@ const MAX_PHOTO_TITLE_LENGTH = 80;
 const MAX_PHOTO_DESCRIPTION_LENGTH = 300;
 const MAX_AUDIO_UPLOAD_BYTES = 5 * 1024 * 1024; // 5 MB (~60s @ HIGH_QUALITY)
 const DAILY_REQUEST_LIMIT = 30;
+const HELP_NEIGHBORS_DAILY_LIMIT = 5;
 
 const HIGH_PRIORITY_REQUEST_CATEGORIES = new Set<string>(['medical', 'electricity', 'care', 'repair']);
 const STORAGE_UPLOAD_TIMEOUT_MS = 20_000;
@@ -660,6 +661,34 @@ export const firebaseChatAPI = {
     };
   },
 
+  getHelpNeighborsDailyLimitStatus: async (): Promise<ApiResult<{
+    count: number;
+    limit: number;
+    remaining: number;
+    allowed: boolean;
+  }>> => {
+    try {
+      const user: FirebaseUser = await ensureFirebaseAuth();
+      const count = await countCurrentDayItemsByUser('requests', user.uid, { group: 'help_neighbors' });
+      const remaining = Math.max(0, HELP_NEIGHBORS_DAILY_LIMIT - count);
+      return {
+        success: true,
+        data: {
+          count,
+          limit: HELP_NEIGHBORS_DAILY_LIMIT,
+          remaining,
+          allowed: count < HELP_NEIGHBORS_DAILY_LIMIT,
+        },
+      };
+    } catch (error: unknown) {
+      void logClientError('firebaseChatAPI.getHelpNeighborsDailyLimitStatus', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  },
+
   /** Submits a new help-request for moderation. */
   addRequest: async (
     requestData: AddRequestPayload,
@@ -682,7 +711,6 @@ export const firebaseChatAPI = {
       const isElectricity = category === 'electricity';
       const isHelpNeighbors = (requestData.group || '') === 'help_neighbors';
       if (isHelpNeighbors) {
-        const HELP_NEIGHBORS_DAILY_LIMIT = 3;
         const dailyHelpCount = await countCurrentDayItemsByUser('requests', user.uid, { group: 'help_neighbors' });
         if (dailyHelpCount >= HELP_NEIGHBORS_DAILY_LIMIT) {
           throw new Error(`Daily help_neighbors limit reached (${HELP_NEIGHBORS_DAILY_LIMIT})`);

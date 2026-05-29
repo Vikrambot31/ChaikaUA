@@ -7,6 +7,7 @@ import { safeNavigate } from '../utils/safeNavigation';
 import { RootState } from '../redux/store';
 import { LIGHT_ORBS, SCREEN_THEME } from '../utils/screenTheme';
 import TactileIcon from '../components/TactileIcon';
+import { openRequestFormWithLimitCheck } from '../utils/requestFormLimitGuard';
 
 type TopicItem = {
   icon: React.ComponentProps<typeof MaterialCommunityIcons>['name'];
@@ -60,6 +61,14 @@ const RequestTopicScreen: React.FC = () => {
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const text = UI_TEXT[language];
 
+  const openTopic = (screen: string) => {
+    if (screen === 'RequestFormScreen') {
+      void openRequestFormWithLimitCheck(navigation, language);
+      return;
+    }
+    safeNavigate(navigation, screen);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View pointerEvents="none" style={styles.backgroundOrbs}>
@@ -105,7 +114,7 @@ const RequestTopicScreen: React.FC = () => {
             <TouchableOpacity
               key={topic.screen}
               style={styles.topicCard}
-              onPress={() => safeNavigate(navigation, topic.screen)}
+              onPress={() => openTopic(topic.screen)}
               activeOpacity={0.86}
             >
               <View style={styles.topicGloss} />
@@ -169,4 +178,3 @@ const styles = StyleSheet.create({
 });
 
 export default RequestTopicScreen;
-

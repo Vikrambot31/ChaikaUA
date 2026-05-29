@@ -21,6 +21,7 @@ import MiniUserAvatar from '../components/MiniUserAvatar';
 import TactileIcon from '../components/TactileIcon';
 import { safeCallPhone } from '../utils/communicationActions';
 import type { DetailItemData } from '../utils/detailViewTypes';
+import { openRequestFormWithLimitCheck } from '../utils/requestFormLimitGuard';
 
 const UI_TEXT = {
   ua: {
@@ -304,7 +305,7 @@ const MyRequestsScreen = () => {
           <Text style={styles.emptySubtext}>{text.emptySub}</Text>
           <TouchableOpacity
             style={styles.createButton}
-            onPress={() => navigation.navigate('RequestFormScreen')}
+            onPress={() => { void openRequestFormWithLimitCheck(navigation, language); }}
             activeOpacity={0.85}
           >
             <MaterialCommunityIcons name="plus-circle-outline" size={16} color="#FFFFFF" />

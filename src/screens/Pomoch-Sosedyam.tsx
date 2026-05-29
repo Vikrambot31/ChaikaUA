@@ -23,6 +23,7 @@ import { database } from '../firebase-config';
 import { resolveUserAvatarMap } from '../utils/userAvatar';
 import type { DetailItemData } from '../utils/detailViewTypes';
 import UserCardActionBar from '../components/UserCardActionBar';
+import { openRequestFormWithLimitCheck } from '../utils/requestFormLimitGuard';
 
 const HELP_NEIGHBORS_SPLASH_KEY = '@help_neighbors_first_visit_splash_seen';
 
@@ -176,7 +177,7 @@ const HelpNeighborsScreen: React.FC = () => {
 
               <TouchableOpacity
                 style={styles.addRequestButton}
-                onPress={() => navigation.navigate('RequestFormScreen')}
+                onPress={() => { void openRequestFormWithLimitCheck(navigation, language); }}
                 activeOpacity={0.86}
               >
                 <Text style={styles.addRequestButtonText}>+ Додати прохання</Text>

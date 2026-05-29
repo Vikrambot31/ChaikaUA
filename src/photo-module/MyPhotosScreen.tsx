@@ -385,10 +385,11 @@ const MyPhotosScreen: React.FC = () => {
     async (source: 'camera' | 'library') => {
       if (adding) return;
       setAdding(true);
+      let created: UserPhoto | null = null;
       try {
         // Photo is saved locally with status='local' — no Firebase upload yet.
         // Upload happens only when the photo is attached to a form and submitted.
-        await (source === 'camera'
+        created = await (source === 'camera'
           ? photoService.addFromCamera({ userId, type: 'gallery' })
           : photoService.addFromLibrary({ userId, type: 'gallery' }));
       } catch (error) {
@@ -396,8 +397,15 @@ const MyPhotosScreen: React.FC = () => {
       } finally {
         setAdding(false);
       }
+      // In select mode a freshly added photo is attached immediately, so the user
+      // doesn't have to tap it again in the grid (status 'local' is accepted by the form).
+      if (created && selectMode) {
+        selectedForAttachmentRef.current = true;
+        PhotoSelector.select(created);
+        handleBack();
+      }
     },
-    [adding, language, userId],
+    [adding, language, userId, selectMode, handleBack],
   );
 
   const addPhoto = useCallback(async () => {

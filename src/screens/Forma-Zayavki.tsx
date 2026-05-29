@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+﻿import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -25,7 +25,6 @@ import { getRequests } from '../services/api';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { getDonePhotos } from '../utils/submissionRequirements';
 import { normalizePersonName, sanitizeStoredText } from '../utils/textUtils';
-import { showUserError } from '../utils/userFacingErrors';
 import { normalizeUkrainianPhoneStrict, validateName, validatePhone } from '../utils/validators';
 
 type Lang = 'ua' | 'ru' | 'en';
@@ -48,7 +47,7 @@ const HELP_TYPES = [
   { value: 'other', label: { ua: 'Інше', ru: 'Другое', en: 'Other' } },
 ] as const;
 
-const MAX_DESCRIPTION_LENGTH = 500;
+const MAX_DESCRIPTION_LENGTH = 280;
 const REQUEST_FORM_DRAFT_KEY = '@chaika:request-form-draft:v1';
 
 const TEXT_BY_LANG = {
@@ -99,12 +98,22 @@ const TEXT_BY_LANG = {
     descriptionExample: 'Приклад: Потрібна допомога купити ліки сьогодні після 18:00, будинок 12.',
     descriptionEmpty: 'Опишіть, яка допомога потрібна.',
     descriptionShort: 'Додайте ще трохи деталей. Мінімум 10 символів.',
-    descriptionCount: '{count}/500, мін. 10 символів',
+    descriptionCount: '{count}/{max}, мін. 10 символів',
     descriptionLeft: 'Ще {left} символів до мінімуму.',
     photoHint: "Фото необов'язкове, але допоможе швидше зрозуміти ситуацію.",
     photoReady: 'Фото готове.',
     photoUploadWait: 'Фото ще завантажується.',
     photoUploadError: 'Фото з помилкою. Видаліть його або спробуйте ще раз.',
+    dailyHelpLimit: 'Сьогодні ви вже надіслали 5 прохань про допомогу. Нове прохання можна буде надіслати завтра.',
+    dailyRequestLimit: 'Сьогодні ви вже надіслали багато заявок. Спробуйте завтра.',
+    languageMismatch: 'Напишіть опис мовою застосунку. Для російської - російською, для української - українською, для англійської - англійською.',
+    loginExpired: 'Сесія входу закінчилась. Увійдіть в акаунт ще раз і повторіть відправку.',
+    permissionDenied: 'Немає дозволу записати заявку. Перезайдіть в акаунт або зверніться до підтримки.',
+    networkError: 'Немає стабільного інтернету. Перевірте з’єднання і натисніть відправити ще раз.',
+    serverUnavailable: 'Сервер тимчасово недоступний. Форма заповнена правильно, спробуйте трохи пізніше.',
+    missingRequestId: 'Firebase прийняв запит, але не повернув номер заявки. Спробуйте відправити ще раз.',
+    serverRejected: 'Форма заповнена, але сервер її не прийняв. Спробуйте змінити опис або надіслати пізніше.',
+    unknownServerReason: 'Форма заповнена, але сервер повернув незнайому причину: {reason}',
   },
   ru: {
     back: 'Назад',
@@ -153,12 +162,22 @@ const TEXT_BY_LANG = {
     descriptionExample: 'Пример: Нужна помощь купить лекарства сегодня после 18:00, дом 12.',
     descriptionEmpty: 'Опишите, какая помощь нужна.',
     descriptionShort: 'Добавьте ещё немного деталей. Минимум 10 символов.',
-    descriptionCount: '{count}/500, мин. 10 символов',
+    descriptionCount: '{count}/{max}, мин. 10 символов',
     descriptionLeft: 'Ещё {left} символов до минимума.',
     photoHint: 'Фото необязательно, но поможет быстрее понять ситуацию.',
     photoReady: 'Фото готово.',
     photoUploadWait: 'Фото ещё загружается.',
     photoUploadError: 'Фото с ошибкой. Удалите его или попробуйте ещё раз.',
+    dailyHelpLimit: 'Сегодня вы уже отправили 5 просьб о помощи. Новую просьбу можно будет отправить завтра.',
+    dailyRequestLimit: 'Сегодня вы уже отправили много заявок. Попробуйте завтра.',
+    languageMismatch: 'Напишите описание на языке приложения. Для русского - по-русски, для украинского - по-украински, для английского - по-английски.',
+    loginExpired: 'Сессия входа закончилась. Войдите в аккаунт ещё раз и повторите отправку.',
+    permissionDenied: 'Нет разрешения записать заявку. Перезайдите в аккаунт или обратитесь в поддержку.',
+    networkError: 'Нет стабильного интернета. Проверьте соединение и нажмите отправить ещё раз.',
+    serverUnavailable: 'Сервер временно недоступен. Форма заполнена правильно, попробуйте немного позже.',
+    missingRequestId: 'Firebase принял запрос, но не вернул номер заявки. Попробуйте отправить ещё раз.',
+    serverRejected: 'Форма заполнена, но сервер её не принял. Попробуйте изменить описание или отправить позже.',
+    unknownServerReason: 'Форма заполнена, но сервер вернул незнакомую причину: {reason}',
   },
   en: {
     back: 'Back',
@@ -207,12 +226,22 @@ const TEXT_BY_LANG = {
     descriptionExample: 'Example: Need help buying medicine today after 18:00, building 12.',
     descriptionEmpty: 'Describe what help is needed.',
     descriptionShort: 'Add a little more detail. Minimum 10 characters.',
-    descriptionCount: '{count}/500, min. 10 characters',
+    descriptionCount: '{count}/{max}, min. 10 characters',
     descriptionLeft: '{left} more characters to reach the minimum.',
     photoHint: 'Photo is optional, but it helps people understand the situation faster.',
     photoReady: 'Photo is ready.',
     photoUploadWait: 'Photo is still uploading.',
     photoUploadError: 'Photo has an error. Remove it or try again.',
+    dailyHelpLimit: 'You have already sent 5 help requests today. You can send a new one tomorrow.',
+    dailyRequestLimit: 'You have already sent many requests today. Try again tomorrow.',
+    languageMismatch: 'Write the description in the app language: Russian for Russian, Ukrainian for Ukrainian, English for English.',
+    loginExpired: 'Your sign-in session has expired. Sign in again and resend the request.',
+    permissionDenied: 'You do not have permission to save this request. Sign in again or contact support.',
+    networkError: 'The internet connection is unstable. Check the connection and tap send again.',
+    serverUnavailable: 'The server is temporarily unavailable. The form is filled correctly; try again later.',
+    missingRequestId: 'Firebase accepted the request but did not return a request number. Try sending again.',
+    serverRejected: 'The form is complete, but the server did not accept it. Try changing the description or send it later.',
+    unknownServerReason: 'The form is complete, but the server returned an unknown reason: {reason}',
   },
 } as const;
 
@@ -294,6 +323,75 @@ const FieldMessage = ({ state, extra }: { state: FieldState; extra?: string }) =
   </View>
 );
 
+const getSubmitFailureMessage = (rawError: unknown, t: (typeof TEXT_BY_LANG)[Lang]): string => {
+  const rawMessage = rawError instanceof Error ? rawError.message : String(rawError ?? '');
+  const raw = rawMessage.toLowerCase();
+
+  if (raw.includes('daily help_neighbors limit')) {
+    return t.dailyHelpLimit;
+  }
+
+  if (raw.includes('daily request limit')) {
+    return t.dailyRequestLimit;
+  }
+
+  if (
+    raw.includes('auth/network-request-failed') ||
+    raw.includes('network') ||
+    raw.includes('offline') ||
+    raw.includes('fetch') ||
+    raw.includes('internet')
+  ) {
+    return t.networkError;
+  }
+
+  if (raw.includes('unavailable') || raw.includes('timeout') || raw.includes('deadline')) {
+    return t.serverUnavailable;
+  }
+
+  if (
+    raw.includes('unauthenticated') ||
+    raw.includes('authentication required') ||
+    raw.includes('not authenticated') ||
+    raw.includes('login required') ||
+    raw.includes('sign in')
+  ) {
+    return t.loginExpired;
+  }
+
+  if (
+    raw.includes('permission-denied') ||
+    raw.includes('permission_denied') ||
+    raw.includes('missing or insufficient permissions') ||
+    raw.includes('unauthorized') ||
+    raw.includes('forbidden')
+  ) {
+    return t.permissionDenied;
+  }
+
+  if (
+    raw.includes('англ') ||
+    raw.includes('english') ||
+    raw.includes('non-english') ||
+    raw.includes('language')
+  ) {
+    return t.languageMismatch;
+  }
+
+  if (raw.includes('firebase did not return a request id')) {
+    return t.missingRequestId;
+  }
+
+  if (raw.includes('invalid request payload') || raw.includes('invalid')) {
+    return t.serverRejected;
+  }
+
+  const safeReason = rawMessage.trim().slice(0, 160);
+  return safeReason
+    ? fillTemplate(t.unknownServerReason, { reason: safeReason })
+    : t.serverRejected;
+};
+
 const RequestFormScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
   const dispatch = useDispatch<AppDispatch>();
@@ -305,6 +403,7 @@ const RequestFormScreen: React.FC = () => {
   const [description, setDescription] = useState('');
   const [photos, setPhotos] = useState<UploadedPhoto[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [submittedOnce, setSubmittedOnce] = useState(false);
   const [touched, setTouched] = useState<Record<FieldKey, boolean>>({
     name: false,
@@ -339,6 +438,10 @@ const RequestFormScreen: React.FC = () => {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    setSubmitError(null);
+  }, [name, phone, helpType, description, photos]);
 
   const markTouched = (field: FieldKey) => {
     setTouched((current) => (current[field] ? current : { ...current, [field]: true }));
@@ -433,6 +536,9 @@ const RequestFormScreen: React.FC = () => {
   ]);
 
   const bannerState = useMemo(() => {
+    if (submitError) {
+      return { tone: 'error' as FieldTone, message: submitError };
+    }
     if (formReady) {
       return { tone: 'valid' as FieldTone, message: t.bannerReady };
     }
@@ -446,7 +552,7 @@ const RequestFormScreen: React.FC = () => {
       };
     }
     return { tone: 'idle' as FieldTone, message: t.bannerStart };
-  }, [fieldStates.photos.tone, formReady, photosReady, requiredDone, submittedOnce, t]);
+  }, [fieldStates.photos.tone, formReady, photosReady, requiredDone, submitError, submittedOnce, t]);
 
   const saveDraft = async () => {
     await AsyncStorage.setItem(REQUEST_FORM_DRAFT_KEY, JSON.stringify({
@@ -524,7 +630,9 @@ const RequestFormScreen: React.FC = () => {
       });
 
       if (!result.success) {
-        showUserError(language, 'send', result.error || t.sendFailed);
+        const friendlyError = getSubmitFailureMessage(result.error || t.sendFailed, t);
+        setSubmitError(friendlyError);
+        Alert.alert(t.errorTitle, friendlyError);
         return;
       }
 
@@ -554,6 +662,7 @@ const RequestFormScreen: React.FC = () => {
       setHelpType('');
       setDescription('');
       setPhotos([]);
+      setSubmitError(null);
       setSubmittedOnce(false);
       setTouched({
         name: false,
@@ -564,7 +673,9 @@ const RequestFormScreen: React.FC = () => {
       });
       void AsyncStorage.removeItem(REQUEST_FORM_DRAFT_KEY).catch(() => undefined);
     } catch (error) {
-      showUserError(language, 'send', error);
+      const friendlyError = getSubmitFailureMessage(error, t);
+      setSubmitError(friendlyError);
+      Alert.alert(t.errorTitle, friendlyError);
     } finally {
       setSubmitting(false);
     }
@@ -679,7 +790,7 @@ const RequestFormScreen: React.FC = () => {
               editable={!submitting}
             />
             <View style={styles.counterRow}>
-              <Text style={styles.hint}>{fillTemplate(t.descriptionCount, { count: cleanDescription.length })}</Text>
+              <Text style={styles.hint}>{fillTemplate(t.descriptionCount, { count: cleanDescription.length, max: MAX_DESCRIPTION_LENGTH })}</Text>
               <StatusIcon tone={fieldStates.description.tone} />
             </View>
             <FieldMessage state={fieldStates.description} extra={descriptionExtra} />

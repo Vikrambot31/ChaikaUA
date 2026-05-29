@@ -18,6 +18,7 @@ import { isModeratorUser } from '../firebase-auth-session';
 import { useContactRequest } from '../hooks/useContactRequest';
 import ContactReasonModal from '../components/ContactReasonModal';
 import { resolveUserAvatarMap } from '../utils/userAvatar';
+import { openRequestFormWithLimitCheck } from '../utils/requestFormLimitGuard';
 
 type RequestsNavigation = NativeStackNavigationProp<Record<string, object | undefined>>;
 type AppLanguage = 'ua' | 'ru' | 'en';
@@ -288,7 +289,7 @@ const RequestsScreen: React.FC = () => {
 
         <TouchableOpacity
           style={styles.createButton}
-          onPress={() => navigation.navigate('RequestFormScreen')}
+          onPress={() => { void openRequestFormWithLimitCheck(navigation, language); }}
           activeOpacity={0.85}
         >
           <MaterialCommunityIcons name="plus" size={24} color="#FFFFFF" />
@@ -546,4 +547,3 @@ const styles = StyleSheet.create({
 });
 
 export default RequestsScreen;
-

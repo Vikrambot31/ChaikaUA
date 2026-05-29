@@ -36,6 +36,7 @@ import { pickUserAvatarUri, resolveUserAvatarMap } from '../utils/userAvatar';
 import { useContactRequest } from '../hooks/useContactRequest';
 import ContactReasonModal from '../components/ContactReasonModal';
 import { safeCallPhone } from '../utils/communicationActions';
+import { openRequestFormWithLimitCheck } from '../utils/requestFormLimitGuard';
 
 type ChatRequest = ChatRequestLike;
 
@@ -909,8 +910,8 @@ const OnlineChatScreen = () => {
             return;
           }
           addRequestNavLock.current = true;
-          navigation.navigate('RequestFormScreen');
-          setTimeout(() => { addRequestNavLock.current = false; }, 800);
+          void openRequestFormWithLimitCheck(navigation, language)
+            .finally(() => { setTimeout(() => { addRequestNavLock.current = false; }, 800); });
         }}
         variant="primary"
         style={{ marginHorizontal: 16, marginTop: 10, marginBottom: 14 }}
