@@ -158,12 +158,18 @@ interface DbPhotoValue {
 /** Shape of a raw database user node. */
 interface DbUserValue {
   name?: unknown;
+  email?: unknown;
   phone?: unknown;
   photoURL?: unknown;
   building?: unknown;
   houseNumber?: unknown;
   registeredAt?: unknown;
   daysUsed?: unknown;
+  registrationStatus?: unknown;
+  provider?: unknown;
+  providerId?: unknown;
+  gender?: unknown;
+  age?: unknown;
   profession?: unknown;
   sphere?: unknown;
   activityType?: unknown;
@@ -233,12 +239,18 @@ interface FilterOptions {
 interface CommunityUser {
   id: string;
   name: string;
+  email?: string;
   phone: string;
   photoURL?: string;
   building: string;
   houseNumber: string;
   registeredAt: string;
   daysUsed: number;
+  registrationStatus?: string;
+  provider?: string;
+  providerId?: string;
+  gender?: string;
+  age?: number;
   profession?: string;
 }
 
@@ -1351,6 +1363,7 @@ export const communityUsersAPI = {
             id,
             name:
               typeof v?.name === 'string' ? v.name : 'Житель Чайки',
+            email: typeof v?.email === 'string' ? v.email : undefined,
             phone: typeof v?.phone === 'string' ? maskPhone(v.phone) : '',
             photoURL:
               typeof v?.photoURL === 'string' ? v.photoURL : undefined,
@@ -1364,6 +1377,16 @@ export const communityUsersAPI = {
                 : new Date().toISOString(),
             daysUsed:
               typeof v?.daysUsed === 'number' ? v.daysUsed : 0,
+            registrationStatus:
+              typeof v?.registrationStatus === 'string' ? v.registrationStatus : undefined,
+            provider:
+              typeof v?.provider === 'string' ? v.provider : undefined,
+            providerId:
+              typeof v?.providerId === 'string' ? v.providerId : undefined,
+            gender:
+              typeof v?.gender === 'string' ? v.gender : undefined,
+            age:
+              typeof v?.age === 'number' ? v.age : undefined,
             profession:
               typeof v?.profession === 'string'
                 ? v.profession

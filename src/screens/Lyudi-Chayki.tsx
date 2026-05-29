@@ -26,6 +26,7 @@ import { useContactRequest } from '../hooks/useContactRequest';
 import ContactReasonModal from '../components/ContactReasonModal';
 import type { DetailItemData } from '../utils/detailViewTypes';
 import UserCardActionBar from '../components/UserCardActionBar';
+import { START_AVATAR_URI_PREFIX } from '../utils/startAvatars';
 
 const CACHE_KEY = '@chaika:community_users_cache_v1';
 const PRIMARY = '#7A1E5C';
@@ -127,6 +128,7 @@ type UiText = (typeof UI_TEXT)[Lang];
 type CommunityUser = {
   id: string;
   name: string;
+  email?: string;
   phone?: string;
   photoURL?: string;
   city?: string;
@@ -135,6 +137,11 @@ type CommunityUser = {
   registeredAt?: string;
   daysUsed?: number;
   profession?: string;
+  registrationStatus?: string;
+  provider?: string;
+  providerId?: string;
+  gender?: string;
+  age?: number;
 };
 
 type Person = CommunityUser & {
@@ -162,9 +169,40 @@ const mapCurrentUser = (user: User | null, text: UiText): CommunityUser | null =
     city: user.city,
     registeredAt: user.registeredAt ? new Date(user.registeredAt).toISOString() : undefined,
     daysUsed: user.daysUsed,
-    profession: undefined,
+    profession: user.profession,
+    gender: user.gender,
+    age: user.age,
+    registrationStatus: user.registrationStatus,
+    provider: user.provider,
+    providerId: user.providerId,
   };
 };
+
+const hasText = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;
+
+const firstText = (...values: unknown[]): string | undefined => {
+  const found = values.find(hasText);
+  return typeof found === 'string' ? found.trim() : undefined;
+};
+
+const mergeCommunityUser = (existing: CommunityUser, next: CommunityUser): CommunityUser => ({
+  ...existing,
+  name: firstText(existing.name, next.name) || existing.name || next.name,
+  email: firstText(existing.email, next.email),
+  phone: firstText(existing.phone, next.phone),
+  photoURL: firstText(existing.photoURL, next.photoURL),
+  city: firstText(existing.city, next.city),
+  building: firstText(existing.building, next.building),
+  houseNumber: firstText(existing.houseNumber, next.houseNumber),
+  registeredAt: firstText(existing.registeredAt, next.registeredAt),
+  daysUsed: typeof existing.daysUsed === 'number' ? existing.daysUsed : next.daysUsed,
+  profession: firstText(existing.profession, next.profession),
+  registrationStatus: firstText(existing.registrationStatus, next.registrationStatus),
+  provider: firstText(existing.provider, next.provider),
+  providerId: firstText(existing.providerId, next.providerId),
+  gender: firstText(existing.gender, next.gender),
+  age: typeof existing.age === 'number' ? existing.age : next.age,
+});
 
 export default function TopGirlsBoysScreen() {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
@@ -213,21 +251,73 @@ export default function TopGirlsBoysScreen() {
     return stats;
   }, [appRequests, approvedRequests, helpRequests]);
 
+  const seenUsersFromActivity = useMemo(() => {
+    const byId = new Map<string, CommunityUser>();
+    const remember = (item: {
+      userId?: string;
+      name?: string;
+      phone?: string;
+      userPhotoURL?: string;
+      startAvatarKey?: string;
+      building?: string;
+      createdAt?: number | Date;
+      timestamp?: number;
+    }) => {
+      const id = typeof item.userId === 'string' ? item.userId.trim() : '';
+      if (!id) return;
+
+      const photoURL = firstText(
+        item.userPhotoURL,
+        item.startAvatarKey ? `${START_AVATAR_URI_PREFIX}${item.startAvatarKey}` : undefined,
+      );
+      const createdAtMs = item.createdAt instanceof Date
+        ? item.createdAt.getTime()
+        : typeof item.createdAt === 'number'
+          ? item.createdAt
+          : typeof item.timestamp === 'number'
+            ? item.timestamp
+            : undefined;
+      const next: CommunityUser = {
+        id,
+        name: firstText(item.name) || text.residentFallback,
+        phone: firstText(item.phone) || '',
+        photoURL,
+        building: firstText(item.building),
+        registeredAt: createdAtMs ? new Date(createdAtMs).toISOString() : undefined,
+        registrationStatus: 'seen',
+      };
+      const existing = byId.get(id);
+      byId.set(id, existing ? mergeCommunityUser(existing, next) : next);
+    };
+
+    appRequests.forEach(remember);
+    approvedRequests.forEach(remember);
+    helpRequests.forEach(remember);
+    return Array.from(byId.values());
+  }, [appRequests, approvedRequests, helpRequests, text.residentFallback]);
+
   const mergeWithCurrentUser = useCallback(
     (remoteUsers: CommunityUser[]) => {
       const current = mapCurrentUser(user, text);
-      const seen = new Set<string>();
-      const sanitized = remoteUsers.filter((item) => {
+      const byId = new Map<string, CommunityUser>();
+      const addUser = (item: CommunityUser) => {
         const id = typeof item.id === 'string' ? item.id.trim() : '';
-        if (!id || seen.has(id)) return false;
-        seen.add(id);
-        return true;
-      });
-      if (!current?.id) return sanitized;
-      const withoutDuplicate = sanitized.filter((item) => item.id !== current.id);
-      return [current, ...withoutDuplicate];
+        if (!id) return;
+        const normalized = { ...item, id };
+        const existing = byId.get(id);
+        byId.set(id, existing ? mergeCommunityUser(existing, normalized) : normalized);
+      };
+
+      remoteUsers.forEach(addUser);
+      seenUsersFromActivity.forEach(addUser);
+      if (current?.id) {
+        addUser(current);
+        const currentMerged = byId.get(current.id) || current;
+        return [currentMerged, ...Array.from(byId.values()).filter((item) => item.id !== current.id)];
+      }
+      return Array.from(byId.values());
     },
-    [text, user]
+    [seenUsersFromActivity, text, user]
   );
 
   const loadPeople = useCallback(async () => {
@@ -597,4 +687,3 @@ const styles = StyleSheet.create({
   levelName: { color: PRIMARY, fontSize: 10, fontWeight: '900', textAlign: 'center', lineHeight: 12 },
   contactBtn: { width: 32, height: 28, borderRadius: 10, backgroundColor: PRIMARY, alignItems: 'center', justifyContent: 'center' },
 });
-

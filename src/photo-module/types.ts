@@ -1,4 +1,5 @@
-export type PhotoUploadStatus = 'queued' | 'uploading' | 'uploaded' | 'error';
+/** 'local' = compressed and saved on device, not yet enqueued for Firebase upload */
+export type PhotoUploadStatus = 'local' | 'queued' | 'uploading' | 'uploaded' | 'error';
 
 export type PhotoModerationStatus = 'not_submitted' | 'pending' | 'approved' | 'rejected';
 

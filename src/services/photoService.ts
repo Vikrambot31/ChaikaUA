@@ -152,7 +152,7 @@ async function createLocalRecord(prepared: PreparedPhoto): Promise<UserPhoto> {
     size: prepared.size,
     moderationStatus: prepared.moderationStatus ?? 'pending',
     deleted: false,
-    status: 'queued',
+    status: 'local',
     createdAt: now,
     updatedAt: now,
     retryCount: 0,

@@ -87,6 +87,7 @@ async function uploadViaFileSystem(
 ): Promise<UploadedPhotoResult> {
   const storage = getStorageInstance();
   const user = await ensureFirebaseAuth();
+  if (!user) throw new Error('Sign in required to upload photos.');
   const timeoutMs = options.timeoutMs ?? PHOTO_UPLOAD_TIMEOUT_MS;
   const maxAttempts = options.maxAttempts ?? PHOTO_UPLOAD_MAX_ATTEMPTS;
   const backoffMs = options.backoffMs ?? PHOTO_UPLOAD_BACKOFF_MS;
@@ -324,6 +325,7 @@ async function uploadViaBlobFetch(
 ): Promise<UploadedPhotoResult> {
   const storage = getStorageInstance();
   const user = await ensureFirebaseAuth();
+  if (!user) throw new Error('Sign in required to upload photos.');
   const timeoutMs = options.timeoutMs ?? PHOTO_UPLOAD_TIMEOUT_MS;
   const maxAttempts = options.maxAttempts ?? PHOTO_UPLOAD_MAX_ATTEMPTS;
   const backoffMs = options.backoffMs ?? PHOTO_UPLOAD_BACKOFF_MS;

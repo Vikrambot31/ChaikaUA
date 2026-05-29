@@ -159,11 +159,15 @@ export async function uploadPhotoWithEngine(
 
   // ── Step 2: upload to Firebase Storage ─────────────────────────────────────
   const user = await ensureFirebaseAuth();
+  if (!user) throw new Error('Sign in required to upload photos.');
+
   let storagePath = '';
   let downloadUrl: string | undefined;
   let lastError: unknown = null;
 
   for (let attempt = 1; attempt <= MAX_UPLOAD_ATTEMPTS; attempt += 1) {
+    // Give visual feedback that upload is in progress (not frozen at 10%)
+    onProgress?.(10 + attempt * 20); // 30% → 50% → 70% across attempts
     void recordRuntimeTrace({
       screen: sourceLabel,
       action: 'engine_upload',
@@ -236,6 +240,22 @@ export async function uploadPhotoWithEngine(
   }
 
   onProgress?.(85);
+
+  // ── Request photos: skip thumbnail + RTDB write — the form submission already
+  // saves storagePath in the requests/{key} node; no separate RTDB record needed.
+  if (collection === 'requests') {
+    onProgress?.(100);
+    void recordRuntimeTrace({
+      screen: sourceLabel,
+      action: 'engine_complete',
+      status: 'success',
+      feature: 'gallery',
+      stage: 'complete_fast',
+      firebasePath: storagePath,
+      details: { storagePath, collection, skippedRtdb: true, skippedThumbnail: true },
+    });
+    return { storagePath, rtdbId: '', downloadUrl };
+  }
 
   // ── Step 2.5: generate and upload 360px thumbnail ───────────────────────────
   let thumbnailUrl: string | undefined;

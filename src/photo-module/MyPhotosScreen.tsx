@@ -201,6 +201,7 @@ const UI_TEXT = {
 } as const;
 
 const statusColor: Record<UserPhoto['status'], string> = {
+  local: SCREEN_THEME.woodGreenDark,
   queued: '#A66A00',
   uploading: SCREEN_THEME.enamelBlueDark,
   uploaded: SCREEN_THEME.woodGreenDark,
@@ -262,7 +263,6 @@ const MyPhotosScreen: React.FC = () => {
     (state: RootState) => state.language?.current ?? 'ua',
   ) as AppLanguage;
   const uid = useSelector((state: RootState) => state.auth.user?.id ?? '');
-  const userName = useSelector((state: RootState) => state.auth.user?.name ?? '');
   const userEmail = useSelector((state: RootState) => state.auth.user?.email ?? '');
   const text = UI_TEXT[language] ?? UI_TEXT.ru;
   const selectText = SELECT_MODE_TEXT[language] ?? SELECT_MODE_TEXT.ru;
@@ -302,7 +302,9 @@ const MyPhotosScreen: React.FC = () => {
   const limitReached = totalPhotoCount >= MAX_USER_PHOTOS;
   const addButtonDisabled = limitReached || adding;
   const selectedCount = selectedForReview.length;
-  const hasUploadingLocalPhotos = displayedLocalPhotos.some((photo) => photo.status === 'queued' || photo.status === 'uploading');
+  const hasUploadingLocalPhotos = displayedLocalPhotos.some(
+    (photo) => photo.status === 'queued' || photo.status === 'uploading',
+  );
 
   const handleBack = useCallback(() => {
     if (typeof navigation.canGoBack === 'function' && navigation.canGoBack()) {
@@ -370,6 +372,7 @@ const MyPhotosScreen: React.FC = () => {
 
   const statusLabels = useMemo<Record<UserPhoto['status'], string>>(
     () => ({
+      local: text.uploaded,   // "Готово" — on device, ready to attach
       queued: text.queued,
       uploading: text.uploading,
       uploaded: text.uploaded,
@@ -378,37 +381,23 @@ const MyPhotosScreen: React.FC = () => {
     [text],
   );
 
-  const enqueueAndSelect = useCallback(
-    async (photo: UserPhoto | null) => {
-      if (!photo) return;
-      await UploadQueue.enqueue(
-        photo.id,
-        photo.localUri,
-        { uploadedBy: userEmail || userName || userId },
-        { collection: 'user_photos', uid },
-      );
-      void UploadQueue.process();
-    },
-    [uid, userEmail, userId, userName],
-  );
-
   const runAdd = useCallback(
     async (source: 'camera' | 'library') => {
       if (adding) return;
       setAdding(true);
       try {
-        const photo =
-          source === 'camera'
-            ? await photoService.addFromCamera({ userId, type: 'gallery' })
-            : await photoService.addFromLibrary({ userId, type: 'gallery' });
-        await enqueueAndSelect(photo);
+        // Photo is saved locally with status='local' — no Firebase upload yet.
+        // Upload happens only when the photo is attached to a form and submitted.
+        await (source === 'camera'
+          ? photoService.addFromCamera({ userId, type: 'gallery' })
+          : photoService.addFromLibrary({ userId, type: 'gallery' }));
       } catch (error) {
         showUserError(language, 'upload', error);
       } finally {
         setAdding(false);
       }
     },
-    [adding, enqueueAndSelect, language, userId],
+    [adding, language, userId],
   );
 
   const addPhoto = useCallback(async () => {
@@ -501,7 +490,9 @@ const MyPhotosScreen: React.FC = () => {
   const selectPhoto = useCallback(
     (photo: UserPhoto) => {
       if (!selectMode) return;
-      if (photo.status !== 'uploaded') {
+      // Allow 'local' photos — PhotoUploadField will enqueue them for upload on selection.
+      // Block only photos that are actively uploading or errored.
+      if (photo.status === 'uploading' || photo.status === 'queued' || photo.status === 'error') {
         Alert.alert(selectText.waitTitle, selectText.waitBody);
         return;
       }
@@ -514,7 +505,7 @@ const MyPhotosScreen: React.FC = () => {
 
   const renderLocalPhoto = ({ item }: { item: UserPhoto }) => {
     const displayUri = getPhotoThumbnailUri(item) || getBestPhotoUri(item) || item.localUri || '';
-    const busy = item.status === 'uploading' || deletingId === item.id;
+    const busy = (item.status === 'uploading' || item.status === 'queued') && deletingId !== item.id;
     const uploadProgress = Math.max(0, Math.min(100, item.progress ?? (item.status === 'uploaded' ? 100 : 0)));
 
     return (
@@ -562,7 +553,7 @@ const MyPhotosScreen: React.FC = () => {
         {selectMode ? (
           <View style={styles.selectOverlay}>
             <MaterialCommunityIcons
-              name={item.status === 'uploaded' ? 'check-circle-outline' : 'progress-upload'}
+              name={item.status === 'uploaded' || item.status === 'local' ? 'check-circle-outline' : 'progress-upload'}
               size={24}
               color="#fff"
             />
@@ -735,10 +726,13 @@ const MyPhotosScreen: React.FC = () => {
           </View>
         ) : null}
 
-        {/* Section: Local in-flight uploads */}
+        {/* Section: Local in-flight uploads (queued/uploading/error/local) */}
         {displayedLocalPhotos.length > 0 ? (
           <View style={styles.section}>
-            <SectionHeader label={text.sectionUploading} count={displayedLocalPhotos.length} />
+            <SectionHeader
+              label={displayedLocalPhotos.every((p) => p.status === 'local') ? text.sectionSaved : text.sectionUploading}
+              count={displayedLocalPhotos.length}
+            />
             <FlatList
               data={displayedLocalPhotos}
               keyExtractor={(item: UserPhoto) => item.id}

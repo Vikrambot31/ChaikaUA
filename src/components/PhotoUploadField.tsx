@@ -36,9 +36,9 @@ type Props = {
 type Lang = 'ua' | 'ru' | 'en';
 
 const STATUS_LABELS_BY_LANG: Record<Lang, Record<UserPhoto['status'], string>> = {
-  ua: { queued: 'у черзі', uploading: 'завантаження', uploaded: 'готово', error: 'помилка' },
-  ru: { queued: 'в очереди', uploading: 'загружается', uploaded: 'готово', error: 'ошибка' },
-  en: { queued: 'queued', uploading: 'uploading', uploaded: 'done', error: 'error' },
+  ua: { local: 'завантаження', queued: 'у черзі', uploading: 'завантаження', uploaded: 'готово', error: 'помилка' },
+  ru: { local: 'загружается', queued: 'в очереди', uploading: 'загружается', uploaded: 'готово', error: 'ошибка' },
+  en: { local: 'uploading', queued: 'queued', uploading: 'uploading', uploaded: 'done', error: 'error' },
 };
 
 const BUTTON_LABELS_BY_LANG: Record<Lang, { limit: string; more: string; select: string }> = {
@@ -68,7 +68,7 @@ const PHOTO_UNAVAILABLE_BY_LANG: Record<Lang, string> = {
 const mapStatus = (status: UserPhoto['status']): UploadedPhoto['status'] => {
   if (status === 'uploaded') return 'done';
   if (status === 'error') return 'error';
-  return 'uploading';
+  return 'uploading'; // 'local', 'queued', 'uploading' all show as uploading in the form
 };
 
 const mapPhoto = (photo: UserPhoto): UploadedPhoto => ({
@@ -209,7 +209,7 @@ export default function PhotoUploadField({
         <View style={styles.grid}>
           {selected.map((photo) => {
             const uri = getPhotoThumbnailUri(photo) || getBestPhotoUri(photo) || photo.localUri;
-            const isUploading = photo.status === 'uploading' || photo.status === 'queued';
+            const isUploading = photo.status === 'local' || photo.status === 'uploading' || photo.status === 'queued';
             return (
               <TouchableOpacity
                 key={photo.id}

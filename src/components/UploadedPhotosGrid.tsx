@@ -44,6 +44,7 @@ const UI_TEXT = {
 } as const;
 
 const STATUS_COLOR: Record<UserPhoto['status'], string> = {
+  local: SCREEN_THEME.woodGreenDark,
   queued: '#A66A00',
   uploading: SCREEN_THEME.enamelBlueDark,
   uploaded: SCREEN_THEME.woodGreenDark,
@@ -66,6 +67,7 @@ export default function UploadedPhotosGrid({ title, maxItems = 12 }: Props) {
 
   const visiblePhotos = useMemo(() => photos.slice(0, maxItems), [maxItems, photos]);
   const statusLabels = useMemo<Record<UserPhoto['status'], string>>(() => ({
+    local: text.uploaded,   // local photo — ready
     queued: text.queued,
     uploading: text.uploading,
     uploaded: text.uploaded,
