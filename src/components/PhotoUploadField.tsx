@@ -28,6 +28,7 @@ type Props = {
   maxPhotos?: number;
   storagePath?: string;
   onPhotosChange?: (photos: UploadedPhoto[]) => void;
+  onBeforePickerOpen?: () => void | Promise<void>;
   onPickerOpenChange?: (isOpen: boolean) => void;
   onDebugEvent?: (event: { source: string; action: string; details?: Record<string, unknown> }) => void;
 };
@@ -86,6 +87,7 @@ export default function PhotoUploadField({
   maxPhotos = 5,
   storagePath = 'gallery',
   onPhotosChange,
+  onBeforePickerOpen,
   onPickerOpenChange,
   onDebugEvent,
 }: Props) {
@@ -173,8 +175,9 @@ export default function PhotoUploadField({
     }).catch((error) => safeLogError('PhotoUploadField.UploadQueue.enqueue', error, { photoId: photo.id }));
   }, [language, maxPhotos, storagePath, uid, userName]);
 
-  const openSelector = useCallback(() => {
+  const openSelector = useCallback(async () => {
     if (limitReached) return;
+    await onBeforePickerOpen?.();
     onPickerOpenChange?.(true);
     onDebugEvent?.({ source: 'PhotoUploadField', action: 'open.my-photos', details: { storagePath } });
     PhotoSelector.open(navigation, (photo) => {
@@ -182,7 +185,7 @@ export default function PhotoUploadField({
       // 600мс задержка — Android не успевает закрыть модалку через onRequestClose после goBack
       setTimeout(() => onPickerOpenChange?.(false), 600);
     });
-  }, [addSelectedPhoto, limitReached, navigation, onDebugEvent, onPickerOpenChange, storagePath]);
+  }, [addSelectedPhoto, limitReached, navigation, onBeforePickerOpen, onDebugEvent, onPickerOpenChange, storagePath]);
 
   const removePhoto = useCallback((photoId: string) => {
     setSelected((current) => current.filter((photo) => photo.id !== photoId));
@@ -249,7 +252,7 @@ export default function PhotoUploadField({
 
       <TouchableOpacity
         style={[styles.selectButton, limitReached && styles.selectButtonDisabled]}
-        onPress={openSelector}
+        onPress={() => { void openSelector(); }}
         activeOpacity={0.86}
         disabled={limitReached}
       >

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -23,9 +24,9 @@ import { addHelpRequest, syncFromRequests } from '../redux/slices/helpRequestsSl
 import { getRequests } from '../services/api';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { getDonePhotos } from '../utils/submissionRequirements';
-import { normalizePersonName, normalizePhoneText, sanitizeStoredText } from '../utils/textUtils';
+import { normalizePersonName, sanitizeStoredText } from '../utils/textUtils';
 import { showUserError } from '../utils/userFacingErrors';
-import { validateName, validatePhone } from '../utils/validators';
+import { normalizeUkrainianPhoneStrict, validateName, validatePhone } from '../utils/validators';
 
 const HELP_TYPES = [
   { value: 'medicine', label: 'Медицина' },
@@ -38,8 +39,51 @@ const HELP_TYPES = [
 ] as const;
 
 const MAX_DESCRIPTION_LENGTH = 500;
+const REQUEST_FORM_DRAFT_KEY = '@chaika:request-form-draft:v1';
 
 type Lang = 'ua' | 'ru' | 'en';
+
+const formatPhoneParts = (prefix: string, parts: string[]): string => {
+  const filledParts = parts.filter(Boolean);
+  return filledParts.length > 0 ? `${prefix} ${filledParts.join(' ')}` : prefix;
+};
+
+const formatPhoneInput = (value: string): string => {
+  const startsWithPlus = value.trimStart().startsWith('+');
+  const digits = value.replace(/\D/g, '');
+
+  if (!digits) {
+    return startsWithPlus ? '+' : '';
+  }
+
+  if (digits.startsWith('380')) {
+    const capped = digits.slice(0, 12);
+    return formatPhoneParts(`+${capped.slice(0, 3)}`, [
+      capped.slice(3, 5),
+      capped.slice(5, 8),
+      capped.slice(8, 10),
+      capped.slice(10, 12),
+    ]);
+  }
+
+  if (startsWithPlus && digits.startsWith('38')) {
+    const capped = digits.slice(0, 12);
+    return formatPhoneParts(`+${capped.slice(0, Math.min(3, capped.length))}`, [
+      capped.slice(3, 5),
+      capped.slice(5, 8),
+      capped.slice(8, 10),
+      capped.slice(10, 12),
+    ]);
+  }
+
+  const capped = digits.slice(0, 10);
+  return [
+    capped.slice(0, 3),
+    capped.slice(3, 6),
+    capped.slice(6, 8),
+    capped.slice(8, 10),
+  ].filter(Boolean).join(' ');
+};
 
 const TEXT = {
   title: 'Додати прохання',
@@ -63,6 +107,10 @@ const TEXT = {
   shortDescription: 'Опис має бути не менше 10 символів.',
   photoUploading: 'Зачекайте, поки фото завантажиться, або видаліть його.',
   photoError: 'Фото не завантажилось. Видаліть його або спробуйте ще раз.',
+  authRequiredTitle: '\u041d\u0443\u0436\u0435\u043d \u0432\u0445\u043e\u0434',
+  authRequiredBody: '\u0427\u0442\u043e\u0431\u044b \u0434\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0437\u0430\u044f\u0432\u043a\u0443, \u0441\u043d\u0430\u0447\u0430\u043b\u0430 \u0432\u043e\u0439\u0434\u0438\u0442\u0435 \u0438\u043b\u0438 \u043f\u0440\u043e\u0439\u0434\u0438\u0442\u0435 \u0440\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u044e.',
+  authLater: '\u041f\u043e\u0437\u0436\u0435',
+  authGoLogin: '\u041f\u0435\u0440\u0435\u0439\u0442\u0438 \u043d\u0430 \u0432\u0445\u043e\u0434',
 };
 
 const RequestFormScreen: React.FC = () => {
@@ -71,15 +119,64 @@ const RequestFormScreen: React.FC = () => {
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
   const user = useSelector((state: RootState) => state.auth.user);
   const [name, setName] = useState(user?.name ?? '');
-  const [phone, setPhone] = useState(user?.phone || '+380');
+  const [phone, setPhone] = useState(() => formatPhoneInput(user?.phone || '+38'));
   const [helpType, setHelpType] = useState('');
   const [description, setDescription] = useState('');
   const [photos, setPhotos] = useState<UploadedPhoto[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const hasUserId = Boolean(user?.id);
+
+  useEffect(() => {
+    let cancelled = false;
+    void AsyncStorage.getItem(REQUEST_FORM_DRAFT_KEY).then((raw) => {
+      if (!raw || cancelled) return;
+      try {
+        const draft = JSON.parse(raw) as Partial<{
+          name: string;
+          phone: string;
+          helpType: string;
+          description: string;
+        }>;
+        if (typeof draft.name === 'string') setName(draft.name);
+        if (typeof draft.phone === 'string') setPhone(formatPhoneInput(draft.phone));
+        if (typeof draft.helpType === 'string') setHelpType(draft.helpType);
+        if (typeof draft.description === 'string') setDescription(draft.description.slice(0, MAX_DESCRIPTION_LENGTH));
+      } catch {
+        // Ignore invalid draft payload.
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const saveDraft = async () => {
+    await AsyncStorage.setItem(REQUEST_FORM_DRAFT_KEY, JSON.stringify({
+      name,
+      phone,
+      helpType,
+      description,
+    })).catch(() => undefined);
+  };
+
+  const promptAuthRequired = () => {
+    Alert.alert(TEXT.authRequiredTitle, TEXT.authRequiredBody, [
+      { text: TEXT.authLater, style: 'cancel' },
+      {
+        text: TEXT.authGoLogin,
+        onPress: () => navigation.navigate('LoginScreen', { redirectTo: 'RequestFormScreen', redirectMode: 'auth' }),
+      },
+    ]);
+  };
 
   const submit = async () => {
+    if (!hasUserId) {
+      promptAuthRequired();
+      return;
+    }
+
     const normalizedName = normalizePersonName(name);
-    const normalizedPhone = normalizePhoneText(phone);
+    const normalizedPhone = normalizeUkrainianPhoneStrict(phone.trim());
     const cleanDescription = sanitizeStoredText(description.trim());
 
     if (!normalizedName || !normalizedPhone || !helpType || !cleanDescription) {
@@ -108,6 +205,12 @@ const RequestFormScreen: React.FC = () => {
     }
 
     const firstPhoto = getDonePhotos(photos)[0];
+    const photoPayload = firstPhoto
+      ? {
+          photoUri: firstPhoto.downloadUrl,
+          photoStoragePath: firstPhoto.storagePath,
+        }
+      : {};
 
     setSubmitting(true);
     try {
@@ -121,8 +224,7 @@ const RequestFormScreen: React.FC = () => {
         building: 'Чайка',
         text: cleanDescription,
         description: cleanDescription,
-        photoUri: firstPhoto?.downloadUrl ?? '',
-        photoStoragePath: firstPhoto?.storagePath ?? '',
+        ...photoPayload,
       });
 
       if (!result.success) {
@@ -152,10 +254,11 @@ const RequestFormScreen: React.FC = () => {
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
       setName(user?.name ?? '');
-      setPhone(user?.phone || '+380');
+      setPhone(formatPhoneInput(user?.phone || '+38'));
       setHelpType('');
       setDescription('');
       setPhotos([]);
+      void AsyncStorage.removeItem(REQUEST_FORM_DRAFT_KEY).catch(() => undefined);
     } catch (error) {
       showUserError(language, 'send', error);
     } finally {
@@ -198,7 +301,7 @@ const RequestFormScreen: React.FC = () => {
             <Text style={styles.label}>{TEXT.phone}</Text>
             <TextInput
               value={phone}
-              onChangeText={setPhone}
+              onChangeText={(value) => setPhone(formatPhoneInput(value))}
               placeholder={TEXT.phonePlaceholder}
               placeholderTextColor={SCREEN_THEME.textSecondary}
               style={styles.input}
@@ -235,13 +338,21 @@ const RequestFormScreen: React.FC = () => {
             <Text style={styles.hint}>{description.trim().length}/500, мін. 10 символів</Text>
 
             <Text style={styles.label}>{TEXT.photo}</Text>
-            <PhotoUploadField
-              uid={user?.id ?? ''}
-              userName={user?.name || name || user?.id || 'user'}
-              maxPhotos={1}
-              storagePath="requests"
-              onPhotosChange={setPhotos}
-            />
+            {hasUserId ? (
+              <PhotoUploadField
+                uid={user?.id ?? ''}
+                userName={user?.name || name || user?.id || 'user'}
+                maxPhotos={1}
+                storagePath="requests"
+                onPhotosChange={setPhotos}
+                onBeforePickerOpen={saveDraft}
+              />
+            ) : (
+              <TouchableOpacity style={styles.authNotice} onPress={promptAuthRequired} activeOpacity={0.86}>
+                <MaterialCommunityIcons name="lock-outline" size={20} color={SCREEN_THEME.terracotta} />
+                <Text style={styles.authNoticeText}>{TEXT.authRequiredBody}</Text>
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity
               style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
@@ -334,6 +445,25 @@ const styles = StyleSheet.create({
   },
   submitButtonDisabled: { opacity: 0.68 },
   submitText: { color: '#FFFFFF', fontWeight: '900', fontSize: 16 },
+  authNotice: {
+    minHeight: 52,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#D9BF91',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 13,
+    paddingVertical: 11,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  authNoticeText: {
+    flex: 1,
+    color: SCREEN_THEME.textPrimary,
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 18,
+  },
 });
 
 export default RequestFormScreen;
