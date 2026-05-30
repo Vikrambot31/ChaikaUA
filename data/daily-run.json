@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-05-30",
+      "publishedAt": "2026-05-30T06:41:55.678Z",
+      "key": "https://bigkyiv.com.ua/deyakyj-gromadskyj-transport-zminyt-marshruty-u-vyhidni/"
+    },
+    {
       "type": "places",
       "date": "2026-05-29",
       "publishedAt": "2026-05-29T11:17:43.257Z",
