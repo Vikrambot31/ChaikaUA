@@ -19,6 +19,10 @@ export type RuntimeErrorEntry = {
   code: string;
   appVersion: string;
   sessionId: string;
+  /** Total duration of the traced operation in ms (only on terminal statuses). */
+  durationMs?: number;
+  /** true when durationMs exceeded the slow-operation threshold. */
+  slowOp?: boolean;
 };
 
 export type DedupedRuntimeError = {
@@ -91,6 +95,8 @@ const normalizeRuntimeRecord = (id: string, value: unknown): RuntimeErrorEntry |
     code: getString(rawEntry.code),
     appVersion: getString(rawEntry.appVersion) || getString(raw.appVersion) || '-',
     sessionId: getString(rawEntry.sessionId) || getString(raw.sessionId) || '-',
+    durationMs: typeof rawEntry.durationMs === 'number' ? rawEntry.durationMs : undefined,
+    slowOp: rawEntry.slowOp === true ? true : undefined,
   };
 };
 

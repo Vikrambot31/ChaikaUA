@@ -30,6 +30,7 @@ export const ErrorMonitorPage = () => {
   const [mode, setMode] = useState<'runtime' | 'reports'>('runtime');
   const [search, setSearch] = useState('');
   const [versionFilter, setVersionFilter] = useState('');
+  const [severityFilter, setSeverityFilter] = useState('');
 
   // Collect unique appVersions for the version dropdown
   const availableVersions = useMemo(() => {
@@ -46,6 +47,8 @@ export const ErrorMonitorPage = () => {
     const q = search.trim().toLowerCase();
     return dedupedRuntimeErrors.filter((item) => {
       if (versionFilter && item.sample.appVersion !== versionFilter) return false;
+      if (severityFilter === 'slow' && !item.sample.slowOp) return false;
+      if (severityFilter && severityFilter !== 'slow' && item.sample.severity !== severityFilter) return false;
       if (!q) return true;
       return [
         item.sample.shortType,
@@ -60,7 +63,7 @@ export const ErrorMonitorPage = () => {
         item.sample.sessionId,
       ].some((value) => value.toLowerCase().includes(q));
     });
-  }, [dedupedRuntimeErrors, search, versionFilter]);
+  }, [dedupedRuntimeErrors, search, versionFilter, severityFilter]);
 
   const filteredReports = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -164,6 +167,18 @@ export const ErrorMonitorPage = () => {
             </select>
           </label>
         )}
+        {mode === 'runtime' && (
+          <label className="field">
+            <span>Тип</span>
+            <select value={severityFilter} onChange={(event) => setSeverityFilter(event.target.value)}>
+              <option value="">Все</option>
+              <option value="critical">critical — краши</option>
+              <option value="warning">warning — предупреждения</option>
+              <option value="slow">slow — медленные операции</option>
+              <option value="info">info</option>
+            </select>
+          </label>
+        )}
         <label className="field">
           <span>Поиск</span>
           <input
@@ -199,6 +214,11 @@ export const ErrorMonitorPage = () => {
                   <tr key={item.fingerprint}>
                     <td>
                       <span className={severityClass(item.sample.severity)}>{item.sample.severity}</span>
+                      {item.sample.slowOp ? (
+                        <span className="pill" style={{ backgroundColor: '#F59E0B', color: '#fff', marginLeft: '4px' }}>
+                          slow {item.sample.durationMs ? `${Math.round(item.sample.durationMs / 1000)}s` : ''}
+                        </span>
+                      ) : null}
                       <strong>{item.sample.shortType}</strong>
                       <small>{item.sample.humanMessage || item.sample.rawMessage || '-'}</small>
                     </td>

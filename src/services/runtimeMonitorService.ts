@@ -28,6 +28,10 @@ export interface RuntimeMonitorEntry {
   screen: string;
   action?: string;
   status?: RuntimeMonitorStatus;
+  /** Duration of the traced operation in milliseconds (only on terminal statuses). */
+  durationMs?: number;
+  /** true when durationMs exceeded the slow-operation threshold for the feature. */
+  slowOp?: boolean;
   shortType: string;
   humanMessage: string;
   severity: RuntimeMonitorSeverity;
@@ -68,12 +72,24 @@ type TraceInput = {
   message?: string;
   details?: Record<string, unknown>;
   error?: unknown;
+  /**
+   * Pass Date.now() from when the operation started.
+   * On terminal statuses (success / fail / timeout) the service computes
+   * durationMs and flags the entry as slowOp if the threshold is exceeded.
+   */
+  startedAt?: number;
 };
 
 const STORAGE_KEY = '@chaika:runtime_monitor_logs';
 const MAX_ENTRIES = 50;
 const MAX_STACK_LENGTH = 2000;
 const MAX_FORMATTED_LOG_LENGTH = 20000;
+
+// Slow-operation thresholds per feature (ms). Exceeded on terminal statuses.
+const SLOW_OP_THRESHOLDS: Record<string, number> = {
+  gallery: 30_000, // photo uploads: warn after 30 s
+};
+const SLOW_OP_DEFAULT_MS = 15_000; // all other operations: warn after 15 s
 
 let cachedAppVersion: string | null = null;
 
@@ -559,6 +575,8 @@ const createEntryFromLogger = ({
   };
 };
 
+const TERMINAL_STATUSES: RuntimeMonitorStatus[] = ['success', 'fail', 'timeout', 'cancel'];
+
 const createEntryFromTrace = ({
   screen,
   action,
@@ -570,9 +588,30 @@ const createEntryFromTrace = ({
   message,
   details = {},
   error,
+  startedAt,
 }: TraceInput): RuntimeMonitorEntry => {
   const rawMessage = error ? normalizeErrorMessage(error) : sanitizeString(message || `${action}:${status}`);
-  const severity: RuntimeMonitorSeverity = status === 'fail' || status === 'timeout' ? 'critical' : 'info';
+
+  // Compute duration on terminal statuses when caller passed startedAt.
+  const isTerminal = TERMINAL_STATUSES.includes(status);
+  const durationMs =
+    isTerminal && typeof startedAt === 'number' && startedAt > 0
+      ? Date.now() - startedAt
+      : undefined;
+
+  const slowOpThreshold =
+    feature && Object.prototype.hasOwnProperty.call(SLOW_OP_THRESHOLDS, feature)
+      ? SLOW_OP_THRESHOLDS[feature]
+      : SLOW_OP_DEFAULT_MS;
+  const slowOp = durationMs !== undefined && durationMs > slowOpThreshold ? true : undefined;
+
+  const severity: RuntimeMonitorSeverity =
+    status === 'fail' || status === 'timeout'
+      ? 'critical'
+      : slowOp
+        ? 'warning'
+        : 'info';
+
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     at: Date.now(),
@@ -580,10 +619,16 @@ const createEntryFromTrace = ({
     screen: sanitizeString(screen || 'unknown'),
     action: sanitizeString(action || 'unknown_action'),
     status,
-    shortType: `${sanitizeString(action || 'Action')} · ${status}`,
-    humanMessage: message
-      ? sanitizeString(message)
-      : `Runtime trace: ${sanitizeString(action || 'action')} завершился со статусом ${status}.`,
+    durationMs,
+    slowOp,
+    shortType: slowOp
+      ? `${sanitizeString(action || 'Action')} · slow (${Math.round(durationMs! / 1000)}s)`
+      : `${sanitizeString(action || 'Action')} · ${status}`,
+    humanMessage: slowOp
+      ? `Медленная операция: ${sanitizeString(action || 'action')} завершилась за ${Math.round(durationMs! / 1000)}с (порог ${Math.round(slowOpThreshold / 1000)}с).`
+      : message
+        ? sanitizeString(message)
+        : `Runtime trace: ${sanitizeString(action || 'action')} завершился со статусом ${status}.`,
     severity,
     rawMessage,
     firebasePath: firebasePath ? sanitizeString(firebasePath) : extractFirebasePath(screen, details),
@@ -685,6 +730,10 @@ export const initRuntimeMonitor = async (): Promise<void> => {
               ? sanitizeString((item as { action?: string }).action)
               : undefined,
             status: ((item as { status?: RuntimeMonitorStatus }).status ?? undefined),
+            durationMs: typeof (item as { durationMs?: unknown }).durationMs === 'number'
+              ? (item as { durationMs: number }).durationMs
+              : undefined,
+            slowOp: (item as { slowOp?: unknown }).slowOp === true ? true : undefined,
             shortType: sanitizeString((item as { shortType?: unknown }).shortType ?? 'Runtime ошибка'),
             humanMessage: sanitizeString((item as { humanMessage?: unknown }).humanMessage ?? 'Произошла ошибка.'),
             severity: ((item as { severity?: RuntimeMonitorSeverity }).severity ?? 'warning'),

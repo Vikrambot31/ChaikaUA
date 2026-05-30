@@ -45,6 +45,8 @@ import {
   RemoteConfigSnapshot,
 } from './src/services/remoteConfig';
 import { beginStartupSync, markStartupTaskReady } from './src/services/startupSync';
+import { initSessionLifecycle } from './src/services/sessionLifecycleService';
+import { initFreezeWatchdog } from './src/services/freezeWatchdogService';
 import { isSafePromiseTimeoutError, safePromiseTimeout } from './src/utils/safePromiseTimeout';
 import { UploadQueue } from './src/photo-module';
 import { LOCAL_MODE, getCurrentLocalUser } from './src/local/LOCAL_MODE';
@@ -115,6 +117,8 @@ try { initCrashReporting(); } catch (e) { console.warn('[startup] initCrashRepor
 try { initRuntimeMonitorGlobalHandlers(); } catch (e) { console.warn('[startup] initRuntimeMonitorGlobalHandlers failed:', e); }
 try { initLiveDiagnostics(); } catch (e) { console.warn('[startup] initLiveDiagnostics failed:', e); }
 try { initConsoleErrorCapture(); } catch (e) { console.warn('[startup] initConsoleErrorCapture failed:', e); }
+try { initFreezeWatchdog(); } catch (e) { console.warn('[startup] initFreezeWatchdog failed:', e); }
+void initSessionLifecycle().catch((e) => console.warn('[startup] initSessionLifecycle failed:', e));
 
 const STARTUP_SECURITY_LOAD_TIMEOUT_MS = 8000;
 const PROFILE_LOAD_TIMEOUT_MS = 8000;

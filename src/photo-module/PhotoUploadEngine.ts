@@ -200,6 +200,7 @@ export async function uploadPhotoWithEngine(
   let storagePath = '';
   let downloadUrl: string | undefined;
   let lastError: unknown = null;
+  const uploadStartedAt = Date.now();
 
   for (let attempt = 1; attempt <= MAX_UPLOAD_ATTEMPTS; attempt += 1) {
     // Give visual feedback that upload is in progress (not frozen at 10%)
@@ -236,6 +237,7 @@ export async function uploadPhotoWithEngine(
         feature: 'gallery',
         stage: `upload.attempt_${attempt}`,
         firebasePath: storagePath,
+        startedAt: uploadStartedAt,
         details: { attempt, hasDownloadUrl: Boolean(downloadUrl) },
       });
       break;
@@ -248,6 +250,7 @@ export async function uploadPhotoWithEngine(
         feature: 'gallery',
         stage: `upload.attempt_${attempt}`,
         error: err,
+        startedAt: attempt >= MAX_UPLOAD_ATTEMPTS ? uploadStartedAt : undefined,
         details: { attempt, maxAttempts: MAX_UPLOAD_ATTEMPTS },
       });
 
@@ -291,6 +294,7 @@ export async function uploadPhotoWithEngine(
       feature: 'gallery',
       stage: 'complete_fast',
       firebasePath: storagePath,
+      startedAt: uploadStartedAt,
       details: { storagePath, collection, skippedRtdb: true, skippedThumbnail: true },
     });
     return { storagePath, rtdbId: '', downloadUrl, compressedUri: currentCompressedUri };
@@ -418,6 +422,7 @@ export async function uploadPhotoWithEngine(
     feature: 'gallery',
     stage: 'complete',
     firebasePath: storagePath,
+    startedAt: uploadStartedAt,
     details: { storagePath, rtdbId, collection },
   });
 
