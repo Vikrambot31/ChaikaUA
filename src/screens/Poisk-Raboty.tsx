@@ -353,9 +353,9 @@ const JobSearchScreen: React.FC = () => {
   const blinkAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    const unsubscribe = jobService.subscribe(setListings);
+    const unsubscribe = jobService.subscribe(setListings, user?.id);
     return unsubscribe;
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     const userIds = Array.from(new Set(listings.map((item) => item.userId).filter((id): id is string => Boolean(id))));

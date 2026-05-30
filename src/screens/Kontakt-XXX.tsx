@@ -372,7 +372,7 @@ const KontaktiChaikyScreen: React.FC = () => {
 
   useEffect(() => {
     let isMounted = true;
-    const unsubscribe = contactsService.subscribe(setListings);
+    const unsubscribe = contactsService.subscribe(setListings, user?.id);
     // Restore draft if Android restarted the activity while picker was open
     (async () => {
       try {
@@ -392,7 +392,7 @@ const KontaktiChaikyScreen: React.FC = () => {
       isMounted = false;
       unsubscribe();
     };
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     latestDraftRef.current = { category, condition, price, description, phone, addFormVisible };

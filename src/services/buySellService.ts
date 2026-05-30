@@ -69,8 +69,8 @@ const mapBuySellItem = (id: string, data: any, isArchived?: boolean): BuySellLis
 });
 
 export const buySellService = {
-  subscribe(callback: (items: BuySellListing[]) => void): () => void {
-    // ─── LOCAL_MODE ───────────────���───────────────────────────────────────────
+  subscribe(callback: (items: BuySellListing[]) => void, currentUserId?: string): () => void {
+    // ─── LOCAL_MODE ───────────────
     if (LOCAL_MODE) {
       let cancelled = false;
       const load = () => {
@@ -85,10 +85,20 @@ export const buySellService = {
       const timer = setInterval(load, 5000);
       return () => { cancelled = true; clearInterval(timer); };
     }
-    // ───────────────��───────────────────────────────���─────────────────────────
+    // ─────────────────────────────
+    let approvedItems: BuySellListing[] = [];
+    let ownPendingItems: BuySellListing[] = [];
+
+    const emit = (active: BuySellListing[]) => {
+      const ids = new Set(active.map((i) => i.id));
+      const extras = ownPendingItems.filter((i) => !ids.has(i.id));
+      const merged = [...extras, ...active];
+      void resolveMediaAccessUrls(merged, 'buy_sell_listings', (item) => item.photoStoragePath || item.photoUri || '', (item, url) => ({ ...item, photoUri: url })).then(callback);
+    };
+
     const listRef = query(ref(database, PATH), orderByChild('moderationStatus'), equalTo('approved'), limitToLast(ACTIVE_LIMIT + ACTIVE_LIMIT_BUFFER));
 
-    const unsubscribe = onValue(listRef, (snapshot) => {
+    const unsubscribeApproved = onValue(listRef, (snapshot) => {
       const raw = snapshot.val();
       const now = Date.now();
       const active: BuySellListing[] = raw
@@ -101,9 +111,10 @@ export const buySellService = {
             .reverse()
             .slice(0, ACTIVE_LIMIT)
         : [];
+      approvedItems = active;
 
       if (active.length >= FEED_MINIMUM) {
-        void resolveMediaAccessUrls(active, 'buy_sell_listings', (item) => item.photoStoragePath || item.photoUri || '', (item, url) => ({ ...item, photoUri: url })).then(callback);
+        emit(active);
         return;
       }
 
@@ -114,14 +125,33 @@ export const buySellService = {
               .map(([id, data]) => mapBuySellItem(id, data, true))
               .reverse()
           : [];
-        void resolveMediaAccessUrls([...active, ...archived], 'buy_sell_listings', (item) => item.photoStoragePath || item.photoUri || '', (item, url) => ({ ...item, photoUri: url })).then(callback);
+        emit([...active, ...archived]);
       }).catch((error) => {
         console.warn('[buySellService] expired fallback load failed:', error);
-        void resolveMediaAccessUrls(active, 'buy_sell_listings', (item) => item.photoStoragePath || item.photoUri || '', (item, url) => ({ ...item, photoUri: url })).then(callback);
+        emit(active);
       });
     });
 
-    return unsubscribe;
+    let unsubscribeOwn: (() => void) | undefined;
+    if (currentUserId) {
+      const ownRef = query(ref(database, PATH), orderByChild('userId'), equalTo(currentUserId));
+      unsubscribeOwn = onValue(ownRef, (snapshot) => {
+        const raw = snapshot.val();
+        ownPendingItems = raw
+          ? Object.entries(raw as Record<string, any>)
+              .map(([id, data]) => mapBuySellItem(id, data))
+              .filter((item) => item.moderationStatus !== 'approved')
+          : [];
+        const ids = new Set(approvedItems.map((i) => i.id));
+        const extras = ownPendingItems.filter((i) => !ids.has(i.id));
+        void resolveMediaAccessUrls([...extras, ...approvedItems], 'buy_sell_listings', (item) => item.photoStoragePath || item.photoUri || '', (item, url) => ({ ...item, photoUri: url })).then(callback);
+      }, () => { ownPendingItems = []; });
+    }
+
+    return () => {
+      unsubscribeApproved();
+      unsubscribeOwn?.();
+    };
   },
 
   async add(item: Omit<BuySellListing, 'id'>): Promise<string> {

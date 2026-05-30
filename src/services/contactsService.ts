@@ -69,10 +69,18 @@ const mapContactItem = (id: string, data: any, isArchived?: boolean): ContactLis
 });
 
 export const contactsService = {
-  subscribe(callback: (items: ContactListing[]) => void): () => void {
+  subscribe(callback: (items: ContactListing[]) => void, currentUserId?: string): () => void {
     const listRef = query(ref(database, PATH), orderByChild('moderationStatus'), equalTo('approved'), limitToLast(ACTIVE_LIMIT + ACTIVE_LIMIT_BUFFER));
     let requestId = 0;
     let disposed = false;
+    let latestApprovedArchived: ContactListing[] = [];
+    let ownPendingItems: ContactListing[] = [];
+
+    const buildMerged = (approvedArchived: ContactListing[]): ContactListing[] => {
+      const ids = new Set(approvedArchived.map((i) => i.id));
+      const extras = ownPendingItems.filter((i) => !ids.has(i.id));
+      return [...extras, ...approvedArchived];
+    };
 
     const resolvePhotosInBackground = (items: ContactListing[], currentRequestId: number): void => {
       const resolvedPhotoUris = new Map<string, string>();
@@ -111,7 +119,7 @@ export const contactsService = {
       });
     };
 
-    const unsubscribe = onValue(listRef, (snapshot) => {
+    const unsubscribeApproved = onValue(listRef, (snapshot) => {
       requestId += 1;
       const currentRequestId = requestId;
       const raw = snapshot.val();
@@ -128,12 +136,14 @@ export const contactsService = {
         : [];
 
       if (active.length >= FEED_MINIMUM) {
-        callback(active);
-        resolvePhotosInBackground(active, currentRequestId);
+        latestApprovedArchived = active;
+        const merged = buildMerged(active);
+        callback(merged);
+        resolvePhotosInBackground(merged, currentRequestId);
         return;
       }
 
-      callback(active);
+      callback(buildMerged(active));
 
       void get(query(ref(database, PATH), orderByChild('moderationStatus'), equalTo('expired'), limitToLast(ARCHIVED_FALLBACK_LIMIT))).then((expiredSnapshot) => {
         if (disposed || currentRequestId !== requestId) return;
@@ -143,20 +153,38 @@ export const contactsService = {
               .map(([id, data]) => mapContactItem(id, data, true))
               .reverse()
           : [];
-        const items = [...active, ...archived];
-        callback(items);
-        resolvePhotosInBackground(items, currentRequestId);
+        const combined = [...active, ...archived];
+        latestApprovedArchived = combined;
+        const merged = buildMerged(combined);
+        callback(merged);
+        resolvePhotosInBackground(merged, currentRequestId);
       }).catch((error) => {
         console.warn('[contactsService] expired fallback load failed:', error);
         if (disposed || currentRequestId !== requestId) return;
-        resolvePhotosInBackground(active, currentRequestId);
+        latestApprovedArchived = active;
+        resolvePhotosInBackground(buildMerged(active), currentRequestId);
       });
     });
+
+    let unsubscribeOwn: (() => void) | undefined;
+    if (currentUserId) {
+      const ownRef = query(ref(database, PATH), orderByChild('userId'), equalTo(currentUserId));
+      unsubscribeOwn = onValue(ownRef, (snapshot) => {
+        const raw = snapshot.val();
+        ownPendingItems = raw
+          ? Object.entries(raw as Record<string, any>)
+              .map(([id, data]) => mapContactItem(id, data))
+              .filter((item) => item.moderationStatus !== 'approved')
+          : [];
+        callback(buildMerged(latestApprovedArchived));
+      }, () => { ownPendingItems = []; });
+    }
 
     return () => {
       disposed = true;
       requestId += 1;
-      unsubscribe();
+      unsubscribeApproved();
+      unsubscribeOwn?.();
     };
   },
 

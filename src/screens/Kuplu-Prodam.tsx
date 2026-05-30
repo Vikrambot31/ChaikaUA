@@ -313,7 +313,7 @@ const BuySellScreen: React.FC = () => {
 
   useEffect(() => {
     let isMounted = true;
-    const unsubscribe = buySellService.subscribe(setListings);
+    const unsubscribe = buySellService.subscribe(setListings, user?.id);
     // Restore draft if Android restarted the activity while picker was open
     (async () => {
       try {
@@ -339,7 +339,7 @@ const BuySellScreen: React.FC = () => {
       isMounted = false;
       unsubscribe();
     };
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     if (!addFormVisible) return;

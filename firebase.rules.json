@@ -36,7 +36,7 @@
 
     "contacts_listings": {
       ".read": "auth != null",
-      ".indexOn": "moderationStatus",
+      ".indexOn": ["moderationStatus", "userId"],
       "$listingId": {
         ".write": "auth != null && (!data.exists() || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
       }
@@ -44,7 +44,7 @@
 
     "lost_found": {
       ".read": "auth != null",
-      ".indexOn": "moderationStatus",
+      ".indexOn": ["moderationStatus", "userId"],
       "$itemId": {
         ".write": "auth != null && (!data.exists() || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
       }
@@ -60,7 +60,7 @@
 
     "job_listings": {
       ".read": "auth != null",
-      ".indexOn": "moderationStatus",
+      ".indexOn": ["moderationStatus", "userId"],
       "$listingId": {
         ".write": "auth != null && (!data.exists() || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
       }

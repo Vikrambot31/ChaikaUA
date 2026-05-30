@@ -54,10 +54,19 @@ const mapJobItem = (id: string, data: any, isArchived?: boolean): JobListing => 
 });
 
 export const jobService = {
-  subscribe(callback: (items: JobListing[]) => void): () => void {
+  subscribe(callback: (items: JobListing[]) => void, currentUserId?: string): () => void {
+    let approvedItems: JobListing[] = [];
+    let ownPendingItems: JobListing[] = [];
+
+    const emit = (active: JobListing[]) => {
+      const ids = new Set(active.map((i) => i.id));
+      const extras = ownPendingItems.filter((i) => !ids.has(i.id));
+      callback([...extras, ...active]);
+    };
+
     const listRef = query(ref(database, PATH), orderByChild('moderationStatus'), equalTo('approved'), limitToLast(ACTIVE_LIMIT + ACTIVE_LIMIT_BUFFER));
 
-    const unsubscribe = onValue(listRef, (snapshot) => {
+    const unsubscribeApproved = onValue(listRef, (snapshot) => {
       const raw = snapshot.val();
       const now = Date.now();
       const active: JobListing[] = raw
@@ -70,9 +79,10 @@ export const jobService = {
             .reverse()
             .slice(0, ACTIVE_LIMIT)
         : [];
+      approvedItems = active;
 
       if (active.length >= FEED_MINIMUM) {
-        callback(active);
+        emit(active);
         return;
       }
 
@@ -83,13 +93,32 @@ export const jobService = {
               .map(([id, data]) => mapJobItem(id, data, true))
               .reverse()
           : [];
-        callback([...active, ...archived]);
+        emit([...active, ...archived]);
       }).catch(() => {
-        callback(active);
+        emit(active);
       });
     });
 
-    return unsubscribe;
+    let unsubscribeOwn: (() => void) | undefined;
+    if (currentUserId) {
+      const ownRef = query(ref(database, PATH), orderByChild('userId'), equalTo(currentUserId));
+      unsubscribeOwn = onValue(ownRef, (snapshot) => {
+        const raw = snapshot.val();
+        ownPendingItems = raw
+          ? Object.entries(raw as Record<string, any>)
+              .map(([id, data]) => mapJobItem(id, data))
+              .filter((item) => item.moderationStatus !== 'approved')
+          : [];
+        const ids = new Set(approvedItems.map((i) => i.id));
+        const extras = ownPendingItems.filter((i) => !ids.has(i.id));
+        callback([...extras, ...approvedItems]);
+      }, () => { ownPendingItems = []; });
+    }
+
+    return () => {
+      unsubscribeApproved();
+      unsubscribeOwn?.();
+    };
   },
 
   async add(item: Omit<JobListing, 'id'>): Promise<string> {
