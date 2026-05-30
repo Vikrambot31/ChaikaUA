@@ -1,10 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { onValue, ref, runTransaction } from 'firebase/database';
 import { database } from '../firebase-config';
 import MiniUserAvatar from './MiniUserAvatar';
 import { useSoftToast } from '../hooks/useSoftToast';
+
+const RTDB_FORBIDDEN_KEY_CHARS = /[.#$[\]/]/g;
+const toSafeRtdbKey = (value: string): string => (value ?? '').replace(RTDB_FORBIDDEN_KEY_CHARS, '_').trim();
 
 type Lang = 'ua' | 'ru' | 'en';
 
@@ -60,17 +63,18 @@ export default function UserCardActionBar({
   const [localLikes, setLocalLikes] = useState<Record<string, true>>({});
   const [localBusy, setLocalBusy] = useState(false);
   const { showError, showInfo } = useSoftToast();
-  const canUseLocalLike = Boolean(likePath && likeId && currentUserId && liked === undefined && likeCount === undefined && !onLike);
+  const safeLikeId = useMemo(() => (likeId ? toSafeRtdbKey(likeId) : undefined), [likeId]);
+  const canUseLocalLike = Boolean(likePath && safeLikeId && currentUserId && liked === undefined && likeCount === undefined && !onLike);
   const needsAuth = !currentUserId && !onLike;
 
   useEffect(() => {
-    if (!likePath || !likeId || liked !== undefined || likeCount !== undefined) return;
-    const unsubscribe = onValue(ref(database, `${likePath}/${likeId}`), (snapshot) => {
+    if (!likePath || !safeLikeId || liked !== undefined || likeCount !== undefined) return;
+    const unsubscribe = onValue(ref(database, `${likePath}/${safeLikeId}`), (snapshot) => {
       const value = snapshot.val();
       setLocalLikes(value && typeof value === 'object' ? value : {});
     });
     return unsubscribe;
-  }, [likeCount, likeId, likePath, liked]);
+  }, [likeCount, safeLikeId, likePath, liked]);
 
   const resolvedLiked = liked ?? Boolean(currentUserId && localLikes[currentUserId]);
   const resolvedCount = likeCount ?? Object.keys(localLikes).length;
@@ -80,7 +84,7 @@ export default function UserCardActionBar({
   const resolvedContactDisabled = contactDisabled || !onContact;
 
   const handleLocalLike = async () => {
-    if (!canUseLocalLike || !likePath || !likeId || !currentUserId || localBusy) return;
+    if (!canUseLocalLike || !likePath || !safeLikeId || !currentUserId || localBusy) return;
     const previousLikes = localLikes;
     const nextLikes = { ...previousLikes };
     if (nextLikes[currentUserId]) {
@@ -92,7 +96,7 @@ export default function UserCardActionBar({
     setLocalLikes(nextLikes);
     setLocalBusy(true);
     try {
-      await runTransaction(ref(database, `${likePath}/${likeId}/${currentUserId}`), (current) => (current ? null : true));
+      await runTransaction(ref(database, `${likePath}/${safeLikeId}/${currentUserId}`), (current) => (current ? null : true));
     } catch {
       setLocalLikes(previousLikes);
       showError(t.saveFailed, t.retry);

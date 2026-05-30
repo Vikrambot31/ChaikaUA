@@ -39,6 +39,7 @@ import { safeCallPhone } from '../utils/communicationActions';
 import { openRequestFormWithLimitCheck } from '../utils/requestFormLimitGuard';
 import AppPhotoImage from '../components/AppPhotoImage';
 import FeedLikeButton from '../components/FeedLikeButton';
+import { normalizeLanguage } from '../redux/slices/languageSlice';
 
 type ChatRequest = ChatRequestLike;
 
@@ -305,16 +306,27 @@ const TOPIC_LABELS = {
 const normalizeTopicKey = (value?: string | null) =>
   String(value || '').trim().toLowerCase();
 
+const TOPIC_ALIASES: Record<string, keyof typeof TOPIC_LABELS.ua> = {
+  shopping: 'going_shopping',
+  delivery_shopping: 'going_shopping',
+  grocery: 'going_shopping',
+  groceries: 'going_shopping',
+  food_sharing: 'going_shopping',
+  foodshare: 'going_shopping',
+};
+
+const resolveTopicKey = (value?: string | null): keyof typeof TOPIC_LABELS.ua | 'other' => {
+  const normalized = normalizeTopicKey(value);
+  if (!normalized) return 'other';
+  if (normalized in TOPIC_ALIASES) return TOPIC_ALIASES[normalized];
+  if (normalized in TOPIC_LABELS.ua) return normalized as keyof typeof TOPIC_LABELS.ua;
+  return 'other';
+};
+
 const formatTopicLabel = (key: string, language: keyof typeof TOPIC_LABELS) => {
   const labels = TOPIC_LABELS[language] ?? TOPIC_LABELS.ua;
-  if (key in labels) {
-    return labels[key as keyof typeof labels];
-  }
-  return key
-    .replace(/[_-]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/^\w/, (char) => char.toUpperCase()) || labels.other;
+  const topicKey = resolveTopicKey(key);
+  return labels[topicKey] ?? TOPIC_LABELS.ua[topicKey] ?? TOPIC_LABELS.ua.other;
 };
 
 const TECHNICAL_DESCRIPTION_PREFIXES = new Set(['text', 'description', 'desc', 'category', 'subcategory', 'group', 'topic']);
@@ -322,7 +334,7 @@ const TECHNICAL_DESCRIPTION_PREFIXES = new Set(['text', 'description', 'desc', '
 const isKnownTopicKey = (key?: string | null) => {
   const normalized = normalizeTopicKey(key);
   if (!normalized) return false;
-  return Object.values(TOPIC_LABELS).some((labels) => normalized in labels);
+  return normalized in TOPIC_ALIASES || normalized in TOPIC_LABELS.ua;
 };
 
 const stripChatDescriptionPrefix = (value: string) => {
@@ -342,7 +354,7 @@ const splitChatTopic = (item: ChatRequest, language: keyof typeof TOPIC_LABELS) 
   const bracketMatch = rawText.match(/^\[([^\]]+)]\s*(.*)$/);
   const explicitTopic = isKnownTopicKey(bracketMatch?.[1]) ? bracketMatch?.[1]?.trim() : undefined;
   const cleanDescription = stripChatDescriptionPrefix(rawText);
-  const topicKey = normalizeTopicKey(item.subcategory || item.category || item.group || explicitTopic || 'other');
+  const topicKey = resolveTopicKey(item.subcategory || item.category || item.group || explicitTopic);
   return {
     topic: formatTopicLabel(topicKey, language),
     description: cleanDescription,
@@ -352,7 +364,7 @@ const splitChatTopic = (item: ChatRequest, language: keyof typeof TOPIC_LABELS) 
 const OnlineChatScreen = () => {
   const navigation = useNavigation<ChatNavigation>();
   const navLock = useRef(false);
-  const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
+  const language = useSelector((state: RootState) => normalizeLanguage(state.language?.current)) as 'ua' | 'ru' | 'en';
   const currentUser = useSelector((state: RootState) => state.auth.user);
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const text = UI_TEXT[language];

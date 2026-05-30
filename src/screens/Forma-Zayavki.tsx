@@ -21,6 +21,7 @@ import type { AppDispatch, RootState } from '../redux/store';
 import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField';
 import { firebaseChatAPI } from '../firebase-config';
 import { addHelpRequest, syncFromRequests } from '../redux/slices/helpRequestsSlice';
+import { normalizeLanguage } from '../redux/slices/languageSlice';
 import { getRequests } from '../services/api';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { getDonePhotos } from '../utils/submissionRequirements';
@@ -395,7 +396,7 @@ const getSubmitFailureMessage = (rawError: unknown, t: (typeof TEXT_BY_LANG)[Lan
 const RequestFormScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
   const dispatch = useDispatch<AppDispatch>();
-  const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
+  const language = useSelector((state: RootState) => normalizeLanguage(state.language?.current)) as Lang;
   const user = useSelector((state: RootState) => state.auth.user);
   const [name, setName] = useState(user?.name ?? '');
   const [phone, setPhone] = useState(() => formatPhoneInput(user?.phone || '+38'));

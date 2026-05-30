@@ -115,6 +115,13 @@ const toTimestamp = (value: unknown): number => {
 
 const getPhotoIdentity = (photo: GalleryPhoto): string => photo.storagePath || photo.uri || photo.id;
 
+// Извлекает RTDB-безопасный ID из storagePath: "community_photos/uid/1714_abc.jpg" → "1714_abc"
+// uniqueId() содержит только цифры, подчёркивание и hex — никаких запрещённых символов Firebase.
+const rtdbIdFromStoragePath = (storagePath: string): string => {
+  const filename = storagePath.split('/').pop() ?? '';
+  return filename.replace(/\.[^.]+$/, '') || storagePath;
+};
+
 const GalleryPhotoItem = memo(function GalleryPhotoItem({ item, size, currentUserId }: { item: GalleryPhoto; size: number; currentUserId?: string }) {
   return (
     <View style={[styles.photoCell, { width: size, height: size }]}>
@@ -262,7 +269,7 @@ export default function FotoRayonaScreen() {
       const mapped = photos
         .filter((photo) => photo.status !== 'error')
         .map((photo, index) => ({
-          id: photo.storagePath || photo.downloadUrl || photo.localUri || `local-${index}`,
+          id: photo.storagePath ? rtdbIdFromStoragePath(photo.storagePath) : (photo.downloadUrl || photo.localUri || `local-${index}`),
           uri: photo.downloadUrl || photo.thumbUri || photo.localUri,
           storagePath: photo.storagePath,
           createdAt: Date.now() - index,
