@@ -37,8 +37,6 @@ type Lang = 'ua' | 'ru' | 'en';
 const UI_TEXT = {
   ua: {
     title: 'Фото району',
-    subtitle: "Додавайте фотографії ЖК Чайка. Фото з'явиться після перевірки модератором.",
-    addPhoto: 'Вибрати фото',
     pendingStatus: 'на модерації',
     uploadProgress: (p: number) => `завантаження ${p}%`,
     descTitle: 'Опис фото',
@@ -53,8 +51,6 @@ const UI_TEXT = {
   },
   ru: {
     title: 'Фото района',
-    subtitle: 'Добавляйте фотографии ЖК Чайка. Фото появится после проверки модератором.',
-    addPhoto: 'Выбрать фото',
     pendingStatus: 'на модерации',
     uploadProgress: (p: number) => `загрузка ${p}%`,
     descTitle: 'Описание фото',
@@ -69,8 +65,6 @@ const UI_TEXT = {
   },
   en: {
     title: 'District photos',
-    subtitle: 'Add photos of Chaika. Photos appear after moderator review.',
-    addPhoto: 'Select photo',
     pendingStatus: 'in moderation',
     uploadProgress: (p: number) => `uploading ${p}%`,
     descTitle: 'Photo description',
@@ -90,6 +84,10 @@ type GalleryPhoto = {
   uri: string;
   storagePath: string;
   createdAt: number;
+  // Local (just-picked) photo state — drives the inline overlay
+  pending?: boolean;
+  uploading?: boolean;
+  progress?: number;
 };
 
 type RawCommunityPhoto = {
@@ -113,19 +111,28 @@ const toTimestamp = (value: unknown): number => {
   return 0;
 };
 
-// ─── Approved photo tile ─────────────────────────────────────────────────────
+// ─── Photo tile (approved OR local pending) ──────────────────────────────────
 
 const GalleryPhotoItem = memo(function GalleryPhotoItem({
   item,
   size,
   currentUserId,
+  pendingLabel,
+  uploadProgressLabel,
+  onPressDescription,
 }: {
   item: GalleryPhoto;
   size: number;
   currentUserId?: string;
+  pendingLabel: string;
+  uploadProgressLabel: (p: number) => string;
+  onPressDescription: (id: string) => void;
 }) {
+  const isLocal = Boolean(item.pending);
+  const progress = Math.min(100, Math.max(0, Math.round(item.progress ?? (item.uploading ? 0 : 100))));
+
   return (
-    <View style={[styles.photoCell, { width: size, height: size }]}>
+    <View style={[styles.photoCell, isLocal && styles.localCell, { width: size, height: size }]}>
       {item.uri ? (
         <AppPhotoImage
           uri={item.uri}
@@ -138,12 +145,42 @@ const GalleryPhotoItem = memo(function GalleryPhotoItem({
       ) : (
         <View style={styles.photoFallback} />
       )}
-      <FeedLikeButton
-        currentUserId={currentUserId}
-        likePath="feed_likes/district_photos"
-        likeId={item.id}
-        style={styles.photoLikeButton}
-      />
+
+      {/* Uploading: progress bar overlay */}
+      {item.uploading ? (
+        <View style={styles.progressOverlay}>
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${Math.max(6, progress)}%` }]} />
+          </View>
+          <Text style={styles.progressText}>{uploadProgressLabel(progress)}</Text>
+        </View>
+      ) : null}
+
+      {/* Done but pending moderation: badge + description button */}
+      {isLocal && !item.uploading ? (
+        <>
+          <View style={styles.pendingBadge}>
+            <Text style={styles.pendingBadgeText}>{pendingLabel}</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.descBtn}
+            onPress={() => onPressDescription(item.id)}
+            activeOpacity={0.82}
+          >
+            <MaterialCommunityIcons name="pencil-outline" size={14} color="#fff" />
+          </TouchableOpacity>
+        </>
+      ) : null}
+
+      {/* Approved photos: like button */}
+      {!isLocal ? (
+        <FeedLikeButton
+          currentUserId={currentUserId}
+          likePath="feed_likes/district_photos"
+          likeId={item.id}
+          style={styles.photoLikeButton}
+        />
+      ) : null}
     </View>
   );
 });
@@ -159,18 +196,13 @@ export default function FotoRayonaScreen() {
 
   const [remotePhotos, setRemotePhotos] = useState<GalleryPhoto[]>([]);
   const [loading, setLoading] = useState(true);
-  const [uploadedPhotos, setUploadedPhotos] = useState<UploadedPhoto[]>([]);
+  // Just-picked photos kept by photoId — accumulate, never drop on empty callback
+  const [localById, setLocalById] = useState<Record<string, UploadedPhoto>>({});
 
   // Description modal
   const [descVisible, setDescVisible] = useState(false);
   const [descText, setDescText] = useState('');
   const [descAddress, setDescAddress] = useState('');
-
-  // Latest uploading/done photo — what the user just picked
-  const activeUpload = useMemo(
-    () => uploadedPhotos.find((p) => p.status === 'uploading' || p.status === 'done') ?? null,
-    [uploadedPhotos],
-  );
 
   // Firebase: approved photos
   useEffect(() => {
@@ -226,18 +258,49 @@ export default function FotoRayonaScreen() {
     return unsubscribe;
   }, []);
 
+  // Accumulate picked photos by id so a tile is shown the instant it is picked
+  // and never vanishes while its upload progresses.
   const handlePhotosChange = useCallback((photos: UploadedPhoto[]) => {
-    setUploadedPhotos(photos.filter((p) => p.status !== 'error'));
+    setLocalById((current) => {
+      const next = { ...current };
+      for (const p of photos) {
+        if (p.status === 'error') {
+          delete next[p.photoId];
+        } else {
+          next[p.photoId] = p;
+        }
+      }
+      return next;
+    });
   }, []);
 
   const handleDescWordLimit = useCallback((val: string) => {
     const words = val.split(/\s+/).filter(Boolean);
-    if (words.length <= 5) {
-      setDescText(val);
-    } else {
-      setDescText(words.slice(0, 5).join(' '));
-    }
+    setDescText(words.length <= 5 ? val : words.slice(0, 5).join(' '));
   }, []);
+
+  const openDescription = useCallback((id: string) => {
+    void id;
+    setDescVisible(true);
+  }, []);
+
+  // Merge local pending photos (first) with approved photos, deduped by storagePath.
+  const data = useMemo<GalleryPhoto[]>(() => {
+    const approvedPaths = new Set(remotePhotos.map((p) => p.storagePath).filter(Boolean));
+    const localTiles = Object.values(localById)
+      // Once approved (same storagePath shows up in the grid) drop the local copy
+      .filter((p) => !p.storagePath || !approvedPaths.has(p.storagePath))
+      .map<GalleryPhoto>((p) => ({
+        id: p.photoId,
+        uri: p.localUri || p.thumbUri || p.downloadUrl || '',
+        storagePath: p.storagePath || '',
+        createdAt: Number.MAX_SAFE_INTEGER,
+        pending: true,
+        uploading: p.status === 'uploading',
+        progress: p.progress,
+      }));
+    return [...localTiles, ...remotePhotos].slice(0, MAX_PHOTOS);
+  }, [localById, remotePhotos]);
 
   const gridPadding = 10;
   const photoSize = useMemo(
@@ -247,12 +310,18 @@ export default function FotoRayonaScreen() {
 
   const renderItem = useCallback(
     ({ item }: { item: GalleryPhoto }) => (
-      <GalleryPhotoItem item={item} size={photoSize} currentUserId={user?.id} />
+      <GalleryPhotoItem
+        item={item}
+        size={photoSize}
+        currentUserId={user?.id}
+        pendingLabel={text.pendingStatus}
+        uploadProgressLabel={text.uploadProgress}
+        onPressDescription={openDescription}
+      />
     ),
-    [photoSize, user?.id],
+    [openDescription, photoSize, text.pendingStatus, text.uploadProgress, user?.id],
   );
 
-  // Header: just the title
   const header = useMemo(
     () => (
       <View style={styles.headerWrap}>
@@ -265,80 +334,9 @@ export default function FotoRayonaScreen() {
     [remotePhotos.length, text],
   );
 
-  // Empty state while loading or no photos
-  const empty = useMemo(
+  const footer = useMemo(
     () => (
-      <View style={styles.emptyState}>
-        {loading ? (
-          <ActivityIndicator color={SCREEN_THEME.terracotta} size="large" />
-        ) : (
-          <>
-            <MaterialCommunityIcons name="image-plus" size={30} color="#8C6A46" />
-            <Text style={styles.emptyTitle}>{text.emptyTitle}</Text>
-            <Text style={styles.emptyText}>{text.emptyText}</Text>
-          </>
-        )}
-      </View>
-    ),
-    [loading, text],
-  );
-
-  // Footer: pending upload section + pick button
-  const footer = useMemo(() => {
-    const isUploading = activeUpload?.status === 'uploading';
-    const progress = Math.min(100, Math.max(0, Math.round(activeUpload?.progress ?? (isUploading ? 0 : 100))));
-    // Show actual photo — localUri is set immediately when user picks
-    const photoUri = activeUpload?.localUri || activeUpload?.thumbUri || activeUpload?.downloadUrl || '';
-
-    return (
       <View style={styles.footerWrap}>
-        {/* Pending photo section — visible immediately after user picks */}
-        {activeUpload ? (
-          <View style={styles.pendingCard}>
-            {/* Progress bar */}
-            <View style={styles.progressTrack}>
-              <View style={[styles.progressFill, { width: `${Math.max(4, progress)}%` }]} />
-            </View>
-
-            {/* Photo row */}
-            <View style={styles.pendingRow}>
-              {/* Actual photo thumbnail */}
-              <View style={styles.pendingThumb}>
-                {photoUri ? (
-                  <AppPhotoImage
-                    uri={photoUri}
-                    storagePath={activeUpload.storagePath}
-                    style={styles.pendingThumbImg}
-                    resizeMode="cover"
-                    debugLabel="PendingUpload"
-                    showDebugInfo={false}
-                  />
-                ) : (
-                  <View style={styles.pendingThumbFallback} />
-                )}
-              </View>
-
-              {/* Status texts */}
-              <View style={styles.pendingInfo}>
-                {isUploading && (
-                  <Text style={styles.progressText}>{text.uploadProgress(progress)}</Text>
-                )}
-                <Text style={styles.pendingStatusText}>{text.pendingStatus}</Text>
-              </View>
-
-              {/* Description button */}
-              <TouchableOpacity
-                style={styles.descBtn}
-                onPress={() => setDescVisible(true)}
-                activeOpacity={0.82}
-              >
-                <MaterialCommunityIcons name="pencil-outline" size={14} color="#fff" />
-              </TouchableOpacity>
-            </View>
-          </View>
-        ) : null}
-
-        {/* Pick photo button */}
         {user ? (
           <PhotoUploadField
             uid={user.id}
@@ -363,13 +361,31 @@ export default function FotoRayonaScreen() {
           </TouchableOpacity>
         )}
       </View>
-    );
-  }, [activeUpload, handlePhotosChange, navigation, text, user]);
+    ),
+    [handlePhotosChange, navigation, text.loginToUpload, user],
+  );
+
+  const empty = useMemo(
+    () => (
+      <View style={styles.emptyState}>
+        {loading ? (
+          <ActivityIndicator color={SCREEN_THEME.terracotta} size="large" />
+        ) : (
+          <>
+            <MaterialCommunityIcons name="image-plus" size={30} color="#8C6A46" />
+            <Text style={styles.emptyTitle}>{text.emptyTitle}</Text>
+            <Text style={styles.emptyText}>{text.emptyText}</Text>
+          </>
+        )}
+      </View>
+    ),
+    [loading, text],
+  );
 
   return (
     <SafeAreaView style={styles.container}>
       <FlatList
-        data={remotePhotos}
+        data={data}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         numColumns={NUM_COLUMNS}
@@ -382,18 +398,14 @@ export default function FotoRayonaScreen() {
         removeClippedSubviews
       />
 
-      {/* Description modal — slides up from bottom */}
+      {/* Description modal */}
       <Modal
         visible={descVisible}
         transparent
         animationType="slide"
         onRequestClose={() => setDescVisible(false)}
       >
-        <TouchableOpacity
-          style={styles.modalBackdrop}
-          activeOpacity={1}
-          onPress={() => setDescVisible(false)}
-        >
+        <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setDescVisible(false)}>
           <TouchableOpacity style={styles.modalCard} activeOpacity={1} onPress={() => {}}>
             <Text style={styles.modalTitle}>{text.descTitle}</Text>
             <TextInput
@@ -413,18 +425,10 @@ export default function FotoRayonaScreen() {
               maxLength={100}
             />
             <View style={styles.modalBtns}>
-              <TouchableOpacity
-                style={styles.modalCancelBtn}
-                onPress={() => setDescVisible(false)}
-                activeOpacity={0.82}
-              >
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setDescVisible(false)} activeOpacity={0.82}>
                 <Text style={styles.modalCancelText}>{text.cancel}</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modalSaveBtn}
-                onPress={() => setDescVisible(false)}
-                activeOpacity={0.82}
-              >
+              <TouchableOpacity style={styles.modalSaveBtn} onPress={() => setDescVisible(false)} activeOpacity={0.82}>
                 <Text style={styles.modalSaveText}>{text.save}</Text>
               </TouchableOpacity>
             </View>
@@ -443,21 +447,13 @@ const styles = StyleSheet.create({
 
   // Header
   headerWrap: { paddingTop: 14, paddingBottom: 8 },
-  headerTitle: {
-    color: SCREEN_THEME.textPrimary,
-    fontSize: 26,
-    fontWeight: '900',
-  },
-  photoCounter: {
-    marginTop: 4,
-    color: SCREEN_THEME.textSecondary,
-    fontSize: 12,
-    fontWeight: '700',
-  },
+  headerTitle: { color: SCREEN_THEME.textPrimary, fontSize: 26, fontWeight: '900' },
+  photoCounter: { marginTop: 4, color: SCREEN_THEME.textSecondary, fontSize: 12, fontWeight: '700' },
 
   // Grid
   columnWrapper: { gap: GRID_GAP, marginBottom: GRID_GAP },
   photoCell: { backgroundColor: '#F0E8D8', overflow: 'hidden' },
+  localCell: { borderWidth: 2, borderColor: '#22B14C' },
   photo: { width: '100%', height: '100%' },
   photoFallback: { width: '100%', height: '100%', backgroundColor: '#858584' },
   photoLikeButton: {
@@ -472,52 +468,54 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(122, 30, 92, 0.92)',
   },
 
-  // Footer
-  footerWrap: { paddingTop: 10, gap: 10 },
-
-  // Pending upload card
-  pendingCard: {
-    backgroundColor: SCREEN_THEME.paperStrong,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#E4D0AB',
-    padding: 10,
-    gap: 8,
+  // Uploading overlay
+  progressOverlay: {
+    position: 'absolute',
+    left: 5,
+    right: 5,
+    bottom: 5,
+    borderRadius: 9,
+    paddingHorizontal: 6,
+    paddingVertical: 5,
+    backgroundColor: 'rgba(255,255,255,0.92)',
   },
   progressTrack: {
-    height: 8,
+    height: 7,
     borderRadius: 999,
     overflow: 'hidden',
     backgroundColor: 'rgba(34,177,76,0.18)',
   },
-  progressFill: {
-    height: '100%',
-    borderRadius: 999,
-    backgroundColor: '#22B14C',
-  },
-  pendingRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  pendingThumb: {
-    width: 60,
-    height: 60,
+  progressFill: { height: '100%', borderRadius: 999, backgroundColor: '#22B14C' },
+  progressText: { marginTop: 3, color: '#22A044', fontSize: 10, fontWeight: '900', textAlign: 'center' },
+
+  // Pending moderation badge
+  pendingBadge: {
+    position: 'absolute',
+    left: 5,
+    right: 5,
+    bottom: 5,
+    minHeight: 20,
     borderRadius: 10,
-    overflow: 'hidden',
-    backgroundColor: '#D8D1C2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    backgroundColor: 'rgba(255,255,255,0.9)',
   },
-  pendingThumbImg: { width: '100%', height: '100%' },
-  pendingThumbFallback: { width: '100%', height: '100%', backgroundColor: '#858584' },
-  pendingInfo: { flex: 1, gap: 3 },
-  progressText: { color: '#22A044', fontSize: 12, fontWeight: '900' },
-  pendingStatusText: { color: SCREEN_THEME.textSecondary, fontSize: 13, fontWeight: '700' },
+  pendingBadgeText: { color: '#6B6B6B', fontSize: 9, fontWeight: '900', textAlign: 'center' },
   descBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    width: 28,
+    height: 28,
+    borderRadius: 9,
     backgroundColor: SCREEN_THEME.terracotta,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
-  // Login button
+  // Footer
+  footerWrap: { paddingTop: 10 },
   loginBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -544,11 +542,7 @@ const styles = StyleSheet.create({
   emptyText: { color: SCREEN_THEME.textSecondary, textAlign: 'center', lineHeight: 19 },
 
   // Description modal
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalCard: {
     backgroundColor: '#FAF4EC',
     borderTopLeftRadius: 20,
@@ -576,11 +570,6 @@ const styles = StyleSheet.create({
     borderColor: '#E4D0AB',
   },
   modalCancelText: { color: SCREEN_THEME.textSecondary, fontSize: 14, fontWeight: '700' },
-  modalSaveBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    backgroundColor: SCREEN_THEME.terracotta,
-  },
+  modalSaveBtn: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 10, backgroundColor: SCREEN_THEME.terracotta },
   modalSaveText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 });

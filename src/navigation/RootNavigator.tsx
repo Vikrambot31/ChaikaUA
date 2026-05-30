@@ -160,6 +160,7 @@ export type RootStackParamList = {
   OsbbAddNewsScreen: { editItem?: OsbbEditableNewsItem } | undefined;
   OsbbAdminScreen: undefined;
   ChaikaBonusPlusScreen: undefined;
+  SoulPhotosScreen: undefined;
   FotoRayonaScreen: undefined;
   LostAndFoundScreen: undefined;
   ImportantNewsScreen: undefined;
@@ -222,6 +223,7 @@ const linking: LinkingOptions<RootStackParamList> = {
        OsbbNovostyScreen: 'screen/osbb/news',
        NotificationSettingsScreen: 'screen/notifications',
        MyPhotosScreen: 'screen/my-photos',
+       SoulPhotosScreen: 'screen/foto-dlya-dushi',
        FotoRayonaScreen: 'screen/foto-rayona',
        PhotoUploadScreen: 'screen/photo-upload',
        StartAvatarPickerScreen: 'screen/start-avatar',
@@ -299,6 +301,7 @@ const ROUTE_FILE_MAP: Record<string, string> = {
   OsbbAddNewsScreen: 'OSBB-AddNews.tsx',
   OsbbAdminScreen: 'OSBB-AdminPanel.tsx',
   ChaikaBonusPlusScreen: 'Chaika-Bonus-Plus.tsx',
+  SoulPhotosScreen: 'Foto-Dlya-Dushi.tsx',
   FotoRayonaScreen: 'Foto-Rayona.tsx',
   PhotoUploadScreen: 'Zagruzka-Foto.tsx',
   StartAvatarPickerScreen: 'StartAvatarPickerScreen.tsx',
@@ -476,6 +479,7 @@ const AdminUserErrorsScreen = createLazyScreen(() => import('../screens/AdminUse
 const ServerStatusScreen = createLazyScreen(() => import('../screens/ServerStatusScreen'), 'LazyServerStatusScreen');
 const AuthDiagnosticScreen = createLazyScreen(() => import('../screens/AuthDiagnosticScreen'), 'LazyAuthDiagnosticScreen');
 const SecurityControlScreen = createLazyScreen(() => import('../screens/admin/SecurityControlScreen'), 'LazySecurityControlScreen');
+const SoulPhotosScreen = createLazyScreen(() => import('../screens/Foto-Dlya-Dushi'), 'LazySoulPhotosScreen');
 const FotoRayonaScreen = createLazyScreen(() => import('../screens/Foto-Rayona'), 'LazyFotoRayonaScreen');
 const PlacesScreen = createLazyScreen(() => import('../screens/Mesta-Chayki'), 'LazyPlacesScreen');
 const MyPhotosScreen = createLazyScreen(() => import('../photo-module/MyPhotosScreen'), 'LazyMyPhotosScreen');
@@ -669,6 +673,7 @@ function AuthNavigation() {
       'OsbbNovostyScreen',
       'OsbbSetupScreen',
       'OsbbAddNewsScreen',
+      'SoulPhotosScreen',
       'FotoRayonaScreen',
       'LostAndFoundScreen',
       'JobSearchScreen',
@@ -800,6 +805,7 @@ function AuthNavigation() {
         <Stack.Screen name="OsbbAddNewsScreen" component={withGuard(OsbbAddNewsScreen, 'trusted')} />
         <Stack.Screen name="OsbbAdminScreen" component={withGuard(OsbbAdminScreen, 'auth')} />
         <Stack.Screen name="ChaikaBonusPlusScreen" component={ChaikaBonusPlusScreen} />
+        <Stack.Screen name="SoulPhotosScreen" component={withGuard(SoulPhotosScreen, 'trusted')} />
         <Stack.Screen name="FotoRayonaScreen" component={withGuard(FotoRayonaScreenWithBoundary, 'trusted')} />
         <Stack.Screen name="PhotoUploadScreen" component={withGuard(PhotoUploadScreen, 'trusted')} options={{ headerShown: false }} />
         <Stack.Screen name="StartAvatarPickerScreen" component={StartAvatarPickerScreen} options={{ headerShown: false }} />

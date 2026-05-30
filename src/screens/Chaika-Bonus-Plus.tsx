@@ -96,6 +96,11 @@ const ChaikaBonusPlusScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const text = UI_TEXT[language];
+  const soulPhotosItem: BonusItem = language === 'ru'
+    ? { label: 'Фото для Души', desc: 'Отдельная галерея теплых фото от жителей', screen: 'SoulPhotosScreen', icon: 'tag-heart-outline', accent: '#C97959' }
+    : language === 'en'
+      ? { label: 'Photos for the Soul', desc: 'A separate warm photo gallery from residents', screen: 'SoulPhotosScreen', icon: 'tag-heart-outline', accent: '#C97959' }
+      : { label: 'Фото для душі', desc: 'Особлива галерея теплих фото від мешканців', screen: 'SoulPhotosScreen', icon: 'tag-heart-outline', accent: '#C97959' };
 
   const renderItem = (item: BonusItem) => (
     <TouchableOpacity
@@ -126,7 +131,7 @@ const ChaikaBonusPlusScreen: React.FC = () => {
         <Text style={styles.pageTitle}>{text.headerTitle}</Text>
 
         <Text style={styles.sectionLabel}>{text.sectionFrequent}</Text>
-        <View style={styles.list}>{text.frequent.map(renderItem)}</View>
+        <View style={styles.list}>{[soulPhotosItem, ...text.frequent].map(renderItem)}</View>
 
         <Text style={styles.sectionLabel}>{text.sectionCommunity}</Text>
         <View style={styles.list}>{text.community.map(renderItem)}</View>
