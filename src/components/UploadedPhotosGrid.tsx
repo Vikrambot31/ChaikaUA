@@ -59,8 +59,10 @@ export default function UploadedPhotosGrid({ title, maxItems = 12 }: Props) {
   const [previewPhoto, setPreviewPhoto] = useState<PreviewPhoto | null>(null);
 
   useEffect(() => {
+    // Only show the current user's photos. While auth is still resolving
+    // (userId empty) show nothing rather than every photo on the device.
     const unsubscribe = ImageStorage.subscribe((items) => {
-      setPhotos(items.filter((item) => !item.deleted && (!userId || item.userId === userId)));
+      setPhotos(userId ? items.filter((item) => !item.deleted && item.userId === userId) : []);
     });
     return unsubscribe;
   }, [userId]);

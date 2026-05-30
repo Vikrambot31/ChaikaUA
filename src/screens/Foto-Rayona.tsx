@@ -134,7 +134,7 @@ const GalleryPhotoItem = memo(function GalleryPhotoItem({ item, size, currentUse
       <FeedLikeButton
         currentUserId={currentUserId}
         likePath="feed_likes/district_photos"
-        likeId={getPhotoIdentity(item)}
+        likeId={item.id}
         style={styles.photoLikeButton}
       />
     </View>
@@ -451,7 +451,7 @@ export default function FotoRayonaScreen() {
     <SafeAreaView style={styles.container}>
       <FlatList
         data={photos}
-        keyExtractor={getPhotoIdentity}
+        keyExtractor={(item) => item.id}
         renderItem={renderItem}
         numColumns={NUM_COLUMNS}
         ListHeaderComponent={header}

@@ -1,10 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleProp, StyleSheet, Text, TouchableOpacity, ViewStyle } from 'react-native';
 import type { GestureResponderEvent } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { onValue, ref, runTransaction } from 'firebase/database';
 import { database } from '../firebase-config';
 import { useSoftToast } from '../hooks/useSoftToast';
+
+// RTDB keys may not contain ".", "#", "$", "[", "]" or "/". Some callers pass a
+// storage path / filename as likeId, which would crash the listener and the
+// transaction — sanitize it into a single safe key segment.
+const RTDB_FORBIDDEN_KEY_CHARS = /[.#$\[\]/]/g;
+const toSafeRtdbKey = (value: string): string => (value ?? '').replace(RTDB_FORBIDDEN_KEY_CHARS, '_').trim();
 
 type Props = {
   currentUserId?: string;
@@ -25,14 +31,16 @@ export default function FeedLikeButton({
   const [busy, setBusy] = useState(false);
   const { showError, showInfo } = useSoftToast();
 
+  const safeLikeId = useMemo(() => toSafeRtdbKey(likeId), [likeId]);
+
   useEffect(() => {
-    if (!likePath || !likeId) return;
-    const unsubscribe = onValue(ref(database, `${likePath}/${likeId}`), (snapshot) => {
+    if (!likePath || !safeLikeId) return;
+    const unsubscribe = onValue(ref(database, `${likePath}/${safeLikeId}`), (snapshot) => {
       const value = snapshot.val();
       setLikes(value && typeof value === 'object' ? value : {});
     });
     return unsubscribe;
-  }, [likeId, likePath]);
+  }, [safeLikeId, likePath]);
 
   const liked = Boolean(currentUserId && likes[currentUserId]);
   const count = Object.keys(likes).length;
@@ -43,7 +51,7 @@ export default function FeedLikeButton({
       showInfo('Sign in required', 'Only registered users can like');
       return;
     }
-    if (busy) return;
+    if (busy || !likePath || !safeLikeId) return;
 
     const previousLikes = likes;
     const nextLikes = { ...previousLikes };
@@ -56,7 +64,7 @@ export default function FeedLikeButton({
     setLikes(nextLikes);
     setBusy(true);
     try {
-      await runTransaction(ref(database, `${likePath}/${likeId}/${currentUserId}`), (current) => (current ? null : true));
+      await runTransaction(ref(database, `${likePath}/${safeLikeId}/${currentUserId}`), (current) => (current ? null : true));
     } catch {
       setLikes(previousLikes);
       showError('Could not save', 'Tap like again to retry');

@@ -16,7 +16,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { recordRuntimeTrace } from '../services/runtimeMonitorService';
 import { safeLogError } from '../utils/errorLogger';
-import { uploadPhotoWithEngine } from './PhotoUploadEngine';
+import { deleteEngineUpload, uploadPhotoWithEngine } from './PhotoUploadEngine';
 import { ImageStorage } from './ImageStorage';
 import type { PhotoUploadTask } from './types';
 
@@ -32,6 +32,11 @@ const MAX_ERROR_LENGTH = 300;
 
 let processing = false;
 let pendingRerun = false;
+
+// Photo IDs the user removed while their upload may already be in flight.
+// process() checks this set before and after each upload so a cancelled photo
+// is never committed (and any already-stored file/record is cleaned up).
+const cancelledIds = new Set<string>();
 
 const readQueue = async (): Promise<PhotoUploadTask[]> => {
   const raw = await AsyncStorage.getItem(QUEUE_KEY);
@@ -177,7 +182,11 @@ export const UploadQueue = {
   },
 
   async remove(photoId: string): Promise<void> {
+    // Mark as cancelled so an in-flight upload is discarded (not silently
+    // committed) and hide it locally immediately.
+    cancelledIds.add(photoId);
     await removeTask(photoId);
+    await ImageStorage.updatePhoto(photoId, { deleted: true }).catch(() => {});
   },
 
   /**
@@ -201,6 +210,14 @@ export const UploadQueue = {
           continue;
         }
         if (photo.status === 'uploaded') {
+          await removeTask(task.photoId);
+          continue;
+        }
+
+        // Cancelled before its upload started — drop it without touching the network.
+        if (cancelledIds.has(task.photoId)) {
+          cancelledIds.delete(task.photoId);
+          await ImageStorage.updatePhoto(task.photoId, { deleted: true }).catch(() => {});
           await removeTask(task.photoId);
           continue;
         }
@@ -238,7 +255,9 @@ export const UploadQueue = {
         try {
           const collection = task.collection ?? 'user_photos';
           const uid = String(task.uid ?? photo.userId ?? '').trim();
-          if (collection !== 'community_photos' && (!uid || uid === 'unknown' || uid === 'local-user')) {
+          // Every upload must be attributed to a real account — including
+          // community_photos, which previously skipped this guard.
+          if (!uid || uid === 'unknown' || uid === 'local-user') {
             const message = 'Sign in is required to upload this photo.';
             await ImageStorage.updatePhoto(task.photoId, {
               status: 'error',
@@ -293,6 +312,24 @@ export const UploadQueue = {
             firebasePath: result.storagePath,
             details: { photoId: task.photoId, storagePath: result.storagePath, rtdbId: result.rtdbId },
           });
+
+          // Cancelled by the user while the upload was in flight: the file/record
+          // already exist in Storage/RTDB — delete them instead of committing.
+          if (cancelledIds.has(task.photoId)) {
+            cancelledIds.delete(task.photoId);
+            await deleteEngineUpload({ storagePath: result.storagePath, rtdbId: result.rtdbId, collection, uid });
+            await ImageStorage.updatePhoto(task.photoId, { deleted: true }).catch(() => {});
+            await removeTask(task.photoId);
+            void recordRuntimeTrace({
+              screen: 'UploadQueue.process',
+              action: 'task_cancelled',
+              status: 'success',
+              feature: 'profile',
+              stage: 'cancelled_after_upload',
+              details: { photoId: task.photoId, storagePath: result.storagePath, rtdbId: result.rtdbId },
+            });
+            continue;
+          }
 
           // If Storage upload succeeded but getDownloadURL failed — treat as error.
           // A localUri stored as imageUrl would be sent to Firebase and shown as

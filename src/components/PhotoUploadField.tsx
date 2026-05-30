@@ -101,6 +101,9 @@ export default function PhotoUploadField({
   const onPhotosChangeRef = useRef(onPhotosChange);
   onPhotosChangeRef.current = onPhotosChange;
 
+  // Guards against a rapid double-tap opening the picker twice.
+  const openingRef = useRef(false);
+
   useFocusEffect(
     useCallback(() => {
       // When the form screen regains focus after MyPhotosScreen closes, recover any
@@ -110,6 +113,7 @@ export default function PhotoUploadField({
       //   2. The screen stayed mounted but state was reset before the update committed.
       // Duplicate guard (current.some) prevents adding the same photo twice when the
       // direct callback path already succeeded.
+      openingRef.current = false;
       const pending = PhotoSelector.consumePending();
       if (pending) {
         setSelected((current) => {
@@ -190,14 +194,15 @@ export default function PhotoUploadField({
   }, [language, maxPhotos, storagePath, uid, userName]);
 
   const openSelector = useCallback(async () => {
-    if (limitReached) return;
+    if (limitReached || openingRef.current) return;
+    openingRef.current = true;
     await onBeforePickerOpen?.();
     onPickerOpenChange?.(true);
     onDebugEvent?.({ source: 'PhotoUploadField', action: 'open.my-photos', details: { storagePath } });
     PhotoSelector.open(navigation, (photo) => {
       addSelectedPhoto(photo);
       // 600мс задержка — Android не успевает закрыть модалку через onRequestClose после goBack
-      setTimeout(() => onPickerOpenChange?.(false), 600);
+      setTimeout(() => { onPickerOpenChange?.(false); openingRef.current = false; }, 600);
     });
   }, [addSelectedPhoto, limitReached, navigation, onBeforePickerOpen, onDebugEvent, onPickerOpenChange, storagePath]);
 
@@ -248,7 +253,11 @@ export default function PhotoUploadField({
                   {isUploading ? (
                     <ActivityIndicator size="small" color="#fff" style={styles.spinner} />
                   ) : null}
-                  <Text style={styles.statusText}>{statusLabels[photo.status]}</Text>
+                  <Text style={styles.statusText}>
+                    {isUploading && (photo.progress ?? 0) > 0 && (photo.progress ?? 0) < 100
+                      ? `${statusLabels[photo.status]} ${photo.progress}%`
+                      : statusLabels[photo.status]}
+                  </Text>
                 </View>
 
                 <TouchableOpacity

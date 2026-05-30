@@ -15,10 +15,10 @@
 
 import * as FileSystem from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
-import { push, ref } from 'firebase/database';
+import { push, ref, remove } from 'firebase/database';
 import { deleteObject, ref as storageRef } from 'firebase/storage';
 import { database, storage } from '../firebase-core';
-import { ensureFirebaseAuth } from '../firebase-auth-session';
+import { ensureFirebaseAuth, isAnonymousFirebaseUser } from '../firebase-auth-session';
 import { uploadPhotoToNamespace } from '../services/photoUploadService';
 import { recordRuntimeTrace } from '../services/runtimeMonitorService';
 import { safeLogError } from '../utils/errorLogger';
@@ -122,6 +122,36 @@ const deleteUploadedStorageQuietly = async (storagePath: string, context: Record
   }
 };
 
+/** Maps an upload collection to its RTDB node path (single source of truth). */
+const rtdbCollectionFor = (collection: string, uid: string): string =>
+  collection === 'community_photos' ? 'community_photos' :
+  collection === 'requests'         ? `request_photos/${uid}` :
+                                      `user_photos/${uid}`;
+
+/**
+ * Removes a completed upload (Storage object + RTDB record). Used when a photo
+ * is cancelled by the user while its upload was already in flight, so the file
+ * does not linger as an orphan in the gallery / moderation queue.
+ */
+export async function deleteEngineUpload(params: {
+  storagePath?: string;
+  rtdbId?: string;
+  collection: string;
+  uid: string;
+}): Promise<void> {
+  const { storagePath, rtdbId, collection, uid } = params;
+  if (storagePath) {
+    await deleteUploadedStorageQuietly(storagePath, { collection, uid, stage: 'cancel_cleanup' });
+  }
+  if (rtdbId) {
+    try {
+      await remove(ref(database, `${rtdbCollectionFor(collection, uid)}/${rtdbId}`));
+    } catch (error) {
+      safeLogError('PhotoUploadEngine.deleteEngineUpload', error, { rtdbId, collection, uid });
+    }
+  }
+}
+
 /**
  * Full lifecycle upload:
  *  1. Validate locally (size, format)
@@ -164,7 +194,8 @@ export async function uploadPhotoWithEngine(
 
   // ── Step 2: upload to Firebase Storage ─────────────────────────────────────
   const user = await ensureFirebaseAuth();
-  if (!user) throw new Error('Sign in required to upload photos.');
+  // Guests are auto-signed-in anonymously for reads; block them from uploading.
+  if (!user || isAnonymousFirebaseUser(user)) throw new Error('Sign in required to upload photos.');
 
   let storagePath = '';
   let downloadUrl: string | undefined;
@@ -305,10 +336,7 @@ export async function uploadPhotoWithEngine(
 
   // ── Step 3: write RTDB pending entry ────────────────────────────────────────
   const now = Date.now();
-  const rtdbCollection =
-    collection === 'community_photos' ? 'community_photos' :
-    collection === 'requests'         ? `request_photos/${uid}` :
-                                        `user_photos/${uid}`;
+  const rtdbCollection = rtdbCollectionFor(collection, uid);
 
   const isRequestPhoto = collection === 'requests';
   const isPersonalPhoto = collection !== 'community_photos' && !isRequestPhoto;

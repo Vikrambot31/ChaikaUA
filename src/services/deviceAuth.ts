@@ -7,7 +7,7 @@ import { auth, database } from '../firebase-core';
 import { getCurrentAppVersion } from './appVersion';
 import { logSecurityAuditEvent } from './securityAuditLogger';
 import { secureGet, secureRemove, secureSet } from '../utils/secureStorage';
-import { logClientError } from '../utils/errorLogger';
+import { logClientError, logClientEvent } from '../utils/errorLogger';
 
 const AUTHORIZED_DEVICES_PATH = 'authorized_devices';
 const DEVICE_ID_STORAGE_KEY = '@chaika:device_id_v1';
@@ -106,10 +106,14 @@ const readSecureValue = async (key: string): Promise<string | null> => {
       );
     } catch (error) {
       if (isSecureStoreDecryptError(error)) {
-        void logClientError('deviceAuth.readSecureValue', error, {
+        // Expected, self-healing condition (e.g. after reinstall / keychain change):
+        // we delete the corrupted entry and regenerate below. Log as an event, not
+        // an error, to avoid false-alarm noise in ops/errors.
+        void logClientEvent('deviceAuth.readSecureValue.recovered', {
           key,
           safeKey,
           action: 'recover_by_delete_and_regenerate',
+          reason: error instanceof Error ? error.message : String(error),
         });
         try {
           await withTimeout(

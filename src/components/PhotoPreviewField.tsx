@@ -10,6 +10,8 @@ type Props = {
   disabled?: boolean;
   addLabel: string;
   removeLabel?: string;
+  /** Shown when the selected image fails to render. Pass a localized string. */
+  errorLabel?: string;
   iconColor?: string;
   accentColor?: string;
   backgroundColor?: string;
@@ -26,6 +28,7 @@ const PhotoPreviewField: React.FC<Props> = ({
   disabled = false,
   addLabel,
   removeLabel,
+  errorLabel = 'Фото не удалось показать. Выберите другое фото.',
   iconColor = '#5E534C',
   accentColor = '#7A4B36',
   backgroundColor = '#F7F3EE',
@@ -71,7 +74,7 @@ const PhotoPreviewField: React.FC<Props> = ({
           <View style={styles.placeholder}>
             <MaterialCommunityIcons name={hasPhoto ? 'image-off-outline' : 'camera-plus-outline'} size={30} color={iconColor} />
             <Text style={[styles.placeholderText, { color: iconColor }]}>
-              {hasPhoto ? 'Фото не удалось показать. Выберите другое фото.' : addLabel}
+              {hasPhoto ? errorLabel : addLabel}
             </Text>
           </View>
         )}
