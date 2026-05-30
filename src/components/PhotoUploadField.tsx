@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, Modal, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import AppPhotoImage from './AppPhotoImage';
-import { PhotoSelector } from '../photo-module/PhotoSelector';
 import { getBestPhotoUri, getPhotoThumbnailUri, ImageStorage } from '../photo-module/ImageStorage';
 import { UploadQueue } from '../photo-module/UploadQueue';
 import type { UserPhoto } from '../photo-module/types';
+import { photoService } from '../services/photoService';
+import { PhotoPermissionError } from '../utils/photoPicker';
 import type { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { safeLogError } from '../utils/errorLogger';
@@ -65,6 +66,24 @@ const PHOTO_UNAVAILABLE_BY_LANG: Record<Lang, string> = {
   en: 'Photo unavailable',
 };
 
+const PICKER_SOURCE_LABELS: Record<Lang, { title: string; camera: string; library: string; cancel: string }> = {
+  ua: { title: 'Додати фото', camera: 'Камера', library: 'Галерея', cancel: 'Скасувати' },
+  ru: { title: 'Добавить фото', camera: 'Камера', library: 'Галерея', cancel: 'Отмена' },
+  en: { title: 'Add photo', camera: 'Camera', library: 'Gallery', cancel: 'Cancel' },
+};
+
+const PERMISSION_ALERT_BY_LANG: Record<Lang, { title: string; body: string }> = {
+  ua: { title: 'Немає доступу', body: 'Дозвольте доступ до камери або галереї в налаштуваннях.' },
+  ru: { title: 'Нет доступа', body: 'Разрешите доступ к камере или галерее в настройках.' },
+  en: { title: 'No access', body: 'Allow camera or gallery access in settings.' },
+};
+
+const PICK_ERROR_BY_LANG: Record<Lang, { title: string; body: string }> = {
+  ua: { title: 'Помилка', body: 'Не вдалося додати фото. Спробуйте ще раз.' },
+  ru: { title: 'Ошибка', body: 'Не удалось добавить фото. Попробуйте ещё раз.' },
+  en: { title: 'Error', body: 'Could not add the photo. Try again.' },
+};
+
 const mapStatus = (status: UserPhoto['status']): UploadedPhoto['status'] => {
   if (status === 'uploaded') return 'done';
   if (status === 'error') return 'error';
@@ -88,7 +107,6 @@ export default function PhotoUploadField({
   storagePath = 'gallery',
   onPhotosChange,
   onBeforePickerOpen,
-  onPickerOpenChange,
   onDebugEvent,
 }: Props) {
   const navigation = useNavigation<{ navigate: (...args: [string, object]) => void }>();
@@ -100,41 +118,6 @@ export default function PhotoUploadField({
 
   const onPhotosChangeRef = useRef(onPhotosChange);
   onPhotosChangeRef.current = onPhotosChange;
-
-  // Guards against a rapid double-tap opening the picker twice.
-  const openingRef = useRef(false);
-
-  useFocusEffect(
-    useCallback(() => {
-      // When the form screen regains focus after MyPhotosScreen closes, recover any
-      // photo that was selected but not yet reflected in state. This handles two cases:
-      //   1. The screen was unmounted by the navigator (Android detachInactiveScreens)
-      //      and the direct callback state-update was a no-op on the unmounted component.
-      //   2. The screen stayed mounted but state was reset before the update committed.
-      // Duplicate guard (current.some) prevents adding the same photo twice when the
-      // direct callback path already succeeded.
-      openingRef.current = false;
-      const pending = PhotoSelector.consumePending();
-      if (pending) {
-        setSelected((current) => {
-          if (current.some((item) => item.id === pending.id)) return current;
-          return maxPhotos > 0 ? [...current, pending].slice(0, maxPhotos) : [...current, pending];
-        });
-      }
-      onPickerOpenChange?.(false);
-    }, [maxPhotos, onPickerOpenChange]),
-  );
-
-  // При монтировании: восстанавливаем фото если компонент был пересоздан во время навигации
-  useEffect(() => {
-    const pending = PhotoSelector.consumePending();
-    if (pending) {
-      setSelected((current) => {
-        if (current.some((item) => item.id === pending.id)) return current;
-        return maxPhotos > 0 ? [...current, pending].slice(0, maxPhotos) : [...current, pending];
-      });
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     onDebugEvent?.({
@@ -193,18 +176,48 @@ export default function PhotoUploadField({
     }).catch((error) => safeLogError('PhotoUploadField.UploadQueue.enqueue', error, { photoId: photo.id }));
   }, [language, maxPhotos, storagePath, uid, userName]);
 
-  const openSelector = useCallback(async () => {
-    if (limitReached || openingRef.current) return;
-    openingRef.current = true;
+  // Picks an image directly via the system overlay (no screen navigation),
+  // saves it locally, then enqueues it for upload. Inline progress is rendered
+  // from ImageStorage updates — the user never leaves the form.
+  const pickFrom = useCallback(async (source: 'camera' | 'library') => {
+    try {
+      const photo = source === 'camera'
+        ? await photoService.addFromCamera({ userId: uid, type: 'gallery' })
+        : await photoService.addFromLibrary({ userId: uid, type: 'gallery' });
+      if (photo) addSelectedPhoto(photo);
+    } catch (error) {
+      const alert = error instanceof PhotoPermissionError
+        ? (PERMISSION_ALERT_BY_LANG[language] ?? PERMISSION_ALERT_BY_LANG.ua)
+        : (PICK_ERROR_BY_LANG[language] ?? PICK_ERROR_BY_LANG.ua);
+      Alert.alert(alert.title, alert.body);
+      safeLogError('PhotoUploadField.pickFrom', error, { source, storagePath });
+    }
+  }, [addSelectedPhoto, language, storagePath, uid]);
+
+  const openPicker = useCallback(async () => {
+    if (limitReached) return;
+    if (!uid) {
+      const a = AUTH_ALERT_BY_LANG[language] ?? AUTH_ALERT_BY_LANG.ua;
+      Alert.alert(a.title, a.message, [
+        { text: a.loginBtn, onPress: () => navigation.navigate('LoginScreen', {}) },
+        { text: 'OK', style: 'cancel' },
+      ]);
+      return;
+    }
     await onBeforePickerOpen?.();
-    onPickerOpenChange?.(true);
-    onDebugEvent?.({ source: 'PhotoUploadField', action: 'open.my-photos', details: { storagePath } });
-    PhotoSelector.open(navigation, (photo) => {
-      addSelectedPhoto(photo);
-      // 600мс задержка — Android не успевает закрыть модалку через onRequestClose после goBack
-      setTimeout(() => { onPickerOpenChange?.(false); openingRef.current = false; }, 600);
-    });
-  }, [addSelectedPhoto, limitReached, navigation, onBeforePickerOpen, onDebugEvent, onPickerOpenChange, storagePath]);
+    onDebugEvent?.({ source: 'PhotoUploadField', action: 'open.inline-picker', details: { storagePath } });
+
+    if (Platform.OS === 'web') {
+      void pickFrom('library');
+      return;
+    }
+    const labels = PICKER_SOURCE_LABELS[language] ?? PICKER_SOURCE_LABELS.ua;
+    Alert.alert(labels.title, '', [
+      { text: labels.camera, onPress: () => { void pickFrom('camera'); } },
+      { text: labels.library, onPress: () => { void pickFrom('library'); } },
+      { text: labels.cancel, style: 'cancel' },
+    ]);
+  }, [language, limitReached, navigation, onBeforePickerOpen, onDebugEvent, pickFrom, storagePath, uid]);
 
   const removePhoto = useCallback((photoId: string) => {
     setSelected((current) => current.filter((photo) => photo.id !== photoId));
@@ -244,21 +257,25 @@ export default function PhotoUploadField({
                   </View>
                 )}
 
-                {/* Статус загрузки */}
-                <View style={[
-                  styles.statusBadge,
-                  photo.status === 'error' && styles.errorBadge,
-                  photo.status === 'uploaded' && styles.doneBadge,
-                ]}>
-                  {isUploading ? (
-                    <ActivityIndicator size="small" color="#fff" style={styles.spinner} />
-                  ) : null}
-                  <Text style={styles.statusText}>
-                    {isUploading && (photo.progress ?? 0) > 0 && (photo.progress ?? 0) < 100
-                      ? `${statusLabels[photo.status]} ${photo.progress}%`
-                      : statusLabels[photo.status]}
-                  </Text>
-                </View>
+                {/* Загрузка: большая зелёная шкала прогресса 0→100% */}
+                {isUploading ? (
+                  <View style={styles.uploadProgressWrap}>
+                    <View style={styles.uploadProgressTrack}>
+                      <View style={[styles.uploadProgressFill, { width: `${Math.max(8, photo.progress ?? 0)}%` }]} />
+                    </View>
+                    <Text style={styles.uploadProgressText}>
+                      {(photo.progress ?? 0) > 0 ? `${photo.progress}%` : statusLabels[photo.status]}
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={[
+                    styles.statusBadge,
+                    photo.status === 'error' && styles.errorBadge,
+                    photo.status === 'uploaded' && styles.doneBadge,
+                  ]}>
+                    <Text style={styles.statusText}>{statusLabels[photo.status]}</Text>
+                  </View>
+                )}
 
                 <TouchableOpacity
                   style={styles.removeButton}
@@ -275,7 +292,7 @@ export default function PhotoUploadField({
 
       <TouchableOpacity
         style={[styles.selectButton, limitReached && styles.selectButtonDisabled]}
-        onPress={() => { void openSelector(); }}
+        onPress={() => { void openPicker(); }}
         activeOpacity={0.86}
         disabled={limitReached}
       >
@@ -343,7 +360,34 @@ const styles = StyleSheet.create({
   doneBadge: { backgroundColor: 'rgba(38, 95, 71, 0.9)' },
   errorBadge: { backgroundColor: 'rgba(150, 56, 42, 0.9)' },
   statusText: { color: '#fff', fontSize: 10, fontWeight: '800' },
-  spinner: { width: 12, height: 12 },
+  uploadProgressWrap: {
+    position: 'absolute',
+    left: 6,
+    right: 6,
+    bottom: 6,
+    borderRadius: 9,
+    paddingHorizontal: 7,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(20, 28, 22, 0.84)',
+  },
+  uploadProgressTrack: {
+    height: 8,
+    borderRadius: 999,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.28)',
+  },
+  uploadProgressFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: '#4CAF50',
+  },
+  uploadProgressText: {
+    marginTop: 4,
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
   removeButton: {
     position: 'absolute',
     top: 6,

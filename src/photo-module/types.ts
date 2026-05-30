@@ -62,7 +62,3 @@ export type PhotoUploadTask = {
   updatedAt: number;
   metadata?: PhotoUploadMetadata;
 };
-
-export type MyPhotosScreenParams = {
-  selectMode?: boolean;
-};

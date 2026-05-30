@@ -13,7 +13,7 @@
  *   • User selects saved/rejected photos and sends them for review manually.
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -30,7 +30,7 @@ import {
 } from 'react-native';
 import { get, ref, query, orderByChild, onValue, update } from 'firebase/database';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { RouteProp, useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { RootState } from '../redux/store';
 import AppPhotoImage from '../components/AppPhotoImage';
@@ -40,9 +40,8 @@ import { safeLogError } from '../utils/errorLogger';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { showUserError } from '../utils/userFacingErrors';
 import { getBestPhotoUri, getPhotoThumbnailUri, ImageStorage } from './ImageStorage';
-import { PhotoSelector } from './PhotoSelector';
 import { UploadQueue } from './UploadQueue';
-import type { MyPhotosScreenParams, UserPhoto } from './types';
+import type { UserPhoto } from './types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -52,38 +51,8 @@ type Navigation = {
   canGoBack?: () => boolean;
   navigate?: (screen: string) => void;
 };
-type Route = RouteProp<Record<string, MyPhotosScreenParams | undefined>, string>;
 type PreviewPhoto = { uri: string; storagePath?: string };
 const MAX_USER_PHOTOS = 10;
-const SELECT_MODE_TEXT: Record<AppLanguage, {
-  emptyNotice: string;
-  waitNotice: string;
-  chooseReady: string;
-  waitTitle: string;
-  waitBody: string;
-}> = {
-  ua: {
-    emptyNotice: '\u0421\u043f\u043e\u0447\u0430\u0442\u043a\u0443 \u0434\u043e\u0434\u0430\u0439\u0442\u0435 \u0444\u043e\u0442\u043e \u0443 "\u041c\u043e\u0457 \u0444\u043e\u0442\u043e\u0433\u0440\u0430\u0444\u0456\u0457". \u041f\u043e\u0442\u0456\u043c \u043e\u0431\u0435\u0440\u0456\u0442\u044c \u0439\u043e\u0433\u043e \u0434\u043b\u044f \u0437\u0430\u044f\u0432\u043a\u0438.',
-    waitNotice: '\u0414\u043e\u0447\u0435\u043a\u0430\u0439\u0442\u0435\u0441\u044f, \u043f\u043e\u043a\u0438 \u043d\u0430 \u0444\u043e\u0442\u043e \u0437\u02bc\u044f\u0432\u0438\u0442\u044c\u0441\u044f "\u0413\u043e\u0442\u043e\u0432\u043e".',
-    chooseReady: '\u041e\u0431\u0435\u0440\u0456\u0442\u044c \u0444\u043e\u0442\u043e, \u044f\u043a\u0435 \u0445\u043e\u0447\u0435\u0442\u0435 \u043f\u0440\u0438\u043a\u0440\u0456\u043f\u0438\u0442\u0438 \u0434\u043e \u0437\u0430\u044f\u0432\u043a\u0438.',
-    waitTitle: '\u0424\u043e\u0442\u043e \u0449\u0435 \u0437\u0430\u0432\u0430\u043d\u0442\u0430\u0436\u0443\u0454\u0442\u044c\u0441\u044f',
-    waitBody: '\u0414\u043e\u0447\u0435\u043a\u0430\u0439\u0442\u0435\u0441\u044f \u0441\u0442\u0430\u0442\u0443\u0441\u0443 "\u0413\u043e\u0442\u043e\u0432\u043e" \u043d\u0430 \u0444\u043e\u0442\u043e, \u043f\u043e\u0442\u0456\u043c \u043d\u0430\u0442\u0438\u0441\u043d\u0456\u0442\u044c \u043d\u0430 \u043d\u044c\u043e\u0433\u043e.',
-  },
-  ru: {
-    emptyNotice: '\u0421\u043d\u0430\u0447\u0430\u043b\u0430 \u0434\u043e\u0431\u0430\u0432\u044c\u0442\u0435 \u0444\u043e\u0442\u043e \u0432 "\u041c\u043e\u0438 \u0444\u043e\u0442\u043e\u0433\u0440\u0430\u0444\u0438\u0438". \u041f\u043e\u0442\u043e\u043c \u0432\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0435\u0433\u043e \u0434\u043b\u044f \u0437\u0430\u044f\u0432\u043a\u0438.',
-    waitNotice: '\u0414\u043e\u0436\u0434\u0438\u0442\u0435\u0441\u044c, \u043f\u043e\u043a\u0430 \u043d\u0430 \u0444\u043e\u0442\u043e \u0431\u0443\u0434\u0435\u0442 \u043d\u0430\u043f\u0438\u0441\u0430\u043d\u043e "\u0413\u043e\u0442\u043e\u0432\u043e".',
-    chooseReady: '\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0444\u043e\u0442\u043e, \u043a\u043e\u0442\u043e\u0440\u043e\u0435 \u0445\u043e\u0442\u0438\u0442\u0435 \u043f\u0440\u0438\u043a\u0440\u0435\u043f\u0438\u0442\u044c \u043a \u0437\u0430\u044f\u0432\u043a\u0435.',
-    waitTitle: '\u0424\u043e\u0442\u043e \u0435\u0449\u0451 \u0437\u0430\u0433\u0440\u0443\u0436\u0430\u0435\u0442\u0441\u044f',
-    waitBody: '\u0414\u043e\u0436\u0434\u0438\u0442\u0435\u0441\u044c \u0441\u0442\u0430\u0442\u0443\u0441\u0430 "\u0413\u043e\u0442\u043e\u0432\u043e" \u043d\u0430 \u0444\u043e\u0442\u043e, \u043f\u043e\u0442\u043e\u043c \u043d\u0430\u0436\u043c\u0438\u0442\u0435 \u043d\u0430 \u043d\u0435\u0433\u043e.',
-  },
-  en: {
-    emptyNotice: 'First add a photo to My photos. Then choose it for the request.',
-    waitNotice: 'Wait until the photo says "Ready".',
-    chooseReady: 'Choose the photo you want to attach to the request.',
-    waitTitle: 'Photo is still uploading',
-    waitBody: 'Wait until the photo says "Ready", then tap it.',
-  },
-};
 
 /** A photo record fetched from RTDB (user_photos/{uid} node). */
 type RtdbPhoto = {
@@ -258,15 +227,12 @@ const SectionHeader: React.FC<{ label: string; count: number; color?: string }> 
 
 const MyPhotosScreen: React.FC = () => {
   const navigation = useNavigation<Navigation>();
-  const route = useRoute<Route>();
   const language = useSelector(
     (state: RootState) => state.language?.current ?? 'ua',
   ) as AppLanguage;
   const uid = useSelector((state: RootState) => state.auth.user?.id ?? '');
   const userEmail = useSelector((state: RootState) => state.auth.user?.email ?? '');
   const text = UI_TEXT[language] ?? UI_TEXT.ru;
-  const selectText = SELECT_MODE_TEXT[language] ?? SELECT_MODE_TEXT.ru;
-  const selectMode = Boolean(route.params?.selectMode);
 
   const [localPhotos, setLocalPhotos] = useState<UserPhoto[]>([]);
   const [rtdbPhotos, setRtdbPhotos] = useState<RtdbPhoto[]>([]);
@@ -276,7 +242,6 @@ const MyPhotosScreen: React.FC = () => {
   const [selectedForReview, setSelectedForReview] = useState<string[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [previewPhoto, setPreviewPhoto] = useState<PreviewPhoto | null>(null);
-  const selectedForAttachmentRef = useRef(false);
 
   const userId = uid || userEmail || 'local-user';
 
@@ -302,9 +267,6 @@ const MyPhotosScreen: React.FC = () => {
   const limitReached = totalPhotoCount >= MAX_USER_PHOTOS;
   const addButtonDisabled = limitReached || adding;
   const selectedCount = selectedForReview.length;
-  const hasUploadingLocalPhotos = displayedLocalPhotos.some(
-    (photo) => photo.status === 'queued' || photo.status === 'uploading',
-  );
 
   const handleBack = useCallback(() => {
     if (typeof navigation.canGoBack === 'function' && navigation.canGoBack()) {
@@ -318,11 +280,8 @@ const MyPhotosScreen: React.FC = () => {
     const unsubscribe = ImageStorage.subscribe((items) =>
       setLocalPhotos(items.filter((item) => !item.deleted)),
     );
-    return () => {
-      unsubscribe();
-      if (selectMode && !selectedForAttachmentRef.current) PhotoSelector.cancel();
-    };
-  }, [selectMode]); // eslint-disable-line react-hooks/exhaustive-deps
+    return unsubscribe;
+  }, []);
 
   // Real-time listener for RTDB photos — syncs when moderator approves/rejects
   useEffect(() => {
@@ -385,11 +344,10 @@ const MyPhotosScreen: React.FC = () => {
     async (source: 'camera' | 'library') => {
       if (adding) return;
       setAdding(true);
-      let created: UserPhoto | null = null;
       try {
         // Photo is saved locally with status='local' — no Firebase upload yet.
         // Upload happens only when the photo is attached to a form and submitted.
-        created = await (source === 'camera'
+        await (source === 'camera'
           ? photoService.addFromCamera({ userId, type: 'gallery' })
           : photoService.addFromLibrary({ userId, type: 'gallery' }));
       } catch (error) {
@@ -397,15 +355,8 @@ const MyPhotosScreen: React.FC = () => {
       } finally {
         setAdding(false);
       }
-      // In select mode a freshly added photo is attached immediately, so the user
-      // doesn't have to tap it again in the grid (status 'local' is accepted by the form).
-      if (created && selectMode) {
-        selectedForAttachmentRef.current = true;
-        PhotoSelector.select(created);
-        handleBack();
-      }
     },
-    [adding, language, userId, selectMode, handleBack],
+    [adding, language, userId],
   );
 
   const addPhoto = useCallback(async () => {
@@ -495,35 +446,16 @@ const MyPhotosScreen: React.FC = () => {
     [text],
   );
 
-  const selectPhoto = useCallback(
-    (photo: UserPhoto) => {
-      if (!selectMode) return;
-      // Allow 'local' photos — PhotoUploadField will enqueue them for upload on selection.
-      // Block only photos that are actively uploading or errored.
-      if (photo.status === 'uploading' || photo.status === 'queued' || photo.status === 'error') {
-        Alert.alert(selectText.waitTitle, selectText.waitBody);
-        return;
-      }
-      selectedForAttachmentRef.current = true;
-      PhotoSelector.select(photo);
-      handleBack();
-    },
-    [handleBack, selectMode, selectText],
-  );
-
   const renderLocalPhoto = ({ item }: { item: UserPhoto }) => {
     const displayUri = getPhotoThumbnailUri(item) || getBestPhotoUri(item) || item.localUri || '';
     const busy = (item.status === 'uploading' || item.status === 'queued') && deletingId !== item.id;
-    const uploadProgress = Math.max(0, Math.min(100, item.progress ?? (item.status === 'uploaded' ? 100 : 0)));
 
     return (
       <TouchableOpacity
         style={styles.photoCard}
         activeOpacity={0.86}
         onPress={() => {
-          if (selectMode) {
-            selectPhoto(item);
-          } else if (displayUri) {
+          if (displayUri) {
             setPreviewPhoto({
               uri: getBestPhotoUri(item) || displayUri,
               storagePath: item.storagePath,
@@ -548,25 +480,7 @@ const MyPhotosScreen: React.FC = () => {
           {busy ? <ActivityIndicator size="small" color="#fff" /> : null}
           <Text style={styles.statusText}>{statusLabels[item.status]}</Text>
         </View>
-        {selectMode && item.status !== 'uploaded' ? (
-          <View style={styles.uploadProgressWrap}>
-            <View style={styles.uploadProgressTrack}>
-              <View style={[styles.uploadProgressFill, { width: `${Math.max(8, uploadProgress)}%` }]} />
-            </View>
-            <Text style={styles.uploadProgressText}>
-              {uploadProgress > 0 ? `${uploadProgress}%` : selectText.waitNotice}
-            </Text>
-          </View>
-        ) : null}
-        {selectMode ? (
-          <View style={styles.selectOverlay}>
-            <MaterialCommunityIcons
-              name={item.status === 'uploaded' || item.status === 'local' ? 'check-circle-outline' : 'progress-upload'}
-              size={24}
-              color="#fff"
-            />
-          </View>
-        ) : item.status === 'error' ? (
+        {item.status === 'error' ? (
           <TouchableOpacity
             style={styles.retryButton}
             onPress={() => retryPhoto(item)}
@@ -610,23 +524,6 @@ const MyPhotosScreen: React.FC = () => {
         style={[sStyles.rtdbCard, selected && styles.selectedCard]}
         activeOpacity={0.88}
         onPress={() => {
-          if (selectMode) {
-            selectedForAttachmentRef.current = true;
-            PhotoSelector.select({
-              id: photo.id,
-              userId,
-              localUri: photo.imageUri,
-              imageUrl: photo.imageUri,
-              status: 'uploaded',
-              thumbnail: photo.imageUri,
-              storagePath: photo.storagePath,
-              createdAt: photo.uploadedAt || Date.now(),
-              updatedAt: photo.uploadedAt || Date.now(),
-              moderationStatus: photo.status,
-            });
-            handleBack();
-            return;
-          }
           if (selectable) {
             togglePhotoForReview(photo);
             return;
@@ -674,27 +571,14 @@ const MyPhotosScreen: React.FC = () => {
         </TouchableOpacity>
         <View style={styles.headerCopy}>
           <Text style={styles.title}>{text.title}</Text>
-          <Text style={styles.subtitle}>{selectMode ? text.selectHint : text.subtitle}</Text>
+          <Text style={styles.subtitle}>{text.subtitle}</Text>
         </View>
       </View>
 
-      {limitReached && !selectMode ? (
+      {limitReached ? (
         <View style={styles.pendingBanner}>
           <MaterialCommunityIcons name="image-multiple-outline" size={18} color="#FFF8E1" />
           <Text style={styles.pendingBannerText}>{text.limitReached}</Text>
-        </View>
-      ) : null}
-
-      {selectMode ? (
-        <View style={[styles.pendingBanner, hasAnyPhotos ? styles.selectModeBanner : undefined]}>
-          <MaterialCommunityIcons
-            name={hasAnyPhotos ? (hasUploadingLocalPhotos ? 'progress-upload' : 'gesture-tap') : 'image-plus'}
-            size={18}
-            color="#FFF8E1"
-          />
-          <Text style={styles.pendingBannerText}>
-            {!hasAnyPhotos ? selectText.emptyNotice : hasUploadingLocalPhotos ? selectText.waitNotice : selectText.chooseReady}
-          </Text>
         </View>
       ) : null}
 
@@ -727,7 +611,7 @@ const MyPhotosScreen: React.FC = () => {
               count={rtdbPhotos.length}
               color={SCREEN_THEME.enamelBlueDark}
             />
-            <Text style={styles.reviewHint}>{selectMode ? selectText.chooseReady : text.selectForReview}</Text>
+            <Text style={styles.reviewHint}>{text.selectForReview}</Text>
             <View style={styles.grid}>
               {rtdbPhotos.map(renderRtdbPhoto)}
             </View>
@@ -851,9 +735,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: '#E65100',
   },
-  selectModeBanner: {
-    backgroundColor: SCREEN_THEME.enamelBlueDark,
-  },
   pendingBannerText: {
     flex: 1,
     color: '#FFF8E1',
@@ -929,33 +810,6 @@ const styles = StyleSheet.create({
     backgroundColor: SCREEN_THEME.enamelBlueDark,
   },
   statusText: { color: '#fff', fontSize: 11, fontWeight: '900' },
-  uploadProgressWrap: {
-    position: 'absolute',
-    left: 8,
-    right: 8,
-    bottom: 42,
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 7,
-    backgroundColor: 'rgba(33, 42, 52, 0.76)',
-  },
-  uploadProgressTrack: {
-    height: 6,
-    borderRadius: 999,
-    overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.28)',
-  },
-  uploadProgressFill: {
-    height: '100%',
-    borderRadius: 999,
-    backgroundColor: '#FFFFFF',
-  },
-  uploadProgressText: {
-    marginTop: 5,
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '900',
-  },
   deleteButton: {
     position: 'absolute',
     top: 8,
@@ -975,17 +829,6 @@ const styles = StyleSheet.create({
     height: 34,
     borderRadius: 17,
     backgroundColor: 'rgba(91, 38, 29, 0.82)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  selectOverlay: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(38, 95, 71, 0.88)',
     alignItems: 'center',
     justifyContent: 'center',
   },
