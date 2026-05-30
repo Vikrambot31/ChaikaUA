@@ -19,7 +19,7 @@ import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { Picker } from '@react-native-picker/picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
-import { equalTo, get, orderByChild, query, ref, runTransaction, set } from 'firebase/database';
+import { equalTo, get, onValue, orderByChild, query, ref, runTransaction, set } from 'firebase/database';
 import { database } from '../firebase-config';
 import { ensureFirebaseAuth } from '../firebase-auth-session';
 import { RootState } from '../redux/store';
@@ -424,6 +424,7 @@ export default function ZhkBusinessListScreen() {
   const t = UI_TEXT[language];
 
   const [items, setItems] = useState<BusinessItem[]>([]);
+  const [localBusinessLikes, setLocalBusinessLikes] = useState<Record<string, Record<string, true>>>({});
   const [dailyRatingUsage, setDailyRatingUsage] = useState<DailyRatingUsage | null>(null);
   const [ratingTargetId, setRatingTargetId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -509,6 +510,25 @@ export default function ZhkBusinessListScreen() {
   }, []);
 
   useEffect(() => { void loadData(); }, [loadData]);
+
+  useEffect(() => {
+    const unsubscribe = onValue(ref(database, 'feed_likes/local_business'), (snapshot) => {
+      const value = snapshot.val() as Record<string, unknown> | null;
+      const next: Record<string, Record<string, true>> = {};
+      if (value && typeof value === 'object') {
+        Object.entries(value).forEach(([itemId, likes]) => {
+          if (!likes || typeof likes !== 'object') return;
+          const normalizedLikes: Record<string, true> = {};
+          Object.entries(likes as Record<string, unknown>).forEach(([uid, liked]) => {
+            if (liked === true) normalizedLikes[uid] = true;
+          });
+          next[itemId] = normalizedLikes;
+        });
+      }
+      setLocalBusinessLikes(next);
+    });
+    return unsubscribe;
+  }, []);
 
   const loadMyRequest = useCallback(async () => {
     if (!user?.id) {
@@ -755,40 +775,30 @@ export default function ZhkBusinessListScreen() {
       Alert.alert(t.like, t.signInToLike);
       return;
     }
-    const current = items.find((entry) => entry.id === itemId);
+    const current = {
+      ...(items.find((entry) => entry.id === itemId) ?? {}),
+      likesByUserId: {
+        ...(items.find((entry) => entry.id === itemId)?.likesByUserId ?? {}),
+        ...(localBusinessLikes[itemId] ?? {}),
+      },
+    } as BusinessItem;
     if (current?.likesByUserId?.[uid]) return;
 
     try {
-      const result = await runTransaction(ref(database, `local_business/${itemId}`), (rawCurrent) => {
-        const data = (rawCurrent || {}) as Record<string, unknown>;
-        const likesByUserId = (data.likesByUserId && typeof data.likesByUserId === 'object'
-          ? data.likesByUserId
-          : {}) as Record<string, true>;
-        if (likesByUserId[uid]) return rawCurrent;
-        const nextLikesByUserId: Record<string, true> = { ...likesByUserId, [uid]: true };
-        return {
-          ...data,
-          likesByUserId: nextLikesByUserId,
-          likeCount: Object.keys(nextLikesByUserId).length,
-        };
-      });
-      const updated = result.snapshot.val() as (BusinessItem | null);
-      if (!updated) return;
+      await runTransaction(ref(database, `feed_likes/local_business/${itemId}/${uid}`), (rawCurrent) => (rawCurrent ? rawCurrent : true));
       setItems((prev) => prev.map((entry) => {
         if (entry.id !== itemId) return entry;
-        const likesByUserId = updated.likesByUserId && typeof updated.likesByUserId === 'object'
-          ? updated.likesByUserId
-          : {};
+        const likesByUserId: Record<string, true> = { ...(entry.likesByUserId ?? {}), [uid]: true };
         return {
           ...entry,
           likesByUserId,
-          likeCount: typeof updated.likeCount === 'number' ? updated.likeCount : Object.keys(likesByUserId).length,
+          likeCount: Object.keys({ ...likesByUserId, ...(localBusinessLikes[itemId] ?? {}) }).length,
         };
       }));
     } catch {
       // keep current state on network/db error
     }
-  }, [isAuthenticated, items, t.like, t.signInToLike, user?.id]);
+  }, [isAuthenticated, items, localBusinessLikes, t.like, t.signInToLike, user?.id]);
 
   const handleRating = useCallback(async (itemId: string, stars: number) => {
     const uid = user?.id;
@@ -950,17 +960,23 @@ export default function ZhkBusinessListScreen() {
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
         >
-          {filtered.map((item) => (
+          {filtered.map((item) => {
+            const likesByUserId = {
+              ...(item.likesByUserId ?? {}),
+              ...(localBusinessLikes[item.id] ?? {}),
+            };
+            return (
               <BusinessCard
                 key={item.id}
-                item={item}
+                item={{ ...item, likesByUserId, likeCount: Object.keys(likesByUserId).length }}
                 avatarUri={(item.userId && avatarByUserId[item.userId]) || ''}
                 onLike={handleLike}
                 onOpenRating={setRatingTargetId}
                 currentUserId={user?.id}
-              onContact={item.userId && item.userId !== user?.id ? () => openContactModal({ userId: item.userId as string, name: item.contactName, sourceType: 'buysell', sourceId: item.id, sourceTitle: item.contactName }) : undefined}
+                onContact={item.userId && item.userId !== user?.id ? () => openContactModal({ userId: item.userId as string, name: item.contactName, sourceType: 'buysell', sourceId: item.id, sourceTitle: item.contactName }) : undefined}
               />
-          ))}
+            );
+          })}
         </ScrollView>
       )}
 

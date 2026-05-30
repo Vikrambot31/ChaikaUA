@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import React, { Suspense, useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { NavigationContainer, createNavigationContainerRef, getStateFromPath as getNavigationStateFromPath, useNavigation, type LinkingOptions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -70,6 +70,7 @@ import type { Request, Place } from '../types/app';
 import type { NewsItem as OsbbEditableNewsItem } from '../screens/OSBB-AddNews';
 import { selectAuthBootstrapped, selectIsAuthenticated, selectUser } from '../redux/selectors';
 import { subscribeCurrentUserSecurityRole, type SecurityRole } from '../services/securityRoles';
+import { TrustedAccessContext } from '../contexts/TrustedAccessContext';
 import { recordScreenOpenDiagnostic } from '../services/liveDiagnosticsService';
 import { addBreadcrumb } from '../services/breadcrumbService';
 import { setSnapshotCurrentScreen } from '../services/stateSnapshotService';
@@ -377,15 +378,18 @@ function GuardedScreen({
 }) {
   const isBootstrapped = useSelector(selectAuthBootstrapped);
   const isAuthenticated = useSelector(selectIsAuthenticated);
+  const { isTrusted, isLoading: isTrustedLoading } = useContext(TrustedAccessContext);
 
   const [roleStatus, setRoleStatus] = useState<'loading' | 'allowed' | 'denied'>(
     mode === 'admin' || mode === 'moderator' || mode === 'trusted' ? 'loading' : 'allowed',
   );
+  // For trusted mode: null = role subscription hasn't fired yet (still loading)
+  const [isPrivilegedRole, setIsPrivilegedRole] = useState<boolean | null>(
+    mode === 'trusted' ? null : false,
+  );
 
   const navigation = useNavigation();
 
-  // TrustedAccessContext is provided by SoftInviteAccessGate and reflects
-  // the user's invite/sponsor status loaded from the server.
   useEffect(() => {
     if (mode !== 'admin' && mode !== 'moderator' && mode !== 'trusted') {
       return;
@@ -399,20 +403,36 @@ function GuardedScreen({
       } else if (mode === 'moderator') {
         setRoleStatus(snapshot.role === 'admin' || snapshot.role === 'moderator' ? 'allowed' : 'denied');
       } else {
-        // trusted mode: admin/mod bypass; regular users fall through to context check
-        setRoleStatus(snapshot.role === 'admin' || snapshot.role === 'moderator' ? 'allowed' : 'denied');
+        // trusted mode: track privileged status only; roleStatus derived via TrustedAccessContext effect
+        setIsPrivilegedRole(snapshot.role === 'admin' || snapshot.role === 'moderator');
       }
     });
     return unsubscribe;
   }, [mode, isAuthenticated, isBootstrapped]);
 
+  // For trusted mode: derive roleStatus from role subscription + TrustedAccessContext.
+  // isPrivilegedRole === null means the role subscription hasn't fired yet — keep loading
+  // to avoid premature denial while Firebase resolves.
   useEffect(() => {
-    if (roleStatus === 'denied' && mode !== 'trusted') {
+    if (mode !== 'trusted') return;
+    if (isPrivilegedRole === true) {
+      setRoleStatus('allowed');
+      return;
+    }
+    if (isPrivilegedRole === null || isTrustedLoading) {
+      setRoleStatus('loading');
+      return;
+    }
+    setRoleStatus(isTrusted ? 'allowed' : 'denied');
+  }, [mode, isPrivilegedRole, isTrusted, isTrustedLoading]);
+
+  useEffect(() => {
+    if (roleStatus === 'denied') {
       navigation.reset({ index: 0, routes: [{ name: 'MainTabs' as never }] });
     }
-  }, [roleStatus, navigation, mode]);
+  }, [roleStatus, navigation]);
 
-  if (roleStatus === 'loading' && (mode === 'admin' || mode === 'moderator')) {
+  if (roleStatus === 'loading') {
     return <GuardFallback />;
   }
 

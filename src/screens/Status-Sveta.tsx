@@ -422,18 +422,6 @@ const ElectricityStatusScreen: React.FC = () => {
               renderItem={({ item }) => (
                 <View style={styles.reportItem}>
                   <View style={styles.reportLeft}>
-                    <View
-                      style={[
-                        styles.reportIcon,
-                        { backgroundColor: item.status === 'on' ? '#4CAF50' : '#FF9800' },
-                      ]}
-                    >
-                      <MaterialCommunityIcons
-                        name={item.status === 'on' ? 'lightning-bolt' : 'candle'}
-                        size={20}
-                        color="#FFFFFF"
-                      />
-                    </View>
                     <View style={styles.reportInfo}>
                       <Text style={styles.reportStatus}>
                         {item.status === 'on' ? text.lightOn : text.lightOff}
@@ -449,6 +437,13 @@ const ElectricityStatusScreen: React.FC = () => {
                       minute: '2-digit',
                     })}
                   </Text>
+                  <View style={styles.reportStatusImageFrame}>
+                    <Image
+                      source={item.status === 'on' ? require('../../assets/svet-plus3.webp') : require('../../assets/svet-plus4.webp')}
+                      style={styles.reportStatusImage}
+                      resizeMode="cover"
+                    />
+                  </View>
                 </View>
               )}
             />
@@ -469,18 +464,6 @@ const ElectricityStatusScreen: React.FC = () => {
               renderItem={({ item }) => (
                 <View style={styles.reportItem}>
                   <View style={styles.reportLeft}>
-                    <View
-                      style={[
-                        styles.reportIcon,
-                        { backgroundColor: item.status === 'on' ? '#4CAF50' : '#FF9800' },
-                      ]}
-                    >
-                      <MaterialCommunityIcons
-                        name={item.status === 'on' ? 'lightbulb-on' : 'lightbulb-off-outline'}
-                        size={16}
-                        color="#FFFFFF"
-                      />
-                    </View>
                     <View style={styles.reportInfo}>
                       <Text style={styles.reportStatus}>
                         {item.status === 'on' ? text.lightOnShort : text.lightOffShort}
@@ -500,6 +483,13 @@ const ElectricityStatusScreen: React.FC = () => {
                       minute: '2-digit',
                     })}
                   </Text>
+                  <View style={styles.reportStatusImageFrame}>
+                    <Image
+                      source={item.status === 'on' ? require('../../assets/svet-plus3.webp') : require('../../assets/svet-plus4.webp')}
+                      style={styles.reportStatusImage}
+                      resizeMode="cover"
+                    />
+                  </View>
                 </View>
               )}
             />
@@ -520,37 +510,40 @@ const ElectricityStatusScreen: React.FC = () => {
                 : `${selectedStreet || '-'}, ${selectedBuilding?.houseNumber || '-'}`;
               const isOn = item.status === 'on';
               const statusColor = isOn ? '#2E7D32' : '#EF8E18';
-              const statusBg = isOn ? '#E8F5E9' : '#FFF3E0';
               const statusText = isOn ? text.lightOnShort : text.lightOffShort;
               const avatarUri = pickUserAvatarUri(item);
 
               return (
                 <View key={`mini-feed-${item.id}`} style={styles.residentItemCard}>
-                  <View style={styles.residentTopRow}>
-                    <View style={styles.residentUserRow}>
-                      <MiniUserAvatar uri={avatarUri} name={item.userName || text.resident} size={34} borderRadius={11} backgroundColor="#6A8BA5" />
-                      <View style={styles.residentTextBlock}>
-                        <Text style={styles.residentName}>{item.userName || text.resident}</Text>
-                        <Text style={styles.residentDate}>{formatReportDateTime(item.createdAt)}</Text>
+                  <View style={styles.residentItemMain}>
+                    <View style={styles.residentItemContent}>
+                      <View style={styles.residentTopRow}>
+                        <View style={styles.residentUserRow}>
+                          <MiniUserAvatar uri={avatarUri} name={item.userName || text.resident} size={34} borderRadius={11} backgroundColor="#6A8BA5" />
+                          <View style={styles.residentTextBlock}>
+                            <Text style={styles.residentName}>{item.userName || text.resident}</Text>
+                            <Text style={styles.residentDate}>{formatReportDateTime(item.createdAt)}</Text>
+                          </View>
+                        </View>
+                      </View>
+
+                      <View style={styles.residentMetaRow}>
+                        <MaterialCommunityIcons name="map-marker-outline" size={14} color={SCREEN_THEME.textMuted} />
+                        <Text style={styles.residentMetaText}>{address}</Text>
+                      </View>
+
+                      <View style={styles.residentMetaRow}>
+                        <MaterialCommunityIcons name={isOn ? 'flash' : 'power-plug-off-outline'} size={14} color={statusColor} />
+                        <Text style={[styles.residentMetaText, { color: statusColor, fontWeight: '800' }]}>{statusText}</Text>
                       </View>
                     </View>
-                    <View style={[styles.statusSquare, { backgroundColor: statusBg, borderColor: statusColor }]}>
-                      <MaterialCommunityIcons
-                        name={isOn ? 'lightbulb-on-outline' : 'lightbulb-off-outline'}
-                        size={14}
-                        color={statusColor}
+                    <View style={styles.residentStatusImageFrame}>
+                      <Image
+                        source={isOn ? require('../../assets/svet-plus3.webp') : require('../../assets/svet-plus4.webp')}
+                        style={styles.reportStatusImage}
+                        resizeMode="cover"
                       />
                     </View>
-                  </View>
-
-                  <View style={styles.residentMetaRow}>
-                    <MaterialCommunityIcons name="map-marker-outline" size={14} color={SCREEN_THEME.textMuted} />
-                    <Text style={styles.residentMetaText}>{address}</Text>
-                  </View>
-
-                  <View style={styles.residentMetaRow}>
-                    <MaterialCommunityIcons name={isOn ? 'flash' : 'power-plug-off-outline'} size={14} color={statusColor} />
-                    <Text style={[styles.residentMetaText, { color: statusColor, fontWeight: '800' }]}>{statusText}</Text>
                   </View>
                 </View>
               );
@@ -659,8 +652,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 72,
-    backgroundColor: '#FF9800',
-    borderColor: '#E65100',
+    backgroundColor: '#111111',
+    borderColor: '#000000',
   },
   statusButtonText: {
     fontSize: 12,
@@ -715,11 +708,20 @@ const styles = StyleSheet.create({
   residentItemCard: {
     backgroundColor: SCREEN_THEME.paperStrong,
     borderRadius: 16,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
     marginBottom: 7,
     borderWidth: 1,
     borderColor: '#E4D0AB',
+    overflow: 'hidden',
+  },
+  residentItemMain: {
+    minHeight: 92,
+    flexDirection: 'row',
+    alignItems: 'stretch',
+  },
+  residentItemContent: {
+    flex: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
   residentTopRow: {
     flexDirection: 'row',
@@ -768,6 +770,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     flex: 1,
   },
+  residentStatusImageFrame: {
+    width: 78,
+    alignSelf: 'stretch',
+    overflow: 'hidden',
+    borderTopLeftRadius: 28,
+    borderBottomLeftRadius: 28,
+    borderTopRightRadius: 15,
+    borderBottomRightRadius: 15,
+    borderLeftWidth: 1,
+    borderLeftColor: '#E4D0AB',
+  },
   reportsHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -805,8 +818,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 10,
-    paddingHorizontal: 8,
+    minHeight: 70,
+    paddingLeft: 8,
+    paddingVertical: 6,
     borderBottomWidth: 1,
     borderBottomColor: SCREEN_THEME.borderSoft,
   },
@@ -822,6 +836,19 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  reportStatusImageFrame: {
+    width: 58,
+    height: 58,
+    marginLeft: 8,
+    overflow: 'hidden',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E4D0AB',
+  },
+  reportStatusImage: {
+    width: '100%',
+    height: '100%',
   },
   reportInfo: {
     flex: 1,
