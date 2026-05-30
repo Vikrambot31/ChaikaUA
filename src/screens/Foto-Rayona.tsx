@@ -1,7 +1,6 @@
-import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -13,11 +12,9 @@ import FeedLikeButton from '../components/FeedLikeButton';
 import MiniTabBar from '../components/MiniTabBar';
 import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField';
 import { database } from '../firebase-core';
-import { photoAPI } from '../firebase-config';
 import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import InlineFieldHint from '../components/InlineFieldHint';
-import { useSoftToast } from '../hooks/useSoftToast';
 import { logClientError } from '../utils/errorLogger';
 
 const MAX_PHOTOS = 50;
@@ -25,7 +22,6 @@ const UPLOAD_BATCH_SIZE = 3; // слотов в виджете загрузки 
 const NUM_COLUMNS = 3;
 const GRID_GAP = 3;
 const GALLERY_STORAGE_PATH = 'community_photos';
-const SUBMITTED_GALLERY_PHOTOS_KEY = '@chaika:foto_rayona_submitted_paths:v1';
 
 type Lang = 'ua' | 'ru' | 'en';
 
@@ -40,6 +36,8 @@ const UI_TEXT = {
     photoCounter: (count: number, max: number) => `Фото: ${count} / ${max}`,
     limitReached: 'Досягнуто ліміт фото. Нові фото можна буде додати після видалення старих.',
     sent: 'Фото надіслано на модерацію',
+    pendingStatus: 'На модерації',
+    uploadProgress: (progress: number) => `завантаження ${progress}%`,
     sendToModeration: 'Надіслати на модерацію',
     noPhotosReady: 'Спочатку дочекайтесь завершення завантаження фото.',
     sendError: 'Не вдалося надіслати фото на модерацію. Спробуйте ще раз.',
@@ -57,6 +55,8 @@ const UI_TEXT = {
     photoCounter: (count: number, max: number) => `Фото: ${count} / ${max}`,
     limitReached: 'Достигнут лимит фото. Новые фото можно будет добавить после удаления старых.',
     sent: 'Фото отправлено на модерацию',
+    pendingStatus: 'На модерации',
+    uploadProgress: (progress: number) => `загрузка ${progress}%`,
     sendToModeration: 'Отправить на модерацию',
     noPhotosReady: 'Сначала дождитесь завершения загрузки фото.',
     sendError: 'Не удалось отправить фото на модерацию. Попробуйте ещё раз.',
@@ -74,6 +74,8 @@ const UI_TEXT = {
     photoCounter: (count: number, max: number) => `Photos: ${count} / ${max}`,
     limitReached: 'Photo limit reached. New photos can be added after old ones are removed.',
     sent: 'Photo sent for moderation',
+    pendingStatus: 'In moderation',
+    uploadProgress: (progress: number) => `uploading ${progress}%`,
     sendToModeration: 'Send for moderation',
     noPhotosReady: 'Wait until photo upload finishes first.',
     sendError: 'Failed to send photo for moderation. Try again.',
@@ -88,7 +90,8 @@ type GalleryPhoto = {
   uri: string;
   storagePath: string;
   createdAt: number;
-  status?: UploadedPhoto['status'];
+  status?: UploadedPhoto['status'] | 'pending';
+  progress?: number;
 };
 
 // Структура узла community_photos в RTDB
@@ -122,28 +125,58 @@ const rtdbIdFromStoragePath = (storagePath: string): string => {
   return filename.replace(/\.[^.]+$/, '') || storagePath;
 };
 
-const GalleryPhotoItem = memo(function GalleryPhotoItem({ item, size, currentUserId }: { item: GalleryPhoto; size: number; currentUserId?: string }) {
+const GalleryPhotoItem = memo(function GalleryPhotoItem({
+  item,
+  size,
+  currentUserId,
+  pendingLabel,
+  uploadProgressLabel,
+}: {
+  item: GalleryPhoto;
+  size: number;
+  currentUserId?: string;
+  pendingLabel: string;
+  uploadProgressLabel: (progress: number) => string;
+}) {
+  const isPending = item.status === 'pending';
+  const isUploading = item.status === 'uploading';
+  const isLocalPhoto = isPending || isUploading;
+  const progress = Math.min(100, Math.max(0, Math.round(item.progress ?? (isPending ? 100 : 0))));
   return (
-    <View style={[styles.photoCell, { width: size, height: size }]}>
-      <AppPhotoImage
-        uri={item.uri}
-        storagePath={item.storagePath}
-        style={styles.photo}
-        resizeMode="cover"
-        debugLabel={`DistrictGallery:${item.id}`}
-        showDebugInfo={false}
-      />
-      {item.status === 'uploading' ? (
-        <View style={styles.uploadingOverlay}>
-          <ActivityIndicator color="#FFFFFF" size="small" />
+    <View style={[styles.photoCell, isLocalPhoto && styles.pendingPhotoCell, { width: size, height: size }]}>
+      {item.uri ? (
+        <AppPhotoImage
+          uri={item.uri}
+          storagePath={item.storagePath}
+          style={styles.photo}
+          resizeMode="cover"
+          debugLabel={`DistrictGallery:${item.id}`}
+          showDebugInfo={false}
+        />
+      ) : (
+        <View style={styles.photoFallback} />
+      )}
+      {isUploading ? (
+        <View style={styles.uploadProgressOverlay}>
+          <View style={styles.uploadProgressTrack}>
+            <View style={[styles.uploadProgressFill, { width: `${Math.max(6, progress)}%` }]} />
+          </View>
+          <Text style={styles.uploadProgressText}>{uploadProgressLabel(progress)}</Text>
         </View>
       ) : null}
-      <FeedLikeButton
-        currentUserId={currentUserId}
-        likePath="feed_likes/district_photos"
-        likeId={item.id}
-        style={styles.photoLikeButton}
-      />
+      {isPending ? (
+        <View style={styles.pendingBadge}>
+          <Text style={styles.pendingBadgeText}>{pendingLabel}</Text>
+        </View>
+      ) : null}
+      {!isLocalPhoto ? (
+        <FeedLikeButton
+          currentUserId={currentUserId}
+          likePath="feed_likes/district_photos"
+          likeId={item.id}
+          style={styles.photoLikeButton}
+        />
+      ) : null}
     </View>
   );
 });
@@ -153,35 +186,11 @@ export default function FotoRayonaScreen() {
   const user = useSelector((state: RootState) => state.auth.user);
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
   const text = UI_TEXT[language];
-  const toast = useSoftToast();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [remotePhotos, setRemotePhotos] = useState<GalleryPhoto[]>([]);
   const [localPhotos, setLocalPhotos] = useState<GalleryPhoto[]>([]);
-  const [uploadedPhotos, setUploadedPhotos] = useState<UploadedPhoto[]>([]);
   const [photoTitle, setPhotoTitle] = useState('');
   const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
-  const [submittedPathsVersion, setSubmittedPathsVersion] = useState(0);
-
-  // Отслеживаем пути уже отправленных на модерацию фото (чтобы не дублировать)
-  const submittedPathsRef = useRef<Set<string>>(new Set());
-
-  useEffect(() => {
-    void AsyncStorage.getItem(SUBMITTED_GALLERY_PHOTOS_KEY)
-      .then((raw) => {
-        if (!raw) return;
-        const parsed = JSON.parse(raw) as unknown;
-        if (Array.isArray(parsed)) {
-          submittedPathsRef.current = new Set(parsed.filter((item): item is string => typeof item === 'string'));
-          setSubmittedPathsVersion((version) => version + 1);
-        }
-      })
-      .catch(() => {});
-  }, []);
-
-  const persistSubmittedPaths = useCallback(async () => {
-    await AsyncStorage.setItem(SUBMITTED_GALLERY_PHOTOS_KEY, JSON.stringify(Array.from(submittedPathsRef.current)));
-  }, []);
 
   // Читаем одобренные фото из community_photos (после модерации)
   useEffect(() => {
@@ -261,10 +270,9 @@ export default function FotoRayonaScreen() {
     return unsubscribe;
   }, []);
 
-  // После успешной загрузки показываем фото локально. В модерацию отправляет отдельная кнопка.
+  // После выбора показываем фото локально, а очередь сама отправляет его на модерацию.
   const handlePhotosChange = useCallback(
     (photos: UploadedPhoto[]) => {
-      setUploadedPhotos(photos);
       // Оптимистичный UI: показываем локальные фото пока они грузятся / ждут модерации
       const mapped = photos
         .filter((photo) => photo.status !== 'error')
@@ -273,7 +281,8 @@ export default function FotoRayonaScreen() {
           uri: photo.downloadUrl || photo.thumbUri || photo.localUri,
           storagePath: photo.storagePath,
           createdAt: Date.now() - index,
-          status: photo.status,
+          status: (photo.status === 'done' ? 'pending' : photo.status) as GalleryPhoto['status'],
+          progress: photo.status === 'done' ? 100 : photo.progress,
         }))
         .filter((photo) => photo.uri || photo.storagePath)
         .reverse();
@@ -283,61 +292,9 @@ export default function FotoRayonaScreen() {
     [],
   );
 
-  const readyToSubmitPhotos = useMemo(
-    () => uploadedPhotos.filter((photo) =>
-      photo.status === 'done' &&
-      Boolean(photo.storagePath) &&
-      Boolean(photo.downloadUrl) &&
-      !submittedPathsRef.current.has(photo.storagePath as string),
-    ),
-    [submittedPathsVersion, uploadedPhotos],
-  );
-
-  const handleSubmitPhotos = useCallback(async () => {
-    if (!user?.id || sending) return;
-    if (readyToSubmitPhotos.length === 0) {
-      toast.showError(text.noPhotosReady);
-      return;
-    }
-
-    setSending(true);
-    try {
-      const title = photoTitle.trim() || 'Фото Чайки';
-      let sentCount = 0;
-      for (const photo of readyToSubmitPhotos) {
-        if (!photo.storagePath || !photo.downloadUrl || submittedPathsRef.current.has(photo.storagePath)) continue;
-        const result = await photoAPI.addPhoto({
-          title,
-          imageUri: photo.downloadUrl,
-          storagePath: photo.storagePath,
-          uploadedBy: user.name ?? user.email ?? '',
-          target: 'gallery_public',
-          sourceScreen: 'FotoRayonaScreen',
-          sourceScreenLabel: 'Фото района',
-          sourceFeature: 'district_gallery_quick_upload',
-        });
-        if (!result.success) {
-          toast.showError(text.sendError);
-          continue;
-        }
-        submittedPathsRef.current.add(photo.storagePath);
-        sentCount += 1;
-      }
-      if (sentCount > 0) {
-        await persistSubmittedPaths();
-        setSubmittedPathsVersion((version) => version + 1);
-        toast.showSuccess(text.sent);
-      }
-    } catch {
-      toast.showError(text.sendError);
-    } finally {
-      setSending(false);
-    }
-  }, [persistSubmittedPaths, photoTitle, readyToSubmitPhotos, sending, text.noPhotosReady, text.sendError, text.sent, toast, user]);
-
   const photos = useMemo(() => {
     const seen = new Set<string>();
-    return [...localPhotos, ...remotePhotos]
+    return [...remotePhotos, ...localPhotos]
       .filter((photo) => {
         const identity = getPhotoIdentity(photo);
         if (!identity || seen.has(identity)) return false;
@@ -356,8 +313,16 @@ export default function FotoRayonaScreen() {
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: GalleryPhoto }) => <GalleryPhotoItem item={item} size={photoSize} currentUserId={user?.id} />,
-    [photoSize, user?.id],
+    ({ item }: { item: GalleryPhoto }) => (
+      <GalleryPhotoItem
+        item={item}
+        size={photoSize}
+        currentUserId={user?.id}
+        pendingLabel={text.pendingStatus}
+        uploadProgressLabel={text.uploadProgress}
+      />
+    ),
+    [photoSize, text.pendingStatus, text.uploadProgress, user?.id],
   );
 
   const header = useMemo(
@@ -391,29 +356,16 @@ export default function FotoRayonaScreen() {
                   maxPhotos={Math.min(UPLOAD_BATCH_SIZE, MAX_PHOTOS - photoCount)}
                   storagePath={GALLERY_STORAGE_PATH}
                   onPhotosChange={handlePhotosChange}
+                  hideSelectedPreview
+                  metadata={{
+                    title: photoTitle.trim() || 'Фото Чайки',
+                    sourceScreen: 'FotoRayonaScreen',
+                    sourceScreenLabel: 'Фото района',
+                    sourceFeature: 'district_gallery_quick_upload',
+                  }}
                 />
               )}
-              <TouchableOpacity
-                style={[styles.submitModerationButton, (sending || readyToSubmitPhotos.length === 0) && styles.submitModerationButtonDisabled]}
-                onPress={() => void handleSubmitPhotos()}
-                activeOpacity={0.82}
-                disabled={sending || readyToSubmitPhotos.length === 0}
-              >
-                {sending ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                ) : (
-                  <Text style={styles.submitModerationButtonText}>{text.sendToModeration}</Text>
-                )}
-              </TouchableOpacity>
               <InlineFieldHint message={text.moderationHint} type="hint" />
-              <TouchableOpacity
-                style={styles.fullFormButton}
-                onPress={() => navigation.navigate('PhotoUploadScreen')}
-                activeOpacity={0.82}
-              >
-                <MaterialCommunityIcons name="text-box-plus-outline" size={16} color="#8C6A46" />
-                <Text style={styles.fullFormButtonText}>{text.uploadWithDescription}</Text>
-              </TouchableOpacity>
             </>
           ) : (
             <TouchableOpacity
@@ -428,7 +380,7 @@ export default function FotoRayonaScreen() {
         </View>
       </View>
     ),
-    [handlePhotosChange, handleSubmitPhotos, isPhotoLimitReached, navigation, photoCount, photoTitle, readyToSubmitPhotos.length, sending, text, user],
+    [handlePhotosChange, isPhotoLimitReached, navigation, photoCount, photoTitle, text, user],
   );
 
   const empty = useMemo(
@@ -564,6 +516,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0E8D8',
     overflow: 'hidden',
   },
+  pendingPhotoCell: {
+    borderWidth: 2,
+    borderColor: '#22B14C',
+    backgroundColor: '#D8D1C2',
+  },
+  photoFallback: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#858584',
+  },
   photo: {
     width: '100%',
     height: '100%',
@@ -573,6 +535,52 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.28)',
+  },
+  uploadProgressOverlay: {
+    position: 'absolute',
+    left: 6,
+    right: 6,
+    bottom: 6,
+    borderRadius: 10,
+    paddingHorizontal: 7,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+  },
+  uploadProgressTrack: {
+    height: 8,
+    borderRadius: 999,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(34, 177, 76, 0.18)',
+  },
+  uploadProgressFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: '#22B14C',
+  },
+  uploadProgressText: {
+    marginTop: 4,
+    color: '#22A044',
+    fontSize: 10,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  pendingBadge: {
+    position: 'absolute',
+    left: 6,
+    right: 6,
+    bottom: 6,
+    minHeight: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+    backgroundColor: 'rgba(255, 255, 255, 0.88)',
+  },
+  pendingBadgeText: {
+    color: '#6B6B6B',
+    fontSize: 9,
+    fontWeight: '900',
+    textAlign: 'center',
   },
   photoLikeButton: {
     position: 'absolute',

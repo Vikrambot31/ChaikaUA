@@ -45,6 +45,9 @@ export type PhotoUploadMetadata = {
   title?: string;
   description?: string;
   uploadedBy?: string;
+  sourceScreen?: string;
+  sourceScreenLabel?: string;
+  sourceFeature?: string;
   locationLabel?: string;
   locationType?: 'building' | 'place';
 };

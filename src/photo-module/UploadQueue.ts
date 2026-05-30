@@ -288,6 +288,9 @@ export const UploadQueue = {
                   uploadedBy: task.metadata.uploadedBy,
                   title: task.metadata.title,
                   description: task.metadata.description,
+                  sourceScreen: task.metadata.sourceScreen,
+                  sourceScreenLabel: task.metadata.sourceScreenLabel,
+                  sourceFeature: task.metadata.sourceFeature,
                   locationLabel: task.metadata.locationLabel,
                   locationType: task.metadata.locationType,
                   target: defaultTarget,
@@ -353,7 +356,7 @@ export const UploadQueue = {
             imageUrl: result.downloadUrl,
             storagePath: result.storagePath,
             status: 'uploaded',
-            moderationStatus: 'not_submitted',
+            moderationStatus: collection === 'community_photos' ? 'pending' : 'not_submitted',
             error: undefined,
             retryCount: task.retryCount,
           });

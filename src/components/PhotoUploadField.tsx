@@ -7,6 +7,7 @@ import AppPhotoImage from './AppPhotoImage';
 import { getBestPhotoUri, getPhotoThumbnailUri, ImageStorage } from '../photo-module/ImageStorage';
 import { UploadQueue } from '../photo-module/UploadQueue';
 import type { UserPhoto } from '../photo-module/types';
+import type { PhotoUploadMetadata } from '../photo-module/types';
 import { photoService } from '../services/photoService';
 import { PhotoPermissionError } from '../utils/photoPicker';
 import type { RootState } from '../redux/store';
@@ -32,6 +33,8 @@ type Props = {
   onBeforePickerOpen?: () => void | Promise<void>;
   onPickerOpenChange?: (isOpen: boolean) => void;
   onDebugEvent?: (event: { source: string; action: string; details?: Record<string, unknown> }) => void;
+  metadata?: PhotoUploadMetadata;
+  hideSelectedPreview?: boolean;
 };
 
 type Lang = 'ua' | 'ru' | 'en';
@@ -40,6 +43,12 @@ const STATUS_LABELS_BY_LANG: Record<Lang, Record<UserPhoto['status'], string>> =
   ua: { local: 'завантаження', queued: 'у черзі', uploading: 'завантаження', uploaded: 'готово', error: 'помилка' },
   ru: { local: 'загружается', queued: 'в очереди', uploading: 'загружается', uploaded: 'готово', error: 'ошибка' },
   en: { local: 'uploading', queued: 'queued', uploading: 'uploading', uploaded: 'done', error: 'error' },
+};
+
+const MODERATION_STATUS_LABELS_BY_LANG: Record<Lang, string> = {
+  ua: 'на модерації',
+  ru: 'на модерации',
+  en: 'in moderation',
 };
 
 const BUTTON_LABELS_BY_LANG: Record<Lang, { limit: string; more: string; select: string }> = {
@@ -108,6 +117,8 @@ export default function PhotoUploadField({
   onPhotosChange,
   onBeforePickerOpen,
   onDebugEvent,
+  metadata,
+  hideSelectedPreview = false,
 }: Props) {
   const navigation = useNavigation<{ navigate: (...args: [string, object]) => void }>();
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
@@ -161,6 +172,7 @@ export default function PhotoUploadField({
       photo.id,
       photo.localUri,
       {
+        ...metadata,
         uploadedBy: userName || uid,
       },
       {
@@ -174,7 +186,7 @@ export default function PhotoUploadField({
         Alert.alert(q.title, q.message);
       }
     }).catch((error) => safeLogError('PhotoUploadField.UploadQueue.enqueue', error, { photoId: photo.id }));
-  }, [language, maxPhotos, storagePath, uid, userName]);
+  }, [language, maxPhotos, metadata, storagePath, uid, userName]);
 
   // Picks an image directly via the system overlay (no screen navigation),
   // saves it locally, then enqueues it for upload. Inline progress is rendered
@@ -225,19 +237,27 @@ export default function PhotoUploadField({
   }, []);
 
   const statusLabels = useMemo(
-    () => STATUS_LABELS_BY_LANG[language] ?? STATUS_LABELS_BY_LANG.ua,
-    [language],
+    () => {
+      const labels = STATUS_LABELS_BY_LANG[language] ?? STATUS_LABELS_BY_LANG.ua;
+      if (storagePath !== 'community_photos') return labels;
+      return {
+        ...labels,
+        uploaded: MODERATION_STATUS_LABELS_BY_LANG[language] ?? MODERATION_STATUS_LABELS_BY_LANG.ua,
+      };
+    },
+    [language, storagePath],
   );
 
   const buttonLabel = useMemo(() => {
     const l = BUTTON_LABELS_BY_LANG[language] ?? BUTTON_LABELS_BY_LANG.ua;
     if (limitReached) return l.limit;
+    if (hideSelectedPreview) return l.select;
     return selected.length > 0 ? l.more : l.select;
-  }, [language, limitReached, selected.length]);
+  }, [hideSelectedPreview, language, limitReached, selected.length]);
 
   return (
     <View style={styles.container}>
-      {selected.length > 0 ? (
+      {!hideSelectedPreview && selected.length > 0 ? (
         <View style={styles.grid}>
           {selected.map((photo) => {
             const uri = getPhotoThumbnailUri(photo) || getBestPhotoUri(photo) || photo.localUri;
