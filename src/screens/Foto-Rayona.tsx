@@ -367,69 +367,65 @@ export default function FotoRayonaScreen() {
           <Text style={styles.headerTitle}>{text.title}</Text>
           <Text style={styles.headerSubtitle}>{text.subtitle}</Text>
         </View>
-      </View>
-    ),
-    [text.subtitle, text.title],
-  );
-
-  const footer = useMemo(
-    () => (
-      <View style={styles.uploadCard}>
-        <Text style={styles.uploadTitle}>{text.addPhoto}</Text>
-        {user ? (
-          <>
-            <TextInput
-              value={photoTitle}
-              onChangeText={setPhotoTitle}
-              placeholder={text.photoTitlePlaceholder}
-              placeholderTextColor={SCREEN_THEME.textMuted}
-              style={styles.titleInput}
-              maxLength={80}
-            />
-            <Text style={styles.photoCounter}>{text.photoCounter(photoCount, MAX_PHOTOS)}</Text>
-            {isPhotoLimitReached ? (
-              <InlineFieldHint message={text.limitReached} type="hint" />
-            ) : (
-              <PhotoUploadField
-                uid={user.id}
-                userName={user.name ?? user.email ?? ''}
-                maxPhotos={Math.min(UPLOAD_BATCH_SIZE, MAX_PHOTOS - photoCount)}
-                storagePath={GALLERY_STORAGE_PATH}
-                onPhotosChange={handlePhotosChange}
+        {/* Upload card sits directly under the title so the user sees photo feedback
+            immediately after picking — no scrolling to the bottom required. */}
+        <View style={styles.uploadCard}>
+          <Text style={styles.uploadTitle}>{text.addPhoto}</Text>
+          {user ? (
+            <>
+              <TextInput
+                value={photoTitle}
+                onChangeText={setPhotoTitle}
+                placeholder={text.photoTitlePlaceholder}
+                placeholderTextColor={SCREEN_THEME.textMuted}
+                style={styles.titleInput}
+                maxLength={80}
               />
-            )}
-            <TouchableOpacity
-              style={[styles.submitModerationButton, (sending || readyToSubmitPhotos.length === 0) && styles.submitModerationButtonDisabled]}
-              onPress={() => void handleSubmitPhotos()}
-              activeOpacity={0.82}
-              disabled={sending || readyToSubmitPhotos.length === 0}
-            >
-              {sending ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
+              <Text style={styles.photoCounter}>{text.photoCounter(photoCount, MAX_PHOTOS)}</Text>
+              {isPhotoLimitReached ? (
+                <InlineFieldHint message={text.limitReached} type="hint" />
               ) : (
-                <Text style={styles.submitModerationButtonText}>{text.sendToModeration}</Text>
+                <PhotoUploadField
+                  uid={user.id}
+                  userName={user.name ?? user.email ?? ''}
+                  maxPhotos={Math.min(UPLOAD_BATCH_SIZE, MAX_PHOTOS - photoCount)}
+                  storagePath={GALLERY_STORAGE_PATH}
+                  onPhotosChange={handlePhotosChange}
+                />
               )}
-            </TouchableOpacity>
-            <InlineFieldHint message={text.moderationHint} type="hint" />
+              <TouchableOpacity
+                style={[styles.submitModerationButton, (sending || readyToSubmitPhotos.length === 0) && styles.submitModerationButtonDisabled]}
+                onPress={() => void handleSubmitPhotos()}
+                activeOpacity={0.82}
+                disabled={sending || readyToSubmitPhotos.length === 0}
+              >
+                {sending ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.submitModerationButtonText}>{text.sendToModeration}</Text>
+                )}
+              </TouchableOpacity>
+              <InlineFieldHint message={text.moderationHint} type="hint" />
+              <TouchableOpacity
+                style={styles.fullFormButton}
+                onPress={() => navigation.navigate('PhotoUploadScreen')}
+                activeOpacity={0.82}
+              >
+                <MaterialCommunityIcons name="text-box-plus-outline" size={16} color="#8C6A46" />
+                <Text style={styles.fullFormButtonText}>{text.uploadWithDescription}</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
             <TouchableOpacity
               style={styles.fullFormButton}
-              onPress={() => navigation.navigate('PhotoUploadScreen')}
+              onPress={() => navigation.navigate('LoginScreen', {})}
               activeOpacity={0.82}
             >
-              <MaterialCommunityIcons name="text-box-plus-outline" size={16} color="#8C6A46" />
-              <Text style={styles.fullFormButtonText}>{text.uploadWithDescription}</Text>
+              <MaterialCommunityIcons name="login" size={16} color="#8C6A46" />
+              <Text style={styles.fullFormButtonText}>{text.loginToUpload}</Text>
             </TouchableOpacity>
-          </>
-        ) : (
-          <TouchableOpacity
-            style={styles.fullFormButton}
-            onPress={() => navigation.navigate('LoginScreen', {})}
-            activeOpacity={0.82}
-          >
-            <MaterialCommunityIcons name="login" size={16} color="#8C6A46" />
-            <Text style={styles.fullFormButtonText}>{text.loginToUpload}</Text>
-          </TouchableOpacity>
-        )}
+          )}
+        </View>
       </View>
     ),
     [handlePhotosChange, handleSubmitPhotos, isPhotoLimitReached, navigation, photoCount, photoTitle, readyToSubmitPhotos.length, sending, text, user],
@@ -462,7 +458,6 @@ export default function FotoRayonaScreen() {
         renderItem={renderItem}
         numColumns={NUM_COLUMNS}
         ListHeaderComponent={header}
-        ListFooterComponent={footer}
         ListEmptyComponent={empty}
         contentContainerStyle={styles.content}
         columnWrapperStyle={styles.columnWrapper}

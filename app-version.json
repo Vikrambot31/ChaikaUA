@@ -1,14 +1,14 @@
 {
-  "latestVersion": "1.1.335",
-  "minSupportedVersion": "1.1.335",
+  "latestVersion": "1.1.336",
+  "minSupportedVersion": "1.1.336",
   "forceUpdate": true,
   "updateTitle": "Оновіть додаток",
   "updateText": "Вийшла нова версія Чайки. Стара версія більше не підтримується.",
-  "androidUrl": "https://chaika-life.netlify.app/release/ChaikaLife-v1.1.335-2026-05-30_15-46.apk",
-  "apkFileName": "ChaikaLife-v1.1.335-2026-05-30_15-46.apk",
+  "androidUrl": "https://chaika-life.netlify.app/release/ChaikaLife-v1.1.336-2026-05-30_19-40.apk",
+  "apkFileName": "ChaikaLife-v1.1.336-2026-05-30_19-40.apk",
   "iosUrl": "https://chaika-life.netlify.app/",
   "webUrl": "https://chaika-life.netlify.app/",
   "landingUrl": "https://chaika-life.netlify.app/",
   "lastVersionDate": "2026-05-30",
-  "lastBuildStamp": "2026-05-30_15-46"
+  "lastBuildStamp": "2026-05-30_19-40"
 }
