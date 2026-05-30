@@ -34,6 +34,9 @@ const resolveStorageUrl = getDownloadURL as (
 // ─── Connection monitor ────────────────────────────────────────────────────────
 
 let lastConnectedState: boolean | null = null;
+let disconnectDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+const DISCONNECT_DEBOUNCE_MS = 4000;
+
 try {
   onValue(
     ref(database, '.info/connected'),
@@ -48,9 +51,21 @@ try {
         }
 
         if (connected && !lastConnectedState) {
-          void logClientEvent('connection_restored');
+          // Cancel pending disconnect log — connection recovered before debounce fired
+          if (disconnectDebounceTimer !== null) {
+            clearTimeout(disconnectDebounceTimer);
+            disconnectDebounceTimer = null;
+          } else {
+            void logClientEvent('connection_restored');
+          }
         } else if (!connected && lastConnectedState) {
-          void logClientError('firebase_connection', new Error('Connection lost'));
+          // Debounce: only log if still disconnected after DISCONNECT_DEBOUNCE_MS
+          if (disconnectDebounceTimer === null) {
+            disconnectDebounceTimer = setTimeout(() => {
+              disconnectDebounceTimer = null;
+              void logClientError('firebase_connection', new Error('Connection lost'));
+            }, DISCONNECT_DEBOUNCE_MS);
+          }
         }
         lastConnectedState = connected;
       } catch {

@@ -58,7 +58,7 @@ const mapLostFoundItem = (id: string, data: any, now: number, isArchived?: boole
 });
 
 export const lostFoundService = {
-  subscribe(callback: (items: LostFoundItem[]) => void): () => void {
+  subscribe(callback: (items: LostFoundItem[]) => void, currentUserId?: string): () => void {
     // ─── LOCAL_MODE ───────────────────────────────────────────────────────────
     if (LOCAL_MODE) {
       let cancelled = false;
@@ -75,12 +75,23 @@ export const lostFoundService = {
       return () => { cancelled = true; clearInterval(timer); };
     }
     // ─────────────────────────────────────────────────────────────────────────
+    const now = Date.now();
+    let approvedItems: LostFoundItem[] = [];
+    let ownPendingItems: LostFoundItem[] = [];
+
+    const emit = (active: LostFoundItem[]) => {
+      // Merge own pending/rejected items (not yet approved) with the feed
+      const ids = new Set(active.map((i) => i.id));
+      const extras = ownPendingItems.filter((i) => !ids.has(i.id));
+      const merged = [...extras, ...active];
+      callback(merged);
+    };
+
     const listRef = query(ref(database, PATH), orderByChild('moderationStatus'), equalTo('approved'), limitToLast(ACTIVE_LIMIT + ACTIVE_LIMIT_BUFFER));
 
-    const unsubscribe = onValue(listRef, (snapshot) => {
+    const unsubscribeApproved = onValue(listRef, (snapshot) => {
       const raw = snapshot.val();
-      const now = Date.now();
-      const active: LostFoundItem[] = raw
+      approvedItems = raw
         ? Object.entries(raw as Record<string, any>)
             .map(([id, data]) => mapLostFoundItem(id, data, now))
             .filter((item) => item.moderationStatus === 'approved' && new Date(item.expiresAt).getTime() > now)
@@ -88,8 +99,8 @@ export const lostFoundService = {
             .slice(0, ACTIVE_LIMIT)
         : [];
 
-      if (active.length >= FEED_MINIMUM) {
-        callback(active);
+      if (approvedItems.length >= FEED_MINIMUM) {
+        emit(approvedItems);
         return;
       }
 
@@ -100,14 +111,34 @@ export const lostFoundService = {
               .map(([id, data]) => mapLostFoundItem(id, data, now, true))
               .reverse()
           : [];
-        callback([...active, ...archived]);
+        emit([...approvedItems, ...archived]);
       }).catch((error) => {
         console.warn('[lostFoundService] expired fallback load failed:', error);
-        callback(active);
+        emit(approvedItems);
       });
     });
 
-    return unsubscribe;
+    let unsubscribeOwn: (() => void) | undefined;
+    if (currentUserId) {
+      const ownRef = query(ref(database, PATH), orderByChild('userId'), equalTo(currentUserId));
+      unsubscribeOwn = onValue(ownRef, (snapshot) => {
+        const raw = snapshot.val();
+        ownPendingItems = raw
+          ? Object.entries(raw as Record<string, any>)
+              .map(([id, data]) => mapLostFoundItem(id, data, now))
+              .filter((item) => item.moderationStatus !== 'approved')
+          : [];
+        // Re-emit with updated own items merged into last known approved list
+        const ids = new Set(approvedItems.map((i) => i.id));
+        const extras = ownPendingItems.filter((i) => !ids.has(i.id));
+        callback([...extras, ...approvedItems]);
+      }, () => { ownPendingItems = []; });
+    }
+
+    return () => {
+      unsubscribeApproved();
+      unsubscribeOwn?.();
+    };
   },
 
   async add(item: Omit<LostFoundItem, 'id'>): Promise<string> {

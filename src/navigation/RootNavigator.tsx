@@ -512,6 +512,7 @@ const MapScreenWithBoundary = withErrorBoundary(MapScreen);
 const RequestTopicScreenWithBoundary = withErrorBoundary(RequestTopicScreen);
 const ChaikaBonusPlusScreenWithBoundary = withErrorBoundary(ChaikaBonusPlusScreen);
 const ProfileScreenWithBoundary = withErrorBoundary(ProfileScreen);
+const FotoRayonaScreenWithBoundary = withErrorBoundary(FotoRayonaScreen);
 
 function OnlineChatNavigator() {
   return (
@@ -799,7 +800,7 @@ function AuthNavigation() {
         <Stack.Screen name="OsbbAddNewsScreen" component={withGuard(OsbbAddNewsScreen, 'trusted')} />
         <Stack.Screen name="OsbbAdminScreen" component={withGuard(OsbbAdminScreen, 'auth')} />
         <Stack.Screen name="ChaikaBonusPlusScreen" component={ChaikaBonusPlusScreen} />
-        <Stack.Screen name="FotoRayonaScreen" component={withGuard(FotoRayonaScreen, 'trusted')} />
+        <Stack.Screen name="FotoRayonaScreen" component={withGuard(FotoRayonaScreenWithBoundary, 'trusted')} />
         <Stack.Screen name="PhotoUploadScreen" component={withGuard(PhotoUploadScreen, 'trusted')} options={{ headerShown: false }} />
         <Stack.Screen name="StartAvatarPickerScreen" component={StartAvatarPickerScreen} options={{ headerShown: false }} />
         <Stack.Screen name="ProfileSetupScreen" component={ProfileSetupScreen} options={{ headerShown: false, gestureEnabled: false }} />

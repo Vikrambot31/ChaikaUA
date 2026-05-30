@@ -18,6 +18,7 @@ import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import InlineFieldHint from '../components/InlineFieldHint';
 import { useSoftToast } from '../hooks/useSoftToast';
+import { logClientError } from '../utils/errorLogger';
 
 const MAX_PHOTOS = 50;
 const UPLOAD_BATCH_SIZE = 3; // слотов в виджете загрузки (избегаем 50 пустых ячеек)
@@ -187,34 +188,67 @@ export default function FotoRayonaScreen() {
     const unsubscribe = onValue(
       photosRef,
       (snapshot) => {
-        const raw = snapshot.val() as Record<string, RawCommunityPhoto> | null;
-        if (!raw) {
+        try {
+          const raw = snapshot.val() as unknown;
+          if (!raw) {
+            setRemotePhotos([]);
+            setLoading(false);
+            return;
+          }
+
+          if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+            void logClientError('FotoRayona.loadPhotos.invalidRoot', new Error('Unexpected community_photos shape'), {
+              valueType: Array.isArray(raw) ? 'array' : typeof raw,
+            });
+            setRemotePhotos([]);
+            setLoading(false);
+            return;
+          }
+
+          const photos = Object.entries(raw as Record<string, unknown>)
+            .map<GalleryPhoto | null>(([id, value]) => {
+              if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+                void logClientError('FotoRayona.loadPhotos.invalidItem', new Error('Unexpected community photo item shape'), {
+                  id,
+                  valueType: Array.isArray(value) ? 'array' : typeof value,
+                });
+                return null;
+              }
+
+              try {
+                const photo = value as RawCommunityPhoto;
+                const storagePath = toClean(photo.storagePath);
+                const uri = toClean(photo.imageUri);
+                return {
+                  id,
+                  uri,
+                  storagePath,
+                  createdAt: toTimestamp(photo.createdAt) || toTimestamp(photo.uploadedAt),
+                  status: undefined,
+                } satisfies GalleryPhoto;
+              } catch (error) {
+                void logClientError('FotoRayona.loadPhotos.item', error, { id });
+                return null;
+              }
+            })
+            .filter((photo): photo is GalleryPhoto => photo !== null)
+            .filter((photo) => (photo.uri || photo.storagePath) && photo.storagePath?.startsWith(`${GALLERY_STORAGE_PATH}/`))
+            .sort((a, b) => b.createdAt - a.createdAt || b.id.localeCompare(a.id))
+            .slice(0, MAX_PHOTOS);
+
+          setRemotePhotos(photos);
+          setLoading(false);
+        } catch (error) {
+          void logClientError('FotoRayona.loadPhotos.processing', error);
           setRemotePhotos([]);
           setLoading(false);
-          return;
         }
-
-        const photos = Object.entries(raw)
-          .map(([id, value]) => {
-            const storagePath = toClean(value.storagePath);
-            const uri = toClean(value.imageUri);
-            return {
-              id,
-              uri,
-              storagePath,
-              createdAt: toTimestamp(value.createdAt) || toTimestamp(value.uploadedAt),
-              status: undefined, // approved — оверлей не нужен
-            } satisfies GalleryPhoto;
-          })
-          // Показываем только фото из нашего хранилища (защита от мусорных записей)
-          .filter((photo) => (photo.uri || photo.storagePath) && photo.storagePath?.startsWith(`${GALLERY_STORAGE_PATH}/`))
-          .sort((a, b) => b.createdAt - a.createdAt || b.id.localeCompare(a.id))
-          .slice(0, MAX_PHOTOS);
-
-        setRemotePhotos(photos);
+      },
+      (error) => {
+        void logClientError('FotoRayona.loadPhotos.firebase', error);
+        setRemotePhotos([]);
         setLoading(false);
       },
-      () => setLoading(false),
     );
 
     return unsubscribe;

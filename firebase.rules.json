@@ -148,6 +148,28 @@
       }
     },
 
+    "sports": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$sport": {
+        "players": {
+          ".indexOn": "rating",
+          "$uid": {
+            ".read": "auth != null",
+            ".write": "auth != null && auth.uid === $uid"
+          }
+        },
+        "days": {
+          "$date": {
+            "$uid": {
+              ".read": "auth != null",
+              ".write": "auth != null && auth.uid === $uid"
+            }
+          }
+        }
+      }
+    },
+
     "voice_messages": {
       ".read": "auth != null",
       ".write": "auth != null"

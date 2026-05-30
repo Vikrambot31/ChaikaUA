@@ -156,19 +156,6 @@ const UI_TEXT = {
   },
 } as const;
 
-const getItemIcon = (category: string): React.ComponentProps<typeof MaterialCommunityIcons>['name'] => {
-  const value = category.toLowerCase();
-  if (value.includes('ключ') || value.includes('key')) return 'key-variant';
-  if (value.includes('документ') || value.includes('document')) return 'file-document-outline';
-  if (value.includes('телефон') || value.includes('phone')) return 'cellphone';
-  if (value.includes('сум') || value.includes('рюк') || value.includes('bag') || value.includes('backpack')) return 'bag-personal-outline';
-  if (value.includes('карт') || value.includes('card') || value.includes('брел')) return 'card-account-details-outline';
-  if (value.includes('іграш') || value.includes('игруш') || value.includes('toy')) return 'teddy-bear';
-  if (value.includes('одяг') || value.includes('одеж') || value.includes('cloth')) return 'tshirt-crew-outline';
-  if (value.includes('прикрас') || value.includes('украш') || value.includes('jewel')) return 'diamond-stone';
-  return 'magnify';
-};
-
 const formatItemDate = (value: string, language: AppLanguage): string => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
@@ -225,9 +212,9 @@ const LostAndFoundScreen: React.FC = () => {
   );
 
   useEffect(() => {
-    const unsubscribe = lostFoundService.subscribe(setItems);
+    const unsubscribe = lostFoundService.subscribe(setItems, user?.id);
     return unsubscribe;
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     const userIds = Array.from(new Set(items.map((item) => item.userId).filter((id): id is string => Boolean(id))));
@@ -432,36 +419,8 @@ const LostAndFoundScreen: React.FC = () => {
               ? { name: 'close-circle' as const, color: SCREEN_THEME.terracottaDark }
               : { name: 'clock-outline' as const, color: '#A08860' };
 
-          return (
-            <TouchableOpacity style={styles.card} onPress={() => openDetail(item)} activeOpacity={0.86}>
-              <TouchableOpacity
-                style={styles.visualWrap}
-                onPress={(event) => {
-                  event.stopPropagation();
-                  if (hasItemPhoto) setPreviewPhoto({ uri: item.photoUri, storagePath: item.photoStoragePath });
-                }}
-                activeOpacity={hasItemPhoto ? 0.85 : 1}
-              >
-                {hasItemPhoto ? (
-                  <AppPhotoImage
-                    uri={item.photoUri}
-                    storagePath={item.photoStoragePath}
-                    style={styles.cardThumb}
-                    resizeMode="contain"
-                    debugLabel={`LostFound:${item.id}`}
-                    showDebugInfo={false}
-                  />
-                ) : (
-                  <View style={[styles.cardThumb, styles.cardThumbPlaceholder]}>
-                    <MaterialCommunityIcons name={getItemIcon(item.category)} size={26} color="#B8A888" />
-                  </View>
-                )}
-                <View style={[styles.typeDot, item.type === 'lost' ? styles.lostDot : styles.foundDot]}>
-                  <MaterialCommunityIcons name={item.type === 'lost' ? 'alert-circle-outline' : 'check-circle-outline'} size={13} color="#fff" />
-                </View>
-              </TouchableOpacity>
-
-              <View style={styles.copy}>
+          const cardContent = (
+            <View style={styles.copy}>
                 <View style={styles.cardTopRow}>
                   <Text style={[styles.typeBadge, item.type === 'lost' ? styles.lostBadge : styles.foundBadge]} numberOfLines={1}>
                     {typeLabels[item.type]}
@@ -515,7 +474,41 @@ const LostAndFoundScreen: React.FC = () => {
                     </TouchableOpacity>
                   </View>
                 ) : null}
-              </View>
+            </View>
+          );
+
+          if (hasItemPhoto) {
+            return (
+              <TouchableOpacity style={styles.card} onPress={() => openDetail(item)} activeOpacity={0.86}>
+                <TouchableOpacity
+                  style={styles.visualWrap}
+                  onPress={(event) => {
+                    event.stopPropagation();
+                    setPreviewPhoto({ uri: item.photoUri || '', storagePath: item.photoStoragePath });
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <AppPhotoImage
+                    uri={item.photoUri}
+                    storagePath={item.photoStoragePath}
+                    style={styles.cardThumb}
+                    resizeMode="contain"
+                    debugLabel={`LostFound:${item.id}`}
+                    showDebugInfo={false}
+                  />
+                  <View style={[styles.typeDot, item.type === 'lost' ? styles.lostDot : styles.foundDot]}>
+                    <MaterialCommunityIcons name={item.type === 'lost' ? 'alert-circle-outline' : 'check-circle-outline'} size={13} color="#fff" />
+                  </View>
+                </TouchableOpacity>
+
+                {cardContent}
+              </TouchableOpacity>
+            );
+          }
+
+          return (
+            <TouchableOpacity style={[styles.card, styles.cardNoPhoto]} onPress={() => openDetail(item)} activeOpacity={0.86}>
+              {cardContent}
             </TouchableOpacity>
           );
         }}
@@ -702,6 +695,9 @@ const styles = StyleSheet.create({
     borderColor: '#E4D0AB',
     gap: 8,
   },
+  cardNoPhoto: {
+    flexDirection: 'column',
+  },
   visualWrap: {
     position: 'relative',
     width: '38%',
@@ -714,11 +710,6 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     borderRadius: 20,
     backgroundColor: '#F0E8D8',
-  },
-  cardThumbPlaceholder: {
-    backgroundColor: '#F0E8D8',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   typeDot: {
     position: 'absolute',

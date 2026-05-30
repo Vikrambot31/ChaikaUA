@@ -714,23 +714,27 @@ const RequestFormScreen: React.FC = () => {
             <Text style={styles.subtitle}>{t.subtitle}</Text>
           </View>
 
-          <View style={[styles.statusBanner, styles[`${bannerState.tone}Banner`]]}>
-            <StatusIcon tone={bannerState.tone} />
-            <Text style={[styles.statusBannerText, { color: toneColor[bannerState.tone] }]}>{bannerState.message}</Text>
-          </View>
+          {(bannerState.tone !== 'idle' || submittedOnce) ? (
+            <View style={[styles.statusBanner, styles[`${bannerState.tone}Banner`]]}>
+              <StatusIcon tone={bannerState.tone} />
+              <Text style={[styles.statusBannerText, { color: toneColor[bannerState.tone] }]}>{bannerState.message}</Text>
+            </View>
+          ) : null}
 
-          <View style={styles.checklistCard}>
-            <Text style={styles.checklistTitle}>{t.checklistTitle}</Text>
-            {checklist.map((item) => (
-              <View key={item.key} style={styles.checklistRow}>
-                <StatusIcon tone={item.state.tone} />
-                <Text style={styles.checklistLabel}>{item.label}</Text>
-                <Text style={[styles.checklistStatus, { color: toneColor[item.state.tone] }]}>
-                  {item.optional && item.state.tone === 'idle' ? t.optional : item.state.message}
-                </Text>
-              </View>
-            ))}
-          </View>
+          {(requiredDone > 0 || submittedOnce) ? (
+            <View style={styles.checklistCard}>
+              <Text style={styles.checklistTitle}>{t.checklistTitle}</Text>
+              {checklist.map((item) => (
+                <View key={item.key} style={styles.checklistRow}>
+                  <StatusIcon tone={item.state.tone} />
+                  <Text style={styles.checklistLabel}>{item.label}</Text>
+                  <Text style={[styles.checklistStatus, { color: toneColor[item.state.tone] }]}>
+                    {item.optional && item.state.tone === 'idle' ? t.optional : item.state.message}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
 
           <View style={styles.formCard}>
             <FieldHeader label={t.name} state={fieldStates.name} />

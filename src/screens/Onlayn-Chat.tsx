@@ -38,7 +38,7 @@ import ContactReasonModal from '../components/ContactReasonModal';
 import { safeCallPhone } from '../utils/communicationActions';
 import { openRequestFormWithLimitCheck } from '../utils/requestFormLimitGuard';
 import AppPhotoImage from '../components/AppPhotoImage';
-import UserCardActionBar from '../components/UserCardActionBar';
+import FeedLikeButton from '../components/FeedLikeButton';
 
 type ChatRequest = ChatRequestLike;
 
@@ -850,22 +850,14 @@ const OnlineChatScreen = () => {
                       )}
                     </TouchableOpacity>
                   ) : null}
+                  <FeedLikeButton
+                    currentUserId={currentUser?.id}
+                    likePath="feed_likes/requests"
+                    likeId={item.id}
+                    style={styles.chatActionLikeBtn}
+                  />
                   </View>
                 ) : null}
-
-                <UserCardActionBar
-                  avatarUri={avatarUri}
-                  name={item.name}
-                  userId={item.userId}
-                  currentUserId={currentUser?.id}
-                  language={language}
-                  showAvatar={hasPhoto}
-                  avatarSize={hasPhoto ? 36 : 32}
-                  showProfile={false}
-                  showContact={false}
-                  likePath="feed_likes/requests"
-                  likeId={item.id}
-                />
               </TouchableOpacity>
             );
           }}
@@ -1315,6 +1307,9 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     color: '#fff',
+  },
+  chatActionLikeBtn: {
+    marginLeft: 'auto' as const,
   },
 });
 
