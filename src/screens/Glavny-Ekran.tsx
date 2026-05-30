@@ -16,7 +16,7 @@ import { Video, ResizeMode } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationProp, ParamListBase, useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import MainMenuModal from '../components/MainMenuModal';
 import OnboardingSlides from '../components/OnboardingSlides';
 import MiniUserAvatar from '../components/MiniUserAvatar';
@@ -25,6 +25,7 @@ import { RootState } from '../redux/store';
 import { getChaikaActivity, getLevelName } from '../utils/chaikaLevels';
 import { useTranslation } from '../i18n/useTranslation';
 import { selectTodayReports } from '../redux/slices/electricitySlice';
+import { syncFromRequests } from '../redux/slices/helpRequestsSlice';
 import { normalizeLanguage } from '../redux/slices/languageSlice';
 import { database, firebaseChatAPI } from '../firebase-config';
 import { safeOpenExternalUrl } from '../utils/communicationActions';
@@ -525,6 +526,7 @@ const HomeScreen: React.FC = () => {
   const feedFadeAnim = useRef(new Animated.Value(1)).current;
   const blinkAnim = useRef(new Animated.Value(1)).current;
   const newsGlowAnim = useRef(new Animated.Value(0.78)).current;
+  const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.auth.user);
   const appRequests = useSelector((state: RootState) => state.requests?.items ?? []);
   const approvedRequests = useSelector((state: RootState) => state.requests?.approved ?? []);
@@ -551,9 +553,12 @@ const HomeScreen: React.FC = () => {
   }, [feedFadeAnim]);
 
   useEffect(() => {
-    const unsubscribe = firebaseChatAPI.getRequests(setLiveRequests);
+    const unsubscribe = firebaseChatAPI.getRequests((requests) => {
+      setLiveRequests(requests);
+      dispatch(syncFromRequests(requests));
+    });
     return unsubscribe;
-  }, []);
+  }, [dispatch]);
 
   useEffect(() => {
     const userIds = Array.from(new Set([

@@ -13,7 +13,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../redux/store';
 import { HelpRequest } from '../types/app';
-import { selectTodayHelpRequests } from '../redux/slices/helpRequestsSlice';
+import { selectTodayHelpRequests, selectYesterdayHelpRequests } from '../redux/slices/helpRequestsSlice';
 import MiniTabBar from '../components/MiniTabBar';
 import ContactReasonModal from '../components/ContactReasonModal';
 import { useContactRequest } from '../hooks/useContactRequest';
@@ -27,6 +27,8 @@ import { openRequestFormWithLimitCheck } from '../utils/requestFormLimitGuard';
 
 const HELP_NEIGHBORS_SPLASH_KEY = '@help_neighbors_first_visit_splash_seen';
 
+type ListItem = HelpRequest & { isYesterday?: boolean };
+
 const UI_TEXT = {
   ua: {
     listTitle: 'Термінові запити',
@@ -34,6 +36,7 @@ const UI_TEXT = {
     emptySubtitle: 'Немає термінових прохань від сусідів',
     expired: 'Час минув',
     splash: 'Зробимо Чайку місцем підтримки один для одного',
+    yesterday: 'Вчора',
   },
   ru: {
     listTitle: 'Срочные запросы',
@@ -41,6 +44,7 @@ const UI_TEXT = {
     emptySubtitle: 'Нет срочных просьб от соседей',
     expired: 'Срок вышел',
     splash: 'Сделаем Чайку местом поддержки друг для друга',
+    yesterday: 'Вчера',
   },
   en: {
     listTitle: 'Urgent requests',
@@ -48,6 +52,7 @@ const UI_TEXT = {
     emptySubtitle: 'There are no urgent requests from neighbors',
     expired: 'Time expired',
     splash: "Let's make Chaika Life a place of support for one another",
+    yesterday: 'Yesterday',
   },
 } as const;
 
@@ -71,13 +76,18 @@ const HelpNeighborsScreen: React.FC = () => {
   const [avatarByUserId, setAvatarByUserId] = useState<Record<string, string>>({});
 
   const todayRequests = useSelector((state: RootState) => selectTodayHelpRequests(state)) as HelpRequest[];
+  const yesterdayRequests = useSelector((state: RootState) => selectYesterdayHelpRequests(state));
   const burningRequests = useMemo(
     () => todayRequests.filter((request) => request.isBurning && request.expiresAt > new Date()),
     [todayRequests]
   );
+  const listData = useMemo((): ListItem[] => [
+    ...burningRequests,
+    ...yesterdayRequests.map((r) => ({ ...r, isYesterday: true as const })),
+  ], [burningRequests, yesterdayRequests]);
 
   useEffect(() => {
-    const userIds = Array.from(new Set(burningRequests.map((item) => item.userId).filter((id): id is string => Boolean(id))));
+    const userIds = Array.from(new Set(listData.map((item) => item.userId).filter((id): id is string => Boolean(id))));
     if (userIds.length === 0) return;
     let cancelled = false;
     void resolveUserAvatarMap(database, userIds).then((resolved) => {
@@ -87,7 +97,7 @@ const HelpNeighborsScreen: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [burningRequests]);
+  }, [listData]);
 
   useEffect(() => {
     let isMounted = true;
@@ -165,7 +175,7 @@ const HelpNeighborsScreen: React.FC = () => {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
-          data={burningRequests}
+          data={listData}
           keyExtractor={(item) => item.id}
           initialNumToRender={8}
           windowSize={5}
@@ -191,8 +201,16 @@ const HelpNeighborsScreen: React.FC = () => {
               </View>
             </>
           }
-          renderItem={({ item }) => (
-            <TouchableOpacity style={styles.requestCard} onPress={() => { if (navLock.current) return; navLock.current = true; openDetail(item); setTimeout(() => { navLock.current = false; }, 800); }} activeOpacity={0.86}>
+          renderItem={({ item, index }) => (
+            <>
+              {item.isYesterday && (index === 0 || !listData[index - 1]?.isYesterday) && (
+                <View style={styles.yesterdaySeparator}>
+                  <View style={styles.yesterdayLine} />
+                  <Text style={styles.yesterdayLabel}>{text.yesterday}</Text>
+                  <View style={styles.yesterdayLine} />
+                </View>
+              )}
+            <TouchableOpacity style={item.isYesterday ? styles.requestCardYesterday : styles.requestCard} onPress={() => { if (navLock.current) return; navLock.current = true; openDetail(item); setTimeout(() => { navLock.current = false; }, 800); }} activeOpacity={0.86}>
               <View style={styles.requestHeader}>
                 <View style={styles.userInfo}>
                   <Text style={styles.userName}>{item.name}</Text>
@@ -223,6 +241,7 @@ const HelpNeighborsScreen: React.FC = () => {
                 avatarSize={64}
               />
             </TouchableOpacity>
+            </>
           )}
           ListEmptyComponent={
             <View style={styles.emptyState}>
@@ -328,6 +347,22 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: 'center', paddingVertical: 40 },
   emptyText: { fontWeight: '900', color: SCREEN_THEME.textPrimary, marginTop: 12 },
   emptySubtext: { color: SCREEN_THEME.textSecondary, marginTop: 4 },
+  requestCardYesterday: {
+    backgroundColor: '#D6D6D6',
+    borderRadius: 20,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#B0B0B0',
+  },
+  yesterdaySeparator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 14,
+    gap: 8,
+  },
+  yesterdayLine: { flex: 1, height: 1, backgroundColor: '#B0B0B0' },
+  yesterdayLabel: { color: '#888888', fontWeight: '800', fontSize: 13 },
 });
 
 export default HelpNeighborsScreen;

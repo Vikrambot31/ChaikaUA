@@ -9,6 +9,7 @@ import { equalTo, limitToLast, onValue, orderByChild, query, ref } from 'firebas
 import { useSelector } from 'react-redux';
 
 import AppPhotoImage from '../components/AppPhotoImage';
+import FeedLikeButton from '../components/FeedLikeButton';
 import MiniTabBar from '../components/MiniTabBar';
 import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField';
 import { database } from '../firebase-core';
@@ -113,7 +114,7 @@ const toTimestamp = (value: unknown): number => {
 
 const getPhotoIdentity = (photo: GalleryPhoto): string => photo.storagePath || photo.uri || photo.id;
 
-const GalleryPhotoItem = memo(function GalleryPhotoItem({ item, size }: { item: GalleryPhoto; size: number }) {
+const GalleryPhotoItem = memo(function GalleryPhotoItem({ item, size, currentUserId }: { item: GalleryPhoto; size: number; currentUserId?: string }) {
   return (
     <View style={[styles.photoCell, { width: size, height: size }]}>
       <AppPhotoImage
@@ -129,6 +130,12 @@ const GalleryPhotoItem = memo(function GalleryPhotoItem({ item, size }: { item: 
           <ActivityIndicator color="#FFFFFF" size="small" />
         </View>
       ) : null}
+      <FeedLikeButton
+        currentUserId={currentUserId}
+        likePath="feed_likes/district_photos"
+        likeId={getPhotoIdentity(item)}
+        style={styles.photoLikeButton}
+      />
     </View>
   );
 });
@@ -308,8 +315,8 @@ export default function FotoRayonaScreen() {
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: GalleryPhoto }) => <GalleryPhotoItem item={item} size={photoSize} />,
-    [photoSize],
+    ({ item }: { item: GalleryPhoto }) => <GalleryPhotoItem item={item} size={photoSize} currentUserId={user?.id} />,
+    [photoSize, user?.id],
   );
 
   const header = useMemo(
@@ -530,6 +537,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.28)',
+  },
+  photoLikeButton: {
+    position: 'absolute',
+    right: 6,
+    bottom: 6,
+    minWidth: 42,
+    minHeight: 28,
+    borderRadius: 14,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: 'rgba(122, 30, 92, 0.92)',
   },
   emptyState: {
     minHeight: 220,

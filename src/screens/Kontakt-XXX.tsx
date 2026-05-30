@@ -890,13 +890,15 @@ const KontaktiChaikyScreen: React.FC = () => {
                 const likes = contactLikes[item.id] ?? {};
 
                 return (
-                  <TouchableOpacity
+                  <View
                     key={item.id}
                     style={styles.kCard}
-                    onPress={() => { if (navLock.current) return; navLock.current = true; navigation.navigate('ItemDetailScreen', { item: mapToDetailData(item) }); setTimeout(() => { navLock.current = false; }, 800); }}
-                    activeOpacity={0.86}
                   >
-                    <View style={styles.kCardTop}>
+                    <TouchableOpacity
+                      style={styles.kCardTop}
+                      onPress={() => { if (navLock.current) return; navLock.current = true; navigation.navigate('ItemDetailScreen', { item: mapToDetailData(item) }); setTimeout(() => { navLock.current = false; }, 800); }}
+                      activeOpacity={0.86}
+                    >
                       {Boolean(item.photoUri || item.photoStoragePath) ? (
                         <AppPhotoImage
                           uri={item.photoUri}
@@ -945,7 +947,7 @@ const KontaktiChaikyScreen: React.FC = () => {
                           <Text style={styles.kModInfo} numberOfLines={2}>{modMsg}</Text>
                         ) : null}
                       </View>
-                    </View>
+                    </TouchableOpacity>
 
                     <UserCardActionBar
                       avatarUri={avatarUri || ''}
@@ -969,7 +971,7 @@ const KontaktiChaikyScreen: React.FC = () => {
                         <Text style={styles.kDeleteLinkText}>{text.deleteText}</Text>
                       </TouchableOpacity>
                     ) : null}
-                  </TouchableOpacity>
+                  </View>
                 );
               })
             )}

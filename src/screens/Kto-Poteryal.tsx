@@ -22,6 +22,7 @@ import TactileIcon from '../components/TactileIcon';
 import ContactReasonModal from '../components/ContactReasonModal';
 import { useContactRequest } from '../hooks/useContactRequest';
 import AppPhotoImage from '../components/AppPhotoImage';
+import FeedLikeButton from '../components/FeedLikeButton';
 import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { RootState } from '../redux/store';
@@ -484,6 +485,12 @@ const LostAndFoundScreen: React.FC = () => {
                     <MiniUserAvatar uri={authorAvatarUri} name={item.name || text.anonymous} size={28} borderRadius={10} backgroundColor="#6A8BA5" />
                     <Text style={styles.itemMeta} numberOfLines={1}>{item.name || text.anonymous}</Text>
                   </View>
+                  <FeedLikeButton
+                    currentUserId={user?.id}
+                    likePath="feed_likes/lost_found"
+                    likeId={item.id}
+                    style={styles.likeAction}
+                  />
                   <TouchableOpacity style={styles.phoneAction} onPress={(event) => { event.stopPropagation(); void safeCallPhone(item.phone, language); }} activeOpacity={0.75}>
                     <TactileIcon icon="phone-outline" size={34} iconSize={14} backgroundColor="#403933" />
                   </TouchableOpacity>
@@ -787,6 +794,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  likeAction: {
+    minWidth: 44,
+    minHeight: 34,
+    paddingHorizontal: 8,
   },
   phoneActionText: { color: '#8A5B00', fontSize: 11, fontWeight: '900' },
   closeBtn: { alignSelf: 'flex-start', borderRadius: 11, backgroundColor: SCREEN_THEME.terracotta, paddingHorizontal: 10, paddingVertical: 7 },

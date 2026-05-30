@@ -118,6 +118,15 @@ export const selectCompletedRequests = (state: RootState) => {
   const all = state.helpRequests?.items ?? [];
   return all.filter((r: HelpRequest) => !r.isBurning);
 };
+
+export const selectYesterdayHelpRequests = (state: RootState): HelpRequest[] => {
+  const all = state.helpRequests?.items ?? [];
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const yesterdayStart = new Date(todayStart);
+  yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+  return all.filter((r: HelpRequest) => r.createdAt >= yesterdayStart && r.createdAt < todayStart);
+};
 export const selectHelpRequestsLoading = (state: RootState) => state.helpRequests?.loading ?? false;
 export const selectHelpRequestsError = (state: RootState) => state.helpRequests?.error ?? null;
 

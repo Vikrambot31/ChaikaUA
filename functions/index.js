@@ -1017,6 +1017,10 @@ exports.adminModerateContentItem = functionsV1.https.onCall(async (data, context
         patch.rejectionReason = null;
       }
 
+      if (section === 'communityPhotos') {
+        patch.moderationStatus = nextStatusValue;
+      }
+
       if (section === 'communityPhotos' && action === 'approved') {
         patch.safetyStatus = 'manual_reviewed';
         patch.safetyReviewedAt = now;
