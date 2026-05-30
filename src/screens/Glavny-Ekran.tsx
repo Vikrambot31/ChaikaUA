@@ -791,7 +791,7 @@ const HomeScreen: React.FC = () => {
           {showIntroVideo ? (
             <View style={[styles.panel1Shadow, { height: panelBodyHeight }]}> 
               <Video
-                source={require('../../assets/CHAIKA-panel-1.mp4')}
+                source={require('../../assets/chaika-panel-1_bVC1Ke1v.mp4')}
                 style={{ width: SCREEN_W - 48, height: panelBodyHeight }}
                 resizeMode={ResizeMode.CONTAIN}
                 shouldPlay

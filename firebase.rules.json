@@ -330,6 +330,26 @@
         ".write": "auth != null",
         ".read": "auth != null && root.child('user_roles').child(auth.uid).child('role').val() === 'admin'"
       }
+    },
+
+    "profileViewRequests": {
+      "$targetUserId": {
+        ".read": "auth != null && (auth.uid === $targetUserId || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
+        "$requesterId": {
+          ".read": "auth != null && (auth.uid === $targetUserId || auth.uid === $requesterId)",
+          ".write": "auth != null && auth.uid === $requesterId"
+        }
+      }
+    },
+
+    "outgoingProfileRequestsByUser": {
+      "$requesterId": {
+        ".read": "auth != null && (auth.uid === $requesterId || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
+        "$targetUserId": {
+          ".read": "auth != null && (auth.uid === $requesterId || root.child('user_roles').child(auth.uid).child('role').val() === 'admin')",
+          ".write": "auth != null && auth.uid === $requesterId"
+        }
+      }
     }
   }
 }

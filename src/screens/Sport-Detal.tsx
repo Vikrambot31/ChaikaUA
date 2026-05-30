@@ -6,6 +6,8 @@ import { useSelector } from 'react-redux';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import type { RootState } from '../redux/store';
 import { sportsService, SportKey, SportPlayer, SportTodayEntry } from '../services/sportsService';
+import ContactReasonModal from '../components/ContactReasonModal';
+import { useContactRequest } from '../hooks/useContactRequest';
 
 type Lang = 'ua' | 'ru' | 'en';
 type SportDetailParams = { sportKey: SportKey; sportTitle: string };
@@ -87,6 +89,7 @@ const SportDetailScreen: React.FC = () => {
   const sportKey = route.params?.sportKey || 'basketball';
   const myRating = players.find((player) => player.id === user?.id)?.rating ?? 0;
   const isMyPlayerAdded = players.some((player) => player.id === user?.id);
+  const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
 
   useEffect(() => {
     setLoading(true);
@@ -140,7 +143,7 @@ const SportDetailScreen: React.FC = () => {
   };
 
   const showPlayerContact = (player: ContactPlayer) => {
-    Alert.alert(text.contact, `${player.name}${player.phone ? `\n${player.phone}` : ''}${player.time ? `\n${player.time}` : ''}`);
+    void openContactModal({ userId: player.id, name: player.name, sourceType: 'sport', sourceTitle: title });
   };
 
   return (
@@ -213,6 +216,13 @@ const SportDetailScreen: React.FC = () => {
           </TouchableOpacity>
         ))}
       </ScrollView>
+      <ContactReasonModal
+        visible={contactModalVisible}
+        pending={contactPending}
+        target={contactTarget}
+        onSelect={(reason) => void sendContactRequest(reason)}
+        onClose={closeContactModal}
+      />
     </SafeAreaView>
   );
 };

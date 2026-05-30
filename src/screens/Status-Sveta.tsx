@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
   FlatList,
+  Image,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -312,6 +313,14 @@ const ElectricityStatusScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.headerImageFrame}>
+          <Image
+            source={require('../../assets/ImageToStl.com_svet-plus2.webp')}
+            style={styles.headerImage}
+            resizeMode="cover"
+          />
+        </View>
+
         <TactileCard elevated style={styles.statusCard} pressable={false}>
           <Text style={styles.cardTitle}>{text.selectStatus}</Text>
 
@@ -563,6 +572,20 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingTop: 24,
     paddingBottom: 32,
+  },
+  headerImageFrame: {
+    width: '100%',
+    height: 158,
+    borderRadius: 28,
+    overflow: 'hidden',
+    marginBottom: 14,
+    backgroundColor: SCREEN_THEME.paper,
+    borderWidth: 1,
+    borderColor: SCREEN_THEME.borderStrong,
+  },
+  headerImage: {
+    width: '100%',
+    height: '100%',
   },
   ledIndicatorOn: {
     position: 'absolute',

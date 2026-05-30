@@ -4,7 +4,6 @@ import { Picker } from '@react-native-picker/picker';
 import { useSelector } from 'react-redux';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import MiniTabBar from '../components/MiniTabBar';
 import MiniUserAvatar from '../components/MiniUserAvatar';
 import AppPhotoImage from '../components/AppPhotoImage';
@@ -734,9 +733,14 @@ const BuySellScreen: React.FC = () => {
         }
         renderItem={({ item }) => {
           const authorAvatarUri = (item.userId && avatarByUserId[item.userId]) || undefined;
+          const hasListingPhoto = Boolean((item.photoUri || item.photoStoragePath || '').trim());
 
           return (
-            <TouchableOpacity style={styles.listingCard} onPress={() => openDetail(item)} activeOpacity={0.86}>
+            <TouchableOpacity
+              style={[styles.listingCard, !hasListingPhoto && styles.listingCardCompact]}
+              onPress={() => openDetail(item)}
+              activeOpacity={0.86}
+            >
             <View style={styles.listingHeader}>
               <MiniUserAvatar uri={authorAvatarUri} name={item.itemName} size={34} borderRadius={11} backgroundColor="#6A8BA5" />
               <Text style={[styles.listingName, { marginLeft: 8 }]}>{item.itemName}</Text>
@@ -761,8 +765,8 @@ const BuySellScreen: React.FC = () => {
                 </Text>
               )}
             </View>
-            <Text style={styles.listingDescription} numberOfLines={2}>{item.description || text.noDesc}</Text>
-            {Boolean(item.photoUri || item.photoStoragePath) ? (
+            <Text style={[styles.listingDescription, !hasListingPhoto && styles.listingDescriptionCompact]} numberOfLines={hasListingPhoto ? 2 : 3}>{item.description || text.noDesc}</Text>
+            {hasListingPhoto ? (
               <AppPhotoImage
                 uri={item.photoUri}
                 storagePath={item.photoStoragePath}
@@ -770,11 +774,7 @@ const BuySellScreen: React.FC = () => {
                 resizeMode="contain"
                 debugLabel={`BuySell:${item.id}`}
               />
-            ) : (
-              <View style={[styles.listingPhoto, styles.listingPhotoPlaceholder]}>
-                <MaterialCommunityIcons name="image-off-outline" size={26} color="#B8A888" />
-              </View>
-            )}
+            ) : null}
             <Text style={styles.moderationInfo}>
               {getModerationUserMessage(language, item.moderationStatus, item.rejectionReason || item.moderationReason)}
             </Text>
@@ -990,6 +990,7 @@ const styles = StyleSheet.create({
   emptyFilteredTitle: { color: SCREEN_THEME.textPrimary, fontWeight: '800', fontSize: 14 },
   emptyFilteredSub: { color: SCREEN_THEME.textSecondary, marginTop: 4, fontSize: 12, lineHeight: 18 },
   listingCard: { backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 20, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#E4D0AB' },
+  listingCardCompact: { paddingVertical: 12 },
   listingHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   listingName: { fontWeight: '800', color: SCREEN_THEME.textPrimary, flex: 1, marginRight: 8 },
   deleteText: { color: '#D05B4D', fontWeight: '700' },
@@ -999,8 +1000,8 @@ const styles = StyleSheet.create({
   listingPrice: { fontSize: 15, fontWeight: '900', color: '#00897B' },
   statusBadge: { fontSize: 11, fontWeight: '900', color: '#8A5A00', backgroundColor: '#FFF2C7', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
   listingDescription: { color: '#fff', backgroundColor: '#7A1E5C', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 7, lineHeight: 18, marginBottom: 8, fontWeight: '800', overflow: 'hidden' },
+  listingDescriptionCompact: { backgroundColor: '#F7F3EE', color: SCREEN_THEME.textPrimary, borderWidth: 1, borderColor: '#E8DDD3', marginBottom: 6 },
   listingPhoto: { width: '100%', height: 220, borderRadius: 16, marginBottom: 8, backgroundColor: '#F0EDE8' },
-  listingPhotoPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   moderationInfo: { color: '#5F5043', backgroundColor: '#FFF8EA', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 8, fontSize: 12, lineHeight: 17, fontWeight: '700' },
   addBar: {
     paddingHorizontal: 16,
@@ -1067,9 +1068,6 @@ const styles = StyleSheet.create({
 });
 
 export default BuySellScreen;
-
-
-
 
 
 
