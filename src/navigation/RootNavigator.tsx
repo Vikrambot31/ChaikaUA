@@ -752,7 +752,7 @@ function AuthNavigation() {
         <Stack.Screen name="RequestsTab" component={RequestTopicScreen} />
         <Stack.Screen name="ListScreen" component={ListScreen} />
         <Stack.Screen name="PlaceDetailsPanel" component={PlaceDetailsPanel as React.ComponentType<unknown>} />
-        <Stack.Screen name="RequestFormScreen" component={withGuard(RequestFormScreen, 'auth')} />
+        <Stack.Screen name="RequestFormScreen" component={RequestFormScreen} />
         <Stack.Screen name="HelpNeighborsScreen" component={HelpNeighborsScreen} />
         <Stack.Screen name="HelpRequestScreen" component={HelpRequestScreen} />
         <Stack.Screen name="TopPlacesScreen" component={TopPlacesScreen} />
