@@ -14,6 +14,7 @@ import { LIGHT_ORBS, SCREEN_THEME } from '../utils/screenTheme';
 import { showUserError } from '../utils/userFacingErrors';
 import { profilePermissionService } from '../services/profilePermissionService';
 import { pickUserAvatarUri, resolveUserAvatarMap } from '../utils/userAvatar';
+import { getRequestTopicLabel } from '../data/categories';
 
 type RequestDetailParams = {
   request: Request;
@@ -253,7 +254,10 @@ const RequestDetailScreen = ({
   };
 
   const avatarColor = AVATAR_COLORS[(request.name?.charCodeAt(0) ?? 0) % AVATAR_COLORS.length] || '#C77A5D';
-  const categoryLabel = text.categories[request.category as keyof typeof text.categories] ?? request.category;
+  const categoryLabel = getRequestTopicLabel(
+    { category: request.category, group: request.group, subcategory: request.subcategory },
+    language,
+  );
 
   return (
     <SafeAreaView style={styles.container}>

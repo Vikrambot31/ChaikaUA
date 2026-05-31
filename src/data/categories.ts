@@ -262,6 +262,64 @@ export const getStoreLabel = (storeValue: string): string =>
 export const getTimeLabel = (timeValue: string): string =>
   TIME_SLOTS.find((slot) => slot.value === timeValue)?.label ?? timeValue;
 
+type LocalizedLabel = { ua: string; ru: string; en: string };
+
+const REQUEST_TOPIC_FALLBACK: Record<AppLanguage, string> = {
+  ua: 'Заявка',
+  ru: 'Заявка',
+  en: 'Request',
+};
+
+const REQUEST_TOPIC_LABELS: Record<string, LocalizedLabel> = {
+  problem: { ua: 'Проблеми ЖК', ru: 'Проблемы ЖК', en: 'Building issue' },
+  problems: { ua: 'Проблеми ЖК', ru: 'Проблемы ЖК', en: 'Building issue' },
+  electricity: { ua: 'Світло', ru: 'Свет', en: 'Power' },
+  power: { ua: 'Світло', ru: 'Свет', en: 'Power' },
+  power_on: { ua: 'Світло є', ru: 'Свет есть', en: 'Power on' },
+  power_off: { ua: 'Світла нема', ru: 'Света нет', en: 'Power off' },
+  yard: { ua: 'Двір', ru: 'Двор', en: 'Yard' },
+  infrastructure: { ua: 'Інфраструктура', ru: 'Инфраструктура', en: 'Infrastructure' },
+  safety: { ua: 'Безпека', ru: 'Безопасность', en: 'Safety' },
+  help: { ua: 'Допомога', ru: 'Помощь', en: 'Help' },
+  help_neighbors: { ua: 'Допомога', ru: 'Помощь', en: 'Help' },
+  medical: { ua: 'Медицина', ru: 'Медицина', en: 'Medical' },
+  delivery: { ua: 'Доставка', ru: 'Доставка', en: 'Delivery' },
+  shopping: { ua: 'Покупки', ru: 'Покупки', en: 'Shopping' },
+  legal: { ua: 'Юрист', ru: 'Юрист', en: 'Legal' },
+  tech: { ua: 'Техніка', ru: 'Техника', en: 'Tech' },
+  moving: { ua: 'Переїзд', ru: 'Переезд', en: 'Moving' },
+  contacts: { ua: 'Контакти', ru: 'Контакты', en: 'Contacts' },
+  buy_sell: { ua: 'Куплю / продам', ru: 'Куплю / продам', en: 'Buy / sell' },
+  lost_found: { ua: 'Загублено / знайдено', ru: 'Потеряно / найдено', en: 'Lost / found' },
+  other: { ua: 'Інше', ru: 'Другое', en: 'Other' },
+};
+
+const normalizeTopicValue = (value?: string | null): string =>
+  String(value ?? '').trim().toLowerCase();
+
+const findRequestTopicLabel = (value?: string | null): LocalizedLabel | undefined => {
+  const key = normalizeTopicValue(value);
+  if (!key) return undefined;
+  if (REQUEST_TOPIC_LABELS[key]) return REQUEST_TOPIC_LABELS[key];
+  if (CATEGORY_LABELS[key]) return CATEGORY_LABELS[key];
+
+  return Object.values({ ...REQUEST_TOPIC_LABELS, ...CATEGORY_LABELS }).find((entry) =>
+    (['ua', 'ru', 'en'] as const).some((lang) => normalizeTopicValue(entry[lang]) === key),
+  );
+};
+
+export const getRequestTopicLabel = (
+  params: { category?: string | null; group?: string | null; subcategory?: string | null },
+  lang: AppLanguage,
+): string => {
+  const candidates = [params.subcategory, params.category, params.group];
+  for (const candidate of candidates) {
+    const label = findRequestTopicLabel(candidate);
+    if (label) return label[lang];
+  }
+  return REQUEST_TOPIC_FALLBACK[lang];
+};
+
 interface BuildRequestTextParams {
   groupValue: string;
   subValue: string;

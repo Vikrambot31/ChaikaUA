@@ -25,6 +25,7 @@ import { useContactRequest } from '../hooks/useContactRequest';
 import ContactReasonModal from '../components/ContactReasonModal';
 import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
 import type { DetailItemData } from '../utils/detailViewTypes';
+import { getRequestTopicLabel } from '../data/categories';
 import { getFirstDoneRequestPhoto, getRequiredPhotoLabel, hasPhotoUploadInProgress, validateSubmissionRequirements } from '../utils/submissionRequirements';
 
 type Problem = {
@@ -218,6 +219,7 @@ const CLEAN_PROBLEMS_TEXT = {
 } as const;
 
 // Lookup: any language's category label to canonical index (0-4)
+const PROBLEM_CATEGORY_KEYS = ['yard', 'cleaning', 'infrastructure', 'electricity', 'safety'] as const;
 const CATEGORY_LOOKUP = new Map<string, number>();
 (['ua', 'ru', 'en'] as const).forEach((lang) => {
   const t = CLEAN_PROBLEMS_TEXT[lang];
@@ -225,8 +227,16 @@ const CATEGORY_LOOKUP = new Map<string, number>();
     CATEGORY_LOOKUP.set(label.toLowerCase(), idx);
   });
 });
+PROBLEM_CATEGORY_KEYS.forEach((key, idx) => {
+  CATEGORY_LOOKUP.set(key, idx);
+});
 const normalizeCategory = (v: string): number =>
   CATEGORY_LOOKUP.get(v.toLowerCase()) ?? -1;
+
+const normalizeProblemCategoryKey = (value: string): string => {
+  const index = normalizeCategory(value);
+  return index >= 0 ? PROBLEM_CATEGORY_KEYS[index] : value;
+};
 
 const toClean = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 
@@ -563,7 +573,7 @@ const text = CLEAN_PROBLEMS_TEXT[language];
       language,
       category: 'problem',
       group: 'problems',
-      subcategory: category,
+      subcategory: normalizeProblemCategoryKey(category),
       building: `${street}, ${house}`,
       text: cleanTitle,
       description: cleanTitle,
@@ -795,7 +805,9 @@ const text = CLEAN_PROBLEMS_TEXT[language];
                     {!!problem.house && <Text style={styles.addressHouse} numberOfLines={1}>{problem.house}</Text>}
                   </View>
                   <View style={styles.personMetaRow}>
-                    <Text style={styles.personMetaText} numberOfLines={1}>{problem.category} - {problem.votes} {text.votes}</Text>
+                    <Text style={styles.personMetaText} numberOfLines={1}>
+                      {getRequestTopicLabel({ category: 'problem', subcategory: problem.category }, language)} - {problem.votes} {text.votes}
+                    </Text>
                   </View>
                 </View>
               </TouchableOpacity>
@@ -1172,4 +1184,3 @@ const styles = StyleSheet.create({
     color: SCREEN_THEME.textSecondary,
   },
 });
-

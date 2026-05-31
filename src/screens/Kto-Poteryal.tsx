@@ -156,6 +156,18 @@ const UI_TEXT = {
   },
 } as const;
 
+const getLostFoundCategoryLabel = (value: string, language: AppLanguage): string => {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return '';
+
+  for (const lang of ['ua', 'ru', 'en'] as const) {
+    const index = UI_TEXT[lang].categories.findIndex((label) => label.toLowerCase() === normalized);
+    if (index >= 0) return UI_TEXT[language].categories[index];
+  }
+
+  return value;
+};
+
 const formatItemDate = (value: string, language: AppLanguage): string => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
@@ -361,7 +373,7 @@ const LostAndFoundScreen: React.FC = () => {
 
   const mapToDetailData = (item: LostFoundItem): DetailItemData => ({
     id: item.id,
-    title: item.name || item.category,
+    title: item.name || getLostFoundCategoryLabel(item.category, language),
     photoUri: item.photoUri,
     photoStoragePath: item.photoStoragePath,
     phone: item.phone,
@@ -428,7 +440,7 @@ const LostAndFoundScreen: React.FC = () => {
                 </View>
 
                 <View style={styles.itemTitleBox}>
-                  <Text style={styles.itemTitle} numberOfLines={2}>{item.category}</Text>
+                  <Text style={styles.itemTitle} numberOfLines={2}>{getLostFoundCategoryLabel(item.category, language)}</Text>
                   {!!item.description && (
                     <Text style={styles.itemDescription} numberOfLines={2}>{item.description}</Text>
                   )}
@@ -453,7 +465,7 @@ const LostAndFoundScreen: React.FC = () => {
                       style={styles.phoneAction}
                       onPress={(event) => {
                         event.stopPropagation();
-                        openContactModal({ userId: item.userId as string, name: item.name || text.anonymous, sourceType: 'help', sourceId: item.id, sourceTitle: item.category });
+                        openContactModal({ userId: item.userId as string, name: item.name || text.anonymous, sourceType: 'help', sourceId: item.id, sourceTitle: getLostFoundCategoryLabel(item.category, language) });
                       }}
                       activeOpacity={0.75}
                     >

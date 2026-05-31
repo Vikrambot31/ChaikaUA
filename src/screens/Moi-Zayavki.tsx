@@ -22,6 +22,7 @@ import TactileIcon from '../components/TactileIcon';
 import { safeCallPhone } from '../utils/communicationActions';
 import type { DetailItemData } from '../utils/detailViewTypes';
 import { openRequestFormWithLimitCheck } from '../utils/requestFormLimitGuard';
+import { getRequestTopicLabel } from '../data/categories';
 
 const UI_TEXT = {
   ua: {
@@ -121,6 +122,8 @@ type Lang = keyof typeof UI_TEXT;
 type MyRequestItem = {
   id: string;
   category?: string;
+  group?: string;
+  subcategory?: string;
   status?: string;
   text?: string;
   phone?: string;
@@ -257,7 +260,7 @@ const MyRequestsScreen = () => {
 
   const mapToDetailData = useCallback((item: MyRequestItem): DetailItemData => ({
     id: item.id,
-    title: item.category || 'Заявка',
+    title: getRequestTopicLabel({ category: item.category, group: item.group, subcategory: item.subcategory }, language),
     description: item.text,
     phone: item.phone,
     category: item.category,
@@ -266,7 +269,7 @@ const MyRequestsScreen = () => {
     createdAt: item.createdAt ? new Date(item.createdAt).toISOString() : undefined,
     sourceType: 'help',
     sourceId: item.id,
-  }), [text.statusApproved, text.statusPending, text.statusRejected, user?.id]);
+  }), [language, text.statusApproved, text.statusPending, text.statusRejected, user?.id]);
 
   const openDetail = useCallback((item: MyRequestItem) => {
     navigation.navigate('ItemDetailScreen', { item: mapToDetailData(item) });

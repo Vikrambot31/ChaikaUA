@@ -11,6 +11,7 @@ import MiniTabBar from '../components/MiniTabBar';
 import { useContactRequest } from '../hooks/useContactRequest';
 import type { RootState } from '../redux/store';
 import type { ViewRequestContext } from '../services/profilePermissionService';
+import { getRequestTopicLabel } from '../data/categories';
 import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
 import type { DetailItemData } from '../utils/detailViewTypes';
 import { SCREEN_THEME } from '../utils/screenTheme';
@@ -97,6 +98,7 @@ export default function ItemDetailScreen({
   const canRequestContact = Boolean(item.userId && item.userId !== currentUser?.id);
   const canContact = canRequestContact || hasPhone;
   const hasPhoto = Boolean(item.photoUri || item.photoStoragePath);
+  const categoryLabel = item.category ? getRequestTopicLabel({ category: item.category }, language) : '';
 
   const fields = [
     { label: text.description, value: item.description },
@@ -161,9 +163,9 @@ export default function ItemDetailScreen({
 
         <View style={styles.titleCard}>
           <Text style={styles.title}>{item.title}</Text>
-          {item.category ? (
+          {categoryLabel ? (
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>{item.category}</Text>
+              <Text style={styles.badgeText}>{categoryLabel}</Text>
             </View>
           ) : null}
         </View>
