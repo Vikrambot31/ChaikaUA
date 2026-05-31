@@ -1,0 +1,30 @@
+# Normalize line endings for all text files
+* text=auto
+
+# Source code — always LF in repo and working copy
+*.ts   text eol=lf
+*.tsx  text eol=lf
+*.js   text eol=lf
+*.mjs  text eol=lf
+*.cjs  text eol=lf
+*.json text eol=lf
+*.md   text eol=lf
+*.css  text eol=lf
+*.html text eol=lf
+
+# Windows batch files — must be CRLF on Windows or cmd.exe may misbehave
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+
+# Binaries — no conversion
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.apk  binary
+*.keystore binary
+*.ttf  binary
+*.otf  binary
+*.woff binary
+*.woff2 binary
