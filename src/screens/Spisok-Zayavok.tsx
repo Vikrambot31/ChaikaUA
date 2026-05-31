@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, RefreshControl, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, RefreshControl, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useDispatch, useSelector } from 'react-redux';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { get, ref } from 'firebase/database';
 import RequestItem from '../components/RequestItem';
+import ModerationPhotoCard, { type ModerationPhoto } from '../components/ModerationPhotoCard';
 import { deleteRequest } from '../redux/slices/requestsSlice';
 import { selectUser } from '../redux/slices/authSlice';
 import { Request } from '../types/app';
@@ -13,7 +15,7 @@ import { COLORS, SIZES } from '../utils/constants';
 import { SkeletonList } from '../components/SkeletonLoader';
 import MiniTabBar from '../components/MiniTabBar';
 import type { AppDispatch, RootState } from '../redux/store';
-import { database, firebaseChatAPI } from '../firebase-config';
+import { database, firebaseChatAPI, photoAPI } from '../firebase-config';
 import { isModeratorUser } from '../firebase-auth-session';
 import { useContactRequest } from '../hooks/useContactRequest';
 import ContactReasonModal from '../components/ContactReasonModal';
@@ -45,6 +47,10 @@ const UI_TEXT = {
     rejectBtn: 'Відхилити',
     deleteBtn: 'Видалити',
     emptySub: "Список оновиться, коли з'являться нові заявки.",
+    deleteTitle: 'Видалення',
+    deleteBody: 'Видалити назавжди?',
+    cancel: 'Скасувати',
+    actionFailed: 'Дію не вдалося виконати',
   },
   ru: {
     emptyRequests: 'Нет заявок',
@@ -62,6 +68,10 @@ const UI_TEXT = {
     rejectBtn: 'Отклонить',
     deleteBtn: 'Удалить',
     emptySub: 'Список обновится, когда появятся новые заявки.',
+    deleteTitle: 'Удаление',
+    deleteBody: 'Удалить навсегда?',
+    cancel: 'Отмена',
+    actionFailed: 'Действие не выполнено',
   },
   en: {
     emptyRequests: 'No requests',
@@ -79,8 +89,24 @@ const UI_TEXT = {
     rejectBtn: 'Reject',
     deleteBtn: 'Delete',
     emptySub: 'The list will update when new requests appear.',
+    deleteTitle: 'Delete',
+    deleteBody: 'Delete permanently?',
+    cancel: 'Cancel',
+    actionFailed: 'Action could not be completed',
   },
 } as const;
+
+const PHOTO_SOURCE_SCREENS = ['FotoRayonaScreen', 'SoulPhotosScreen'] as const;
+
+type FeedRow =
+  | { kind: 'request'; key: string; sortKey: number; request: Request }
+  | { kind: 'photo'; key: string; sortKey: number; photo: ModerationPhoto };
+
+const toNumber = (value: unknown): number => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+};
+const toStr = (value: unknown): string => (typeof value === 'string' ? value : '');
 const PAGE_SIZE = 20;
 
 const RequestsScreen: React.FC = () => {
@@ -95,6 +121,7 @@ const RequestsScreen: React.FC = () => {
   const [moderationBusyId, setModerationBusyId] = useState<string | null>(null);
   const [isModerator, setIsModerator] = useState(false);
   const [requests, setRequests] = useState<Request[]>([]);
+  const [pendingPhotos, setPendingPhotos] = useState<ModerationPhoto[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -142,6 +169,38 @@ const RequestsScreen: React.FC = () => {
     [text.loadingError],
   );
 
+  const loadPendingPhotos = useCallback(async () => {
+    const snapshot = await get(ref(database, 'community_photos'));
+    if (!snapshot.exists()) {
+      setPendingPhotos([]);
+      return;
+    }
+    const value = snapshot.val() as Record<string, Record<string, unknown>>;
+    const sources = new Set<string>(PHOTO_SOURCE_SCREENS);
+    const items = Object.entries(value)
+      .map<ModerationPhoto | null>(([id, raw]) => {
+        if (!raw || typeof raw !== 'object') return null;
+        const sourceScreen = toStr(raw.sourceScreen);
+        if (!sources.has(sourceScreen)) return null;
+        const status = toStr(raw.status) || 'pending';
+        if (status !== 'pending') return null;
+        return {
+          id,
+          uri: toStr(raw.thumbnailUrl) || toStr(raw.imageUri) || undefined,
+          storagePath: toStr(raw.storagePath) || undefined,
+          title: toStr(raw.title) || undefined,
+          description: toStr(raw.description) || undefined,
+          userName: toStr(raw.userName) || toStr(raw.uploadedBy) || undefined,
+          sourceScreen,
+          createdAt: toNumber(raw.createdAt) || toNumber(raw.uploadedAt),
+          status: 'pending',
+        };
+      })
+      .filter((item): item is ModerationPhoto => item !== null)
+      .sort((a, b) => b.createdAt - a.createdAt);
+    setPendingPhotos(items);
+  }, []);
+
   useEffect(() => {
     let active = true;
     let mounted = true;
@@ -150,6 +209,9 @@ const RequestsScreen: React.FC = () => {
       .then((allowed) => {
         if (mounted) {
           setIsModerator(allowed);
+          if (allowed) {
+            void loadPendingPhotos().catch(() => {});
+          }
         }
       })
       .catch(() => {
@@ -169,7 +231,7 @@ const RequestsScreen: React.FC = () => {
       mounted = false;
       active = false;
     };
-  }, [user?.id, user?.email, loadPage]);
+  }, [user?.id, user?.email, loadPage, loadPendingPhotos]);
 
   useEffect(() => {
     const userIds = Array.from(new Set(requests.map((item) => item.userId).filter((id): id is string => Boolean(id))));
@@ -187,11 +249,14 @@ const RequestsScreen: React.FC = () => {
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await loadPage(null, false);
+      await Promise.all([
+        loadPage(null, false),
+        isModerator ? loadPendingPhotos() : Promise.resolve(),
+      ]);
     } finally {
       setRefreshing(false);
     }
-  }, [loadPage]);
+  }, [isModerator, loadPage, loadPendingPhotos]);
 
   const handleLoadMore = useCallback(async () => {
     if (loading || loadingMore || !hasMore || !nextCursor) return;
@@ -236,6 +301,58 @@ const RequestsScreen: React.FC = () => {
     [dispatch, moderationBusyId],
   );
 
+  const moderatePhoto = useCallback(
+    async (photoId: string, status: 'approved' | 'rejected') => {
+      const busyId = `photo:${photoId}`;
+      if (moderationBusyId) {
+        return;
+      }
+
+      setModerationBusyId(busyId);
+      try {
+        const result = await photoAPI.moderatePhoto(photoId, status);
+        if (result.success) {
+          setPendingPhotos((prev) => prev.filter((item) => item.id !== photoId));
+        } else {
+          Alert.alert(text.loadingError, result.error ?? text.actionFailed);
+        }
+      } finally {
+        setModerationBusyId(null);
+      }
+    },
+    [moderationBusyId, text.actionFailed, text.loadingError],
+  );
+
+  const deletePhoto = useCallback(
+    (photoId: string) => {
+      if (moderationBusyId) {
+        return;
+      }
+
+      Alert.alert(text.deleteTitle, text.deleteBody, [
+        { text: text.cancel, style: 'cancel' },
+        {
+          text: text.deleteBtn,
+          style: 'destructive',
+          onPress: () => {
+            const busyId = `photo:${photoId}`;
+            setModerationBusyId(busyId);
+            void photoAPI.deletePhoto(photoId)
+              .then((result) => {
+                if (result.success) {
+                  setPendingPhotos((prev) => prev.filter((item) => item.id !== photoId));
+                } else {
+                  Alert.alert(text.loadingError, result.error ?? text.actionFailed);
+                }
+              })
+              .finally(() => setModerationBusyId(null));
+          },
+        },
+      ]);
+    },
+    [moderationBusyId, text.actionFailed, text.cancel, text.deleteBody, text.deleteBtn, text.deleteTitle, text.loadingError],
+  );
+
   const sortedRequests = useMemo(() => {
     const resolveStatus = (item: Request): RequestStatusFilter => {
       if (item.status === 'approved' || item.status === 'pending' || item.status === 'rejected') {
@@ -248,6 +365,26 @@ const RequestsScreen: React.FC = () => {
       .filter((item) => statusFilter === 'all' || resolveStatus(item) === statusFilter)
       .sort((a, b) => b.createdAt - a.createdAt);
   }, [requests, statusFilter]);
+
+  const feedRows = useMemo<FeedRow[]>(() => {
+    const requestRows: FeedRow[] = sortedRequests.map((request) => ({
+      kind: 'request',
+      key: `request:${request.id}`,
+      sortKey: request.createdAt,
+      request,
+    }));
+
+    const photoRows: FeedRow[] = isModerator && (statusFilter === 'all' || statusFilter === 'pending')
+      ? pendingPhotos.map((photo) => ({
+          kind: 'photo',
+          key: `photo:${photo.id}`,
+          sortKey: photo.createdAt,
+          photo,
+        }))
+      : [];
+
+    return [...requestRows, ...photoRows].sort((a, b) => b.sortKey - a.sortKey);
+  }, [isModerator, pendingPhotos, sortedRequests, statusFilter]);
 
   const emptyMessage = error ?? text.emptyRequests;
 
@@ -336,35 +473,49 @@ const RequestsScreen: React.FC = () => {
     </>
   );
 
-  const renderItem = useCallback(({ item }: { item: Request }) => {
-    const isOwn = Boolean(item.userId && item.userId === user?.id);
-    const isOther = Boolean(item.userId && item.userId !== user?.id);
+  const renderItem = useCallback(({ item }: { item: FeedRow }) => {
+    if (item.kind === 'photo') {
+      return (
+        <ModerationPhotoCard
+          photo={item.photo}
+          onApprove={() => void moderatePhoto(item.photo.id, 'approved')}
+          onReject={() => void moderatePhoto(item.photo.id, 'rejected')}
+          onDelete={() => deletePhoto(item.photo.id)}
+          busy={moderationBusyId === `photo:${item.photo.id}`}
+          language={language}
+        />
+      );
+    }
+
+    const request = item.request;
+    const isOwn = Boolean(request.userId && request.userId === user?.id);
+    const isOther = Boolean(request.userId && request.userId !== user?.id);
     return (
       <RequestItem
-        request={item}
-        avatarUri={(item.userId && avatarByUserId[item.userId]) || undefined}
+        request={request}
+        avatarUri={(request.userId && avatarByUserId[request.userId]) || undefined}
         currentUserId={user?.id}
         isOwn={isOwn}
-        onPress={() => { if (navLock.current) return; navLock.current = true; navigation.navigate('RequestDetail', { request: item }); setTimeout(() => { navLock.current = false; }, 800); }}
-        onDelete={isOwn ? () => void removeRequest(item.id) : undefined}
-        onProfile={isOther ? () => { if (navLock.current) return; navLock.current = true; navigation.navigate('ViewUserProfile', { userId: item.userId as string }); setTimeout(() => { navLock.current = false; }, 800); } : undefined}
-        onContact={isOther ? () => openContactModal({ userId: item.userId as string, name: item.name ?? 'Unknown', sourceType: 'help', sourceId: item.id, sourceTitle: item.description?.slice(0, 60) }) : undefined}
-        onApprove={isModerator ? () => void moderate(item.id, 'approved') : undefined}
-        onReject={isModerator ? () => void moderate(item.id, 'rejected') : undefined}
-        onModDelete={isModerator ? () => void removeRequest(item.id) : undefined}
+        onPress={() => { if (navLock.current) return; navLock.current = true; navigation.navigate('RequestDetail', { request }); setTimeout(() => { navLock.current = false; }, 800); }}
+        onDelete={isOwn ? () => void removeRequest(request.id) : undefined}
+        onProfile={isOther ? () => { if (navLock.current) return; navLock.current = true; navigation.navigate('ViewUserProfile', { userId: request.userId as string }); setTimeout(() => { navLock.current = false; }, 800); } : undefined}
+        onContact={isOther ? () => openContactModal({ userId: request.userId as string, name: request.name ?? 'Unknown', sourceType: 'help', sourceId: request.id, sourceTitle: request.description?.slice(0, 60) }) : undefined}
+        onApprove={isModerator ? () => void moderate(request.id, 'approved') : undefined}
+        onReject={isModerator ? () => void moderate(request.id, 'rejected') : undefined}
+        onModDelete={isModerator ? () => void removeRequest(request.id) : undefined}
         isModerator={isModerator}
-        moderationBusy={moderationBusyId === item.id}
+        moderationBusy={moderationBusyId === request.id}
         language={language}
       />
     );
-  }, [avatarByUserId, isModerator, language, moderationBusyId, moderate, navigation, openContactModal, removeRequest, user?.id]);
+  }, [avatarByUserId, deletePhoto, isModerator, language, moderate, moderatePhoto, moderationBusyId, navigation, openContactModal, removeRequest, user?.id]);
 
   return (
     <SafeAreaView style={styles.container}>
       <FlatList
         keyboardShouldPersistTaps="handled"
-        data={sortedRequests}
-        keyExtractor={(item: Request) => item.id}
+        data={feedRows}
+        keyExtractor={(item: FeedRow) => item.key}
         renderItem={renderItem}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={COLORS.primary} colors={[COLORS.primary]} />}
         contentContainerStyle={styles.listContent}

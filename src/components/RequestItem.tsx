@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useMemo } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Request } from '../types/app';
 import { SCREEN_THEME } from '../utils/screenTheme';
@@ -7,6 +7,7 @@ import { pickUserAvatarUri } from '../utils/userAvatar';
 import TactileCard from './TactileCard';
 import MiniUserAvatar from './MiniUserAvatar';
 import UserCardActionBar from './UserCardActionBar';
+import AppPhotoImage from './AppPhotoImage';
 
 interface RequestItemProps {
   request: Request;
@@ -187,8 +188,8 @@ const RequestItem: React.FC<RequestItemProps> = ({
   moderationBusy,
   language = 'ua',
 }) => {
-  const [menuOpen, setMenuOpen] = useState(false);
   const topic = useMemo(() => getTopicVisual(request, language), [language, request]);
+  const hasPhoto = Boolean(request.photoUri || request.photoStoragePath);
 
   const statusInfo = useMemo(() => {
     if (request.status === 'rejected') return { label: language === 'ru' ? 'Отклонено' : language === 'en' ? 'Rejected' : 'Відхилено', bg: '#fee2e2', color: '#b91c1c' };
@@ -205,8 +206,6 @@ const RequestItem: React.FC<RequestItemProps> = ({
     approve: language === 'ru' ? 'Одобрить' : language === 'en' ? 'Approve' : 'Схвалити',
     reject: language === 'ru' ? 'Отклонить' : language === 'en' ? 'Reject' : 'Відхилити',
     delete: language === 'ru' ? 'Удалить' : language === 'en' ? 'Delete' : 'Видалити',
-    cancel: language === 'ru' ? 'Отмена' : language === 'en' ? 'Cancel' : 'Скасувати',
-    more: language === 'ru' ? 'Еще' : language === 'en' ? 'More' : 'Ще',
   }), [language]);
 
   return (
@@ -247,6 +246,17 @@ const RequestItem: React.FC<RequestItemProps> = ({
           </View>
         </View>
 
+        {hasPhoto ? (
+          <AppPhotoImage
+            uri={request.photoUri}
+            storagePath={request.photoStoragePath}
+            style={styles.photo}
+            resizeMode="cover"
+            isOwner={Boolean(isModerator)}
+            debugLabel={`RequestItem:${request.id}`}
+          />
+        ) : null}
+
         <UserCardActionBar
           avatarUri={resolvedAvatarUri}
           name={request.name ?? ''}
@@ -262,75 +272,56 @@ const RequestItem: React.FC<RequestItemProps> = ({
 
         {(hasModActions || (isOwn && onDelete)) ? (
           <View style={styles.modActionsRow}>
-              {hasModActions ? (
-                <>
-                  {onApprove && !request.isApproved && request.status !== 'approved' ? (
-                    <TouchableOpacity
-                      style={[styles.modIconBtn, { backgroundColor: '#2A7B41' }]}
-                      onPress={onApprove}
-                      disabled={moderationBusy}
-                      activeOpacity={0.8}
-                    >
-                      <MaterialCommunityIcons name="check" size={13} color="#fff" />
-                    </TouchableOpacity>
-                  ) : null}
-                  {(onReject || onModDelete) ? (
-                    <TouchableOpacity
-                      style={[styles.modIconBtn, { backgroundColor: '#4A413A' }]}
-                      onPress={() => setMenuOpen(true)}
-                      activeOpacity={0.8}
-                    >
-                      <MaterialCommunityIcons name="dots-horizontal" size={13} color="#fff" />
-                    </TouchableOpacity>
-                  ) : null}
-                </>
-              ) : null}
-              {isOwn && onDelete ? (
-                <TouchableOpacity style={styles.roundDeleteBtn} onPress={onDelete} activeOpacity={0.8}>
-                  <MaterialCommunityIcons name="trash-can-outline" size={16} color="#fff" />
-                </TouchableOpacity>
-              ) : null}
+            {hasModActions ? (
+              <>
+                {onApprove && !request.isApproved && request.status !== 'approved' ? (
+                  <TouchableOpacity
+                    style={[styles.modBtn, styles.modBtnApprove]}
+                    onPress={onApprove}
+                    disabled={moderationBusy}
+                    activeOpacity={0.85}
+                  >
+                    <MaterialCommunityIcons name="check-circle-outline" size={16} color="#fff" />
+                    <Text style={styles.modBtnText}>{L.approve}</Text>
+                  </TouchableOpacity>
+                ) : null}
+                {onReject ? (
+                  <TouchableOpacity
+                    style={[styles.modBtn, styles.modBtnReject]}
+                    onPress={onReject}
+                    disabled={moderationBusy}
+                    activeOpacity={0.85}
+                  >
+                    <MaterialCommunityIcons name="close-circle-outline" size={16} color="#fff" />
+                    <Text style={styles.modBtnText}>{L.reject}</Text>
+                  </TouchableOpacity>
+                ) : null}
+                {onModDelete ? (
+                  <TouchableOpacity
+                    style={[styles.modBtn, styles.modBtnDelete]}
+                    onPress={onModDelete}
+                    disabled={moderationBusy}
+                    activeOpacity={0.85}
+                  >
+                    <MaterialCommunityIcons name="trash-can-outline" size={16} color="#fff" />
+                    <Text style={styles.modBtnText}>{L.delete}</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </>
+            ) : null}
+            {isOwn && onDelete ? (
+              <TouchableOpacity
+                style={[styles.modBtn, styles.modBtnDelete]}
+                onPress={onDelete}
+                activeOpacity={0.85}
+              >
+                <MaterialCommunityIcons name="trash-can-outline" size={16} color="#fff" />
+                <Text style={styles.modBtnText}>{L.delete}</Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
         ) : null}
       </TactileCard>
-
-      {/* "в‹Ї" secondary actions modal */}
-      <Modal
-        visible={menuOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setMenuOpen(false)}
-      >
-        <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setMenuOpen(false)}>
-          <View style={styles.menuSheet}>
-            {onReject ? (
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={() => { setMenuOpen(false); onReject(); }}
-                activeOpacity={0.8}
-                disabled={moderationBusy}
-              >
-                <MaterialCommunityIcons name="close-circle-outline" size={18} color="#B96B1E" />
-                <Text style={[styles.menuItemText, { color: '#B96B1E' }]}>{L.reject}</Text>
-              </TouchableOpacity>
-            ) : null}
-            {onModDelete ? (
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={() => { setMenuOpen(false); onModDelete(); }}
-                activeOpacity={0.8}
-                disabled={moderationBusy}
-              >
-                <MaterialCommunityIcons name="trash-can-outline" size={18} color="#A73737" />
-                <Text style={[styles.menuItemText, { color: '#A73737' }]}>{L.delete}</Text>
-              </TouchableOpacity>
-            ) : null}
-            <TouchableOpacity style={[styles.menuItem, styles.menuCancel]} onPress={() => setMenuOpen(false)} activeOpacity={0.8}>
-              <Text style={styles.menuCancelText}>{L.cancel}</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
     </>
   );
 };
@@ -420,80 +411,41 @@ const styles = StyleSheet.create({
     color: '#7A6D64',
     lineHeight: 17,
   },
+  photo: {
+    width: '100%',
+    height: 180,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
   modActionsRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    gap: 4,
-    marginTop: 6,
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 8,
+    marginBottom: 10,
   },
-  actionBtnOutlined: {
+  modBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    borderWidth: 1,
-    borderColor: '#D4B9A8',
+    gap: 5,
     borderRadius: 12,
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-    backgroundColor: 'transparent',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
-  actionBtnOutlinedText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#7A1E5C',
+  modBtnApprove: {
+    backgroundColor: '#2A7B41',
   },
-  modIconBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
+  modBtnReject: {
+    backgroundColor: '#C77A2B',
   },
-  roundDeleteBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  modBtnDelete: {
     backgroundColor: '#C0392B',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
-  // Modal menu
-  menuOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.38)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 40,
-  },
-  menuSheet: {
-    backgroundColor: '#fff',
-    borderRadius: 18,
-    width: '100%',
-    overflow: 'hidden',
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0EBE3',
-  },
-  menuItemText: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  menuCancel: {
-    justifyContent: 'center',
-    borderBottomWidth: 0,
-  },
-  menuCancelText: {
-    color: SCREEN_THEME.textSecondary,
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
-    width: '100%',
+  modBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#fff',
   },
 });
 
