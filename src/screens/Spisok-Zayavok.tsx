@@ -5,7 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useDispatch, useSelector } from 'react-redux';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { get, ref } from 'firebase/database';
+import { get, ref, remove, update } from 'firebase/database';
 import RequestItem from '../components/RequestItem';
 import ModerationPhotoCard, { type ModerationPhoto } from '../components/ModerationPhotoCard';
 import { deleteRequest } from '../redux/slices/requestsSlice';
@@ -19,8 +19,12 @@ import { database, firebaseChatAPI, photoAPI } from '../firebase-config';
 import { isModeratorUser } from '../firebase-auth-session';
 import { useContactRequest } from '../hooks/useContactRequest';
 import ContactReasonModal from '../components/ContactReasonModal';
-import { resolveUserAvatarMap } from '../utils/userAvatar';
 import { openRequestFormWithLimitCheck } from '../utils/requestFormLimitGuard';
+import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
+import { lostFoundService } from '../services/lostFoundService';
+import { buySellService } from '../services/buySellService';
+import { contactsService } from '../services/contactsService';
+import { appSuggestionsService } from '../services/appSuggestionsService';
 
 type RequestsNavigation = NativeStackNavigationProp<Record<string, object | undefined>>;
 type AppLanguage = 'ua' | 'ru' | 'en';
@@ -96,17 +100,28 @@ const UI_TEXT = {
   },
 } as const;
 
-const PHOTO_SOURCE_SCREENS = ['FotoRayonaScreen', 'SoulPhotosScreen'] as const;
+const PHOTO_SOURCE_SCREENS = ['FotoRayonaScreen', 'SoulPhotosScreen', 'PhotoUploadScreen'] as const;
 
 type FeedRow =
   | { kind: 'request'; key: string; sortKey: number; request: Request }
-  | { kind: 'photo'; key: string; sortKey: number; photo: ModerationPhoto };
+  | { kind: 'photo'; key: string; sortKey: number; photo: ModerationPhoto }
+  | { kind: 'lostFound'; key: string; sortKey: number; item: ModerationPhoto }
+  | { kind: 'buySell'; key: string; sortKey: number; item: ModerationPhoto }
+  | { kind: 'contacts'; key: string; sortKey: number; item: ModerationPhoto }
+  | { kind: 'localBusiness'; key: string; sortKey: number; item: ModerationPhoto }
+  | { kind: 'appSuggestion'; key: string; sortKey: number; item: ModerationPhoto };
 
 const toNumber = (value: unknown): number => {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
 };
 const toStr = (value: unknown): string => (typeof value === 'string' ? value : '');
+const toTimestamp = (value: unknown): number => {
+  const numeric = toNumber(value);
+  if (numeric > 0) return numeric;
+  const parsed = Date.parse(toStr(value));
+  return Number.isFinite(parsed) ? parsed : 0;
+};
 const PAGE_SIZE = 20;
 
 const RequestsScreen: React.FC = () => {
@@ -122,6 +137,11 @@ const RequestsScreen: React.FC = () => {
   const [isModerator, setIsModerator] = useState(false);
   const [requests, setRequests] = useState<Request[]>([]);
   const [pendingPhotos, setPendingPhotos] = useState<ModerationPhoto[]>([]);
+  const [pendingLostFound, setPendingLostFound] = useState<ModerationPhoto[]>([]);
+  const [pendingBuySell, setPendingBuySell] = useState<ModerationPhoto[]>([]);
+  const [pendingContacts, setPendingContacts] = useState<ModerationPhoto[]>([]);
+  const [pendingLocalBusiness, setPendingLocalBusiness] = useState<ModerationPhoto[]>([]);
+  const [pendingAppSuggestions, setPendingAppSuggestions] = useState<ModerationPhoto[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -129,7 +149,7 @@ const RequestsScreen: React.FC = () => {
   const [nextCursor, setNextCursor] = useState<number | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [statusFilter, setStatusFilter] = useState<RequestStatusFilter>('all');
-  const [avatarByUserId, setAvatarByUserId] = useState<Record<string, string>>({});
+  const avatarByUserId = useUserAvatarMap(requests.map((item) => item.userId));
 
   const loadPage = useCallback(
     async (cursorBefore: number | null, append: boolean) => {
@@ -201,6 +221,173 @@ const RequestsScreen: React.FC = () => {
     setPendingPhotos(items);
   }, []);
 
+  const loadPendingLostFound = useCallback(async () => {
+    const snapshot = await get(ref(database, 'lost_found'));
+    if (!snapshot.exists()) {
+      setPendingLostFound([]);
+      return;
+    }
+
+    const typeLabels = {
+      lost: language === 'ru' ? 'Потеряно' : language === 'en' ? 'Lost' : 'Загублено',
+      found: language === 'ru' ? 'Найдено' : language === 'en' ? 'Found' : 'Знайдено',
+    } as const;
+
+    const value = snapshot.val() as Record<string, Record<string, unknown>>;
+    const items = Object.entries(value)
+      .map<ModerationPhoto | null>(([id, raw]) => {
+        if (!raw || typeof raw !== 'object') return null;
+        const status = toStr(raw.moderationStatus) || 'pending';
+        if (status !== 'pending') return null;
+        const type = toStr(raw.type) === 'lost' ? 'lost' : 'found';
+        const category = toStr(raw.category);
+        const description = toStr(raw.description);
+        const summary = [typeLabels[type], category, description].filter(Boolean).join(' • ');
+        return {
+          id,
+          uri: toStr(raw.photoUri) || undefined,
+          storagePath: toStr(raw.photoStoragePath) || undefined,
+          title: toStr(raw.name) || category || typeLabels[type],
+          description: summary,
+          userName: toStr(raw.name) || undefined,
+          sourceScreen: 'LostFoundScreen',
+          createdAt: toTimestamp(raw.createdAt) || toTimestamp(raw.submittedForModerationAt),
+          status: 'pending',
+        };
+      })
+      .filter((item): item is ModerationPhoto => item !== null)
+      .sort((a, b) => b.createdAt - a.createdAt);
+    setPendingLostFound(items);
+  }, [language]);
+
+  const loadPendingBuySell = useCallback(async () => {
+    const snapshot = await get(ref(database, 'buy_sell_listings'));
+    if (!snapshot.exists()) {
+      setPendingBuySell([]);
+      return;
+    }
+
+    const typeLabels = {
+      buy: language === 'ru' ? 'Куплю' : language === 'en' ? 'Buy' : 'Куплю',
+      sell: language === 'ru' ? 'Продам' : language === 'en' ? 'Sell' : 'Продам',
+    } as const;
+
+    const value = snapshot.val() as Record<string, Record<string, unknown>>;
+    const items = Object.entries(value)
+      .map<ModerationPhoto | null>(([id, raw]) => {
+        if (!raw || typeof raw !== 'object') return null;
+        const status = toStr(raw.moderationStatus) || 'pending';
+        if (status !== 'pending') return null;
+        const listingType = toStr(raw.listingType) === 'buy' ? 'buy' : 'sell';
+        const itemName = toStr(raw.itemName);
+        const price = toStr(raw.price);
+        const description = toStr(raw.description);
+        const summary = [typeLabels[listingType], toStr(raw.category), price, description].filter(Boolean).join(' • ');
+        return {
+          id,
+          uri: toStr(raw.photoUri) || undefined,
+          storagePath: toStr(raw.photoStoragePath) || undefined,
+          title: itemName || typeLabels[listingType],
+          description: summary,
+          userName: itemName || undefined,
+          sourceScreen: 'BuySellScreen',
+          createdAt: toTimestamp(raw.createdAt) || toTimestamp(raw.submittedForModerationAt),
+          status: 'pending',
+        };
+      })
+      .filter((item): item is ModerationPhoto => item !== null)
+      .sort((a, b) => b.createdAt - a.createdAt);
+    setPendingBuySell(items);
+  }, [language]);
+
+  const loadPendingContacts = useCallback(async () => {
+    const snapshot = await get(ref(database, 'contacts_listings'));
+    if (!snapshot.exists()) {
+      setPendingContacts([]);
+      return;
+    }
+
+    const value = snapshot.val() as Record<string, Record<string, unknown>>;
+    const items = Object.entries(value)
+      .map<ModerationPhoto | null>(([id, raw]) => {
+        if (!raw || typeof raw !== 'object') return null;
+        const status = toStr(raw.moderationStatus) || 'pending';
+        if (status !== 'pending') return null;
+        const itemName = toStr(raw.itemName);
+        const price = toStr(raw.price);
+        const description = toStr(raw.description);
+        const summary = [toStr(raw.category), toStr(raw.condition), price, description].filter(Boolean).join(' • ');
+        return {
+          id,
+          uri: toStr(raw.photoUri) || undefined,
+          storagePath: toStr(raw.photoStoragePath) || undefined,
+          title: itemName || (language === 'ru' ? 'Контакт' : language === 'en' ? 'Contact' : 'Контакт'),
+          description: summary,
+          userName: itemName || undefined,
+          sourceScreen: 'ContactsScreen',
+          createdAt: toTimestamp(raw.createdAt) || toTimestamp(raw.submittedForModerationAt),
+          status: 'pending',
+        };
+      })
+      .filter((item): item is ModerationPhoto => item !== null)
+      .sort((a, b) => b.createdAt - a.createdAt);
+    setPendingContacts(items);
+  }, [language]);
+
+  const loadPendingLocalBusiness = useCallback(async () => {
+    const snapshot = await get(ref(database, 'local_business'));
+    if (!snapshot.exists()) {
+      setPendingLocalBusiness([]);
+      return;
+    }
+
+    const value = snapshot.val() as Record<string, Record<string, unknown>>;
+    const items = Object.entries(value)
+      .map<ModerationPhoto | null>(([id, raw]) => {
+        if (!raw || typeof raw !== 'object') return null;
+        const status = toStr(raw.status) || 'pending';
+        if (status !== 'pending') return null;
+        const contactName = toStr(raw.contactName);
+        const category = toStr(raw.categoryLabel) || toStr(raw.categoryKey);
+        const subcategory = toStr(raw.subcategoryLabel) || toStr(raw.subcategoryKey);
+        const priceMin = toNumber(raw.priceMin);
+        const priceMax = toNumber(raw.priceMax);
+        const priceText = priceMin || priceMax ? [priceMin ? `${priceMin}` : '', priceMax ? `${priceMax}` : ''].filter(Boolean).join('-') : '';
+        const description = toStr(raw.description);
+        const summary = [category, subcategory, priceText, description].filter(Boolean).join(' • ');
+        return {
+          id,
+          uri: toStr(raw.photoUri) || undefined,
+          storagePath: toStr(raw.photoStoragePath) || undefined,
+          title: contactName || subcategory || (language === 'ru' ? 'Бизнес/услуга' : language === 'en' ? 'Business/service' : 'Бізнес/послуга'),
+          description: summary,
+          userName: contactName || undefined,
+          sourceScreen: 'LocalBusinessScreen',
+          createdAt: toTimestamp(raw.updatedAt) || toTimestamp(raw.createdAt),
+          status: 'pending',
+        };
+      })
+      .filter((item): item is ModerationPhoto => item !== null)
+      .sort((a, b) => b.createdAt - a.createdAt);
+    setPendingLocalBusiness(items);
+  }, [language]);
+
+  const loadPendingAppSuggestions = useCallback(async () => {
+    const items = (await appSuggestionsService.getSuggestionsOnce())
+      .filter((item) => item.moderationStatus === 'pending')
+      .map<ModerationPhoto>((item) => ({
+        id: item.id,
+        title: language === 'ru' ? 'Предложение по приложению' : language === 'en' ? 'App suggestion' : 'Пропозиція щодо додатку',
+        description: item.text,
+        userName: item.name || undefined,
+        sourceScreen: 'AppSuggestionScreen',
+        createdAt: toTimestamp(item.createdAt) || toTimestamp(item.submittedForModerationAt),
+        status: 'pending',
+      }))
+      .sort((a, b) => b.createdAt - a.createdAt);
+    setPendingAppSuggestions(items);
+  }, [language]);
+
   useEffect(() => {
     let active = true;
     let mounted = true;
@@ -211,6 +398,11 @@ const RequestsScreen: React.FC = () => {
           setIsModerator(allowed);
           if (allowed) {
             void loadPendingPhotos().catch(() => {});
+            void loadPendingLostFound().catch(() => {});
+            void loadPendingBuySell().catch(() => {});
+            void loadPendingContacts().catch(() => {});
+            void loadPendingLocalBusiness().catch(() => {});
+            void loadPendingAppSuggestions().catch(() => {});
           }
         }
       })
@@ -231,20 +423,7 @@ const RequestsScreen: React.FC = () => {
       mounted = false;
       active = false;
     };
-  }, [user?.id, user?.email, loadPage, loadPendingPhotos]);
-
-  useEffect(() => {
-    const userIds = Array.from(new Set(requests.map((item) => item.userId).filter((id): id is string => Boolean(id))));
-    if (userIds.length === 0) return;
-    let cancelled = false;
-    void resolveUserAvatarMap(database, userIds).then((resolved) => {
-      if (cancelled) return;
-      setAvatarByUserId((prev) => ({ ...prev, ...resolved }));
-    }).catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [requests]);
+  }, [user?.id, user?.email, loadPage, loadPendingPhotos, loadPendingLostFound, loadPendingBuySell, loadPendingContacts, loadPendingLocalBusiness, loadPendingAppSuggestions]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -252,11 +431,16 @@ const RequestsScreen: React.FC = () => {
       await Promise.all([
         loadPage(null, false),
         isModerator ? loadPendingPhotos() : Promise.resolve(),
+        isModerator ? loadPendingLostFound() : Promise.resolve(),
+        isModerator ? loadPendingBuySell() : Promise.resolve(),
+        isModerator ? loadPendingContacts() : Promise.resolve(),
+        isModerator ? loadPendingLocalBusiness() : Promise.resolve(),
+        isModerator ? loadPendingAppSuggestions() : Promise.resolve(),
       ]);
     } finally {
       setRefreshing(false);
     }
-  }, [isModerator, loadPage, loadPendingPhotos]);
+  }, [isModerator, loadPage, loadPendingPhotos, loadPendingLostFound, loadPendingBuySell, loadPendingContacts, loadPendingLocalBusiness, loadPendingAppSuggestions]);
 
   const handleLoadMore = useCallback(async () => {
     if (loading || loadingMore || !hasMore || !nextCursor) return;
@@ -353,6 +537,246 @@ const RequestsScreen: React.FC = () => {
     [moderationBusyId, text.actionFailed, text.cancel, text.deleteBody, text.deleteBtn, text.deleteTitle, text.loadingError],
   );
 
+  const moderateLostFound = useCallback(
+    async (itemId: string, status: 'approved' | 'rejected') => {
+      const busyId = `lost_found:${itemId}`;
+      if (moderationBusyId) {
+        return;
+      }
+
+      setModerationBusyId(busyId);
+      try {
+        await lostFoundService.moderate(itemId, status);
+        setPendingLostFound((prev) => prev.filter((item) => item.id !== itemId));
+      } catch (errorValue) {
+        Alert.alert(text.loadingError, errorValue instanceof Error ? errorValue.message : text.actionFailed);
+      } finally {
+        setModerationBusyId(null);
+      }
+    },
+    [moderationBusyId, text.actionFailed, text.loadingError],
+  );
+
+  const deleteLostFound = useCallback(
+    (itemId: string) => {
+      if (moderationBusyId) {
+        return;
+      }
+
+      Alert.alert(text.deleteTitle, text.deleteBody, [
+        { text: text.cancel, style: 'cancel' },
+        {
+          text: text.deleteBtn,
+          style: 'destructive',
+          onPress: () => {
+            const busyId = `lost_found:${itemId}`;
+            setModerationBusyId(busyId);
+            void remove(ref(database, `lost_found/${itemId}`))
+              .then(() => setPendingLostFound((prev) => prev.filter((item) => item.id !== itemId)))
+              .catch((errorValue: unknown) => {
+                Alert.alert(text.loadingError, errorValue instanceof Error ? errorValue.message : text.actionFailed);
+              })
+              .finally(() => setModerationBusyId(null));
+          },
+        },
+      ]);
+    },
+    [moderationBusyId, text.actionFailed, text.cancel, text.deleteBody, text.deleteBtn, text.deleteTitle, text.loadingError],
+  );
+
+  const moderateBuySell = useCallback(
+    async (itemId: string, status: 'approved' | 'rejected') => {
+      const busyId = `buy_sell:${itemId}`;
+      if (moderationBusyId) {
+        return;
+      }
+
+      setModerationBusyId(busyId);
+      try {
+        await buySellService.moderate(itemId, status);
+        setPendingBuySell((prev) => prev.filter((item) => item.id !== itemId));
+      } catch (errorValue) {
+        Alert.alert(text.loadingError, errorValue instanceof Error ? errorValue.message : text.actionFailed);
+      } finally {
+        setModerationBusyId(null);
+      }
+    },
+    [moderationBusyId, text.actionFailed, text.loadingError],
+  );
+
+  const deleteBuySell = useCallback(
+    (itemId: string) => {
+      if (moderationBusyId) {
+        return;
+      }
+
+      Alert.alert(text.deleteTitle, text.deleteBody, [
+        { text: text.cancel, style: 'cancel' },
+        {
+          text: text.deleteBtn,
+          style: 'destructive',
+          onPress: () => {
+            const busyId = `buy_sell:${itemId}`;
+            setModerationBusyId(busyId);
+            void remove(ref(database, `buy_sell_listings/${itemId}`))
+              .then(() => setPendingBuySell((prev) => prev.filter((item) => item.id !== itemId)))
+              .catch((errorValue: unknown) => {
+                Alert.alert(text.loadingError, errorValue instanceof Error ? errorValue.message : text.actionFailed);
+              })
+              .finally(() => setModerationBusyId(null));
+          },
+        },
+      ]);
+    },
+    [moderationBusyId, text.actionFailed, text.cancel, text.deleteBody, text.deleteBtn, text.deleteTitle, text.loadingError],
+  );
+
+  const moderateContacts = useCallback(
+    async (itemId: string, status: 'approved' | 'rejected') => {
+      const busyId = `contacts:${itemId}`;
+      if (moderationBusyId) {
+        return;
+      }
+
+      setModerationBusyId(busyId);
+      try {
+        await contactsService.moderate(itemId, status);
+        setPendingContacts((prev) => prev.filter((item) => item.id !== itemId));
+      } catch (errorValue) {
+        Alert.alert(text.loadingError, errorValue instanceof Error ? errorValue.message : text.actionFailed);
+      } finally {
+        setModerationBusyId(null);
+      }
+    },
+    [moderationBusyId, text.actionFailed, text.loadingError],
+  );
+
+  const deleteContacts = useCallback(
+    (itemId: string) => {
+      if (moderationBusyId) {
+        return;
+      }
+
+      Alert.alert(text.deleteTitle, text.deleteBody, [
+        { text: text.cancel, style: 'cancel' },
+        {
+          text: text.deleteBtn,
+          style: 'destructive',
+          onPress: () => {
+            const busyId = `contacts:${itemId}`;
+            setModerationBusyId(busyId);
+            void remove(ref(database, `contacts_listings/${itemId}`))
+              .then(() => setPendingContacts((prev) => prev.filter((item) => item.id !== itemId)))
+              .catch((errorValue: unknown) => {
+                Alert.alert(text.loadingError, errorValue instanceof Error ? errorValue.message : text.actionFailed);
+              })
+              .finally(() => setModerationBusyId(null));
+          },
+        },
+      ]);
+    },
+    [moderationBusyId, text.actionFailed, text.cancel, text.deleteBody, text.deleteBtn, text.deleteTitle, text.loadingError],
+  );
+
+  const moderateLocalBusiness = useCallback(
+    async (itemId: string, status: 'approved' | 'rejected') => {
+      const busyId = `local_business:${itemId}`;
+      if (moderationBusyId) {
+        return;
+      }
+
+      setModerationBusyId(busyId);
+      try {
+        await update(ref(database, `local_business/${itemId}`), {
+          status: status === 'approved' ? 'active' : 'rejected',
+          moderatedAt: new Date().toISOString(),
+          moderationReason: status === 'rejected' ? 'default_rejected' : null,
+          rejectionReason: status === 'rejected' ? 'default_rejected' : null,
+        });
+        setPendingLocalBusiness((prev) => prev.filter((item) => item.id !== itemId));
+      } catch (errorValue) {
+        Alert.alert(text.loadingError, errorValue instanceof Error ? errorValue.message : text.actionFailed);
+      } finally {
+        setModerationBusyId(null);
+      }
+    },
+    [moderationBusyId, text.actionFailed, text.loadingError],
+  );
+
+  const deleteLocalBusiness = useCallback(
+    (itemId: string) => {
+      if (moderationBusyId) {
+        return;
+      }
+
+      Alert.alert(text.deleteTitle, text.deleteBody, [
+        { text: text.cancel, style: 'cancel' },
+        {
+          text: text.deleteBtn,
+          style: 'destructive',
+          onPress: () => {
+            const busyId = `local_business:${itemId}`;
+            setModerationBusyId(busyId);
+            void remove(ref(database, `local_business/${itemId}`))
+              .then(() => setPendingLocalBusiness((prev) => prev.filter((item) => item.id !== itemId)))
+              .catch((errorValue: unknown) => {
+                Alert.alert(text.loadingError, errorValue instanceof Error ? errorValue.message : text.actionFailed);
+              })
+              .finally(() => setModerationBusyId(null));
+          },
+        },
+      ]);
+    },
+    [moderationBusyId, text.actionFailed, text.cancel, text.deleteBody, text.deleteBtn, text.deleteTitle, text.loadingError],
+  );
+
+  const moderateAppSuggestion = useCallback(
+    async (itemId: string, status: 'approved' | 'rejected') => {
+      const busyId = `app_suggestion:${itemId}`;
+      if (moderationBusyId) {
+        return;
+      }
+
+      setModerationBusyId(busyId);
+      try {
+        await appSuggestionsService.moderateSuggestion(itemId, status);
+        setPendingAppSuggestions((prev) => prev.filter((item) => item.id !== itemId));
+      } catch (errorValue) {
+        Alert.alert(text.loadingError, errorValue instanceof Error ? errorValue.message : text.actionFailed);
+      } finally {
+        setModerationBusyId(null);
+      }
+    },
+    [moderationBusyId, text.actionFailed, text.loadingError],
+  );
+
+  const deleteAppSuggestion = useCallback(
+    (itemId: string) => {
+      if (moderationBusyId) {
+        return;
+      }
+
+      Alert.alert(text.deleteTitle, text.deleteBody, [
+        { text: text.cancel, style: 'cancel' },
+        {
+          text: text.deleteBtn,
+          style: 'destructive',
+          onPress: () => {
+            const busyId = `app_suggestion:${itemId}`;
+            setModerationBusyId(busyId);
+            void appSuggestionsService.deleteSuggestion(itemId)
+              .then(() => setPendingAppSuggestions((prev) => prev.filter((item) => item.id !== itemId)))
+              .catch((errorValue: unknown) => {
+                Alert.alert(text.loadingError, errorValue instanceof Error ? errorValue.message : text.actionFailed);
+              })
+              .finally(() => setModerationBusyId(null));
+          },
+        },
+      ]);
+    },
+    [moderationBusyId, text.actionFailed, text.cancel, text.deleteBody, text.deleteBtn, text.deleteTitle, text.loadingError],
+  );
+
   const sortedRequests = useMemo(() => {
     const resolveStatus = (item: Request): RequestStatusFilter => {
       if (item.status === 'approved' || item.status === 'pending' || item.status === 'rejected') {
@@ -383,8 +807,53 @@ const RequestsScreen: React.FC = () => {
         }))
       : [];
 
-    return [...requestRows, ...photoRows].sort((a, b) => b.sortKey - a.sortKey);
-  }, [isModerator, pendingPhotos, sortedRequests, statusFilter]);
+    const lostFoundRows: FeedRow[] = isModerator && (statusFilter === 'all' || statusFilter === 'pending')
+      ? pendingLostFound.map((item) => ({
+          kind: 'lostFound',
+          key: `lost_found:${item.id}`,
+          sortKey: item.createdAt,
+          item,
+        }))
+      : [];
+
+    const buySellRows: FeedRow[] = isModerator && (statusFilter === 'all' || statusFilter === 'pending')
+      ? pendingBuySell.map((item) => ({
+          kind: 'buySell',
+          key: `buy_sell:${item.id}`,
+          sortKey: item.createdAt,
+          item,
+        }))
+      : [];
+
+    const contactsRows: FeedRow[] = isModerator && (statusFilter === 'all' || statusFilter === 'pending')
+      ? pendingContacts.map((item) => ({
+          kind: 'contacts',
+          key: `contacts:${item.id}`,
+          sortKey: item.createdAt,
+          item,
+        }))
+      : [];
+
+    const localBusinessRows: FeedRow[] = isModerator && (statusFilter === 'all' || statusFilter === 'pending')
+      ? pendingLocalBusiness.map((item) => ({
+          kind: 'localBusiness',
+          key: `local_business:${item.id}`,
+          sortKey: item.createdAt,
+          item,
+        }))
+      : [];
+
+    const appSuggestionRows: FeedRow[] = isModerator && (statusFilter === 'all' || statusFilter === 'pending')
+      ? pendingAppSuggestions.map((item) => ({
+          kind: 'appSuggestion',
+          key: `app_suggestion:${item.id}`,
+          sortKey: item.createdAt,
+          item,
+        }))
+      : [];
+
+    return [...requestRows, ...photoRows, ...lostFoundRows, ...buySellRows, ...contactsRows, ...localBusinessRows, ...appSuggestionRows].sort((a, b) => b.sortKey - a.sortKey);
+  }, [isModerator, pendingAppSuggestions, pendingBuySell, pendingContacts, pendingLocalBusiness, pendingLostFound, pendingPhotos, sortedRequests, statusFilter]);
 
   const emptyMessage = error ?? text.emptyRequests;
 
@@ -398,7 +867,7 @@ const RequestsScreen: React.FC = () => {
       <View style={styles.statsCard}>
         <View style={styles.statItem}>
           <Text style={styles.statLabel}>{text.totalRequests}</Text>
-          <Text style={styles.statValue}>{sortedRequests.length}</Text>
+          <Text style={styles.statValue}>{feedRows.length}</Text>
         </View>
         <View style={styles.divider} />
         <View style={styles.statItem}>
@@ -487,6 +956,71 @@ const RequestsScreen: React.FC = () => {
       );
     }
 
+    if (item.kind === 'lostFound') {
+      return (
+        <ModerationPhotoCard
+          photo={item.item}
+          onApprove={() => void moderateLostFound(item.item.id, 'approved')}
+          onReject={() => void moderateLostFound(item.item.id, 'rejected')}
+          onDelete={() => deleteLostFound(item.item.id)}
+          busy={moderationBusyId === `lost_found:${item.item.id}`}
+          language={language}
+        />
+      );
+    }
+
+    if (item.kind === 'buySell') {
+      return (
+        <ModerationPhotoCard
+          photo={item.item}
+          onApprove={() => void moderateBuySell(item.item.id, 'approved')}
+          onReject={() => void moderateBuySell(item.item.id, 'rejected')}
+          onDelete={() => deleteBuySell(item.item.id)}
+          busy={moderationBusyId === `buy_sell:${item.item.id}`}
+          language={language}
+        />
+      );
+    }
+
+    if (item.kind === 'contacts') {
+      return (
+        <ModerationPhotoCard
+          photo={item.item}
+          onApprove={() => void moderateContacts(item.item.id, 'approved')}
+          onReject={() => void moderateContacts(item.item.id, 'rejected')}
+          onDelete={() => deleteContacts(item.item.id)}
+          busy={moderationBusyId === `contacts:${item.item.id}`}
+          language={language}
+        />
+      );
+    }
+
+    if (item.kind === 'localBusiness') {
+      return (
+        <ModerationPhotoCard
+          photo={item.item}
+          onApprove={() => void moderateLocalBusiness(item.item.id, 'approved')}
+          onReject={() => void moderateLocalBusiness(item.item.id, 'rejected')}
+          onDelete={() => deleteLocalBusiness(item.item.id)}
+          busy={moderationBusyId === `local_business:${item.item.id}`}
+          language={language}
+        />
+      );
+    }
+
+    if (item.kind === 'appSuggestion') {
+      return (
+        <ModerationPhotoCard
+          photo={item.item}
+          onApprove={() => void moderateAppSuggestion(item.item.id, 'approved')}
+          onReject={() => void moderateAppSuggestion(item.item.id, 'rejected')}
+          onDelete={() => deleteAppSuggestion(item.item.id)}
+          busy={moderationBusyId === `app_suggestion:${item.item.id}`}
+          language={language}
+        />
+      );
+    }
+
     const request = item.request;
     const isOwn = Boolean(request.userId && request.userId === user?.id);
     const isOther = Boolean(request.userId && request.userId !== user?.id);
@@ -508,7 +1042,7 @@ const RequestsScreen: React.FC = () => {
         language={language}
       />
     );
-  }, [avatarByUserId, deletePhoto, isModerator, language, moderate, moderatePhoto, moderationBusyId, navigation, openContactModal, removeRequest, user?.id]);
+  }, [avatarByUserId, deleteAppSuggestion, deleteBuySell, deleteContacts, deleteLocalBusiness, deleteLostFound, deletePhoto, isModerator, language, moderate, moderateAppSuggestion, moderateBuySell, moderateContacts, moderateLocalBusiness, moderateLostFound, moderatePhoto, moderationBusyId, navigation, openContactModal, removeRequest, user?.id]);
 
   return (
     <SafeAreaView style={styles.container}>

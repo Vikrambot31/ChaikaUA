@@ -29,6 +29,12 @@ interface ModerationPhotoCardProps {
 const SOURCE_LABELS: Record<string, { ua: string; ru: string; en: string }> = {
   FotoRayonaScreen: { ua: 'Фото району', ru: 'Фото района', en: 'District photos' },
   SoulPhotosScreen: { ua: 'Фото для душі', ru: 'Фото для души', en: 'Soul photos' },
+  PhotoUploadScreen: { ua: 'Додати фото', ru: 'Добавить фото', en: 'Add photo' },
+  LostFoundScreen: { ua: 'Хто загубив', ru: 'Кто потерял', en: 'Lost and found' },
+  BuySellScreen: { ua: 'Куплю/Продам', ru: 'Куплю/Продам', en: 'Buy/Sell' },
+  ContactsScreen: { ua: 'Контакти', ru: 'Контакты', en: 'Contacts' },
+  LocalBusinessScreen: { ua: 'Бізнес/послуги ЖК', ru: 'Бизнес/услуги ЖК', en: 'Local business' },
+  AppSuggestionScreen: { ua: 'Пропозиції додатку', ru: 'Предложения приложения', en: 'App suggestions' },
 };
 
 const formatDateShort = (value: number): string => {

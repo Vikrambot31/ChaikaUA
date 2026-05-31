@@ -4,7 +4,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Alert, SafeAreaView, Activity
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationProp, ParamListBase, RouteProp } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
-import { database, firebaseChatAPI } from '../firebase-config';
+import { firebaseChatAPI } from '../firebase-config';
 import type { RootState } from '../redux/store';
 import type { Request } from '../types/app';
 import TactileIcon from '../components/TactileIcon';
@@ -13,8 +13,9 @@ import MiniUserAvatar from '../components/MiniUserAvatar';
 import { LIGHT_ORBS, SCREEN_THEME } from '../utils/screenTheme';
 import { showUserError } from '../utils/userFacingErrors';
 import { profilePermissionService } from '../services/profilePermissionService';
-import { pickUserAvatarUri, resolveUserAvatarMap } from '../utils/userAvatar';
+import { pickUserAvatarUri } from '../utils/userAvatar';
 import { getRequestTopicLabel } from '../data/categories';
+import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 
 type RequestDetailParams = {
   request: Request;
@@ -137,7 +138,8 @@ const RequestDetailScreen = ({
   const [deleting, setDeleting] = useState(false);
   const [accessStatus, setAccessStatus] = useState<'pending' | 'approved' | 'denied' | null>(null);
   const [sendingConnect, setSendingConnect] = useState(false);
-  const [resolvedAvatarUri, setResolvedAvatarUri] = useState(() => pickUserAvatarUri(request));
+  const avatarByUserId = useUserAvatarMap([request.userId]);
+  const resolvedAvatarUri = (request.userId && avatarByUserId[request.userId]) || pickUserAvatarUri({ userPhotoURL: request.userPhotoURL, startAvatarKey: request.startAvatarKey }) || pickUserAvatarUri(request);
 
   const getTimeAgo = (timestamp: number) => {
     const diff = Date.now() - timestamp;
@@ -160,20 +162,6 @@ const RequestDetailScreen = ({
     };
     void loadAccess();
   }, [currentUser?.id, request.userId]);
-
-  useEffect(() => {
-    setResolvedAvatarUri(pickUserAvatarUri({ userPhotoURL: request.userPhotoURL, startAvatarKey: request.startAvatarKey }));
-    const requestUserId = request.userId;
-    if (!requestUserId) return;
-    let cancelled = false;
-    void resolveUserAvatarMap(database, [requestUserId]).then((resolved) => {
-      if (cancelled) return;
-      setResolvedAvatarUri(resolved[requestUserId] || pickUserAvatarUri({ userPhotoURL: request.userPhotoURL, startAvatarKey: request.startAvatarKey }));
-    }).catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [request]);
 
   const handleConnect = async () => {
     if (!currentUser?.id || !request.userId || currentUser.id === request.userId) {

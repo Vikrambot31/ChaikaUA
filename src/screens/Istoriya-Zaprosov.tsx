@@ -15,11 +15,10 @@ import { createPendingModeration } from '../utils/moderation';
 import { normalizePhoneText } from '../utils/textUtils';
 import type { HelpRequest } from '../types/app';
 import MiniUserAvatar from '../components/MiniUserAvatar';
-import { database } from '../firebase-config';
-import { resolveUserAvatarMap } from '../utils/userAvatar';
 import { safeCallPhone } from '../utils/communicationActions';
 import type { DetailItemData } from '../utils/detailViewTypes';
 import UserCardActionBar from '../components/UserCardActionBar';
+import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 
 type FilterType = 'all' | 'active' | 'completed' | 'today' | 'expired' | 'mine';
 type Lang = 'ua' | 'ru' | 'en';
@@ -206,12 +205,12 @@ const HelpHistoryScreen: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [nowTs, setNowTs] = useState(() => Date.now());
-  const [avatarByUserId, setAvatarByUserId] = useState<Record<string, string>>({});
   const user = useSelector(selectUser);
   const sourceRequests = useSelector((state: RootState) => selectAllRequests(state));
 
   const allRequests = useSelector((state: RootState) => selectAllHelpRequests(state)) as HelpRequest[];
   const completedRequests = useSelector((state: RootState) => selectCompletedRequests(state)) as HelpRequest[];
+  const avatarByUserId = useUserAvatarMap(allRequests.map((item) => item.userId));
 
   useEffect(() => {
     if (sourceRequests.length === 0) return;
@@ -222,22 +221,6 @@ const HelpHistoryScreen: React.FC = () => {
     const timer = setInterval(() => setNowTs(Date.now()), 60000);
     return () => clearInterval(timer);
   }, []);
-
-  useEffect(() => {
-    const userIds = Array.from(new Set(allRequests.map((item) => item.userId).filter((id): id is string => Boolean(id))));
-    if (userIds.length === 0) return;
-    let cancelled = false;
-    void (async () => {
-      const resolved = await resolveUserAvatarMap(database, userIds);
-      if (cancelled) return;
-      setAvatarByUserId((prev) => {
-        const next = { ...prev };
-        Object.entries(resolved).forEach(([uid, photo]) => { if (photo) next[uid] = photo; });
-        return next;
-      });
-    })();
-    return () => { cancelled = true; };
-  }, [allRequests]);
 
   const isOwnRequest = useCallback((request: HelpRequest) => {
     if (!user) return false;

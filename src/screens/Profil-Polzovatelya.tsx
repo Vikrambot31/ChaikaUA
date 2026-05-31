@@ -21,6 +21,7 @@ import { logClientEvent } from '../utils/errorLogger';
 import AppPhotoImage from '../components/AppPhotoImage';
 import { signOutPrimarySession } from '../services/authSessionService';
 import { subscribeCurrentUserSecurityRole, type SecurityRole } from '../services/securityRoles';
+import { pickUserAvatarUri } from '../utils/userAvatar';
 
 type AppNavigation = import('@react-navigation/native').NavigationProp<Record<string, object | undefined>>;
 
@@ -397,6 +398,7 @@ const ProfileScreen: React.FC = () => {
       ...levelActivity,
     };
   }, [appRequests.length, approvedRequests.length, helpRequests.length, user?.daysUsed, user?.registeredAt]);
+  const profileAvatarUri = useMemo(() => pickUserAvatarUri(user), [user]);
   return (
     <SafeAreaView style={styles.container}>
       <View pointerEvents="none" style={styles.backgroundOrbs}>
@@ -422,8 +424,8 @@ const ProfileScreen: React.FC = () => {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <TactileCard elevated style={styles.headerCard} pressable={false}>
           <View style={styles.avatarCircle}>
-            {user?.photoURL ? (
-              <AppPhotoImage uri={user.photoURL} style={styles.headerImage} resizeMode="cover" debugLabel={`Profile:${user.id}`} />
+            {profileAvatarUri ? (
+              <AppPhotoImage uri={profileAvatarUri} style={styles.headerImage} resizeMode="cover" debugLabel={`Profile:${user?.id || 'unknown'}`} />
             ) : (
               <Image source={require('../../assets/WEBP-version/profil.webp')} style={styles.headerImage} resizeMode="cover" />
             )}

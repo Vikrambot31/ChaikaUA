@@ -17,7 +17,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
-import { database, firebaseChatAPI } from '../firebase-config';
+import { firebaseChatAPI } from '../firebase-config';
 import { RootState } from '../redux/store';
 import { LIGHT_ORBS, SCREEN_THEME } from '../utils/screenTheme';
 import {
@@ -32,7 +32,7 @@ import TactileInput from '../components/TactileInput';
 import TactileButton from '../components/TactileButton';
 import MiniUserAvatar from '../components/MiniUserAvatar';
 import { getUserErrorMessage, showUserError } from '../utils/userFacingErrors';
-import { pickUserAvatarUri, resolveUserAvatarMap } from '../utils/userAvatar';
+import { pickUserAvatarUri } from '../utils/userAvatar';
 import { useContactRequest } from '../hooks/useContactRequest';
 import ContactReasonModal from '../components/ContactReasonModal';
 import { safeCallPhone } from '../utils/communicationActions';
@@ -40,6 +40,7 @@ import { openRequestFormWithLimitCheck } from '../utils/requestFormLimitGuard';
 import AppPhotoImage from '../components/AppPhotoImage';
 import FeedLikeButton from '../components/FeedLikeButton';
 import { normalizeLanguage } from '../redux/slices/languageSlice';
+import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 
 type ChatRequest = ChatRequestLike;
 
@@ -431,7 +432,7 @@ const OnlineChatScreen = () => {
   const [hasMore, setHasMore] = useState(true);
   const [nextCursor, setNextCursor] = useState<number | null>(null);
   const [deleteBusyId, setDeleteBusyId] = useState<string | null>(null);
-  const [avatarByUserId, setAvatarByUserId] = useState<Record<string, string>>({});
+  const avatarByUserId = useUserAvatarMap(requests.map((item) => item.userId));
   const [actionModal, setActionModal] = useState<{ visible: boolean; userId: string; userName: string }>({ visible: false, userId: '', userName: '' });
 
   const loadRequests = async (cursorBefore: number | null = null) => {
@@ -505,28 +506,6 @@ const OnlineChatScreen = () => {
   useEffect(() => {
     setFilteredRequests(filterChatRequests(requests, debouncedSearch, selectedCategory));
   }, [requests, debouncedSearch, selectedCategory]);
-
-  useEffect(() => {
-    const userIds = Array.from(new Set(requests.map((item) => item.userId).filter((id): id is string => Boolean(id))));
-    if (userIds.length === 0) return;
-
-    let cancelled = false;
-    void (async () => {
-      const resolved = await resolveUserAvatarMap(database, userIds);
-      if (cancelled) return;
-      setAvatarByUserId((prev) => {
-        const next = { ...prev };
-        Object.entries(resolved).forEach(([uid, photo]) => {
-          if (photo) next[uid] = photo;
-        });
-        return next;
-      });
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [requests]);
 
   useEffect(() => {
     let active = true;
@@ -822,7 +801,7 @@ const OnlineChatScreen = () => {
                       activeOpacity={0.8}
                     >
                       <MaterialCommunityIcons name="phone-outline" size={13} color={SCREEN_THEME.woodGreenDark} />
-                      <Text style={styles.chatActionBtnText}>
+                      <Text style={styles.chatActionBtnText} numberOfLines={1}>
                         {language === 'ua' ? 'Подзвонити' : language === 'ru' ? 'Позвонить' : 'Call'}
                       </Text>
                     </TouchableOpacity>
@@ -834,7 +813,7 @@ const OnlineChatScreen = () => {
                       activeOpacity={0.8}
                     >
                       <MaterialCommunityIcons name="badge-account-outline" size={13} color={SCREEN_THEME.woodGreenDark} />
-                      <Text style={styles.chatActionBtnText}>
+                      <Text style={styles.chatActionBtnText} numberOfLines={1}>
                         {language === 'ua' ? 'Профіль' : language === 'ru' ? 'Профиль' : 'Profile'}
                       </Text>
                     </TouchableOpacity>
@@ -846,7 +825,7 @@ const OnlineChatScreen = () => {
                       activeOpacity={0.8}
                     >
                       <MaterialCommunityIcons name="arrow-right-circle-outline" size={13} color="#fff" />
-                      <Text style={styles.chatActionBtnAccentText}>
+                      <Text style={styles.chatActionBtnAccentText} numberOfLines={1}>
                         {language === 'ua' ? "Зв'язатись" : language === 'ru' ? 'Связаться' : 'Contact'}
                       </Text>
                     </TouchableOpacity>
@@ -1279,7 +1258,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
   },
   chatActionBtn: {
     flexDirection: 'row',
@@ -1291,11 +1270,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 7,
     backgroundColor: 'transparent',
+    flexShrink: 1,
   },
   chatActionBtnText: {
     fontSize: 11,
     fontWeight: '800',
     color: SCREEN_THEME.woodGreenDark,
+    flexShrink: 1,
   },
   chatActionBtnAccent: {
     flexDirection: 'row',
@@ -1305,11 +1286,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 7,
     backgroundColor: '#7A1E5C',
+    flexShrink: 1,
   },
   chatActionBtnAccentText: {
     fontSize: 11,
     fontWeight: '800',
     color: '#fff',
+    flexShrink: 1,
   },
   chatActionBtnDelete: {
     flexDirection: 'row',
@@ -1328,6 +1311,7 @@ const styles = StyleSheet.create({
   },
   chatActionLikeBtn: {
     marginLeft: 'auto' as const,
+    flexShrink: 0,
   },
 });
 

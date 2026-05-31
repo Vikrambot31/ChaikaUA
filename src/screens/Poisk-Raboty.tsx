@@ -14,8 +14,7 @@ import { RootState } from '../redux/store';
 import { getModerationLabel } from '../utils/moderation';
 import { jobService, JobListing } from '../services/jobService';
 import { showUserError } from '../utils/userFacingErrors';
-import { database } from '../firebase-config';
-import { resolveUserAvatarMap } from '../utils/userAvatar';
+import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 import { useContactRequest } from '../hooks/useContactRequest';
 import ContactReasonModal from '../components/ContactReasonModal';
 import { safeCallPhone } from '../utils/communicationActions';
@@ -428,7 +427,6 @@ const JobSearchScreen: React.FC = () => {
   const [about, setAbout] = useState('');
   const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
   const [listings, setListings] = useState<JobListing[]>([]);
-  const [avatarByUserId, setAvatarByUserId] = useState<Record<string, string>>({});
   const [selectedFilter, setSelectedFilter] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [touched, setTouched] = useState<Record<FieldKey, boolean>>({
@@ -444,27 +442,12 @@ const JobSearchScreen: React.FC = () => {
   const [searchAbout, setSearchAbout] = useState('');
   const [actionModal, setActionModal] = useState<{ visible: boolean; userId: string; userName: string }>({ visible: false, userId: '', userName: '' });
   const blinkAnim = useRef(new Animated.Value(1)).current;
+  const avatarByUserId = useUserAvatarMap(listings.map((item) => item.userId));
 
   useEffect(() => {
     const unsubscribe = jobService.subscribe(setListings, user?.id);
     return unsubscribe;
   }, [user?.id]);
-
-  useEffect(() => {
-    const userIds = Array.from(new Set(listings.map((item) => item.userId).filter((id): id is string => Boolean(id))));
-    if (userIds.length === 0) return;
-    let cancelled = false;
-    void (async () => {
-      const resolved = await resolveUserAvatarMap(database, userIds);
-      if (cancelled) return;
-      setAvatarByUserId((prev) => {
-        const next = { ...prev };
-        Object.entries(resolved).forEach(([uid, photo]) => { if (photo) next[uid] = photo; });
-        return next;
-      });
-    })();
-    return () => { cancelled = true; };
-  }, [listings]);
 
   useEffect(() => {
     if (!name.trim() && user?.name) {

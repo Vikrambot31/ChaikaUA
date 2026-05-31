@@ -27,6 +27,7 @@ import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
 import type { DetailItemData } from '../utils/detailViewTypes';
 import { getRequestTopicLabel } from '../data/categories';
 import { getFirstDoneRequestPhoto, getRequiredPhotoLabel, hasPhotoUploadInProgress, validateSubmissionRequirements } from '../utils/submissionRequirements';
+import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 
 type Problem = {
   id: string;
@@ -313,6 +314,7 @@ const text = CLEAN_PROBLEMS_TEXT[language];
 
   const [rawItems, setRawItems] = useState<RawProblem[]>([]);
   const [profileByUserId, setProfileByUserId] = useState<Record<string, { name?: string; phone?: string; age?: string; avatarUri?: string }>>({});
+  const avatarByUserId = useUserAvatarMap(rawItems.map((item) => item.userId));
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const [voterMap, setVoterMap] = useState<Record<string, Record<string, true>>>({});
   const [loading, setLoading] = useState(true);
@@ -475,12 +477,12 @@ const text = CLEAN_PROBLEMS_TEXT[language];
         name: item.name || profile?.name || '',
         phone: item.phone || profile?.phone || '',
         age: item.age || profile?.age || '',
-        avatarUri: item.avatarUri || profile?.avatarUri || '',
+        avatarUri: (item.userId && avatarByUserId[item.userId]) || item.avatarUri || profile?.avatarUri || '',
         votes: Object.keys(voterMap[item.id] ?? {}).length,
         hasVoted: !!(voteUserId && voterMap[item.id]?.[voteUserId]),
       };
     }),
-    [profileByUserId, rawItems, voterMap, voteUserId]
+    [avatarByUserId, profileByUserId, rawItems, voterMap, voteUserId]
   );
 
   const visible = useMemo(() => {

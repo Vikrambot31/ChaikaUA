@@ -35,6 +35,7 @@ import { createPendingModeration } from '../utils/moderation';
 import { showUserError } from '../utils/userFacingErrors';
 import MiniUserAvatar from '../components/MiniUserAvatar';
 import { pickUserAvatarUri } from '../utils/userAvatar';
+import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 
 const RATE_LIMIT_KEY = 'electricity_report_timestamps';
 const MAX_PER_DAY = 2;
@@ -197,6 +198,7 @@ const ElectricityStatusScreen: React.FC = () => {
       .sort((a, b) => getTs(b.createdAt) - getTs(a.createdAt))
       .slice(0, 5);
   }, [todayReports]);
+  const avatarByUserId = useUserAvatarMap(bottomFeedReports.map((item) => item.userId));
 
   const formatReportDateTime = useCallback((value: Date | string) => {
     const dt = value instanceof Date ? value : new Date(value);
@@ -511,7 +513,7 @@ const ElectricityStatusScreen: React.FC = () => {
               const isOn = item.status === 'on';
               const statusColor = isOn ? '#2E7D32' : '#EF8E18';
               const statusText = isOn ? text.lightOnShort : text.lightOffShort;
-              const avatarUri = pickUserAvatarUri(item);
+              const avatarUri = (item.userId && avatarByUserId[item.userId]) || pickUserAvatarUri(item);
 
               return (
                 <View key={`mini-feed-${item.id}`} style={styles.residentItemCard}>

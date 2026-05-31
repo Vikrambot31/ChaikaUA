@@ -19,8 +19,7 @@ import ContactReasonModal from '../components/ContactReasonModal';
 import { useContactRequest } from '../hooks/useContactRequest';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { safeCallPhone } from '../utils/communicationActions';
-import { database } from '../firebase-config';
-import { resolveUserAvatarMap } from '../utils/userAvatar';
+import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 import type { DetailItemData } from '../utils/detailViewTypes';
 import UserCardActionBar from '../components/UserCardActionBar';
 import { openRequestFormWithLimitCheck } from '../utils/requestFormLimitGuard';
@@ -74,7 +73,6 @@ const HelpNeighborsScreen: React.FC = () => {
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const [showHelpSplash, setShowHelpSplash] = useState(false);
   const [isReady, setIsReady] = useState(false);
-  const [avatarByUserId, setAvatarByUserId] = useState<Record<string, string>>({});
 
   const todayRequests = useSelector((state: RootState) => selectTodayHelpRequests(state)) as HelpRequest[];
   const yesterdayRequests = useSelector((state: RootState) => selectYesterdayHelpRequests(state));
@@ -86,19 +84,7 @@ const HelpNeighborsScreen: React.FC = () => {
     ...burningRequests,
     ...yesterdayRequests.map((r) => ({ ...r, isYesterday: true as const })),
   ], [burningRequests, yesterdayRequests]);
-
-  useEffect(() => {
-    const userIds = Array.from(new Set(listData.map((item) => item.userId).filter((id): id is string => Boolean(id))));
-    if (userIds.length === 0) return;
-    let cancelled = false;
-    void resolveUserAvatarMap(database, userIds).then((resolved) => {
-      if (cancelled) return;
-      setAvatarByUserId((prev) => ({ ...prev, ...resolved }));
-    }).catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [listData]);
+  const avatarByUserId = useUserAvatarMap(listData.map((item) => item.userId));
 
   useEffect(() => {
     let isMounted = true;

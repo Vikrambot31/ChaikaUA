@@ -31,11 +31,10 @@ import { showUserError } from '../utils/userFacingErrors';
 import { safeCallPhone } from '../utils/communicationActions';
 import { validatePhone, normalizeUkrainianPhoneStrict } from '../utils/validators';
 import { normalizePhoneText } from '../utils/textUtils';
-import { database } from '../firebase-config';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import type { DetailItemData } from '../utils/detailViewTypes';
 import { getDonePhotos, validateSubmissionRequirements } from '../utils/submissionRequirements';
-import { resolveUserAvatarMap } from '../utils/userAvatar';
+import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 
 type AppLanguage = 'ua' | 'ru' | 'en';
 
@@ -182,7 +181,6 @@ const LostAndFoundScreen: React.FC = () => {
   const text = UI_TEXT[language];
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const [items, setItems] = useState<LostFoundItem[]>([]);
-  const [avatarByUserId, setAvatarByUserId] = useState<Record<string, string>>({});
   const [type, setType] = useState<RequestType>('lost');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState(() => normalizePhoneText(user?.phone ?? ''));
@@ -212,6 +210,7 @@ const LostAndFoundScreen: React.FC = () => {
   const [previewPhoto, setPreviewPhoto] = useState<{ uri: string; storagePath?: string } | null>(null);
   const hasUploadingPhotos = formPhotos.some((photo) => photo.status === 'uploading');
   const hasPhotoErrors = formPhotos.some((photo) => photo.status === 'error');
+  const avatarByUserId = useUserAvatarMap(items.map((item) => item.userId));
 
   const typeLabels = useMemo<Record<RequestType, string>>(
     () => ({ found: text.typeFound, lost: text.typeLost }),
@@ -222,17 +221,6 @@ const LostAndFoundScreen: React.FC = () => {
     const unsubscribe = lostFoundService.subscribe(setItems, user?.id);
     return unsubscribe;
   }, [user?.id]);
-
-  useEffect(() => {
-    const userIds = Array.from(new Set(items.map((item) => item.userId).filter((id): id is string => Boolean(id))));
-    if (userIds.length === 0) return;
-    let cancelled = false;
-    void resolveUserAvatarMap(database, userIds).then((resolved) => {
-      if (cancelled) return;
-      setAvatarByUserId((prev) => ({ ...prev, ...resolved }));
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [items]);
 
   useEffect(() => {
     if (!name.trim() && user?.name) {

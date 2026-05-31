@@ -29,7 +29,7 @@ import MiniUserAvatar from '../components/MiniUserAvatar';
 import AppPhotoImage from '../components/AppPhotoImage';
 import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField';
 import { resolveMediaAccessUrls } from '../services/mediaAccess';
-import { resolveUserAvatarMap } from '../utils/userAvatar';
+import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 import { useContactRequest } from '../hooks/useContactRequest';
 import ContactReasonModal from '../components/ContactReasonModal';
 import { safeCallPhone } from '../utils/communicationActions';
@@ -430,7 +430,7 @@ export default function ZhkBusinessListScreen() {
   const [error, setError] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [avatarByUserId, setAvatarByUserId] = useState<Record<string, string>>({});
+  const avatarByUserId = useUserAvatarMap(items.map((item) => item.userId));
   const [addFormVisible, setAddFormVisible] = useState(false);
   const [formCategoryKey, setFormCategoryKey] = useState('');
   const [formSubcategoryKey, setFormSubcategoryKey] = useState('');
@@ -553,19 +553,6 @@ export default function ZhkBusinessListScreen() {
   }, [user?.id]);
 
   useEffect(() => { void loadMyRequest(); }, [loadMyRequest]);
-
-  useEffect(() => {
-    const userIds = Array.from(new Set(items.map((item) => item.userId).filter((id): id is string => Boolean(id))));
-    if (userIds.length === 0) return;
-    let cancelled = false;
-    void resolveUserAvatarMap(database, userIds).then((resolved) => {
-      if (cancelled) return;
-      setAvatarByUserId((prev) => ({ ...prev, ...resolved }));
-    }).catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [items]);
 
   useEffect(() => {
     if (!contactName.trim() && user?.name) {

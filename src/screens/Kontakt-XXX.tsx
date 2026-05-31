@@ -14,7 +14,7 @@ import { RootState } from '../redux/store';
 import { contactsService, ContactListing } from '../services/contactsService';
 import { getModerationUserMessage, showUserError } from '../utils/userFacingErrors';
 import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField';
-import { get, onValue, ref, runTransaction } from 'firebase/database';
+import { get, ref } from 'firebase/database';
 import { database } from '../firebase-config';
 import { useContactRequest } from '../hooks/useContactRequest';
 import ContactReasonModal from '../components/ContactReasonModal';
@@ -27,6 +27,7 @@ import { useSoftToast } from '../hooks/useSoftToast';
 import { getDonePhotos, validateSubmissionRequirements } from '../utils/submissionRequirements';
 import { getLanguageValidationError } from '../utils/contentLanguageGuard';
 import UserCardActionBar from '../components/UserCardActionBar';
+import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 
 const CONTACT_LISTING_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const PROFILE_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -327,8 +328,6 @@ const KontaktiChaikyScreen: React.FC = () => {
   const [showPhoneOnCard, setShowPhoneOnCard] = useState(true);
   const [listings, setListings] = useState<ContactListing[]>([]);
   const [profileByUserId, setProfileByUserId] = useState<Record<string, ContactProfile>>({});
-  const [contactLikes, setContactLikes] = useState<Record<string, Record<string, true>>>({});
-  const [likeBusyById, setLikeBusyById] = useState<Record<string, boolean>>({});
   const [selectedFilterCategory, setSelectedFilterCategory] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [addFormVisible, setAddFormVisible] = useState(false);
@@ -344,6 +343,7 @@ const KontaktiChaikyScreen: React.FC = () => {
   const blinkAnim = useRef(new Animated.Value(1)).current;
   const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestDraftRef = useRef({ category, condition, price, description, phone, addFormVisible });
+  const avatarByUserId = useUserAvatarMap(listings.map((item) => item.userId));
   const previousAddFormVisibleRef = useRef(addFormVisible);
   const skipNextDraftFlushRef = useRef(false);
 
@@ -495,45 +495,6 @@ const KontaktiChaikyScreen: React.FC = () => {
     })();
     return () => { cancelled = true; };
   }, [listingUserIdsKey]);
-
-  useEffect(() => {
-    const unsubscribe = onValue(ref(database, 'feed_likes/contacts'), (snapshot) => {
-      const value = snapshot.val() as Record<string, unknown> | null;
-      const next: Record<string, Record<string, true>> = {};
-      if (value && typeof value === 'object') {
-        Object.entries(value).forEach(([listingId, likes]) => {
-          if (!likes || typeof likes !== 'object') return;
-          const normalizedLikes: Record<string, true> = {};
-          Object.entries(likes as Record<string, unknown>).forEach(([uid, liked]) => {
-            if (liked === true) normalizedLikes[uid] = true;
-          });
-          next[listingId] = normalizedLikes;
-        });
-      }
-      setContactLikes(next);
-    });
-    return unsubscribe;
-  }, []);
-
-  const handleContactLike = useCallback((listingId: string) => {
-    if (!user?.id || likeBusyById[listingId]) return;
-    const uid = user.id;
-    setLikeBusyById((prev) => ({ ...prev, [listingId]: true }));
-    void runTransaction(ref(database, `feed_likes/contacts/${listingId}/${uid}`), (current) => (current ? null : true))
-      .catch(() => {
-        toast.showError(
-          { ua: 'Не вдалося зберегти', ru: 'Не удалось сохранить', en: 'Could not save' }[language],
-          { ua: 'Натисніть лайк ще раз, щоб повторити', ru: 'Нажмите лайк ещё раз, чтобы повторить', en: 'Tap like again to retry' }[language],
-        );
-      })
-      .finally(() => {
-        setLikeBusyById((prev) => {
-          const next = { ...prev };
-          delete next[listingId];
-          return next;
-        });
-      });
-  }, [language, likeBusyById, toast, user?.id]);
 
   useEffect(() => {
     const anim = Animated.loop(
@@ -871,7 +832,7 @@ const KontaktiChaikyScreen: React.FC = () => {
             ) : (
               filteredListings.map((item) => {
                 const profile = item.userId ? profileByUserId[item.userId] : undefined;
-                const avatarUri = profile?.avatarUri || '';
+                const avatarUri = (item.userId && avatarByUserId[item.userId]) || profile?.avatarUri || '';
                 const isOwn = item.userId === user?.id;
                 const showPhone = !!(item.phone && item.showPhone !== false);
                 const conditionLabel = text.conditionLabels[item.condition as keyof typeof text.conditionLabels] ?? item.condition;
@@ -881,8 +842,6 @@ const KontaktiChaikyScreen: React.FC = () => {
                 const displayName = profile?.name || item.itemName;
                 const modMsg = getModerationUserMessage(language, item.moderationStatus, item.rejectionReason || item.moderationReason);
                 const showModInfo = isOwn && item.moderationStatus !== 'approved';
-                const likes = contactLikes[item.id] ?? {};
-
                 return (
                   <View
                     key={item.id}
@@ -954,10 +913,6 @@ const KontaktiChaikyScreen: React.FC = () => {
                       contactDisabled={!showPhone && (!item.userId || item.userId === user?.id)}
                       likePath="feed_likes/contacts"
                       likeId={item.id}
-                      liked={Boolean(user?.id && likes[user.id])}
-                      likeCount={Object.keys(likes).length}
-                      likeBusy={Boolean(likeBusyById[item.id])}
-                      onLike={user?.id ? () => handleContactLike(item.id) : undefined}
                     />
                     {isOwn ? (
                       <TouchableOpacity style={styles.kDeleteLink} onPress={() => handleDelete(item.id)} activeOpacity={0.8}>

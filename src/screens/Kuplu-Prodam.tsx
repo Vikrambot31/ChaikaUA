@@ -14,7 +14,6 @@ import { getModerationLabel } from '../utils/moderation';
 import { buySellService, BuySellListing } from '../services/buySellService';
 import { getModerationUserMessage, showUserError } from '../utils/userFacingErrors';
 import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField';
-import { database } from '../firebase-config';
 import { useContactRequest } from '../hooks/useContactRequest';
 import ContactReasonModal from '../components/ContactReasonModal';
 import { safeCallPhone } from '../utils/communicationActions';
@@ -22,7 +21,7 @@ import type { DetailItemData } from '../utils/detailViewTypes';
 import { getDonePhotos, validateSubmissionRequirements } from '../utils/submissionRequirements';
 import { getLanguageValidationError } from '../utils/contentLanguageGuard';
 import UserCardActionBar from '../components/UserCardActionBar';
-import { resolveUserAvatarMap } from '../utils/userAvatar';
+import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 
 const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000;
 
@@ -302,7 +301,6 @@ const BuySellScreen: React.FC = () => {
   const draftHadPhotos = useRef(false);
   const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
   const [listings, setListings] = useState<BuySellListing[]>([]);
-  const [avatarByUserId, setAvatarByUserId] = useState<Record<string, string>>({});
   const [selectedFilterCategory, setSelectedFilterCategory] = useState('');
   const [selectedFilterListingType, setSelectedFilterListingType] = useState<'' | 'buy' | 'sell'>('');
   const [submitting, setSubmitting] = useState(false);
@@ -317,6 +315,7 @@ const BuySellScreen: React.FC = () => {
   const [searchContact, setSearchContact] = useState('');
   const [searchDescription, setSearchDescription] = useState('');
   const blinkAnim = useRef(new Animated.Value(1)).current;
+  const avatarByUserId = useUserAvatarMap(listings.map((item) => item.userId));
 
   const handleRequestCloseModal = useCallback(() => {
     const closeTitle = language === 'ru' ? 'Закрыть форму?' : language === 'en' ? 'Close form?' : 'Закрити форму?';
@@ -373,17 +372,6 @@ const BuySellScreen: React.FC = () => {
     draftHadPhotos.current = false;
     Alert.alert(text.draftRestoredTitle, text.draftRestoredMsg, [{ text: text.draftRestoredOk }]);
   }, [addFormVisible, text.draftRestoredTitle, text.draftRestoredMsg, text.draftRestoredOk]);
-
-  useEffect(() => {
-    const userIds = Array.from(new Set(listings.map((item) => item.userId).filter((id): id is string => Boolean(id))));
-    if (userIds.length === 0) return;
-    let cancelled = false;
-    void resolveUserAvatarMap(database, userIds).then((resolved) => {
-      if (cancelled) return;
-      setAvatarByUserId((prev) => ({ ...prev, ...resolved }));
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [listings]);
 
   useEffect(() => {
     const anim = Animated.loop(
@@ -781,6 +769,7 @@ const BuySellScreen: React.FC = () => {
         renderItem={({ item }) => {
           const authorAvatarUri = (item.userId && avatarByUserId[item.userId]) || undefined;
           const hasListingPhoto = Boolean((item.photoUri || item.photoStoragePath || '').trim());
+          const itemListingType = item.listingType || 'sell';
 
           return (
             <TouchableOpacity
@@ -798,9 +787,9 @@ const BuySellScreen: React.FC = () => {
               ) : null}
             </View>
             <View style={styles.listingMeta}>
-              {(item.listingType || 'sell') === 'buy' ? (
-                <Text style={styles.listingTypeBadge}>{text.buyListingType}</Text>
-              ) : null}
+              <Text style={[styles.listingTypeBadge, itemListingType === 'sell' && styles.listingTypeSellBadge]}>
+                {itemListingType === 'buy' ? text.buyListingType : text.sellListingType}
+              </Text>
               <Text style={styles.listingBadgeText}>{text.conditionLabels[item.condition as keyof typeof text.conditionLabels] ?? item.condition}</Text>
               <Text style={styles.listingPrice}>{item.price} грн</Text>
               {item.isArchived ? (
@@ -1077,7 +1066,8 @@ const styles = StyleSheet.create({
   deleteText: { color: '#D05B4D', fontWeight: '700' },
   listingMeta: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 6 },
   archiveBadge: { fontSize: 10, fontWeight: '700', color: '#fff', backgroundColor: '#8B7355', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 4, overflow: 'hidden' },
-  listingTypeBadge: { fontSize: 10, fontWeight: '900', color: '#fff', backgroundColor: '#5967C8', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4, overflow: 'hidden' },
+  listingTypeBadge: { fontSize: 18, fontWeight: '900', color: '#fff', backgroundColor: '#5967C8', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 8, overflow: 'hidden' },
+  listingTypeSellBadge: { backgroundColor: SCREEN_THEME.terracotta },
   listingBadgeText: { fontSize: 11, fontWeight: '700', color: '#7B1FA2' },
   listingPrice: { fontSize: 15, fontWeight: '900', color: '#00897B' },
   statusBadge: { fontSize: 11, fontWeight: '900', color: '#8A5A00', backgroundColor: '#FFF2C7', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },

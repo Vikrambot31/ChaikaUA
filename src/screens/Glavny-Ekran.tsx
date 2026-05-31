@@ -27,11 +27,12 @@ import { useTranslation } from '../i18n/useTranslation';
 import { selectTodayReports } from '../redux/slices/electricitySlice';
 import { syncFromRequests } from '../redux/slices/helpRequestsSlice';
 import { normalizeLanguage } from '../redux/slices/languageSlice';
-import { database, firebaseChatAPI } from '../firebase-config';
+import { firebaseChatAPI } from '../firebase-config';
 import { safeOpenExternalUrl } from '../utils/communicationActions';
 import type { Request as AppRequest } from '../types/app';
 import { logClientError } from '../utils/errorLogger';
-import { pickUserAvatarUri, resolveUserAvatarMap } from '../utils/userAvatar';
+import { pickUserAvatarUri } from '../utils/userAvatar';
+import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 
 const ONBOARDING_KEY = '@chaika:onboarding_done';
 const INTRO_VIDEO_KEY = '@chaika:intro_video_shown';
@@ -520,7 +521,6 @@ const HomeScreen: React.FC = () => {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showIntroVideo, setShowIntroVideo] = useState(false);
   const [liveRequests, setLiveRequests] = useState<AppRequest[]>([]);
-  const [avatarByUserId, setAvatarByUserId] = useState<Record<string, string>>({});
   const [videoNaturalH, setVideoNaturalH] = useState(Math.round((SCREEN_W - 32) * 9 / 16));
   // Start visible if video already shown (not first launch); animate in after video ends
   const feedFadeAnim = useRef(new Animated.Value(1)).current;
@@ -535,6 +535,10 @@ const HomeScreen: React.FC = () => {
   const { t } = useTranslation();
   const language = useSelector((state: RootState) => normalizeLanguage(state.language?.current));
   const feedText = FEED_UI[language] ?? FEED_UI.ua;
+  const avatarByUserId = useUserAvatarMap([
+    ...helpRequests.map((item: { userId?: string }) => item.userId),
+    ...liveRequests.map((item) => item.userId),
+  ]);
 
   useEffect(() => {
     AsyncStorage.getItem(ONBOARDING_KEY).then((val) => {
@@ -559,22 +563,6 @@ const HomeScreen: React.FC = () => {
     });
     return unsubscribe;
   }, [dispatch]);
-
-  useEffect(() => {
-    const userIds = Array.from(new Set([
-      ...helpRequests.map((item: { userId?: string }) => item.userId),
-      ...liveRequests.map((item) => item.userId),
-    ].filter((id): id is string => Boolean(id))));
-    if (userIds.length === 0) return;
-    let cancelled = false;
-    void resolveUserAvatarMap(database, userIds).then((resolved) => {
-      if (cancelled) return;
-      setAvatarByUserId((prev) => ({ ...prev, ...resolved }));
-    }).catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [helpRequests, liveRequests]);
 
   const handleVideoFinish = () => {
     void AsyncStorage.setItem(INTRO_VIDEO_KEY, '1').catch((error) => {
