@@ -8,9 +8,9 @@ import {
   View,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import { NavigationProp, RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
-import { ChildCategory, ChildFeature, ChildOffer, Place } from '../types/app';
+import { ChildCategory, ChildFeature, ChildOffer, Place, PlaceType } from '../types/app';
 import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { openInGoogleMaps } from '../utils/googleMapsLink';
@@ -41,8 +41,12 @@ const UI_TEXT = {
     spots: 'Наявність місць',
     spotsYes: 'є місця',
     spotsNo: 'місць немає',
+    priceFrom: 'від',
+    currency: 'грн',
     priceUnknown: 'уточнюйте',
     ageUnknown: 'уточнюйте',
+    infoUnknown: 'уточнюйте',
+    descriptionEmpty: 'Детальна інформація поки не заповнена. Можна скористатися маршрутом або контактами, якщо вони доступні.',
     categoryLabel: {
       kindergarten: 'Садочок',
       school: 'Школа',
@@ -104,8 +108,12 @@ const UI_TEXT = {
     spots: 'Наличие мест',
     spotsYes: 'есть места',
     spotsNo: 'мест нет',
+    priceFrom: 'от',
+    currency: 'грн',
     priceUnknown: 'уточняйте',
     ageUnknown: 'уточняйте',
+    infoUnknown: 'уточняйте',
+    descriptionEmpty: 'Подробная информация пока не заполнена. Можно воспользоваться маршрутом или контактами, если они доступны.',
     categoryLabel: {
       kindergarten: 'Садик',
       school: 'Школа',
@@ -167,8 +175,12 @@ const UI_TEXT = {
     spots: 'Availability',
     spotsYes: 'spots available',
     spotsNo: 'no spots',
+    priceFrom: 'from',
+    currency: 'UAH',
     priceUnknown: 'ask',
     ageUnknown: 'ask',
+    infoUnknown: 'ask',
+    descriptionEmpty: 'Detailed information has not been filled in yet. You can use route or contacts if available.',
     categoryLabel: {
       kindergarten: 'Kindergarten',
       school: 'School',
@@ -251,12 +263,15 @@ function formatOfferDate(timestamp?: number): string {
   return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
+type AppNavigation = NavigationProp<Record<string, object | undefined>>;
+
 export default function DetalDetskogoMestaScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<AppNavigation>();
   const route = useRoute<RouteParams>();
   const place: Place = route.params.place;
   const info = place.childInfo;
-  const category = info?.category ?? 'kindergarten';
+  const category: ChildCategory = info?.category
+    ?? (place.type === PlaceType.SCHOOL ? 'school' : place.type === PlaceType.KINDERGARTEN ? 'kindergarten' : 'development');
 
   const language = useSelector((s: RootState) => s.language?.current ?? 'ua') as Lang;
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
@@ -272,7 +287,7 @@ export default function DetalDetskogoMestaScreen() {
   const priceLabel = useMemo(() => {
     if (!info?.priceFrom) return text.priceUnknown;
     const period = info.pricePeriod ? text.periods[info.pricePeriod] : text.periods.month;
-    return `${info.priceFrom} grn/${period}`;
+    return `${text.priceFrom} ${info.priceFrom} ${text.currency}/${period}`;
   }, [info, text]);
 
   const featureLabels = useMemo(() => {
@@ -325,17 +340,21 @@ export default function DetalDetskogoMestaScreen() {
     </View>
   );
 
+  const openOffer = (offer: ChildOffer) => {
+    navigation.navigate('DetalDetskogoPredlozheniyaScreen', { offer });
+  };
+
   const renderOfferCard = (offer: ChildOffer) => {
     const dateLabel = offer.dateFrom ? formatOfferDate(offer.dateFrom) : (offer.validUntil ? `до ${formatOfferDate(offer.validUntil)}` : '');
     return (
-      <View style={styles.offerCard} key={offer.id}>
+      <TouchableOpacity style={styles.offerCard} key={offer.id} activeOpacity={0.88} onPress={() => openOffer(offer)}>
         <View style={styles.offerBadge}>
           <Text style={styles.offerBadgeText}>{text.offerTypes[offer.type]}</Text>
         </View>
         <Text style={styles.offerTitle}>{offer.title}</Text>
         <Text style={styles.offerShortText}>{offer.shortText}</Text>
         {dateLabel ? <Text style={styles.offerDate}>{dateLabel}</Text> : null}
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -401,17 +420,15 @@ export default function DetalDetskogoMestaScreen() {
         </View>
 
         {/* 10.2 Main info */}
-        {info ? (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{text.mainInfoTitle}</Text>
-            <View style={styles.infoBlock}>
-              {renderInfoRow(text.age, ageLabel)}
-              {renderInfoRow(text.price, priceLabel)}
-              {info.schedule ? renderInfoRow(text.schedule, info.schedule) : null}
-              {info.hasAvailablePlaces != null ? renderInfoRow(text.spots, info.hasAvailablePlaces ? text.spotsYes : text.spotsNo) : null}
-            </View>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{text.mainInfoTitle}</Text>
+          <View style={styles.infoBlock}>
+            {renderInfoRow(text.age, ageLabel)}
+            {renderInfoRow(text.price, priceLabel)}
+            {renderInfoRow(text.schedule, info?.schedule ?? text.infoUnknown)}
+            {renderInfoRow(text.spots, info?.hasAvailablePlaces == null ? text.infoUnknown : info.hasAvailablePlaces ? text.spotsYes : text.spotsNo)}
           </View>
-        ) : null}
+        </View>
 
         {/* 10.3 Safety */}
         {safetyItems.length > 0 ? (
@@ -434,17 +451,15 @@ export default function DetalDetskogoMestaScreen() {
         ) : null}
 
         {/* 10.5 Description */}
-        {info?.shortDescription ? (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{text.descriptionTitle}</Text>
-            <Text style={styles.descriptionText}>{info.shortDescription}</Text>
-            {info.fullDescription ? (
-              <TouchableOpacity activeOpacity={0.8}>
-                <Text style={styles.readMore}>{text.readMore}</Text>
-              </TouchableOpacity>
-            ) : null}
-          </View>
-        ) : null}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{text.descriptionTitle}</Text>
+          <Text style={styles.descriptionText}>{info?.shortDescription ?? text.descriptionEmpty}</Text>
+          {info?.fullDescription ? (
+            <TouchableOpacity activeOpacity={0.8}>
+              <Text style={styles.readMore}>{text.readMore}</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
 
         {/* 10.6 Offers for this place */}
         {offers.length > 0 ? (

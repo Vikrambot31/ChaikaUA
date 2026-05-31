@@ -12,7 +12,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { chaykaPlaces } from '../services/chaykaPlacesData';
-import { ChildCategory, ChildFeature, Place, PlaceType } from '../types/app';
+import { childInfoSeed, getActiveOffers } from '../services/childrenSeed';
+import { ChildCategory, ChildFeature, ChildOffer, Place, PlaceType } from '../types/app';
 import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
 
@@ -34,10 +35,16 @@ const UI_TEXT = {
     categoriesTitle: 'Категорії',
     recommendedTitle: 'Є місця / Рекомендуємо поруч',
     allPlacesTitle: 'Всі місця для дітей',
+    eventsListTitle: 'Події та пропозиції',
     noResults: 'Нічого не знайдено. Спробуйте змінити пошук або категорію.',
+    noOffers: 'Поки що немає активних подій або пропозицій.',
     details: 'Детальніше',
     call: 'Подзвонити',
     telegram: 'Telegram',
+    validUntil: 'до',
+    free: 'безкоштовно',
+    priceFrom: 'від',
+    currency: 'грн',
     priceUnknown: 'ціну уточнюйте',
     ageUnknown: 'вік уточнюйте',
     available: 'є місця',
@@ -75,6 +82,13 @@ const UI_TEXT = {
       day: 'день',
       once: 'разово',
     },
+    offerTypes: {
+      promotion: 'Акція',
+      event: 'Подія',
+      open_day: 'Відкритий день',
+      trial_lesson: 'Пробне заняття',
+      available_places: 'Є місця',
+    },
   },
   ru: {
     title: 'Все для детей',
@@ -86,10 +100,16 @@ const UI_TEXT = {
     categoriesTitle: 'Категории',
     recommendedTitle: 'Есть места / Рекомендуем рядом',
     allPlacesTitle: 'Все места для детей',
+    eventsListTitle: 'События и предложения',
     noResults: 'Ничего не найдено. Попробуйте изменить поиск или категорию.',
+    noOffers: 'Пока нет активных событий или предложений.',
     details: 'Подробнее',
     call: 'Позвонить',
     telegram: 'Telegram',
+    validUntil: 'до',
+    free: 'бесплатно',
+    priceFrom: 'от',
+    currency: 'грн',
     priceUnknown: 'цену уточняйте',
     ageUnknown: 'возраст уточняйте',
     available: 'есть места',
@@ -127,6 +147,13 @@ const UI_TEXT = {
       day: 'день',
       once: 'разово',
     },
+    offerTypes: {
+      promotion: 'Акция',
+      event: 'Событие',
+      open_day: 'Открытый день',
+      trial_lesson: 'Пробное занятие',
+      available_places: 'Есть места',
+    },
   },
   en: {
     title: 'Everything for Kids',
@@ -138,10 +165,16 @@ const UI_TEXT = {
     categoriesTitle: 'Categories',
     recommendedTitle: 'Available spots / Nearby picks',
     allPlacesTitle: 'All kids places',
+    eventsListTitle: 'Events and offers',
     noResults: 'Nothing found. Try changing search or category.',
+    noOffers: 'No active events or offers yet.',
     details: 'Details',
     call: 'Call',
     telegram: 'Telegram',
+    validUntil: 'until',
+    free: 'free',
+    priceFrom: 'from',
+    currency: 'UAH',
     priceUnknown: 'ask for price',
     ageUnknown: 'ask for age',
     available: 'spots available',
@@ -179,6 +212,13 @@ const UI_TEXT = {
       day: 'day',
       once: 'once',
     },
+    offerTypes: {
+      promotion: 'Promotion',
+      event: 'Event',
+      open_day: 'Open day',
+      trial_lesson: 'Trial lesson',
+      available_places: 'Spots available',
+    },
   },
 } as const;
 
@@ -191,6 +231,27 @@ const CATEGORIES: { key: CategoryKey; icon: React.ComponentProps<typeof Material
   { key: 'medical', icon: 'medical-bag' },
   { key: 'event', icon: 'calendar-star' },
 ];
+
+const mergeChildInfo = (place: Place): Place => {
+  const seed = childInfoSeed[place.id];
+  if (!seed) return place;
+  return { ...place, childInfo: seed };
+};
+
+const formatOfferDate = (timestamp?: number) => {
+  if (!timestamp) return '';
+  const date = new Date(timestamp);
+  return `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}`;
+};
+
+const getOfferMeta = (offer: ChildOffer, text: ScreenText) => {
+  const parts: string[] = [];
+  if (offer.dateFrom) parts.push(formatOfferDate(offer.dateFrom));
+  if (!offer.dateFrom && offer.validUntil) parts.push(`${text.validUntil} ${formatOfferDate(offer.validUntil)}`);
+  if (offer.discountPercent != null) parts.push(`-${offer.discountPercent}%`);
+  if (offer.price === 0) parts.push(text.free);
+  return parts.join(' · ');
+};
 
 const getChildCategory = (place: Place): ChildCategory | null => {
   if (place.childInfo?.category) return place.childInfo.category;
@@ -217,7 +278,7 @@ const getPriceLabel = (place: Place, text: ScreenText) => {
   const price = place.childInfo?.priceFrom;
   if (!price) return text.priceUnknown;
   const period = place.childInfo?.pricePeriod ? text.periods[place.childInfo.pricePeriod] : text.periods.month;
-  return `від ${price} грн/${period}`;
+  return `${text.priceFrom} ${price} ${text.currency}/${period}`;
 };
 
 const getFeatureLabels = (place: Place, text: ScreenText) => {
@@ -239,7 +300,10 @@ export default function VseDlyaDeteyScreen() {
 
   const childPlaces = useMemo(() => (
     chaykaPlaces
-      .map((place) => ({ place, category: getChildCategory(place) }))
+      .map((raw) => {
+        const place = mergeChildInfo(raw);
+        return { place, category: getChildCategory(place) };
+      })
       .filter((item): item is { place: Place; category: ChildCategory } => Boolean(item.category))
   ), []);
 
@@ -252,6 +316,7 @@ export default function VseDlyaDeteyScreen() {
     childPlaces.forEach(({ category }) => {
       counts[category] += 1;
     });
+    counts.event = getActiveOffers().length;
     return counts;
   }, [childPlaces]);
 
@@ -266,8 +331,36 @@ export default function VseDlyaDeteyScreen() {
 
   const recommendedPlaces = useMemo(() => filteredPlaces.slice(0, 4), [filteredPlaces]);
 
+  const activeOffers = useMemo(() => getActiveOffers(), []);
+  const isEventsCategory = activeCategory === 'event';
+
   const openPlace = (place: Place) => {
     navigation.navigate('DetalDetskogoMestaScreen', { place });
+  };
+
+  const openOffer = (offer: ChildOffer) => {
+    navigation.navigate('DetalDetskogoPredlozheniyaScreen', { offer });
+  };
+
+  const renderOfferCard = (offer: ChildOffer, wide = false) => {
+    const offerPlace = chaykaPlaces.find((p) => p.id === offer.placeId);
+    const offerMeta = getOfferMeta(offer, text);
+    return (
+      <TouchableOpacity
+        key={offer.id}
+        style={[styles.offerCard, wide && styles.offerCardWide]}
+        activeOpacity={0.88}
+        onPress={() => openOffer(offer)}
+      >
+        <View style={styles.offerBadge}>
+          <Text style={styles.offerBadgeText}>{text.offerTypes[offer.type]}</Text>
+        </View>
+        <Text style={styles.offerTitle} numberOfLines={2}>{offer.title}</Text>
+        <Text style={styles.offerShortText} numberOfLines={wide ? 3 : 2}>{offer.shortText}</Text>
+        {offerMeta ? <Text style={styles.offerMeta} numberOfLines={1}>{offerMeta}</Text> : null}
+        {offerPlace ? <Text style={styles.offerPlaceName} numberOfLines={1}>{offerPlace.name}</Text> : null}
+      </TouchableOpacity>
+    );
   };
 
   const renderPlaceCard = ({ place, category }: { place: Place; category: ChildCategory }, compact = false) => {
@@ -341,15 +434,21 @@ export default function VseDlyaDeteyScreen() {
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>{text.actualTitle}</Text>
         </View>
-        <View style={styles.actualCard}>
-          <View style={styles.actualIcon}>
-            <MaterialCommunityIcons name="calendar-star" size={24} color="#FFFFFF" />
+        {activeOffers.length > 0 ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.offersRow}>
+            {activeOffers.map((offer) => renderOfferCard(offer))}
+          </ScrollView>
+        ) : (
+          <View style={styles.actualCard}>
+            <View style={styles.actualIcon}>
+              <MaterialCommunityIcons name="calendar-star" size={24} color="#FFFFFF" />
+            </View>
+            <View style={styles.actualTextBlock}>
+              <Text style={styles.actualTitle}>{text.actualEmptyTitle}</Text>
+              <Text style={styles.actualText}>{text.actualEmptyText}</Text>
+            </View>
           </View>
-          <View style={styles.actualTextBlock}>
-            <Text style={styles.actualTitle}>{text.actualEmptyTitle}</Text>
-            <Text style={styles.actualText}>{text.actualEmptyText}</Text>
-          </View>
-        </View>
+        )}
 
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>{text.categoriesTitle}</Text>
@@ -378,7 +477,7 @@ export default function VseDlyaDeteyScreen() {
           })}
         </ScrollView>
 
-        {recommendedPlaces.length > 0 ? (
+        {!isEventsCategory && recommendedPlaces.length > 0 ? (
           <>
             <View style={styles.sectionHeaderRow}>
               <Text style={styles.sectionTitle}>{text.recommendedTitle}</Text>
@@ -390,11 +489,22 @@ export default function VseDlyaDeteyScreen() {
         ) : null}
 
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>{text.allPlacesTitle}</Text>
-          <Text style={styles.resultCount}>{filteredPlaces.length}</Text>
+          <Text style={styles.sectionTitle}>{isEventsCategory ? text.eventsListTitle : text.allPlacesTitle}</Text>
+          <Text style={styles.resultCount}>{isEventsCategory ? activeOffers.length : filteredPlaces.length}</Text>
         </View>
 
-        {filteredPlaces.length > 0 ? (
+        {isEventsCategory ? (
+          activeOffers.length > 0 ? (
+            <View style={styles.cardList}>
+              {activeOffers.map((offer) => renderOfferCard(offer, true))}
+            </View>
+          ) : (
+            <View style={styles.emptyState}>
+              <MaterialCommunityIcons name="calendar-remove-outline" size={34} color={SCREEN_THEME.textMuted} />
+              <Text style={styles.emptyText}>{text.noOffers}</Text>
+            </View>
+          )
+        ) : filteredPlaces.length > 0 ? (
           <View style={styles.cardList}>
             {filteredPlaces.map((item) => renderPlaceCard(item))}
           </View>
@@ -667,5 +777,58 @@ const styles = StyleSheet.create({
     color: SCREEN_THEME.textSecondary,
     fontWeight: '700',
     lineHeight: 20,
+  },
+  offersRow: {
+    paddingBottom: 16,
+    gap: 10,
+  },
+  offerCard: {
+    width: 220,
+    backgroundColor: '#FFF7E3',
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(216, 175, 89, 0.35)',
+  },
+  offerCardWide: {
+    width: '100%',
+  },
+  offerBadge: {
+    alignSelf: 'flex-start',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    backgroundColor: SCREEN_THEME.terracotta,
+    marginBottom: 6,
+  },
+  offerBadgeText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#fff',
+  },
+  offerTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: SCREEN_THEME.textPrimary,
+    lineHeight: 18,
+  },
+  offerShortText: {
+    marginTop: 4,
+    fontSize: 12,
+    fontWeight: '600',
+    color: SCREEN_THEME.textSecondary,
+    lineHeight: 16,
+  },
+  offerMeta: {
+    marginTop: 7,
+    fontSize: 12,
+    fontWeight: '900',
+    color: SCREEN_THEME.terracottaDark,
+  },
+  offerPlaceName: {
+    marginTop: 6,
+    fontSize: 11,
+    fontWeight: '800',
+    color: SCREEN_THEME.enamelBlueDark,
   },
 });
