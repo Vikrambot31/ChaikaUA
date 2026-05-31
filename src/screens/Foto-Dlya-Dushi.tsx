@@ -296,7 +296,7 @@ export default function SoulPhotosScreen() {
     </View>
   );
 
-  const footer = (
+  const uploadPanel = (
     <View style={styles.uploadPanel}>
       <View style={styles.descriptionRow}>
         <View style={styles.descriptionIcon}>
@@ -380,17 +380,18 @@ export default function SoulPhotosScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <FlatList
+        style={styles.photoList}
         data={data}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         numColumns={NUM_COLUMNS}
         ListHeaderComponent={header}
-        ListFooterComponent={footer}
         ListEmptyComponent={empty}
         contentContainerStyle={styles.content}
         columnWrapperStyle={styles.row}
         showsVerticalScrollIndicator={false}
       />
+      {uploadPanel}
       <MiniTabBar />
     </SafeAreaView>
   );
@@ -398,7 +399,8 @@ export default function SoulPhotosScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F6E9C9' },
-  content: { paddingHorizontal: 12, paddingBottom: 118 },
+  photoList: { flex: 1 },
+  content: { paddingHorizontal: 12, paddingBottom: 14 },
   header: {
     paddingTop: 10,
     paddingBottom: 12,
@@ -491,9 +493,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   uploadPanel: {
-    marginTop: 10,
-    paddingTop: 10,
+    flexShrink: 0,
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 10,
     gap: 10,
+    borderTopWidth: 2,
+    borderTopColor: '#D8BF8B',
+    backgroundColor: '#F6E9C9',
   },
   descriptionRow: {
     flexDirection: 'row',

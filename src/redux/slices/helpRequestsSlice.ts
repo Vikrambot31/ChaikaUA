@@ -75,6 +75,8 @@ const helpRequestsSlice = createSlice({
             name: item.name,
             phone: item.phone,
             description: item.description || item.text || '',
+            photoUri: item.photoUri,
+            photoStoragePath: item.photoStoragePath,
             createdAt,
             expiresAt,
             isBurning: item.status !== 'rejected' && expiresAt > new Date(),

@@ -70,6 +70,8 @@ export interface HelpRequest {
   name: string;
   phone: string;
   description: string;
+  photoUri?: string;
+  photoStoragePath?: string;
   createdAt: Date;
   expiresAt: Date;
   isBurning: boolean;
