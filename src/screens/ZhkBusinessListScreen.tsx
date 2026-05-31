@@ -39,7 +39,6 @@ import { normalizeUkrainianPhoneStrict } from '../utils/validators';
 import { safeLogError } from '../utils/errorLogger';
 import StarRatingModal from '../components/StarRatingModal';
 import { DailyRatingUsage, canUseDailyRating, recordDailyRatingUse } from '../utils/monthlyRating';
-import UploadedPhotosGrid from '../components/UploadedPhotosGrid';
 import { getDonePhotos, validateSubmissionRequirements } from '../utils/submissionRequirements';
 
 // --- Types --------------------------------------------------------------------
@@ -449,7 +448,6 @@ export default function ZhkBusinessListScreen() {
       .then((raw) => setDailyRatingUsage(raw ? (JSON.parse(raw) as DailyRatingUsage) : null))
       .catch(() => setDailyRatingUsage(null));
   }, []);
-  const pickerActiveRef = React.useRef(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -606,12 +604,7 @@ export default function ZhkBusinessListScreen() {
     setPriceMax('');
   }, [user?.name]);
 
-  const handlePickerOpenChange = useCallback((isOpen: boolean) => {
-    pickerActiveRef.current = isOpen;
-  }, []);
-
   const handleRequestCloseAddForm = useCallback(() => {
-    if (pickerActiveRef.current) return;
     setAddFormVisible(false);
   }, []);
 
@@ -1088,15 +1081,17 @@ export default function ZhkBusinessListScreen() {
                 </View>
 
                 <Text style={styles.formLabel}>{t.photoLabel}</Text>
-                <PhotoUploadField
-                  uid={user?.id ?? ''}
-                  userName={user?.name ?? ''}
-                  maxPhotos={1}
-                  storagePath="local_business"
-                  onPhotosChange={(photos) => setFormPhotos(photos.filter((photo) => photo.status === 'done'))}
-                  onPickerOpenChange={handlePickerOpenChange}
-                />
-                <UploadedPhotosGrid />
+                {user?.id ? (
+                  <PhotoUploadField
+                    uid={user.id}
+                    userName={user?.name ?? ''}
+                    maxPhotos={1}
+                    storagePath="local_business"
+                    onPhotosChange={setFormPhotos}
+                  />
+                ) : (
+                  <Text style={styles.signInNote}>{t.signInToSubmit}</Text>
+                )}
 
                 <TouchableOpacity
                   style={[styles.submitBtn, (!isSubmitFormValid || submitting) && styles.submitBtnDisabled]}
@@ -1419,6 +1414,7 @@ const styles = StyleSheet.create({
   },
   textarea: { minHeight: 92, textAlignVertical: 'top' },
   charCount: { alignSelf: 'flex-end', color: SCREEN_THEME.textMuted, fontSize: 11, marginTop: 4, fontWeight: '700' },
+  signInNote: { color: SCREEN_THEME.textSecondary, fontSize: 13, fontWeight: '700', paddingVertical: 10, lineHeight: 18 },
   formPriceRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   formPriceInputHalf: { flex: 1 },
   formPriceSep: { fontSize: 16, color: SCREEN_THEME.textMuted, fontWeight: '700' },

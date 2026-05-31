@@ -813,7 +813,7 @@ function AuthNavigation() {
         <Stack.Screen name="LostAndFoundScreen" component={withGuard(LostAndFoundScreen, 'trusted')} />
         <Stack.Screen name="ImportantNewsScreen" component={ImportantNewsScreen} />
         <Stack.Screen name="NotificationSettingsScreen" component={withGuard(NotificationSettingsScreen, 'auth')} />
-        <Stack.Screen name="ZhkBusinessListScreen" component={withGuard(ZhkBusinessListScreen, 'trusted')} />
+        <Stack.Screen name="ZhkBusinessListScreen" component={ZhkBusinessListScreen} />
         <Stack.Screen name="SportNaChaykeScreen" component={withGuard(SportNaChaykeScreen, 'auth')} />
         <Stack.Screen name="SportDetailScreen" component={withGuard(SportDetailScreen, 'trusted')} />
         <Stack.Screen name="ProfileRequestsScreen" component={withGuard(ProfileRequestsScreen, 'trusted')} />

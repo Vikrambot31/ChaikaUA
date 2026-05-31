@@ -849,3 +849,111 @@ photoSubmitText: {
 | 2 — пример | `src/screens/Forma-Zayavki.tsx` | Готовый пример применения в ScrollView-форме |
 
 **Если что-то непонятно в гайде → открой `Foto-Dlya-Dushi.tsx` и смотри как там сделано.**
+
+---
+
+## 7. КРИТИЧЕСКИЙ УРОК: Как починили Форма-Заявки (2026-05-31)
+
+> Экран не отображал превью фото после выбора из галереи. Проблема существовала ~месяц. Ниже — точные причины и как их диагностировать на других экранах.
+
+### 7.1 Три причины поломки (по приоритету)
+
+**Причина 1 — `onBeforePickerOpen` блокировал пикер**
+
+```jsx
+// ❌ СЛОМАНО — saveDraft вызывался внутри openPicker ДО открытия камеры
+<RequestPhotoUploadField
+  onBeforePickerOpen={saveDraft}   // ← это блокировало/прерывало поток
+/>
+```
+
+`PhotoUploadField.openPicker()` делает `await onBeforePickerOpen?.()` без try/catch. Если колбэк бросает исключение или зависает — `Alert` с камерой/галереей **никогда не открывается**, либо состояние компонента разрушается до того, как фото добавляется в `selected`.
+
+```jsx
+// ✅ ПРАВИЛЬНО — автосохранение через debounced useEffect, не через колбэк
+useEffect(() => {
+  const timer = setTimeout(() => {
+    void AsyncStorage.setItem(DRAFT_KEY, JSON.stringify({...})).catch(() => undefined);
+  }, 600);
+  return () => clearTimeout(timer);
+}, [description, helpType, name, phone]);
+
+// Поле без onBeforePickerOpen:
+<RequestPhotoUploadField
+  uid={user.id}
+  userName={user?.name ?? ''}
+  maxPhotos={1}
+  onPhotosChange={setFormPhotos}
+/>
+```
+
+---
+
+**Причина 2 — `withGuard` обёртка на экране (только Форма-Заявки имела её)**
+
+```jsx
+// ❌ СЛОМАНО — только RequestFormScreen был обёрнут, ChaikaProblemsScreen — нет
+<Stack.Screen name="RequestFormScreen" component={withGuard(RequestFormScreen, 'auth')} />
+<Stack.Screen name="ChaikaProblemsScreen" component={ChaikaProblemsScreen} />
+```
+
+`GuardedScreen` подписывается на `isAuthenticated` / `isBootstrapped` из Redux. При возврате из нативной галереи Firebase `onAuthStateChanged` пересинхронизирует токен — это вызывает ре-рендер GuardedScreen с новым `children` элементом, что при определённых условиях уничтожает внутренний `selected` state компонента.
+
+```jsx
+// ✅ ПРАВИЛЬНО — убрать withGuard, экран сам управляет авторизацией через {user ? ...}
+<Stack.Screen name="RequestFormScreen" component={RequestFormScreen} />
+```
+
+Форма-Заявки уже проверяет авторизацию: `{user?.id ? <PhotoField/> : null}` и `validateSubmissionRequirements()` на submit. Guard избыточен.
+
+---
+
+**Причина 3 — `key={photoResetKey}` создавал ненужный сброс**
+
+```jsx
+// ❌ СЛОМАНО — key привязан к useState, менялся при каждом submit
+<RequestPhotoUploadField key={photoResetKey} ... />
+```
+
+`key` на компоненте = **принудительный ремонт**. Меняется key → теряется весь внутренний state (`selected`, прогресс). Рабочий экран Проблемы-Чайки не имел `key` вообще.
+
+```jsx
+// ✅ ПРАВИЛЬНО — без key. После успешного submit экран закрывается (goBack),
+// поэтому сброс state происходит автоматически при размонтировании.
+<RequestPhotoUploadField
+  uid={user.id}
+  userName={user?.name ?? ''}
+  maxPhotos={1}
+  onPhotosChange={setFormPhotos}
+/>
+```
+
+---
+
+### 7.2 Диагностический чеклист для других экранов
+
+Если на экране фото не появляются в сетке после выбора — проверь по порядку:
+
+| # | Что проверить | Где смотреть |
+|---|---|---|
+| 1 | Есть ли `onBeforePickerOpen` на `RequestPhotoUploadField` / `PhotoUploadField`? | JSX экрана |
+| 2 | Обёрнут ли экран в `withGuard(...)` в `RootNavigator.tsx`? | `src/navigation/RootNavigator.tsx` |
+| 3 | Есть ли `key={...}` на поле с фото? Меняется ли этот key? | JSX экрана |
+| 4 | Гейтинг `{user?.id ? ...}` — может ли `user.id` быть `undefined`? | Redux user object |
+| 5 | Пересобрано ли приложение после правок? (native app — Metro reload обязателен) | — |
+
+### 7.3 Эталон — точный JSX для экрана с формой (ScrollView)
+
+```jsx
+// Копируй это для любого нового экрана с RequestPhotoUploadField:
+{user?.id ? (
+  <RequestPhotoUploadField
+    uid={user.id}
+    userName={user?.name ?? ''}
+    maxPhotos={1}
+    onPhotosChange={setFormPhotos}
+  />
+) : null}
+```
+
+Референс (рабочий, проверен на устройстве): `src/screens/Problemy-Chayki.tsx` строки 710–716.
