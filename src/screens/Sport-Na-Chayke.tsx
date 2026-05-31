@@ -71,10 +71,64 @@ const UI_TEXT: Record<Lang, {
   },
 };
 
+const SPORT_FEED_TEXT: Record<Lang, {
+  places: Record<SportKey, string>;
+  gamesTitle: string;
+  gamesEmpty: string;
+  today: string;
+  joinGame: string;
+  sportsTitle: string;
+  peopleCount: (count: number) => string;
+}> = {
+  ua: {
+    places: {
+      basketball: 'вуличний майданчик',
+      football: 'футбольне поле',
+      tennis_big: 'тенісний корт',
+      tennis_small: 'стіл для тенісу',
+    },
+    gamesTitle: 'Найближчі ігри сьогодні',
+    gamesEmpty: 'Поки немає запланованих ігор. Оберіть спорт і вкажіть час.',
+    today: 'Сьогодні',
+    joinGame: 'Приєднатися',
+    sportsTitle: 'Оберіть спорт',
+    peopleCount: (count: number) => `${count} люд.`,
+  },
+  ru: {
+    places: {
+      basketball: 'уличная площадка',
+      football: 'футбольное поле',
+      tennis_big: 'теннисный корт',
+      tennis_small: 'стол для тенниса',
+    },
+    gamesTitle: 'Ближайшие игры сегодня',
+    gamesEmpty: 'Пока нет запланированных игр. Выберите спорт и укажите время.',
+    today: 'Сегодня',
+    joinGame: 'Присоединиться',
+    sportsTitle: 'Выберите спорт',
+    peopleCount: (count: number) => `${count} чел.`,
+  },
+  en: {
+    places: {
+      basketball: 'outdoor court',
+      football: 'football field',
+      tennis_big: 'tennis court',
+      tennis_small: 'table tennis spot',
+    },
+    gamesTitle: 'Upcoming games today',
+    gamesEmpty: 'No games planned yet. Choose a sport and set your time.',
+    today: 'Today',
+    joinGame: 'Join',
+    sportsTitle: 'Choose a sport',
+    peopleCount: (count: number) => `${count} people`,
+  },
+};
+
 const SportNaChaykeScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as Lang;
   const text = UI_TEXT[language];
+  const feedText = SPORT_FEED_TEXT[language];
   const blinkAnim = useRef(new Animated.Value(1)).current;
   const [todayEntriesBySport, setTodayEntriesBySport] = useState<Record<SportKey, SportTodayEntry[]>>({
     basketball: [],
@@ -116,6 +170,23 @@ const SportNaChaykeScreen: React.FC = () => {
     return uniqueIds.size;
   }, [todayEntriesBySport]);
 
+  const upcomingGames = useMemo(() => {
+    return SPORTS.flatMap((sport) => {
+      const groupsByTime = new Map<string, SportTodayEntry[]>();
+      todayEntriesBySport[sport.key]?.forEach((entry) => {
+        const players = groupsByTime.get(entry.time) ?? [];
+        players.push(entry);
+        groupsByTime.set(entry.time, players);
+      });
+
+      return Array.from(groupsByTime.entries()).map(([time, players]) => ({
+        sport,
+        time,
+        players,
+      }));
+    }).sort((a, b) => a.time.localeCompare(b.time) || text.sports[a.sport.key].localeCompare(text.sports[b.sport.key]));
+  }, [todayEntriesBySport, text.sports]);
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -132,6 +203,44 @@ const SportNaChaykeScreen: React.FC = () => {
           <Text style={styles.subtitle}>{text.subtitle}</Text>
         </View>
 
+        <Text style={styles.sectionTitle}>{feedText.gamesTitle}</Text>
+        <View style={styles.gamesList}>
+          {upcomingGames.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <MaterialCommunityIcons name="calendar-clock" size={24} color={SCREEN_THEME.textSecondary} />
+              <Text style={styles.emptyText}>{feedText.gamesEmpty}</Text>
+            </View>
+          ) : upcomingGames.map((game) => (
+            <TouchableOpacity
+              key={`${game.sport.key}-${game.time}`}
+              style={styles.gameCard}
+              onPress={() => navigation.navigate('SportDetailScreen', { sportKey: game.sport.key, sportTitle: text.sports[game.sport.key] })}
+              activeOpacity={0.86}
+            >
+              <View style={[styles.gameIcon, { backgroundColor: game.sport.accent }]}>
+                <MaterialCommunityIcons name={game.sport.icon} size={22} color="#FFFFFF" />
+              </View>
+              <View style={styles.gameCopy}>
+                <View style={styles.gameMetaRow}>
+                  <Text style={styles.gameMeta}>{feedText.today}</Text>
+                  <Text style={styles.gameTime}>{game.time}</Text>
+                </View>
+                <Text style={styles.gameTitle}>{text.sports[game.sport.key]}</Text>
+                <View style={styles.gameDetailsRow}>
+                  <MaterialCommunityIcons name="account-group-outline" size={15} color={SCREEN_THEME.textSecondary} />
+                  <Text style={styles.gameDetails}>{feedText.peopleCount(game.players.length)}</Text>
+                  <MaterialCommunityIcons name="map-marker-outline" size={15} color={SCREEN_THEME.textSecondary} />
+                  <Text style={styles.gameDetails} numberOfLines={1}>{feedText.places[game.sport.key]}</Text>
+                </View>
+              </View>
+              <View style={styles.joinPill}>
+                <Text style={styles.joinText}>{feedText.joinGame}</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Text style={styles.sectionTitle}>{feedText.sportsTitle}</Text>
         <View style={styles.list}>
           {SPORTS.map((sport) => (
             <TouchableOpacity
@@ -186,6 +295,39 @@ const styles = StyleSheet.create({
   liveCount: { color: 'rgba(255,255,255,0.82)', fontSize: 11, fontWeight: '700', textAlign: 'center' },
   title: { marginTop: 10, fontSize: 28, fontWeight: '900', color: '#FFFFFF', textAlign: 'center' },
   subtitle: { marginTop: 8, fontSize: 14, lineHeight: 20, color: 'rgba(255,255,255,0.86)', textAlign: 'center', fontWeight: '700' },
+  sectionTitle: { marginTop: 4, marginBottom: 10, fontSize: 13, fontWeight: '900', color: SCREEN_THEME.textSecondary, textTransform: 'uppercase', letterSpacing: 0.8 },
+  gamesList: { gap: 10, marginBottom: 18 },
+  emptyCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: 18,
+    padding: 14,
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderWidth: 1,
+    borderColor: '#E4D0AB',
+  },
+  emptyText: { flex: 1, fontSize: 13, lineHeight: 18, fontWeight: '700', color: SCREEN_THEME.textSecondary },
+  gameCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 18,
+    padding: 12,
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderWidth: 1,
+    borderColor: '#E4D0AB',
+    ...SCREEN_THEME.raisedShadow,
+  },
+  gameIcon: { width: 46, height: 46, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  gameCopy: { flex: 1, marginLeft: 12, marginRight: 8, minWidth: 0 },
+  gameMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 3 },
+  gameMeta: { fontSize: 11, fontWeight: '900', color: SCREEN_THEME.textSecondary, textTransform: 'uppercase' },
+  gameTime: { fontSize: 16, fontWeight: '900', color: SCREEN_THEME.terracottaDark },
+  gameTitle: { fontSize: 15, fontWeight: '900', color: SCREEN_THEME.textPrimary },
+  gameDetailsRow: { marginTop: 5, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  gameDetails: { maxWidth: 116, fontSize: 12, fontWeight: '700', color: SCREEN_THEME.textSecondary },
+  joinPill: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: SCREEN_THEME.woodGreenDark },
+  joinText: { fontSize: 11, fontWeight: '900', color: '#FFFFFF' },
   list: { gap: 12 },
   card: {
     flexDirection: 'row',

@@ -15,7 +15,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
-import { get, ref } from 'firebase/database';
+import { get, onValue, ref } from 'firebase/database';
 import { ContactReason, ProfileViewRequest, ViewRequestStatus, profilePermissionService } from '../services/profilePermissionService';
 import {
   PROFILE_REQUEST_CONTEXT_KEYS,
@@ -198,6 +198,63 @@ const UI = {
   },
 };
 
+const normalizeIncomingRequests = (
+  data: Record<string, Partial<ProfileViewRequest>> | null | undefined,
+  includeHistory: boolean,
+): ProfileViewRequest[] => {
+  if (!data) return [];
+  return Object.entries(data)
+    .map(([requesterId, value]) => ({
+      requesterId: typeof value.requesterId === 'string' && value.requesterId.trim() ? value.requesterId : requesterId,
+      requesterUserId: typeof value.requesterUserId === 'string' ? value.requesterUserId : (typeof value.requesterId === 'string' ? value.requesterId : requesterId),
+      requesterName: typeof value.requesterName === 'string' && value.requesterName.trim() ? value.requesterName : 'Unknown user',
+      requesterPhotoURL: typeof value.requesterPhotoURL === 'string' ? value.requesterPhotoURL : '',
+      requestedAt: typeof value.requestedAt === 'string' ? value.requestedAt : new Date(0).toISOString(),
+      createdAt: typeof value.createdAt === 'string' ? value.createdAt : undefined,
+      context: (value.context as ProfileViewRequest['context']) ?? 'lyudi',
+      status: (value.status as ProfileViewRequest['status']) ?? 'pending',
+      sharedContact: typeof value.sharedContact === 'string' ? value.sharedContact : '',
+      reason: value.reason as ContactReason | undefined,
+      sourceType: typeof value.sourceType === 'string' ? value.sourceType : undefined,
+      sourceId: typeof value.sourceId === 'string' ? value.sourceId : undefined,
+      sourceTitle: typeof value.sourceTitle === 'string' ? value.sourceTitle : undefined,
+      requesterPhone: typeof value.requesterPhone === 'string' ? value.requesterPhone : undefined,
+      targetPhone: typeof value.targetPhone === 'string' ? value.targetPhone : undefined,
+    }))
+    .filter((r) => Boolean(r.requesterId) && (includeHistory || r.status === 'pending'))
+    .sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime());
+};
+
+const normalizeOutgoingRequests = (
+  data: Record<string, Partial<ProfileViewRequest>> | null | undefined,
+  userId: string,
+): ProfileViewRequest[] => {
+  if (!data) return [];
+  return Object.entries(data)
+    .map(([targetUserId, value]) => ({
+      requesterId: typeof value.requesterId === 'string' && value.requesterId.trim() ? value.requesterId : userId,
+      requesterUserId: typeof value.requesterUserId === 'string' ? value.requesterUserId : userId,
+      requesterName: typeof value.requesterName === 'string' && value.requesterName.trim() ? value.requesterName : 'Unknown user',
+      requesterPhotoURL: typeof value.requesterPhotoURL === 'string' ? value.requesterPhotoURL : '',
+      targetUserId,
+      targetName: typeof value.targetName === 'string' ? value.targetName : '',
+      targetPhotoURL: typeof value.targetPhotoURL === 'string' ? value.targetPhotoURL : '',
+      requestedAt: typeof value.requestedAt === 'string' ? value.requestedAt : new Date(0).toISOString(),
+      createdAt: typeof value.createdAt === 'string' ? value.createdAt : undefined,
+      context: (value.context as ProfileViewRequest['context']) ?? 'lyudi',
+      status: (value.status as ProfileViewRequest['status']) ?? 'pending',
+      sharedContact: typeof value.sharedContact === 'string' ? value.sharedContact : '',
+      reason: value.reason as ContactReason | undefined,
+      sourceType: typeof value.sourceType === 'string' ? value.sourceType : undefined,
+      sourceId: typeof value.sourceId === 'string' ? value.sourceId : undefined,
+      sourceTitle: typeof value.sourceTitle === 'string' ? value.sourceTitle : undefined,
+      requesterPhone: typeof value.requesterPhone === 'string' ? value.requesterPhone : undefined,
+      targetPhone: typeof value.targetPhone === 'string' ? value.targetPhone : undefined,
+    }))
+    .filter((r) => Boolean(r.targetUserId))
+    .sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime());
+};
+
 export default function ProfileRequestsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const navLock = useRef(false);
@@ -217,6 +274,7 @@ export default function ProfileRequestsScreen() {
   const [incomingVotes, setIncomingVotes] = useState<Record<string, number>>({});
   const [seenContacts, setSeenContacts] = useState<Record<string, boolean>>({});
   const [clearingHistory, setClearingHistory] = useState(false);
+  const [respondingRequestId, setRespondingRequestId] = useState<string | null>(null);
 
   const loadIncomingPhones = useCallback(async (incoming: ProfileViewRequest[]) => {
     const uniqueRequesterIds = Array.from(new Set(incoming.map((item) => item.requesterId).filter(Boolean)));
@@ -266,28 +324,6 @@ export default function ProfileRequestsScreen() {
     );
   }, []);
 
-  const load = useCallback(async () => {
-    if (!user?.id) return;
-    setLoading(true);
-    try {
-      const hidden = await profilePermissionService.getHiddenRequestKeys(user.id);
-      const reqs = activeTab === 'history'
-        ? await profilePermissionService.getAllRequestsWithHistory(user.id)
-        : activeTab === 'outgoing'
-          ? await profilePermissionService.getOutgoingRequests(user.id)
-          : await profilePermissionService.getAllRequests(user.id);
-      setHiddenKeys(hidden);
-      setRequests(reqs);
-      if (activeTab === 'incoming') {
-        await loadIncomingPhones(reqs);
-      }
-    } catch {
-      Alert.alert(t.errTitle, t.errBody);
-    } finally {
-      setLoading(false);
-    }
-  }, [activeTab, loadIncomingPhones, t.errBody, t.errTitle, user?.id]);
-
   useEffect(() => {
     if (!user?.id) {
       setLoading(false);
@@ -335,9 +371,38 @@ export default function ProfileRequestsScreen() {
   }, [loadIncomingPhones, t.errBody, t.errTitle, user?.id]);
 
   useEffect(() => {
-    if (!tabInitialized) return;
-    void load();
-  }, [load, tabInitialized]);
+    if (!tabInitialized || !user?.id) return undefined;
+
+    setLoading(true);
+    const path = activeTab === 'outgoing'
+      ? `outgoingProfileRequestsByUser/${user.id}`
+      : `profileViewRequests/${user.id}`;
+
+    const unsubscribe = onValue(ref(database, path), async (snap) => {
+      try {
+        const hidden = await profilePermissionService.getHiddenRequestKeys(user.id);
+        const raw = snap.exists() ? (snap.val() as Record<string, Partial<ProfileViewRequest>>) : null;
+        const nextRequests = activeTab === 'outgoing'
+          ? normalizeOutgoingRequests(raw, user.id)
+          : normalizeIncomingRequests(raw, activeTab === 'history');
+
+        setHiddenKeys(hidden);
+        setRequests(nextRequests);
+        if (activeTab === 'incoming') {
+          await loadIncomingPhones(nextRequests);
+        }
+      } catch {
+        Alert.alert(t.errTitle, t.errBody);
+      } finally {
+        setLoading(false);
+      }
+    }, () => {
+      Alert.alert(t.errTitle, t.errBody);
+      setLoading(false);
+    });
+
+    return unsubscribe;
+  }, [activeTab, loadIncomingPhones, t.errBody, t.errTitle, tabInitialized, user?.id]);
 
   useEffect(() => {
     void (async () => {
@@ -429,6 +494,19 @@ export default function ProfileRequestsScreen() {
       { text: t.clearConfirmYes, style: 'destructive', onPress: () => { void clearContactHistory(); } },
     ]);
   }, [clearContactHistory, t.clearConfirmBody, t.clearConfirmNo, t.clearConfirmTitle, t.clearConfirmYes]);
+
+  const handleRespondToIncoming = useCallback(async (requesterId: string, approved: boolean) => {
+    if (!user?.id || !requesterId || respondingRequestId) return;
+    setRespondingRequestId(requesterId);
+    try {
+      await profilePermissionService.respondToRequest(user.id, requesterId, approved);
+      setRequests((prev) => prev.filter((item) => item.requesterId !== requesterId));
+    } catch {
+      Alert.alert(t.errTitle, t.errBody);
+    } finally {
+      setRespondingRequestId(null);
+    }
+  }, [respondingRequestId, t.errBody, t.errTitle, user?.id]);
 
   const handleCall = async (phoneRaw?: string) => {
     await safeCallPhone(phoneRaw, language);
@@ -548,6 +626,7 @@ export default function ProfileRequestsScreen() {
               const votes = incomingVotes[item.requesterId] ?? 0;
               const reasonText = item.reason ? t.reasons[item.reason as ContactReason] : null;
               const descriptionText = reasonText || item.sourceTitle || (age ? age : null);
+              const isResponding = respondingRequestId === item.requesterId;
               const votesLabel = language === 'en' ? 'votes' : language === 'ru' ? 'голосов' : 'голосів';
               return (
                 <View style={styles.card}>
@@ -587,6 +666,31 @@ export default function ProfileRequestsScreen() {
                         </View>
                       ) : null}
                     </View>
+                  </View>
+
+                  <View style={styles.responseActionsRow}>
+                    <TouchableOpacity
+                      style={[styles.responseBtn, styles.responseBtnApprove, isResponding && styles.responseBtnDisabled]}
+                      onPress={() => { void handleRespondToIncoming(item.requesterId, true); }}
+                      disabled={isResponding || Boolean(respondingRequestId)}
+                      activeOpacity={0.85}
+                    >
+                      {isResponding ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <MaterialCommunityIcons name="check" size={18} color="#fff" />
+                      )}
+                      <Text style={styles.responseBtnText}>{t.approve}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.responseBtn, styles.responseBtnDeny, isResponding && styles.responseBtnDisabled]}
+                      onPress={() => { void handleRespondToIncoming(item.requesterId, false); }}
+                      disabled={isResponding || Boolean(respondingRequestId)}
+                      activeOpacity={0.85}
+                    >
+                      <MaterialCommunityIcons name="close" size={18} color="#A73737" />
+                      <Text style={styles.responseBtnDenyText}>{t.deny}</Text>
+                    </TouchableOpacity>
                   </View>
 
                   <UserCardActionBar
@@ -933,6 +1037,43 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#7A6D64',
     lineHeight: 17,
+  },
+  responseActionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 7,
+  },
+  responseBtn: {
+    flex: 1,
+    minHeight: 42,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+  },
+  responseBtnApprove: {
+    backgroundColor: '#2D7A46',
+  },
+  responseBtnDeny: {
+    backgroundColor: '#FFF1EF',
+    borderWidth: 1,
+    borderColor: '#E7B6AE',
+  },
+  responseBtnDisabled: {
+    opacity: 0.65,
+  },
+  responseBtnText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  responseBtnDenyText: {
+    color: '#A73737',
+    fontSize: 13,
+    fontWeight: '900',
   },
   incomingActionsRow: {
     flexDirection: 'row',
