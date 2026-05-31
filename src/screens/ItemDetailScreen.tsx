@@ -8,7 +8,9 @@ import { useSelector } from 'react-redux';
 import AppPhotoImage from '../components/AppPhotoImage';
 import ContactReasonModal from '../components/ContactReasonModal';
 import MiniTabBar from '../components/MiniTabBar';
+import MiniUserAvatar from '../components/MiniUserAvatar';
 import { useContactRequest } from '../hooks/useContactRequest';
+import type { RootStackParamList } from '../navigation/RootNavigator';
 import type { RootState } from '../redux/store';
 import type { ViewRequestContext } from '../services/profilePermissionService';
 import { getRequestTopicLabel } from '../data/categories';
@@ -86,7 +88,7 @@ export default function ItemDetailScreen({
   navigation,
   route,
 }: {
-  navigation: NavigationProp<ItemDetailParams, 'ItemDetailScreen'>;
+  navigation: NavigationProp<RootStackParamList, 'ItemDetailScreen'>;
   route: RouteProp<ItemDetailParams, 'ItemDetailScreen'>;
 }) {
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
@@ -142,7 +144,17 @@ export default function ItemDetailScreen({
           <Text style={styles.backText}>{text.back}</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{text.headerTitle}</Text>
-        <View style={styles.headerSpacer} />
+        {currentUser?.id ? (
+          <TouchableOpacity
+            style={styles.headerAvatar}
+            onPress={() => navigation.navigate('ViewUserProfile', { userId: currentUser.id })}
+            activeOpacity={0.8}
+          >
+            <MiniUserAvatar uri={currentUser.photoURL} name={currentUser.name} size={34} />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.headerSpacer} />
+        )}
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -246,6 +258,7 @@ const styles = StyleSheet.create({
   backBtn: { flexDirection: 'row', alignItems: 'center', minWidth: 78 },
   backText: { color: '#403933', fontSize: 14, fontWeight: '800' },
   headerTitle: { color: '#2D2520', fontSize: 18, fontWeight: '900' },
+  headerAvatar: { width: 78, alignItems: 'flex-end' },
   headerSpacer: { width: 78 },
   content: { padding: 16, paddingBottom: 112, gap: 12 },
   photo: { width: '100%', height: 300, borderRadius: 22, backgroundColor: '#F0EDE8' },

@@ -4,7 +4,8 @@ import { View, Text, TouchableOpacity, StyleSheet, Alert, SafeAreaView, Activity
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationProp, ParamListBase, RouteProp } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
-import { firebaseChatAPI } from '../firebase-config';
+import { get, ref } from 'firebase/database';
+import { database, firebaseChatAPI } from '../firebase-config';
 import type { RootState } from '../redux/store';
 import type { Request } from '../types/app';
 import TactileIcon from '../components/TactileIcon';
@@ -16,6 +17,7 @@ import { profilePermissionService } from '../services/profilePermissionService';
 import { pickUserAvatarUri } from '../utils/userAvatar';
 import { getRequestTopicLabel } from '../data/categories';
 import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
+import { loadProfileRecord } from '../services/authProfileService';
 
 type RequestDetailParams = {
   request: Request;
@@ -123,6 +125,14 @@ const UI_TEXT = {
 } as const;
 
 const AVATAR_COLORS = ['#C77A5D', '#D8AF59', '#7E9D69', '#5F84B4', '#A56B55'];
+const RTDB_FORBIDDEN_KEY_CHARS = /[.#$[\]/]/g;
+const toSafeRtdbKey = (value: string): string => (value ?? '').replace(RTDB_FORBIDDEN_KEY_CHARS, '_').trim();
+
+const getGenderShortLabel = (gender?: string) => {
+  if (gender === 'male') return 'M';
+  if (gender === 'female') return 'F';
+  return '';
+};
 
 const RequestDetailScreen = ({
   route,
@@ -138,8 +148,17 @@ const RequestDetailScreen = ({
   const [deleting, setDeleting] = useState(false);
   const [accessStatus, setAccessStatus] = useState<'pending' | 'approved' | 'denied' | null>(null);
   const [sendingConnect, setSendingConnect] = useState(false);
+  const [profileName, setProfileName] = useState('');
+  const [profileAge, setProfileAge] = useState<number | undefined>();
+  const [profileGender, setProfileGender] = useState('');
+  const [requestLikes, setRequestLikes] = useState(0);
   const avatarByUserId = useUserAvatarMap([request.userId]);
   const resolvedAvatarUri = (request.userId && avatarByUserId[request.userId]) || pickUserAvatarUri({ userPhotoURL: request.userPhotoURL, startAvatarKey: request.startAvatarKey }) || pickUserAvatarUri(request);
+  const displayName = profileName || request.name || text.fallbackName;
+  const ageGenderLabel = [
+    typeof profileAge === 'number' ? String(profileAge) : '',
+    getGenderShortLabel(profileGender),
+  ].filter(Boolean).join(' / ');
 
   const getTimeAgo = (timestamp: number) => {
     const diff = Date.now() - timestamp;
@@ -163,6 +182,63 @@ const RequestDetailScreen = ({
     void loadAccess();
   }, [currentUser?.id, request.userId]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadProfileMeta = async () => {
+      if (!request.userId) {
+        setProfileName('');
+        setProfileAge(undefined);
+        setProfileGender('');
+        return;
+      }
+
+      try {
+        const profile = await loadProfileRecord(request.userId);
+        if (cancelled) return;
+        setProfileName(profile?.name || '');
+        setProfileAge(profile?.age);
+        setProfileGender(profile?.gender || '');
+      } catch {
+        if (cancelled) return;
+        setProfileName('');
+        setProfileAge(undefined);
+        setProfileGender('');
+      }
+    };
+
+    void loadProfileMeta();
+    return () => {
+      cancelled = true;
+    };
+  }, [request.userId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadRequestLikes = async () => {
+      if (!request.id) {
+        setRequestLikes(0);
+        return;
+      }
+
+      try {
+        const likesSnap = await get(ref(database, `feed_likes/requests/${toSafeRtdbKey(request.id)}`));
+        const likesValue = likesSnap.val();
+        if (!cancelled) {
+          setRequestLikes(likesValue && typeof likesValue === 'object' ? Object.keys(likesValue).length : 0);
+        }
+      } catch {
+        if (!cancelled) setRequestLikes(0);
+      }
+    };
+
+    void loadRequestLikes();
+    return () => {
+      cancelled = true;
+    };
+  }, [request.id]);
+
   const handleConnect = async () => {
     if (!currentUser?.id || !request.userId || currentUser.id === request.userId) {
       Alert.alert(text.connectCant, text.connectCant);
@@ -180,7 +256,7 @@ const RequestDetailScreen = ({
         },
         'help',
         {
-          name: request.name,
+          name: displayName,
           photoURL: resolvedAvatarUri,
         },
       );
@@ -266,13 +342,20 @@ const RequestDetailScreen = ({
         <View style={styles.profileRow}>
           <MiniUserAvatar
             uri={resolvedAvatarUri}
-            name={request.name || text.fallbackName}
+            name={displayName}
             size={62}
             borderRadius={31}
             backgroundColor={avatarColor}
           />
           <View style={styles.profileInfo}>
-            <Text style={styles.nameText}>{request.name || text.fallbackName}</Text>
+            <Text style={styles.nameText}>{displayName}</Text>
+            <View style={styles.profileMetaRow}>
+              {ageGenderLabel ? <Text style={styles.profileMetaText}>{ageGenderLabel}</Text> : null}
+              <View style={styles.ratingPill}>
+                <MaterialCommunityIcons name="heart" size={12} color="#7A1E5C" />
+                <Text style={styles.ratingText}>{requestLikes}</Text>
+              </View>
+            </View>
             <Text style={styles.categoryText}>{categoryLabel}</Text>
             <Text style={styles.timeText}>{getTimeAgo(request.timestamp ?? request.createdAt ?? Date.now())}</Text>
           </View>
@@ -361,6 +444,10 @@ const styles = StyleSheet.create({
   profileRow: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 24, padding: 18, marginBottom: 14, borderWidth: 1, borderColor: '#E4D0AB' },
   profileInfo: { flex: 1 },
   nameText: { fontSize: 19, fontWeight: '900', color: SCREEN_THEME.textPrimary, marginBottom: 4 },
+  profileMetaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 7, marginBottom: 4 },
+  profileMetaText: { fontSize: 12, color: SCREEN_THEME.textSecondary, fontWeight: '800' },
+  ratingPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#F7E7F0', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: '#E5C0D5' },
+  ratingText: { fontSize: 12, color: '#7A1E5C', fontWeight: '900' },
   categoryText: { fontSize: 13, color: SCREEN_THEME.terracottaDark, fontWeight: '800', marginBottom: 2 },
   timeText: { fontSize: 12, color: SCREEN_THEME.textMuted },
   card: { backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 24, padding: 18, marginBottom: 14, borderWidth: 1, borderColor: '#E4D0AB' },

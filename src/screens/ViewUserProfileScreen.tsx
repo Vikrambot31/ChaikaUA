@@ -17,6 +17,7 @@ import {
 import { query, ref, get, orderByChild, equalTo } from 'firebase/database';
 import { database } from '../firebase-config';
 import type { JobListing } from '../services/jobService';
+import { getDaysInApp } from '../utils/chaikaLevels';
 
 const UI_TEXT = {
   ua: {
@@ -77,6 +78,15 @@ interface RouteParams {
   userName?: string;
 }
 
+const RTDB_FORBIDDEN_KEY_CHARS = /[.#$[\]/]/g;
+const toSafeRtdbKey = (value: string): string => (value ?? '').replace(RTDB_FORBIDDEN_KEY_CHARS, '_').trim();
+
+const getGenderShortLabel = (gender?: string) => {
+  if (gender === 'male') return 'M';
+  if (gender === 'female') return 'F';
+  return '';
+};
+
 const ViewUserProfileScreen: React.FC = () => {
   const route = useRoute();
   const { userId } = (route.params as RouteParams) || {};
@@ -86,6 +96,10 @@ const ViewUserProfileScreen: React.FC = () => {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [city, setCity] = useState('');
+  const [age, setAge] = useState<number | undefined>();
+  const [gender, setGender] = useState('');
+  const [registeredAt, setRegisteredAt] = useState('');
+  const [profileLikes, setProfileLikes] = useState(0);
   const [loading, setLoading] = useState(true);
   const [jobListing, setJobListing] = useState<JobListing | null>(null);
 
@@ -104,6 +118,9 @@ const ViewUserProfileScreen: React.FC = () => {
           setName(profile.name || '');
           setPhone(profile.phone || '');
           setCity(profile.building || '');
+          setAge(profile.age);
+          setGender(profile.gender || '');
+          setRegisteredAt(profile.registeredAt || '');
         }
       } catch (error) {
         Alert.alert(text.error, text.errorLoadProfile);
@@ -113,6 +130,14 @@ const ViewUserProfileScreen: React.FC = () => {
 
       // Optional section: user services from job_listings.
       // Failures here should not show a global profile error.
+      try {
+        const likesSnap = await get(ref(database, `feed_likes/people/${toSafeRtdbKey(userId)}`));
+        const likesValue = likesSnap.val();
+        setProfileLikes(likesValue && typeof likesValue === 'object' ? Object.keys(likesValue).length : 0);
+      } catch {
+        setProfileLikes(0);
+      }
+
       try {
         const jobRef = query(ref(database, 'job_listings'), orderByChild('userId'), equalTo(userId));
         const jobSnap = await get(jobRef);
@@ -134,6 +159,18 @@ const ViewUserProfileScreen: React.FC = () => {
 
     void loadUserProfile();
   }, [userId, text]);
+
+  const genderLabel = getGenderShortLabel(gender);
+  const ageGenderLabel = [
+    typeof age === 'number' ? String(age) : '',
+    genderLabel,
+  ].filter(Boolean).join(' / ');
+  const daysInApp = getDaysInApp(registeredAt);
+  const profileMeta = [
+    ageGenderLabel,
+    `${daysInApp} days`,
+    `${profileLikes} likes`,
+  ].filter(Boolean).join(' · ');
 
   if (loading) {
     return (
@@ -166,6 +203,8 @@ const ViewUserProfileScreen: React.FC = () => {
           <View style={styles.valueBox}>
             <Text style={styles.valueText}>{name || '—'}</Text>
           </View>
+
+          <Text style={styles.metaText}>{profileMeta}</Text>
 
           <Text style={styles.inputLabel}>{text.phone}</Text>
           <View style={styles.valueBox}>
@@ -279,6 +318,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: SCREEN_THEME.textPrimary,
     fontWeight: '500',
+  },
+  metaText: {
+    marginTop: 5,
+    fontSize: 12,
+    lineHeight: 16,
+    color: SCREEN_THEME.textSecondary,
+    fontWeight: '700',
   },
   extendedSection: {
     marginTop: 12,

@@ -130,14 +130,14 @@ const ChaikaBonusPlusScreen: React.FC = () => {
         <Image source={require('../../assets/WEBP-version/Service.webp')} style={styles.headerImage} resizeMode="cover" />
         <Text style={styles.pageTitle}>{text.headerTitle}</Text>
 
-        <Text style={styles.sectionLabel}>{text.sectionFrequent}</Text>
-        <View style={styles.list}>{[soulPhotosItem, ...text.frequent].map(renderItem)}</View>
+        <Text style={styles.sectionLabel}>{text.sectionMarket}</Text>
+        <View style={styles.list}>{text.market.map(renderItem)}</View>
 
         <Text style={styles.sectionLabel}>{text.sectionCommunity}</Text>
         <View style={styles.list}>{text.community.map(renderItem)}</View>
 
-        <Text style={styles.sectionLabel}>{text.sectionMarket}</Text>
-        <View style={styles.list}>{text.market.map(renderItem)}</View>
+        <Text style={styles.sectionLabel}>{text.sectionFrequent}</Text>
+        <View style={styles.list}>{[soulPhotosItem, ...text.frequent].map(renderItem)}</View>
       </ScrollView>
     </SafeAreaView>
   );

@@ -43,6 +43,16 @@ describe('Firebase rules explicit child-read policy', () => {
     expect(parsed.rules.community_photos.$photoId['.write']).toContain('auth != null');
   });
 
+  it('allows full users list reads only for admin and moderator roles', () => {
+    const parsed = tryParseJson(readProjectFile('firebase.rules.json')) as Record<string, any>;
+    const usersReadRule = parsed.rules.users['.read'];
+
+    expect(usersReadRule).toContain('auth != null');
+    expect(usersReadRule).toContain("role').val() === 'admin'");
+    expect(usersReadRule).toContain("role').val() === 'moderator'");
+    expect(parsed.rules.users.$uid['.read']).toBe('auth != null');
+  });
+
   it('uses auth-only storage access', () => {
     const rules = readProjectFile('storage.rules');
 

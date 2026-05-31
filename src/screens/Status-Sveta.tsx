@@ -33,9 +33,6 @@ import { selectUser } from '../redux/selectors';
 import type { AppDispatch } from '../redux/store';
 import { createPendingModeration } from '../utils/moderation';
 import { showUserError } from '../utils/userFacingErrors';
-import MiniUserAvatar from '../components/MiniUserAvatar';
-import { pickUserAvatarUri } from '../utils/userAvatar';
-import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 
 const RATE_LIMIT_KEY = 'electricity_report_timestamps';
 const MAX_PER_DAY = 2;
@@ -192,25 +189,6 @@ const ElectricityStatusScreen: React.FC = () => {
       .sort((a, b) => getTs(b.createdAt) - getTs(a.createdAt))
       .slice(0, 10);
   }, [todayReports]);
-
-  const bottomFeedReports = useMemo(() => {
-    return [...todayReports]
-      .sort((a, b) => getTs(b.createdAt) - getTs(a.createdAt))
-      .slice(0, 5);
-  }, [todayReports]);
-  const avatarByUserId = useUserAvatarMap(bottomFeedReports.map((item) => item.userId));
-
-  const formatReportDateTime = useCallback((value: Date | string) => {
-    const dt = value instanceof Date ? value : new Date(value);
-    if (!Number.isFinite(dt.getTime())) return '--';
-    const locale = language === 'ru' ? 'ru-RU' : language === 'en' ? 'en-GB' : 'uk-UA';
-    return dt.toLocaleString(locale, {
-      day: '2-digit',
-      month: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  }, [language]);
 
   const handleStreetChange = (street: string) => {
     setSelectedStreet(street);
@@ -456,7 +434,7 @@ const ElectricityStatusScreen: React.FC = () => {
           <TactileCard elevated style={styles.allReportsCard} pressable={false}>
             <View style={styles.reportsHeader}>
               <MaterialCommunityIcons name="format-list-bulleted" size={20} color="#FF9800" />
-              <Text style={styles.cardTitle}>{text.allReports} (10)</Text>
+              <Text style={styles.cardTitle}>{text.allReports} ({latestReports.length})</Text>
             </View>
 
             <FlatList
@@ -498,60 +476,6 @@ const ElectricityStatusScreen: React.FC = () => {
           </TactileCard>
         )}
 
-        {bottomFeedReports.length > 0 && (
-          <TactileCard elevated style={styles.residentFeedCard} pressable={false}>
-            <View style={styles.reportsHeader}>
-              <MaterialCommunityIcons name="account-group-outline" size={20} color={SCREEN_THEME.woodGreenDark} />
-              <Text style={styles.cardTitle}>{text.recentFeed} (5)</Text>
-            </View>
-
-            {bottomFeedReports.map((item) => {
-              const building = BUILDINGS.find((b) => b.id === item.buildingId);
-              const address = building
-                ? getFullAddress(building)
-                : `${selectedStreet || '-'}, ${selectedBuilding?.houseNumber || '-'}`;
-              const isOn = item.status === 'on';
-              const statusColor = isOn ? '#2E7D32' : '#EF8E18';
-              const statusText = isOn ? text.lightOnShort : text.lightOffShort;
-              const avatarUri = (item.userId && avatarByUserId[item.userId]) || pickUserAvatarUri(item);
-
-              return (
-                <View key={`mini-feed-${item.id}`} style={styles.residentItemCard}>
-                  <View style={styles.residentItemMain}>
-                    <View style={styles.residentItemContent}>
-                      <View style={styles.residentTopRow}>
-                        <View style={styles.residentUserRow}>
-                          <MiniUserAvatar uri={avatarUri} name={item.userName || text.resident} size={34} borderRadius={11} backgroundColor="#6A8BA5" />
-                          <View style={styles.residentTextBlock}>
-                            <Text style={styles.residentName}>{item.userName || text.resident}</Text>
-                            <Text style={styles.residentDate}>{formatReportDateTime(item.createdAt)}</Text>
-                          </View>
-                        </View>
-                      </View>
-
-                      <View style={styles.residentMetaRow}>
-                        <MaterialCommunityIcons name="map-marker-outline" size={14} color={SCREEN_THEME.textMuted} />
-                        <Text style={styles.residentMetaText}>{address}</Text>
-                      </View>
-
-                      <View style={styles.residentMetaRow}>
-                        <MaterialCommunityIcons name={isOn ? 'flash' : 'power-plug-off-outline'} size={14} color={statusColor} />
-                        <Text style={[styles.residentMetaText, { color: statusColor, fontWeight: '800' }]}>{statusText}</Text>
-                      </View>
-                    </View>
-                    <View style={styles.residentStatusImageFrame}>
-                      <Image
-                        source={isOn ? require('../../assets/svet-plus3.webp') : require('../../assets/svet-plus4.webp')}
-                        style={styles.reportStatusImage}
-                        resizeMode="cover"
-                      />
-                    </View>
-                  </View>
-                </View>
-              );
-            })}
-          </TactileCard>
-        )}
       </ScrollView>
       <MiniTabBar />
     </SafeAreaView>
@@ -702,86 +626,6 @@ const styles = StyleSheet.create({
   allReportsCard: {
     padding: 16,
     marginBottom: 14,
-  },
-  residentFeedCard: {
-    padding: 12,
-    marginBottom: 12,
-  },
-  residentItemCard: {
-    backgroundColor: SCREEN_THEME.paperStrong,
-    borderRadius: 16,
-    marginBottom: 7,
-    borderWidth: 1,
-    borderColor: '#E4D0AB',
-    overflow: 'hidden',
-  },
-  residentItemMain: {
-    minHeight: 92,
-    flexDirection: 'row',
-    alignItems: 'stretch',
-  },
-  residentItemContent: {
-    flex: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-  },
-  residentTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 5,
-  },
-  residentUserRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  residentTextBlock: {
-    marginLeft: 7,
-    flex: 1,
-  },
-  residentName: {
-    color: SCREEN_THEME.textPrimary,
-    fontWeight: '800',
-    fontSize: 13,
-  },
-  residentDate: {
-    color: SCREEN_THEME.textMuted,
-    fontSize: 11,
-    marginTop: 1,
-    fontWeight: '700',
-  },
-  statusSquare: {
-    width: 23,
-    height: 23,
-    borderRadius: 6,
-    borderWidth: 1.2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 6,
-  },
-  residentMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    marginTop: 1,
-  },
-  residentMetaText: {
-    color: SCREEN_THEME.textSecondary,
-    fontSize: 12,
-    fontWeight: '600',
-    flex: 1,
-  },
-  residentStatusImageFrame: {
-    width: 78,
-    alignSelf: 'stretch',
-    overflow: 'hidden',
-    borderTopLeftRadius: 28,
-    borderBottomLeftRadius: 28,
-    borderTopRightRadius: 15,
-    borderBottomRightRadius: 15,
-    borderLeftWidth: 1,
-    borderLeftColor: '#E4D0AB',
   },
   reportsHeader: {
     flexDirection: 'row',

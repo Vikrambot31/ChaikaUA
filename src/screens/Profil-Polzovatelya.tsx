@@ -562,12 +562,6 @@ const ProfileScreen: React.FC = () => {
             <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('PhotoUploadScreen')} activeOpacity={0.84}>
-            <TactileIcon icon="camera-plus-outline" size={40} iconSize={18} backgroundColor="#7A9B6A" />
-            <Text style={styles.menuLabel}>{text.uploadPhoto}</Text>
-            <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
-          </TouchableOpacity>
-
           <TouchableOpacity
             style={styles.menuItem}
             onPress={() => {
