@@ -73,6 +73,11 @@ const UI = {
     showHidden: 'Показати приховані',
     restore: 'Повернути',
     hide: 'Сховати',
+    clearHistory: 'Очистити всю історію контактів',
+    clearConfirmTitle: 'Очистити історію?',
+    clearConfirmBody: 'Усі запити контактів будуть приховані з цього екрана.',
+    clearConfirmYes: 'Так',
+    clearConfirmNo: 'Ні',
     openSource: 'Відкрити джерело',
     sharedContact: 'Контакт',
     copy: 'Скопіювати',
@@ -115,6 +120,11 @@ const UI = {
     showHidden: 'Показать скрытые',
     restore: 'Вернуть',
     hide: 'Скрыть',
+    clearHistory: 'Очистить всю историю контактов',
+    clearConfirmTitle: 'Очистить историю?',
+    clearConfirmBody: 'Все запросы контактов будут скрыты с этого экрана.',
+    clearConfirmYes: 'Да',
+    clearConfirmNo: 'Нет',
     openSource: 'Открыть источник',
     sharedContact: 'Контакт',
     copy: 'Копировать',
@@ -157,6 +167,11 @@ const UI = {
     showHidden: 'Show hidden',
     restore: 'Restore',
     hide: 'Hide',
+    clearHistory: 'Clear all contact history',
+    clearConfirmTitle: 'Clear history?',
+    clearConfirmBody: 'All contact requests will be hidden from this screen.',
+    clearConfirmYes: 'Yes',
+    clearConfirmNo: 'No',
     openSource: 'Open source',
     sharedContact: 'Contact',
     copy: 'Copy',
@@ -201,6 +216,7 @@ export default function ProfileRequestsScreen() {
   const [incomingAges, setIncomingAges] = useState<Record<string, string>>({});
   const [incomingVotes, setIncomingVotes] = useState<Record<string, number>>({});
   const [seenContacts, setSeenContacts] = useState<Record<string, boolean>>({});
+  const [clearingHistory, setClearingHistory] = useState(false);
 
   const loadIncomingPhones = useCallback(async (incoming: ProfileViewRequest[]) => {
     const uniqueRequesterIds = Array.from(new Set(incoming.map((item) => item.requesterId).filter(Boolean)));
@@ -352,15 +368,67 @@ export default function ProfileRequestsScreen() {
   };
 
   const filteredRequests = requests.filter((item) => {
-    if (activeTab === 'incoming') return true;
     const targetUserId = activeTab === 'outgoing' ? (item.targetUserId ?? '') : (user?.id ?? '');
     const hiddenKey = profilePermissionService.requestKey(targetUserId, item.requesterId);
     const isHidden = Boolean(hiddenKeys[hiddenKey]);
     if (!showHidden && isHidden) return false;
+    if (activeTab === 'incoming') return true;
     if (statusFilter !== 'all' && item.status !== statusFilter) return false;
     if (contextFilter !== 'all' && item.context !== contextFilter) return false;
     return true;
   });
+
+  const clearContactHistory = useCallback(async () => {
+    if (!user?.id || clearingHistory) return;
+    setClearingHistory(true);
+    try {
+      const [incoming, outgoing, history] = await Promise.all([
+        profilePermissionService.getAllRequests(user.id),
+        profilePermissionService.getOutgoingRequests(user.id),
+        profilePermissionService.getAllRequestsWithHistory(user.id),
+      ]);
+
+      const archiveTargets = new Map<string, { targetUserId: string; requesterId: string }>();
+      [...incoming, ...history].forEach((item) => {
+        const targetUserId = user.id;
+        const requesterId = item.requesterId;
+        if (!requesterId) return;
+        archiveTargets.set(profilePermissionService.requestKey(targetUserId, requesterId), { targetUserId, requesterId });
+      });
+      outgoing.forEach((item) => {
+        const targetUserId = item.targetUserId ?? '';
+        if (!targetUserId) return;
+        const requesterId = user.id;
+        archiveTargets.set(profilePermissionService.requestKey(targetUserId, requesterId), { targetUserId, requesterId });
+      });
+
+      await Promise.all(
+        Array.from(archiveTargets.values()).map((entry) =>
+          profilePermissionService.hideRequestForUser(user.id, entry.targetUserId, entry.requesterId),
+        ),
+      );
+      setHiddenKeys((prev) => {
+        const next = { ...prev };
+        archiveTargets.forEach((_, key) => { next[key] = true; });
+        return next;
+      });
+      setRequests((prev) => prev.filter((item) => {
+        const targetUserId = activeTab === 'outgoing' ? (item.targetUserId ?? '') : user.id;
+        return !archiveTargets.has(profilePermissionService.requestKey(targetUserId, item.requesterId));
+      }));
+    } catch {
+      Alert.alert(t.errTitle, t.errBody);
+    } finally {
+      setClearingHistory(false);
+    }
+  }, [activeTab, clearingHistory, t.errBody, t.errTitle, user?.id]);
+
+  const confirmClearContactHistory = useCallback(() => {
+    Alert.alert(t.clearConfirmTitle, t.clearConfirmBody, [
+      { text: t.clearConfirmNo, style: 'cancel' },
+      { text: t.clearConfirmYes, style: 'destructive', onPress: () => { void clearContactHistory(); } },
+    ]);
+  }, [clearContactHistory, t.clearConfirmBody, t.clearConfirmNo, t.clearConfirmTitle, t.clearConfirmYes]);
 
   const handleCall = async (phoneRaw?: string) => {
     await safeCallPhone(phoneRaw, language);
@@ -403,6 +471,20 @@ export default function ProfileRequestsScreen() {
           <Text style={[styles.tabBtnText, activeTab === 'history' && styles.tabBtnTextActive]}>{t.tabHistory}</Text>
         </TouchableOpacity>
       </View>
+
+      <TouchableOpacity
+        style={[styles.clearHistoryBtn, clearingHistory && styles.clearHistoryBtnDisabled]}
+        onPress={confirmClearContactHistory}
+        disabled={clearingHistory}
+        activeOpacity={0.85}
+      >
+        {clearingHistory ? (
+          <ActivityIndicator size="small" color="#A73737" />
+        ) : (
+          <MaterialCommunityIcons name="delete-sweep-outline" size={18} color="#A73737" />
+        )}
+        <Text style={styles.clearHistoryText}>{t.clearHistory}</Text>
+      </TouchableOpacity>
 
       {activeTab !== 'incoming' ? (
         <View style={styles.filtersBlock}>
@@ -671,6 +753,29 @@ const styles = StyleSheet.create({
   },
   tabBtnTextActive: {
     color: '#fff',
+  },
+  clearHistoryBtn: {
+    marginHorizontal: 12,
+    marginTop: 2,
+    marginBottom: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E7B6AE',
+    backgroundColor: '#FFF1EF',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  clearHistoryBtnDisabled: {
+    opacity: 0.65,
+  },
+  clearHistoryText: {
+    color: '#A73737',
+    fontSize: 13,
+    fontWeight: '900',
   },
   filtersBlock: { paddingHorizontal: 12, paddingBottom: 4, gap: 8 },
   filterRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },

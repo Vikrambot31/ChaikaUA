@@ -54,7 +54,7 @@ const UI_TEXT: Record<'ua' | 'ru' | 'en', SectionedItems> = {
     sectionCommunity: 'Сообщество',
     sectionMarket: 'Объявления',
     frequent: [
-      { label: 'Свет и сообщения', desc: 'Что пишут соседи в доме', screen: 'ElectricityStatusScreen', icon: 'lightning-bolt-outline', accent: '#C79C47' },
+      { label: 'Есть ли СВЕТ?', desc: 'Что пишут соседи в доме', screen: 'ElectricityStatusScreen', icon: 'lightning-bolt-outline', accent: '#C79C47' },
       { label: 'Места Чайки', desc: 'Кафе, магазины и сервисы рядом', screen: 'PlacesScreen', icon: 'map-marker-multiple', accent: '#00897B' },
       { label: 'Фото района', desc: 'Галерея фотографий ЖК Чайка', screen: 'FotoRayonaScreen', icon: 'image-plus', accent: '#5C6BC0' },
     ] as BonusItem[],

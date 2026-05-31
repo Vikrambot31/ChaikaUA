@@ -43,6 +43,13 @@ const UI_TEXT = {
     deleteBody: 'Цю дію не можна буде скасувати.',
     deleteSuccess: 'Заявку видалено',
     deleteError: 'Не вдалося видалити заявку',
+    clearHistory: 'Очистити всю історію заявок',
+    clearTitle: 'Очистити історію?',
+    clearBody: 'Усі ваші заявки буде видалено. Цю дію не можна буде скасувати.',
+    clearYes: 'Так',
+    clearNo: 'Ні',
+    clearSuccess: 'Історію заявок очищено',
+    clearError: 'Не вдалося очистити історію заявок',
     moderationInfo: 'Статус заявки',
     cancel: 'Скасувати',
     successTitle: 'Готово',
@@ -66,6 +73,13 @@ const UI_TEXT = {
     deleteBody: 'Это действие нельзя будет отменить.',
     deleteSuccess: 'Заявка удалена',
     deleteError: 'Не удалось удалить заявку',
+    clearHistory: 'Очистить всю историю заявок',
+    clearTitle: 'Очистить историю?',
+    clearBody: 'Все ваши заявки будут удалены. Это действие нельзя будет отменить.',
+    clearYes: 'Да',
+    clearNo: 'Нет',
+    clearSuccess: 'История заявок очищена',
+    clearError: 'Не удалось очистить историю заявок',
     moderationInfo: 'Статус заявки',
     cancel: 'Отмена',
     successTitle: 'Готово',
@@ -89,6 +103,13 @@ const UI_TEXT = {
     deleteBody: 'This action cannot be undone.',
     deleteSuccess: 'Request deleted',
     deleteError: 'Failed to delete request',
+    clearHistory: 'Clear all request history',
+    clearTitle: 'Clear history?',
+    clearBody: 'All your requests will be deleted. This action cannot be undone.',
+    clearYes: 'Yes',
+    clearNo: 'No',
+    clearSuccess: 'Request history cleared',
+    clearError: 'Failed to clear request history',
     moderationInfo: 'Request status',
     cancel: 'Cancel',
     successTitle: 'Done',
@@ -117,6 +138,7 @@ const MyRequestsScreen = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [clearingHistory, setClearingHistory] = useState(false);
 
   const loadRequests = useCallback(async () => {
     const result = await firebaseChatAPI.getMyRequests();
@@ -162,6 +184,39 @@ const MyRequestsScreen = () => {
       },
     ]);
   }, [language, text.cancel, text.delete, text.deleteBody, text.deleteError, text.deleteSuccess, text.deleteTitle, text.successTitle]);
+
+  const clearHistory = useCallback(async () => {
+    if (clearingHistory || requests.length === 0) return;
+    setClearingHistory(true);
+    try {
+      const results = await Promise.all(
+        requests.map((item) => firebaseChatAPI.deleteRequest(item.id)),
+      );
+      const failedIds = new Set(
+        requests
+          .filter((_, index) => !results[index]?.success)
+          .map((item) => item.id),
+      );
+
+      if (failedIds.size > 0) {
+        setRequests((prev) => prev.filter((item) => failedIds.has(item.id)));
+        showUserError(language, 'delete', text.clearError);
+        return;
+      }
+
+      setRequests([]);
+      Alert.alert(text.successTitle, text.clearSuccess);
+    } finally {
+      setClearingHistory(false);
+    }
+  }, [clearingHistory, language, requests, text.clearError, text.clearSuccess, text.successTitle]);
+
+  const confirmClearHistory = useCallback(() => {
+    Alert.alert(text.clearTitle, text.clearBody, [
+      { text: text.clearNo, style: 'cancel' },
+      { text: text.clearYes, style: 'destructive', onPress: () => { void clearHistory(); } },
+    ]);
+  }, [clearHistory, text.clearBody, text.clearNo, text.clearTitle, text.clearYes]);
 
   const getStatusColor = (status: string | undefined) => {
     switch (status) {
@@ -343,6 +398,19 @@ const MyRequestsScreen = () => {
                 <Text style={styles.statsLabel}>{text.statApproved}</Text>
               </View>
             </View>
+            <TouchableOpacity
+              style={[styles.clearHistoryButton, clearingHistory && styles.clearHistoryButtonDisabled]}
+              onPress={confirmClearHistory}
+              disabled={clearingHistory}
+              activeOpacity={0.85}
+            >
+              {clearingHistory ? (
+                <ActivityIndicator size="small" color="#A73737" />
+              ) : (
+                <MaterialCommunityIcons name="delete-sweep-outline" size={18} color="#A73737" />
+              )}
+              <Text style={styles.clearHistoryButtonText}>{text.clearHistory}</Text>
+            </TouchableOpacity>
           </>
         )}
         initialNumToRender={8}
@@ -410,6 +478,27 @@ const styles = StyleSheet.create({
     color: COLORS.gray,
     fontWeight: '700',
     textAlign: 'center',
+  },
+  clearHistoryButton: {
+    marginBottom: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E7B6AE',
+    backgroundColor: '#FFF1EF',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  clearHistoryButtonDisabled: {
+    opacity: 0.65,
+  },
+  clearHistoryButtonText: {
+    color: '#A73737',
+    fontSize: 13,
+    fontWeight: '900',
   },
   centerContainer: {
     flex: 1,
