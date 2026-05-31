@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -12,23 +12,18 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  useWindowDimensions,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationProp, ParamListBase, useNavigation } from '@react-navigation/native';
-import { equalTo, onValue, orderByChild, query, ref } from 'firebase/database';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '../redux/store';
-import AppPhotoImage from '../components/AppPhotoImage';
 import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField';
-import { database } from '../firebase-core';
 import { firebaseChatAPI } from '../firebase-config';
 import { addHelpRequest, syncFromRequests } from '../redux/slices/helpRequestsSlice';
 import { normalizeLanguage } from '../redux/slices/languageSlice';
 import { getRequests } from '../services/api';
 import { SCREEN_THEME } from '../utils/screenTheme';
-import { logClientError } from '../utils/errorLogger';
 import { normalizePersonName, sanitizeStoredText } from '../utils/textUtils';
 import { normalizeUkrainianPhoneStrict, validateName, validatePhone } from '../utils/validators';
 
@@ -41,35 +36,6 @@ type FieldState = {
   tone: FieldTone;
   message: string;
 };
-
-type SoulPhoto = {
-  id: string;
-  uri: string;
-  storagePath: string;
-  createdAt: number;
-  status: 'approved' | 'pending';
-  local?: boolean;
-  uploading?: boolean;
-  progress?: number;
-};
-
-type RawPhoto = {
-  imageUri?: unknown;
-  thumbnailUrl?: unknown;
-  storagePath?: unknown;
-  createdAt?: unknown;
-  uploadedAt?: unknown;
-  status?: unknown;
-  sourceScreen?: unknown;
-  uid?: unknown;
-  userId?: unknown;
-};
-
-const SCREEN_ID = 'RequestFormScreen';
-const STORAGE_PATH = 'community_photos';
-const MAX_ITEMS = 60;
-const NUM_COLUMNS = 3;
-const GRID_GAP = 7;
 
 const HELP_TYPES = [
   { value: 'medicine', label: { ua: 'Медицина', ru: 'Медицина', en: 'Medicine' } },
@@ -296,30 +262,6 @@ const toneColor: Record<FieldTone, string> = {
   warning: '#B7791F',
 };
 
-const clean = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
-
-const timestamp = (value: unknown): number => {
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (typeof value === 'string') {
-    const numeric = Number(value);
-    if (Number.isFinite(numeric)) return numeric;
-    const parsed = Date.parse(value);
-    if (!Number.isNaN(parsed)) return parsed;
-  }
-  return 0;
-};
-
-const clampProgress = (value: unknown): number => {
-  const numeric = typeof value === 'number' && Number.isFinite(value) ? value : 0;
-  return Math.min(100, Math.max(0, Math.round(numeric)));
-};
-
-const limitWords = (value: string, maxWords: number): string => {
-  const words = value.split(/\s+/).filter(Boolean);
-  if (words.length <= maxWords) return value;
-  return words.slice(0, maxWords).join(' ');
-};
-
 const formatPhoneParts = (prefix: string, parts: string[]): string => {
   const filledParts = parts.filter(Boolean);
   return filledParts.length > 0 ? `${prefix} ${filledParts.join(' ')}` : prefix;
@@ -387,53 +329,6 @@ const FieldMessage = ({ state, extra, visible }: { state: FieldState; extra?: st
     </View>
   );
 };
-
-const SoulTile = memo(function SoulTile({
-  item,
-  size,
-  pendingLabel,
-  uploadLabel,
-}: {
-  item: SoulPhoto;
-  size: number;
-  pendingLabel: string;
-  uploadLabel: (p: number) => string;
-}) {
-  const progress = clampProgress(item.progress ?? (item.uploading ? 0 : 100));
-  const pending = item.status === 'pending';
-
-  return (
-    <View style={[styles.tile, pending ? styles.pendingTile : styles.approvedTile, { width: size, height: size }]}>
-      {item.uri ? (
-        <AppPhotoImage
-          uri={item.uri}
-          storagePath={item.storagePath}
-          style={styles.tileImage}
-          resizeMode="cover"
-          debugLabel={`RequestPhoto:${item.id}`}
-          showDebugInfo={false}
-        />
-      ) : (
-        <View style={styles.grayExample} />
-      )}
-
-      {item.uploading ? (
-        <View style={styles.uploadLayer}>
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${Math.max(7, progress)}%` }]} />
-          </View>
-          <Text style={styles.progressText}>{uploadLabel(progress)}</Text>
-        </View>
-      ) : null}
-
-      {pending && !item.uploading ? (
-        <View style={styles.pendingLabel}>
-          <Text style={styles.pendingText}>{pendingLabel}</Text>
-        </View>
-      ) : null}
-    </View>
-  );
-});
 
 const getSubmitFailureMessage = (rawError: unknown, t: (typeof TEXT_BY_LANG)[Lang]): string => {
   const rawMessage = rawError instanceof Error ? rawError.message : String(rawError ?? '');
@@ -505,7 +400,6 @@ const getSubmitFailureMessage = (rawError: unknown, t: (typeof TEXT_BY_LANG)[Lan
 };
 
 const RequestFormScreen: React.FC = () => {
-  const { width } = useWindowDimensions();
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
   const dispatch = useDispatch<AppDispatch>();
   const language = useSelector((state: RootState) => normalizeLanguage(state.language?.current)) as Lang;
@@ -525,11 +419,8 @@ const RequestFormScreen: React.FC = () => {
   });
 
   // Photo section state
-  const [remotePhotos, setRemotePhotos] = useState<SoulPhoto[]>([]);
   const [pickedPhotos, setPickedPhotos] = useState<Record<string, UploadedPhoto>>({});
-  const [photoDescription, setPhotoDescription] = useState('');
-  const [photoAddress, setPhotoAddress] = useState('');
-  const [photoLoading, setPhotoLoading] = useState(true);
+  const [photoResetKey, setPhotoResetKey] = useState(0);
 
   const hasUserId = Boolean(user?.id);
   const t = TEXT_BY_LANG[language] ?? TEXT_BY_LANG.ua;
@@ -572,60 +463,6 @@ const RequestFormScreen: React.FC = () => {
     })).catch(() => undefined);
   }, [description, helpType, name, phone]);
 
-  // Firebase listener for community photos filtered by this screen
-  useEffect(() => {
-    const photosQuery = query(ref(database, 'community_photos'), orderByChild('sourceScreen'), equalTo(SCREEN_ID));
-    const unsubscribe = onValue(
-      photosQuery,
-      (snapshot) => {
-        try {
-          const value = snapshot.val() as unknown;
-          if (!value || typeof value !== 'object' || Array.isArray(value)) {
-            setRemotePhotos([]);
-            setPhotoLoading(false);
-            return;
-          }
-
-          const currentUid = user?.id ?? '';
-          const items = Object.entries(value as Record<string, unknown>)
-            .map<SoulPhoto | null>(([id, raw]) => {
-              if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-              const photo = raw as RawPhoto;
-              const status = clean(photo.status);
-              const owner = clean(photo.uid) || clean(photo.userId);
-              const isApproved = status === 'approved';
-              const isOwnPending = status === 'pending' && Boolean(currentUid) && owner === currentUid;
-              if (!isApproved && !isOwnPending) return null;
-              return {
-                id,
-                uri: clean(photo.thumbnailUrl) || clean(photo.imageUri),
-                storagePath: clean(photo.storagePath),
-                createdAt: timestamp(photo.createdAt) || timestamp(photo.uploadedAt),
-                status: isApproved ? 'approved' : 'pending',
-              };
-            })
-            .filter((item): item is SoulPhoto => item !== null)
-            .sort((a, b) => b.createdAt - a.createdAt || b.id.localeCompare(a.id))
-            .slice(0, MAX_ITEMS);
-
-          setRemotePhotos(items);
-          setPhotoLoading(false);
-        } catch (error) {
-          void logClientError('RequestFormScreen.loadPhotos', error);
-          setRemotePhotos([]);
-          setPhotoLoading(false);
-        }
-      },
-      (error) => {
-        void logClientError('RequestFormScreen.firebase', error);
-        setRemotePhotos([]);
-        setPhotoLoading(false);
-      },
-    );
-
-    return unsubscribe;
-  }, [user?.id]);
-
   const handlePhotosChange = useCallback((photos: UploadedPhoto[]) => {
     setPickedPhotos((current) => {
       const next = { ...current };
@@ -640,42 +477,8 @@ const RequestFormScreen: React.FC = () => {
     });
   }, []);
 
-  const data = useMemo<SoulPhoto[]>(() => {
-    const remotePaths = new Set(remotePhotos.map((photo) => photo.storagePath).filter(Boolean));
-    const local = Object.values(pickedPhotos)
-      .filter((photo) => !photo.storagePath || !remotePaths.has(photo.storagePath))
-      .map<SoulPhoto>((photo) => ({
-        id: photo.photoId,
-        uri: photo.localUri || photo.thumbUri || photo.downloadUrl,
-        storagePath: photo.storagePath,
-        createdAt: Number.MAX_SAFE_INTEGER,
-        status: 'pending',
-        local: true,
-        uploading: photo.status === 'uploading',
-        progress: photo.progress,
-      }));
-
-    return [...local, ...remotePhotos].slice(0, MAX_ITEMS);
-  }, [pickedPhotos, remotePhotos]);
-
-  const pendingCount = data.filter((photo) => photo.status === 'pending').length;
-  const hasUploadedLocal = Object.values(pickedPhotos).some((photo) => photo.status === 'done');
   const photoUploadsInProgress = Object.values(pickedPhotos).some((photo) => photo.status === 'uploading');
   const firstUploadedPhoto = Object.values(pickedPhotos).find((photo) => photo.status === 'done' && (photo.storagePath || photo.downloadUrl));
-
-  const gridPadding = 12;
-  const tileSize = useMemo(
-    () => Math.floor((width - 32 - gridPadding * 2 - GRID_GAP * (NUM_COLUMNS - 1)) / NUM_COLUMNS),
-    [width],
-  );
-
-  const photoRows = useMemo(() => {
-    const rows: SoulPhoto[][] = [];
-    for (let i = 0; i < data.length; i += NUM_COLUMNS) {
-      rows.push(data.slice(i, i + NUM_COLUMNS));
-    }
-    return rows;
-  }, [data]);
 
   const markTouched = (field: FieldKey) => {
     setTouched((current) => (current[field] ? current : { ...current, [field]: true }));
@@ -853,6 +656,8 @@ const RequestFormScreen: React.FC = () => {
         helpType: false,
         description: false,
       });
+      setPickedPhotos({});
+      setPhotoResetKey((k) => k + 1);
       void AsyncStorage.removeItem(REQUEST_FORM_DRAFT_KEY).catch(() => undefined);
     } catch (error) {
       const friendlyError = getSubmitFailureMessage(error, t);
@@ -958,6 +763,19 @@ const RequestFormScreen: React.FC = () => {
             </View>
             <FieldMessage state={fieldStates.description} extra={descriptionExtra} visible={activeIssueKey === 'description'} />
 
+            <Text style={styles.label}>{pt.sectionTitle}</Text>
+            {user ? (
+              <PhotoUploadField
+                key={photoResetKey}
+                uid={user.id}
+                userName={user.name ?? user.email ?? ''}
+                maxPhotos={1}
+                storagePath="requests"
+                onPhotosChange={handlePhotosChange}
+                onBeforePickerOpen={saveDraft}
+              />
+            ) : null}
+
             <TouchableOpacity
               style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
               onPress={submit}
@@ -973,105 +791,6 @@ const RequestFormScreen: React.FC = () => {
                 </>
               )}
             </TouchableOpacity>
-          </View>
-
-          {/* Photo section — same system as community photo screens */}
-          <View style={styles.photoCard}>
-            <Text style={styles.photoSectionTitle}>{pt.sectionTitle}</Text>
-
-            {photoRows.length > 0 ? (
-              photoRows.map((row, rowIndex) => (
-                <View key={rowIndex} style={styles.photoRow}>
-                  {row.map((item) => (
-                    <SoulTile
-                      key={item.id}
-                      item={item}
-                      size={tileSize}
-                      pendingLabel={pt.pending}
-                      uploadLabel={pt.upload}
-                    />
-                  ))}
-                </View>
-              ))
-            ) : (
-              <View style={styles.photoEmpty}>
-                {photoLoading ? (
-                  <ActivityIndicator size="large" color={SCREEN_THEME.terracotta} />
-                ) : (
-                  <>
-                    <MaterialCommunityIcons name="image-outline" size={38} color="#8D735A" />
-                    <Text style={styles.photoEmptyText}>{pt.empty}</Text>
-                  </>
-                )}
-              </View>
-            )}
-
-            <View style={styles.uploadPanel}>
-              <View style={styles.descriptionRow}>
-                <View style={styles.descriptionIcon}>
-                  <MaterialCommunityIcons name="map-marker-outline" size={18} color="#fff" />
-                </View>
-                <View style={styles.descriptionFields}>
-                  <Text style={styles.descriptionTitle}>{pt.descTitle}</Text>
-                  <TextInput
-                    value={photoAddress}
-                    onChangeText={setPhotoAddress}
-                    placeholder={pt.addressPlaceholder}
-                    placeholderTextColor="#9B9183"
-                    style={styles.photoInput}
-                    maxLength={80}
-                  />
-                  <TextInput
-                    value={photoDescription}
-                    onChangeText={(value) => setPhotoDescription(limitWords(value, 5))}
-                    placeholder={pt.descPlaceholder}
-                    placeholderTextColor="#9B9183"
-                    style={styles.photoInput}
-                    maxLength={60}
-                  />
-                </View>
-              </View>
-
-              {user ? (
-                <View style={styles.realPickerWrap}>
-                  <PhotoUploadField
-                    uid={user.id}
-                    userName={user.name ?? user.email ?? ''}
-                    maxPhotos={1}
-                    storagePath={STORAGE_PATH}
-                    onPhotosChange={handlePhotosChange}
-                    onBeforePickerOpen={saveDraft}
-                    hideSelectedPreview
-                    metadata={{
-                      title: pt.sectionTitle,
-                      description: photoDescription.trim(),
-                      sourceScreen: SCREEN_ID,
-                      sourceScreenLabel: pt.sectionTitle,
-                      sourceFeature: 'request_form_photo_upload',
-                      locationLabel: photoAddress.trim(),
-                      locationType: photoAddress.trim() ? 'place' : undefined,
-                    }}
-                  />
-                </View>
-              ) : (
-                <TouchableOpacity
-                  style={styles.loginButton}
-                  onPress={() => navigation.navigate('LoginScreen', {})}
-                  activeOpacity={0.82}
-                >
-                  <MaterialCommunityIcons name="login" size={19} color="#fff" />
-                  <Text style={styles.actionText}>{pt.login}</Text>
-                </TouchableOpacity>
-              )}
-
-              <TouchableOpacity
-                style={[styles.photoSubmitButton, !hasUploadedLocal && styles.photoSubmitButtonDisabled]}
-                disabled
-                activeOpacity={0.86}
-              >
-                <Text style={styles.photoSubmitText}>{hasUploadedLocal || pendingCount > 0 ? pt.sending : pt.send}</Text>
-              </TouchableOpacity>
-            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -1185,165 +904,6 @@ const styles = StyleSheet.create({
   },
   submitButtonDisabled: { opacity: 0.68 },
   submitText: { color: '#FFFFFF', fontWeight: '900', fontSize: 16, textAlign: 'center' },
-  // Photo section
-  photoCard: {
-    borderRadius: 24,
-    padding: 12,
-    backgroundColor: '#FFF8EA',
-    borderWidth: 1,
-    borderColor: '#E4D0AB',
-    gap: 8,
-  },
-  photoSectionTitle: {
-    color: '#453321',
-    fontSize: 18,
-    fontWeight: '900',
-    textAlign: 'center',
-    marginBottom: 6,
-  },
-  photoRow: {
-    flexDirection: 'row',
-    gap: GRID_GAP,
-    marginBottom: GRID_GAP,
-  },
-  tile: {
-    borderRadius: 8,
-    overflow: 'hidden',
-    backgroundColor: '#858584',
-  },
-  approvedTile: {
-    borderWidth: 1,
-    borderColor: '#6F766B',
-  },
-  pendingTile: {
-    borderWidth: 2,
-    borderColor: '#22B14C',
-  },
-  tileImage: { width: '100%', height: '100%' },
-  grayExample: { width: '100%', height: '100%', backgroundColor: '#858584' },
-  uploadLayer: {
-    position: 'absolute',
-    left: 6,
-    right: 6,
-    bottom: 6,
-    padding: 6,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.92)',
-  },
-  progressTrack: {
-    height: 9,
-    borderRadius: 999,
-    overflow: 'hidden',
-    backgroundColor: '#E5E0D2',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 999,
-    backgroundColor: '#22B14C',
-  },
-  progressText: {
-    marginTop: 4,
-    color: '#21A347',
-    fontSize: 12,
-    fontWeight: '900',
-    textAlign: 'center',
-  },
-  pendingLabel: {
-    position: 'absolute',
-    left: 5,
-    right: 5,
-    bottom: 5,
-    minHeight: 24,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.92)',
-  },
-  pendingText: {
-    color: '#77746E',
-    fontSize: 11,
-    fontWeight: '900',
-    textAlign: 'center',
-  },
-  photoEmpty: {
-    minHeight: 120,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-  },
-  photoEmptyText: {
-    color: '#75684F',
-    fontSize: 14,
-    fontWeight: '900',
-    textAlign: 'center',
-  },
-  uploadPanel: {
-    marginTop: 4,
-    gap: 10,
-  },
-  descriptionRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-  },
-  descriptionIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#C97959',
-  },
-  descriptionFields: { flex: 1, gap: 7 },
-  descriptionTitle: {
-    color: '#6D5740',
-    fontSize: 13,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  photoInput: {
-    minHeight: 42,
-    borderRadius: 9,
-    borderWidth: 1,
-    borderColor: '#E0C796',
-    backgroundColor: '#FFF8E9',
-    color: '#453321',
-    fontSize: 14,
-    fontWeight: '800',
-    paddingHorizontal: 11,
-    paddingVertical: 8,
-  },
-  realPickerWrap: {
-    overflow: 'hidden',
-  },
-  loginButton: {
-    minHeight: 52,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#C97959',
-  },
-  actionText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  photoSubmitButton: {
-    minHeight: 52,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#8FA77A',
-  },
-  photoSubmitButtonDisabled: { opacity: 0.66 },
-  photoSubmitText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '900',
-    textAlign: 'center',
-  },
 });
 
 export default RequestFormScreen;

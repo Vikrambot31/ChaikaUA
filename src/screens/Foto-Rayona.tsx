@@ -2,11 +2,9 @@ import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Modal,
   SafeAreaView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
   useWindowDimensions,
@@ -14,562 +12,488 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { RootStackParamList } from '../navigation/RootNavigator';
-import { equalTo, limitToLast, onValue, orderByChild, query, ref } from 'firebase/database';
+import { equalTo, onValue, orderByChild, query, ref } from 'firebase/database';
 import { useSelector } from 'react-redux';
 
 import AppPhotoImage from '../components/AppPhotoImage';
-import FeedLikeButton from '../components/FeedLikeButton';
 import MiniTabBar from '../components/MiniTabBar';
 import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField';
 import { database } from '../firebase-core';
-import { RootState } from '../redux/store';
+import type { RootStackParamList } from '../navigation/RootNavigator';
+import type { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { logClientError } from '../utils/errorLogger';
 
-const MAX_PHOTOS = 50;
+const SCREEN_ID = 'FotoRayonaScreen';
+const STORAGE_PATH = 'community_photos';
+const MAX_ITEMS = 60;
 const NUM_COLUMNS = 3;
-const GRID_GAP = 3;
-const GALLERY_STORAGE_PATH = 'community_photos';
+const GRID_GAP = 7;
 
 type Lang = 'ua' | 'ru' | 'en';
 
 const UI_TEXT = {
   ua: {
     title: 'Фото району',
-    pendingStatus: 'на модерації',
-    uploadProgress: (p: number) => `завантаження ${p}%`,
-    descTitle: 'Опис фото',
-    descPlaceholder: 'До 5 слів про місце',
-    addressPlaceholder: 'Адреса місця',
-    save: 'Зберегти',
-    cancel: 'Скасувати',
-    loginToUpload: 'Увійдіть щоб додати фото',
-    emptyTitle: 'Поки немає фотографій',
-    emptyText: "Додайте перше фото. Воно з'явиться після схвалення.",
-    photoCounter: (c: number, m: number) => `Фото: ${c} / ${m}`,
+    approvedNote: 'Схвалені модератором фото',
+    pending: 'на модерації',
+    send: 'Відправити на модерацію',
+    sending: 'Фото вже на модерації',
+    upload: (p: number) => `завантаження ${p}%`,
+    login: 'Увійдіть, щоб додати фото',
+    empty: 'Поки немає фото району',
   },
   ru: {
     title: 'Фото района',
-    pendingStatus: 'на модерации',
-    uploadProgress: (p: number) => `загрузка ${p}%`,
-    descTitle: 'Описание фото',
-    descPlaceholder: 'До 5 слов о месте',
-    addressPlaceholder: 'Адрес места',
-    save: 'Сохранить',
-    cancel: 'Отмена',
-    loginToUpload: 'Войдите чтобы добавить фото',
-    emptyTitle: 'Пока нет фотографий',
-    emptyText: 'Добавьте первое фото. Оно появится после одобрения.',
-    photoCounter: (c: number, m: number) => `Фото: ${c} / ${m}`,
+    approvedNote: 'Одобренные модератором фото',
+    pending: 'на модерации',
+    send: 'Отправить на модерацию',
+    sending: 'Фото уже на модерации',
+    upload: (p: number) => `загрузка ${p}%`,
+    login: 'Войдите, чтобы добавить фото',
+    empty: 'Пока нет фото района',
   },
   en: {
-    title: 'District photos',
-    pendingStatus: 'in moderation',
-    uploadProgress: (p: number) => `uploading ${p}%`,
-    descTitle: 'Photo description',
-    descPlaceholder: 'Up to 5 words about the place',
-    addressPlaceholder: 'Place address',
-    save: 'Save',
-    cancel: 'Cancel',
-    loginToUpload: 'Sign in to add a photo',
-    emptyTitle: 'No photos yet',
-    emptyText: 'Add the first photo. It will appear after approval.',
-    photoCounter: (c: number, m: number) => `Photos: ${c} / ${m}`,
+    title: 'District Photos',
+    approvedNote: 'Photos approved by moderators',
+    pending: 'in moderation',
+    send: 'Submit for moderation',
+    sending: 'Photo is in moderation',
+    upload: (p: number) => `uploading ${p}%`,
+    login: 'Sign in to add a photo',
+    empty: 'No district photos yet',
   },
 } as const;
 
-type GalleryPhoto = {
+type SoulPhoto = {
   id: string;
   uri: string;
   storagePath: string;
   createdAt: number;
-  // Local (just-picked) photo state — drives the inline overlay
-  pending?: boolean;
+  status: 'approved' | 'pending';
+  local?: boolean;
   uploading?: boolean;
   progress?: number;
 };
 
-type RawCommunityPhoto = {
+type RawPhoto = {
   imageUri?: unknown;
+  thumbnailUrl?: unknown;
   storagePath?: unknown;
   createdAt?: unknown;
   uploadedAt?: unknown;
   status?: unknown;
+  sourceScreen?: unknown;
+  uid?: unknown;
+  userId?: unknown;
 };
 
-const toClean = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
+const clean = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 
-const toTimestamp = (value: unknown): number => {
+const timestamp = (value: unknown): number => {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   if (typeof value === 'string') {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed)) return parsed;
-    const date = Date.parse(value);
-    if (!Number.isNaN(date)) return date;
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) return numeric;
+    const parsed = Date.parse(value);
+    if (!Number.isNaN(parsed)) return parsed;
   }
   return 0;
 };
 
-// ─── Photo tile (approved OR local pending) ──────────────────────────────────
+const clampProgress = (value: unknown): number => {
+  const numeric = typeof value === 'number' && Number.isFinite(value) ? value : 0;
+  return Math.min(100, Math.max(0, Math.round(numeric)));
+};
 
-const GalleryPhotoItem = memo(function GalleryPhotoItem({
+const SoulTile = memo(function SoulTile({
   item,
   size,
-  currentUserId,
   pendingLabel,
-  uploadProgressLabel,
-  onPressDescription,
+  uploadLabel,
 }: {
-  item: GalleryPhoto;
+  item: SoulPhoto;
   size: number;
-  currentUserId?: string;
   pendingLabel: string;
-  uploadProgressLabel: (p: number) => string;
-  onPressDescription: (id: string) => void;
+  uploadLabel: (p: number) => string;
 }) {
-  const isLocal = Boolean(item.pending);
-  const progress = Math.min(100, Math.max(0, Math.round(item.progress ?? (item.uploading ? 0 : 100))));
+  const progress = clampProgress(item.progress ?? (item.uploading ? 0 : 100));
+  const pending = item.status === 'pending';
 
   return (
-    <View style={[styles.photoCell, isLocal && styles.localCell, { width: size, height: size }]}>
+    <View style={[styles.tile, pending ? styles.pendingTile : styles.approvedTile, { width: size, height: size }]}>
       {item.uri ? (
         <AppPhotoImage
           uri={item.uri}
           storagePath={item.storagePath}
-          style={styles.photo}
+          style={styles.tileImage}
           resizeMode="cover"
-          debugLabel={`DistrictGallery:${item.id}`}
+          debugLabel={`DistrictPhoto:${item.id}`}
           showDebugInfo={false}
         />
       ) : (
-        <View style={styles.photoFallback} />
+        <View style={styles.grayExample} />
       )}
 
-      {/* Uploading: progress bar overlay */}
       {item.uploading ? (
-        <View style={styles.progressOverlay}>
+        <View style={styles.uploadLayer}>
           <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${Math.max(6, progress)}%` }]} />
+            <View style={[styles.progressFill, { width: `${Math.max(7, progress)}%` }]} />
           </View>
-          <Text style={styles.progressText}>{uploadProgressLabel(progress)}</Text>
+          <Text style={styles.progressText}>{uploadLabel(progress)}</Text>
         </View>
       ) : null}
 
-      {/* Done but pending moderation: badge + description button */}
-      {isLocal && !item.uploading ? (
-        <>
-          <View style={styles.pendingBadge}>
-            <Text style={styles.pendingBadgeText}>{pendingLabel}</Text>
-          </View>
-          <TouchableOpacity
-            style={styles.descBtn}
-            onPress={() => onPressDescription(item.id)}
-            activeOpacity={0.82}
-          >
-            <MaterialCommunityIcons name="pencil-outline" size={14} color="#fff" />
-          </TouchableOpacity>
-        </>
-      ) : null}
-
-      {/* Approved photos: like button */}
-      {!isLocal ? (
-        <FeedLikeButton
-          currentUserId={currentUserId}
-          likePath="feed_likes/district_photos"
-          likeId={item.id}
-          style={styles.photoLikeButton}
-        />
+      {pending && !item.uploading ? (
+        <View style={styles.pendingLabel}>
+          <Text style={styles.pendingText}>{pendingLabel}</Text>
+        </View>
       ) : null}
     </View>
   );
 });
 
-// ─── Screen ──────────────────────────────────────────────────────────────────
-
 export default function FotoRayonaScreen() {
   const { width } = useWindowDimensions();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const user = useSelector((state: RootState) => state.auth.user);
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
-  const text = UI_TEXT[language];
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const text = UI_TEXT[language] ?? UI_TEXT.ua;
 
-  const [remotePhotos, setRemotePhotos] = useState<GalleryPhoto[]>([]);
+  const [remotePhotos, setRemotePhotos] = useState<SoulPhoto[]>([]);
+  const [pickedPhotos, setPickedPhotos] = useState<Record<string, UploadedPhoto>>({});
   const [loading, setLoading] = useState(true);
-  // Just-picked photos kept by photoId — accumulate, never drop on empty callback
-  const [localById, setLocalById] = useState<Record<string, UploadedPhoto>>({});
 
-  // Description modal
-  const [descVisible, setDescVisible] = useState(false);
-  const [descText, setDescText] = useState('');
-  const [descAddress, setDescAddress] = useState('');
-
-  // Firebase: approved photos
   useEffect(() => {
-    const photosRef = query(
-      ref(database, 'community_photos'),
-      orderByChild('status'),
-      equalTo('approved'),
-      limitToLast(MAX_PHOTOS),
-    );
+    const photosQuery = query(ref(database, 'community_photos'), orderByChild('sourceScreen'), equalTo(SCREEN_ID));
     const unsubscribe = onValue(
-      photosRef,
+      photosQuery,
       (snapshot) => {
         try {
-          const raw = snapshot.val() as unknown;
-          if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+          const value = snapshot.val() as unknown;
+          if (!value || typeof value !== 'object' || Array.isArray(value)) {
             setRemotePhotos([]);
             setLoading(false);
             return;
           }
-          const photos = Object.entries(raw as Record<string, unknown>)
-            .map<GalleryPhoto | null>(([id, value]) => {
-              if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
-              try {
-                const photo = value as RawCommunityPhoto;
-                return {
-                  id,
-                  uri: toClean(photo.imageUri),
-                  storagePath: toClean(photo.storagePath),
-                  createdAt: toTimestamp(photo.createdAt) || toTimestamp(photo.uploadedAt),
-                };
-              } catch {
-                return null;
-              }
+
+          const currentUid = user?.id ?? '';
+          const items = Object.entries(value as Record<string, unknown>)
+            .map<SoulPhoto | null>(([id, raw]) => {
+              if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+              const photo = raw as RawPhoto;
+              const status = clean(photo.status);
+              const owner = clean(photo.uid) || clean(photo.userId);
+              const isApproved = status === 'approved';
+              const isOwnPending = status === 'pending' && Boolean(currentUid) && owner === currentUid;
+              if (!isApproved && !isOwnPending) return null;
+              return {
+                id,
+                uri: clean(photo.thumbnailUrl) || clean(photo.imageUri),
+                storagePath: clean(photo.storagePath),
+                createdAt: timestamp(photo.createdAt) || timestamp(photo.uploadedAt),
+                status: isApproved ? 'approved' : 'pending',
+              };
             })
-            .filter((p): p is GalleryPhoto => p !== null)
-            .filter((p) => (p.uri || p.storagePath) && p.storagePath?.startsWith(`${GALLERY_STORAGE_PATH}/`))
+            .filter((item): item is SoulPhoto => item !== null)
             .sort((a, b) => b.createdAt - a.createdAt || b.id.localeCompare(a.id))
-            .slice(0, MAX_PHOTOS);
-          setRemotePhotos(photos);
+            .slice(0, MAX_ITEMS);
+
+          setRemotePhotos(items);
           setLoading(false);
         } catch (error) {
-          void logClientError('FotoRayona.loadPhotos', error);
+          void logClientError('FotoRayonaScreen.load', error);
           setRemotePhotos([]);
           setLoading(false);
         }
       },
       (error) => {
-        void logClientError('FotoRayona.firebase', error);
+        void logClientError('FotoRayonaScreen.firebase', error);
         setRemotePhotos([]);
         setLoading(false);
       },
     );
-    return unsubscribe;
-  }, []);
 
-  // Accumulate picked photos by id so a tile is shown the instant it is picked
-  // and never vanishes while its upload progresses.
+    return unsubscribe;
+  }, [user?.id]);
+
   const handlePhotosChange = useCallback((photos: UploadedPhoto[]) => {
-    setLocalById((current) => {
+    setPickedPhotos((current) => {
       const next = { ...current };
-      for (const p of photos) {
-        if (p.status === 'error') {
-          delete next[p.photoId];
+      for (const photo of photos) {
+        if (photo.status === 'error') {
+          delete next[photo.photoId];
         } else {
-          next[p.photoId] = p;
+          next[photo.photoId] = photo;
         }
       }
       return next;
     });
   }, []);
 
-  const handleDescWordLimit = useCallback((val: string) => {
-    const words = val.split(/\s+/).filter(Boolean);
-    setDescText(words.length <= 5 ? val : words.slice(0, 5).join(' '));
-  }, []);
-
-  const openDescription = useCallback((id: string) => {
-    void id;
-    setDescVisible(true);
-  }, []);
-
-  // Merge local pending photos (first) with approved photos, deduped by storagePath.
-  const data = useMemo<GalleryPhoto[]>(() => {
-    const approvedPaths = new Set(remotePhotos.map((p) => p.storagePath).filter(Boolean));
-    const localTiles = Object.values(localById)
-      // Once approved (same storagePath shows up in the grid) drop the local copy
-      .filter((p) => !p.storagePath || !approvedPaths.has(p.storagePath))
-      .map<GalleryPhoto>((p) => ({
-        id: p.photoId,
-        uri: p.localUri || p.thumbUri || p.downloadUrl || '',
-        storagePath: p.storagePath || '',
+  const data = useMemo<SoulPhoto[]>(() => {
+    const remotePaths = new Set(remotePhotos.map((photo) => photo.storagePath).filter(Boolean));
+    const local = Object.values(pickedPhotos)
+      .filter((photo) => !photo.storagePath || !remotePaths.has(photo.storagePath))
+      .map<SoulPhoto>((photo) => ({
+        id: photo.photoId,
+        uri: photo.localUri || photo.thumbUri || photo.downloadUrl,
+        storagePath: photo.storagePath,
         createdAt: Number.MAX_SAFE_INTEGER,
-        pending: true,
-        uploading: p.status === 'uploading',
-        progress: p.progress,
+        status: 'pending',
+        local: true,
+        uploading: photo.status === 'uploading',
+        progress: photo.progress,
       }));
-    return [...localTiles, ...remotePhotos].slice(0, MAX_PHOTOS);
-  }, [localById, remotePhotos]);
 
-  const gridPadding = 10;
-  const photoSize = useMemo(
+    return [...local, ...remotePhotos].slice(0, MAX_ITEMS);
+  }, [pickedPhotos, remotePhotos]);
+
+  const pendingCount = data.filter((photo) => photo.status === 'pending').length;
+  const hasUploadedLocal = Object.values(pickedPhotos).some((photo) => photo.status === 'done');
+
+  const gridPadding = 12;
+  const tileSize = useMemo(
     () => Math.floor((width - gridPadding * 2 - GRID_GAP * (NUM_COLUMNS - 1)) / NUM_COLUMNS),
     [width],
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: GalleryPhoto }) => (
-      <GalleryPhotoItem
-        item={item}
-        size={photoSize}
-        currentUserId={user?.id}
-        pendingLabel={text.pendingStatus}
-        uploadProgressLabel={text.uploadProgress}
-        onPressDescription={openDescription}
-      />
+    ({ item }: { item: SoulPhoto }) => (
+      <SoulTile item={item} size={tileSize} pendingLabel={text.pending} uploadLabel={text.upload} />
     ),
-    [openDescription, photoSize, text.pendingStatus, text.uploadProgress, user?.id],
+    [text.pending, text.upload, tileSize],
   );
 
-  const header = useMemo(
-    () => (
-      <View style={styles.headerWrap}>
-        <Text style={styles.headerTitle}>{text.title}</Text>
-        {remotePhotos.length > 0 && (
-          <Text style={styles.photoCounter}>{text.photoCounter(remotePhotos.length, MAX_PHOTOS)}</Text>
-        )}
-      </View>
-    ),
-    [remotePhotos.length, text],
+  const header = (
+    <View style={styles.header}>
+      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} activeOpacity={0.78}>
+        <MaterialCommunityIcons name="arrow-left" size={22} color={SCREEN_THEME.textPrimary} />
+      </TouchableOpacity>
+      <Text style={styles.title}>{text.title}</Text>
+      <Text style={styles.subtitle}>{text.approvedNote}</Text>
+    </View>
   );
 
-  const footer = useMemo(
-    () => (
-      <View style={styles.footerWrap}>
-        {user ? (
+  const uploadPanel = (
+    <View style={styles.uploadPanel}>
+      {user ? (
+        <View style={styles.realPickerWrap}>
           <PhotoUploadField
             uid={user.id}
             userName={user.name ?? user.email ?? ''}
-            maxPhotos={3}
-            storagePath={GALLERY_STORAGE_PATH}
+            maxPhotos={1}
+            storagePath={STORAGE_PATH}
             onPhotosChange={handlePhotosChange}
             hideSelectedPreview
             metadata={{
-              sourceScreen: 'FotoRayonaScreen',
-              sourceFeature: 'district_gallery_quick_upload',
+              title: text.title,
+              sourceScreen: SCREEN_ID,
+              sourceScreenLabel: text.title,
+              sourceFeature: 'district_photos_upload',
             }}
           />
-        ) : (
-          <TouchableOpacity
-            style={styles.loginBtn}
-            onPress={() => navigation.navigate('LoginScreen', {})}
-            activeOpacity={0.82}
-          >
-            <MaterialCommunityIcons name="login" size={16} color="#8C6A46" />
-            <Text style={styles.loginBtnText}>{text.loginToUpload}</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    ),
-    [handlePhotosChange, navigation, text.loginToUpload, user],
+        </View>
+      ) : (
+        <TouchableOpacity
+          style={styles.loginButton}
+          onPress={() => navigation.navigate('LoginScreen', {})}
+          activeOpacity={0.82}
+        >
+          <MaterialCommunityIcons name="login" size={19} color="#fff" />
+          <Text style={styles.actionText}>{text.login}</Text>
+        </TouchableOpacity>
+      )}
+
+      <TouchableOpacity
+        style={[styles.submitButton, !hasUploadedLocal && styles.submitButtonDisabled]}
+        disabled
+        activeOpacity={0.86}
+      >
+        <Text style={styles.submitText}>{hasUploadedLocal || pendingCount > 0 ? text.sending : text.send}</Text>
+      </TouchableOpacity>
+    </View>
   );
 
-  const empty = useMemo(
-    () => (
-      <View style={styles.emptyState}>
-        {loading ? (
-          <ActivityIndicator color={SCREEN_THEME.terracotta} size="large" />
-        ) : (
-          <>
-            <MaterialCommunityIcons name="image-plus" size={30} color="#8C6A46" />
-            <Text style={styles.emptyTitle}>{text.emptyTitle}</Text>
-            <Text style={styles.emptyText}>{text.emptyText}</Text>
-          </>
-        )}
-      </View>
-    ),
-    [loading, text],
+  const empty = (
+    <View style={styles.empty}>
+      {loading ? (
+        <ActivityIndicator size="large" color={SCREEN_THEME.terracotta} />
+      ) : (
+        <>
+          <MaterialCommunityIcons name="image-outline" size={38} color="#8D735A" />
+          <Text style={styles.emptyText}>{text.empty}</Text>
+        </>
+      )}
+    </View>
   );
 
   return (
     <SafeAreaView style={styles.container}>
       <FlatList
+        style={styles.photoList}
         data={data}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         numColumns={NUM_COLUMNS}
         ListHeaderComponent={header}
-        ListFooterComponent={footer}
         ListEmptyComponent={empty}
         contentContainerStyle={styles.content}
-        columnWrapperStyle={styles.columnWrapper}
+        columnWrapperStyle={styles.row}
         showsVerticalScrollIndicator={false}
-        removeClippedSubviews
       />
-
-      {/* Description modal */}
-      <Modal
-        visible={descVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setDescVisible(false)}
-      >
-        <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setDescVisible(false)}>
-          <TouchableOpacity style={styles.modalCard} activeOpacity={1} onPress={() => {}}>
-            <Text style={styles.modalTitle}>{text.descTitle}</Text>
-            <TextInput
-              style={styles.modalInput}
-              value={descText}
-              onChangeText={handleDescWordLimit}
-              placeholder={text.descPlaceholder}
-              placeholderTextColor={SCREEN_THEME.textMuted}
-              maxLength={60}
-            />
-            <TextInput
-              style={styles.modalInput}
-              value={descAddress}
-              onChangeText={setDescAddress}
-              placeholder={text.addressPlaceholder}
-              placeholderTextColor={SCREEN_THEME.textMuted}
-              maxLength={100}
-            />
-            <View style={styles.modalBtns}>
-              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setDescVisible(false)} activeOpacity={0.82}>
-                <Text style={styles.modalCancelText}>{text.cancel}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalSaveBtn} onPress={() => setDescVisible(false)} activeOpacity={0.82}>
-                <Text style={styles.modalSaveText}>{text.save}</Text>
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
-
+      {uploadPanel}
       <MiniTabBar />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: SCREEN_THEME.appBg },
-  content: { paddingHorizontal: 10, paddingBottom: 28 },
-
-  // Header
-  headerWrap: { paddingTop: 14, paddingBottom: 8 },
-  headerTitle: { color: SCREEN_THEME.textPrimary, fontSize: 26, fontWeight: '900' },
-  photoCounter: { marginTop: 4, color: SCREEN_THEME.textSecondary, fontSize: 12, fontWeight: '700' },
-
-  // Grid
-  columnWrapper: { gap: GRID_GAP, marginBottom: GRID_GAP },
-  photoCell: { backgroundColor: '#F0E8D8', overflow: 'hidden' },
-  localCell: { borderWidth: 2, borderColor: '#22B14C' },
-  photo: { width: '100%', height: '100%' },
-  photoFallback: { width: '100%', height: '100%', backgroundColor: '#858584' },
-  photoLikeButton: {
+  container: { flex: 1, backgroundColor: '#F6E9C9' },
+  photoList: { flex: 1 },
+  content: { paddingHorizontal: 12, paddingBottom: 14 },
+  header: {
+    paddingTop: 10,
+    paddingBottom: 12,
+    alignItems: 'center',
+  },
+  backButton: {
     position: 'absolute',
+    top: 8,
+    left: 0,
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#D8BF8B',
+    backgroundColor: '#FFF8E9',
+  },
+  title: {
+    color: '#453321',
+    fontSize: 34,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  subtitle: {
+    marginTop: 4,
+    color: '#75684F',
+    fontSize: 12,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  row: { gap: GRID_GAP, marginBottom: GRID_GAP },
+  tile: {
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: '#858584',
+  },
+  approvedTile: {
+    borderWidth: 1,
+    borderColor: '#6F766B',
+  },
+  pendingTile: {
+    borderWidth: 2,
+    borderColor: '#22B14C',
+  },
+  tileImage: { width: '100%', height: '100%' },
+  grayExample: { width: '100%', height: '100%', backgroundColor: '#858584' },
+  uploadLayer: {
+    position: 'absolute',
+    left: 6,
     right: 6,
     bottom: 6,
-    minWidth: 42,
-    minHeight: 28,
-    borderRadius: 14,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    backgroundColor: 'rgba(122, 30, 92, 0.92)',
-  },
-
-  // Uploading overlay
-  progressOverlay: {
-    position: 'absolute',
-    left: 5,
-    right: 5,
-    bottom: 5,
-    borderRadius: 9,
-    paddingHorizontal: 6,
-    paddingVertical: 5,
+    padding: 6,
+    borderRadius: 8,
     backgroundColor: 'rgba(255,255,255,0.92)',
   },
   progressTrack: {
-    height: 7,
+    height: 9,
     borderRadius: 999,
     overflow: 'hidden',
-    backgroundColor: 'rgba(34,177,76,0.18)',
+    backgroundColor: '#E5E0D2',
   },
-  progressFill: { height: '100%', borderRadius: 999, backgroundColor: '#22B14C' },
-  progressText: { marginTop: 3, color: '#22A044', fontSize: 10, fontWeight: '900', textAlign: 'center' },
-
-  // Pending moderation badge
-  pendingBadge: {
+  progressFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: '#22B14C',
+  },
+  progressText: {
+    marginTop: 4,
+    color: '#21A347',
+    fontSize: 12,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  pendingLabel: {
     position: 'absolute',
     left: 5,
     right: 5,
     bottom: 5,
-    minHeight: 20,
+    minHeight: 24,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 4,
-    backgroundColor: 'rgba(255,255,255,0.9)',
+    backgroundColor: 'rgba(255,255,255,0.92)',
   },
-  pendingBadgeText: { color: '#6B6B6B', fontSize: 9, fontWeight: '900', textAlign: 'center' },
-  descBtn: {
-    position: 'absolute',
-    top: 5,
-    right: 5,
-    width: 28,
-    height: 28,
-    borderRadius: 9,
-    backgroundColor: SCREEN_THEME.terracotta,
-    alignItems: 'center',
-    justifyContent: 'center',
+  pendingText: {
+    color: '#77746E',
+    fontSize: 11,
+    fontWeight: '900',
+    textAlign: 'center',
   },
-
-  // Footer
-  footerWrap: { paddingTop: 10 },
-  loginBtn: {
+  uploadPanel: {
+    flexShrink: 0,
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 10,
+    gap: 10,
+    borderTopWidth: 2,
+    borderTopColor: '#D8BF8B',
+    backgroundColor: '#F6E9C9',
+  },
+  realPickerWrap: {
+    overflow: 'hidden',
+  },
+  loginButton: {
+    minHeight: 52,
+    borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E4D0AB',
-    backgroundColor: '#FAF4EC',
-    alignSelf: 'flex-start',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#C97959',
   },
-  loginBtnText: { color: '#8C6A46', fontSize: 13, fontWeight: '600' },
-
-  // Empty
-  emptyState: {
-    minHeight: 180,
+  actionText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  submitButton: {
+    minHeight: 52,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 24,
+    backgroundColor: '#8FA77A',
+  },
+  submitButtonDisabled: { opacity: 0.66 },
+  submitText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  empty: {
+    minHeight: 230,
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 10,
   },
-  emptyTitle: { color: SCREEN_THEME.textPrimary, fontSize: 18, fontWeight: '900' },
-  emptyText: { color: SCREEN_THEME.textSecondary, textAlign: 'center', lineHeight: 19 },
-
-  // Description modal
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalCard: {
-    backgroundColor: '#FAF4EC',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    gap: 12,
+  emptyText: {
+    color: '#75684F',
+    fontSize: 16,
+    fontWeight: '900',
+    textAlign: 'center',
   },
-  modalTitle: { color: SCREEN_THEME.textPrimary, fontSize: 17, fontWeight: '900' },
-  modalInput: {
-    backgroundColor: '#FFFDF6',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E7D6B3',
-    color: SCREEN_THEME.textPrimary,
-    fontSize: 15,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  modalBtns: { flexDirection: 'row', gap: 10, justifyContent: 'flex-end' },
-  modalCancelBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#E4D0AB',
-  },
-  modalCancelText: { color: SCREEN_THEME.textSecondary, fontSize: 14, fontWeight: '700' },
-  modalSaveBtn: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 10, backgroundColor: SCREEN_THEME.terracotta },
-  modalSaveText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 });
