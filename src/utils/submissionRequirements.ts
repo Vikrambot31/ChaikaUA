@@ -48,10 +48,24 @@ const normalizeLanguage = (language: string | undefined): AppLanguage => {
 export const getRequiredPhotoLabel = (language: string | undefined): string =>
   TEXT[normalizeLanguage(language)].photoLabel;
 
+export const REQUEST_PHOTO_STORAGE_PATH_RE = /^requests\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp|heic|heif)$/i;
+
 // Requires a real Firebase download URL — not a local file path.
 // storagePath alone is not sufficient because other users cannot access it.
 export const getDonePhotos = (photos: UploadedPhoto[]): UploadedPhoto[] =>
   photos.filter((photo) => photo.status === 'done' && Boolean(photo.downloadUrl) && /^https?:\/\//i.test(photo.downloadUrl));
+
+export const hasPhotoUploadInProgress = (photos: UploadedPhoto[]): boolean =>
+  photos.some((photo) => photo.status === 'uploading');
+
+export const getFirstDoneRequestPhoto = (photos: UploadedPhoto[]): { photoUri: string; photoStoragePath: string } | null => {
+  const photo = getDonePhotos(photos).find((item) => REQUEST_PHOTO_STORAGE_PATH_RE.test(item.storagePath));
+  if (!photo) return null;
+  return {
+    photoUri: photo.downloadUrl,
+    photoStoragePath: photo.storagePath,
+  };
+};
 
 export const validateSubmissionRequirements = ({
   language,

@@ -18,13 +18,11 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationProp, ParamListBase, useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../redux/store';
-import AppPhotoImage from '../components/AppPhotoImage';
-import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField';
+import RequestPhotoUploadField, { UploadedPhoto } from '../components/RequestPhotoUploadField';
 import { firebaseChatAPI } from '../firebase-config';
-import { UploadQueue } from '../photo-module/UploadQueue';
 import { normalizeLanguage } from '../redux/slices/languageSlice';
 import { SCREEN_THEME } from '../utils/screenTheme';
-import { getDonePhotos, validateSubmissionRequirements } from '../utils/submissionRequirements';
+import { getFirstDoneRequestPhoto, hasPhotoUploadInProgress, validateSubmissionRequirements } from '../utils/submissionRequirements';
 import { normalizePersonName, sanitizeStoredText } from '../utils/textUtils';
 import { normalizeUkrainianPhoneStrict, validateName, validatePhone } from '../utils/validators';
 
@@ -50,7 +48,6 @@ const HELP_TYPES = [
 
 const MAX_DESCRIPTION_LENGTH = 280;
 const REQUEST_FORM_DRAFT_KEY = '@chaika:request-form-draft:v1';
-const REQUEST_PHOTO_STORAGE_PATH_RE = /^requests\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp|heic|heif)$/i;
 
 const PHOTO_UI_TEXT = {
   ua: {
@@ -420,7 +417,7 @@ const RequestFormScreen: React.FC = () => {
   });
 
   // Photo section state
-  const [pickedPhotos, setPickedPhotos] = useState<Record<string, UploadedPhoto>>({});
+  const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
   const [photoResetKey, setPhotoResetKey] = useState(0);
 
   const hasUserId = Boolean(user?.id);
@@ -464,26 +461,7 @@ const RequestFormScreen: React.FC = () => {
     })).catch(() => undefined);
   }, [description, helpType, name, phone]);
 
-  const handlePhotosChange = useCallback((photos: UploadedPhoto[]) => {
-    setPickedPhotos(Object.fromEntries(
-      photos
-        .filter((photo) => photo.status !== 'error')
-        .map((photo) => [photo.photoId, photo]),
-    ));
-  }, []);
-
-  const removePickedPhoto = useCallback((photoId: string) => {
-    setPickedPhotos((current) => {
-      const next = { ...current };
-      delete next[photoId];
-      return next;
-    });
-    setPhotoResetKey((k) => k + 1);
-    void UploadQueue.remove(photoId);
-  }, []);
-
-  const pickedPhotoList = Object.values(pickedPhotos);
-  const photoUploadsInProgress = pickedPhotoList.some((photo) => photo.status === 'uploading');
+  const photoUploadsInProgress = hasPhotoUploadInProgress(formPhotos);
 
   const markTouched = (field: FieldKey) => {
     setTouched((current) => (current[field] ? current : { ...current, [field]: true }));
@@ -607,11 +585,14 @@ const RequestFormScreen: React.FC = () => {
       return;
     }
 
+    if (formPhotos.length > 0 && !getFirstDoneRequestPhoto(formPhotos)) {
+      Alert.alert(t.errorTitle, pt.waitUpload);
+      return;
+    }
+
     setSubmitting(true);
     try {
-      const donePhotos = getDonePhotos(pickedPhotoList);
-      const resolvedPhotoUri = donePhotos[0]?.downloadUrl ?? '';
-      const resolvedStoragePath = donePhotos[0]?.storagePath ?? '';
+      const requestPhoto = getFirstDoneRequestPhoto(formPhotos);
 
       const result = await firebaseChatAPI.addRequest({
         name: normalizedName,
@@ -623,10 +604,7 @@ const RequestFormScreen: React.FC = () => {
         building: 'Чайка',
         text: cleanDescription,
         description: cleanDescription,
-        photoUri: resolvedPhotoUri,
-        ...(resolvedStoragePath && REQUEST_PHOTO_STORAGE_PATH_RE.test(resolvedStoragePath)
-          ? { photoStoragePath: resolvedStoragePath }
-          : {}),
+        ...(requestPhoto ?? {}),
       });
 
       if (!result.success) {
@@ -651,7 +629,7 @@ const RequestFormScreen: React.FC = () => {
         helpType: false,
         description: false,
       });
-      setPickedPhotos({});
+      setFormPhotos([]);
       setPhotoResetKey((k) => k + 1);
       void AsyncStorage.removeItem(REQUEST_FORM_DRAFT_KEY).catch(() => undefined);
     } catch (error) {
@@ -759,53 +737,14 @@ const RequestFormScreen: React.FC = () => {
             <FieldMessage state={fieldStates.description} extra={descriptionExtra} visible={activeIssueKey === 'description'} />
 
             <Text style={styles.label}>{pt.sectionTitle}</Text>
-            {Object.values(pickedPhotos).length > 0 ? (
-              <View style={styles.photoPreviewGrid}>
-                {Object.values(pickedPhotos).map((photo) => {
-                  const uri = photo.thumbUri || photo.downloadUrl || photo.localUri;
-                  return (
-                    <View key={photo.photoId} style={styles.photoPreviewCard}>
-                      {uri ? (
-                        <AppPhotoImage uri={uri} storagePath={photo.storagePath} style={styles.photoPreviewImage} resizeMode="cover" />
-                      ) : (
-                        <View style={styles.photoPreviewFallback}>
-                          <MaterialCommunityIcons name="image-off-outline" size={24} color={SCREEN_THEME.textMuted} />
-                        </View>
-                      )}
-                      {photo.status === 'uploading' ? (
-                        <View style={styles.photoProgressWrap}>
-                          <View style={styles.photoProgressTrack}>
-                            <View style={[styles.photoProgressFill, { width: `${Math.max(8, photo.progress)}%` }]} />
-                          </View>
-                          <Text style={styles.photoProgressText}>{photo.progress > 0 ? `${photo.progress}%` : pt.upload(0)}</Text>
-                        </View>
-                      ) : (
-                        <View style={styles.photoDoneBadge}>
-                          <Text style={styles.photoDoneText}>{pt.pending}</Text>
-                        </View>
-                      )}
-                      <TouchableOpacity
-                        style={styles.photoRemoveButton}
-                        onPress={() => removePickedPhoto(photo.photoId)}
-                        activeOpacity={0.82}
-                      >
-                        <MaterialCommunityIcons name="close" size={18} color="#fff" />
-                      </TouchableOpacity>
-                    </View>
-                  );
-                })}
-              </View>
-            ) : null}
             {user ? (
-              <PhotoUploadField
+              <RequestPhotoUploadField
                 key={photoResetKey}
                 uid={user.id}
                 userName={user.name ?? user.email ?? ''}
                 maxPhotos={1}
-                storagePath="requests"
-                onPhotosChange={handlePhotosChange}
+                onPhotosChange={setFormPhotos}
                 onBeforePickerOpen={saveDraft}
-                hideSelectedPreview
               />
             ) : null}
 
@@ -924,78 +863,6 @@ const styles = StyleSheet.create({
   fieldMessageWrap: { marginTop: 6, gap: 4 },
   fieldMessage: { fontSize: 12, fontWeight: '900', lineHeight: 16 },
   hint: { color: SCREEN_THEME.textSecondary, fontSize: 12, fontWeight: '700', lineHeight: 16 },
-  photoPreviewGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 10,
-  },
-  photoPreviewCard: {
-    width: 104,
-    height: 104,
-    borderRadius: 10,
-    overflow: 'hidden',
-    backgroundColor: SCREEN_THEME.paperStrong,
-    borderWidth: 1,
-    borderColor: '#E4D0AB',
-  },
-  photoPreviewImage: { width: '100%', height: '100%' },
-  photoPreviewFallback: {
-    width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: SCREEN_THEME.paperStrong,
-  },
-  photoProgressWrap: {
-    position: 'absolute',
-    left: 6,
-    right: 6,
-    bottom: 6,
-    borderRadius: 9,
-    paddingHorizontal: 7,
-    paddingVertical: 6,
-    backgroundColor: 'rgba(20, 28, 22, 0.84)',
-  },
-  photoProgressTrack: {
-    height: 8,
-    borderRadius: 999,
-    overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.28)',
-  },
-  photoProgressFill: {
-    height: '100%',
-    borderRadius: 999,
-    backgroundColor: '#4CAF50',
-  },
-  photoProgressText: {
-    marginTop: 4,
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '900',
-    textAlign: 'center',
-  },
-  photoDoneBadge: {
-    position: 'absolute',
-    left: 6,
-    bottom: 6,
-    borderRadius: 999,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    backgroundColor: 'rgba(38, 95, 71, 0.9)',
-  },
-  photoDoneText: { color: '#fff', fontSize: 10, fontWeight: '800' },
-  photoRemoveButton: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(25, 25, 25, 0.72)',
-  },
   submitButton: {
     marginTop: 18,
     minHeight: 52,

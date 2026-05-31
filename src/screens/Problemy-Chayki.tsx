@@ -17,7 +17,7 @@ import { firebaseChatAPI } from '../firebase-config';
 import { ensureFirebaseAuth } from '../firebase-auth-session';
 import { showUserError } from '../utils/userFacingErrors';
 import { BUILDINGS } from '../data/buildings';
-import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField';
+import RequestPhotoUploadField, { UploadedPhoto } from '../components/RequestPhotoUploadField';
 import MiniUserAvatar from '../components/MiniUserAvatar';
 import { pickUserAvatarUri } from '../utils/userAvatar';
 import AppPhotoImage from '../components/AppPhotoImage';
@@ -25,7 +25,7 @@ import { useContactRequest } from '../hooks/useContactRequest';
 import ContactReasonModal from '../components/ContactReasonModal';
 import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
 import type { DetailItemData } from '../utils/detailViewTypes';
-import { getDonePhotos, getRequiredPhotoLabel, validateSubmissionRequirements } from '../utils/submissionRequirements';
+import { getFirstDoneRequestPhoto, getRequiredPhotoLabel, hasPhotoUploadInProgress, validateSubmissionRequirements } from '../utils/submissionRequirements';
 
 type Problem = {
   id: string;
@@ -548,11 +548,14 @@ const text = CLEAN_PROBLEMS_TEXT[language];
       return;
     }
 
+    if (hasPhotoUploadInProgress(formPhotos) || (formPhotos.length > 0 && !getFirstDoneRequestPhoto(formPhotos))) {
+      Alert.alert(text.error, language === 'en' ? 'Wait until the photo finishes uploading.' : language === 'ru' ? 'Подождите, пока фото загрузится.' : 'Зачекайте, поки фото завантажиться.');
+      return;
+    }
+
     setSubmitting(true);
     try {
-    const donePhotos = getDonePhotos(formPhotos);
-    const resolvedPhotoUri = donePhotos[0]?.downloadUrl ?? '';
-    const resolvedStoragePath = donePhotos[0]?.storagePath ?? '';
+    const requestPhoto = getFirstDoneRequestPhoto(formPhotos);
 
     const result = await firebaseChatAPI.addRequest({
       name: user.name || user.email || '',
@@ -564,10 +567,7 @@ const text = CLEAN_PROBLEMS_TEXT[language];
       building: `${street}, ${house}`,
       text: cleanTitle,
       description: cleanTitle,
-      photoUri: resolvedPhotoUri,
-      ...(resolvedStoragePath && /^requests\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp|heic|heif)$/i.test(resolvedStoragePath)
-        ? { photoStoragePath: resolvedStoragePath }
-        : {}),
+      ...(requestPhoto ?? {}),
     });
     if (!result.success) {
       showUserError(language, 'send', result.error);
@@ -708,11 +708,10 @@ const text = CLEAN_PROBLEMS_TEXT[language];
                 </ScrollView>
                 <Text style={styles.fieldLabel}>{requiredPhotoLabel}</Text>
                 {user?.id ? (
-                  <PhotoUploadField
+                  <RequestPhotoUploadField
                     uid={user.id}
                     userName={user?.name ?? ''}
                     maxPhotos={3}
-                    storagePath="requests"
                     onPhotosChange={setFormPhotos}
                   />
                 ) : (
@@ -1173,5 +1172,4 @@ const styles = StyleSheet.create({
     color: SCREEN_THEME.textSecondary,
   },
 });
-
 
