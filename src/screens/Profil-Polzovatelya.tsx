@@ -36,6 +36,7 @@ const UI_TEXT = {
     userStatus: 'Статус користувача',
     editProfile: 'Редагувати профіль',
     myPhotos: 'Мої фотографії',
+    uploadPhoto: 'Завантажити фото',
     myRequests: 'Мої заявки',
     helpHistory: 'Історія допомоги',
     notifications: 'Сповіщення',
@@ -92,6 +93,7 @@ const UI_TEXT = {
     userStatus: 'Статус пользователя',
     editProfile: 'Редактировать профиль',
     myPhotos: 'Мои фотографии',
+    uploadPhoto: 'Загрузить фото',
     myRequests: 'Мои заявки',
     helpHistory: 'История помощи',
     notifications: 'Уведомления',
@@ -148,6 +150,7 @@ const UI_TEXT = {
     userStatus: 'User status',
     editProfile: 'Edit profile',
     myPhotos: 'My photos',
+    uploadPhoto: 'Upload photo',
     myRequests: 'My requests',
     helpHistory: 'Help history',
     notifications: 'Notifications',
@@ -536,6 +539,12 @@ const ProfileScreen: React.FC = () => {
           <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('MyPhotosScreen')} activeOpacity={0.84}>
             <TactileIcon icon="image-multiple-outline" size={40} iconSize={18} backgroundColor="#6A8BA5" />
             <Text style={styles.menuLabel}>{text.myPhotos}</Text>
+            <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('PhotoUploadScreen')} activeOpacity={0.84}>
+            <TactileIcon icon="camera-plus-outline" size={40} iconSize={18} backgroundColor="#7A9B6A" />
+            <Text style={styles.menuLabel}>{text.uploadPhoto}</Text>
             <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
           </TouchableOpacity>
 

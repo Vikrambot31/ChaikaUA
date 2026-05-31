@@ -293,14 +293,8 @@ const BuySellScreen: React.FC = () => {
   const [searchContact, setSearchContact] = useState('');
   const [searchDescription, setSearchDescription] = useState('');
   const blinkAnim = useRef(new Animated.Value(1)).current;
-  const pickerActiveRef = useRef(false);
-
-  const handlePickerOpenChange = useCallback((isOpen: boolean) => {
-    pickerActiveRef.current = isOpen;
-  }, []);
 
   const handleRequestCloseModal = useCallback(() => {
-    if (pickerActiveRef.current) return;
     const closeTitle = language === 'ru' ? 'Закрыть форму?' : language === 'en' ? 'Close form?' : 'Закрити форму?';
     const closeMsg = language === 'ru' ? 'Вы ещё не отправили объявление. Закрыть?' : language === 'en' ? 'You haven\'t submitted the listing yet. Close?' : 'Ви ще не надіслали оголошення. Закрити?';
     const closeNo = language === 'ru' ? 'Нет' : language === 'en' ? 'No' : 'Ні';
@@ -884,14 +878,17 @@ const BuySellScreen: React.FC = () => {
                 <Text style={styles.formLabel}>{text.photoLabel}</Text>
                 <Text style={styles.requiredMark}>{text.photoRequiredMark}</Text>
               </View>
-              <PhotoUploadField
-                uid={user?.id ?? ''}
-                userName={user?.name ?? ''}
-                maxPhotos={5}
-                storagePath="buy_sell"
-                onPhotosChange={setFormPhotos}
-                onPickerOpenChange={handlePickerOpenChange}
-              />
+              {user?.id ? (
+                <PhotoUploadField
+                  uid={user.id}
+                  userName={user?.name ?? ''}
+                  maxPhotos={5}
+                  storagePath="buy_sell"
+                  onPhotosChange={setFormPhotos}
+                />
+              ) : (
+                <Text style={styles.signInNote}>{text.authRequired}</Text>
+              )}
 
               <TouchableOpacity style={[styles.submitBtn, (submitting || hasUploadingPhotos) && styles.submitBtnDisabled]} onPress={handleSubmit} activeOpacity={0.85} disabled={submitting || hasUploadingPhotos}>
                 {submitting ? (
@@ -965,6 +962,7 @@ const styles = StyleSheet.create({
   formLabel: { fontWeight: '700', color: SCREEN_THEME.textPrimary, marginBottom: 8, marginTop: 8 },
   photoLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   requiredMark: { fontSize: 11, fontWeight: '700', color: SCREEN_THEME.terracottaDark, marginBottom: 8, marginTop: 8 },
+  signInNote: { color: SCREEN_THEME.textSecondary, fontSize: 13, fontWeight: '700', paddingVertical: 10, lineHeight: 18 },
   input: { backgroundColor: '#F7F3EE', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, color: SCREEN_THEME.textPrimary, borderWidth: 1, borderColor: '#E8DDD3' },
   textarea: { minHeight: 80, textAlignVertical: 'top' },
   pickerWrapper: { backgroundColor: '#F7F3EE', borderRadius: 16, borderWidth: 1, borderColor: '#E8DDD3', overflow: 'hidden' },

@@ -762,9 +762,9 @@ function AuthNavigation() {
         <Stack.Screen name="ElectricityStatusScreen" component={ElectricityStatusScreen} />
         <Stack.Screen name="HelpScreen" component={HelpScreen} />
         <Stack.Screen name="AnnouncementsScreen" component={AnnouncementsScreen} />
-        <Stack.Screen name="JobSearchScreen" component={withGuard(JobSearchScreen, 'trusted')} />
-        <Stack.Screen name="BuySellScreen" component={withGuard(BuySellScreen, 'trusted')} />
-        <Stack.Screen name="KontaktiChaikyScreen" component={withGuard(KontaktiChaikyScreen, 'trusted')} />
+        <Stack.Screen name="JobSearchScreen" component={JobSearchScreen} />
+        <Stack.Screen name="BuySellScreen" component={BuySellScreen} />
+        <Stack.Screen name="KontaktiChaikyScreen" component={KontaktiChaikyScreen} />
         <Stack.Screen name="ItemDetailScreen" component={ItemDetailScreen} />
         <Stack.Screen name="AppInfoScreen" component={AppInfoScreen} />
         <Stack.Screen name="LoginScreen" component={LoginScreen} />
@@ -805,20 +805,20 @@ function AuthNavigation() {
         <Stack.Screen name="OsbbAddNewsScreen" component={withGuard(OsbbAddNewsScreen, 'trusted')} />
         <Stack.Screen name="OsbbAdminScreen" component={withGuard(OsbbAdminScreen, 'auth')} />
         <Stack.Screen name="ChaikaBonusPlusScreen" component={ChaikaBonusPlusScreen} />
-        <Stack.Screen name="SoulPhotosScreen" component={withGuard(SoulPhotosScreen, 'trusted')} />
-        <Stack.Screen name="FotoRayonaScreen" component={withGuard(FotoRayonaScreenWithBoundary, 'trusted')} />
-        <Stack.Screen name="PhotoUploadScreen" component={withGuard(PhotoUploadScreen, 'trusted')} options={{ headerShown: false }} />
+        <Stack.Screen name="SoulPhotosScreen" component={SoulPhotosScreen} />
+        <Stack.Screen name="FotoRayonaScreen" component={FotoRayonaScreenWithBoundary} />
+        <Stack.Screen name="PhotoUploadScreen" component={PhotoUploadScreen} options={{ headerShown: false }} />
         <Stack.Screen name="StartAvatarPickerScreen" component={StartAvatarPickerScreen} options={{ headerShown: false }} />
         <Stack.Screen name="ProfileSetupScreen" component={ProfileSetupScreen} options={{ headerShown: false, gestureEnabled: false }} />
-        <Stack.Screen name="LostAndFoundScreen" component={withGuard(LostAndFoundScreen, 'trusted')} />
+        <Stack.Screen name="LostAndFoundScreen" component={LostAndFoundScreen} />
         <Stack.Screen name="ImportantNewsScreen" component={ImportantNewsScreen} />
         <Stack.Screen name="NotificationSettingsScreen" component={withGuard(NotificationSettingsScreen, 'auth')} />
         <Stack.Screen name="ZhkBusinessListScreen" component={ZhkBusinessListScreen} />
         <Stack.Screen name="SportNaChaykeScreen" component={withGuard(SportNaChaykeScreen, 'auth')} />
         <Stack.Screen name="SportDetailScreen" component={withGuard(SportDetailScreen, 'trusted')} />
         <Stack.Screen name="ProfileRequestsScreen" component={withGuard(ProfileRequestsScreen, 'trusted')} />
-        <Stack.Screen name="MyPhotosScreen" component={withGuard(MyPhotosScreen, 'trusted')} options={{ headerShown: false }} />
-        <Stack.Screen name="MyApprovedPhotosScreen" component={withGuard(MyApprovedPhotosScreen, 'trusted')} options={{ headerShown: false }} />
+        <Stack.Screen name="MyPhotosScreen" component={MyPhotosScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="MyApprovedPhotosScreen" component={MyApprovedPhotosScreen} options={{ headerShown: false }} />
         <Stack.Screen name="AppVersionInfoScreen" component={AppVersionInfoScreen} />
         <Stack.Screen name="AppMonitorScreen" component={withGuard(AppMonitorScreen, 'auth')} />
       </Stack.Navigator>

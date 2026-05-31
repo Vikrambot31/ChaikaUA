@@ -21,11 +21,10 @@ import ContactReasonModal from '../components/ContactReasonModal';
 import { pickUserAvatarUri } from '../utils/userAvatar';
 import { safeOpenViber } from '../utils/communicationActions';
 import type { DetailItemData } from '../utils/detailViewTypes';
-import UploadedPhotosGrid from '../components/UploadedPhotosGrid';
 import InlineFieldHint from '../components/InlineFieldHint';
 import { FormFieldError } from '../components/ValidationErrorMessage';
 import { useSoftToast } from '../hooks/useSoftToast';
-import { validateSubmissionRequirements } from '../utils/submissionRequirements';
+import { getDonePhotos, validateSubmissionRequirements } from '../utils/submissionRequirements';
 import { getLanguageValidationError } from '../utils/contentLanguageGuard';
 import UserCardActionBar from '../components/UserCardActionBar';
 
@@ -343,7 +342,6 @@ const KontaktiChaikyScreen: React.FC = () => {
   const [searchDescription, setSearchDescription] = useState('');
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const blinkAnim = useRef(new Animated.Value(1)).current;
-  const pickerActiveRef = useRef(false);
   const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestDraftRef = useRef({ category, condition, price, description, phone, addFormVisible });
   const previousAddFormVisibleRef = useRef(addFormVisible);
@@ -354,12 +352,7 @@ const KontaktiChaikyScreen: React.FC = () => {
     [text.categories],
   );
 
-  const handlePickerOpenChange = useCallback((isOpen: boolean) => {
-    pickerActiveRef.current = isOpen;
-  }, []);
-
   const handleRequestCloseModal = useCallback(() => {
-    if (pickerActiveRef.current) return;
     Alert.alert(
       'Закрити форму?',
       'Ви ще не надіслали заявку. Закрити?',
@@ -666,8 +659,9 @@ const KontaktiChaikyScreen: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const resolvedPhotoUri = formPhotos[0]?.downloadUrl ?? '';
-      const resolvedStoragePath = formPhotos[0]?.storagePath ?? '';
+      const donePhotos = getDonePhotos(formPhotos);
+      const resolvedPhotoUri = donePhotos[0]?.downloadUrl ?? '';
+      const resolvedStoragePath = donePhotos[0]?.storagePath ?? '';
 
       const itemName = user?.name?.trim() || getCategoryLabel(category);
       const createdAt = new Date();
@@ -1062,15 +1056,17 @@ const KontaktiChaikyScreen: React.FC = () => {
               <FormFieldError error={submitAttempted && phone.replace(/\D/g, '').length < 7 ? text.errorPhone : undefined} />
 
               <Text style={styles.formLabel}>{text.photoLabel}</Text>
-              <PhotoUploadField
-                uid={user?.id ?? ''}
-                userName={user?.name ?? ''}
-                maxPhotos={5}
-                storagePath="contacts"
-                onPhotosChange={(photos) => setFormPhotos(photos.filter((p) => p.status === 'done'))}
-                onPickerOpenChange={handlePickerOpenChange}
-              />
-              <UploadedPhotosGrid />
+              {user?.id ? (
+                <PhotoUploadField
+                  uid={user.id}
+                  userName={user?.name ?? ''}
+                  maxPhotos={5}
+                  storagePath="contacts"
+                  onPhotosChange={setFormPhotos}
+                />
+              ) : (
+                <Text style={styles.signInNote}>{text.authRequired}</Text>
+              )}
 
               <View style={styles.toggleRow}>
                 <Text style={styles.formLabel}>{text.showPhoneToggle}</Text>
@@ -1152,6 +1148,7 @@ const styles = StyleSheet.create({
   liveText: { color: '#2D7E4D', fontSize: 11, fontWeight: '900', marginRight: 6 },
   liveCount: { color: SCREEN_THEME.textSecondary, fontSize: 11, fontWeight: '700', textAlign: 'center' },
   formLabel: { fontWeight: '700', color: SCREEN_THEME.textPrimary, marginBottom: 8, marginTop: 8 },
+  signInNote: { color: SCREEN_THEME.textSecondary, fontSize: 13, fontWeight: '700', paddingVertical: 10, lineHeight: 18 },
   input: { backgroundColor: '#F7F3EE', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, color: SCREEN_THEME.textPrimary, borderWidth: 1, borderColor: '#E8DDD3' },
   textarea: { minHeight: 80, textAlignVertical: 'top' },
   pickerWrapper: { backgroundColor: '#F7F3EE', borderRadius: 16, borderWidth: 1, borderColor: '#E8DDD3', overflow: 'hidden' },

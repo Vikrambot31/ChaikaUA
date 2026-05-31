@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -179,13 +179,8 @@ const LostAndFoundScreen: React.FC = () => {
   const [addFormVisible, setAddFormVisible] = useState(false);
   const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const pickerActiveRef = useRef(false);
 
-  const handlePickerOpenChange = useCallback((isOpen: boolean) => {
-    pickerActiveRef.current = isOpen;
-  }, []);
   const handleRequestCloseModal = useCallback(() => {
-    if (pickerActiveRef.current) return;
     // Bug #9 fix: skip confirmation if the form has not been touched
     const isDirty = category !== '' || description.trim() !== '' || formPhotos.length > 0;
     if (!isDirty) {
@@ -612,14 +607,17 @@ const LostAndFoundScreen: React.FC = () => {
 
               {/* Photo upload - optional */}
               <Text style={styles.fieldLabel}>{text.photoLabel}</Text>
-              <PhotoUploadField
-                uid={user?.id ?? ''}
-                userName={user?.name ?? ''}
-                maxPhotos={1}
-                storagePath="lost_found"
-                onPhotosChange={setFormPhotos}
-                onPickerOpenChange={handlePickerOpenChange}
-              />
+              {user?.id ? (
+                <PhotoUploadField
+                  uid={user.id}
+                  userName={user?.name ?? ''}
+                  maxPhotos={1}
+                  storagePath="lost_found"
+                  onPhotosChange={setFormPhotos}
+                />
+              ) : (
+                <Text style={styles.signInNote}>{text.authRequired}</Text>
+              )}
 
               {/* Submit */}
               <TouchableOpacity
@@ -891,6 +889,7 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   fieldLabel: { color: SCREEN_THEME.textPrimary, fontWeight: '900', marginBottom: 8 },
+  signInNote: { color: SCREEN_THEME.textSecondary, fontSize: 13, fontWeight: '700', paddingVertical: 10, lineHeight: 18 },
   categoryScroller: { gap: 8, paddingRight: 20, paddingBottom: 12 },
   categoryChip: {
     borderRadius: 999,

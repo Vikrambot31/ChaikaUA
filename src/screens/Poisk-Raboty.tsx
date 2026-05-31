@@ -764,13 +764,17 @@ const JobSearchScreen: React.FC = () => {
                 />
 
                 <Text style={styles.formLabel}>{requiredPhotoLabel}</Text>
-                <PhotoUploadField
-                  uid={user?.id ?? ''}
-                  userName={user?.name ?? ''}
-                  maxPhotos={3}
-                  storagePath="job_listings"
-                  onPhotosChange={setFormPhotos}
-                />
+                {user?.id ? (
+                  <PhotoUploadField
+                    uid={user.id}
+                    userName={user?.name ?? ''}
+                    maxPhotos={3}
+                    storagePath="job_listings"
+                    onPhotosChange={setFormPhotos}
+                  />
+                ) : (
+                  <Text style={styles.signInNote}>{text.authRequired}</Text>
+                )}
 
                 <TouchableOpacity style={[styles.submitBtn, (submitting || hasUploadingPhotos) && { opacity: 0.65 }]} onPress={() => { void handleSubmit(); }} activeOpacity={0.85} disabled={submitting || hasUploadingPhotos}>
                   {submitting ? (
@@ -1028,6 +1032,7 @@ const styles = StyleSheet.create({
   publishToggleBtnText: { color: '#fff', fontWeight: '800', fontSize: 14 },
   formCard: { backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 24, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#E4D0AB' },
   formLabel: { fontWeight: '700', color: SCREEN_THEME.textPrimary, marginBottom: 8, marginTop: 8 },
+  signInNote: { color: SCREEN_THEME.textSecondary, fontSize: 13, fontWeight: '700', paddingVertical: 10, lineHeight: 18 },
   kindSwitcher: {
     flexDirection: 'row',
     gap: 8,
