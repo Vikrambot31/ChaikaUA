@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ValidationError } from '../utils/validationMessages';
+import { useTranslation } from '../i18n/useTranslation';
 
 interface ValidationErrorMessageProps {
   error: ValidationError | null;
@@ -39,6 +40,8 @@ interface ValidationErrorsListProps {
  * !?8A>: всех ошибок 20;V40FVW
  */
 export const ValidationErrorsList: React.FC<ValidationErrorsListProps> = ({ errors, visible = true }) => {
+  const { t } = useTranslation();
+
   if (!visible || errors.length === 0) {
     return null;
   }
@@ -47,7 +50,7 @@ export const ValidationErrorsList: React.FC<ValidationErrorsListProps> = ({ erro
     <View style={styles.listContainer}>
       <View style={styles.listHeader}>
         <MaterialCommunityIcons name="alert" size={20} color="#DC2626" />
-        <Text style={styles.listTitle}>Помилки в формі</Text>
+        <Text style={styles.listTitle}>{t.validationErrors.formTitle}</Text>
       </View>
       {errors.map((error, index) => (
         <View key={`${error.field}-${index}`} style={styles.listItem}>

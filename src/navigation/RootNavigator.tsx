@@ -100,7 +100,7 @@ export type RootStackParamList = {
   RequestsTab: undefined;
   ListScreen: undefined;
   PlaceDetailsPanel: { place: Place };
-  RequestFormScreen: undefined;
+  RequestFormScreen: { group?: string } | undefined;
   HelpNeighborsScreen: undefined;
   HelpRequestScreen: undefined;
   TopPlacesScreen: undefined;
@@ -787,7 +787,7 @@ function AuthNavigation() {
         <Stack.Screen name="TopCafeScreen" component={TopCafeScreen} />
         <Stack.Screen name="TopStoresScreen" component={TopStoresScreen} />
         <Stack.Screen name="PlacesScreen" component={PlacesScreen} />
-        <Stack.Screen name="RequestsScreen" component={RequestsScreen} />
+        <Stack.Screen name="RequestsScreen" component={withGuard(RequestsScreen, 'moderator')} />
         <Stack.Screen name="RequestTopicScreen" component={RequestTopicScreen} />
         <Stack.Screen name="SubscriptionScreen" component={SubscriptionScreen} />
         <Stack.Screen name="RatingScreen" component={RatingScreen} />

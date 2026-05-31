@@ -8,43 +8,8 @@ import TactileIcon from '../components/TactileIcon';
 
 const AnnouncementsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
-  const { language } = useTranslation();
-
-  const text = {
-    ua: {
-      back: 'Назад',
-      title: 'Оголошення',
-      subtitle: 'Виберіть розділ для публікації',
-      jobs: 'Пошук роботи',
-      jobsSub: 'Вакансії та резюме мешканців',
-      market: 'Куплю / Продам',
-      marketSub: 'Товари та послуги в ЖК',
-      infoTitle: 'Як це працює',
-      info: '1. Виберіть розділ\n2. Заповніть форму\n3. Публікацію побачать сусіди',
-    },
-    ru: {
-      back: 'Назад',
-      title: 'Объявления',
-      subtitle: 'Выберите раздел для публикации',
-      jobs: 'Поиск работы',
-      jobsSub: 'Вакансии и резюме жителей',
-      market: 'Куплю / Продам',
-      marketSub: 'Товары и услуги в ЖК',
-      infoTitle: 'Как это работает',
-      info: '1. Выберите раздел\n2. Заполните форму\n3. Публикацию увидят соседи',
-    },
-    en: {
-      back: 'Back',
-      title: 'Announcements',
-      subtitle: 'Choose a section to publish',
-      jobs: 'Job Search',
-      jobsSub: 'Jobs and resident resumes',
-      market: 'Buy / Sell',
-      marketSub: 'Goods and services in the complex',
-      infoTitle: 'How it works',
-      info: '1. Choose a section\n2. Fill the form\n3. Your post appears to neighbors',
-    },
-  }[language];
+  const { t } = useTranslation();
+  const text = t.announcements;
 
   return (
     <SafeAreaView style={styles.container}>

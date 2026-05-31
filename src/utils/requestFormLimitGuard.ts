@@ -3,8 +3,12 @@ import { firebaseChatAPI } from '../firebase-config';
 
 type Lang = 'ua' | 'ru' | 'en';
 
+// Accepts any React Navigation prop. The real `navigate` is a generic,
+// route-typed overload that is not assignable to a plain `(string, params)`
+// signature, so we widen the args to stay compatible with every caller.
 type NavigationLike = {
-  navigate: (screen: string) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  navigate: (...args: any[]) => void;
 };
 
 const TEXT = {
@@ -55,6 +59,6 @@ export const openRequestFormWithLimitCheck = async (
     return false;
   }
 
-  navigation.navigate('RequestFormScreen');
+  navigation.navigate('RequestFormScreen', { group: 'help_neighbors' });
   return true;
 };

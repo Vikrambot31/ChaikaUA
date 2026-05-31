@@ -8,6 +8,7 @@ import {
   Platform,
 } from 'react-native';
 import { AudioAttachment } from '../types/app';
+import { useTranslation } from '../i18n/useTranslation';
 
 interface Props {
   onRecordingComplete: (audio: AudioAttachment & { localUri: string }) => void;
@@ -25,6 +26,8 @@ function formatMs(ms: number): string {
 }
 
 export default function VoiceRecorder({ onRecordingComplete, onClear, recording }: Props) {
+  const { t } = useTranslation();
+  const copy = t.voiceRecorder;
   const [isRecording, setIsRecording] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(0);
@@ -42,7 +45,7 @@ export default function VoiceRecorder({ onRecordingComplete, onClear, recording 
 
   const startRecording = async () => {
     if (Platform.OS === 'web') {
-      setError('Запис голосу недоступний у браузері');
+      setError(copy.webUnavailable);
       return;
     }
     setError(null);
@@ -71,7 +74,7 @@ export default function VoiceRecorder({ onRecordingComplete, onClear, recording 
         }
       }, 500);
     } catch {
-      setError('Не вдалося розпочати запис. Перевірте дозвіл на мікрофон.');
+      setError(copy.startFailed);
     } finally {
       setIsLoading(false);
     }
@@ -102,7 +105,7 @@ export default function VoiceRecorder({ onRecordingComplete, onClear, recording 
         });
       }
     } catch {
-      setError('Помилка при зупинці запису');
+      setError(copy.stopFailed);
     } finally {
       setIsLoading(false);
     }
@@ -121,7 +124,7 @@ export default function VoiceRecorder({ onRecordingComplete, onClear, recording 
         <View style={styles.doneRow}>
           <Text style={styles.doneIcon}>✓</Text>
           <Text style={styles.doneText}>
-            Голосове повідомлення ({formatMs(recording.duration)})
+            {copy.recordedMessage} ({formatMs(recording.duration)})
           </Text>
           <TouchableOpacity onPress={handleClear} style={styles.clearBtn}>
             <Text style={styles.clearText}>✕</Text>
@@ -150,7 +153,7 @@ export default function VoiceRecorder({ onRecordingComplete, onClear, recording 
           <Text style={styles.btnIcon}>{isRecording ? '■' : '🎤'}</Text>
         )}
         <Text style={styles.btnLabel}>
-          {isRecording ? 'Зупинити запис' : 'Записати голос'}
+          {isRecording ? copy.stopRecording : copy.recordVoice}
         </Text>
       </TouchableOpacity>
     </View>

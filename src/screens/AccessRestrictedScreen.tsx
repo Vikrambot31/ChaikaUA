@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { COLORS } from '../utils/constants';
+import { useTranslation } from '../i18n/useTranslation';
 
 type AccessRestrictedScreenProps = {
   onGoBack: () => void;
@@ -16,32 +17,31 @@ type AccessRestrictedScreenProps = {
  * is managed by SoftInviteAccessGate above the navigator.
  */
 export default function AccessRestrictedScreen({ onGoBack, onOpenInviteAccess, pendingInvite = false }: AccessRestrictedScreenProps) {
+  const { t } = useTranslation();
+  const copy = t.accessRestricted;
+
   return (
     <View style={styles.root}>
       <View style={styles.card}>
-        <Text style={styles.eyebrow}>Chaika Life</Text>
-        <Text style={styles.title}>{pendingInvite ? 'Заявка рассматривается' : 'Доступ обмежено'}</Text>
+        <Text style={styles.eyebrow}>{copy.eyebrow}</Text>
+        <Text style={styles.title}>{pendingInvite ? copy.pendingTitle : copy.restrictedTitle}</Text>
         <Text style={styles.body}>
-          {pendingInvite
-            ? 'Ваша заявка ещё рассматривается. Спасибо, что вы с нами.'
-            : 'Для просмотра этого раздела нужна одобренная заявка.'}
+          {pendingInvite ? copy.pendingBody : copy.restrictedBody}
         </Text>
         <Text style={styles.hint}>
-          {pendingInvite
-            ? 'Пока доступен режим просмотра, как без регистрации. Полный доступ откроется после подтверждения.'
-            : 'Щоб отримати повний доступ, подайте заявку через поручителя або дочекайтеся рішення модератора.'}
+          {pendingInvite ? copy.pendingHint : copy.restrictedHint}
         </Text>
 
         <TouchableOpacity style={styles.btnPrimary} onPress={onOpenInviteAccess ?? onGoBack} activeOpacity={0.85}>
-          <Text style={styles.btnPrimaryText}>{pendingInvite ? 'Переглянути статус заявки' : 'Подати заявку'}</Text>
+          <Text style={styles.btnPrimaryText}>{pendingInvite ? copy.pendingPrimary : copy.restrictedPrimary}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.btnSecondary} onPress={onOpenInviteAccess ?? onGoBack} activeOpacity={0.85}>
-          <Text style={styles.btnSecondaryText}>{pendingInvite ? 'Оновити шлях перевірки' : 'Перейти до підтвердження'}</Text>
+          <Text style={styles.btnSecondaryText}>{pendingInvite ? copy.pendingSecondary : copy.restrictedSecondary}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.btnBack} onPress={onGoBack} activeOpacity={0.7}>
-          <Text style={styles.btnBackText}>Назад</Text>
+          <Text style={styles.btnBackText}>{copy.back}</Text>
         </TouchableOpacity>
       </View>
     </View>

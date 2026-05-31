@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import MiniTabBar from '../components/MiniTabBar';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, SafeAreaView, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, SafeAreaView, ActivityIndicator, ScrollView } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationProp, ParamListBase, RouteProp } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
@@ -270,7 +270,7 @@ const RequestDetailScreen = ({
         <View style={styles.headerSpacer} />
       </View>
 
-      <View style={styles.content}>
+      <ScrollView style={styles.content} contentContainerStyle={styles.contentInner} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <View style={styles.profileRow}>
           <MiniUserAvatar
             uri={resolvedAvatarUri}
@@ -350,7 +350,7 @@ const RequestDetailScreen = ({
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Text style={styles.backButtonText}>{text.backToList}</Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
       <MiniTabBar />
     </SafeAreaView>
   );
@@ -364,7 +364,8 @@ const styles = StyleSheet.create({
   headerButton: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#F1E1BC', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E0C89A' },
   headerTitle: { fontSize: 18, fontWeight: '900', color: SCREEN_THEME.textPrimary },
   headerSpacer: { width: 42 },
-  content: { flex: 1, paddingHorizontal: 20, paddingTop: 8 },
+  content: { flex: 1 },
+  contentInner: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 24 },
   profileRow: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 24, padding: 18, marginBottom: 14, borderWidth: 1, borderColor: '#E4D0AB' },
   profileInfo: { flex: 1 },
   nameText: { fontSize: 19, fontWeight: '900', color: SCREEN_THEME.textPrimary, marginBottom: 4 },

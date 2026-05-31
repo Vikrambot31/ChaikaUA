@@ -12,44 +12,15 @@ const QR_IMAGE_URL = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&d
 
 export default function QRCodeScreen() {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
-  const { language } = useTranslation();
+  const { t } = useTranslation();
+  const copy = t.qrCode;
   const [qrError, setQrError] = useState(false);
-
-  const t = language === 'ru'
-    ? {
-        title: 'Поделиться приложением',
-        share: 'Поделиться ссылкой',
-        copied: 'Ссылка готова',
-        open: 'Показать ссылку',
-        subtitle: 'Отправьте ссылку соседям или друзьям, чтобы они быстро установили приложение.',
-        errorTitle: 'Ошибка',
-        shareError: 'Не удалось поделиться ссылкой.',
-      }
-    : language === 'en'
-      ? {
-          title: 'Share app',
-          share: 'Share link',
-          copied: 'Link ready',
-          open: 'Show link',
-          subtitle: 'Send the app link to friends so they can install it quickly.',
-          errorTitle: 'Error',
-          shareError: 'Could not share the link.',
-        }
-      : {
-          title: 'Поділитися додатком',
-          share: 'Поділитися посиланням',
-          copied: 'Посилання готове',
-          open: 'Показати посилання',
-          subtitle: 'Надішліть посилання сусідам або друзям, щоб вони швидко встановили додаток.',
-          errorTitle: 'Помилка',
-          shareError: 'Не вдалося поділитися посиланням.',
-        };
 
   const onShare = async () => {
     try {
       await Share.share({ message: `Chaika Life\n${APP_URL}` });
     } catch {
-      Alert.alert(t.errorTitle, t.shareError);
+      Alert.alert(copy.errorTitle, copy.shareError);
     }
   };
 
@@ -57,7 +28,7 @@ export default function QRCodeScreen() {
     try {
       await Linking.openURL(APP_URL);
     } catch {
-      Alert.alert(t.errorTitle, APP_URL);
+      Alert.alert(copy.errorTitle, APP_URL);
     }
   };
 
@@ -73,14 +44,14 @@ export default function QRCodeScreen() {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <MaterialCommunityIcons name="arrow-left" size={20} color={SCREEN_THEME.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t.title}</Text>
+        <Text style={styles.headerTitle}>{copy.title}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.heroCard}>
-          <Text style={styles.title}>{t.title}</Text>
-          <Text style={styles.subtitle}>{t.subtitle}</Text>
+          <Text style={styles.title}>{copy.title}</Text>
+          <Text style={styles.subtitle}>{copy.subtitle}</Text>
 
           <View style={styles.qrShell}>
             <View style={styles.qrCard}>
@@ -107,11 +78,11 @@ export default function QRCodeScreen() {
 
           <TouchableOpacity style={styles.button} onPress={onShare} activeOpacity={0.88}>
             <TactileIcon icon="share-variant-outline" size={42} iconSize={18} backgroundColor="#7A4B36" tint="#FFF3CE" />
-            <Text style={styles.buttonText}>{t.share}</Text>
+            <Text style={styles.buttonText}>{copy.share}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.ghost} onPress={onOpenUrl}>
-            <Text style={styles.ghostText}>{t.open}</Text>
+            <Text style={styles.ghostText}>{copy.open}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

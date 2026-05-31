@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { NavigationProp, ParamListBase, useNavigation } from '@react-navigation/native';
+import { NavigationProp, ParamListBase, useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../redux/store';
 import RequestPhotoUploadField, { UploadedPhoto } from '../components/RequestPhotoUploadField';
@@ -400,6 +400,8 @@ const getSubmitFailureMessage = (rawError: unknown, t: (typeof TEXT_BY_LANG)[Lan
 
 const RequestFormScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
+  const route = useRoute<RouteProp<{ RequestFormScreen: { group?: string } }, 'RequestFormScreen'>>();
+  const requestGroup = route.params?.group ?? 'requests';
   const language = useSelector((state: RootState) => normalizeLanguage(state.language?.current)) as Lang;
   const user = useSelector((state: RootState) => state.auth.user);
   const [name, setName] = useState(user?.name ?? '');
@@ -605,7 +607,7 @@ const RequestFormScreen: React.FC = () => {
         phone: normalizedPhone,
         language,
         category: helpType,
-        group: 'requests',
+        group: requestGroup,
         subcategory: helpType,
         building: 'Чайка',
         text: cleanDescription,

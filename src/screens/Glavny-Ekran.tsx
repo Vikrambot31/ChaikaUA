@@ -332,7 +332,7 @@ const getRequestTargetScreen = (req: AppRequest): string => {
   }
   if (haystack.includes('help_neighbors') || haystack.includes('help')) return 'HelpNeighborsScreen';
 
-  return 'RequestsScreen';
+  return 'OnlineChatTab';
 };
 
 type FeedVisual = {

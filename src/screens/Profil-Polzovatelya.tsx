@@ -20,6 +20,7 @@ import { profilePermissionService } from '../services/profilePermissionService';
 import { logClientEvent } from '../utils/errorLogger';
 import AppPhotoImage from '../components/AppPhotoImage';
 import { signOutPrimarySession } from '../services/authSessionService';
+import { subscribeCurrentUserSecurityRole, type SecurityRole } from '../services/securityRoles';
 
 type AppNavigation = import('@react-navigation/native').NavigationProp<Record<string, object | undefined>>;
 
@@ -41,6 +42,7 @@ const UI_TEXT = {
     helpHistory: 'Історія допомоги',
     notifications: 'Сповіщення',
     appMonitor: 'Монітор застосунку',
+    requestsAdmin: 'Усі заявки (адмін)',
     moderation: 'Центр модерації',
     moderationPasscodeTitle: 'Міні-пароль модерації',
     moderationPasscodeHint: 'Введіть код доступу до сервісного центру.',
@@ -98,6 +100,7 @@ const UI_TEXT = {
     helpHistory: 'История помощи',
     notifications: 'Уведомления',
     appMonitor: 'Монитор приложения',
+    requestsAdmin: 'Все заявки (админ)',
     moderation: 'Центр модерации',
     moderationPasscodeTitle: 'Мини-пароль модерации',
     moderationPasscodeHint: 'Введите код доступа к сервисному центру.',
@@ -155,6 +158,7 @@ const UI_TEXT = {
     helpHistory: 'Help history',
     notifications: 'Notifications',
     appMonitor: 'Application monitor',
+    requestsAdmin: 'All requests (admin)',
     moderation: 'Moderation center',
     moderationPasscodeTitle: 'Moderation passcode',
     moderationPasscodeHint: 'Enter the service center access code.',
@@ -226,6 +230,7 @@ const ProfileScreen: React.FC = () => {
   const [latestPendingRequestedAtMs, setLatestPendingRequestedAtMs] = useState(0);
   const [lastSeenPendingAtMs, setLastSeenPendingAtMs] = useState(0);
   const [moderationUnlocked, setModerationUnlocked] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const isLoggedIn = Boolean(user?.id);
   const hasPrimaryModerationAccess = Boolean(
     user?.id &&
@@ -253,6 +258,17 @@ const ProfileScreen: React.FC = () => {
       },
     ]);
   }, [dispatch, navigation, text.cancel, text.exit, text.exitConfirm, text.exitTitle, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setIsAdmin(false);
+      return;
+    }
+    const unsubscribeRole = subscribeCurrentUserSecurityRole((snapshot: { role: SecurityRole }) => {
+      setIsAdmin(snapshot.role === 'admin');
+    });
+    return unsubscribeRole;
+  }, [user?.id]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -590,6 +606,18 @@ const ProfileScreen: React.FC = () => {
             <Text style={styles.menuLabel}>{text.appMonitor}</Text>
             <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
           </TouchableOpacity>
+
+          {isAdmin ? (
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => navigation.navigate('RequestsScreen')}
+              activeOpacity={0.84}
+            >
+              <TactileIcon icon="clipboard-list-outline" size={40} iconSize={18} backgroundColor="#7A1E5C" />
+              <Text style={styles.menuLabel}>{text.requestsAdmin}</Text>
+              <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
+            </TouchableOpacity>
+          ) : null}
 
           {moderationUnlocked && hasPrimaryModerationAccess ? (
             <TouchableOpacity
