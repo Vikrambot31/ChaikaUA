@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -418,7 +418,6 @@ const RequestFormScreen: React.FC = () => {
 
   // Photo section state
   const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
-  const [photoResetKey, setPhotoResetKey] = useState(0);
 
   const hasUserId = Boolean(user?.id);
   const t = TEXT_BY_LANG[language] ?? TEXT_BY_LANG.ua;
@@ -452,13 +451,20 @@ const RequestFormScreen: React.FC = () => {
     setSubmitError(null);
   }, [name, phone, helpType, description]);
 
-  const saveDraft = useCallback(async () => {
-    await AsyncStorage.setItem(REQUEST_FORM_DRAFT_KEY, JSON.stringify({
-      name,
-      phone,
-      helpType,
-      description,
-    })).catch(() => undefined);
+  // Auto-save draft whenever form fields change (debounced 600ms).
+  // Previously this was called via onBeforePickerOpen, but that caused
+  // openPicker to recreate on every keystroke and interfered with
+  // the photo preview appearing after selection.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void AsyncStorage.setItem(REQUEST_FORM_DRAFT_KEY, JSON.stringify({
+        name,
+        phone,
+        helpType,
+        description,
+      })).catch(() => undefined);
+    }, 600);
+    return () => clearTimeout(timer);
   }, [description, helpType, name, phone]);
 
   const photoUploadsInProgress = hasPhotoUploadInProgress(formPhotos);
@@ -630,7 +636,6 @@ const RequestFormScreen: React.FC = () => {
         description: false,
       });
       setFormPhotos([]);
-      setPhotoResetKey((k) => k + 1);
       void AsyncStorage.removeItem(REQUEST_FORM_DRAFT_KEY).catch(() => undefined);
     } catch (error) {
       const friendlyError = getSubmitFailureMessage(error, t);
@@ -737,14 +742,12 @@ const RequestFormScreen: React.FC = () => {
             <FieldMessage state={fieldStates.description} extra={descriptionExtra} visible={activeIssueKey === 'description'} />
 
             <Text style={styles.label}>{pt.sectionTitle}</Text>
-            {user ? (
+            {user?.id ? (
               <RequestPhotoUploadField
-                key={photoResetKey}
                 uid={user.id}
-                userName={user.name ?? user.email ?? ''}
+                userName={user?.name ?? ''}
                 maxPhotos={1}
                 onPhotosChange={setFormPhotos}
-                onBeforePickerOpen={saveDraft}
               />
             ) : null}
 
