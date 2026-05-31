@@ -33,6 +33,7 @@ const UI_TEXT = {
     cards: [
       { id: '1', title: 'Топ місця', subtitle: 'Кращі кафе та магазини', icon: 'star', color: '#7A1E5C', screen: 'TopPlacesScreen' },
       { id: '2', title: 'Місця Чайки', subtitle: 'Кафе, магазини, школи та салони', icon: 'map-marker-multiple', color: '#00897B', screen: 'PlacesScreen' },
+      { id: '4', title: 'Все для дітей', subtitle: 'Садочки, школи, гуртки та події', icon: 'baby-face-outline', color: '#C77A5D', screen: 'VseDlyaDeteyScreen' },
       { id: '3', title: 'Карта Чайки', subtitle: 'Всі місця на карті', icon: 'map-search', color: '#3B7EA1', tab: 'MapTab' },
       { id: '5', title: 'Люди Чайки', subtitle: 'Активні мешканці', icon: 'account-multiple', color: '#E53935', screen: 'TopGirlsBoysScreen' },
     ] as HubCard[],
@@ -44,6 +45,7 @@ const UI_TEXT = {
     cards: [
       { id: '1', title: 'Топ места', subtitle: 'Лучшие кафе и магазины', icon: 'star', color: '#7A1E5C', screen: 'TopPlacesScreen' },
       { id: '2', title: 'Места Чайки', subtitle: 'Кафе, магазины, школы и салоны', icon: 'map-marker-multiple', color: '#00897B', screen: 'PlacesScreen' },
+      { id: '4', title: 'Все для детей', subtitle: 'Садики, школы, кружки и события', icon: 'baby-face-outline', color: '#C77A5D', screen: 'VseDlyaDeteyScreen' },
       { id: '3', title: 'Карта Чайки', subtitle: 'Все места на карте', icon: 'map-search', color: '#3B7EA1', tab: 'MapTab' },
       { id: '5', title: 'Люди Чайки', subtitle: 'Активные жители', icon: 'account-multiple', color: '#E53935', screen: 'TopGirlsBoysScreen' },
     ] as HubCard[],
@@ -55,6 +57,7 @@ const UI_TEXT = {
     cards: [
       { id: '1', title: 'Top places', subtitle: 'Best cafes and stores', icon: 'star', color: '#7A1E5C', screen: 'TopPlacesScreen' },
       { id: '2', title: 'Chaika Life places', subtitle: 'Cafes, stores, schools, salons, and more', icon: 'map-marker-multiple', color: '#00897B', screen: 'PlacesScreen' },
+      { id: '4', title: 'Everything for Kids', subtitle: 'Kindergartens, schools, clubs and events', icon: 'baby-face-outline', color: '#C77A5D', screen: 'VseDlyaDeteyScreen' },
       { id: '3', title: 'Chaika Life map', subtitle: 'Open all places on the map', icon: 'map-search', color: '#3B7EA1', tab: 'MapTab' },
       { id: '5', title: 'Chaika Life people', subtitle: 'Active residents', icon: 'account-multiple', color: '#E53935', screen: 'TopGirlsBoysScreen' },
     ] as HubCard[],
@@ -236,4 +239,3 @@ const styles = StyleSheet.create({
 });
 
 export default PlacesAndPeopleHub;
-

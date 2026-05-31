@@ -60,6 +60,8 @@ import LostAndFoundScreen from '../screens/Kto-Poteryal';
 import ImportantNewsScreen from '../screens/Vazhnye-Novosti-Chayki';
 import NotificationSettingsScreen from '../screens/Nalashtuvannya-Spovishchen';
 import ZhkBusinessListScreen from '../screens/ZhkBusinessListScreen';
+import VseDlyaDeteyScreen from '../screens/Vse-Dlya-Detey';
+import DetalDetskogoMestaScreen from '../screens/Detal-Detskogo-Mesta';
 import SportNaChaykeScreen from '../screens/Sport-Na-Chayke';
 import SportDetailScreen from '../screens/Sport-Detal';
 import ProfileRequestsScreen from '../screens/ProfileRequestsScreen';
@@ -150,6 +152,8 @@ export type RootStackParamList = {
   QRCodeScreen: undefined;
   EditProfileScreen: undefined;
   PlacesAndPeopleHub: undefined;
+  VseDlyaDeteyScreen: undefined;
+  DetalDetskogoMestaScreen: { place: Place };
   PoruchitelScreen: undefined;
   OsbbHubScreen: undefined;
   OsbbSborScreen: undefined;
@@ -228,6 +232,8 @@ const linking: LinkingOptions<RootStackParamList> = {
        PhotoUploadScreen: 'screen/photo-upload',
        StartAvatarPickerScreen: 'screen/start-avatar',
        ZhkBusinessListScreen: 'screen/business/list',
+       VseDlyaDeteyScreen: 'screen/kids',
+       DetalDetskogoMestaScreen: 'screen/kids/place',
       SportNaChaykeScreen: 'screen/sports',
       SportDetailScreen: 'screen/sports/detail',
       CrashDiagnosticsScreen: 'screen/crash-diagnostics',
@@ -291,6 +297,8 @@ const ROUTE_FILE_MAP: Record<string, string> = {
   QRCodeScreen: 'QR-Kod.tsx',
   EditProfileScreen: 'EditProfileScreen.tsx',
   PlacesAndPeopleHub: 'Mistsa-i-Lyudi-Hub.tsx',
+  VseDlyaDeteyScreen: 'Vse-Dlya-Detey.tsx',
+  DetalDetskogoMestaScreen: 'Detal-Detskogo-Mesta.tsx',
   PoruchitelScreen: 'Poruchitel.tsx',
   OsbbHubScreen: 'OSBB-Hub.tsx',
   OsbbSborScreen: 'OSBB-Sbor.tsx',
@@ -794,6 +802,8 @@ function AuthNavigation() {
         <Stack.Screen name="EditProfileScreen" component={withGuard(EditProfileScreen, 'auth')} />
         <Stack.Screen name="ViewUserProfile" component={withGuard(ViewUserProfileScreen, 'trusted')} />
         <Stack.Screen name="PlacesAndPeopleHub" component={PlacesAndPeopleHub} />
+        <Stack.Screen name="VseDlyaDeteyScreen" component={VseDlyaDeteyScreen} />
+        <Stack.Screen name="DetalDetskogoMestaScreen" component={DetalDetskogoMestaScreen} />
         <Stack.Screen name="PoruchitelScreen" component={withGuard(PoruchitelScreen, 'trusted')} />
         <Stack.Screen name="OsbbHubScreen" component={withGuard(OsbbHubScreen, 'trusted')} />
         <Stack.Screen name="OsbbSborScreen" component={withGuard(OsbbSborScreen, 'trusted')} />

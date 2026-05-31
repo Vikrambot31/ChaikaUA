@@ -23,6 +23,82 @@ export interface Place {
   website?: string;
   workingHours?: string;
   createdAt: number;
+  childInfo?: ChildInfo;
+}
+
+// --- Children module (раздел "Все для детей") ---
+
+export type ChildCategory =
+  | 'kindergarten'
+  | 'school'
+  | 'development'
+  | 'sport'
+  | 'medical'
+  | 'event';
+
+export type ChildFeature =
+  | 'shelter'
+  | 'food'
+  | 'english'
+  | 'speech_therapist'
+  | 'nurse'
+  | 'sport'
+  | 'full_day'
+  | 'half_day'
+  | 'trial_day';
+
+export interface ChildSafetyInfo {
+  hasShelter?: boolean;
+  hasSecurityGuard?: boolean;
+  hasVideoSurveillance?: boolean;
+  hasClosedTerritory?: boolean;
+  hasAccessControl?: boolean;
+  hasFireSafety?: boolean;
+}
+
+export interface ChildMedicalInfo {
+  hasNurse?: boolean;
+  hasDoctor?: boolean;
+  hasFirstAid?: boolean;
+  hasAllergySupport?: boolean;
+  nearbyClinic?: string;
+}
+
+export interface ChildInfo {
+  category: ChildCategory;
+  ageFrom?: number;
+  ageTo?: number;
+  priceFrom?: number;
+  pricePeriod?: 'month' | 'lesson' | 'day' | 'once';
+  hasAvailablePlaces?: boolean;
+  schedule?: string;
+  shortDescription?: string;
+  fullDescription?: string;
+  telegram?: string;
+  photos?: string[];
+  features?: ChildFeature[];
+  safety?: ChildSafetyInfo;
+  medical?: ChildMedicalInfo;
+}
+
+export interface ChildOffer {
+  id: string;
+  placeId: string;
+  type: 'promotion' | 'event' | 'open_day' | 'trial_lesson' | 'available_places';
+  title: string;
+  shortText: string;
+  fullText?: string;
+  dateFrom?: number;
+  dateTo?: number;
+  validUntil?: number;
+  ageFrom?: number;
+  ageTo?: number;
+  price?: number;
+  discountPercent?: number;
+  isFeatured?: boolean;
+  isActive: boolean;
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface AudioAttachment {
