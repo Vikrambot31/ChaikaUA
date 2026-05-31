@@ -69,6 +69,13 @@ const UI_TEXT = {
     listingsTitle: 'Активні оголошення',
     filterLabel: 'Фільтр товарів',
     filterAll: 'Усі категорії',
+    filterAllListingTypes: 'Усі',
+    buyToggle: 'Хочу купити',
+    sellToggle: 'Хочу продати',
+    searchListingType: 'Тип оголошення',
+    searchAnyListingType: 'Будь-який',
+    buyListingType: 'Куплю',
+    sellListingType: 'Продам',
     pending: 'На модерації',
     approved: 'Схвалено',
     rejected: 'Відхилено',
@@ -142,6 +149,13 @@ const UI_TEXT = {
     listingsTitle: 'Активные объявления',
     filterLabel: 'Фильтр товаров',
     filterAll: 'Все категории',
+    filterAllListingTypes: 'Все',
+    buyToggle: 'Хочу купить',
+    sellToggle: 'Хочу продать',
+    searchListingType: 'Тип объявления',
+    searchAnyListingType: 'Любой',
+    buyListingType: 'Куплю',
+    sellListingType: 'Продам',
     pending: 'На модерации',
     approved: 'Одобрено',
     rejected: 'Отклонено',
@@ -215,6 +229,13 @@ const UI_TEXT = {
     listingsTitle: 'Active listings',
     filterLabel: 'Items filter',
     filterAll: 'All categories',
+    filterAllListingTypes: 'All',
+    buyToggle: 'I want to buy',
+    sellToggle: 'I want to sell',
+    searchListingType: 'Listing type',
+    searchAnyListingType: 'Any',
+    buyListingType: 'Buying',
+    sellListingType: 'Selling',
     pending: 'Pending moderation',
     approved: 'Approved',
     rejected: 'Rejected',
@@ -272,6 +293,7 @@ const BuySellScreen: React.FC = () => {
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const text = UI_TEXT[language];
   const [itemName, setItemName] = useState('');
+  const [listingType, setListingType] = useState<'buy' | 'sell'>('sell');
   const [category, setCategory] = useState('');
   const [condition, setCondition] = useState('');
   const [price, setPrice] = useState('');
@@ -282,11 +304,13 @@ const BuySellScreen: React.FC = () => {
   const [listings, setListings] = useState<BuySellListing[]>([]);
   const [avatarByUserId, setAvatarByUserId] = useState<Record<string, string>>({});
   const [selectedFilterCategory, setSelectedFilterCategory] = useState('');
+  const [selectedFilterListingType, setSelectedFilterListingType] = useState<'' | 'buy' | 'sell'>('');
   const [submitting, setSubmitting] = useState(false);
   const [addFormVisible, setAddFormVisible] = useState(false);
   const [searchModalVisible, setSearchModalVisible] = useState(false);
   const [searchItemName, setSearchItemName] = useState('');
   const [searchCategory, setSearchCategory] = useState('');
+  const [searchListingType, setSearchListingType] = useState<'' | 'buy' | 'sell'>('');
   const [searchCondition, setSearchCondition] = useState('');
   const [searchPriceFrom, setSearchPriceFrom] = useState('');
   const [searchPriceTo, setSearchPriceTo] = useState('');
@@ -313,8 +337,9 @@ const BuySellScreen: React.FC = () => {
       try {
         const raw = await AsyncStorage.getItem('@chaika:buy_sell_draft');
         if (!isMounted || !raw) return;
-        const draft = JSON.parse(raw) as Partial<{ itemName: string; category: string; condition: string; price: string; description: string; phone: string; addFormVisible: boolean; hadPhotos: boolean }>;
+        const draft = JSON.parse(raw) as Partial<{ itemName: string; listingType: 'buy' | 'sell'; category: string; condition: string; price: string; description: string; phone: string; addFormVisible: boolean; hadPhotos: boolean }>;
         if (draft.itemName) setItemName(draft.itemName);
+        if (draft.listingType === 'buy' || draft.listingType === 'sell') setListingType(draft.listingType);
         if (draft.category) setCategory(draft.category);
         if (draft.condition) setCondition(draft.condition);
         if (draft.price) setPrice(draft.price);
@@ -339,9 +364,9 @@ const BuySellScreen: React.FC = () => {
     if (!addFormVisible) return;
     void AsyncStorage.setItem(
       '@chaika:buy_sell_draft',
-      JSON.stringify({ itemName, category, condition, price, description, phone, addFormVisible: true, hadPhotos: formPhotos.length > 0 }),
+      JSON.stringify({ itemName, listingType, category, condition, price, description, phone, addFormVisible: true, hadPhotos: formPhotos.length > 0 }),
     ).catch(() => {});
-  }, [addFormVisible, itemName, category, condition, price, description, phone, formPhotos]);
+  }, [addFormVisible, itemName, listingType, category, condition, price, description, phone, formPhotos]);
 
   useEffect(() => {
     if (!addFormVisible || !draftHadPhotos.current) return;
@@ -380,9 +405,12 @@ const BuySellScreen: React.FC = () => {
 
     return listings.filter((item) => {
       const numericPrice = Number(String(item.price).replace(',', '.').replace(/[^\d.]/g, ''));
+      const itemListingType = item.listingType || 'sell';
 
       if (selectedFilterCategory && item.category !== selectedFilterCategory) return false;
+      if (selectedFilterListingType && itemListingType !== selectedFilterListingType) return false;
       if (searchCategory && item.category !== searchCategory) return false;
+      if (searchListingType && itemListingType !== searchListingType) return false;
       if (searchCondition && item.condition !== searchCondition) return false;
       if (queryItemName && !item.itemName.toLowerCase().includes(queryItemName)) return false;
       if (queryContact && !item.phone.toLowerCase().includes(queryContact)) return false;
@@ -398,9 +426,11 @@ const BuySellScreen: React.FC = () => {
     searchContact,
     searchDescription,
     searchItemName,
+    searchListingType,
     searchPriceFrom,
     searchPriceTo,
     selectedFilterCategory,
+    selectedFilterListingType,
   ]);
 
   const hasAdvancedSearch = useMemo(
@@ -408,6 +438,7 @@ const BuySellScreen: React.FC = () => {
       Boolean(
         searchItemName.trim() ||
         searchCategory ||
+        searchListingType ||
         searchCondition ||
         searchPriceFrom.trim() ||
         searchPriceTo.trim() ||
@@ -420,6 +451,7 @@ const BuySellScreen: React.FC = () => {
       searchContact,
       searchDescription,
       searchItemName,
+      searchListingType,
       searchPriceFrom,
       searchPriceTo,
     ],
@@ -431,6 +463,7 @@ const BuySellScreen: React.FC = () => {
   const resetSearch = () => {
     setSearchItemName('');
     setSearchCategory('');
+    setSearchListingType('');
     setSearchCondition('');
     setSearchPriceFrom('');
     setSearchPriceTo('');
@@ -440,6 +473,7 @@ const BuySellScreen: React.FC = () => {
 
   const resetForm = () => {
     setItemName('');
+    setListingType('sell');
     setCategory('');
     setCondition('');
     setPrice('');
@@ -531,6 +565,7 @@ const BuySellScreen: React.FC = () => {
       const createdAt = new Date();
 
       await buySellService.add({
+        listingType,
         itemName: itemName.trim(),
         category,
         condition,
@@ -607,6 +642,15 @@ const BuySellScreen: React.FC = () => {
                   {ITEM_CATEGORY_VALUES.map((value, index) => (
                     <Picker.Item key={`search-category-${value}`} label={text.categories[index]} value={value} />
                   ))}
+                </Picker>
+              </View>
+
+              <Text style={styles.formLabel}>{text.searchListingType}</Text>
+              <View style={styles.pickerWrapper}>
+                <Picker selectedValue={searchListingType} onValueChange={setSearchListingType} style={styles.picker}>
+                  <Picker.Item label={text.searchAnyListingType} value="" />
+                  <Picker.Item label={text.buyListingType} value="buy" />
+                  <Picker.Item label={text.sellListingType} value="sell" />
                 </Picker>
               </View>
 
@@ -695,13 +739,22 @@ const BuySellScreen: React.FC = () => {
             {listings.length > 0 ? (
               <View style={styles.listingsSection}>
                 <Text style={styles.formLabel}>{text.filterLabel}</Text>
-                <View style={styles.pickerWrapper}>
-                  <Picker selectedValue={selectedFilterCategory} onValueChange={setSelectedFilterCategory} style={styles.picker}>
-                    <Picker.Item label={text.filterAll} value="" />
-                    {ITEM_CATEGORY_VALUES.map((value, index) => (
-                      <Picker.Item key={`filter-${value}`} label={text.categories[index]} value={value} />
-                    ))}
-                  </Picker>
+                <View style={styles.quickFilterRow}>
+                  <View style={[styles.pickerWrapper, styles.quickCategoryPicker]}>
+                    <Picker selectedValue={selectedFilterCategory} onValueChange={setSelectedFilterCategory} style={styles.picker}>
+                      <Picker.Item label={text.filterAll} value="" />
+                      {ITEM_CATEGORY_VALUES.map((value, index) => (
+                        <Picker.Item key={`filter-${value}`} label={text.categories[index]} value={value} />
+                      ))}
+                    </Picker>
+                  </View>
+                  <View style={[styles.pickerWrapper, styles.quickTypePicker]}>
+                    <Picker selectedValue={selectedFilterListingType} onValueChange={setSelectedFilterListingType} style={styles.picker}>
+                      <Picker.Item label={text.filterAllListingTypes} value="" />
+                      <Picker.Item label={text.buyListingType} value="buy" />
+                      <Picker.Item label={text.sellListingType} value="sell" />
+                    </Picker>
+                  </View>
                 </View>
 
                 <View style={styles.listingsHeaderRow}>
@@ -745,6 +798,9 @@ const BuySellScreen: React.FC = () => {
               ) : null}
             </View>
             <View style={styles.listingMeta}>
+              {(item.listingType || 'sell') === 'buy' ? (
+                <Text style={styles.listingTypeBadge}>{text.buyListingType}</Text>
+              ) : null}
               <Text style={styles.listingBadgeText}>{text.conditionLabels[item.condition as keyof typeof text.conditionLabels] ?? item.condition}</Text>
               <Text style={styles.listingPrice}>{item.price} грн</Text>
               {item.isArchived ? (
@@ -820,6 +876,23 @@ const BuySellScreen: React.FC = () => {
               contentContainerStyle={styles.sheetContent}
               style={styles.sheetScroll}
             >
+              <View style={styles.typeToggleRow}>
+                <TouchableOpacity
+                  style={[styles.typeToggleBtn, listingType === 'buy' ? styles.typeToggleBuyActive : styles.typeToggleInactive]}
+                  onPress={() => setListingType('buy')}
+                  activeOpacity={0.82}
+                >
+                  <Text style={[styles.typeToggleText, listingType === 'buy' && styles.typeToggleTextActive]}>{text.buyToggle}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.typeToggleBtn, listingType === 'sell' ? styles.typeToggleSellActive : styles.typeToggleInactive]}
+                  onPress={() => setListingType('sell')}
+                  activeOpacity={0.82}
+                >
+                  <Text style={[styles.typeToggleText, listingType === 'sell' && styles.typeToggleTextActive]}>{text.sellToggle}</Text>
+                </TouchableOpacity>
+              </View>
+
               <Text style={styles.formLabel}>{text.itemNameLabel}</Text>
               <TextInput
                 placeholder={text.itemNamePlaceholder}
@@ -966,7 +1039,17 @@ const styles = StyleSheet.create({
   input: { backgroundColor: '#F7F3EE', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, color: SCREEN_THEME.textPrimary, borderWidth: 1, borderColor: '#E8DDD3' },
   textarea: { minHeight: 80, textAlignVertical: 'top' },
   pickerWrapper: { backgroundColor: '#F7F3EE', borderRadius: 16, borderWidth: 1, borderColor: '#E8DDD3', overflow: 'hidden' },
+  quickFilterRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
+  quickCategoryPicker: { flex: 1.5 },
+  quickTypePicker: { flex: 1 },
   picker: { color: SCREEN_THEME.textPrimary, height: 50 },
+  typeToggleRow: { flexDirection: 'row', gap: 10, marginBottom: 8 },
+  typeToggleBtn: { flex: 1, minHeight: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, paddingVertical: 10 },
+  typeToggleBuyActive: { backgroundColor: SCREEN_THEME.woodGreen },
+  typeToggleSellActive: { backgroundColor: SCREEN_THEME.terracotta },
+  typeToggleInactive: { backgroundColor: '#ECE7E1', borderWidth: 1, borderColor: '#D9CFC4' },
+  typeToggleText: { color: SCREEN_THEME.textPrimary, fontWeight: '900', fontSize: 13, textAlign: 'center' },
+  typeToggleTextActive: { color: '#fff' },
   submitBtn: { backgroundColor: SCREEN_THEME.terracotta, borderRadius: 16, paddingVertical: 14, alignItems: 'center', marginTop: 14 },
   submitBtnDisabled: { opacity: 0.65 },
   submitBtnText: { color: '#FFFFFF', fontWeight: '800' },
@@ -992,8 +1075,9 @@ const styles = StyleSheet.create({
   listingHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   listingName: { fontWeight: '800', color: SCREEN_THEME.textPrimary, flex: 1, marginRight: 8 },
   deleteText: { color: '#D05B4D', fontWeight: '700' },
-  listingMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+  listingMeta: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 6 },
   archiveBadge: { fontSize: 10, fontWeight: '700', color: '#fff', backgroundColor: '#8B7355', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 4, overflow: 'hidden' },
+  listingTypeBadge: { fontSize: 10, fontWeight: '900', color: '#fff', backgroundColor: '#5967C8', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4, overflow: 'hidden' },
   listingBadgeText: { fontSize: 11, fontWeight: '700', color: '#7B1FA2' },
   listingPrice: { fontSize: 15, fontWeight: '900', color: '#00897B' },
   statusBadge: { fontSize: 11, fontWeight: '900', color: '#8A5A00', backgroundColor: '#FFF2C7', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
@@ -1066,8 +1150,3 @@ const styles = StyleSheet.create({
 });
 
 export default BuySellScreen;
-
-
-
-
-

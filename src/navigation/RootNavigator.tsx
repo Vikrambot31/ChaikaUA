@@ -596,7 +596,6 @@ function AuthNavigation() {
   const [navigationContainerReady, setNavigationContainerReady] = useState(false);
   const [navKey, setNavKey] = useState(0);
   const navErrorCountRef = useRef(0);
-  const profileSetupShownRef = useRef(false);
 
   useEffect(() => {
     setNavReady(true);
@@ -612,17 +611,17 @@ function AuthNavigation() {
       });
       return;
     }
-    if (profileSetupShownRef.current) {
-      console.log('[ProfileSetup] Already shown, skipping');
-      return;
-    }
+    const hasProfileAvatar = Boolean(currentUser.startAvatarKey?.trim())
+      || Boolean(currentUser.photoURL?.trim())
+      || Boolean(currentUser.photoURLs?.some((url) => url.trim()));
+    const needsSetup = !currentUser.gender || !currentUser.age || !hasProfileAvatar;
     console.log('[ProfileSetup] User profile check:', {
       gender: currentUser.gender,
       age: currentUser.age,
-      needsSetup: !currentUser.gender || !currentUser.age,
+      hasProfileAvatar,
+      needsSetup,
     });
-    if (!currentUser.gender || !currentUser.age) {
-      profileSetupShownRef.current = true;
+    if (needsSetup && navigationRef.getCurrentRoute()?.name !== 'ProfileSetupScreen') {
       console.log('[ProfileSetup] Navigating to ProfileSetupScreen');
       navigationRef.navigate('ProfileSetupScreen');
     }

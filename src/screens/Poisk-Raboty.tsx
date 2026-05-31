@@ -6,6 +6,7 @@ import { NavigationProp, useNavigation } from '@react-navigation/native';
 import MiniTabBar from '../components/MiniTabBar';
 import AppPhotoImage from '../components/AppPhotoImage';
 import { SCREEN_THEME } from '../utils/screenTheme';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import TactileIcon from '../components/TactileIcon';
 import MiniUserAvatar from '../components/MiniUserAvatar';
 import { normalizePersonName, normalizePhoneText } from '../utils/textUtils';
@@ -28,6 +29,49 @@ type AppLanguage = 'ua' | 'ru' | 'en';
 type JobListingKind = 'resume' | 'vacancy';
 const RESUME_WORK_TYPE_INDEXES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
 const VACANCY_WORK_TYPE_INDEXES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
+
+type FieldTone = 'idle' | 'valid' | 'error' | 'warning';
+type FieldKey = 'name' | 'phone' | 'age' | 'workType' | 'about';
+type IconName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
+
+type FieldState = {
+  tone: FieldTone;
+  message: string;
+};
+
+const toneIcon: Record<FieldTone, IconName> = {
+  idle: 'circle-outline',
+  valid: 'check-circle',
+  error: 'alert-circle',
+  warning: 'progress-clock',
+};
+
+const toneColor: Record<FieldTone, string> = {
+  idle: SCREEN_THEME.textMuted,
+  valid: '#2F7D50',
+  error: '#B84A3A',
+  warning: '#B7791F',
+};
+
+const StatusIcon = ({ tone }: { tone: FieldTone }) => (
+  <MaterialCommunityIcons name={toneIcon[tone]} size={20} color={toneColor[tone]} />
+);
+
+const FieldHeader = ({ label, state }: { label: string; state: FieldState }) => (
+  <View style={styles.fieldHeader}>
+    <Text style={styles.fieldLabel}>{label}</Text>
+    <StatusIcon tone={state.tone} />
+  </View>
+);
+
+const FieldMessage = ({ state, visible }: { state: FieldState; visible: boolean }) => {
+  if (!visible || !state.message) return null;
+  return (
+    <View style={styles.fieldMessageWrap}>
+      <Text style={[styles.fieldMessage, { color: toneColor[state.tone] }]}>{state.message}</Text>
+    </View>
+  );
+};
 
 const UI_TEXT = {
   ua: {
@@ -120,6 +164,21 @@ const UI_TEXT = {
     viewProfile: 'Переглянути профіль',
     contactUser: "Зв'язатися",
     authRequired: 'Увійдіть в акаунт, щоб опублікувати оголошення.',
+    ready: 'Готово',
+    nameHint: "Вкажіть ім'я або контактну особу.",
+    nameEmpty: "Напишіть ім'я.",
+    nameInvalid: "Ім'я має містити мінімум 2 символи.",
+    phoneHint: 'Формат: +380 XX XXX XX XX.',
+    phoneEmpty: 'Напишіть номер телефону.',
+    phoneInvalid: 'Перевірте номер у форматі +380 XX XXX XX XX.',
+    ageHint: 'Вкажіть вік від 14 до 100 років.',
+    ageEmpty: 'Напишіть ваш вік.',
+    ageInvalid: 'Вік має бути від 14 до 100.',
+    workTypeHint: 'Оберіть категорію роботи.',
+    workTypeEmpty: 'Оберіть тип робіт.',
+    aboutHint: "Опишіть вакансію: обов'язки, графік, оплата.",
+    aboutEmpty: 'Опишіть, кого шукаєте.',
+    submitReview: 'Перевірити та опублікувати',
   },
   ru: {
     workTypes: [
@@ -211,6 +270,21 @@ const UI_TEXT = {
     viewProfile: 'Просмотреть профиль',
     contactUser: 'Связаться',
     authRequired: 'Войдите в аккаунт, чтобы опубликовать объявление.',
+    ready: 'Готово',
+    nameHint: 'Укажите имя или контактное лицо.',
+    nameEmpty: 'Напишите имя.',
+    nameInvalid: 'Имя должно содержать минимум 2 символа.',
+    phoneHint: 'Формат: +380 XX XXX XX XX.',
+    phoneEmpty: 'Напишите номер телефона.',
+    phoneInvalid: 'Проверьте номер в формате +380 XX XXX XX XX.',
+    ageHint: 'Укажите возраст от 14 до 100 лет.',
+    ageEmpty: 'Напишите ваш возраст.',
+    ageInvalid: 'Возраст должен быть от 14 до 100.',
+    workTypeHint: 'Выберите категорию работы.',
+    workTypeEmpty: 'Выберите тип работ.',
+    aboutHint: 'Опишите вакансию: обязанности, график, оплата.',
+    aboutEmpty: 'Опишите, кого ищете.',
+    submitReview: 'Проверить и опубликовать',
   },
   en: {
     workTypes: [
@@ -302,6 +376,21 @@ const UI_TEXT = {
     viewProfile: 'View profile',
     contactUser: 'Contact',
     authRequired: 'Sign in to publish a listing.',
+    ready: 'Ready',
+    nameHint: 'Enter your name or contact person.',
+    nameEmpty: 'Enter a name.',
+    nameInvalid: 'Name must be at least 2 characters.',
+    phoneHint: 'Format: +380 XX XXX XX XX.',
+    phoneEmpty: 'Enter a phone number.',
+    phoneInvalid: 'Check phone format: +380 XX XXX XX XX.',
+    ageHint: 'Enter age between 14 and 100.',
+    ageEmpty: 'Enter your age.',
+    ageInvalid: 'Age must be between 14 and 100.',
+    workTypeHint: 'Select a work category.',
+    workTypeEmpty: 'Select a work type.',
+    aboutHint: 'Describe the vacancy: responsibilities, schedule, pay.',
+    aboutEmpty: 'Describe who you are looking for.',
+    submitReview: 'Review and publish',
   },
 } as const;
 
@@ -342,6 +431,10 @@ const JobSearchScreen: React.FC = () => {
   const [avatarByUserId, setAvatarByUserId] = useState<Record<string, string>>({});
   const [selectedFilter, setSelectedFilter] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [touched, setTouched] = useState<Record<FieldKey, boolean>>({
+    name: false, phone: false, age: false, workType: false, about: false,
+  });
+  const [submittedOnce, setSubmittedOnce] = useState(false);
   const [isPublishFormVisible, setIsPublishFormVisible] = useState(false);
   const [searchModalVisible, setSearchModalVisible] = useState(false);
   const [searchName, setSearchName] = useState('');
@@ -405,6 +498,92 @@ const JobSearchScreen: React.FC = () => {
     [text.approved, text.pending, text.rejected],
   );
   const isVacancyForm = listingKind === 'vacancy';
+
+  const markTouched = (field: FieldKey) => {
+    setTouched((current) => (current[field] ? current : { ...current, [field]: true }));
+  };
+
+  const nameReady = name.trim().length >= 2;
+  const phoneReady = phone.replace(/\D/g, '').length >= 7;
+  const ageNum = Number.parseInt(age.trim(), 10);
+  const ageReady = isVacancyForm || (Number.isFinite(ageNum) && ageNum >= 14 && ageNum <= 100);
+  const workTypeReady = Boolean(workType);
+  const aboutReady = !isVacancyForm || about.trim().length > 0;
+  const formReady = nameReady && phoneReady && ageReady && workTypeReady && aboutReady;
+
+  const fieldStates = useMemo<Record<FieldKey, FieldState>>(() => {
+    const phoneDigits = phone.replace(/\D/g, '');
+
+    const showNameIssue = submittedOnce || touched.name || name.trim().length > 0;
+    const showPhoneIssue = submittedOnce || touched.phone || phoneDigits.length > 2;
+    const showAgeIssue = submittedOnce || touched.age || age.trim().length > 0;
+    const showWorkTypeIssue = submittedOnce || touched.workType;
+    const showAboutIssue = submittedOnce || touched.about || about.trim().length > 0;
+
+    const nameState: FieldState = nameReady
+      ? { tone: 'valid', message: text.ready }
+      : {
+          tone: showNameIssue ? 'error' : 'idle',
+          message: !name.trim() ? (showNameIssue ? text.nameEmpty : text.nameHint) : text.nameInvalid,
+        };
+
+    const phoneState: FieldState = phoneReady
+      ? { tone: 'valid', message: text.ready }
+      : {
+          tone: showPhoneIssue ? 'error' : 'idle',
+          message: phoneDigits.length <= 2 ? (showPhoneIssue ? text.phoneEmpty : text.phoneHint) : text.phoneInvalid,
+        };
+
+    const ageState: FieldState = isVacancyForm
+      ? { tone: 'idle', message: '' }
+      : ageReady
+      ? { tone: 'valid', message: text.ready }
+      : {
+          tone: showAgeIssue ? 'error' : 'idle',
+          message: !age.trim() ? (showAgeIssue ? text.ageEmpty : text.ageHint) : text.ageInvalid,
+        };
+
+    const workTypeState: FieldState = workTypeReady
+      ? { tone: 'valid', message: text.ready }
+      : {
+          tone: showWorkTypeIssue ? 'error' : 'idle',
+          message: showWorkTypeIssue ? text.workTypeEmpty : text.workTypeHint,
+        };
+
+    const aboutState: FieldState = !isVacancyForm
+      ? (about.trim() ? { tone: 'valid', message: text.ready } : { tone: 'idle', message: '' })
+      : aboutReady
+      ? { tone: 'valid', message: text.ready }
+      : {
+          tone: showAboutIssue ? 'error' : 'idle',
+          message: !about.trim() ? (showAboutIssue ? text.aboutEmpty : text.aboutHint) : text.aboutHint,
+        };
+
+    return { name: nameState, phone: phoneState, age: ageState, workType: workTypeState, about: aboutState };
+  }, [
+    about,
+    age,
+    ageReady,
+    isVacancyForm,
+    name,
+    nameReady,
+    phone,
+    phoneReady,
+    submittedOnce,
+    text,
+    touched.about,
+    touched.age,
+    touched.name,
+    touched.phone,
+    touched.workType,
+    workTypeReady,
+  ]);
+
+  const activeIssueKey = useMemo(() => (
+    (['name', 'phone', 'age', 'workType', 'about'] as FieldKey[])
+      .find((key) => fieldStates[key].tone === 'error' || fieldStates[key].tone === 'warning')
+  ), [fieldStates]);
+
   const getListingKind = (item: JobListing): JobListingKind => item.listingKind === 'vacancy' ? 'vacancy' : 'resume';
   const formWorkTypes = useMemo(() => {
     const indexes = isVacancyForm ? VACANCY_WORK_TYPE_INDEXES : RESUME_WORK_TYPE_INDEXES;
@@ -484,6 +663,7 @@ const JobSearchScreen: React.FC = () => {
     if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, userStartAvatarKey: user?.startAvatarKey, navigation })) {
       return;
     }
+    setSubmittedOnce(true);
     const isVacancy = listingKind === 'vacancy';
     if (!name.trim() || !phone.trim() || !workType || (!isVacancy && !age.trim()) || (isVacancy && !about.trim())) {
       Alert.alert(text.alertFormTitle, isVacancy ? text.alertVacancyFormBody : text.alertFormBody);
@@ -557,6 +737,8 @@ const JobSearchScreen: React.FC = () => {
       setAbout('');
       setFormPhotos([]);
       setListingKind('resume');
+      setTouched({ name: false, phone: false, age: false, workType: false, about: false });
+      setSubmittedOnce(false);
       setIsPublishFormVisible(false);
     } catch (error) {
       showUserError(language, 'send', error);
@@ -709,59 +891,66 @@ const JobSearchScreen: React.FC = () => {
                 <View style={styles.kindSwitcher}>
                   <TouchableOpacity
                     style={[styles.kindOption, listingKind === 'resume' && styles.kindOptionActive]}
-                    onPress={() => { setListingKind('resume'); setWorkType(''); }}
+                    onPress={() => { setListingKind('resume'); setWorkType(''); setTouched({ name: false, phone: false, age: false, workType: false, about: false }); setSubmittedOnce(false); }}
                     activeOpacity={0.82}
                   >
                     <Text style={[styles.kindOptionText, listingKind === 'resume' && styles.kindOptionTextActive]}>{text.resumeOption}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.kindOption, listingKind === 'vacancy' && styles.kindOptionActive]}
-                    onPress={() => { setListingKind('vacancy'); setWorkType(''); }}
+                    onPress={() => { setListingKind('vacancy'); setWorkType(''); setTouched({ name: false, phone: false, age: false, workType: false, about: false }); setSubmittedOnce(false); }}
                     activeOpacity={0.82}
                   >
                     <Text style={[styles.kindOptionText, listingKind === 'vacancy' && styles.kindOptionTextActive]}>{text.vacancyOption}</Text>
                   </TouchableOpacity>
                 </View>
 
-                <Text style={styles.formLabel}>{isVacancyForm ? text.labelContactName : text.labelName}</Text>
+                <FieldHeader label={isVacancyForm ? text.labelContactName : text.labelName} state={fieldStates.name} />
                 <TextInput
                   placeholder={isVacancyForm ? text.placeholderContactName : text.placeholderName}
                   value={name}
                   onChangeText={(value) => setName(normalizePersonName(value))}
-                  style={styles.input}
+                  onBlur={() => markTouched('name')}
+                  style={[styles.input, fieldStates.name.tone === 'error' && styles.inputError, fieldStates.name.tone === 'valid' && styles.inputValid]}
                   placeholderTextColor="#A0938D"
                 />
+                <FieldMessage state={fieldStates.name} visible={activeIssueKey === 'name'} />
 
-                <Text style={styles.formLabel}>{text.labelPhone}</Text>
-                <TextInput placeholder="+380..." value={phone} onChangeText={(value) => setPhone(normalizePhoneText(value))} keyboardType="phone-pad" style={styles.input} placeholderTextColor="#A0938D" />
+                <FieldHeader label={text.labelPhone} state={fieldStates.phone} />
+                <TextInput placeholder="+380..." value={phone} onChangeText={(value) => setPhone(normalizePhoneText(value))} onBlur={() => markTouched('phone')} keyboardType="phone-pad" style={[styles.input, fieldStates.phone.tone === 'error' && styles.inputError, fieldStates.phone.tone === 'valid' && styles.inputValid]} placeholderTextColor="#A0938D" />
+                <FieldMessage state={fieldStates.phone} visible={activeIssueKey === 'phone'} />
 
                 {!isVacancyForm ? (
                   <>
-                    <Text style={styles.formLabel}>{text.labelAge}</Text>
-                    <TextInput placeholder={text.placeholderAge} value={age} onChangeText={(value) => setAge(value.replace(/[^0-9]/g, '').slice(0, 3))} keyboardType="number-pad" style={styles.input} placeholderTextColor="#A0938D" />
+                    <FieldHeader label={text.labelAge} state={fieldStates.age} />
+                    <TextInput placeholder={text.placeholderAge} value={age} onChangeText={(value) => setAge(value.replace(/[^0-9]/g, '').slice(0, 3))} onBlur={() => markTouched('age')} keyboardType="number-pad" style={[styles.input, fieldStates.age.tone === 'error' && styles.inputError, fieldStates.age.tone === 'valid' && styles.inputValid]} placeholderTextColor="#A0938D" />
+                    <FieldMessage state={fieldStates.age} visible={activeIssueKey === 'age'} />
                   </>
                 ) : null}
 
-                <Text style={styles.formLabel}>{text.labelWorkType}</Text>
-                <View style={styles.pickerWrapper}>
-                  <Picker selectedValue={workType} onValueChange={setWorkType} style={styles.picker}>
+                <FieldHeader label={text.labelWorkType} state={fieldStates.workType} />
+                <View style={[styles.pickerWrapper, fieldStates.workType.tone === 'error' && styles.inputError, fieldStates.workType.tone === 'valid' && styles.inputValid]}>
+                  <Picker selectedValue={workType} onValueChange={(value) => { setWorkType(value); markTouched('workType'); }} style={styles.picker}>
                     <Picker.Item label={text.searchAnyType} value="" />
                     {formWorkTypes.map((item) => (
                       <Picker.Item key={item} label={item} value={item} />
                     ))}
                   </Picker>
                 </View>
+                <FieldMessage state={fieldStates.workType} visible={activeIssueKey === 'workType'} />
 
-                <Text style={styles.formLabel}>{isVacancyForm ? text.labelVacancyAbout : text.labelAbout}</Text>
+                <FieldHeader label={isVacancyForm ? text.labelVacancyAbout : text.labelAbout} state={fieldStates.about} />
                 <TextInput
                   placeholder={isVacancyForm ? text.placeholderVacancyAbout : text.placeholderAbout}
                   value={about}
                   onChangeText={setAbout}
-                  style={[styles.input, styles.textarea]}
+                  onBlur={() => markTouched('about')}
+                  style={[styles.input, styles.textarea, fieldStates.about.tone === 'error' && styles.inputError, fieldStates.about.tone === 'valid' && styles.inputValid]}
                   placeholderTextColor="#A0938D"
                   multiline
                   maxLength={180}
                 />
+                <FieldMessage state={fieldStates.about} visible={activeIssueKey === 'about'} />
 
                 <Text style={styles.formLabel}>{requiredPhotoLabel}</Text>
                 {user?.id ? (
@@ -780,7 +969,10 @@ const JobSearchScreen: React.FC = () => {
                   {submitting ? (
                     <ActivityIndicator color="#fff" />
                   ) : (
-                    <Text style={styles.submitBtnText}>{hasUploadingPhotos ? (language === 'ru' ? 'Загрузка фото…' : language === 'en' ? 'Uploading photo…' : 'Завантаження фото…') : isVacancyForm ? text.submitVacancy : text.submit}</Text>
+                    <>
+                      <MaterialCommunityIcons name={formReady ? 'send' : 'clipboard-check-outline'} size={18} color="#FFFFFF" />
+                      <Text style={styles.submitBtnText}>{hasUploadingPhotos ? (language === 'ru' ? 'Загрузка фото…' : language === 'en' ? 'Uploading photo…' : 'Завантаження фото…') : formReady ? (isVacancyForm ? text.submitVacancy : text.submit) : text.submitReview}</Text>
+                    </>
                   )}
                 </TouchableOpacity>
               </View>
@@ -1032,6 +1224,17 @@ const styles = StyleSheet.create({
   publishToggleBtnText: { color: '#fff', fontWeight: '800', fontSize: 14 },
   formCard: { backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 24, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#E4D0AB' },
   formLabel: { fontWeight: '700', color: SCREEN_THEME.textPrimary, marginBottom: 8, marginTop: 8 },
+  fieldHeader: {
+    marginTop: 12,
+    marginBottom: 7,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  fieldLabel: { color: SCREEN_THEME.textPrimary, fontSize: 14, fontWeight: '900' },
+  fieldMessageWrap: { marginTop: 6, marginBottom: 2 },
+  fieldMessage: { fontSize: 12, fontWeight: '900', lineHeight: 16 },
   signInNote: { color: SCREEN_THEME.textSecondary, fontSize: 13, fontWeight: '700', paddingVertical: 10, lineHeight: 18 },
   kindSwitcher: {
     flexDirection: 'row',
@@ -1063,8 +1266,10 @@ const styles = StyleSheet.create({
   workTypeChipActive: { backgroundColor: '#DDEAF0', borderColor: SCREEN_THEME.enamelBlueDark },
   workTypeText: { color: SCREEN_THEME.textSecondary, fontSize: 12, fontWeight: '800' },
   workTypeTextActive: { color: SCREEN_THEME.enamelBlueDark },
-  submitBtn: { backgroundColor: SCREEN_THEME.terracotta, borderRadius: 16, paddingVertical: 14, alignItems: 'center', marginTop: 14 },
+  submitBtn: { backgroundColor: SCREEN_THEME.terracotta, borderRadius: 16, paddingVertical: 14, paddingHorizontal: 16, alignItems: 'center', marginTop: 14, flexDirection: 'row', justifyContent: 'center', gap: 8 },
   submitBtnText: { color: '#FFFFFF', fontWeight: '800' },
+  inputError: { borderColor: '#B84A3A', backgroundColor: '#FFF7F5' },
+  inputValid: { borderColor: '#2F7D50', backgroundColor: '#FBFFFC' },
   listingsSection: { marginBottom: 16 },
   pickerWrapper: {
     backgroundColor: '#F7F3EE',

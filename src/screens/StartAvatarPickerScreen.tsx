@@ -62,11 +62,11 @@ export default function StartAvatarPickerScreen() {
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const user = useSelector(selectUser);
   const text = TEXT[language] ?? TEXT.ua;
-  const [selectedKey, setSelectedKey] = useState(START_AVATARS[0]?.key ?? '');
+  const [selectedKey, setSelectedKey] = useState('');
   const [saving, setSaving] = useState(false);
   const [successVisible, setSuccessVisible] = useState(false);
   const selectedAvatar = useMemo(
-    () => START_AVATARS.find((avatar) => avatar.key === selectedKey) ?? START_AVATARS[0],
+    () => START_AVATARS.find((avatar) => avatar.key === selectedKey),
     [selectedKey],
   );
 
@@ -135,9 +135,9 @@ export default function StartAvatarPickerScreen() {
 
       <View style={styles.footer}>
         <TouchableOpacity
-          style={[styles.continueButton, saving && { opacity: 0.55 }]}
+          style={[styles.continueButton, (!selectedAvatar || saving) && { opacity: 0.55 }]}
           onPress={() => void confirm()}
-          disabled={saving}
+          disabled={!selectedAvatar || saving}
           activeOpacity={0.86}
         >
           {saving

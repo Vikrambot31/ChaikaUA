@@ -612,6 +612,7 @@ const HomeScreen: React.FC = () => {
 
     for (const req of liveRequests) {
       if (!req.isApproved) continue;
+      if (req.group === 'help_neighbors' || req.category === 'help') continue;
       const visual = getFeedVisual({
         category: req.category,
         group: req.group,

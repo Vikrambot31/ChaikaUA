@@ -421,11 +421,13 @@ const ProfileScreen: React.FC = () => {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <TactileCard elevated style={styles.headerCard} pressable={false}>
-          {user?.photoURL ? (
-            <AppPhotoImage uri={user.photoURL} style={styles.headerImage} resizeMode="cover" debugLabel={`Profile:${user.id}`} />
-          ) : (
-            <Image source={require('../../assets/WEBP-version/profil.webp')} style={styles.headerImage} resizeMode="cover" />
-          )}
+          <View style={styles.avatarCircle}>
+            {user?.photoURL ? (
+              <AppPhotoImage uri={user.photoURL} style={styles.headerImage} resizeMode="cover" debugLabel={`Profile:${user.id}`} />
+            ) : (
+              <Image source={require('../../assets/WEBP-version/profil.webp')} style={styles.headerImage} resizeMode="cover" />
+            )}
+          </View>
           <View style={styles.headerInfo}>
             <Text style={[styles.userName, !user?.name && styles.userNameGuest]}>{user?.name || text.guest}</Text>
             {user?.email ? <Text style={styles.userMeta}>{user.email}</Text> : null}
@@ -746,20 +748,28 @@ const styles = StyleSheet.create({
   orb: { position: 'absolute', borderRadius: 999 },
   content: { padding: 16, paddingBottom: 36 },
   headerCard: {
-    padding: 0,
-    overflow: 'hidden',
+    padding: 20,
     marginBottom: 14,
+    alignItems: 'center',
+  },
+  avatarCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: SCREEN_THEME.terracotta,
+    marginBottom: 4,
   },
   registerCta: {
     marginBottom: 14,
   },
   headerImage: {
-    width: '100%',
-    height: 180,
+    width: 100,
+    height: 100,
   },
   headerInfo: {
-    padding: 16,
-    paddingTop: 14,
+    paddingTop: 10,
     alignItems: 'center',
   },
   userName: {

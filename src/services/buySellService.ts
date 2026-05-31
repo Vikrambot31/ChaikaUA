@@ -10,6 +10,7 @@ import { assertTextMatchesLanguage, normalizeAppLang, type AppLang } from '../ut
 
 export interface BuySellListing {
   id: string;
+  listingType: 'buy' | 'sell';
   itemName: string;
   category: string;
   condition: string;
@@ -48,6 +49,7 @@ const normalizePrice = (value: string): string => {
 
 const mapBuySellItem = (id: string, data: any, isArchived?: boolean): BuySellListing => ({
   id,
+  listingType: data.listingType || 'sell',
   itemName: data.itemName || '',
   category: data.category || '',
   condition: data.condition || '',
@@ -171,6 +173,7 @@ export const buySellService = {
       const photoStoragePath = item.photoStoragePath || item.photoUri;
       const sanitized = {
         ...item,
+        listingType: item.listingType === 'buy' ? 'buy' : 'sell',
         itemName: sanitizeStoredText(item.itemName),
         category: sanitizeStoredText(item.category),
         condition: sanitizeStoredText(item.condition),

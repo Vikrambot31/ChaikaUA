@@ -25,7 +25,6 @@ import { SCREEN_THEME } from '../utils/screenTheme';
 import {
   START_AVATARS,
   saveSelectedStartAvatar,
-  getDefaultAvatarKey,
   saveTempProfileData,
 } from '../utils/startAvatars';
 import { updateProfileRecord, uploadProfilePhoto } from '../services/authProfileService';
@@ -121,28 +120,22 @@ export default function ProfileSetupScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  const existingPhotoURL = user?.photoURL?.trim() || user?.photoURLs?.find((url) => url.trim())?.trim() || '';
+  const hasExistingAvatar = Boolean(existingPhotoURL) || Boolean(user?.startAvatarKey?.trim());
   const trimmedName = name.trim();
   const parsedAge = parseInt(ageText, 10);
   const isNameDone = trimmedName.length >= 2;
-  const isAvatarDone = selectedKey !== '' || customAvatarUri !== '';
+  const isAvatarDone = selectedKey !== '' || customAvatarUri !== '' || hasExistingAvatar;
   const isGenderDone = gender !== null;
   const isAgeDone = !isNaN(parsedAge) && parsedAge >= 14 && parsedAge <= 100;
 
   const handleGenderSelect = (g: 'male' | 'female') => {
     setGender(g);
-    if (!selectedKey) {
-      const age = parseInt(ageText, 10);
-      setSelectedKey(getDefaultAvatarKey(g, isNaN(age) ? undefined : age));
-    }
   };
 
   const handleAgeChange = (val: string) => {
     setAgeText(val);
     setError('');
-    if (gender && !selectedKey) {
-      const age = parseInt(val, 10);
-      setSelectedKey(getDefaultAvatarKey(gender, isNaN(age) ? undefined : age));
-    }
   };
 
   const handlePickAvatarPhoto = async () => {
@@ -197,15 +190,12 @@ export default function ProfileSetupScreen() {
     const age = parsedAge;
     if (isNaN(age) || age < 14 || age > 100) { setError(text.ageError); return; }
 
-    const avatarKey = selectedKey || getDefaultAvatarKey(gender ?? undefined, age);
-    const avatar = START_AVATARS.find((a) => a.key === avatarKey) ?? START_AVATARS[0];
-
     setSaving(true);
     try {
       const uid = auth.currentUser?.uid || user?.id;
-      let nextPhotoURL = avatar.uri;
-      let nextPhotoURLs = [avatar.uri];
-      let nextStartAvatarKey = avatar.key;
+      let nextPhotoURL = existingPhotoURL;
+      let nextPhotoURLs = user?.photoURLs?.filter((url) => url.trim()) ?? (existingPhotoURL ? [existingPhotoURL] : []);
+      let nextStartAvatarKey = user?.startAvatarKey ?? '';
 
       if (customAvatarUri) {
         if (!uid) {
@@ -216,7 +206,11 @@ export default function ProfileSetupScreen() {
         nextPhotoURL = uploaded.url;
         nextPhotoURLs = [uploaded.url];
         nextStartAvatarKey = '';
-      } else {
+      } else if (selectedKey) {
+        const avatar = START_AVATARS.find((a) => a.key === selectedKey) ?? START_AVATARS[0];
+        nextPhotoURL = avatar.uri;
+        nextPhotoURLs = [avatar.uri];
+        nextStartAvatarKey = avatar.key;
         await saveSelectedStartAvatar(avatar.key);
       }
 
@@ -247,7 +241,7 @@ export default function ProfileSetupScreen() {
           name: trimmedName,
           gender: gender!,
           age,
-          startAvatarKey: avatar.key,
+          startAvatarKey: selectedKey,
         });
       }
 
