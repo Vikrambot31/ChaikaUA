@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-06-01",
+      "publishedAt": "2026-06-01T09:19:38.192Z",
+      "key": "https://bigkyiv.com.ua/pochatok-chervnya-v-ukrayini-bude-doshhovym-i-spekotnym-vodnochas/"
+    },
+    {
       "type": "places",
       "date": "2026-05-31",
       "publishedAt": "2026-05-31T10:05:39.102Z",
