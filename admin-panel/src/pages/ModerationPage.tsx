@@ -4,6 +4,7 @@ import { InfoHint } from '../components/InfoHint';
 import { AiAnalysisButton } from '../components/AiAnalysisButton';
 import { EditRequestModal } from '../components/EditRequestModal';
 import { analyzeText } from '../services/aiAnalysisService';
+import { logDisagreement } from '../services/aiFeedbackService';
 import type { AnalysisResult, AiVerdict } from '../types/ai';
 import {
   deleteModerationItem,
@@ -213,6 +214,24 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
       } else {
         await moderateItem(item, action);
         setMessage(action === 'approved' ? 'Запись одобрена.' : 'Запись отклонена.');
+
+        // Disagreement logging: если AI дал вердикт и модератор пошёл против
+        const aiResult = aiResults.get(item.path);
+        if (aiResult) {
+          const aiExpectedAction = aiResult.verdict === 'approve' ? 'approved' : 'rejected';
+          if (aiExpectedAction !== action) {
+            logDisagreement({
+              itemPath: item.path,
+              section: item.section,
+              textTruncated: (item.subtitle || item.title || '').slice(0, 200),
+              aiVerdict: aiResult.verdict,
+              aiConfidence: aiResult.confidence,
+              humanAction: action,
+              moderatorUid: user.uid,
+              timestamp: Date.now(),
+            }).catch(() => { /* silent — не блокируем модерацию */ });
+          }
+        }
       }
       setItems((current) => current.filter((candidate) => candidate.path !== item.path));
       setSelectedPaths((current) => {

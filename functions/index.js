@@ -2571,10 +2571,15 @@ exports.offerHelp = functions.https.onCall(async (data, context) => {
 // =============================================================
 
 const AI_PROVIDER = process.env.AI_PROVIDER || 'deepseek';
-const AI_API_KEY = process.env.AI_API_KEY || '';
+const AI_API_KEY = process.env.AI_API_KEY || process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY || '';
 const AI_MODEL = process.env.AI_MODEL || 'deepseek-chat';
 const AI_BUDGET_DAILY = Number(process.env.AI_BUDGET_DAILY) || 5000;
 const AI_BUDGET_MONTHLY = Number(process.env.AI_BUDGET_MONTHLY) || 100000;
+
+const isConfiguredAiApiKey = (key = '') => {
+  const value = String(key || '').trim();
+  return Boolean(value && value !== 'sk-your-key-here' && !/^sk-x+$/i.test(value));
+};
 
 const AI_PER_UID_MAX = 30; // запросов/мин на модератора
 const AI_GLOBAL_MAX = 100; // запросов/мин на всех
@@ -2970,9 +2975,9 @@ exports.adminAnalyzeContent = functionsV1.https.onCall(async (data, context) => 
     await checkAiBudget(db);
 
     // 4. Проверка API ключа
-    if (!AI_API_KEY) {
+    if (!isConfiguredAiApiKey(AI_API_KEY)) {
       throw new functionsV1.https.HttpsError('failed-precondition',
-        'AI_API_KEY не настроен. Добавьте ключ в functions/.env');
+        'AI_API_KEY не настроен. Добавьте реальный DeepSeek ключ в functions/.env или переменную DEEPSEEK_API_KEY');
     }
 
     // 5. Построение промпта
@@ -3341,5 +3346,92 @@ JSON формат:
     if (error instanceof functionsV1.https.HttpsError) throw error;
     console.error('[adminSuggestFix] unexpected error:', error?.message || error);
     return { suggestions: [] };
+  }
+});
+
+// =============================================================
+//  AI Feedback — disagreement logging + accuracy stats + budget
+// =============================================================
+
+exports.logAiDisagreement = functionsV1.https.onCall(async (data, context) => {
+  try {
+    const actor = await assertAdminModerationAccess(context);
+    const db = admin.database();
+
+    const entry = {
+      itemPath: sanitizeText(String(data?.itemPath || ''), 500),
+      section: String(data?.section || '').trim(),
+      textTruncated: redactText(sanitizeText(String(data?.textTruncated || ''), 200)),
+      aiVerdict: String(data?.aiVerdict || '').trim(),
+      aiConfidence: Number(data?.aiConfidence) || 0,
+      humanAction: String(data?.humanAction || '').trim(),
+      moderatorUid: actor.uid,
+      timestamp: Date.now(),
+    };
+
+    if (!entry.itemPath || !entry.section || !entry.aiVerdict || !entry.humanAction) {
+      throw new functionsV1.https.HttpsError('invalid-argument', 'Missing required disagreement fields');
+    }
+
+    await db.ref('ops/ai_disagreements').push(entry);
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof functionsV1.https.HttpsError) throw error;
+    console.error('[logAiDisagreement] error:', error?.message);
+    throw new functionsV1.https.HttpsError('internal', 'Failed to log disagreement');
+  }
+});
+
+exports.getAiAccuracyStats = functionsV1.https.onCall(async (data, context) => {
+  try {
+    await assertAdminModerationAccess(context);
+    const db = admin.database();
+    const periodDays = Math.min(Math.max(Number(data?.periodDays) || 30, 1), 365);
+    const since = Date.now() - periodDays * DAY_MS;
+
+    // Count total AI analyses in period
+    const analysisSnap = await db.ref('ops/ai_analysis')
+      .orderByChild('timestamp').startAt(since)
+      .once('value');
+    const analyses = analysisSnap.val() || {};
+    const totalDecisions = Object.keys(analyses).length;
+
+    // Count disagreements in period
+    const disagreeSnap = await db.ref('ops/ai_disagreements')
+      .orderByChild('timestamp').startAt(since)
+      .once('value');
+    const disagreements = disagreeSnap.val() || {};
+    const disagreementCount = Object.keys(disagreements).length;
+
+    const agreements = Math.max(totalDecisions - disagreementCount, 0);
+    const accuracy = totalDecisions > 0 ? agreements / totalDecisions : 0;
+
+    return { totalDecisions, agreements, disagreements: disagreementCount, accuracy };
+  } catch (error) {
+    if (error instanceof functionsV1.https.HttpsError) throw error;
+    console.error('[getAiAccuracyStats] error:', error?.message);
+    throw new functionsV1.https.HttpsError('internal', 'Failed to get AI accuracy stats');
+  }
+});
+
+exports.getAiBudgetUsage = functionsV1.https.onCall(async (_data, context) => {
+  try {
+    await assertAdminModerationAccess(context);
+    const db = admin.database();
+    const metaSnap = await db.ref('ops/ai_usage/_meta').once('value');
+    const meta = metaSnap.val() || {};
+
+    return {
+      dailyUsed: Number(meta.dailyTotal) || 0,
+      dailyLimit: AI_BUDGET_DAILY,
+      monthlyUsed: Number(meta.monthlyTotal) || 0,
+      monthlyLimit: AI_BUDGET_MONTHLY,
+      provider: AI_PROVIDER,
+      model: AI_MODEL,
+    };
+  } catch (error) {
+    if (error instanceof functionsV1.https.HttpsError) throw error;
+    console.error('[getAiBudgetUsage] error:', error?.message);
+    throw new functionsV1.https.HttpsError('internal', 'Failed to get budget usage');
   }
 });

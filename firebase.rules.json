@@ -346,6 +346,11 @@
       }
     },
 
+    "moderation_analysis_cache": {
+      ".read": "auth != null && (root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
+      ".write": false
+    },
+
     "ops": {
       ".read": "auth != null && (root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
       ".write": "auth != null && (root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
