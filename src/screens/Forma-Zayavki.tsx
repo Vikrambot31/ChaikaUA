@@ -23,6 +23,7 @@ import { firebaseChatAPI } from '../firebase-config';
 import { normalizeLanguage } from '../redux/slices/languageSlice';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { getFirstDoneRequestPhoto, hasPhotoUploadInProgress, validateSubmissionRequirements } from '../utils/submissionRequirements';
+import { checkYellowList } from '../utils/yellowListCheck';
 import { normalizePersonName, sanitizeStoredText } from '../utils/textUtils';
 import { normalizeUkrainianPhoneStrict, validateName, validatePhone } from '../utils/validators';
 
@@ -570,6 +571,8 @@ const RequestFormScreen: React.FC = () => {
     if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, userStartAvatarKey: user?.startAvatarKey, navigation })) {
       return;
     }
+
+    if (await checkYellowList(user?.id, language)) return;
 
     setSubmittedOnce(true);
 

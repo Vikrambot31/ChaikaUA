@@ -27,6 +27,7 @@ import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
 import type { DetailItemData } from '../utils/detailViewTypes';
 import { getRequestTopicLabel } from '../data/categories';
 import { getFirstDoneRequestPhoto, getRequiredPhotoLabel, hasPhotoUploadInProgress, validateSubmissionRequirements } from '../utils/submissionRequirements';
+import { checkYellowList } from '../utils/yellowListCheck';
 import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 
 type Problem = {
@@ -546,6 +547,7 @@ const text = CLEAN_PROBLEMS_TEXT[language];
     if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, userStartAvatarKey: user?.startAvatarKey, navigation })) {
       return;
     }
+    if (await checkYellowList(user?.id, language)) return;
     const cleanTitle = sanitizeStoredText(title.trim());
     if (!cleanTitle) {
       Alert.alert(text.error, text.fillTitle);

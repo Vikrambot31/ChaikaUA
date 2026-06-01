@@ -12,6 +12,7 @@ export type ChatRequestLike = {
   group?: string;
   subcategory?: string;
   phone?: string;
+  status?: string;
   timestamp?: number;
   createdAt?: { getTime?: () => number } | Date;
   expires_at?: number;

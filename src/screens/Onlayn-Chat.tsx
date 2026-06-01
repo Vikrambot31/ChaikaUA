@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { firebaseChatAPI } from '../firebase-config';
@@ -444,7 +444,8 @@ const OnlineChatScreen = () => {
       setLoadError(getUserErrorMessage(language, 'load', result.error));
       return false;
     }
-    const normalized = normalizeChatRequests(result.data as ChatRequest[]);
+    const normalized = normalizeChatRequests(result.data as ChatRequest[])
+      .filter((r) => !r.status || r.status === 'approved');
     const page = normalized.slice(0, PAGE_SIZE);
     const oldestTimestamp = page.length > 0 ? getChatRequestTimestamp(page[page.length - 1]) : null;
 
@@ -464,6 +465,8 @@ const OnlineChatScreen = () => {
   const loadFailedRef = useRef(text.loadFailed);
   useEffect(() => { loadFailedRef.current = text.loadFailed; }, [text.loadFailed]);
 
+  const hasInitialLoadRef = useRef(false);
+
   useEffect(() => {
     setLoading(true);
     const timeout = setTimeout(() => {
@@ -474,6 +477,7 @@ const OnlineChatScreen = () => {
     void loadRequests().finally(() => {
       clearTimeout(timeout);
       setLoading(false);
+      hasInitialLoadRef.current = true;
     });
 
     return () => {
@@ -481,6 +485,17 @@ const OnlineChatScreen = () => {
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Re-fetch approved requests when navigating back to this screen
+  // (e.g., after moderator rejected items on the moderation screen)
+  useFocusEffect(
+    useCallback(() => {
+      if (hasInitialLoadRef.current) {
+        void loadRequests();
+      }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []),
+  );
 
   const handleRefresh = async () => {
     setRefreshing(true);
