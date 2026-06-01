@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -66,6 +66,9 @@ type BusinessItem = {
   updatedAt?: string;
   version?: number;
   rejectionReason?: string;
+  isPromoted?: boolean;
+  promotedUntil?: number | string;
+  promotedPriority?: number;
 };
 
 type MyBusinessRequest = Pick<BusinessItem, 'status' | 'rejectionReason' | 'version' | 'createdAt'> | null;
@@ -192,6 +195,9 @@ const UI_TEXT = {
     subtitle: 'Бізнес та послуги від ваших сусідів',
     searchPlaceholder: 'Пошук за ім\'ям або описом...',
     allCategories: 'Всі',
+    topForYou: 'Топ для вас',
+    promoted: 'Просування',
+    moreDetails: 'Детальніше',
     call: 'Зателефонувати',
     contactLabel: 'контакт:',
     noResults: 'Нічого не знайдено',
@@ -252,6 +258,9 @@ const UI_TEXT = {
     subtitle: 'Бизнес и услуги от ваших соседей',
     searchPlaceholder: 'Поиск по имени или описанию...',
     allCategories: 'Все',
+    topForYou: 'Топ для вас',
+    promoted: 'Продвижение',
+    moreDetails: 'Подробнее',
     call: 'Позвонить',
     contactLabel: 'контакт:',
     noResults: 'Ничего не найдено',
@@ -312,6 +321,9 @@ const UI_TEXT = {
     subtitle: 'Business & services from your neighbors',
     searchPlaceholder: 'Search by name or description...',
     allCategories: 'All',
+    topForYou: 'Top for you',
+    promoted: 'Promoted',
+    moreDetails: 'Details',
     call: 'Call',
     contactLabel: 'contact:',
     noResults: 'Nothing found',
@@ -410,6 +422,27 @@ function getMyRequestStatusText(status: string | undefined, text: typeof UI_TEXT
   if (status === 'active') return text.myRequestActive;
   if (status === 'rejected') return text.myRequestRejected;
   return text.myRequestPending;
+}
+
+function getTimestamp(value: string | number | undefined): number {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const parsed = new Date(value).getTime();
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
+function isBusinessPromotionActive(item: BusinessItem, now = Date.now()): boolean {
+  if (!item.isPromoted) return false;
+  const promotedUntil = getTimestamp(item.promotedUntil);
+  return promotedUntil === 0 || promotedUntil > now;
+}
+
+function getBusinessPopularityScore(item: BusinessItem): number {
+  const ratingValues = Object.values(item.ratingByUserId || {});
+  const ratingAvg = ratingValues.length ? ratingValues.reduce((sum, value) => sum + value, 0) / ratingValues.length : 0;
+  return (item.likeCount || 0) * 3 + ratingAvg * 2 + ratingValues.length;
 }
 
 // --- Screen -------------------------------------------------------------------
@@ -575,6 +608,29 @@ export default function ZhkBusinessListScreen() {
       item.subcategoryLabel?.toLowerCase().includes(q);
     return matchCat && matchSearch;
   });
+
+  const topItems = useMemo(() => {
+    const now = Date.now();
+    return items
+      .map((item) => {
+        const likesByUserId = {
+          ...(item.likesByUserId ?? {}),
+          ...(localBusinessLikes[item.id] ?? {}),
+        };
+        return { ...item, likesByUserId, likeCount: Object.keys(likesByUserId).length };
+      })
+      .sort((a, b) => {
+        const aPromoted = isBusinessPromotionActive(a, now);
+        const bPromoted = isBusinessPromotionActive(b, now);
+        if (aPromoted !== bPromoted) return bPromoted ? 1 : -1;
+        if (aPromoted && bPromoted) {
+          const priorityDiff = (b.promotedPriority || 0) - (a.promotedPriority || 0);
+          if (priorityDiff !== 0) return priorityDiff;
+        }
+        return getBusinessPopularityScore(b) - getBusinessPopularityScore(a) || getTimestamp(b.createdAt) - getTimestamp(a.createdAt);
+      })
+      .slice(0, 8);
+  }, [items, localBusinessLikes]);
 
   const selectedFormCategory = BUSINESS_CATEGORIES.find((category) => category.key === formCategoryKey);
   const selectedFormSubcategory = selectedFormCategory?.subs.find((subcategory) => subcategory.key === formSubcategoryKey);
@@ -830,6 +886,69 @@ export default function ZhkBusinessListScreen() {
     ? ratingTargetValues.reduce((sum, value) => sum + value, 0) / ratingTargetValues.length
     : 0;
 
+  const renderTopBusinessCard = (item: BusinessItem) => {
+    const hasPhoto = Boolean(item.photoUri?.trim() || item.photoStoragePath?.trim());
+    const ratingValues = Object.values(item.ratingByUserId || {});
+    const avgRating = ratingValues.length > 0
+      ? ratingValues.reduce((sum, value) => sum + value, 0) / ratingValues.length
+      : 0;
+    const likeCount = typeof item.likeCount === 'number' ? item.likeCount : Object.keys(item.likesByUserId || {}).length;
+    const hasLiked = Boolean(user?.id && item.likesByUserId?.[user.id]);
+    const priceText = getBusinessPriceText(item, t);
+    const displayTitle = item.subcategoryLabel || item.categoryLabel;
+    const isPromoted = isBusinessPromotionActive(item);
+
+    return (
+      <TouchableOpacity
+        key={item.id}
+        style={styles.topBusinessCard}
+        activeOpacity={0.88}
+        onPress={() => navigation.navigate('ItemDetailScreen', { item: mapToDetailData(item, t) })}
+      >
+        <View style={styles.topBusinessPromoHeader}>
+          <View style={styles.topBusinessBadge}>
+            <MaterialCommunityIcons name={isPromoted ? 'bullhorn-outline' : 'fire'} size={12} color="#fff" />
+            <Text style={styles.topBusinessBadgeText}>{isPromoted ? t.promoted : t.topForYou}</Text>
+          </View>
+          <Text style={styles.topBusinessCategory} numberOfLines={1}>{item.categoryLabel}</Text>
+        </View>
+        {hasPhoto ? (
+          <View style={styles.topBusinessPhotoWrap}>
+            <AppPhotoImage
+              uri={item.photoUri}
+              storagePath={item.photoStoragePath}
+              style={styles.topBusinessPhoto}
+              resizeMode="cover"
+              debugLabel={`TopBusiness:${item.id}`}
+            />
+          </View>
+        ) : null}
+        <Text style={styles.topBusinessTitle} numberOfLines={2}>{displayTitle}</Text>
+        <Text style={styles.topBusinessName} numberOfLines={1}>{item.contactName}</Text>
+        {priceText ? <Text style={styles.topBusinessPrice} numberOfLines={1}>{priceText}</Text> : null}
+        <View style={styles.topBusinessMetaRow}>
+          <TouchableOpacity style={styles.topBusinessStars} onPress={() => setRatingTargetId(item.id)} activeOpacity={0.75}>
+            <MaterialCommunityIcons name="star" size={15} color={avgRating > 0 ? '#F5A623' : '#C8B89A'} />
+            <Text style={styles.topBusinessMetaText}>{avgRating > 0 ? avgRating.toFixed(1) : '–'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.topBusinessLike, hasLiked && styles.topBusinessLikeActive]}
+            onPress={() => { void handleLike(item.id); }}
+            activeOpacity={hasLiked ? 1 : 0.85}
+            disabled={hasLiked}
+          >
+            <MaterialCommunityIcons name={hasLiked ? 'thumb-up' : 'thumb-up-outline'} size={14} color={hasLiked ? '#fff' : SCREEN_THEME.textSecondary} />
+            <Text style={[styles.topBusinessLikeText, hasLiked && styles.topBusinessLikeTextActive]}>{likeCount}</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.topBusinessCtaRow}>
+          <Text style={styles.topBusinessCtaText}>{t.moreDetails}</Text>
+          <MaterialCommunityIcons name="arrow-right" size={15} color="#fff" />
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -907,6 +1026,17 @@ export default function ZhkBusinessListScreen() {
           ))}
         </ScrollView>
       )}
+
+      {!loading && !error && topItems.length > 0 ? (
+        <View style={styles.topSection}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>{t.topForYou}</Text>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.topBusinessRow}>
+            {topItems.map((item) => renderTopBusinessCard(item))}
+          </ScrollView>
+        </View>
+      ) : null}
 
       {/* Content */}
       {loading ? (
@@ -1317,6 +1447,126 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: SCREEN_THEME.terracotta, borderColor: SCREEN_THEME.terracotta },
   chipText: { fontSize: 13, fontWeight: '700', color: SCREEN_THEME.textSecondary },
   chipTextActive: { color: '#fff' },
+  topSection: { marginBottom: 4 },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    marginTop: 2,
+    marginBottom: 10,
+  },
+  sectionTitle: { fontSize: 18, fontWeight: '900', color: SCREEN_THEME.textPrimary },
+  topBusinessRow: { paddingHorizontal: 16, paddingBottom: 14, gap: 10 },
+  topBusinessCard: {
+    width: 232,
+    minHeight: 226,
+    backgroundColor: '#FFF8E8',
+    borderRadius: 22,
+    padding: 13,
+    borderWidth: 1,
+    borderColor: 'rgba(194, 129, 98, 0.34)',
+    shadowColor: '#A08060',
+    shadowOpacity: 0.14,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 5,
+  },
+  topBusinessPromoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 9,
+  },
+  topBusinessBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    backgroundColor: SCREEN_THEME.terracotta,
+  },
+  topBusinessBadgeText: { fontSize: 10, fontWeight: '900', color: '#fff' },
+  topBusinessCategory: {
+    flex: 1,
+    textAlign: 'right',
+    fontSize: 10,
+    fontWeight: '900',
+    color: SCREEN_THEME.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.35,
+  },
+  topBusinessPhotoWrap: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(46, 36, 22, 0.18)',
+    marginBottom: 10,
+  },
+  topBusinessPhoto: {
+    width: '100%',
+    height: 112,
+    backgroundColor: '#EDE3D0',
+  },
+  topBusinessTitle: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: SCREEN_THEME.textPrimary,
+    lineHeight: 19,
+  },
+  topBusinessName: {
+    marginTop: 4,
+    fontSize: 12,
+    fontWeight: '800',
+    color: SCREEN_THEME.enamelBlueDark,
+  },
+  topBusinessPrice: {
+    alignSelf: 'flex-start',
+    marginTop: 7,
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: '#F6ECDC',
+    fontSize: 12,
+    fontWeight: '900',
+    color: SCREEN_THEME.terracottaDark,
+  },
+  topBusinessMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginTop: 11,
+  },
+  topBusinessStars: { flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1 },
+  topBusinessMetaText: { fontSize: 11, fontWeight: '800', color: SCREEN_THEME.textSecondary },
+  topBusinessLike: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#D8C7A5',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    backgroundColor: '#F6ECDC',
+  },
+  topBusinessLikeActive: { backgroundColor: SCREEN_THEME.terracotta, borderColor: SCREEN_THEME.terracotta },
+  topBusinessLikeText: { fontSize: 12, fontWeight: '900', color: SCREEN_THEME.textSecondary },
+  topBusinessLikeTextActive: { color: '#fff' },
+  topBusinessCtaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 12,
+    borderRadius: 14,
+    paddingVertical: 8,
+    backgroundColor: SCREEN_THEME.enamelBlueDark,
+  },
+  topBusinessCtaText: { color: '#fff', fontSize: 12, fontWeight: '900' },
   list: { flex: 1 },
   listContent: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 100 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 12 },

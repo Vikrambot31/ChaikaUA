@@ -1,5 +1,5 @@
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { get, onValue, ref } from 'firebase/database';
+import { equalTo, get, onValue, orderByChild, query, ref } from 'firebase/database';
 import { auth, database, firebaseApp } from '../firebase-core';
 import { CACHE_TTL, cacheGet, cacheSet } from '../utils/cacheLayer';
 import { normalizeSponsorPhoneValue } from '../utils/rulesEngine';
@@ -263,4 +263,117 @@ export const approveSponsorConfirmation = async (confirmationId: string): Promis
 export const denySponsorConfirmation = async (confirmationId: string): Promise<void> => {
   const callable = httpsCallable<{ confirmationId: string }, { ok: boolean }>(functions, 'denySponsorConfirmation');
   await callable({ confirmationId });
+};
+
+// ── Trust Tree direct reads ─────────────────────────────────────────────
+
+export type TrustTreeNode = {
+  userUid: string;
+  sponsorUid: string | null;
+  phoneMasked: string;
+  sponsorName: string;
+  depthToRoot: number;
+  rootPath: string[];
+  riskScore: number;
+  riskLevel: string;
+  inviteCount: number;
+  inviteLimit: number;
+  status: string;
+  approvedAt: number;
+  approvalSource: string;
+  createdAt: number;
+};
+
+export type TrustChainLink = {
+  uid: string;
+  name: string;
+  depth: number;
+};
+
+export type TrustTreeChild = {
+  uid: string;
+  name: string;
+  phoneMasked: string;
+  approvedAt: number;
+  depthToRoot: number;
+};
+
+const normalizeTrustNode = (raw: unknown): TrustTreeNode | null => {
+  if (!raw || typeof raw !== 'object') return null;
+  const d = raw as Record<string, unknown>;
+  return {
+    userUid: String(d.userUid || ''),
+    sponsorUid: d.sponsorUid ? String(d.sponsorUid) : null,
+    phoneMasked: String(d.phoneMasked || ''),
+    sponsorName: String(d.sponsorName || ''),
+    depthToRoot: Number(d.depthToRoot || 0),
+    rootPath: Array.isArray(d.rootPath) ? d.rootPath.map(String) : [],
+    riskScore: Number(d.riskScore || 0),
+    riskLevel: String(d.riskLevel || ''),
+    inviteCount: Number(d.inviteCount || 0),
+    inviteLimit: Number(d.inviteLimit || 0),
+    status: String(d.status || ''),
+    approvedAt: Number(d.approvedAt || 0),
+    approvalSource: String(d.approvalSource || ''),
+    createdAt: Number(d.createdAt || 0),
+  };
+};
+
+export const getMyTrustNode = async (): Promise<TrustTreeNode | null> => {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return null;
+  const snapshot = await get(ref(database, `trust_tree/${uid}`));
+  return normalizeTrustNode(snapshot.val());
+};
+
+export const getMyTrustChain = async (): Promise<TrustChainLink[]> => {
+  const node = await getMyTrustNode();
+  if (!node || !node.rootPath.length) return [];
+  const chain: TrustChainLink[] = [];
+  for (let i = 0; i < node.rootPath.length; i++) {
+    const chainUid = node.rootPath[i];
+    let name = '';
+    try {
+      const userSnap = await get(ref(database, `users/${chainUid}/name`));
+      name = String(userSnap.val() || '');
+    } catch {
+      name = '';
+    }
+    chain.push({ uid: chainUid, name: name || `#${i + 1}`, depth: i });
+  }
+  return chain;
+};
+
+export const getMyInvitedChildren = async (): Promise<TrustTreeChild[]> => {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return [];
+  const snap = await get(query(ref(database, 'trust_tree'), orderByChild('sponsorUid'), equalTo(uid)));
+  if (!snap.exists()) return [];
+  const children: TrustTreeChild[] = [];
+  snap.forEach((child) => {
+    const val = child.val();
+    if (val && typeof val === 'object') {
+      children.push({
+        uid: child.key || '',
+        name: String(val.sponsorName || val.phoneMasked || ''),
+        phoneMasked: String(val.phoneMasked || ''),
+        approvedAt: Number(val.approvedAt || val.createdAt || 0),
+        depthToRoot: Number(val.depthToRoot || 0),
+      });
+    }
+  });
+  return children;
+};
+
+export const subscribeMyTrustNode = (
+  onChanged: (node: TrustTreeNode | null) => void,
+): (() => void) => {
+  const uid = auth.currentUser?.uid;
+  if (!uid) {
+    onChanged(null);
+    return () => {};
+  }
+  return onValue(ref(database, `trust_tree/${uid}`), (snapshot) => {
+    onChanged(normalizeTrustNode(snapshot.val()));
+  });
 };

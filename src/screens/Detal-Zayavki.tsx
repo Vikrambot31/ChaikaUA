@@ -18,6 +18,7 @@ import { pickUserAvatarUri } from '../utils/userAvatar';
 import { getRequestTopicLabel } from '../data/categories';
 import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 import { loadProfileRecord } from '../services/authProfileService';
+import { offerHelp, checkIfHelped } from '../services/bonusService';
 
 type RequestDetailParams = {
   request: Request;
@@ -57,6 +58,10 @@ const UI_TEXT = {
       delivery: 'Доставка',
       other: 'Інше',
     },
+    iHelped: 'Я допоміг',
+    alreadyHelped: 'Ви вже відгукнулись',
+    helpedSuccess: '+20 бонусів за допомогу!',
+    helpError: 'Не вдалося надіслати відгук',
   },
   ru: {
     headerTitle: 'Детали заявки',
@@ -89,6 +94,10 @@ const UI_TEXT = {
       delivery: 'Доставка',
       other: 'Другое',
     },
+    iHelped: 'Я помог',
+    alreadyHelped: 'Вы уже откликнулись',
+    helpedSuccess: '+20 бонусов за помощь!',
+    helpError: 'Не удалось отправить отклик',
   },
   en: {
     headerTitle: 'Request Details',
@@ -121,6 +130,10 @@ const UI_TEXT = {
       delivery: 'Delivery',
       other: 'Other',
     },
+    iHelped: 'I helped',
+    alreadyHelped: 'You already responded',
+    helpedSuccess: '+20 bonuses for helping!',
+    helpError: 'Could not send response',
   },
 } as const;
 
@@ -152,6 +165,7 @@ const RequestDetailScreen = ({
   const [profileAge, setProfileAge] = useState<number | undefined>();
   const [profileGender, setProfileGender] = useState('');
   const [requestLikes, setRequestLikes] = useState(0);
+  const [helpStatus, setHelpStatus] = useState<'idle' | 'sending' | 'helped' | 'already'>('idle');
   const avatarByUserId = useUserAvatarMap([request.userId]);
   const resolvedAvatarUri = (request.userId && avatarByUserId[request.userId]) || pickUserAvatarUri({ userPhotoURL: request.userPhotoURL, startAvatarKey: request.startAvatarKey }) || pickUserAvatarUri(request);
   const displayName = profileName || request.name || text.fallbackName;
@@ -292,6 +306,33 @@ const RequestDetailScreen = ({
     return sameName;
   }, [currentUser, request.userId, request.name]);
 
+  useEffect(() => {
+    if (!currentUser?.id || !request.id || isOwnRequest) return;
+    let cancelled = false;
+    void checkIfHelped(request.id).then((helped) => {
+      if (!cancelled && helped) setHelpStatus('already');
+    });
+    return () => { cancelled = true; };
+  }, [currentUser?.id, request.id, isOwnRequest]);
+
+  const handleHelp = async () => {
+    if (!request.id || helpStatus !== 'idle') return;
+    setHelpStatus('sending');
+    try {
+      const result = await offerHelp(request.id);
+      if (result.status === 'already_helped') {
+        setHelpStatus('already');
+        Alert.alert(text.ok, text.alreadyHelped);
+      } else {
+        setHelpStatus('helped');
+        Alert.alert(text.ok, text.helpedSuccess);
+      }
+    } catch {
+      setHelpStatus('idle');
+      Alert.alert(text.helpError, text.helpError);
+    }
+  };
+
   const handleDelete = () => {
     Alert.alert(text.deleteTitle, text.deleteBody, [
       { text: text.cancel, style: 'cancel' },
@@ -409,6 +450,36 @@ const RequestDetailScreen = ({
           </Text>
         ) : null}
 
+        {!isOwnRequest && currentUser?.id ? (
+          <TouchableOpacity
+            style={[
+              styles.helpButton,
+              (helpStatus === 'helped' || helpStatus === 'already') && styles.helpButtonDone,
+              helpStatus === 'sending' && styles.actionButtonDisabled,
+            ]}
+            onPress={() => void handleHelp()}
+            disabled={helpStatus !== 'idle'}
+            activeOpacity={0.82}
+          >
+            {helpStatus === 'sending' ? (
+              <ActivityIndicator color="#FFF9EE" />
+            ) : (
+              <>
+                <MaterialCommunityIcons
+                  name={helpStatus === 'helped' || helpStatus === 'already' ? 'check-circle' : 'handshake'}
+                  size={18}
+                  color="#FFF9EE"
+                />
+                <Text style={styles.helpButtonText}>
+                  {helpStatus === 'helped' || helpStatus === 'already' ? text.alreadyHelped : text.iHelped}
+                </Text>
+                <MaterialCommunityIcons name="circle-multiple" size={14} color="#FFD54F" />
+                <Text style={styles.helpBonusHint}>+20</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        ) : null}
+
         {isOwnRequest ? (
           <TouchableOpacity style={[styles.deleteButton, deleting && styles.deleteButtonDisabled]} onPress={handleDelete} disabled={deleting}>
             {deleting ? (
@@ -475,6 +546,32 @@ const styles = StyleSheet.create({
   },
   deleteButtonDisabled: { opacity: 0.72 },
   deleteButtonText: { color: '#FFF9EE', fontSize: 15, fontWeight: '900' },
+  helpButton: {
+    backgroundColor: '#2196F3',
+    borderRadius: 18,
+    minHeight: 54,
+    borderWidth: 1,
+    borderColor: '#1976D2',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  helpButtonDone: {
+    backgroundColor: '#66BB6A',
+    borderColor: '#4CAF50',
+  },
+  helpButtonText: {
+    color: '#FFF9EE',
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  helpBonusHint: {
+    color: '#FFD54F',
+    fontSize: 13,
+    fontWeight: '900',
+  },
   backButton: { alignItems: 'center', paddingVertical: 12 },
   backButtonText: { color: SCREEN_THEME.textSecondary, fontSize: 14, fontWeight: '800' },
 });

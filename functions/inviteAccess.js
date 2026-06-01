@@ -14,6 +14,7 @@ const INVITE_RUNTIME_LOCKS_PATH = 'invite_runtime_locks';
 const SPONSOR_CONFIRMATIONS_PATH = 'sponsor_confirmations';
 const IN_APP_NOTIFICATIONS_PATH = 'in_app_notifications';
 const USER_ACCESS_PATH = 'user_access';
+const USER_BONUSES_PATH = 'user_bonuses';
 const USERS_PATH = 'users';
 const GENERIC_SUBMIT_RESPONSE = { ok: true, status: 'received' };
 const OWNER_UID = 'LfqIMCAyEzLAb7TNc83lYGW9RiV2';
@@ -475,6 +476,57 @@ const buildTrustNode = ({ uid, phoneHash, phoneMasked, sponsor, request, actorUi
     createdAt: now,
     updatedAt: now,
   };
+};
+
+// ── Bonus system constants ──────────────────────────────────────────────
+const BONUS_INVITE_POINTS = 50;
+const BONUS_INVITE_CAP = 5000;
+const BONUS_LIKE_POINTS = 5;
+const BONUS_LIKE_CAP = 1000;
+const BONUS_HELP_POINTS = 20;
+const BONUS_HELP_CAP = 2000;
+const BONUS_TOTAL_CAP = BONUS_INVITE_CAP + BONUS_LIKE_CAP + BONUS_HELP_CAP;
+
+const BONUS_BADGES = [
+  { min: 5000, badge: 'ambassador' },
+  { min: 2000, badge: 'guardian' },
+  { min: 500,  badge: 'active_resident' },
+  { min: 100,  badge: 'good_neighbor' },
+];
+
+const resolveBadge = (total) => {
+  for (const tier of BONUS_BADGES) {
+    if (total >= tier.min) return tier.badge;
+  }
+  return 'newcomer';
+};
+
+const awardInviteBonus = async (db, sponsorUid, invitedUid, invitedName, now) => {
+  if (!sponsorUid || !invitedUid) return;
+  const bonusRef = db.ref(`${USER_BONUSES_PATH}/${sponsorUid}`);
+  await bonusRef.transaction((current) => {
+    const data = current && typeof current === 'object' ? current : {};
+    const invites = data.invites && typeof data.invites === 'object' ? data.invites : { count: 0, points: 0 };
+    const currentInvitePoints = Number(invites.points || 0);
+    if (currentInvitePoints >= BONUS_INVITE_CAP) return current;
+    const history = Array.isArray(data.inviteHistory) ? data.inviteHistory : [];
+    if (history.some((entry) => entry && entry.uid === invitedUid)) return current;
+    const newInvitePoints = Math.min(currentInvitePoints + BONUS_INVITE_POINTS, BONUS_INVITE_CAP);
+    const newInviteCount = Number(invites.count || 0) + 1;
+    const likes = data.likes && typeof data.likes === 'object' ? data.likes : { count: 0, points: 0 };
+    const help = data.help && typeof data.help === 'object' ? data.help : { count: 0, points: 0 };
+    const newTotal = newInvitePoints + Number(likes.points || 0) + Number(help.points || 0);
+    const newHistory = [...history, { uid: invitedUid, name: String(invitedName || '').slice(0, 60), points: BONUS_INVITE_POINTS, at: now }];
+    return {
+      total: Math.min(newTotal, BONUS_TOTAL_CAP),
+      invites: { count: newInviteCount, points: newInvitePoints },
+      likes: likes,
+      help: help,
+      badge: resolveBadge(newTotal),
+      inviteHistory: newHistory.slice(-100),
+      updatedAt: now,
+    };
+  });
 };
 
 const normalizeUserPhone = (value = {}) =>
@@ -1171,6 +1223,7 @@ const createInviteAccessFunctions = (deps) => {
 
       if (autoApprove && !requiresSponsorConfirmation && sponsor?.uid) {
         await db.ref(`${TRUST_TREE_PATH}/${sponsor.uid}/inviteCount`).transaction((current) => Number(current || 0) + 1);
+        await awardInviteBonus(db, sponsor.uid, uid, requestData.name || requestData.requesterPhoneMasked || '', now);
       }
 
       await writeOpsEvent('invite_request_submitted', {
@@ -1566,6 +1619,7 @@ const createInviteAccessFunctions = (deps) => {
 
         if (sponsor?.uid) {
           await db.ref(`${TRUST_TREE_PATH}/${sponsor.uid}/inviteCount`).transaction((current) => Number(current || 0) + 1);
+          await awardInviteBonus(db, sponsor.uid, request.requesterUid, request.requesterPhoneMasked || request.name || '', now);
         }
       }
 
@@ -1790,6 +1844,7 @@ const createInviteAccessFunctions = (deps) => {
 
     if (nextRequestStatus === 'approved') {
       await db.ref(`${TRUST_TREE_PATH}/${sponsorUid}/inviteCount`).transaction((current) => Number(current || 0) + 1);
+      await awardInviteBonus(db, sponsorUid, requesterUid, request.requesterPhoneMasked || request.name || '', now);
     }
 
     await writeInAppNotification(db, requesterUid, {
@@ -2146,4 +2201,13 @@ const createInviteAccessFunctions = (deps) => {
 
 module.exports = {
   createInviteAccessFunctions,
+  BONUS_INVITE_POINTS,
+  BONUS_INVITE_CAP,
+  BONUS_LIKE_POINTS,
+  BONUS_LIKE_CAP,
+  BONUS_HELP_POINTS,
+  BONUS_HELP_CAP,
+  BONUS_TOTAL_CAP,
+  resolveBadge,
+  USER_BONUSES_PATH,
 };

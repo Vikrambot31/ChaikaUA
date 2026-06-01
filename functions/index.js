@@ -2,7 +2,7 @@
 const functionsV1 = require('firebase-functions/v1');
 const admin = require('firebase-admin');
 const crypto = require('crypto');
-const { createInviteAccessFunctions } = require('./inviteAccess');
+const { createInviteAccessFunctions, BONUS_LIKE_POINTS, BONUS_LIKE_CAP, BONUS_TOTAL_CAP, resolveBadge, USER_BONUSES_PATH } = require('./inviteAccess');
 
 admin.initializeApp();
 
@@ -2464,4 +2464,103 @@ exports.createRequest = functionsV1.https.onCall(async (data, context) => {
   await writeOpsEvent('create_request', { uid, requestId: newRequestRef.key, category });
 
   return { success: true, requestId: newRequestRef.key };
+});
+
+// ── Like-bonus trigger ──────────────────────────────────────────────────
+// When someone likes a person in "Люди Чайки" (feed_likes/people/{targetUid}),
+// recalculate the target user's like-bonuses.
+exports.onPeopleLikeWrite = functionsV1.database
+  .ref('feed_likes/people/{targetUid}')
+  .onWrite(async (change, context) => {
+    const targetUid = context.params.targetUid;
+    if (!targetUid) return null;
+
+    const afterVal = change.after.val();
+    const likeCount = afterVal && typeof afterVal === 'object' ? Object.keys(afterVal).length : 0;
+    const newLikePoints = Math.min(likeCount * BONUS_LIKE_POINTS, BONUS_LIKE_CAP);
+    const now = Date.now();
+
+    const db = admin.database();
+    const bonusRef = db.ref(`${USER_BONUSES_PATH}/${targetUid}`);
+
+    await bonusRef.transaction((current) => {
+      const data = current && typeof current === 'object' ? current : {};
+      const invites = data.invites && typeof data.invites === 'object' ? data.invites : { count: 0, points: 0 };
+      const help = data.help && typeof data.help === 'object' ? data.help : { count: 0, points: 0 };
+      const newTotal = Number(invites.points || 0) + newLikePoints + Number(help.points || 0);
+      return {
+        total: Math.min(newTotal, BONUS_TOTAL_CAP),
+        invites: invites,
+        likes: { count: likeCount, points: newLikePoints },
+        help: help,
+        badge: resolveBadge(newTotal),
+        inviteHistory: Array.isArray(data.inviteHistory) ? data.inviteHistory : [],
+        updatedAt: now,
+      };
+    });
+
+    return null;
+  });
+
+// ── Help-bonus: "Я помог" ───────────────────────────────────────────────
+const { BONUS_HELP_POINTS, BONUS_HELP_CAP } = require('./inviteAccess');
+
+exports.offerHelp = functions.https.onCall(async (data, context) => {
+  if (!context.auth?.uid) throw new functions.https.HttpsError('unauthenticated', 'auth_required');
+  const requestId = String(data.requestId || '').trim();
+  if (!requestId) throw new functions.https.HttpsError('invalid-argument', 'request_id_required');
+
+  const helperUid = context.auth.uid;
+  const db = admin.database();
+  const now = Date.now();
+
+  // Load the request to verify it exists and helper is not the author
+  const requestSnap = await db.ref(`requests/${requestId}`).once('value');
+  const requestVal = requestSnap.val();
+  if (!requestVal) {
+    const helpReqSnap = await db.ref(`help_requests/${requestId}`).once('value');
+    if (!helpReqSnap.exists()) throw new functions.https.HttpsError('not-found', 'request_not_found');
+    const helpReqVal = helpReqSnap.val();
+    if (helpReqVal.userId === helperUid) throw new functions.https.HttpsError('failed-precondition', 'cannot_help_own_request');
+  } else {
+    if (requestVal.userId === helperUid) throw new functions.https.HttpsError('failed-precondition', 'cannot_help_own_request');
+  }
+
+  // Check if already helped this request
+  const existingSnap = await db.ref(`help_responses/${requestId}/${helperUid}`).once('value');
+  if (existingSnap.exists()) {
+    return { ok: true, status: 'already_helped' };
+  }
+
+  // Write help response
+  await db.ref(`help_responses/${requestId}/${helperUid}`).set({
+    helperUid,
+    requestId,
+    at: now,
+  });
+
+  // Award bonus
+  const bonusRef = db.ref(`${USER_BONUSES_PATH}/${helperUid}`);
+  await bonusRef.transaction((current) => {
+    const d = current && typeof current === 'object' ? current : {};
+    const invites = d.invites && typeof d.invites === 'object' ? d.invites : { count: 0, points: 0 };
+    const likes = d.likes && typeof d.likes === 'object' ? d.likes : { count: 0, points: 0 };
+    const help = d.help && typeof d.help === 'object' ? d.help : { count: 0, points: 0 };
+    const currentHelpPoints = Number(help.points || 0);
+    if (currentHelpPoints >= BONUS_HELP_CAP) return current;
+    const newHelpPoints = Math.min(currentHelpPoints + BONUS_HELP_POINTS, BONUS_HELP_CAP);
+    const newHelpCount = Number(help.count || 0) + 1;
+    const newTotal = Number(invites.points || 0) + Number(likes.points || 0) + newHelpPoints;
+    return {
+      total: Math.min(newTotal, BONUS_TOTAL_CAP),
+      invites: invites,
+      likes: likes,
+      help: { count: newHelpCount, points: newHelpPoints },
+      badge: resolveBadge(newTotal),
+      inviteHistory: Array.isArray(d.inviteHistory) ? d.inviteHistory : [],
+      updatedAt: now,
+    };
+  });
+
+  return { ok: true, status: 'helped', points: BONUS_HELP_POINTS };
 });

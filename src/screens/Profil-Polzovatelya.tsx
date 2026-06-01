@@ -22,6 +22,7 @@ import AppPhotoImage from '../components/AppPhotoImage';
 import { signOutPrimarySession } from '../services/authSessionService';
 import { subscribeCurrentUserSecurityRole, type SecurityRole } from '../services/securityRoles';
 import { pickUserAvatarUri } from '../utils/userAvatar';
+import { subscribeMyBonuses, BONUS_CAPS, type UserBonuses } from '../services/bonusService';
 
 type AppNavigation = import('@react-navigation/native').NavigationProp<Record<string, object | undefined>>;
 
@@ -83,6 +84,17 @@ const UI_TEXT = {
     sectionServices: 'Підписка та сервіси',
     contactRequests: "Хочуть зв'язатись",
     contactRequestsHint: 'нових запитів',
+    bonusTitle: 'Бонуси за довіру',
+    bonusInvites: 'Запрошення',
+    bonusLikes: 'Лайки',
+    bonusHelp: 'Допомога',
+    bonusBadgeNewcomer: 'Новачок',
+    bonusBadgeGoodNeighbor: 'Добрий сусід',
+    bonusBadgeActiveResident: 'Активний житель',
+    bonusBadgeGuardian: 'Хранитель Чайки',
+    bonusBadgeAmbassador: 'Посол довіри',
+    bonusNextBadge: (badge: string, points: number) => `До "${badge}" ще ${points} бонусів`,
+    bonusMaxBadge: 'Максимальний статус',
   },
   ru: {
     guest: 'Гость',
@@ -141,6 +153,17 @@ const UI_TEXT = {
     sectionServices: 'Подписка и сервисы',
     contactRequests: 'Хотят связаться',
     contactRequestsHint: 'новых запросов',
+    bonusTitle: 'Бонусы за доверие',
+    bonusInvites: 'Приглашения',
+    bonusLikes: 'Лайки',
+    bonusHelp: 'Помощь',
+    bonusBadgeNewcomer: 'Новичок',
+    bonusBadgeGoodNeighbor: 'Добрый сосед',
+    bonusBadgeActiveResident: 'Активный житель',
+    bonusBadgeGuardian: 'Хранитель Чайки',
+    bonusBadgeAmbassador: 'Посол доверия',
+    bonusNextBadge: (badge: string, points: number) => `До "${badge}" ещё ${points} бонусов`,
+    bonusMaxBadge: 'Максимальный статус',
   },
   en: {
     guest: 'Guest',
@@ -199,6 +222,17 @@ const UI_TEXT = {
     sectionServices: 'Subscription & services',
     contactRequests: 'Contact requests',
     contactRequestsHint: 'new requests',
+    bonusTitle: 'Trust bonuses',
+    bonusInvites: 'Invitations',
+    bonusLikes: 'Likes',
+    bonusHelp: 'Help',
+    bonusBadgeNewcomer: 'Newcomer',
+    bonusBadgeGoodNeighbor: 'Good neighbor',
+    bonusBadgeActiveResident: 'Active resident',
+    bonusBadgeGuardian: 'Chaika Guardian',
+    bonusBadgeAmbassador: 'Trust Ambassador',
+    bonusNextBadge: (badge: string, points: number) => `${points} bonuses until "${badge}"`,
+    bonusMaxBadge: 'Maximum status',
   },
 } as const;
 
@@ -232,6 +266,7 @@ const ProfileScreen: React.FC = () => {
   const [lastSeenPendingAtMs, setLastSeenPendingAtMs] = useState(0);
   const [moderationUnlocked, setModerationUnlocked] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [bonuses, setBonuses] = useState<UserBonuses | null>(null);
   const isLoggedIn = Boolean(user?.id);
   const hasPrimaryModerationAccess = Boolean(
     user?.id &&
@@ -279,6 +314,11 @@ const ProfileScreen: React.FC = () => {
     });
     return unsub;
   }, [user?.id]);
+
+  useEffect(() => {
+    const unsub = subscribeMyBonuses(setBonuses);
+    return unsub;
+  }, []);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -534,6 +574,61 @@ const ProfileScreen: React.FC = () => {
             </View>
           ) : null}
         </TactileCard>
+
+        {/* Trust bonuses card */}
+        <TouchableOpacity
+          activeOpacity={0.86}
+          onPress={() => navigation.navigate('PoruchitelScreen')}
+          style={styles.bonusCard}
+        >
+          <View style={styles.bonusHeader}>
+            <MaterialCommunityIcons name="circle-multiple" size={22} color="#C79C47" />
+            <Text style={styles.bonusTitle}>{text.bonusTitle}</Text>
+            <Text style={styles.bonusTotal}>{bonuses?.total ?? 0}</Text>
+          </View>
+
+          <View style={styles.bonusProgressTrack}>
+            <View style={[styles.bonusProgressFill, { width: `${Math.min(100, ((bonuses?.total ?? 0) / BONUS_CAPS.total) * 100)}%` }]} />
+          </View>
+
+          <View style={styles.bonusBreakdown}>
+            <View style={styles.bonusBreakdownItem}>
+              <MaterialCommunityIcons name="account-plus" size={14} color="#4CAF50" />
+              <Text style={styles.bonusBreakdownLabel}>{text.bonusInvites}</Text>
+              <Text style={styles.bonusBreakdownValue}>{bonuses?.invites.points ?? 0}</Text>
+            </View>
+            <View style={styles.bonusBreakdownItem}>
+              <MaterialCommunityIcons name="heart" size={14} color="#E91E63" />
+              <Text style={styles.bonusBreakdownLabel}>{text.bonusLikes}</Text>
+              <Text style={styles.bonusBreakdownValue}>{bonuses?.likes.points ?? 0}</Text>
+            </View>
+            <View style={styles.bonusBreakdownItem}>
+              <MaterialCommunityIcons name="handshake" size={14} color="#2196F3" />
+              <Text style={styles.bonusBreakdownLabel}>{text.bonusHelp}</Text>
+              <Text style={styles.bonusBreakdownValue}>{bonuses?.help.points ?? 0}</Text>
+            </View>
+          </View>
+
+          {bonuses ? (
+            <View style={styles.bonusBadgeRow}>
+              <MaterialCommunityIcons
+                name={bonuses.badge === 'ambassador' ? 'star-circle' : bonuses.badge === 'guardian' ? 'shield-star' : 'medal'}
+                size={16}
+                color="#C79C47"
+              />
+              <Text style={styles.bonusBadgeText}>
+                {(({
+                  newcomer: text.bonusBadgeNewcomer,
+                  good_neighbor: text.bonusBadgeGoodNeighbor,
+                  active_resident: text.bonusBadgeActiveResident,
+                  guardian: text.bonusBadgeGuardian,
+                  ambassador: text.bonusBadgeAmbassador,
+                }) as Record<string, string>)[bonuses.badge] || text.bonusBadgeNewcomer}
+              </Text>
+              <MaterialCommunityIcons name="chevron-right" size={16} color={SCREEN_THEME.textSecondary} style={{ marginLeft: 'auto' }} />
+            </View>
+          ) : null}
+        </TouchableOpacity>
 
         <Text style={styles.sectionLabel}>{text.sectionSettings}</Text>
         <TactileCard elevated style={styles.card} pressable={false}>
@@ -936,6 +1031,88 @@ const styles = StyleSheet.create({
   levelItemName: { color: SCREEN_THEME.textPrimary, fontSize: 14, fontWeight: '900' },
   levelItemPoints: { color: SCREEN_THEME.textSecondary, fontSize: 12, fontWeight: '700', marginTop: 2 },
   currentLevelMark: { color: SCREEN_THEME.woodGreenDark, fontSize: 11, fontWeight: '900' },
+  // Bonus card styles
+  bonusCard: {
+    backgroundColor: '#FFF8E7',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#E8D5A0',
+    shadowColor: '#C79C47',
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
+  },
+  bonusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
+  bonusTitle: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#6B5E30',
+  },
+  bonusTotal: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#C79C47',
+  },
+  bonusProgressTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#EDE0C0',
+    marginBottom: 12,
+    overflow: 'hidden',
+  },
+  bonusProgressFill: {
+    height: '100%',
+    borderRadius: 3,
+    backgroundColor: '#C79C47',
+  },
+  bonusBreakdown: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 10,
+  },
+  bonusBreakdownItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FFF3D0',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  bonusBreakdownLabel: {
+    flex: 1,
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#8A7B50',
+  },
+  bonusBreakdownValue: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#6B5E30',
+  },
+  bonusBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderTopWidth: 1,
+    borderTopColor: '#EDE0C0',
+    paddingTop: 10,
+  },
+  bonusBadgeText: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#6B5E30',
+  },
   card: {
     marginBottom: 14,
     overflow: 'hidden',

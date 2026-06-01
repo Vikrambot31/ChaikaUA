@@ -365,6 +365,32 @@
       }
     },
 
+    "help_responses": {
+      "$requestId": {
+        ".read": "auth != null",
+        "$helperUid": {
+          ".read": "auth != null",
+          ".write": false
+        }
+      }
+    },
+
+    "trust_tree": {
+      ".read": "auth != null",
+      ".indexOn": ["sponsorUid"],
+      "$uid": {
+        ".read": "auth != null",
+        ".write": false
+      }
+    },
+
+    "user_bonuses": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": false
+      }
+    },
+
     "outgoingProfileRequestsByUser": {
       "$requesterId": {
         ".read": "auth != null && (auth.uid === $requesterId || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",

@@ -27,6 +27,8 @@ import ContactReasonModal from '../components/ContactReasonModal';
 import type { DetailItemData } from '../utils/detailViewTypes';
 import UserCardActionBar from '../components/UserCardActionBar';
 import { START_AVATAR_URI_PREFIX } from '../utils/startAvatars';
+import { get, ref } from 'firebase/database';
+import { database } from '../firebase-config';
 
 const CACHE_KEY = '@chaika:community_users_cache_v1';
 const PRIMARY = '#7A1E5C';
@@ -219,6 +221,7 @@ export default function TopGirlsBoysScreen() {
   const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
   const [statusFilter, setStatusFilter] = useState<PersonStatusFilter>('all');
   const [levelFilter, setLevelFilter] = useState<PersonLevelFilter>('all');
+  const [bonusByUserId, setBonusByUserId] = useState<Record<string, number>>({});
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const [permModal, setPermModal] = useState<{
     visible: boolean;
@@ -358,6 +361,29 @@ export default function TopGirlsBoysScreen() {
   useEffect(() => {
     void loadPeople();
   }, [loadPeople]);
+
+  // Load bonuses for all people in one batch read
+  useEffect(() => {
+    if (people.length === 0) return;
+    let active = true;
+    void (async () => {
+      try {
+        const snap = await get(ref(database, 'user_bonuses'));
+        if (!active || !snap.exists()) return;
+        const all = snap.val() as Record<string, { total?: number }>;
+        const map: Record<string, number> = {};
+        for (const [uid, val] of Object.entries(all)) {
+          if (val && typeof val === 'object') {
+            map[uid] = Number(val.total || 0);
+          }
+        }
+        if (active) setBonusByUserId(map);
+      } catch {
+        // bonuses are non-critical — silently ignore
+      }
+    })();
+    return () => { active = false; };
+  }, [people]);
 
   const ranked: Person[] = useMemo(() => {
     return people
@@ -549,6 +575,12 @@ export default function TopGirlsBoysScreen() {
                   likePath="feed_likes/people"
                   likeId={person.id}
                 />
+                {(bonusByUserId[person.id] ?? 0) > 0 ? (
+                  <View style={styles.bonusCoinRow}>
+                    <MaterialCommunityIcons name="circle-multiple" size={14} color="#C79C47" />
+                    <Text style={styles.bonusCoinText}>{bonusByUserId[person.id]}</Text>
+                  </View>
+                ) : null}
               </TouchableOpacity>
             );
           })
@@ -686,4 +718,17 @@ const styles = StyleSheet.create({
   },
   levelName: { color: PRIMARY, fontSize: 10, fontWeight: '900', textAlign: 'center', lineHeight: 12 },
   contactBtn: { width: 32, height: 28, borderRadius: 10, backgroundColor: PRIMARY, alignItems: 'center', justifyContent: 'center' },
+  bonusCoinRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 4,
+    paddingTop: 5,
+    paddingRight: 4,
+  },
+  bonusCoinText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#C79C47',
+  },
 });
