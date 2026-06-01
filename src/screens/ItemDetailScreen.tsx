@@ -100,6 +100,7 @@ export default function ItemDetailScreen({
   const canRequestContact = Boolean(item.userId && item.userId !== currentUser?.id);
   const canContact = canRequestContact || hasPhone;
   const hasPhoto = Boolean(item.photoUri || item.photoStoragePath);
+  const hasOwnerAvatar = Boolean(item.ownerAvatarUri);
   const categoryLabel = item.category ? getRequestTopicLabel({ category: item.category }, language) : '';
 
   const fields = [
@@ -165,6 +166,13 @@ export default function ItemDetailScreen({
             style={styles.photo}
             resizeMode="contain"
             debugLabel={`ItemDetail:${item.sourceType}:${item.sourceId}`}
+          />
+        ) : hasOwnerAvatar ? (
+          <AppPhotoImage
+            uri={item.ownerAvatarUri}
+            style={styles.photo}
+            resizeMode="cover"
+            debugLabel={`ItemDetail:ownerAvatar:${item.userId}`}
           />
         ) : (
           <View style={styles.photoPlaceholder}>

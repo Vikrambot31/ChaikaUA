@@ -40,6 +40,7 @@ import { safeLogError } from '../utils/errorLogger';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { showUserError } from '../utils/userFacingErrors';
 import { getBestPhotoUri, getPhotoThumbnailUri, ImageStorage } from './ImageStorage';
+import { deleteEngineUpload } from './PhotoUploadEngine';
 import { UploadQueue } from './UploadQueue';
 import type { UserPhoto } from './types';
 
@@ -97,9 +98,15 @@ const UI_TEXT = {
     pendingBanner: 'Ваше фото перевіряється — нові завантаження тимчасово недоступні',
     rejectedReason: 'Причина:',
     moderationNote: 'Видно тільки вам до одобрення',
-    selectForReview: 'Оберіть фото для перевірки',
+    selectForReview: 'Оберіть фото для перевірки або видалення',
     submitForReview: 'Відправити на одобрення',
     submittingForReview: 'Відправляємо...',
+    deleteSelected: 'Видалити обрані',
+    deletingSelected: 'Видаляємо...',
+    deleteSelectedTitle: 'Видалити обрані фото?',
+    deleteSelectedText: 'Обрані фото зникнуть з вашої галереї.',
+    requestPhotosTitle: 'Фото з ваших заявок',
+    requestPhotosNote: 'Зберігаються до 15 днів або за умовами картки, потім видаляються.',
   },
   ru: {
     title: 'Мои фотографии',
@@ -130,9 +137,15 @@ const UI_TEXT = {
     pendingBanner: 'Ваше фото проверяется — новые загрузки временно недоступны',
     rejectedReason: 'Причина:',
     moderationNote: 'Видно только вам до одобрения',
-    selectForReview: 'Выберите фото для проверки',
+    selectForReview: 'Выберите фото для проверки или удаления',
     submitForReview: 'Отправить на одобрение',
     submittingForReview: 'Отправляем...',
+    deleteSelected: 'Удалить выбранные',
+    deletingSelected: 'Удаляем...',
+    deleteSelectedTitle: 'Удалить выбранные фото?',
+    deleteSelectedText: 'Выбранные фото исчезнут из вашей галереи.',
+    requestPhotosTitle: 'Фото из ваших заявок',
+    requestPhotosNote: 'Хранятся до 15 дней или по условиям карточки, потом удаляются.',
   },
   en: {
     title: 'My photos',
@@ -163,11 +176,31 @@ const UI_TEXT = {
     pendingBanner: 'Your photo is being reviewed — new uploads are temporarily unavailable',
     rejectedReason: 'Reason:',
     moderationNote: 'Only visible to you until approved',
-    selectForReview: 'Select photos for review',
+    selectForReview: 'Select photos for review or deletion',
     submitForReview: 'Send for approval',
     submittingForReview: 'Sending...',
+    deleteSelected: 'Delete selected',
+    deletingSelected: 'Deleting...',
+    deleteSelectedTitle: 'Delete selected photos?',
+    deleteSelectedText: 'Selected photos will be removed from your gallery.',
+    requestPhotosTitle: 'Photos from your requests',
+    requestPhotosNote: 'Stored for up to 15 days or by the card rules, then deleted.',
   },
 } as const;
+
+const REQUEST_PHOTO_PREFIXES = [
+  'requests/',
+  'lost_found/',
+  'buy_sell/',
+  'contacts/',
+  'local_business/',
+  'job_listings/',
+];
+
+const isRequestPhoto = (photo: UserPhoto): boolean => {
+  const storagePath = String(photo.storagePath || photo.filePath || '').trim();
+  return REQUEST_PHOTO_PREFIXES.some((prefix) => storagePath.startsWith(prefix));
+};
 
 const statusColor: Record<UserPhoto['status'], string> = {
   local: SCREEN_THEME.woodGreenDark,
@@ -239,6 +272,7 @@ const MyPhotosScreen: React.FC = () => {
   const [rtdbLoading, setRtdbLoading] = useState(false);
   const [adding, setAdding] = useState(false);
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [deletingSelected, setDeletingSelected] = useState(false);
   const [selectedForReview, setSelectedForReview] = useState<string[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [previewPhoto, setPreviewPhoto] = useState<PreviewPhoto | null>(null);
@@ -262,11 +296,22 @@ const MyPhotosScreen: React.FC = () => {
     photo.status !== 'uploaded' ||
     !((photo.storagePath && rtdbPhotoKeys.has(photo.storagePath)) || (photo.imageUrl && rtdbPhotoKeys.has(photo.imageUrl)))
   )), [localPhotos, rtdbPhotoKeys]);
-  const totalPhotoCount = rtdbPhotos.length + displayedLocalPhotos.length;
+  const requestLocalPhotos = useMemo(
+    () => displayedLocalPhotos.filter(isRequestPhoto),
+    [displayedLocalPhotos],
+  );
+  const personalLocalPhotos = useMemo(
+    () => displayedLocalPhotos.filter((photo) => !isRequestPhoto(photo)),
+    [displayedLocalPhotos],
+  );
+  const totalPhotoCount = rtdbPhotos.length + personalLocalPhotos.length;
 
   const limitReached = totalPhotoCount >= MAX_USER_PHOTOS;
   const addButtonDisabled = limitReached || adding;
   const selectedCount = selectedForReview.length;
+  const selectedReviewableCount = useMemo(() => (
+    rtdbPhotos.filter((photo) => selectedForReview.includes(photo.id) && (photo.status === 'not_submitted' || photo.status === 'rejected')).length
+  ), [rtdbPhotos, selectedForReview]);
 
   const handleBack = useCallback(() => {
     if (typeof navigation.canGoBack === 'function' && navigation.canGoBack()) {
@@ -372,31 +417,67 @@ const MyPhotosScreen: React.FC = () => {
   }, [runAdd, text]);
 
   const togglePhotoForReview = useCallback((photo: RtdbPhoto) => {
-    if (photo.status !== 'not_submitted' && photo.status !== 'rejected') return;
     setSelectedForReview((prev) => (
       prev.includes(photo.id) ? prev.filter((id) => id !== photo.id) : [...prev, photo.id]
     ));
   }, []);
 
   const submitSelectedForReview = useCallback(async () => {
-    if (!uid || selectedForReview.length === 0 || submittingReview) return;
+    const reviewablePhotoIds = rtdbPhotos
+      .filter((photo) => selectedForReview.includes(photo.id) && (photo.status === 'not_submitted' || photo.status === 'rejected'))
+      .map((photo) => photo.id);
+    if (!uid || reviewablePhotoIds.length === 0 || submittingReview || deletingSelected) return;
     setSubmittingReview(true);
     try {
       const now = Date.now();
-      await Promise.all(selectedForReview.map((photoId) => update(ref(database, `user_photos/${uid}/${photoId}`), {
+      await Promise.all(reviewablePhotoIds.map((photoId) => update(ref(database, `user_photos/${uid}/${photoId}`), {
         status: 'pending',
         moderationStatus: 'pending',
         submittedAt: now,
         updatedAt: now,
         moderationReason: null,
       })));
-      setSelectedForReview([]);
+      setSelectedForReview((prev) => prev.filter((photoId) => !reviewablePhotoIds.includes(photoId)));
     } catch (error) {
       showUserError(language, 'upload', error);
     } finally {
       setSubmittingReview(false);
     }
-  }, [language, selectedForReview, submittingReview, uid]);
+  }, [deletingSelected, language, rtdbPhotos, selectedForReview, submittingReview, uid]);
+
+  const deleteSelectedRtdbPhotos = useCallback(() => {
+    if (!uid || selectedForReview.length === 0 || deletingSelected || submittingReview) return;
+    const photosToDelete = rtdbPhotos.filter((photo) => selectedForReview.includes(photo.id));
+    if (photosToDelete.length === 0) return;
+
+    Alert.alert(text.deleteSelectedTitle, text.deleteSelectedText, [
+      { text: text.no, style: 'cancel' },
+      {
+        text: text.yes,
+        style: 'destructive',
+        onPress: () => {
+          void (async () => {
+            setDeletingSelected(true);
+            try {
+              await Promise.all(photosToDelete.map((photo) => deleteEngineUpload({
+                storagePath: photo.storagePath,
+                rtdbId: photo.id,
+                collection: 'user_photos',
+                uid,
+              })));
+              setSelectedForReview([]);
+              setRtdbPhotos((prev) => prev.filter((photo) => !selectedForReview.includes(photo.id)));
+            } catch (error) {
+              showUserError(language, 'delete', error);
+              safeLogError('MyPhotosScreen.deleteSelectedRtdbPhotos', error, { uid, count: photosToDelete.length });
+            } finally {
+              setDeletingSelected(false);
+            }
+          })();
+        },
+      },
+    ]);
+  }, [deletingSelected, language, rtdbPhotos, selectedForReview, submittingReview, text, uid]);
 
   const retryPhoto = useCallback(
     (photo: UserPhoto) => {
@@ -502,8 +583,42 @@ const MyPhotosScreen: React.FC = () => {
     );
   };
 
+  const renderRequestPhoto = (photo: UserPhoto) => {
+    const displayUri = getPhotoThumbnailUri(photo) || getBestPhotoUri(photo) || photo.localUri || '';
+
+    return (
+      <TouchableOpacity
+        key={photo.id}
+        style={styles.requestPhotoThumb}
+        activeOpacity={0.84}
+        onPress={() => {
+          if (displayUri) {
+            setPreviewPhoto({
+              uri: getBestPhotoUri(photo) || displayUri,
+              storagePath: photo.storagePath,
+            });
+          }
+        }}
+      >
+        {displayUri ? (
+          <AppPhotoImage
+            uri={displayUri}
+            storagePath={photo.storagePath}
+            style={styles.requestPhotoImage}
+            resizeMode="cover"
+            debugLabel="MyPhotosRequestThumb"
+            showDebugInfo={false}
+          />
+        ) : (
+          <View style={styles.requestPhotoFallback}>
+            <MaterialCommunityIcons name="image-off-outline" size={18} color={SCREEN_THEME.textMuted} />
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
+
   const renderRtdbPhoto = (photo: RtdbPhoto) => {
-    const selectable = photo.status === 'not_submitted' || photo.status === 'rejected';
     const selected = selectedForReview.includes(photo.id);
     const badgeLabel = photo.status === 'pending'
       ? text.sectionPending
@@ -524,11 +639,7 @@ const MyPhotosScreen: React.FC = () => {
         style={[sStyles.rtdbCard, selected && styles.selectedCard]}
         activeOpacity={0.88}
         onPress={() => {
-          if (selectable) {
-            togglePhotoForReview(photo);
-            return;
-          }
-          setPreviewPhoto({ uri: photo.imageUri, storagePath: photo.storagePath });
+          togglePhotoForReview(photo);
         }}
         onLongPress={() => setPreviewPhoto({ uri: photo.imageUri, storagePath: photo.storagePath })}
       >
@@ -542,21 +653,20 @@ const MyPhotosScreen: React.FC = () => {
         <View style={[styles.savedBadge, { backgroundColor: badgeColor }]}>
           <Text style={styles.statusText}>{badgeLabel}</Text>
         </View>
-        {selectable ? (
-          <View style={[styles.reviewSelectBadge, selected && styles.reviewSelectBadgeActive]}>
-            <MaterialCommunityIcons
-              name={selected ? 'check-circle' : 'checkbox-blank-circle-outline'}
-              size={22}
-              color="#fff"
-            />
-          </View>
-        ) : null}
+        <View style={[styles.reviewSelectBadge, selected && styles.reviewSelectBadgeActive]}>
+          <MaterialCommunityIcons
+            name={selected ? 'check-circle' : 'checkbox-blank-circle-outline'}
+            size={22}
+            color="#fff"
+          />
+        </View>
       </TouchableOpacity>
     );
   };
 
   const hasAnyPhotos =
-    displayedLocalPhotos.length > 0 ||
+    personalLocalPhotos.length > 0 ||
+    requestLocalPhotos.length > 0 ||
     pendingPhotos.length > 0 ||
     savedPhotos.length > 0 ||
     approvedPhotos.length > 0 ||
@@ -619,37 +729,64 @@ const MyPhotosScreen: React.FC = () => {
         ) : null}
 
         {/* Section: Local in-flight uploads (queued/uploading/error/local) */}
-        {displayedLocalPhotos.length > 0 ? (
+        {personalLocalPhotos.length > 0 ? (
           <View style={styles.section}>
             <SectionHeader
-              label={displayedLocalPhotos.every((p) => p.status === 'local') ? text.sectionSaved : text.sectionUploading}
-              count={displayedLocalPhotos.length}
+              label={personalLocalPhotos.every((p) => p.status === 'local') ? text.sectionSaved : text.sectionUploading}
+              count={personalLocalPhotos.length}
             />
             <FlatList
-              data={displayedLocalPhotos}
+              data={personalLocalPhotos}
               keyExtractor={(item: UserPhoto) => item.id}
               renderItem={renderLocalPhoto}
               numColumns={2}
               scrollEnabled={false}
               contentContainerStyle={styles.grid}
-              columnWrapperStyle={localPhotos.length > 1 ? styles.gridRow : undefined}
+              columnWrapperStyle={personalLocalPhotos.length > 1 ? styles.gridRow : undefined}
             />
+          </View>
+        ) : null}
+
+        {requestLocalPhotos.length > 0 ? (
+          <View style={styles.requestPhotosSection}>
+            <Text style={styles.requestPhotosTitle}>{text.requestPhotosTitle}</Text>
+            <Text style={styles.requestPhotosNote}>{text.requestPhotosNote}</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.requestPhotosStrip}
+            >
+              {requestLocalPhotos.map(renderRequestPhoto)}
+            </ScrollView>
           </View>
         ) : null}
       </ScrollView>
 
       {selectedCount > 0 ? (
-        <TouchableOpacity
-          style={[styles.reviewButton, submittingReview && styles.addButtonDisabled]}
-          onPress={() => void submitSelectedForReview()}
-          activeOpacity={0.88}
-          disabled={submittingReview}
-        >
-          {submittingReview ? <ActivityIndicator color="#fff" /> : <MaterialCommunityIcons name="send-check-outline" size={20} color="#fff" />}
-          <Text style={styles.addButtonText}>
-            {submittingReview ? text.submittingForReview : `${text.submitForReview} (${selectedCount})`}
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.selectedActionBar}>
+          <TouchableOpacity
+            style={[styles.selectedActionBtn, styles.deleteSelectedButton, (deletingSelected || submittingReview) && styles.addButtonDisabled]}
+            onPress={deleteSelectedRtdbPhotos}
+            activeOpacity={0.88}
+            disabled={deletingSelected || submittingReview}
+          >
+            {deletingSelected ? <ActivityIndicator color="#fff" /> : <MaterialCommunityIcons name="trash-can-outline" size={20} color="#fff" />}
+            <Text style={styles.selectedActionText}>
+              {deletingSelected ? text.deletingSelected : `${text.deleteSelected} (${selectedCount})`}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.selectedActionBtn, styles.reviewSelectedButton, (submittingReview || deletingSelected || selectedReviewableCount === 0) && styles.addButtonDisabled]}
+            onPress={() => void submitSelectedForReview()}
+            activeOpacity={0.88}
+            disabled={submittingReview || deletingSelected || selectedReviewableCount === 0}
+          >
+            {submittingReview ? <ActivityIndicator color="#fff" /> : <MaterialCommunityIcons name="send-check-outline" size={20} color="#fff" />}
+            <Text style={styles.selectedActionText}>
+              {submittingReview ? text.submittingForReview : `${text.submitForReview} (${selectedReviewableCount})`}
+            </Text>
+          </TouchableOpacity>
+        </View>
       ) : null}
 
       {/* FAB — disabled when the personal gallery limit is reached */}
@@ -832,6 +969,50 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  requestPhotosSection: {
+    marginTop: 2,
+    marginBottom: 16,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#E4D0AB',
+  },
+  requestPhotosTitle: {
+    color: SCREEN_THEME.textPrimary,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  requestPhotosNote: {
+    marginTop: 3,
+    color: SCREEN_THEME.textSecondary,
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: '600',
+  },
+  requestPhotosStrip: {
+    paddingTop: 8,
+    paddingBottom: 2,
+    gap: 7,
+  },
+  requestPhotoThumb: {
+    width: 58,
+    height: 58,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderWidth: 1,
+    borderColor: '#E4D0AB',
+  },
+  requestPhotoImage: {
+    width: '100%',
+    height: '100%',
+  },
+  requestPhotoFallback: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: SCREEN_THEME.paperStrong,
+  },
   emptyCard: {
     backgroundColor: SCREEN_THEME.paperStrong,
     borderRadius: 12,
@@ -876,6 +1057,37 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 8,
+  },
+  selectedActionBar: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: 22,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  selectedActionBtn: {
+    flex: 1,
+    minHeight: 56,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 7,
+    paddingHorizontal: 10,
+  },
+  deleteSelectedButton: {
+    backgroundColor: '#8E2E24',
+  },
+  reviewSelectedButton: {
+    backgroundColor: SCREEN_THEME.enamelBlueDark,
+  },
+  selectedActionText: {
+    flexShrink: 1,
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '900',
+    textAlign: 'center',
   },
   addButtonText: { color: '#fff', fontSize: 16, fontWeight: '900' },
   previewBackdrop: {

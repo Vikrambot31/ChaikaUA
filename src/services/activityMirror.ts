@@ -39,6 +39,7 @@ export const publishApprovedActivity = async (payload: ActivityPayload): Promise
     status: 'approved',
     isApproved: true,
     isCensored: false,
+    isMirror: true,
     requiresManualModeration: false,
     submittedForModerationAt: new Date().toISOString(),
     moderatedAt: Date.now(),

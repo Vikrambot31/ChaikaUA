@@ -33,6 +33,13 @@ export function normalizePhoneForUrl(phone?: string | null): string {
   return (phone ?? '').replace(/[^\d+]/g, '').trim();
 }
 
+function toTelegramAppUrl(url: string): string | null {
+  const clean = url.trim();
+  const match = clean.match(/^https?:\/\/t\.me\/([A-Za-z0-9_]+)/i);
+  if (!match?.[1]) return null;
+  return `tg://resolve?domain=${match[1]}`;
+}
+
 function showCommunicationError(language: CommunicationLanguage, message: string): void {
   Alert.alert(TEXT[language].errorTitle, message);
 }
@@ -81,7 +88,26 @@ export async function safeOpenViber(phone?: string | null, language: Communicati
 }
 
 export async function safeOpenExternalUrl(url?: string | null, language: CommunicationLanguage = 'ua'): Promise<boolean> {
-  return safeOpenURL(url, language, TEXT[language].noUrlApp);
+  const cleanUrl = (url ?? '').trim();
+  if (!cleanUrl) {
+    showCommunicationError(language, TEXT[language].invalidUrl);
+    return false;
+  }
+
+  const telegramAppUrl = toTelegramAppUrl(cleanUrl);
+  if (telegramAppUrl) {
+    try {
+      const canOpenTelegram = await Linking.canOpenURL(telegramAppUrl);
+      if (canOpenTelegram) {
+        await Linking.openURL(telegramAppUrl);
+        return true;
+      }
+    } catch {
+      // ignore and fallback to browser URL below
+    }
+  }
+
+  return safeOpenURL(cleanUrl, language, TEXT[language].noUrlApp);
 }
 
 export async function safeOpenMaps(url?: string | null, language: CommunicationLanguage = 'ua'): Promise<boolean> {

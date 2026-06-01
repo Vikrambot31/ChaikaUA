@@ -676,7 +676,7 @@ const KontaktiChaikyScreen: React.FC = () => {
     ]);
   };
 
-  const mapToDetailData = (item: ContactListing): DetailItemData => {
+  const mapToDetailData = (item: ContactListing, ownerAvatarUri?: string): DetailItemData => {
     const categoryLabel = getCategoryLabel(item.category);
     const conditionLabel = text.conditionLabels[item.condition as keyof typeof text.conditionLabels] ?? item.condition;
 
@@ -691,6 +691,7 @@ const KontaktiChaikyScreen: React.FC = () => {
       price: item.price ? `${item.price}` : undefined,
       status: conditionLabel,
       userId: item.userId,
+      ownerAvatarUri,
       createdAt: item.createdAt,
       sourceType: 'lyudi',
       sourceId: item.id,
@@ -849,7 +850,7 @@ const KontaktiChaikyScreen: React.FC = () => {
                   >
                     <TouchableOpacity
                       style={styles.kCardTop}
-                      onPress={() => { if (navLock.current) return; navLock.current = true; navigation.navigate('ItemDetailScreen', { item: mapToDetailData(item) }); setTimeout(() => { navLock.current = false; }, 800); }}
+                      onPress={() => { if (navLock.current) return; navLock.current = true; navigation.navigate('ItemDetailScreen', { item: mapToDetailData(item, avatarUri || undefined) }); setTimeout(() => { navLock.current = false; }, 800); }}
                       activeOpacity={0.86}
                     >
                       {Boolean(item.photoUri || item.photoStoragePath) ? (
@@ -913,6 +914,7 @@ const KontaktiChaikyScreen: React.FC = () => {
                       contactDisabled={!showPhone && (!item.userId || item.userId === user?.id)}
                       likePath="feed_likes/contacts"
                       likeId={item.id}
+                      showLikeAvatars
                     />
                     {isOwn ? (
                       <TouchableOpacity style={styles.kDeleteLink} onPress={() => handleDelete(item.id)} activeOpacity={0.8}>

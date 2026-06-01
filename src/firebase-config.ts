@@ -1088,12 +1088,15 @@ export const firebaseChatAPI = {
       const data: Record<string, unknown> | null = snapshot.val();
       const requests: AppRequest[] = [];
 
+      const MIRROR_CATEGORIES = new Set(['buy_sell', 'contacts', 'job_search', 'lost_found']);
+
       if (data) {
         Object.entries(data).forEach(([id, value]) => {
+          const raw = value as Record<string, unknown>;
+          if (raw?.isMirror === true) return;
           const request = mapDbRequestToAppRequest(id, value);
-          if (request.category === 'app_suggestion') {
-            return;
-          }
+          if (request.category === 'app_suggestion') return;
+          if (request.category && MIRROR_CATEGORIES.has(request.category)) return;
           requests.unshift(request);
         });
       }

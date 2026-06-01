@@ -23,6 +23,62 @@ import MiniTabBar from '../components/MiniTabBar';
 
 type Lang = 'ua' | 'ru' | 'en';
 type AppNav = import('@react-navigation/native').NavigationProp<Record<string, object | undefined>>;
+type LocalErrorEntry = ReturnType<typeof getLocalErrors>[number];
+type ErrorLevel = 'minor' | 'medium' | 'major' | 'critical';
+
+const ERROR_LEVEL_META: Record<ErrorLevel, { label: string; short: string; details: string; color: string; bg: string; icon: keyof typeof MaterialCommunityIcons.glyphMap }> = {
+  minor: {
+    label: 'Мелкая ошибка',
+    short: 'Чаще всего это временный сбой связи или загрузки.',
+    details: 'Обычно приложение продолжает работать. Если ошибка не повторяется, срочно ничего делать не нужно.',
+    color: '#4F7D57',
+    bg: 'rgba(79,125,87,0.12)',
+    icon: 'wifi-alert',
+  },
+  medium: {
+    label: 'Средняя ошибка',
+    short: 'Одна функция могла не выполниться с первого раза.',
+    details: 'Стоит повторить действие. Если карточка появляется часто, лучше отправить отчет администратору.',
+    color: '#9A6A16',
+    bg: 'rgba(154,106,22,0.13)',
+    icon: 'alert-circle-outline',
+  },
+  major: {
+    label: 'Крупная ошибка',
+    short: 'Важное действие могло не сохраниться или не загрузиться.',
+    details: 'Проверьте интернет и повторите действие. Если не помогло, отправьте отчет администратору.',
+    color: '#C05F2C',
+    bg: 'rgba(192,95,44,0.14)',
+    icon: 'alert-outline',
+  },
+  critical: {
+    label: 'Критическая ошибка',
+    short: 'Может мешать работе экрана или всего приложения.',
+    details: 'Лучше сразу отправить отчет администратору и указать, что вы делали перед ошибкой.',
+    color: '#C0392B',
+    bg: 'rgba(192,57,43,0.13)',
+    icon: 'alert-octagon-outline',
+  },
+};
+
+const classifyErrorLevel = (entry: LocalErrorEntry): ErrorLevel => {
+  const haystack = `${entry.functionName || ''} ${entry.source || ''} ${entry.message || ''}`.toLowerCase();
+
+  if (/fatal|crash|errorboundary|error boundary|unhandled|security violation|blocked device|device_blocked|corrupt|corrupted/.test(haystack)) {
+    return 'critical';
+  }
+  if (/permission-denied|permission denied|unauthorized|forbidden|auth\/|database|firebase|storage|upload|failed to save|failed to send|failed to remove|failed to delete|transaction/.test(haystack)) {
+    return 'major';
+  }
+  if (/network|offline|timeout|timed out|connection|unavailable|socket|cancelled|canceled|fetch|internet/.test(haystack)) {
+    return 'minor';
+  }
+  if (/cache|image|photo|render|parse|validation|failed|exception|warning/.test(haystack)) {
+    return 'medium';
+  }
+
+  return 'medium';
+};
 
 const COPY = {
   ua: {
@@ -139,6 +195,22 @@ const UserErrorMonitorScreen: React.FC = () => {
             </TouchableOpacity>
             <Text style={styles.title}>{text.title}</Text>
             <Text style={styles.subtitle}>{text.subtitle}</Text>
+            <View style={styles.noticeBox}>
+              <MaterialCommunityIcons name="information-outline" size={18} color={SCREEN_THEME.woodGreenDark} />
+              <Text style={styles.noticeText}>
+                Не все ошибки критические: иногда приложение просто потеряло связь или не успело загрузить данные. Ниже каждая ошибка помечена уровнем важности.
+              </Text>
+            </View>
+            <View style={styles.legendRow}>
+              {(Object.keys(ERROR_LEVEL_META) as ErrorLevel[]).map((level) => {
+                const meta = ERROR_LEVEL_META[level];
+                return (
+                  <View key={level} style={[styles.legendChip, { backgroundColor: meta.bg, borderColor: meta.color }]}>
+                    <Text style={[styles.legendText, { color: meta.color }]}>{meta.label.replace(' ошибка', '')}</Text>
+                  </View>
+                );
+              })}
+            </View>
             {errors.length > 0 ? (
               <View style={styles.countBadge}>
                 <Text style={styles.countBadgeText}>{text.total(errors.length)}</Text>
@@ -153,13 +225,27 @@ const UserErrorMonitorScreen: React.FC = () => {
               <Text style={styles.emptySubtitle}>{text.noErrorsSub}</Text>
             </View>
           ) : (
-            errors.slice().reverse().map((entry, index) => (
-              <View key={`${entry.at}-${index}`} style={styles.errorCard}>
-                <Text style={styles.errorScreen}>{text.screen}: {entry.functionName}</Text>
-                <Text style={styles.errorMessage}>{text.message}: {entry.message}</Text>
-                <Text style={styles.errorTime}>{text.time}: {new Date(entry.at).toLocaleTimeString()}</Text>
-              </View>
-            ))
+            errors.slice().reverse().map((entry, index) => {
+              const level = classifyErrorLevel(entry);
+              const meta = ERROR_LEVEL_META[level];
+              return (
+                <View key={`${entry.at}-${index}`} style={[styles.errorCard, { borderColor: meta.bg, borderLeftColor: meta.color }]}>
+                  <View style={styles.levelRow}>
+                    <View style={[styles.levelBadge, { backgroundColor: meta.bg }]}>
+                      <MaterialCommunityIcons name={meta.icon} size={14} color={meta.color} />
+                      <Text style={[styles.levelBadgeText, { color: meta.color }]}>{meta.label}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.errorScreen, { color: meta.color }]}>{text.screen}: {entry.functionName}</Text>
+                  <Text style={styles.errorMessage}>{text.message}: {entry.message}</Text>
+                  <Text style={styles.errorTime}>{text.time}: {new Date(entry.at).toLocaleTimeString()}</Text>
+                  <View style={[styles.explainBox, { backgroundColor: meta.bg }]}>
+                    <Text style={[styles.explainTitle, { color: meta.color }]}>{meta.short}</Text>
+                    <Text style={styles.explainText}>{meta.details}</Text>
+                  </View>
+                </View>
+              );
+            })
           )}
         </ScrollView>
 
@@ -211,6 +297,37 @@ const styles = StyleSheet.create({
   backText: { color: SCREEN_THEME.textSecondary, fontSize: 13, fontWeight: '800' },
   title: { fontSize: 24, fontWeight: '900', color: SCREEN_THEME.textPrimary },
   subtitle: { color: SCREEN_THEME.textSecondary, fontSize: 13, lineHeight: 19, fontWeight: '600' },
+  noticeBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginTop: 10,
+    backgroundColor: 'rgba(90,127,107,0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(90,127,107,0.22)',
+    borderRadius: 14,
+    padding: 10,
+  },
+  noticeText: {
+    flex: 1,
+    color: SCREEN_THEME.textPrimary,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '700',
+  },
+  legendRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 8,
+  },
+  legendChip: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+  },
+  legendText: { fontSize: 10, fontWeight: '900' },
   countBadge: {
     marginTop: 6,
     alignSelf: 'flex-start',
@@ -243,9 +360,31 @@ const styles = StyleSheet.create({
     borderLeftColor: '#E57373',
     gap: 3,
   },
+  levelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 3,
+  },
+  levelBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+  },
+  levelBadgeText: { fontSize: 11, fontWeight: '900' },
   errorScreen: { fontSize: 12, fontWeight: '800', color: '#C0392B' },
   errorMessage: { fontSize: 12, color: SCREEN_THEME.textPrimary, lineHeight: 17 },
   errorTime: { fontSize: 11, color: SCREEN_THEME.textMuted, fontWeight: '600' },
+  explainBox: {
+    borderRadius: 12,
+    padding: 9,
+    marginTop: 6,
+    gap: 2,
+  },
+  explainTitle: { fontSize: 12, lineHeight: 16, fontWeight: '900' },
+  explainText: { fontSize: 11, lineHeight: 16, color: SCREEN_THEME.textSecondary, fontWeight: '600' },
   footer: {
     paddingHorizontal: 16,
     paddingTop: 8,

@@ -5,6 +5,7 @@ import { onValue, ref, runTransaction } from 'firebase/database';
 import { database } from '../firebase-config';
 import MiniUserAvatar from './MiniUserAvatar';
 import { useSoftToast } from '../hooks/useSoftToast';
+import { resolveUserAvatarMap } from '../utils/userAvatar';
 
 const RTDB_FORBIDDEN_KEY_CHARS = /[.#$[\]/]/g;
 const toSafeRtdbKey = (value: string): string => (value ?? '').replace(RTDB_FORBIDDEN_KEY_CHARS, '_').trim();
@@ -31,6 +32,7 @@ type Props = {
   showAvatar?: boolean;
   showProfile?: boolean;
   showContact?: boolean;
+  showLikeAvatars?: boolean;
 };
 
 const labels = {
@@ -59,8 +61,10 @@ export default function UserCardActionBar({
   showAvatar = true,
   showProfile = true,
   showContact = true,
+  showLikeAvatars = false,
 }: Props) {
   const [localLikes, setLocalLikes] = useState<Record<string, true>>({});
+  const [likeAvatarByUserId, setLikeAvatarByUserId] = useState<Record<string, string>>({});
   const [localBusy, setLocalBusy] = useState(false);
   const { showError, showInfo } = useSoftToast();
   const safeLikeId = useMemo(() => (likeId ? toSafeRtdbKey(likeId) : undefined), [likeId]);
@@ -78,10 +82,30 @@ export default function UserCardActionBar({
 
   const resolvedLiked = liked ?? Boolean(currentUserId && localLikes[currentUserId]);
   const resolvedCount = likeCount ?? Object.keys(localLikes).length;
+  const likeAvatarUserIds = useMemo(() => {
+    if (!showLikeAvatars) return [];
+    return Object.keys(localLikes).filter(Boolean).slice(0, 3);
+  }, [localLikes, showLikeAvatars]);
   const resolvedBusy = Boolean(likeBusy);
   const t = labels[language] ?? labels.ua;
   const profileDisabled = !onProfile || !userId;
   const resolvedContactDisabled = contactDisabled || !onContact;
+
+  useEffect(() => {
+    if (!showLikeAvatars || likeAvatarUserIds.length === 0) {
+      setLikeAvatarByUserId({});
+      return;
+    }
+
+    let active = true;
+    void resolveUserAvatarMap(database, likeAvatarUserIds).then((resolved) => {
+      if (active) setLikeAvatarByUserId(resolved);
+    }).catch(() => undefined);
+
+    return () => {
+      active = false;
+    };
+  }, [likeAvatarUserIds, showLikeAvatars]);
 
   const handleLocalLike = async () => {
     if (!canUseLocalLike || !likePath || !safeLikeId || !currentUserId || localBusy) return;
@@ -148,16 +172,40 @@ export default function UserCardActionBar({
         </TouchableOpacity>
       ) : null}
 
-      <TouchableOpacity style={[styles.like, resolvedLiked && styles.likeActive, likeDisabled && styles.disabled]} onPress={(event) => { event.stopPropagation(); handleLike(); }} disabled={likeDisabled} activeOpacity={0.8}>
-        {resolvedBusy ? (
-          <ActivityIndicator size="small" color="#fff" />
-        ) : (
-          <>
-            <MaterialCommunityIcons name={resolvedLiked ? 'heart' : 'heart-outline'} size={14} color="#fff" />
-            <Text style={styles.likeText}>{resolvedCount}</Text>
-          </>
-        )}
-      </TouchableOpacity>
+      <View style={styles.likeCluster}>
+        {showLikeAvatars && likeAvatarUserIds.length > 0 ? (
+          <View style={styles.likeAvatarStack} pointerEvents="none">
+            {likeAvatarUserIds.map((likeUserId, index) => (
+              <View
+                key={likeUserId}
+                style={[
+                  styles.likeAvatarWrap,
+                  index > 0 && styles.likeAvatarOverlap,
+                  { zIndex: likeAvatarUserIds.length - index },
+                ]}
+              >
+                <MiniUserAvatar
+                  uri={likeAvatarByUserId[likeUserId] || ''}
+                  name=""
+                  size={22}
+                  borderRadius={11}
+                  backgroundColor="#6A8BA5"
+                />
+              </View>
+            ))}
+          </View>
+        ) : null}
+        <TouchableOpacity style={[styles.like, resolvedLiked && styles.likeActive, likeDisabled && styles.disabled]} onPress={(event) => { event.stopPropagation(); handleLike(); }} disabled={likeDisabled} activeOpacity={0.8}>
+          {resolvedBusy ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <>
+              <MaterialCommunityIcons name={resolvedLiked ? 'heart' : 'heart-outline'} size={14} color="#fff" />
+              <Text style={styles.likeText}>{resolvedCount}</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -194,7 +242,24 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     minWidth: 46,
     backgroundColor: '#7A1E5C',
+  },
+  likeCluster: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginLeft: 'auto',
+  },
+  likeAvatarStack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 24,
+    marginRight: 5,
+  },
+  likeAvatarWrap: {
+    width: 22,
+    height: 22,
+  },
+  likeAvatarOverlap: {
+    marginLeft: -8,
   },
   likeActive: { backgroundColor: '#B13A70' },
   likeText: { fontSize: 11, fontWeight: '900', color: '#fff' },

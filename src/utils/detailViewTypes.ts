@@ -12,6 +12,7 @@ export type DetailItemData = {
   votesCount?: number;
   hasVoted?: boolean;
   userId?: string;
+  ownerAvatarUri?: string;
   createdAt?: string;
   sourceType: string;
   sourceId: string;

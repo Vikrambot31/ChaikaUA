@@ -33,7 +33,7 @@ type ActivityUser = {
 
 const UI_TEXT = {
   ua: {
-    quickLabel: 'Чат заявок',
+    quickLabel: 'ВСІ ЗАЯВКИ ЧАЙКИ',
     quickDesc: 'Відкрити живий список заявок',
     topics: [
       { label: 'Допомога сусідам', desc: 'Термінові запити від мешканців - тільки сьогодні', screen: 'HelpNeighborsScreen', icon: 'hand-heart-outline', accent: SCREEN_THEME.woodGreen },
@@ -44,7 +44,7 @@ const UI_TEXT = {
     ] as TopicItem[],
   },
   ru: {
-    quickLabel: 'Чат заявок',
+    quickLabel: 'ВСЕ ЗАЯВКИ ЧАЙКИ',
     quickDesc: 'Открыть живой список заявок',
     topics: [
       { label: 'Помощь соседям', desc: 'Срочные запросы жителей - только сегодня', screen: 'HelpNeighborsScreen', icon: 'hand-heart-outline', accent: SCREEN_THEME.woodGreen },
@@ -55,7 +55,7 @@ const UI_TEXT = {
     ] as TopicItem[],
   },
   en: {
-    quickLabel: 'Requests chat',
+    quickLabel: 'ALL CHAIKA REQUESTS',
     quickDesc: 'Open live request list',
     topics: [
       { label: 'Neighbor Help', desc: 'Urgent requests from residents - today only', screen: 'HelpNeighborsScreen', icon: 'hand-heart-outline', accent: SCREEN_THEME.woodGreen },
@@ -236,7 +236,7 @@ const RequestTopicScreen: React.FC = () => {
               {[0, 1, 2].map((index) => {
                 const activityUser = activeAvatarUsers[index];
                 return (
-                  <View key={activityUser?.userId ?? `activity-avatar-${index}`} style={[styles.activityAvatarWrap, index > 0 && styles.activityAvatarOverlap]}>
+                  <View key={activityUser?.userId ?? `activity-avatar-${index}`} style={[styles.activityAvatarWrap, { left: index * 22 }, index > 0 && styles.activityAvatarOverlap]}>
                     <MiniUserAvatar
                       uri={activityUser?.photoUri || (activityUser?.userId && avatarByUserId[activityUser.userId]) || undefined}
                       name={activityUser?.name}
@@ -348,22 +348,24 @@ const styles = StyleSheet.create({
   activityRow: { flexDirection: 'row', alignItems: 'center' },
   activityAvatars: {
     width: 78,
-    flexDirection: 'row',
-    alignItems: 'center',
+    minHeight: 48,
     marginRight: 10,
   },
   activityAvatarWrap: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
     borderRadius: 18,
     borderWidth: 2,
     borderColor: '#111',
     backgroundColor: '#FFD917',
     overflow: 'hidden',
   },
-  activityAvatarOverlap: { marginLeft: -12 },
+  activityAvatarOverlap: { marginLeft: 0 },
   activityUsersLabel: {
     position: 'absolute',
     left: 0,
-    bottom: -15,
+    top: 38,
     color: '#15823D',
     fontSize: 8,
     fontWeight: '800',
@@ -373,7 +375,7 @@ const styles = StyleSheet.create({
   sosTrack: {
     height: 31,
     borderRadius: 12,
-    backgroundColor: '#1C1C1C',
+    backgroundColor: SCREEN_THEME.appBg,
     padding: 4,
     overflow: 'hidden',
   },
@@ -416,7 +418,7 @@ const styles = StyleSheet.create({
   offerTrack: {
     height: 27,
     borderRadius: 11,
-    backgroundColor: '#143D22',
+    backgroundColor: SCREEN_THEME.appBg,
     padding: 4,
     overflow: 'hidden',
   },
