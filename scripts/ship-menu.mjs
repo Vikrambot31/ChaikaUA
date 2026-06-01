@@ -44,7 +44,7 @@ const printMenu = () => {
   console.log('Выбери режим:');
   console.log('1. Только проверки + локальный коммит, БЕЗ деплоя на сервер');
   console.log('2. Проверки + коммит + деплой правил Firebase database/storage');
-  console.log('3. Проверки + коммит + полный деплой Firebase rules/storage/functions + git push');
+  console.log('3. Проверки + коммит + ПОЛНЫЙ деплой (rules + functions + админ-панель) + git push');
   console.log('4. Пробный запуск: ничего не менять, только показать действия');
   console.log('');
 };
@@ -86,7 +86,7 @@ if (mode === '1') {
   console.log('\nРежим 2: проверки + коммит + деплой правил Firebase database/storage.');
   shipArgs = ['--message', message, '--deploy=rules'];
 } else if (mode === '3') {
-  console.log('\nРежим 3: проверки + коммит + полный деплой Firebase + git push.');
+  console.log('\nРежим 3: проверки + коммит + полный деплой (rules + functions + админ-панель) + git push.');
   shipArgs = ['--message', message, '--deploy', '--push'];
 } else if (mode === '4') {
   console.log('\nРежим 4: пробный запуск. Ничего не будет изменено.');
