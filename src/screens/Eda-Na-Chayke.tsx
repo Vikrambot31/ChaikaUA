@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import {
   SafeAreaView,
   ScrollView,
@@ -173,8 +173,10 @@ function matchesEatFilter(place: Place, filter: EatFilter): boolean {
   return false;
 }
 
-function openPhone(phone: string) {
-  Linking.openURL(`tel:${phone}`);
+function openPhone(phone?: string) {
+  const safePhone = phone?.trim();
+  if (!safePhone) return;
+  Linking.openURL(`tel:${safePhone}`);
 }
 
 function openRoute(lat: number, lng: number) {
@@ -185,8 +187,9 @@ function openRoute(lat: number, lng: number) {
   Linking.openURL(url);
 }
 
-function openTelegram(telegram: string) {
-  const handle = telegram.replace('@', '').replace('https://t.me/', '');
+function openTelegram(telegram?: string) {
+  const handle = telegram?.trim().replace('@', '').replace('https://t.me/', '');
+  if (!handle) return;
   Linking.openURL(`https://t.me/${handle}`);
 }
 
@@ -206,6 +209,8 @@ export default function EdaNaChaykeScreen() {
   const [mode, setMode] = useState<ScreenMode>('home');
   const [eatFilter, setEatFilter] = useState<EatFilter>('all');
   const [query, setQuery] = useState('');
+  const scrollRef = useRef<ScrollView>(null);
+  const offersSectionY = useRef(0);
 
   useEffect(() => {
     logFoodEvent('food_open_screen');
@@ -274,12 +279,13 @@ export default function EdaNaChaykeScreen() {
 
   const handleOffersScroll = useCallback(() => {
     logFoodEvent('food_open_offer', { category: 'offers' });
-    // scroll handled by the ScrollView ref if needed; for MVP just switch to showing offers
+    scrollRef.current?.scrollTo({ y: Math.max(offersSectionY.current - 8, 0), animated: true });
   }, []);
 
   const handleCallPlace = useCallback((place: Place) => {
+    if (!place.phone) return;
     logFoodEvent('food_call_place', { placeId: place.id });
-    openPhone(place.phone!);
+    openPhone(place.phone);
   }, []);
 
   const handleRoutePlace = useCallback((place: Place) => {
@@ -287,7 +293,8 @@ export default function EdaNaChaykeScreen() {
     openRoute(place.latitude, place.longitude);
   }, []);
 
-  const handleTelegramPlace = useCallback((place: Place, telegram: string) => {
+  const handleTelegramPlace = useCallback((place: Place, telegram?: string) => {
+    if (!telegram) return;
     logFoodEvent('food_open_telegram', { placeId: place.id });
     openTelegram(telegram);
   }, []);
@@ -373,7 +380,7 @@ export default function EdaNaChaykeScreen() {
             <TouchableOpacity
               style={[styles.actionButton, styles.actionButtonTelegram]}
               activeOpacity={0.85}
-              onPress={() => handleTelegramPlace(place, info!.telegram!)}
+              onPress={() => handleTelegramPlace(place, info?.telegram)}
             >
               <MaterialCommunityIcons name="send" size={16} color="#FFFFFF" />
               <Text style={styles.actionButtonText}>{text.telegram}</Text>
@@ -424,7 +431,7 @@ export default function EdaNaChaykeScreen() {
   if (mode === 'eat') {
     return (
       <SafeAreaView style={styles.container}>
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView ref={scrollRef} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           {/* Header */}
           <View style={styles.hero}>
             <TouchableOpacity onPress={handleBack} style={styles.backButton} activeOpacity={0.8}>
@@ -494,7 +501,7 @@ export default function EdaNaChaykeScreen() {
   // --- HOME MODE ---
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.hero}>
           <TouchableOpacity onPress={handleBack} style={styles.backButton} activeOpacity={0.8}>
@@ -559,22 +566,24 @@ export default function EdaNaChaykeScreen() {
               </>
             )}
 
-            {/* Offers */}
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>{text.offersSection}</Text>
+            <View onLayout={(event) => { offersSectionY.current = event.nativeEvent.layout.y; }}>
+              {/* Offers */}
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionTitle}>{text.offersSection}</Text>
+              </View>
+              {offersWithPlaces.length > 0 ? (
+                <View style={styles.cardList}>
+                  {offersWithPlaces.map(({ offer, place }) =>
+                    renderOfferCard(offer, place?.name),
+                  )}
+                </View>
+              ) : (
+                <View style={styles.emptyState}>
+                  <MaterialCommunityIcons name="tag-off-outline" size={34} color={SCREEN_THEME.textMuted} />
+                  <Text style={styles.emptyText}>{text.noOffers}</Text>
+                </View>
+              )}
             </View>
-            {offersWithPlaces.length > 0 ? (
-              <View style={styles.cardList}>
-                {offersWithPlaces.map(({ offer, place }) =>
-                  renderOfferCard(offer, place?.name),
-                )}
-              </View>
-            ) : (
-              <View style={styles.emptyState}>
-                <MaterialCommunityIcons name="tag-off-outline" size={34} color={SCREEN_THEME.textMuted} />
-                <Text style={styles.emptyText}>{text.noOffers}</Text>
-              </View>
-            )}
           </>
         )}
       </ScrollView>

@@ -21,6 +21,16 @@ export type ModerationSectionKey =
   | 'osbbHouseTopics'
   | 'osbbCollections';
 
+export type EditHistoryEntry = {
+  field: string;
+  previousValue: string;
+  newValue: string;
+  moderatorUid: string;
+  moderatorEmail: string;
+  timestamp: number;
+  aiSuggestionId?: string | null;
+};
+
 export type ModerationItem = {
   id: string;
   section: ModerationSectionKey;
@@ -42,6 +52,14 @@ export type ModerationItem = {
   priorityRank: number;
   statusPriority: string;
   raw: Record<string, unknown>;
+  editedAt?: number;
+  editedBy?: string;
+  editHistory?: EditHistoryEntry[];
+};
+
+export type EditResult = {
+  editedFields: string[];
+  totalEdits: number;
 };
 
 export type ModerationSummary = Record<ModerationStatus, number> & {
@@ -225,6 +243,9 @@ const normalizeItem = (
     mediaUrls: [],
     ...priority,
     raw: value,
+    editedAt: getNumber(value.editedAt) || undefined,
+    editedBy: getString(value.editedBy) || undefined,
+    editHistory: Array.isArray(value.editHistory) ? value.editHistory as EditHistoryEntry[] : undefined,
   };
 };
 
@@ -336,4 +357,43 @@ export const deleteModerationItem = async (item: ModerationItem): Promise<void> 
     currentStatus: item.status,
     action: 'delete',
   });
+};
+
+type EditPayload = {
+  section: ModerationSectionKey;
+  path: string;
+  edits: Record<string, string>;
+  aiSuggestionId?: string;
+};
+
+export const editModerationItem = async (
+  item: ModerationItem,
+  edits: Record<string, string>,
+  options?: { aiSuggestionId?: string },
+): Promise<EditResult> => {
+  if (LOCAL_MODE) {
+    await localPatch(`/moderation_items/${item.id}`, {
+      ...edits,
+      editedAt: Date.now(),
+      editedBy: 'local-moderator',
+    });
+    return { editedFields: Object.keys(edits), totalEdits: 1 };
+  }
+
+  if (!functions) throw new Error('Firebase Functions не инициализированы.');
+
+  const callable = httpsCallable<EditPayload, EditResult & { ok: boolean }>(
+    functions,
+    'adminEditContentItem',
+  );
+  const result = await callable({
+    section: item.section,
+    path: item.path,
+    edits,
+    aiSuggestionId: options?.aiSuggestionId,
+  });
+  return {
+    editedFields: result.data.editedFields,
+    totalEdits: result.data.totalEdits,
+  };
 };

@@ -1,6 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { User } from 'firebase/auth';
 import { InfoHint } from '../components/InfoHint';
+import { AiAnalysisButton } from '../components/AiAnalysisButton';
+import { EditRequestModal } from '../components/EditRequestModal';
+import { analyzeText } from '../services/aiAnalysisService';
+import type { AnalysisResult, AiVerdict } from '../types/ai';
 import {
   deleteModerationItem,
   getModerationSummary,
@@ -19,6 +23,12 @@ type ModerationPageProps = {
 };
 
 type StatusFilter = 'all' | ModerationStatus;
+type AiVerdictFilter = 'all' | AiVerdict;
+type MassAnalysisStrategy = 'oldest-first' | 'high-risk-first' | 'newest-first';
+
+const HIGH_RISK_SECTIONS = new Set<ModerationSectionKey>(['buySell', 'jobs', 'lostFound']);
+const AUTO_APPROVE_SECTIONS = new Set<ModerationSectionKey>(['requests', 'appSuggestions', 'contactsListings']);
+const AUTO_APPROVE_MIN_TEXT_LENGTH = 20;
 
 const sectionLabel = (key: ModerationSectionKey): string =>
   MODERATION_SECTIONS.find((section) => section.key === key)?.label || key;
@@ -39,6 +49,93 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
   const [previewIndex, setPreviewIndex] = useState(0);
   const [previewTitle, setPreviewTitle] = useState('');
   const [previewBroken, setPreviewBroken] = useState(false);
+
+  // --- AI state ---
+  const [aiResults, setAiResults] = useState<Map<string, AnalysisResult>>(new Map());
+  const [aiVerdictFilter, setAiVerdictFilter] = useState<AiVerdictFilter>('all');
+  const [autoApproveEnabled, setAutoApproveEnabled] = useState(() => {
+    try { return localStorage.getItem('aiAutoApprove') === 'true'; } catch { return false; }
+  });
+  const [massAnalyzing, setMassAnalyzing] = useState(false);
+  const [massStrategy, setMassStrategy] = useState<MassAnalysisStrategy>('oldest-first');
+  const [massProgress, setMassProgress] = useState({ current: 0, total: 0 });
+  const massCancelRef = useRef(false);
+
+  const toggleAutoApprove = (enabled: boolean) => {
+    setAutoApproveEnabled(enabled);
+    try { localStorage.setItem('aiAutoApprove', String(enabled)); } catch { /* noop */ }
+  };
+
+  const onAiResult = useCallback((itemPath: string, result: AnalysisResult) => {
+    setAiResults((prev) => new Map(prev).set(itemPath, result));
+  }, []);
+
+  // Авто-одобрение: когда AI вернул approve с высоким confidence
+  useEffect(() => {
+    if (!autoApproveEnabled) return;
+    for (const [path, result] of aiResults) {
+      if (result.verdict !== 'approve') continue;
+      if (result.confidence < 0.95 || result.confidence >= 1.0) continue;
+      const item = items.find((i) => i.path === path);
+      if (!item || item.status !== 'pending') continue;
+      if (!AUTO_APPROVE_SECTIONS.has(item.section)) continue;
+      const text = (item.subtitle || item.title || '').trim();
+      if (text.length < AUTO_APPROVE_MIN_TEXT_LENGTH) continue;
+      // Одобрить
+      void runAction(item, 'approved');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aiResults, autoApproveEnabled]);
+
+  // AI stats
+  const aiStats = useMemo(() => {
+    let approve = 0, review = 0, suspicious = 0;
+    for (const r of aiResults.values()) {
+      if (r.verdict === 'approve') approve++;
+      else if (r.verdict === 'review') review++;
+      else if (r.verdict === 'suspicious') suspicious++;
+    }
+    return { approve, review, suspicious, total: aiResults.size };
+  }, [aiResults]);
+
+  // Масс-анализ
+  const startMassAnalysis = async () => {
+    const pending = items.filter((i) => i.status === 'pending' && !aiResults.has(i.path));
+    if (!pending.length) { setMessage('Нет pending-записей для анализа.'); return; }
+
+    // Сортировка по стратегии
+    const sorted = [...pending];
+    if (massStrategy === 'oldest-first') sorted.sort((a, b) => a.timestamp - b.timestamp);
+    else if (massStrategy === 'newest-first') sorted.sort((a, b) => b.timestamp - a.timestamp);
+    else if (massStrategy === 'high-risk-first') sorted.sort((a, b) => {
+      const aRisk = HIGH_RISK_SECTIONS.has(a.section) ? 0 : 1;
+      const bRisk = HIGH_RISK_SECTIONS.has(b.section) ? 0 : 1;
+      return aRisk - bRisk || a.timestamp - b.timestamp;
+    });
+
+    const batch = sorted.slice(0, 20);
+    setMassAnalyzing(true);
+    setMassProgress({ current: 0, total: batch.length });
+    massCancelRef.current = false;
+
+    for (let i = 0; i < batch.length; i++) {
+      if (massCancelRef.current) break;
+      try {
+        const result = await analyzeText(batch[i]);
+        onAiResult(batch[i].path, result);
+      } catch { /* skip failed */ }
+      setMassProgress({ current: i + 1, total: batch.length });
+      if (i < batch.length - 1) await new Promise((r) => setTimeout(r, 500));
+    }
+
+    setMassAnalyzing(false);
+    setMessage(massCancelRef.current ? 'Масс-анализ отменён.' : 'Масс-анализ завершён.');
+  };
+
+  const cancelMassAnalysis = () => { massCancelRef.current = true; };
+
+  // --- Edit modal state ---
+  const [editModalItem, setEditModalItem] = useState<ModerationItem | null>(null);
 
   const refresh = async () => {
     setLoading(true);
@@ -68,6 +165,11 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
           (sectionFilter === 'all' || item.section === sectionFilter),
         )
         .filter((item) => {
+          if (aiVerdictFilter === 'all') return true;
+          const aiResult = aiResults.get(item.path);
+          return aiResult?.verdict === aiVerdictFilter;
+        })
+        .filter((item) => {
           if (!normalizedSearch) return true;
           return [
             item.title,
@@ -83,7 +185,7 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
         })
         .sort((left, right) => sortOrder === 'newest' ? right.timestamp - left.timestamp : left.timestamp - right.timestamp);
     },
-    [items, search, sectionFilter, sortOrder, statusFilter],
+    [items, search, sectionFilter, sortOrder, statusFilter, aiVerdictFilter, aiResults],
   );
 
   const visibleItems = filteredItems.slice(0, visibleLimit);
@@ -201,6 +303,25 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
         <article className="metric metric-info"><span>Просрочены</span><strong>{summary.expired}</strong></article>
       </div>
 
+      {aiStats.total > 0 ? (
+        <div className="statsGrid">
+          <article className="metric metric-success"><span>AI: к одобрению</span><strong>{aiStats.approve}</strong></article>
+          <article className="metric metric-warning"><span>AI: проверить</span><strong>{aiStats.review}</strong></article>
+          <article className="metric metric-danger"><span>AI: подозрительно</span><strong>{aiStats.suspicious}</strong></article>
+          <article className="metric metric-info"><span>AI: проанализировано</span><strong>{aiStats.total}</strong></article>
+        </div>
+      ) : null}
+
+      <div className="filtersRow">
+        <label className="toggleRow">
+          <span>
+            <strong>AI авто-одобрение</strong>
+            <small>Авто-одобрять при confidence &ge; 95% (только безопасные разделы)</small>
+          </span>
+          <input type="checkbox" checked={autoApproveEnabled} onChange={(e) => toggleAutoApprove(e.target.checked)} />
+        </label>
+      </div>
+
       <div className="filtersRow">
         <label className="field">
           <span>Статус</span>
@@ -235,6 +356,15 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
             }}
             placeholder="Название, имя, userId, email, deviceId"
           />
+        </label>
+        <label className="field">
+          <span>AI вердикт</span>
+          <select value={aiVerdictFilter} onChange={(event) => setAiVerdictFilter(event.target.value as AiVerdictFilter)}>
+            <option value="all">Все</option>
+            <option value="approve">AI: одобрить</option>
+            <option value="review">AI: проверить</option>
+            <option value="suspicious">AI: подозрительно</option>
+          </select>
         </label>
         <label className="field">
           <span>Сортировка</span>
@@ -287,6 +417,29 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
           >
             Удалить все
           </button>
+          <span className="batchSeparator" />
+          <select
+            value={massStrategy}
+            onChange={(e) => setMassStrategy(e.target.value as MassAnalysisStrategy)}
+            disabled={massAnalyzing}
+          >
+            <option value="oldest-first">Сначала старые</option>
+            <option value="high-risk-first">Сначала рискованные</option>
+            <option value="newest-first">Сначала новые</option>
+          </select>
+          <button
+            type="button"
+            className="smallButton"
+            disabled={massAnalyzing || busyActions.size > 0}
+            onClick={() => void startMassAnalysis()}
+          >
+            {massAnalyzing ? `AI анализ (${massProgress.current}/${massProgress.total})` : 'AI анализ все pending'}
+          </button>
+          {massAnalyzing ? (
+            <button type="button" className="smallButton dangerButton" onClick={cancelMassAnalysis}>
+              Отмена
+            </button>
+          ) : null}
         </div>
         <div className="tableWrap">
           <table>
@@ -299,6 +452,7 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
                 <th>Время</th>
                 <th>Статус</th>
                 <th>Медиа</th>
+                <th>AI</th>
                 <th>Действия</th>
               </tr>
             </thead>
@@ -315,7 +469,10 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
                     />
                   </td>
                   <td>
-                    <strong>{item.title}</strong>
+                    <strong>
+                      {item.title}
+                      {item.editedAt ? <small className="editedBadge">ред.</small> : null}
+                    </strong>
                     <small>{item.subtitle || item.id}</small>
                   </td>
                   <td>{sectionLabel(item.section)}</td>
@@ -341,7 +498,21 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
                       </button>
                     ) : '-'}
                   </td>
+                  <td>
+                    <AiAnalysisButton item={item} onResult={onAiResult} />
+                  </td>
                   <td className="moderationActions">
+                    {item.status !== 'rejected' && item.status !== 'expired' ? (
+                      <button
+                        type="button"
+                        className="smallButton"
+                        disabled={busyActions.size > 0}
+                        onClick={() => setEditModalItem(item)}
+                        title="Редактировать"
+                      >
+                        Ред.
+                      </button>
+                    ) : null}
                     {item.status !== 'approved' ? (
                       <button
                         type="button"
@@ -374,7 +545,7 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
                 </tr>
               ))}
               {!loading && !filteredItems.length ? (
-                <tr><td colSpan={8}>Записей по фильтру не найдено.</td></tr>
+                <tr><td colSpan={9}>Записей по фильтру не найдено.</td></tr>
               ) : null}
             </tbody>
           </table>
@@ -427,6 +598,23 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
             )}
           </div>
         </div>
+      ) : null}
+      {editModalItem ? (
+        <EditRequestModal
+          item={editModalItem}
+          aiResult={aiResults.get(editModalItem.path) || null}
+          onClose={() => setEditModalItem(null)}
+          onSaved={(updated) => {
+            setItems((prev) => prev.map((i) => i.path === updated.path ? updated : i));
+            setEditModalItem(null);
+            setMessage('Запись отредактирована.');
+          }}
+          onSavedAndApproved={(updated) => {
+            setItems((prev) => prev.filter((i) => i.path !== updated.path));
+            setEditModalItem(null);
+            setMessage('Запись отредактирована и одобрена.');
+          }}
+        />
       ) : null}
     </section>
   );

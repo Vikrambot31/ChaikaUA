@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   SafeAreaView,
   ScrollView,
@@ -35,6 +35,7 @@ const UI_TEXT = {
     descriptionTitle: 'Про заклад',
     offersTitle: 'Актуальні пропозиції',
     readMore: 'Читати повністю',
+    readLess: 'Згорнути',
     age: 'Вік дітей',
     price: 'Ціна від',
     schedule: 'Графік',
@@ -102,6 +103,7 @@ const UI_TEXT = {
     descriptionTitle: 'О заведении',
     offersTitle: 'Актуальные предложения',
     readMore: 'Читать полностью',
+    readLess: 'Свернуть',
     age: 'Возраст детей',
     price: 'Цена от',
     schedule: 'График',
@@ -169,6 +171,7 @@ const UI_TEXT = {
     descriptionTitle: 'About',
     offersTitle: 'Current offers',
     readMore: 'Read more',
+    readLess: 'Collapse',
     age: 'Age range',
     price: 'Price from',
     schedule: 'Schedule',
@@ -275,6 +278,7 @@ export default function DetalDetskogoMestaScreen() {
 
   const language = useSelector((s: RootState) => s.language?.current ?? 'ua') as Lang;
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
   const offers = useMemo(() => getActiveOffers(place.id), [place.id]);
 
@@ -290,11 +294,11 @@ export default function DetalDetskogoMestaScreen() {
     return `${text.priceFrom} ${info.priceFrom} ${text.currency}/${period}`;
   }, [info, text]);
 
-  const featureLabels = useMemo(() => {
+  const featureBadges = useMemo(() => {
     const features = new Set(info?.features ?? []);
     if (info?.safety?.hasShelter) features.add('shelter');
     if (info?.medical?.hasNurse) features.add('nurse');
-    return FEATURE_PRIORITY.filter((f) => features.has(f)).map((f) => text.features[f]);
+    return FEATURE_PRIORITY.filter((f) => features.has(f)).map((f) => ({ key: f, label: text.features[f] }));
   }, [info, text]);
 
   const safetyItems = useMemo(() => {
@@ -383,11 +387,11 @@ export default function DetalDetskogoMestaScreen() {
         </View>
 
         {/* Badges */}
-        {featureLabels.length > 0 ? (
+        {featureBadges.length > 0 ? (
           <View style={styles.badgeRow}>
-            {featureLabels.map((label) => (
-              <View key={label} style={styles.badge}>
-                <Text style={styles.badgeText}>{label}</Text>
+            {featureBadges.map((badge) => (
+              <View key={badge.key} style={styles.badge}>
+                <Text style={styles.badgeText}>{badge.label}</Text>
               </View>
             ))}
           </View>
@@ -453,10 +457,12 @@ export default function DetalDetskogoMestaScreen() {
         {/* 10.5 Description */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{text.descriptionTitle}</Text>
-          <Text style={styles.descriptionText}>{info?.shortDescription ?? text.descriptionEmpty}</Text>
+          <Text style={styles.descriptionText}>
+            {isDescriptionExpanded && info?.fullDescription ? info.fullDescription : info?.shortDescription ?? text.descriptionEmpty}
+          </Text>
           {info?.fullDescription ? (
-            <TouchableOpacity activeOpacity={0.8}>
-              <Text style={styles.readMore}>{text.readMore}</Text>
+            <TouchableOpacity activeOpacity={0.8} onPress={() => setIsDescriptionExpanded((current) => !current)}>
+              <Text style={styles.readMore}>{isDescriptionExpanded ? text.readLess : text.readMore}</Text>
             </TouchableOpacity>
           ) : null}
         </View>

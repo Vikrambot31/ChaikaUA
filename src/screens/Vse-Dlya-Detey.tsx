@@ -287,14 +287,16 @@ const getPriceLabel = (place: Place, text: ScreenText) => {
   return `${text.priceFrom} ${price} ${text.currency}/${period}`;
 };
 
-const getFeatureLabels = (place: Place, text: ScreenText) => {
+const getFeatureBadges = (place: Place, text: ScreenText) => {
   const features = new Set(place.childInfo?.features ?? []);
   if (place.childInfo?.safety?.hasShelter) features.add('shelter');
   if (place.childInfo?.medical?.hasNurse) features.add('nurse');
 
-  const labels: string[] = FEATURE_PRIORITY.filter((feature) => features.has(feature)).map((feature) => text.features[feature]);
-  if (place.childInfo?.hasAvailablePlaces) labels.unshift(text.available);
-  return labels.slice(0, 4);
+  const badges: { key: string; label: string }[] = FEATURE_PRIORITY
+    .filter((feature) => features.has(feature))
+    .map((feature) => ({ key: feature, label: text.features[feature] }));
+  if (place.childInfo?.hasAvailablePlaces) badges.unshift({ key: 'available', label: text.available });
+  return badges.slice(0, 4);
 };
 
 export default function VseDlyaDeteyScreen() {
@@ -372,7 +374,7 @@ export default function VseDlyaDeteyScreen() {
   };
 
   const renderPlaceCard = ({ place, category }: { place: Place; category: ChildCategory }, compact = false) => {
-    const featureLabels = getFeatureLabels(place, text);
+    const featureBadges = getFeatureBadges(place, text);
     return (
       <TouchableOpacity key={place.id} style={styles.placeCard} activeOpacity={0.88} onPress={() => openPlace(place)}>
         <View style={styles.placeHeader}>
@@ -394,11 +396,11 @@ export default function VseDlyaDeteyScreen() {
           <Text style={styles.addressText} numberOfLines={1}>{place.address}</Text>
         </View>
 
-        {featureLabels.length > 0 ? (
+        {featureBadges.length > 0 ? (
           <View style={styles.badgeRow}>
-            {featureLabels.map((label) => (
-              <View key={label} style={styles.badge}>
-                <Text style={styles.badgeText}>{label}</Text>
+            {featureBadges.map((badge) => (
+              <View key={badge.key} style={styles.badge}>
+                <Text style={styles.badgeText}>{badge.label}</Text>
               </View>
             ))}
           </View>

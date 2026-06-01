@@ -227,10 +227,11 @@ export default function SpisokPokupokScreen() {
     Linking.openURL(url);
   };
 
-  const openPhone = (phone: string) => {
-    const place = groceryShops.find((shop) => shop.phone === phone);
-    logFoodEvent('food_call_place', { placeId: place?.id });
-    Linking.openURL(`tel:${phone}`);
+  const openPhone = (place: Place) => {
+    const safePhone = place.phone?.trim();
+    if (!safePhone) return;
+    logFoodEvent('food_call_place', { placeId: place.id });
+    Linking.openURL(`tel:${safePhone}`);
   };
 
   if (!isLoaded) return null;
@@ -356,7 +357,7 @@ export default function SpisokPokupokScreen() {
                       <TouchableOpacity
                         style={styles.shopActionBtn}
                         activeOpacity={0.85}
-                        onPress={() => openPhone(shop.phone!)}
+                        onPress={() => openPhone(shop)}
                       >
                         <MaterialCommunityIcons name="phone" size={16} color={SCREEN_THEME.enamelBlueDark} />
                       </TouchableOpacity>
