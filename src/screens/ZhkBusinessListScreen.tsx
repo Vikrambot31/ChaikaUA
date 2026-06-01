@@ -40,6 +40,7 @@ import { safeLogError } from '../utils/errorLogger';
 import StarRatingModal from '../components/StarRatingModal';
 import { DailyRatingUsage, canUseDailyRating, recordDailyRatingUse } from '../utils/monthlyRating';
 import { getDonePhotos, validateSubmissionRequirements } from '../utils/submissionRequirements';
+import { checkYellowList } from '../utils/yellowListCheck';
 
 // --- Types --------------------------------------------------------------------
 
@@ -694,6 +695,7 @@ export default function ZhkBusinessListScreen() {
     if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, userStartAvatarKey: user?.startAvatarKey, navigation })) {
       return;
     }
+    if (await checkYellowList(user?.id, language)) return;
 
     setSubmitting(true);
     let uidForLog = user?.id ?? '';

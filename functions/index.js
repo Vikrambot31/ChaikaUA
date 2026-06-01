@@ -2570,15 +2570,17 @@ exports.offerHelp = functions.https.onCall(async (data, context) => {
 //  Провайдеронезависимый анализ текста заявок через AI API
 // =============================================================
 
-const AI_PROVIDER = process.env.AI_PROVIDER || 'deepseek';
-const AI_API_KEY = process.env.AI_API_KEY || process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY || '';
-const AI_MODEL = process.env.AI_MODEL || 'deepseek-chat';
+const AI_PROVIDER = process.env.AI_PROVIDER || 'opencode';
+const AI_API_KEY = process.env.AI_API_KEY || process.env.OPENCODE_API_KEY || process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY || '';
+const AI_MODEL = process.env.AI_MODEL || 'deepseek-v4-flash-free';
+const AI_BASE_URL = process.env.AI_BASE_URL || '';
 const AI_BUDGET_DAILY = Number(process.env.AI_BUDGET_DAILY) || 5000;
 const AI_BUDGET_MONTHLY = Number(process.env.AI_BUDGET_MONTHLY) || 100000;
 
 const isConfiguredAiApiKey = (key = '') => {
   const value = String(key || '').trim();
-  return Boolean(value && value !== 'sk-your-key-here' && !/^sk-x+$/i.test(value));
+  const placeholders = ['sk-your-key-here', 'your-opencode-api-key', 'replace_with_your_opencode_api_key'];
+  return Boolean(value && !placeholders.includes(value.toLowerCase()) && !/^sk-x+$/i.test(value));
 };
 
 const AI_PER_UID_MAX = 30; // запросов/мин на модератора
@@ -2791,12 +2793,32 @@ async function callClaude(systemPrompt, userPrompt) {
   };
 }
 
+async function callOpenCode(systemPrompt, userPrompt) {
+  const baseUrl = AI_BASE_URL || 'https://opencode.ai/zen/v1';
+  const response = await fetch(`${baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${AI_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: AI_MODEL,
+      messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
+      temperature: 0.1,
+      max_tokens: 300,
+    }),
+  });
+  if (!response.ok) {
+    const errText = await response.text().catch(() => '');
+    throw new Error(`OpenCode Zen API ${response.status}: ${errText.slice(0, 200)}`);
+  }
+  return response.json();
+}
+
 function callAiProvider(systemPrompt, userPrompt) {
   switch (AI_PROVIDER) {
     case 'openai': return callOpenAI(systemPrompt, userPrompt);
     case 'claude': return callClaude(systemPrompt, userPrompt);
-    case 'deepseek':
-    default: return callDeepSeek(systemPrompt, userPrompt);
+    case 'deepseek': return callDeepSeek(systemPrompt, userPrompt);
+    case 'opencode':
+    default: return callOpenCode(systemPrompt, userPrompt);
   }
 }
 

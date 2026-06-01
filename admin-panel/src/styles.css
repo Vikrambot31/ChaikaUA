@@ -4204,3 +4204,39 @@ td {
   color: #8a9ab0;
   align-self: center;
 }
+
+/* ── Yellow List ── */
+.yellowListFlaggedName {
+  color: #ff4d4d !important;
+}
+.yellowListBadge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #e8a800;
+  color: #1a1a1a;
+  font-size: 10px;
+  font-weight: 900;
+  vertical-align: middle;
+}
+.yellowListBtn {
+  border-color: #b8860b !important;
+  background: #3d3010 !important;
+  color: #e8a800 !important;
+  font-size: 12px !important;
+  min-height: 30px !important;
+  padding: 0 8px !important;
+}
+.yellowListBtn:hover {
+  background: #5a4a1a !important;
+}
+.yellowListBtnActive {
+  border-color: #666 !important;
+  background: #2a2a2a !important;
+  color: #999 !important;
+  font-size: 12px !important;
+  min-height: 30px !important;
+  padding: 0 8px !important;
+  cursor: default !important;
+}

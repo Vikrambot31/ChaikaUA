@@ -21,6 +21,7 @@ import { safeCallPhone } from '../utils/communicationActions';
 import type { DetailItemData } from '../utils/detailViewTypes';
 import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField';
 import { getDonePhotos, getRequiredPhotoLabel, validateSubmissionRequirements } from '../utils/submissionRequirements';
+import { checkYellowList } from '../utils/yellowListCheck';
 import UserCardActionBar from '../components/UserCardActionBar';
 
 const TWO_MONTHS_MS = 60 * 24 * 60 * 60 * 1000;
@@ -646,6 +647,7 @@ const JobSearchScreen: React.FC = () => {
     if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, userStartAvatarKey: user?.startAvatarKey, navigation })) {
       return;
     }
+    if (await checkYellowList(user?.id, language)) return;
     setSubmittedOnce(true);
     const isVacancy = listingKind === 'vacancy';
     if (!name.trim() || !phone.trim() || !workType || (!isVacancy && !age.trim()) || (isVacancy && !about.trim())) {

@@ -34,6 +34,7 @@ import { normalizePhoneText } from '../utils/textUtils';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import type { DetailItemData } from '../utils/detailViewTypes';
 import { getDonePhotos, validateSubmissionRequirements } from '../utils/submissionRequirements';
+import { checkYellowList } from '../utils/yellowListCheck';
 import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 
 type AppLanguage = 'ua' | 'ru' | 'en';
@@ -247,6 +248,7 @@ const LostAndFoundScreen: React.FC = () => {
     if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, userStartAvatarKey: user?.startAvatarKey, navigation })) {
       return;
     }
+    if (await checkYellowList(user?.id, language)) return;
     // Bug #3 fix: separate phone and category checks for precise error messages
     if (!phone.trim()) {
       Alert.alert(text.sendErrorTitle, text.phoneError);

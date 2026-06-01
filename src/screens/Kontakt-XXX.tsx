@@ -25,6 +25,7 @@ import InlineFieldHint from '../components/InlineFieldHint';
 import { FormFieldError } from '../components/ValidationErrorMessage';
 import { useSoftToast } from '../hooks/useSoftToast';
 import { getDonePhotos, validateSubmissionRequirements } from '../utils/submissionRequirements';
+import { checkYellowList } from '../utils/yellowListCheck';
 import { getLanguageValidationError } from '../utils/contentLanguageGuard';
 import UserCardActionBar from '../components/UserCardActionBar';
 import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
@@ -665,6 +666,7 @@ const KontaktiChaikyScreen: React.FC = () => {
     if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, userStartAvatarKey: user?.startAvatarKey, navigation })) {
       return;
     }
+    if (await checkYellowList(user?.id, language)) return;
     const normalizedPrice = price.replace(',', '.').replace(/[^\d.]/g, '');
     const numericPrice = Number(normalizedPrice);
 

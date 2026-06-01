@@ -5,6 +5,7 @@ import { AiAnalysisButton } from '../components/AiAnalysisButton';
 import { EditRequestModal } from '../components/EditRequestModal';
 import { analyzeText } from '../services/aiAnalysisService';
 import { logDisagreement } from '../services/aiFeedbackService';
+import { addToYellowList, subscribeYellowList, removeFromYellowList, type YellowListEntry } from '../services/yellowListService';
 import type { AnalysisResult, AiVerdict } from '../types/ai';
 import {
   deleteModerationItem,
@@ -61,6 +62,61 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
   const [massStrategy, setMassStrategy] = useState<MassAnalysisStrategy>('oldest-first');
   const [massProgress, setMassProgress] = useState({ current: 0, total: 0 });
   const massCancelRef = useRef(false);
+
+  // --- Yellow List state ---
+  const [yellowList, setYellowList] = useState<Map<string, YellowListEntry>>(new Map());
+  const [showYellowListTab, setShowYellowListTab] = useState(false);
+
+  useEffect(() => {
+    const unsub = subscribeYellowList((entries) => {
+      const map = new Map<string, YellowListEntry>();
+      for (const e of entries) map.set(e.uid, e);
+      setYellowList(map);
+    });
+    return unsub;
+  }, []);
+
+  const isUserFlagged = (item: ModerationItem): boolean => {
+    const aiResult = aiResults.get(item.path);
+    return Boolean(aiResult && (aiResult.verdict === 'review' || aiResult.verdict === 'suspicious'));
+  };
+
+  const isUserInYellowList = (uid: string): boolean => {
+    const entry = yellowList.get(uid);
+    return Boolean(entry && entry.active && entry.bannedUntil > Date.now());
+  };
+
+  const handleAddToYellowList = async (item: ModerationItem) => {
+    const aiResult = aiResults.get(item.path);
+    const confirmed = window.confirm(
+      `Добавить "${item.userName || item.userId}" в жёлтый список?\n\nБан на отправку заявок на 14 дней.\nПользователь сохранит доступ к чтению ленты и другим экранам.`
+    );
+    if (!confirmed) return;
+    try {
+      await addToYellowList({
+        uid: item.userId,
+        displayName: item.userName || item.userId,
+        reason: aiResult ? `AI: ${aiResult.verdict} (${Math.round(aiResult.confidence * 100)}%) — ${aiResult.explanation || ''}`.slice(0, 300) : 'Manual moderator decision',
+        bannedBy: user.uid,
+        itemPath: item.path,
+        section: item.section,
+      });
+      setMessage(`${item.userName || item.userId} добавлен в жёлтый список на 14 дней.`);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Ошибка добавления в жёлтый список.');
+    }
+  };
+
+  const handleRemoveFromYellowList = async (uid: string, name: string) => {
+    const confirmed = window.confirm(`Снять бан с "${name}"?`);
+    if (!confirmed) return;
+    try {
+      await removeFromYellowList(uid);
+      setMessage(`Бан снят с ${name}.`);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Ошибка снятия бана.');
+    }
+  };
 
   const toggleAutoApprove = (enabled: boolean) => {
     setAutoApproveEnabled(enabled);
@@ -496,7 +552,10 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
                   </td>
                   <td>{sectionLabel(item.section)}</td>
                   <td>
-                    <strong>{item.userName || '-'}</strong>
+                    <strong className={isUserFlagged(item) || isUserInYellowList(item.userId) ? 'yellowListFlaggedName' : ''}>
+                      {item.userName || '-'}
+                      {isUserInYellowList(item.userId) ? <span className="yellowListBadge" title={`В жёлтом списке до ${new Date(yellowList.get(item.userId)!.bannedUntil).toLocaleDateString()}`}>ЖС</span> : null}
+                    </strong>
                     <small>{item.email || item.userId || '-'}</small>
                     {item.deviceId ? <small>{item.deviceId}</small> : null}
                   </td>
@@ -560,6 +619,23 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
                     >
                       Удалить
                     </button>
+                    {item.userId && (isUserFlagged(item) || isUserInYellowList(item.userId)) ? (
+                      isUserInYellowList(item.userId) ? (
+                        <button type="button" className="smallButton yellowListBtnActive" disabled title={`В жёлтом списке до ${new Date(yellowList.get(item.userId)!.bannedUntil).toLocaleDateString()}`}>
+                          ЖС
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="smallButton yellowListBtn"
+                          disabled={busyActions.size > 0}
+                          onClick={() => void handleAddToYellowList(item)}
+                          title="Добавить в жёлтый список (бан на заявки 14 дней)"
+                        >
+                          ЖС
+                        </button>
+                      )
+                    ) : null}
                   </td>
                 </tr>
               ))}
@@ -618,6 +694,62 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
           </div>
         </div>
       ) : null}
+      {/* --- Yellow List Table --- */}
+      <article style={{ marginTop: 24 }}>
+        <button
+          type="button"
+          className="smallButton"
+          onClick={() => setShowYellowListTab(!showYellowListTab)}
+          style={{ marginBottom: 10 }}
+        >
+          {showYellowListTab ? 'Скрыть жёлтый список' : `Жёлтый список (${yellowList.size})`}
+        </button>
+        {showYellowListTab ? (
+          <div className="tableWrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Пользователь</th>
+                  <th>Причина</th>
+                  <th>Забанен</th>
+                  <th>Истекает</th>
+                  <th>Статус</th>
+                  <th>Действия</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...yellowList.values()].map((entry) => {
+                  const isActive = entry.active && entry.bannedUntil > Date.now();
+                  return (
+                    <tr key={entry.uid}>
+                      <td><strong className={isActive ? 'yellowListFlaggedName' : ''}>{entry.displayName}</strong><br /><small>{entry.uid}</small></td>
+                      <td><small>{entry.reason}</small></td>
+                      <td>{new Date(entry.bannedAt).toLocaleDateString()}</td>
+                      <td>{new Date(entry.bannedUntil).toLocaleDateString()}</td>
+                      <td><span className={`pill ${isActive ? 'warning' : 'good'}`}>{isActive ? 'Активен' : 'Истёк'}</span></td>
+                      <td>
+                        {isActive ? (
+                          <button type="button" className="smallButton" onClick={() => void handleRemoveFromYellowList(entry.uid, entry.displayName)}>
+                            Снять бан
+                          </button>
+                        ) : (
+                          <button type="button" className="smallButton dangerButton" onClick={() => void removeFromYellowList(entry.uid)}>
+                            Удалить запись
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {yellowList.size === 0 ? (
+                  <tr><td colSpan={6}>Жёлтый список пуст.</td></tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+      </article>
+
       {editModalItem ? (
         <EditRequestModal
           item={editModalItem}

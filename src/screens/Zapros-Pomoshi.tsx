@@ -14,6 +14,7 @@ import { RATE_LIMITERS } from '../utils/rateLimiter';
 import { showUserError } from '../utils/userFacingErrors';
 import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField';
 import { getDonePhotos, validateSubmissionRequirements } from '../utils/submissionRequirements';
+import { checkYellowList } from '../utils/yellowListCheck';
 
 // RootState type for language selector
 interface LangState { language?: { current?: string } }
@@ -346,6 +347,7 @@ const HelpRequestScreen: React.FC = () => {
     if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, userStartAvatarKey: user?.startAvatarKey, navigation })) {
       return;
     }
+    if (await checkYellowList(user?.id, language)) return;
     const nextErrors: {
       name?: string;
       phone?: string;
