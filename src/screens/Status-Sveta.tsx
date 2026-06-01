@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -17,9 +17,11 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { BUILDINGS, getBuildingsByStreet, getStreets, getFullAddress } from '../data/buildings';
 import {
   addReport,
+  selectAllReports,
   selectTodayReports,
   selectElectricityError,
   clearError,
+  type ElectricityReport,
 } from '../redux/slices/electricitySlice';
 import { firebaseChatAPI } from '../firebase-config';
 import { COLORS, SIZES } from '../utils/constants';
@@ -31,12 +33,56 @@ import MiniTabBar from '../components/MiniTabBar';
 import type { RootState } from '../redux/store';
 import { selectUser } from '../redux/selectors';
 import type { AppDispatch } from '../redux/store';
+import type { Request as AppRequest } from '../types/app';
 import { createPendingModeration } from '../utils/moderation';
 import { showUserError } from '../utils/userFacingErrors';
 
 const RATE_LIMIT_KEY = 'electricity_report_timestamps';
 const MAX_PER_DAY = 2;
 const MIN_INTERVAL_MS = 4 * 60 * 60 * 1000; // 4 hours
+
+type ActivityDayStats = {
+  key: 'yesterday' | 'today';
+  label: string;
+  reportCount: number;
+  peopleCount: number;
+  offBuildingsCount: number;
+  offPercent: number;
+  onPercent: number;
+};
+
+const ACTIVITY_TEXT = {
+  ua: {
+    title: 'Активність за 2 доби',
+    yesterday: 'вчора',
+    today: 'сьогодні',
+    noReports: 'немає даних',
+    residentsInfo: (count: number) => `${count} жит. (інфо)`,
+    homesOffInfo: (count: number, total: number) => `${count}/${total} домів`,
+    lightWasOff: 'СВІТЛА НЕ БУЛО',
+    lightWasOn: 'СВІТЛО БУЛО',
+  },
+  ru: {
+    title: 'Активность за 2 суток',
+    yesterday: 'вчера',
+    today: 'сегодня',
+    noReports: 'нет данных',
+    residentsInfo: (count: number) => `${count} жит. (инфо)`,
+    homesOffInfo: (count: number, total: number) => `${count}/${total} домов`,
+    lightWasOff: 'СВЕТА НЕ БЫЛО',
+    lightWasOn: 'СВЕТ БЫЛ',
+  },
+  en: {
+    title: 'Activity for 2 days',
+    yesterday: 'yesterday',
+    today: 'today',
+    noReports: 'no data',
+    residentsInfo: (count: number) => `${count} residents (info)`,
+    homesOffInfo: (count: number, total: number) => `${count}/${total} homes`,
+    lightWasOff: 'POWER WAS OFF',
+    lightWasOn: 'POWER WAS ON',
+  },
+} as const;
 
 const getTs = (value: Date | string): number => {
   if (value instanceof Date) return value.getTime();
@@ -55,6 +101,18 @@ const parseNumberArray = (raw: string | null): number[] => {
     return [];
   }
 };
+
+const startOfDay = (date: Date): Date => {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  return next;
+};
+
+const getUniqueReportKey = (report: ElectricityReport): string =>
+  report.userId || report.userPhone || report.id;
+
+const normalizeAddressKey = (value: string): string =>
+  value.trim().toLocaleLowerCase('uk-UA').replace(/\s+/g, ' ');
 
 const UI_TEXT = {
   ua: {
@@ -162,14 +220,24 @@ const ElectricityStatusScreen: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const text = UI_TEXT[language];
+  const activityText = ACTIVITY_TEXT[language];
   const [selectedStreet, setSelectedStreet] = useState<string>('');
   const [selectedBuildingId, setSelectedBuildingId] = useState<string>('');
+  const allReports = useSelector((state: RootState) => selectAllReports(state));
   const todayReports = useSelector((state: RootState) => selectTodayReports(state));
   const error = useSelector((state: RootState) => selectElectricityError(state));
   const [submitting, setSubmitting] = useState(false);
+  const [liveElectricityRequests, setLiveElectricityRequests] = useState<AppRequest[]>([]);
   const user = useSelector(selectUser);
 
   const streets = useMemo(() => getStreets(), []);
+  const buildingIdByAddress = useMemo(() => {
+    const map = new Map<string, string>();
+    BUILDINGS.forEach((building) => {
+      map.set(normalizeAddressKey(getFullAddress(building)), building.id);
+    });
+    return map;
+  }, []);
   const buildingsInStreet = useMemo(
     () => (selectedStreet ? getBuildingsByStreet(selectedStreet) : []),
     [selectedStreet]
@@ -189,6 +257,125 @@ const ElectricityStatusScreen: React.FC = () => {
       .sort((a, b) => getTs(b.createdAt) - getTs(a.createdAt))
       .slice(0, 10);
   }, [todayReports]);
+
+  useEffect(() => {
+    const unsubscribe = firebaseChatAPI.getRequests((requests) => {
+      setLiveElectricityRequests(
+        requests.filter((request) => request.category === 'electricity' || request.group === 'electricity')
+      );
+    });
+    return unsubscribe;
+  }, []);
+
+  const liveElectricityReports = useMemo<ElectricityReport[]>(() => {
+    return liveElectricityRequests
+      .map((request): ElectricityReport | null => {
+        const buildingId = request.building ? buildingIdByAddress.get(normalizeAddressKey(request.building)) : undefined;
+        const status = request.subcategory === 'power_off'
+          ? 'off'
+          : request.subcategory === 'power_on'
+            ? 'on'
+            : null;
+
+        if (!buildingId || !status) return null;
+
+        return {
+          id: `feed-${request.id}`,
+          buildingId,
+          status,
+          createdAt: new Date(request.createdAt || request.timestamp || Date.now()),
+          userId: request.userId,
+          userName: request.name,
+          userPhone: request.phone,
+          userPhotoURL: request.userPhotoURL,
+          startAvatarKey: request.startAvatarKey,
+          moderationStatus: 'approved',
+        };
+      })
+      .filter((report): report is ElectricityReport => report !== null);
+  }, [buildingIdByAddress, liveElectricityRequests]);
+
+  const twoDayActivity = useMemo<ActivityDayStats[]>(() => {
+    const reportMap = new Map<string, ElectricityReport>();
+    [...liveElectricityReports, ...allReports, ...todayReports].forEach((report) => {
+      reportMap.set(report.id, report);
+    });
+
+    const reports = Array.from(reportMap.values());
+    const todayStart = startOfDay(new Date());
+    const yesterdayStart = new Date(todayStart);
+    yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+    const tomorrowStart = new Date(todayStart);
+    tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+    const totalBuildings = Math.max(BUILDINGS.length, 1);
+
+    const makeStats = (
+      key: ActivityDayStats['key'],
+      label: string,
+      from: Date,
+      to: Date
+    ): ActivityDayStats => {
+      const dayReports = reports.filter((report) => {
+        const ts = getTs(report.createdAt);
+        return ts >= from.getTime() && ts < to.getTime();
+      });
+      const offBuildings = new Set(
+        dayReports
+          .filter((report) => report.status === 'off')
+          .map((report) => report.buildingId)
+      );
+      const people = new Set(dayReports.map(getUniqueReportKey));
+      const offPercent = Math.min(100, Math.round((offBuildings.size / totalBuildings) * 100));
+
+      return {
+        key,
+        label,
+        reportCount: dayReports.length,
+        peopleCount: people.size,
+        offBuildingsCount: offBuildings.size,
+        offPercent,
+        onPercent: dayReports.length > 0 ? Math.max(0, 100 - offPercent) : 0,
+      };
+    };
+
+    return [
+      makeStats('yesterday', activityText.yesterday, yesterdayStart, todayStart),
+      makeStats('today', activityText.today, todayStart, tomorrowStart),
+    ];
+  }, [activityText.today, activityText.yesterday, allReports, liveElectricityReports, todayReports]);
+
+  const renderActivityRow = (item: ActivityDayStats) => (
+    <View key={item.key} style={styles.activityDay}>
+      <View style={styles.activityTopLine}>
+        <Text style={styles.activityDayLabel}>{item.label}</Text>
+        <Text style={styles.activityMeta}>
+          {item.reportCount > 0
+            ? `${activityText.residentsInfo(item.peopleCount)} • ${activityText.homesOffInfo(item.offBuildingsCount, BUILDINGS.length)} • ${item.offPercent}%`
+            : activityText.noReports}
+        </Text>
+      </View>
+      <View style={styles.activityBars}>
+        <View style={styles.activityTrack}>
+          {item.reportCount > 0 && item.offPercent > 0 ? (
+            <View style={[styles.activityFillOff, { width: `${item.offPercent}%` }]} />
+          ) : item.reportCount === 0 ? (
+            <View style={styles.activityFillEmpty} />
+          ) : null}
+        </View>
+        <Text style={styles.activitySideLabel}>{activityText.lightWasOff}</Text>
+      </View>
+      <View style={styles.activityBars}>
+        <View style={styles.activityTrack}>
+          {item.reportCount > 0 && item.onPercent > 0 ? (
+            <View style={[styles.activityFillOn, { width: `${item.onPercent}%` }]} />
+          ) : item.reportCount === 0 ? (
+            <View style={styles.activityFillEmpty} />
+          ) : null}
+        </View>
+        <Text style={styles.activitySideLabel}>{activityText.lightWasOn}</Text>
+      </View>
+    </View>
+  );
 
   const handleStreetChange = (street: string) => {
     setSelectedStreet(street);
@@ -386,6 +573,14 @@ const ElectricityStatusScreen: React.FC = () => {
           )}
 
           <Text style={styles.helperText}>{text.helper}</Text>
+        </TactileCard>
+
+        <TactileCard elevated style={styles.activityCard} pressable={false}>
+          <View style={styles.activityHeader}>
+            <MaterialCommunityIcons name="chart-timeline-variant" size={18} color="#2E9B4F" />
+            <Text style={styles.activityTitle}>{activityText.title}</Text>
+          </View>
+          {twoDayActivity.map(renderActivityRow)}
         </TactileCard>
 
         {buildingReports.length > 0 && selectedBuildingId && (
@@ -618,6 +813,84 @@ const styles = StyleSheet.create({
     color: SCREEN_THEME.textMuted,
     fontWeight: '600',
     marginTop: 8,
+  },
+  activityCard: {
+    padding: 12,
+    marginBottom: 14,
+  },
+  activityHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    marginBottom: 8,
+  },
+  activityTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: SCREEN_THEME.textPrimary,
+  },
+  activityDay: {
+    paddingVertical: 7,
+    borderTopWidth: 1,
+    borderTopColor: SCREEN_THEME.borderSoft,
+  },
+  activityTopLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 6,
+  },
+  activityDayLabel: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#1F9D45',
+    textTransform: 'uppercase',
+  },
+  activityMeta: {
+    flex: 1,
+    fontSize: 11,
+    color: SCREEN_THEME.textMuted,
+    fontWeight: '800',
+    textAlign: 'right',
+  },
+  activityBars: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+  },
+  activityTrack: {
+    flex: 1,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#ECE2CF',
+    overflow: 'hidden',
+  },
+  activityFillOff: {
+    height: '100%',
+    minWidth: 2,
+    borderRadius: 7,
+    backgroundColor: '#050505',
+  },
+  activityFillOn: {
+    height: '100%',
+    minWidth: 2,
+    borderRadius: 7,
+    backgroundColor: '#22B84D',
+  },
+  activityFillEmpty: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 7,
+    backgroundColor: '#D8CCB8',
+  },
+  activitySideLabel: {
+    width: 92,
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#20A84A',
+    textAlign: 'left',
   },
   reportsCard: {
     padding: 16,

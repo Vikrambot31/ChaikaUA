@@ -43,6 +43,7 @@ const UI_TEXT: Record<'ua' | 'ru' | 'en', SectionedItems> = {
       { label: 'Спорт на Чайці', desc: 'Баскетбол, футбол і теніс з сусідами', screen: 'SportNaChaykeScreen', icon: 'run-fast', accent: '#4F8D5F' },
     ] as BonusItem[],
     market: [
+      { label: 'Все для дітей', desc: 'Садочки, школи, гуртки та події', screen: 'VseDlyaDeteyScreen', icon: 'baby-face-outline', accent: '#C77A5D' },
       { label: 'Пошук роботи', desc: 'Вакансії та резюме', screen: 'JobSearchScreen', icon: 'briefcase-search-outline', accent: '#4D7892' },
       { label: 'Куплю / продам', desc: 'Оголошення мешканців', screen: 'BuySellScreen', icon: 'shopping-outline', accent: '#C96E3E' },
       { label: 'Послуги та бізнес на Чайці', desc: 'Компанії та послуги у ЖК', screen: 'ZhkBusinessListScreen', icon: 'storefront-outline', accent: '#6E7F47' },
@@ -64,6 +65,7 @@ const UI_TEXT: Record<'ua' | 'ru' | 'en', SectionedItems> = {
       { label: 'Спорт на Чайке', desc: 'Баскетбол, футбол и теннис с соседями', screen: 'SportNaChaykeScreen', icon: 'run-fast', accent: '#4F8D5F' },
     ] as BonusItem[],
     market: [
+      { label: 'Все для детей', desc: 'Садики, школы, кружки и события', screen: 'VseDlyaDeteyScreen', icon: 'baby-face-outline', accent: '#C77A5D' },
       { label: 'Поиск работы', desc: 'Вакансии и резюме', screen: 'JobSearchScreen', icon: 'briefcase-search-outline', accent: '#4D7892' },
       { label: 'Куплю / продам', desc: 'Объявления жителей', screen: 'BuySellScreen', icon: 'shopping-outline', accent: '#C96E3E' },
       { label: 'Услуги и Бизнес на Чайке', desc: 'Компании и услуги в ЖК', screen: 'ZhkBusinessListScreen', icon: 'storefront-outline', accent: '#6E7F47' },
@@ -85,6 +87,7 @@ const UI_TEXT: Record<'ua' | 'ru' | 'en', SectionedItems> = {
       { label: 'Sports in Chaika', desc: 'Basketball, football, and tennis with neighbors', screen: 'SportNaChaykeScreen', icon: 'run-fast', accent: '#4F8D5F' },
     ] as BonusItem[],
     market: [
+      { label: 'Everything for Kids', desc: 'Kindergartens, schools, clubs and events', screen: 'VseDlyaDeteyScreen', icon: 'baby-face-outline', accent: '#C77A5D' },
       { label: 'Job search', desc: 'Vacancies and resumes', screen: 'JobSearchScreen', icon: 'briefcase-search-outline', accent: '#4D7892' },
       { label: 'Buy / sell', desc: 'Resident marketplace', screen: 'BuySellScreen', icon: 'shopping-outline', accent: '#C96E3E' },
       { label: 'Services and Business in Chaika', desc: 'Companies and services in the complex', screen: 'ZhkBusinessListScreen', icon: 'storefront-outline', accent: '#6E7F47' },
