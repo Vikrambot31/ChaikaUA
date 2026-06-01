@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, KeyboardAvoidingView, Modal, Platform, SafeAreaView, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, KeyboardAvoidingView, Linking, Modal, Platform, SafeAreaView, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { useSelector } from 'react-redux';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
@@ -70,6 +70,24 @@ const CONTACT_LEGACY_CATEGORY_VALUES = [
 type ContactLegacyCategoryValue = typeof CONTACT_LEGACY_CATEGORY_VALUES[number];
 
 const ITEM_CONDITION_VALUES = ['new', 'like_new', 'good', 'fair'] as const;
+const ZODIAC_VALUES = ['aries', 'taurus', 'gemini', 'cancer', 'leo', 'virgo', 'libra', 'scorpio', 'sagittarius', 'capricorn', 'aquarius', 'pisces'] as const;
+const HUMAN_DESIGN_TYPE_VALUES = ['generator', 'projector', 'manifestor', 'reflector'] as const;
+const HUMAN_DESIGN_PROFILE_VALUES = ['1/3', '1/4', '2/4', '2/5', '3/5', '3/6', '4/1', '4/6', '5/1', '5/2', '6/2', '6/3'] as const;
+const HUMAN_DESIGN_TELEGRAM_URL = 'https://t.me/Vikram_2027';
+const HUMAN_DESIGN_TELEGRAM_MESSAGE = 'Добрый день. Я с приложения Чайка Life - хочу бесплатно узнать про ДЧ свой тип';
+
+type ContactsDraft = Partial<{
+  category: string;
+  condition: string;
+  price: string;
+  description: string;
+  phone: string;
+  addFormVisible: boolean;
+  isInterestingFormExpanded: boolean;
+  zodiacSign: string;
+  humanDesignType: string;
+  humanDesignProfile: string;
+}>;
 
 const UI_TEXT = {
   ua: {
@@ -146,6 +164,19 @@ const UI_TEXT = {
     ageHint: 'Вкажіть реальний вік. Це допомагає людям краще зрозуміти анкету.',
     phoneHint: "Залиште номер, за яким з вами можна зв'язатися.",
     descriptionHint: 'Коротко напишіть про себе або кого шукаєте.',
+    makeInteresting: 'Зробити анкету цікавішою',
+    zodiacLabel: 'Оберіть зі списку ваш знак зодіаку',
+    humanDesignTypeLabel: 'Ваш тип за системою "Дизайн Людини"',
+    humanDesignProfileLabel: 'Оберіть ваш профіль за Дизайном Людини',
+    humanDesignConsultation: 'Що таке наука Дизайн Людини - хочу безкоштовну консультацію',
+    selectZodiac: 'Оберіть знак...',
+    selectHumanDesignType: 'Оберіть тип...',
+    selectHumanDesignProfile: 'Оберіть профіль...',
+    zodiacLabels: {
+      aries: 'Овен', taurus: 'Телець', gemini: 'Близнюки', cancer: 'Рак', leo: 'Лев', virgo: 'Діва',
+      libra: 'Терези', scorpio: 'Скорпіон', sagittarius: 'Стрілець', capricorn: 'Козоріг', aquarius: 'Водолій', pisces: 'Риби',
+    },
+    humanDesignTypeLabels: { generator: 'Генератор', projector: 'Проектор', manifestor: 'Маніфестор', reflector: 'Рефлектор' },
     descriptionRequired: 'Додайте кілька слів про себе.',
     authRequired: 'Для публікації контакту потрібна реєстрація.',
     live: 'НАЖИВО',
@@ -225,6 +256,19 @@ const UI_TEXT = {
     ageHint: 'Укажите реальный возраст. Это помогает людям лучше понять анкету.',
     phoneHint: 'Оставьте номер, по которому с вами можно связаться.',
     descriptionHint: 'Коротко напишите о себе или кого ищете.',
+    makeInteresting: 'Сделать анкету интереснее',
+    zodiacLabel: 'Выбрать из списка ваш знак зодиака',
+    humanDesignTypeLabel: 'Ваш тип по системе "Дизайн Человека"',
+    humanDesignProfileLabel: 'Выбрать ваш профиль по Дизайну Человека',
+    humanDesignConsultation: 'Что такое наука Дизайн Человека - хочу бесплатную консультацию',
+    selectZodiac: 'Выберите знак...',
+    selectHumanDesignType: 'Выберите тип...',
+    selectHumanDesignProfile: 'Выберите профиль...',
+    zodiacLabels: {
+      aries: 'Овен', taurus: 'Телец', gemini: 'Близнецы', cancer: 'Рак', leo: 'Лев', virgo: 'Дева',
+      libra: 'Весы', scorpio: 'Скорпион', sagittarius: 'Стрелец', capricorn: 'Козерог', aquarius: 'Водолей', pisces: 'Рыбы',
+    },
+    humanDesignTypeLabels: { generator: 'Генератор', projector: 'Проектор', manifestor: 'Манифестор', reflector: 'Рефлектор' },
     descriptionRequired: 'Добавьте несколько слов о себе.',
     authRequired: 'Для публикации контакта требуется регистрация.',
     live: 'В ЭФИРЕ',
@@ -304,6 +348,19 @@ const UI_TEXT = {
     ageHint: 'Enter your real age. It helps people understand the profile better.',
     phoneHint: 'Leave a number people can use to contact you.',
     descriptionHint: 'Briefly write about yourself or who you are looking for.',
+    makeInteresting: 'Make profile more interesting',
+    zodiacLabel: 'Choose your zodiac sign',
+    humanDesignTypeLabel: 'Your Human Design type',
+    humanDesignProfileLabel: 'Choose your Human Design profile',
+    humanDesignConsultation: 'What is Human Design - I want a free consultation',
+    selectZodiac: 'Choose sign...',
+    selectHumanDesignType: 'Choose type...',
+    selectHumanDesignProfile: 'Choose profile...',
+    zodiacLabels: {
+      aries: 'Aries', taurus: 'Taurus', gemini: 'Gemini', cancer: 'Cancer', leo: 'Leo', virgo: 'Virgo',
+      libra: 'Libra', scorpio: 'Scorpio', sagittarius: 'Sagittarius', capricorn: 'Capricorn', aquarius: 'Aquarius', pisces: 'Pisces',
+    },
+    humanDesignTypeLabels: { generator: 'Generator', projector: 'Projector', manifestor: 'Manifestor', reflector: 'Reflector' },
     descriptionRequired: 'Add a few words about yourself.',
     authRequired: 'Registration is required to publish a contact.',
     live: 'LIVE',
@@ -324,6 +381,10 @@ const KontaktiChaikyScreen: React.FC = () => {
   const [price, setPrice] = useState('');
   const [description, setDescription] = useState('');
   const [phone, setPhone] = useState(() => (user?.phone ? normalizePhoneText(user.phone) : '+380'));
+  const [isInterestingFormExpanded, setIsInterestingFormExpanded] = useState(false);
+  const [zodiacSign, setZodiacSign] = useState('');
+  const [humanDesignType, setHumanDesignType] = useState('');
+  const [humanDesignProfile, setHumanDesignProfile] = useState('');
   const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
   const [showPhoneOnCard, setShowPhoneOnCard] = useState(true);
   const [listings, setListings] = useState<ContactListing[]>([]);
@@ -342,7 +403,7 @@ const KontaktiChaikyScreen: React.FC = () => {
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const blinkAnim = useRef(new Animated.Value(1)).current;
   const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const latestDraftRef = useRef({ category, condition, price, description, phone, addFormVisible });
+  const latestDraftRef = useRef({ category, condition, price, description, phone, addFormVisible, isInterestingFormExpanded, zodiacSign, humanDesignType, humanDesignProfile });
   const avatarByUserId = useUserAvatarMap(listings.map((item) => item.userId));
   const previousAddFormVisibleRef = useRef(addFormVisible);
   const skipNextDraftFlushRef = useRef(false);
@@ -371,12 +432,16 @@ const KontaktiChaikyScreen: React.FC = () => {
       try {
         const raw = await AsyncStorage.getItem(CONTACTS_DRAFT_KEY);
         if (!isMounted || !raw) return;
-        const draft = JSON.parse(raw) as Partial<{ category: string; condition: string; price: string; description: string; phone: string; addFormVisible: boolean }>;
+        const draft = JSON.parse(raw) as ContactsDraft;
         if (draft.category) setCategory(draft.category);
         if (draft.condition) setCondition(draft.condition);
         if (draft.price) setPrice(draft.price);
         if (draft.description) setDescription(draft.description);
         if (draft.phone) setPhone(draft.phone);
+        if (draft.isInterestingFormExpanded) setIsInterestingFormExpanded(true);
+        if (draft.zodiacSign) setZodiacSign(draft.zodiacSign);
+        if (draft.humanDesignType) setHumanDesignType(draft.humanDesignType);
+        if (draft.humanDesignProfile) setHumanDesignProfile(draft.humanDesignProfile);
         if (draft.addFormVisible) setAddFormVisible(true);
         await AsyncStorage.removeItem(CONTACTS_DRAFT_KEY);
       } catch { /* ignore */ }
@@ -388,15 +453,15 @@ const KontaktiChaikyScreen: React.FC = () => {
   }, [user?.id]);
 
   useEffect(() => {
-    latestDraftRef.current = { category, condition, price, description, phone, addFormVisible };
-  }, [addFormVisible, category, condition, description, phone, price]);
+    latestDraftRef.current = { category, condition, price, description, phone, addFormVisible, isInterestingFormExpanded, zodiacSign, humanDesignType, humanDesignProfile };
+  }, [addFormVisible, category, condition, description, humanDesignProfile, humanDesignType, isInterestingFormExpanded, phone, price, zodiacSign]);
 
   const saveDraftNow = useCallback((visible = latestDraftRef.current.addFormVisible) => {
     if (!visible) return;
-    const { category: draftCategory, condition: draftCondition, price: draftPrice, description: draftDescription, phone: draftPhone } = latestDraftRef.current;
+    const { category: draftCategory, condition: draftCondition, price: draftPrice, description: draftDescription, phone: draftPhone, isInterestingFormExpanded: draftInteresting, zodiacSign: draftZodiac, humanDesignType: draftDesignType, humanDesignProfile: draftDesignProfile } = latestDraftRef.current;
     void AsyncStorage.setItem(
       CONTACTS_DRAFT_KEY,
-      JSON.stringify({ category: draftCategory, condition: draftCondition, price: draftPrice, description: draftDescription, phone: draftPhone, addFormVisible: true }),
+      JSON.stringify({ category: draftCategory, condition: draftCondition, price: draftPrice, description: draftDescription, phone: draftPhone, addFormVisible: true, isInterestingFormExpanded: draftInteresting, zodiacSign: draftZodiac, humanDesignType: draftDesignType, humanDesignProfile: draftDesignProfile }),
     ).catch(() => {});
   }, []);
 
@@ -427,7 +492,7 @@ const KontaktiChaikyScreen: React.FC = () => {
         draftSaveTimerRef.current = null;
       }
     };
-  }, [addFormVisible, category, condition, description, phone, price, saveDraftNow]);
+  }, [addFormVisible, category, condition, description, humanDesignProfile, humanDesignType, isInterestingFormExpanded, phone, price, saveDraftNow, zodiacSign]);
 
   useEffect(() => () => {
     if (draftSaveTimerRef.current) {
@@ -586,6 +651,10 @@ const KontaktiChaikyScreen: React.FC = () => {
     setPrice('');
     setDescription('');
     setPhone('+380');
+    setIsInterestingFormExpanded(false);
+    setZodiacSign('');
+    setHumanDesignType('');
+    setHumanDesignProfile('');
     setFormPhotos([]);
     setSubmitAttempted(false);
     void AsyncStorage.removeItem(CONTACTS_DRAFT_KEY).catch(() => {});
@@ -645,6 +714,9 @@ const KontaktiChaikyScreen: React.FC = () => {
         expiresAt: new Date(createdAt.getTime() + CONTACT_LISTING_TTL_MS).toISOString(),
         userId: user?.id || '',
         showPhone: showPhoneOnCard,
+        zodiacSign: isInterestingFormExpanded ? zodiacSign : '',
+        humanDesignType: isInterestingFormExpanded ? humanDesignType : '',
+        humanDesignProfile: isInterestingFormExpanded ? humanDesignProfile : '',
         language,
       });
 
@@ -658,6 +730,19 @@ const KontaktiChaikyScreen: React.FC = () => {
       setSubmitting(false);
     }
   };
+
+  const handleHumanDesignConsultation = useCallback(async () => {
+    const encodedMessage = encodeURIComponent(HUMAN_DESIGN_TELEGRAM_MESSAGE);
+    const appUrl = `tg://resolve?domain=Vikram_2027&text=${encodedMessage}`;
+    const webUrl = `${HUMAN_DESIGN_TELEGRAM_URL}?text=${encodedMessage}`;
+
+    try {
+      const canOpenTelegram = await Linking.canOpenURL(appUrl);
+      await Linking.openURL(canOpenTelegram ? appUrl : webUrl);
+    } catch {
+      await Linking.openURL(webUrl).catch(() => {});
+    }
+  }, []);
 
   const handleDelete = (id: string) => {
     Alert.alert(text.deleteConfirmTitle, text.deleteConfirmMsg, [
@@ -689,6 +774,7 @@ const KontaktiChaikyScreen: React.FC = () => {
       photoStoragePath: item.photoStoragePath,
       category: categoryLabel || conditionLabel,
       price: item.price ? `${item.price}` : undefined,
+      priceLabel: text.priceLabel,
       status: conditionLabel,
       userId: item.userId,
       ownerAvatarUri,
@@ -837,6 +923,9 @@ const KontaktiChaikyScreen: React.FC = () => {
                 const isOwn = item.userId === user?.id;
                 const showPhone = !!(item.phone && item.showPhone !== false);
                 const conditionLabel = text.conditionLabels[item.condition as keyof typeof text.conditionLabels] ?? item.condition;
+                const zodiacLabel = item.zodiacSign ? text.zodiacLabels[item.zodiacSign as keyof typeof text.zodiacLabels] : '';
+                const designTypeLabel = item.humanDesignType ? text.humanDesignTypeLabels[item.humanDesignType as keyof typeof text.humanDesignTypeLabels] : '';
+                const designProfileLabel = item.humanDesignProfile || '';
                 const ageText = item.price ? `${item.price}` : '';
                 const categoryLabel = getCategoryLabel(item.category);
                 const descriptionText = item.description?.trim() || text.noDesc;
@@ -891,6 +980,14 @@ const KontaktiChaikyScreen: React.FC = () => {
                             <Text style={styles.kConditionText} numberOfLines={1}>{conditionLabel}</Text>
                           </View>
                         </View>
+
+                        {zodiacLabel || designTypeLabel || designProfileLabel ? (
+                          <View style={styles.kInterestingChips}>
+                            {zodiacLabel ? <Text style={styles.kInterestingChip}>{zodiacLabel}</Text> : null}
+                            {designTypeLabel ? <Text style={styles.kInterestingChip}>{designTypeLabel}</Text> : null}
+                            {designProfileLabel ? <Text style={styles.kInterestingChip}>{designProfileLabel}</Text> : null}
+                          </View>
+                        ) : null}
 
                         <View style={styles.kDescBox}>
                           <Text style={styles.kDescText} numberOfLines={3}>{descriptionText}</Text>
@@ -1011,6 +1108,54 @@ const KontaktiChaikyScreen: React.FC = () => {
               <TextInput placeholder="+380..." value={phone} onChangeText={(value) => setPhone(normalizePhoneText(value))} keyboardType="phone-pad" style={styles.input} placeholderTextColor="#A0938D" />
               <InlineFieldHint message={text.phoneHint} type={phone.replace(/\D/g, '').length >= 7 ? 'success' : 'hint'} />
               <FormFieldError error={submitAttempted && phone.replace(/\D/g, '').length < 7 ? text.errorPhone : undefined} />
+
+              <TouchableOpacity
+                style={styles.interestingBtn}
+                onPress={() => setIsInterestingFormExpanded((prev) => !prev)}
+                activeOpacity={0.84}
+              >
+                <MaterialCommunityIcons name="star-four-points-outline" size={18} color="#7A1E5C" />
+                <Text style={styles.interestingBtnText}>{text.makeInteresting}</Text>
+              </TouchableOpacity>
+
+              {isInterestingFormExpanded ? (
+                <View style={styles.interestingSection}>
+                  <Text style={styles.formLabel}>{text.zodiacLabel}</Text>
+                  <View style={styles.pickerWrapper}>
+                    <Picker selectedValue={zodiacSign} onValueChange={setZodiacSign} style={styles.picker}>
+                      <Picker.Item label={text.selectZodiac} value="" />
+                      {ZODIAC_VALUES.map((value) => (
+                        <Picker.Item key={value} label={text.zodiacLabels[value]} value={value} />
+                      ))}
+                    </Picker>
+                  </View>
+
+                  <Text style={styles.formLabel}>{text.humanDesignTypeLabel}</Text>
+                  <View style={styles.pickerWrapper}>
+                    <Picker selectedValue={humanDesignType} onValueChange={setHumanDesignType} style={styles.picker}>
+                      <Picker.Item label={text.selectHumanDesignType} value="" />
+                      {HUMAN_DESIGN_TYPE_VALUES.map((value) => (
+                        <Picker.Item key={value} label={text.humanDesignTypeLabels[value]} value={value} />
+                      ))}
+                    </Picker>
+                  </View>
+
+                  <Text style={styles.formLabel}>{text.humanDesignProfileLabel}</Text>
+                  <View style={styles.pickerWrapper}>
+                    <Picker selectedValue={humanDesignProfile} onValueChange={setHumanDesignProfile} style={styles.picker}>
+                      <Picker.Item label={text.selectHumanDesignProfile} value="" />
+                      {HUMAN_DESIGN_PROFILE_VALUES.map((value) => (
+                        <Picker.Item key={value} label={value} value={value} />
+                      ))}
+                    </Picker>
+                  </View>
+
+                  <TouchableOpacity style={styles.consultationLink} onPress={handleHumanDesignConsultation} activeOpacity={0.82}>
+                    <MaterialCommunityIcons name="send-circle-outline" size={20} color="#2D7E4D" />
+                    <Text style={styles.consultationLinkText}>{text.humanDesignConsultation}</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
 
               <Text style={styles.formLabel}>{text.photoLabel}</Text>
               {user?.id ? (
@@ -1240,6 +1385,23 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     fontWeight: '800',
   },
+  kInterestingChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 5,
+  },
+  kInterestingChip: {
+    backgroundColor: '#FFF8EA',
+    borderWidth: 1,
+    borderColor: '#E4D0AB',
+    borderRadius: 999,
+    color: '#5F5043',
+    fontSize: 10,
+    fontWeight: '800',
+    overflow: 'hidden',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
   kModInfo: {
     fontSize: 11,
     color: '#8A6200',
@@ -1266,6 +1428,37 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   kDeleteLinkText: { color: '#C0392B', fontSize: 11, fontWeight: '800' },
+  interestingBtn: {
+    alignItems: 'center',
+    backgroundColor: '#F3E5F5',
+    borderColor: '#CE93D8',
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    marginTop: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  interestingBtnText: { color: '#7A1E5C', fontSize: 14, fontWeight: '900', textAlign: 'center' },
+  interestingSection: {
+    backgroundColor: '#FFF8EA',
+    borderColor: '#E4D0AB',
+    borderRadius: 16,
+    borderWidth: 1,
+    marginTop: 10,
+    padding: 12,
+  },
+  consultationLink: {
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+    paddingVertical: 8,
+  },
+  consultationLinkText: { color: '#2D7E4D', flex: 1, fontSize: 13, fontWeight: '900', lineHeight: 18 },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',

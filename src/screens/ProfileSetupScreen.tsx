@@ -44,6 +44,7 @@ const TEXT = {
     agePlaceholder: 'Ваш вік',
     male: 'Чоловік',
     female: 'Жінка',
+    quickRegistration: 'Швидка реєстрація',
     continue: 'Продовжити',
     ageError: 'Вік має бути від 14 до 100',
     nameError: "Введіть ваше ім'я",
@@ -68,6 +69,7 @@ const TEXT = {
     agePlaceholder: 'Ваш возраст',
     male: 'Мужчина',
     female: 'Женщина',
+    quickRegistration: 'Быстрая Регистрация',
     continue: 'Продолжить',
     ageError: 'Возраст должен быть от 14 до 100',
     nameError: 'Введите ваше имя',
@@ -92,6 +94,7 @@ const TEXT = {
     agePlaceholder: 'Your age',
     male: 'Male',
     female: 'Female',
+    quickRegistration: 'Quick registration',
     continue: 'Continue',
     ageError: 'Age must be between 14 and 100',
     nameError: 'Please enter your name',
@@ -182,6 +185,28 @@ export default function ProfileSetupScreen() {
     void confirm().catch(() => {
       Alert.alert(text.missingTitle, text.avatarError);
     });
+  };
+
+  const handleQuickRegistrationPress = async () => {
+    if (saving) return;
+
+    setSaving(true);
+    try {
+      if (selectedKey) {
+        await saveSelectedStartAvatar(selectedKey);
+      }
+      if (isNameDone && isGenderDone && isAgeDone && selectedKey) {
+        await saveTempProfileData({
+          name: trimmedName,
+          gender: gender!,
+          age: parsedAge,
+          startAvatarKey: selectedKey,
+        });
+      }
+      navigation.navigate('LoginScreen');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const confirm = async () => {
@@ -353,11 +378,19 @@ export default function ProfileSetupScreen() {
           />
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-          <View style={{ height: 120 }} />
+          <View style={{ height: 190 }} />
         </ScrollView>
       </KeyboardAvoidingView>
 
       <View style={styles.footer}>
+        <TouchableOpacity
+          style={[styles.quickRegistrationButton, saving && styles.continueButtonDisabled]}
+          onPress={() => void handleQuickRegistrationPress()}
+          disabled={saving}
+          activeOpacity={0.86}
+        >
+          <Text style={styles.quickRegistrationText}>{text.quickRegistration}</Text>
+        </TouchableOpacity>
         <TouchableOpacity
           style={[styles.continueButton, (!canSubmit || saving) && styles.continueButtonDisabled]}
           onPress={handleContinuePress}
@@ -501,6 +534,17 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#E4D0AB',
   },
+  quickRegistrationButton: {
+    minHeight: 52,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: SCREEN_THEME.woodGreenDark,
+    backgroundColor: SCREEN_THEME.paperStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  quickRegistrationText: { color: SCREEN_THEME.woodGreenDark, fontSize: 16, fontWeight: '900' },
   continueButton: {
     minHeight: 54,
     borderRadius: 16,

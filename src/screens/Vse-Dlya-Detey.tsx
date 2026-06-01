@@ -38,6 +38,8 @@ const UI_TEXT = {
     eventsListTitle: 'Події та пропозиції',
     noResults: 'Нічого не знайдено. Спробуйте змінити пошук або категорію.',
     noOffers: 'Поки що немає активних подій або пропозицій.',
+    showPlaces: 'Розгорнути / показати місця',
+    hidePlaces: 'Згорнути місця',
     details: 'Детальніше',
     call: 'Подзвонити',
     telegram: 'Telegram',
@@ -103,6 +105,8 @@ const UI_TEXT = {
     eventsListTitle: 'События и предложения',
     noResults: 'Ничего не найдено. Попробуйте изменить поиск или категорию.',
     noOffers: 'Пока нет активных событий или предложений.',
+    showPlaces: 'Развернуть / показать места',
+    hidePlaces: 'Свернуть места',
     details: 'Подробнее',
     call: 'Позвонить',
     telegram: 'Telegram',
@@ -168,6 +172,8 @@ const UI_TEXT = {
     eventsListTitle: 'Events and offers',
     noResults: 'Nothing found. Try changing search or category.',
     noOffers: 'No active events or offers yet.',
+    showPlaces: 'Expand / show places',
+    hidePlaces: 'Collapse places',
     details: 'Details',
     call: 'Call',
     telegram: 'Telegram',
@@ -297,6 +303,8 @@ export default function VseDlyaDeteyScreen() {
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
   const [activeCategory, setActiveCategory] = useState<CategoryKey>('all');
   const [query, setQuery] = useState('');
+  const [isRecommendedExpanded, setIsRecommendedExpanded] = useState(false);
+  const [isAllPlacesExpanded, setIsAllPlacesExpanded] = useState(false);
 
   const childPlaces = useMemo(() => (
     chaykaPlaces
@@ -407,6 +415,17 @@ export default function VseDlyaDeteyScreen() {
     );
   };
 
+  const renderExpandButton = (expanded: boolean, onPress: () => void) => (
+    <TouchableOpacity style={styles.expandButton} activeOpacity={0.86} onPress={onPress}>
+      <Text style={styles.expandButtonText}>{expanded ? text.hidePlaces : text.showPlaces}</Text>
+      <MaterialCommunityIcons
+        name={expanded ? 'chevron-up' : 'chevron-down'}
+        size={22}
+        color={SCREEN_THEME.enamelBlueDark}
+      />
+    </TouchableOpacity>
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -482,9 +501,12 @@ export default function VseDlyaDeteyScreen() {
             <View style={styles.sectionHeaderRow}>
               <Text style={styles.sectionTitle}>{text.recommendedTitle}</Text>
             </View>
-            <View style={styles.cardList}>
-              {recommendedPlaces.map((item) => renderPlaceCard(item, true))}
-            </View>
+            {renderExpandButton(isRecommendedExpanded, () => setIsRecommendedExpanded((current) => !current))}
+            {isRecommendedExpanded ? (
+              <View style={styles.cardList}>
+                {recommendedPlaces.map((item) => renderPlaceCard(item, true))}
+              </View>
+            ) : null}
           </>
         ) : null}
 
@@ -492,6 +514,10 @@ export default function VseDlyaDeteyScreen() {
           <Text style={styles.sectionTitle}>{isEventsCategory ? text.eventsListTitle : text.allPlacesTitle}</Text>
           <Text style={styles.resultCount}>{isEventsCategory ? activeOffers.length : filteredPlaces.length}</Text>
         </View>
+
+        {!isEventsCategory && filteredPlaces.length > 0 ? (
+          renderExpandButton(isAllPlacesExpanded, () => setIsAllPlacesExpanded((current) => !current))
+        ) : null}
 
         {isEventsCategory ? (
           activeOffers.length > 0 ? (
@@ -504,11 +530,11 @@ export default function VseDlyaDeteyScreen() {
               <Text style={styles.emptyText}>{text.noOffers}</Text>
             </View>
           )
-        ) : filteredPlaces.length > 0 ? (
+        ) : filteredPlaces.length > 0 && isAllPlacesExpanded ? (
           <View style={styles.cardList}>
             {filteredPlaces.map((item) => renderPlaceCard(item))}
           </View>
-        ) : (
+        ) : filteredPlaces.length > 0 ? null : (
           <View style={styles.emptyState}>
             <MaterialCommunityIcons name="magnify-close" size={34} color={SCREEN_THEME.textMuted} />
             <Text style={styles.emptyText}>{text.noResults}</Text>
@@ -673,6 +699,24 @@ const styles = StyleSheet.create({
   },
   categoryCountActive: {
     color: 'rgba(255,255,255,0.82)',
+  },
+  expandButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    borderWidth: 1,
+    borderColor: SCREEN_THEME.borderSoft,
+    marginBottom: 12,
+  },
+  expandButtonText: {
+    flex: 1,
+    color: SCREEN_THEME.enamelBlueDark,
+    fontSize: 15,
+    fontWeight: '900',
   },
   cardList: {
     gap: 10,

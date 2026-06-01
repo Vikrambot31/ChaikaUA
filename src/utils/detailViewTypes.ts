@@ -7,6 +7,7 @@ export type DetailItemData = {
   phone?: string;
   category?: string;
   price?: string;
+  priceLabel?: string;
   address?: string;
   status?: string;
   votesCount?: number;

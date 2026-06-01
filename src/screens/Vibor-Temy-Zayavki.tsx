@@ -266,7 +266,7 @@ const RequestTopicScreen: React.FC = () => {
               <View style={styles.offerTrack}>
                 <View style={[styles.offerFill, { width: `${getOfferBarPercent(todayOffersCount)}%` }]}>
                   <Animated.View style={[styles.offerShimmer, { transform: [{ translateX: shimmerTranslate }, { rotate: '18deg' }] }]} />
-                  <Text style={styles.offerText}>ПРЕДЛОЖЕНИЯ {todayOffersCount}</Text>
+                  <Text style={styles.offerText}>😃 {todayOffersCount}</Text>
                 </View>
               </View>
               <Text style={styles.offerCaption}>работа и бизнес сегодня</Text>

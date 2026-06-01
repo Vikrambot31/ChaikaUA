@@ -105,7 +105,7 @@ export default function ItemDetailScreen({
 
   const fields = [
     { label: text.description, value: item.description },
-    { label: text.price, value: item.price },
+    { label: item.priceLabel ?? text.price, value: item.price },
     { label: text.address, value: item.address },
     { label: text.status, value: item.status },
     { label: text.votes, value: typeof item.votesCount === 'number' ? String(item.votesCount) : undefined },

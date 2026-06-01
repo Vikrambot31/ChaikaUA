@@ -26,6 +26,9 @@ export interface ContactListing {
   moderationReason?: string;
   rejectionReason?: string;
   showPhone?: boolean;
+  zodiacSign?: string;
+  humanDesignType?: string;
+  humanDesignProfile?: string;
   isArchived?: boolean;
   language?: AppLang;
 }
@@ -65,6 +68,9 @@ const mapContactItem = (id: string, data: any, isArchived?: boolean): ContactLis
   moderationReason: isArchived ? '' : (data.moderationReason || data.reason || ''),
   rejectionReason: isArchived ? '' : (data.rejectionReason || data.reason || ''),
   showPhone: data.showPhone !== false,
+  zodiacSign: data.zodiacSign || '',
+  humanDesignType: data.humanDesignType || '',
+  humanDesignProfile: data.humanDesignProfile || '',
   isArchived,
 });
 
@@ -203,6 +209,9 @@ export const contactsService = {
         price: normalizePrice(item.price),
         description: sanitizeStoredText(item.description),
         phone: sanitizeStoredText(item.phone),
+        zodiacSign: sanitizeStoredText(item.zodiacSign || ''),
+        humanDesignType: sanitizeStoredText(item.humanDesignType || ''),
+        humanDesignProfile: sanitizeStoredText(item.humanDesignProfile || ''),
         userId: user.uid,
         photoStoragePath,
         photoUri: '',
