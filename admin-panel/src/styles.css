@@ -4205,38 +4205,136 @@ td {
   align-self: center;
 }
 
-/* ── Yellow List ── */
-.yellowListFlaggedName {
-  color: #ff4d4d !important;
+/* ── Yellow List — ЯРКИЕ стили для подозрительных пользователей ── */
+
+/* Ячейка с именем подозрительного пользователя */
+.ylFlaggedCell {
+  background: #3a0a0a !important;
+  border-left: 4px solid #ff2222 !important;
 }
-.yellowListBadge {
+
+/* Контейнер имени с иконкой */
+.ylFlaggedUser {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* Красная иконка предупреждения */
+.ylWarningIcon {
+  font-size: 20px;
+  color: #ff2222;
+  text-shadow: 0 0 8px #ff0000aa;
+  line-height: 1;
+}
+
+/* Красное имя — яркое и жирное */
+.ylFlaggedName {
+  color: #ff3333 !important;
+  font-weight: 900 !important;
+  font-size: 14px !important;
+  text-shadow: 0 0 6px #ff000066;
+}
+
+/* Бейдж "ПОДОЗРЕНИЕ" — жёлтый */
+.ylSuspectBadge {
   display: inline-block;
-  margin-left: 6px;
-  padding: 1px 5px;
+  padding: 2px 8px;
   border-radius: 4px;
   background: #e8a800;
-  color: #1a1a1a;
+  color: #000;
   font-size: 10px;
   font-weight: 900;
-  vertical-align: middle;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  animation: ylPulse 2s ease-in-out infinite;
 }
-.yellowListBtn {
-  border-color: #b8860b !important;
-  background: #3d3010 !important;
-  color: #e8a800 !important;
-  font-size: 12px !important;
-  min-height: 30px !important;
-  padding: 0 8px !important;
+
+/* Бейдж "ЗАБАНЕН" — красный */
+.ylBadge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #cc0000;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
 }
-.yellowListBtn:hover {
-  background: #5a4a1a !important;
+
+/* Кнопка ЗАБАНИТЬ — большая жёлто-красная */
+.ylBtnBan {
+  min-height: 38px;
+  padding: 4px 14px;
+  border: 2px solid #ff6600;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #cc3300, #992200);
+  color: #ffe500;
+  cursor: pointer;
+  font-weight: 900;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  text-shadow: 0 1px 2px #00000088;
+  transition: transform 0.1s, box-shadow 0.1s;
 }
-.yellowListBtnActive {
-  border-color: #666 !important;
-  background: #2a2a2a !important;
-  color: #999 !important;
-  font-size: 12px !important;
-  min-height: 30px !important;
-  padding: 0 8px !important;
-  cursor: default !important;
+.ylBtnBan:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 12px #ff440088;
+}
+.ylBtnBan:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+/* Кнопка ЗАБАНЕН — серая неактивная */
+.ylBtnBanned {
+  min-height: 38px;
+  padding: 4px 14px;
+  border: 2px solid #666;
+  border-radius: 6px;
+  background: #333;
+  color: #aaa;
+  font-weight: 900;
+  font-size: 12px;
+  cursor: default;
+}
+
+/* Секция жёлтого списка */
+.ylSection {
+  margin-top: 24px;
+  border: 2px solid #cc6600;
+  border-radius: 10px;
+  padding: 16px;
+  background: #1a1008;
+}
+.ylSectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.ylSectionTitle {
+  font-size: 18px;
+  font-weight: 900;
+  color: #ffaa00;
+}
+.ylBannedRow {
+  background: #2a0e0e !important;
+}
+.ylUnbanBtn {
+  border-color: #22aa44 !important;
+  background: #0a2a12 !important;
+  color: #44dd66 !important;
+  font-weight: 900 !important;
+}
+.ylUnbanBtn:hover {
+  background: #0d3a18 !important;
+}
+
+/* Пульсация для привлечения внимания */
+@keyframes ylPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
 }
