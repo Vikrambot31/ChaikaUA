@@ -992,11 +992,9 @@ exports.adminModerateContentItem = functionsV1.https.onCall(async (data, context
     } else {
       const target = snapshot.val() || {};
       const nextStatusValue = action === 'approved' ? config.approvedValue : config.rejectedValue;
-      const reason = sanitizeText(data?.reason || '', 200);
-
-      if (action === 'rejected' && (reason.length < 10 || reason.length > 200)) {
-        throw new functionsV1.https.HttpsError('invalid-argument', 'Rejection reason must be 10-200 characters');
-      }
+      const rawReason = sanitizeText(data?.reason || '', 200);
+      // Reason is optional — use default if not provided
+      const reason = rawReason.length >= 10 ? rawReason : 'Відхилено модератором';
 
       const patch = {
         [config.statusField]: nextStatusValue,
