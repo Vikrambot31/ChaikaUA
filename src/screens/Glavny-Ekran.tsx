@@ -675,6 +675,7 @@ const HomeScreen: React.FC = () => {
     { id: 'lost', icon: 'magnify', titleKey: 'whoLost', subtitleKey: 'whoLostSub', screen: 'LostAndFoundScreen' },
     { id: 'business', icon: 'storefront-outline', titleKey: 'businessOnChaika', subtitleKey: 'businessOnChaikaSub', screen: 'ZhkBusinessListScreen' },
     { id: 'kids', icon: 'baby-face-outline', titleKey: 'kidsHub', subtitleKey: 'kidsHubSub', screen: 'VseDlyaDeteyScreen' },
+    { id: 'food', icon: 'food-fork-drink', titleKey: 'foodHub', subtitleKey: 'foodHubSub', screen: 'EdaNaChaykeScreen' },
   ];
   const activity = React.useMemo(() => {
     return getChaikaActivity({

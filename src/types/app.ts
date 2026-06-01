@@ -24,6 +24,54 @@ export interface Place {
   workingHours?: string;
   createdAt: number;
   childInfo?: ChildInfo;
+  foodInfo?: FoodInfo;
+}
+
+// --- Food module (раздел "Еда на Чайке") ---
+
+export type FoodCategory =
+  | 'pizza'
+  | 'cafe'
+  | 'restaurant'
+  | 'grocery';
+
+export interface FoodInfo {
+  category: FoodCategory;
+  subCategory?: 'pizza' | 'coffee' | 'bakery' | 'grocery' | string;
+  deliveryAvailable?: boolean;
+  orderUrl?: string;
+  telegram?: string;
+}
+
+export interface FoodOffer {
+  id: string;
+  placeId: string;
+  title: string;
+  shortText: string;
+  validUntil?: number;
+  isActive: boolean;
+  createdAt: number;
+}
+
+export type ShoppingCategory =
+  | 'dairy'
+  | 'bread'
+  | 'meat_fish'
+  | 'vegetables'
+  | 'groats'
+  | 'sauces'
+  | 'drinks'
+  | 'snacks'
+  | 'other';
+
+export interface ShoppingItem {
+  id: string;
+  name: string;
+  category: ShoppingCategory;
+  icon: string;
+  isChecked: boolean;
+  isHidden: boolean;
+  sortOrder: number;
 }
 
 // --- Children module (раздел "Все для детей") ---

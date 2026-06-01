@@ -65,6 +65,8 @@ import DetalDetskogoMestaScreen from '../screens/Detal-Detskogo-Mesta';
 import DetalDetskogoPredlozheniyaScreen from '../screens/Detal-Detskogo-Predlozheniya';
 import SportNaChaykeScreen from '../screens/Sport-Na-Chayke';
 import SportDetailScreen from '../screens/Sport-Detal';
+import EdaNaChaykeScreen from '../screens/Eda-Na-Chayke';
+import SpisokPokupokScreen from '../screens/Spisok-Pokupok';
 import ProfileRequestsScreen from '../screens/ProfileRequestsScreen';
 import AppVersionInfoScreen from '../screens/AppVersionInfoScreen';
 import CrashDiagnosticsScreen from '../screens/CrashDiagnosticsScreen';
@@ -174,6 +176,8 @@ export type RootStackParamList = {
   ZhkBusinessListScreen: undefined;
   SportNaChaykeScreen: undefined;
   SportDetailScreen: { sportKey: 'basketball' | 'football' | 'tennis_big' | 'tennis_small'; sportTitle: string };
+  EdaNaChaykeScreen: undefined;
+  SpisokPokupokScreen: undefined;
   ProfileRequestsScreen: undefined;
   MyPhotosScreen: undefined;
   MyApprovedPhotosScreen: undefined;
@@ -239,6 +243,8 @@ const linking: LinkingOptions<RootStackParamList> = {
        DetalDetskogoPredlozheniyaScreen: 'screen/kids/offer',
       SportNaChaykeScreen: 'screen/sports',
       SportDetailScreen: 'screen/sports/detail',
+      EdaNaChaykeScreen: 'screen/food',
+      SpisokPokupokScreen: 'screen/food/shopping',
       CrashDiagnosticsScreen: 'screen/crash-diagnostics',
       AppMonitorScreen: 'screen/app-monitor',
     },
@@ -323,6 +329,8 @@ const ROUTE_FILE_MAP: Record<string, string> = {
   ZhkBusinessListScreen: 'ZhkBusinessListScreen.tsx',
   SportNaChaykeScreen: 'Sport-Na-Chayke.tsx',
   SportDetailScreen: 'Sport-Detal.tsx',
+  EdaNaChaykeScreen: 'Eda-Na-Chayke.tsx',
+  SpisokPokupokScreen: 'Spisok-Pokupok.tsx',
   ProfileRequestsScreen: 'ProfileRequestsScreen.tsx',
   MyPhotosScreen: 'photo-module/MyPhotosScreen.tsx',
   MyApprovedPhotosScreen: 'MyApprovedPhotosScreen.tsx',
@@ -830,6 +838,8 @@ function AuthNavigation() {
         <Stack.Screen name="ZhkBusinessListScreen" component={ZhkBusinessListScreen} />
         <Stack.Screen name="SportNaChaykeScreen" component={withGuard(SportNaChaykeScreen, 'auth')} />
         <Stack.Screen name="SportDetailScreen" component={withGuard(SportDetailScreen, 'trusted')} />
+        <Stack.Screen name="EdaNaChaykeScreen" component={EdaNaChaykeScreen} />
+        <Stack.Screen name="SpisokPokupokScreen" component={SpisokPokupokScreen} />
         <Stack.Screen name="ProfileRequestsScreen" component={withGuard(ProfileRequestsScreen, 'trusted')} />
         <Stack.Screen name="MyPhotosScreen" component={MyPhotosScreen} options={{ headerShown: false }} />
         <Stack.Screen name="MyApprovedPhotosScreen" component={MyApprovedPhotosScreen} options={{ headerShown: false }} />
