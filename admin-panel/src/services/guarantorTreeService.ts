@@ -1,4 +1,4 @@
-import { equalTo, get, limitToFirst, orderByChild, query, ref, remove } from 'firebase/database';
+import { equalTo, get, limitToFirst, orderByChild, query, ref, remove, set } from 'firebase/database';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { database, firebaseApp } from '../firebase/firebase';
 import { LOCAL_MODE, localGet } from '../local/LOCAL_MODE';
@@ -159,6 +159,17 @@ const normalizeInviteRequest = (id: string, raw: unknown): InviteRequestBrief | 
   };
 };
 
+const matchRootGuarantor = (queryText: string): SearchResultItem | null => {
+  const lower = queryText.trim().toLowerCase();
+  const cleanQ = queryText.replace(/\D/g, '');
+  const rootUser = makeRootGuarantorUser();
+  const rootPhoneClean = ROOT_GUARANTOR_PHONE.replace(/\D/g, '');
+  if (ROOT_GUARANTOR_UID.toLowerCase().startsWith(lower)) return { ...rootUser, matchField: 'uid' };
+  if (rootPhoneClean.includes(cleanQ) && cleanQ.length >= 3) return { ...rootUser, matchField: 'phone' };
+  if (rootUser.name.toLowerCase().includes(lower)) return { ...rootUser, matchField: 'name' };
+  return null;
+};
+
 export const searchUsers = async (queryText: string): Promise<SearchResultItem[]> => {
   const trimmed = queryText.trim();
   if (trimmed.length < 2) return [];
@@ -187,6 +198,8 @@ export const searchUsers = async (queryText: string): Promise<SearchResultItem[]
       else if (nameLower.includes(lower)) { matchField = 'name'; score = 40; }
       if (matchField) scored.push({ ...user, matchField, score });
     }
+    const rootMatch = matchRootGuarantor(trimmed);
+    if (rootMatch) scored.push({ ...rootMatch, score: 90 });
     return scored.sort((a, b) => b.score - a.score).slice(0, 10);
   }
 
@@ -218,6 +231,8 @@ export const searchUsers = async (queryText: string): Promise<SearchResultItem[]
     if (matchField) scored.push({ ...user, matchField, score });
   }
 
+  const rootMatch = matchRootGuarantor(trimmed);
+  if (rootMatch && !scored.some((s) => s.uid === ROOT_GUARANTOR_UID)) scored.push({ ...rootMatch, score: 90 });
   return scored.sort((left, right) => right.score - left.score).slice(0, 10);
 };
 
@@ -626,31 +641,54 @@ export const loadFullTree = async (): Promise<{ root: FullTreeNode; orphans: Ful
 export const attachToParent = async (childUid: string, parentUid: string, adminUid: string): Promise<void> => {
   logAudit('attach_to_parent', { adminUid, childUid, parentUid });
   if (LOCAL_MODE) return;
-  const callable = httpsCallable(functions!, 'adminAttachToParent');
-  await callable({ childUid, parentUid, adminUid });
+
+  // Calculate depth: load parent's node to get their depth
+  let parentDepth = 0;
+  if (parentUid !== ROOT_GUARANTOR_UID) {
+    const parentSnap = await get(ref(database, `${TRUST_TREE_PATH}/${parentUid}`));
+    const parentData = parentSnap.val() as Record<string, unknown> | null;
+    if (parentData) parentDepth = getNumber(parentData.depth || parentData.depthToRoot);
+  }
+
+  await set(ref(database, `${TRUST_TREE_PATH}/${childUid}`), {
+    childUid,
+    parentUid,
+    sponsorUid: parentUid,
+    depth: parentDepth + 1,
+    depthToRoot: parentDepth + 1,
+    status: 'active',
+    approvedAt: Date.now(),
+    approvedBy: adminUid,
+    createdAt: Date.now(),
+  });
 };
 
 export const reparentNode = async (childUid: string, newParentUid: string, adminUid: string): Promise<void> => {
   logAudit('reparent_node', { adminUid, childUid, newParentUid });
   if (LOCAL_MODE) return;
-  const callable = httpsCallable(functions!, 'adminReparentNode');
-  await callable({ childUid, newParentUid, adminUid });
+
+  // Same as attach — write/overwrite the trust_tree entry
+  await attachToParent(childUid, newParentUid, adminUid);
 };
 
-export const deleteNode = async (uid: string, strategy: 'promote' | 'orphan', adminUid: string): Promise<void> => {
-  logAudit('delete_node', { adminUid, uid, strategy });
+export const deleteNode = async (uid: string, _strategy: 'promote' | 'orphan', adminUid: string): Promise<void> => {
+  logAudit('delete_node', { adminUid, uid, strategy: _strategy });
   if (LOCAL_MODE) return;
-  const callable = httpsCallable(functions!, 'adminDeleteNode');
-  await callable({ uid, strategy, adminUid });
+  // Remove trust_tree entry
+  await remove(ref(database, `${TRUST_TREE_PATH}/${uid}`));
 };
 
 export const deleteUserRecord = async (uid: string, adminUid: string): Promise<void> => {
   logAudit('delete_user_record', { adminUid, targetUid: uid });
   if (LOCAL_MODE) return;
-  // Remove from users, trust_tree, user_access
-  await Promise.allSettled([
+  // Remove from users, trust_tree, user_access — throw if user record removal fails
+  const results = await Promise.allSettled([
     remove(ref(database, `${USERS_PATH}/${uid}`)),
     remove(ref(database, `${TRUST_TREE_PATH}/${uid}`)),
     remove(ref(database, `${ACCESS_PATH}/${uid}`)),
   ]);
+  const userResult = results[0];
+  if (userResult.status === 'rejected') {
+    throw new Error(`Не удалось удалить пользователя: ${userResult.reason instanceof Error ? userResult.reason.message : 'Ошибка доступа'}`);
+  }
 };

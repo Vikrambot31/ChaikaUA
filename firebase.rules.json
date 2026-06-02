@@ -7,7 +7,7 @@
       ".read": "auth != null && (root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
       "$uid": {
         ".read": "auth != null",
-        ".write": "auth != null && auth.uid === $uid"
+        ".write": "auth != null && (auth.uid === $uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin')"
       }
     },
 
@@ -388,12 +388,20 @@
       }
     },
 
+    "user_access": {
+      ".read": "auth != null && root.child('user_roles').child(auth.uid).child('role').val() === 'admin'",
+      ".write": "auth != null && root.child('user_roles').child(auth.uid).child('role').val() === 'admin'",
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin')"
+      }
+    },
+
     "trust_tree": {
       ".read": "auth != null",
+      ".write": "auth != null && root.child('user_roles').child(auth.uid).child('role').val() === 'admin'",
       ".indexOn": ["sponsorUid"],
       "$uid": {
-        ".read": "auth != null",
-        ".write": false
+        ".read": "auth != null"
       }
     },
 

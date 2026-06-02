@@ -83,10 +83,10 @@ export const useGuarantorTree = (adminUid?: string, canLoadInviteRequests = fals
 
     try {
       const [profile, access, path, inviteRequest, totalUsers] = await Promise.all([
-        loadUserProfile(uid),
-        loadUserAccess(uid),
-        loadTrustPath(uid),
-        canLoadInviteRequests ? loadInviteRequest(uid) : Promise.resolve(null),
+        loadUserProfile(uid).catch(() => null),
+        loadUserAccess(uid).catch(() => null),
+        loadTrustPath(uid).catch(() => []),
+        canLoadInviteRequests ? loadInviteRequest(uid).catch(() => null) : Promise.resolve(null),
         loadUsersTotal().catch(() => 0),
       ]);
 
@@ -159,8 +159,13 @@ export const useGuarantorTree = (adminUid?: string, canLoadInviteRequests = fals
   }, [adminUid, loadTree]);
 
   const handleDeleteUser = useCallback(async (uid: string) => {
-    await deleteUserRecord(uid, adminUid || 'unknown_admin');
-    await loadTree();
+    try {
+      await deleteUserRecord(uid, adminUid || 'unknown_admin');
+      await loadTree();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Не удалось удалить пользователя.';
+      setTreeError(message);
+    }
   }, [adminUid, loadTree]);
 
   // CSV export

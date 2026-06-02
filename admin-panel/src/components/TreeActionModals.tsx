@@ -79,13 +79,19 @@ export const ReparentModal = ({ node, searchFn, onConfirm, onClose }: ReparentMo
   return (
     <div className="tree-modal-overlay" onClick={onClose}>
       <div className="tree-modal" onClick={(e) => e.stopPropagation()}>
-        <h3>Переместить узел</h3>
+        <h3>{node.node?.parentUid ? 'Переместить к другому поручителю' : 'Привязать к поручителю'}</h3>
         <p style={{ color: '#64748b', fontSize: '14px', margin: '0 0 8px' }}>
-          Узел: <strong>{node.user.name}</strong> ({node.user.phone || node.uid.slice(0, 10)})
+          Пользователь: <strong>{node.user.name}</strong> ({node.user.phone || node.uid.slice(0, 10)})
         </p>
-        <p style={{ color: '#64748b', fontSize: '13px', margin: '0 0 16px' }}>
-          Текущий родитель: {node.node?.parentUid?.slice(0, 12) || 'Нет'}
-        </p>
+        {node.node?.parentUid ? (
+          <p style={{ color: '#64748b', fontSize: '13px', margin: '0 0 16px' }}>
+            Текущий поручитель: {node.node.parentUid.slice(0, 12)}...
+          </p>
+        ) : (
+          <p style={{ color: '#d97706', fontSize: '13px', margin: '0 0 16px', fontWeight: 800 }}>
+            Сейчас без поручителя. Выберите к кому привязать:
+          </p>
+        )}
         <div style={{ marginBottom: '12px' }}>
           <label style={{ display: 'block', marginBottom: '6px', fontWeight: 800, fontSize: '13px', color: '#475569' }}>
             Новый родитель:
@@ -103,7 +109,7 @@ export const ReparentModal = ({ node, searchFn, onConfirm, onClose }: ReparentMo
         <div className="tree-modal-actions">
           <button type="button" onClick={onClose}>Отмена</button>
           <button type="button" className="primary" disabled={!newParent || busy} onClick={() => void handleConfirm()}>
-            {busy ? 'Перемещение...' : 'Переместить'}
+            {busy ? 'Привязка...' : (node.node?.parentUid ? 'Переместить' : 'Привязать')}
           </button>
         </div>
       </div>

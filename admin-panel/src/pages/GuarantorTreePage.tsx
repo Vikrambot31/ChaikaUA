@@ -33,7 +33,7 @@ export const GuarantorTreePage = ({ user, role, onNavigate }: GuarantorTreePageP
   // Selected node in full tree
   const [selectedTreeUid, setSelectedTreeUid] = useState<string | null>(null);
 
-  const findNodeInTree = (uid: string): FullTreeNode | null => {
+  const findNodeAnywhere = (uid: string): FullTreeNode | null => {
     if (!tree.fullTree) return null;
     const search = (node: FullTreeNode): FullTreeNode | null => {
       if (node.uid === uid) return node;
@@ -45,7 +45,9 @@ export const GuarantorTreePage = ({ user, role, onNavigate }: GuarantorTreePageP
     };
     const found = search(tree.fullTree);
     if (found) return found;
-    return tree.orphans.find((o) => o.uid === uid) || null;
+    const orphan = tree.orphans.find((o) => o.uid === uid);
+    if (orphan) return orphan;
+    return tree.unlinked.find((u) => u.uid === uid) || null;
   };
 
   const handleSelectNode = (uid: string) => {
@@ -57,17 +59,17 @@ export const GuarantorTreePage = ({ user, role, onNavigate }: GuarantorTreePageP
   };
 
   const handleAddChild = (parentUid: string) => {
-    const node = findNodeInTree(parentUid);
+    const node = findNodeAnywhere(parentUid);
     if (node) setAddChildTarget(node);
   };
 
   const handleReparent = (uid: string) => {
-    const node = findNodeInTree(uid);
+    const node = findNodeAnywhere(uid);
     if (node) setReparentTarget(node);
   };
 
   const handleDelete = (uid: string) => {
-    const node = findNodeInTree(uid);
+    const node = findNodeAnywhere(uid);
     if (node) setDeleteTarget(node);
   };
 

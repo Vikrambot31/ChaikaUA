@@ -315,7 +315,7 @@ export const FullTreeView = ({
                 </div>
                 {isAdmin ? (
                   <div className="unlinked-card-actions">
-                    <button type="button" className="unlinked-btn" onClick={(e) => { e.stopPropagation(); onAddChild(o.uid); }} title="Привязать к поручителю">
+                    <button type="button" className="unlinked-btn" onClick={(e) => { e.stopPropagation(); onReparent(o.uid); }} title="Привязать к поручителю">
                       Привязать
                     </button>
                     <button type="button" className="unlinked-btn danger" onClick={(e) => { e.stopPropagation(); onDeleteUser(o.uid); }} title="Удалить из базы">
