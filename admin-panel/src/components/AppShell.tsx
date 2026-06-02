@@ -192,7 +192,9 @@ export const AppShell = ({ children, user, role, activePage, onNavigate, photoPe
   const connected = useFirebaseConnection();
   const { viewMode, setViewMode } = useViewMode();
   const { stats, error: dashboardError } = useDashboardContext();
-  if (dashboardError) console.error('[AppShell] dashboard error:', dashboardError);
+  if (dashboardError && !dashboardError.toLowerCase().includes('permission_denied') && !dashboardError.toLowerCase().includes('permission denied')) {
+    console.error('[AppShell] dashboard error:', dashboardError);
+  }
 
   const renderModeButton = (mode: ViewMode, label: string) => (
     <button

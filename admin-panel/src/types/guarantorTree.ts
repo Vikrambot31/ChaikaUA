@@ -87,6 +87,23 @@ export type ManualRootGrantResult = {
   message: string;
 };
 
+export type FullTreeNode = {
+  uid: string;
+  user: UserProfile;
+  node: TrustChainNode | null;
+  access: UserAccessRecord | null;
+  children: FullTreeNode[];
+  depth: number;
+};
+
+export type FullTreeStats = {
+  total: number;
+  active: number;
+  blocked: number;
+  orphaned: number;
+  maxDepth: number;
+};
+
 export type GuarantorTreePageProps = {
   user?: User;
   role?: SecurityRole;

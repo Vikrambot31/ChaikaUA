@@ -4,6 +4,8 @@ import { database, firebaseApp } from '../firebase/firebase';
 import { LOCAL_MODE, localGet } from '../local/LOCAL_MODE';
 import type {
   ChainEntry,
+  FullTreeNode,
+  FullTreeStats,
   InviteRequestBrief,
   SearchResultItem,
   TrustChainNode,
@@ -472,4 +474,154 @@ export const grantRootAccessByPhones = async (phones: string[], adminUid: string
     .filter((result) => result.status === 'granted')
     .forEach((result) => logAudit('manual_root_grant', { adminUid, targetUid: result.uid, phone: maskPhone(result.phone) }));
   return results;
+};
+
+export const loadFullTree = async (): Promise<{ root: FullTreeNode; orphans: FullTreeNode[]; stats: FullTreeStats }> => {
+  let allNodes: TrustChainNode[] = [];
+  let allUsers: Map<string, UserProfile> = new Map();
+  let allAccess: Map<string, UserAccessRecord> = new Map();
+
+  if (LOCAL_MODE) {
+    const nodesRaw = await localGet<Array<Record<string, unknown>>>('/trust_tree');
+    if (Array.isArray(nodesRaw)) {
+      allNodes = nodesRaw
+        .map((n) => normalizeTrustNode(String(n.id || ''), n))
+        .filter((n): n is TrustChainNode => n !== null);
+    }
+    const usersRaw = await localGet<Array<Record<string, unknown>>>('/users');
+    if (Array.isArray(usersRaw)) {
+      for (const u of usersRaw) {
+        const uid = String(u.id || '');
+        const profile = normalizeUserProfile(uid, u);
+        if (profile) allUsers.set(uid, profile);
+      }
+    }
+    const accessRaw = await localGet<Array<Record<string, unknown>>>('/user_access');
+    if (Array.isArray(accessRaw)) {
+      for (const a of accessRaw) {
+        const uid = String(a.id || a.uid || '');
+        const record = normalizeUserAccess(uid, a);
+        if (record) allAccess.set(uid, record);
+      }
+    }
+  } else {
+    const [nodesSnap, usersSnap, accessSnap] = await Promise.all([
+      get(ref(database, TRUST_TREE_PATH)),
+      get(query(ref(database, USERS_PATH), limitToFirst(10000))),
+      get(ref(database, ACCESS_PATH)),
+    ]);
+
+    const nodesRaw = nodesSnap.val() as Record<string, unknown> | null;
+    for (const [id, value] of Object.entries(nodesRaw ?? {})) {
+      const node = normalizeTrustNode(id, value);
+      if (node) allNodes.push(node);
+    }
+
+    const usersRaw = usersSnap.val() as Record<string, unknown> | null;
+    for (const [uid, value] of Object.entries(usersRaw ?? {})) {
+      const profile = normalizeUserProfile(uid, value);
+      if (profile) allUsers.set(uid, profile);
+    }
+
+    const accessRaw = accessSnap.val() as Record<string, unknown> | null;
+    for (const [uid, value] of Object.entries(accessRaw ?? {})) {
+      const record = normalizeUserAccess(uid, value);
+      if (record) allAccess.set(uid, record);
+    }
+  }
+
+  // Build parentUid -> children map
+  const childrenMap = new Map<string, TrustChainNode[]>();
+  const nodeByChild = new Map<string, TrustChainNode>();
+  for (const node of allNodes) {
+    nodeByChild.set(node.childUid, node);
+    const parentKey = node.parentUid || '__no_parent__';
+    const list = childrenMap.get(parentKey) || [];
+    list.push(node);
+    childrenMap.set(parentKey, list);
+  }
+
+  // Recursively build tree
+  const visited = new Set<string>();
+  let maxDepth = 0;
+
+  const buildNode = (uid: string, depth: number): FullTreeNode => {
+    visited.add(uid);
+    if (depth > maxDepth) maxDepth = depth;
+    const user = uid === ROOT_GUARANTOR_UID ? makeRootGuarantorUser() : (allUsers.get(uid) ?? makeDeletedUser(uid));
+    const node = nodeByChild.get(uid) ?? null;
+    const access = allAccess.get(uid) ?? null;
+    const childNodes = childrenMap.get(uid) ?? [];
+    const children: FullTreeNode[] = [];
+
+    if (depth < MAX_CHAIN_DEPTH) {
+      for (const childNode of childNodes) {
+        if (!visited.has(childNode.childUid)) {
+          children.push(buildNode(childNode.childUid, depth + 1));
+        }
+      }
+    }
+
+    children.sort((a, b) => (a.user.name || '').localeCompare(b.user.name || '', 'uk'));
+
+    return { uid, user, node, access, children, depth };
+  };
+
+  const root = buildNode(ROOT_GUARANTOR_UID, 0);
+
+  // Collect orphans: nodes whose childUid wasn't visited
+  const orphans: FullTreeNode[] = [];
+  for (const node of allNodes) {
+    if (!visited.has(node.childUid)) {
+      visited.add(node.childUid);
+      const user = allUsers.get(node.childUid) ?? makeDeletedUser(node.childUid);
+      const access = allAccess.get(node.childUid) ?? null;
+      orphans.push({ uid: node.childUid, user, node, access, children: [], depth: -1 });
+    }
+  }
+
+  // Stats
+  let active = 0;
+  let blocked = 0;
+  const countStats = (treeNode: FullTreeNode) => {
+    const status = treeNode.access?.status;
+    if (status === 'active' || status === 'approved' || status === 'whitelist_access' || status === 'temporary_access') active++;
+    else if (status === 'blocked' || status === 'denied') blocked++;
+    for (const child of treeNode.children) countStats(child);
+  };
+  countStats(root);
+
+  const countNodes = (treeNode: FullTreeNode): number => 1 + treeNode.children.reduce((sum, c) => sum + countNodes(c), 0);
+  const total = countNodes(root) - 1 + orphans.length; // exclude root itself
+
+  const stats: FullTreeStats = {
+    total,
+    active,
+    blocked,
+    orphaned: orphans.length,
+    maxDepth,
+  };
+
+  return { root, orphans, stats };
+};
+
+export const attachToParent = async (childUid: string, parentUid: string, adminUid: string): Promise<void> => {
+  logAudit('attach_to_parent', { adminUid, childUid, parentUid });
+  if (LOCAL_MODE) return;
+  const callable = httpsCallable(functions!, 'adminAttachToParent');
+  await callable({ childUid, parentUid, adminUid });
+};
+
+export const reparentNode = async (childUid: string, newParentUid: string, adminUid: string): Promise<void> => {
+  logAudit('reparent_node', { adminUid, childUid, newParentUid });
+  if (LOCAL_MODE) return;
+  const callable = httpsCallable(functions!, 'adminReparentNode');
+  await callable({ childUid, newParentUid, adminUid });
+};
+
+export const deleteNode = async (uid: string, strategy: 'promote' | 'orphan', adminUid: string): Promise<void> => {
+  logAudit('delete_node', { adminUid, uid, strategy });
+  if (LOCAL_MODE) return;
+  const callable = httpsCallable(functions!, 'adminDeleteNode');
+  await callable({ uid, strategy, adminUid });
 };

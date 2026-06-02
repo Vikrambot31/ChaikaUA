@@ -1,4 +1,4 @@
-import { get, limitToLast, off, onValue, orderByChild, query, ref } from 'firebase/database';
+import { get, limitToLast, off, onValue, query, ref } from 'firebase/database';
 import { database, firebaseConfig } from '../firebase/firebase';
 import { LOCAL_MODE, LOCAL_API } from '../local/LOCAL_MODE';
 import { probeRulesLevel } from './rulesProbeService';
@@ -437,6 +437,15 @@ export const subscribeDashboard = LOCAL_MODE
 
   const unsubscribers: Array<() => void> = [];
 
+  const isPermissionDenied = (error: Error): boolean =>
+    error.message.toLowerCase().includes('permission_denied') ||
+    error.message.toLowerCase().includes('permission denied');
+
+  const silentOnPermDenied = (fallback: () => void) => (error: Error) => {
+    if (isPermissionDenied(error)) { fallback(); return; }
+    onError?.(error);
+  };
+
   unsubscribers.push(onValue(ref(database, '.info/connected'), (snapshot) => {
     connected = snapshot.val() === true;
     emit();
@@ -448,17 +457,20 @@ export const subscribeDashboard = LOCAL_MODE
     usersTotal = raw && typeof raw === 'object' ? Object.keys(raw).length : 0;
     activeUsersToday = countActiveUsersToday(raw);
     emit();
-  }).catch((error: unknown) => onError?.(error instanceof Error ? error : new Error(String(error))));
+  }).catch((error: unknown) => {
+    if (error instanceof Error && isPermissionDenied(error)) { emit(); return; }
+    onError?.(error instanceof Error ? error : new Error(String(error)));
+  });
 
   unsubscribers.push(onValue(ref(database, SECURITY_AUTHORIZED_DEVICES_PATH), (snapshot) => {
     deviceStats = buildDeviceStats(snapshot.val());
     emit();
-  }, (error) => onError?.(error)));
+  }, silentOnPermDenied(emit)));
 
   unsubscribers.push(onValue(ref(database, SECURITY_APP_CONTROL_PATH), (snapshot) => {
     config = normalizeRemoteAppControlConfig(snapshot.val() ?? DEFAULT_REMOTE_APP_CONTROL_CONFIG);
     emit();
-  }, (error) => onError?.(error)));
+  }, silentOnPermDenied(emit)));
 
   // Реальна перевірка: анонімний HTTP-запит до RTDB REST API.
   // Не залежить від флагу в базі — перевіряє фактичний стан правил.
@@ -480,29 +492,30 @@ export const subscribeDashboard = LOCAL_MODE
   unsubscribers.push(onValue(ref(database, SECURITY_LOGS_PATH), (snapshot) => {
     activities = flattenLogs(snapshot.val());
     emit();
-  }, (error) => onError?.(error)));
+  }, silentOnPermDenied(emit)));
 
-  unsubscribers.push(onValue(query(ref(database, 'ops/errors'), orderByChild('timestamp'), limitToLast(300)), (snapshot) => {
+  // orderByChild('timestamp') removed — path may not have the index; client-side filtering is sufficient
+  unsubscribers.push(onValue(query(ref(database, 'ops/errors'), limitToLast(300)), (snapshot) => {
     permissionDenied24h = countPermissionDenied24h(snapshot.val());
     emit();
-  }, (error) => onError?.(error)));
+  }, silentOnPermDenied(emit)));
 
   unsubscribers.push(onValue(ref(database, 'ops/subscriptions/active_count'), (snapshot) => {
     activeSubscriptions = getNumber(snapshot.val());
     emit();
-  }, (error) => onError?.(error)));
+  }, silentOnPermDenied(emit)));
 
   unsubscribers.push(onValue(ref(database, 'stats/moderation_queue_counts'), (snapshot) => {
     const raw = snapshot.val();
     pendingPhotos = getQueueNumber(raw, ['pendingPhotos', 'photos', 'communityPhotos', 'pending_photos']);
     pendingInviteRequests = getQueueNumber(raw, ['pendingInviteRequests', 'inviteRequests', 'invite_requests', 'pending_invites']);
     emit();
-  }, (error) => onError?.(error)));
+  }, silentOnPermDenied(emit)));
 
   unsubscribers.push(onValue(ref(database, 'stats/moderation_avg_hours'), (snapshot) => {
     moderationAvgHours = getNumber(snapshot.val());
     emit();
-  }, (error) => onError?.(error)));
+  }, silentOnPermDenied(emit)));
 
   moderationDashboardPaths.forEach((path) => {
     const dataRef = ref(database, path);
@@ -510,7 +523,7 @@ export const subscribeDashboard = LOCAL_MODE
       moderationByPath.set(path, countModerationTree(snapshot.val()));
       recomputeModeration();
       emit();
-    }, (error) => onError?.(error));
+    }, silentOnPermDenied(() => { moderationByPath.set(path, { ...emptyCounter }); recomputeModeration(); emit(); }));
     unsubscribers.push(() => {
       off(dataRef);
       unsubscribe();
