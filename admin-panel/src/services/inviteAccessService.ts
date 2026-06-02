@@ -191,14 +191,27 @@ export const loadInviteAccessState = async (): Promise<InviteAccessState> => {
       hasMore: false,
     };
   }
-  const [flagSnapshot, sponsorsSnapshot, requestsSnapshot] = await Promise.all([
+  const [flagResult, sponsorsResult, requestsResult] = await Promise.allSettled([
     get(ref(database, FEATURE_FLAG_PATH)),
     get(ref(database, TRUSTED_SPONSORS_PATH)),
     get(query(ref(database, INVITE_REQUESTS_PATH), orderByChild('createdAt'), limitToLast(PAGE_SIZE))),
   ]);
 
-  const rawSponsors = sponsorsSnapshot.val() as Record<string, unknown> | null;
-  const rawRequests = requestsSnapshot.val() as Record<string, unknown> | null;
+  const denied = [flagResult, sponsorsResult, requestsResult].filter(
+    (r): r is PromiseRejectedResult => r.status === 'rejected',
+  );
+  if (denied.length === 3) {
+    // All paths denied — surface the first error so the UI can show it
+    throw denied[0].reason instanceof Error ? denied[0].reason : new Error(String(denied[0].reason));
+  }
+
+  const rawSponsors = sponsorsResult.status === 'fulfilled'
+    ? (sponsorsResult.value.val() as Record<string, unknown> | null)
+    : null;
+  const rawRequests = requestsResult.status === 'fulfilled'
+    ? (requestsResult.value.val() as Record<string, unknown> | null)
+    : null;
+  const rawFlag = flagResult.status === 'fulfilled' ? flagResult.value.val() : null;
 
   const sponsors = Object.entries(rawSponsors ?? {})
     .map(([id, value]) => normalizeSponsor(id, value))
@@ -211,7 +224,7 @@ export const loadInviteAccessState = async (): Promise<InviteAccessState> => {
     .sort((left, right) => right.createdAt - left.createdAt);
 
   return {
-    flag: normalizeFlag(flagSnapshot.val()),
+    flag: normalizeFlag(rawFlag),
     sponsors,
     requests,
     hasMore: requests.length >= PAGE_SIZE,

@@ -473,8 +473,23 @@ export const subscribeDashboard = LOCAL_MODE
   }, silentOnPermDenied(emit)));
 
   // Реальна перевірка: анонімний HTTP-запит до RTDB REST API.
-  // Не залежить від флагу в базі — перевіряє фактичний стан правил.
+  // Результат кешується в sessionStorage — повторні запити не робляться.
+  const SESSION_KEY = 'rulesProbeResult';
   const runRulesProbe = () => {
+    const cached = sessionStorage.getItem(SESSION_KEY);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached) as { level: string; openPaths: string[]; checkedAt: number };
+        rulesEnforcementLevel = parsed.level === 'OPEN' ? 'OPEN'
+          : parsed.level === 'PARTIAL' ? 'PARTIAL'
+          : parsed.level === 'SECURE' ? 'SECURE'
+          : 'UNKNOWN';
+        rulesOpenPaths = parsed.openPaths ?? [];
+        rulesCheckedAt = parsed.checkedAt ?? 0;
+        emit();
+        return;
+      } catch { /* ignore parse error, re-probe */ }
+    }
     void probeRulesLevel(firebaseConfig.databaseURL ?? '').then((result) => {
       rulesEnforcementLevel = result.level === 'OPEN' ? 'OPEN'
         : result.level === 'PARTIAL' ? 'PARTIAL'
@@ -482,11 +497,16 @@ export const subscribeDashboard = LOCAL_MODE
         : 'UNKNOWN';
       rulesOpenPaths = result.openPaths;
       rulesCheckedAt = result.checkedAt;
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify({ level: rulesEnforcementLevel, openPaths: rulesOpenPaths, checkedAt: rulesCheckedAt }));
       emit();
     });
   };
   runRulesProbe();
-  const rulesProbeInterval = setInterval(runRulesProbe, 5 * 60 * 1000);
+  // Перевіряємо раз на 30 хвилин — тільки якщо кеш застарів
+  const rulesProbeInterval = setInterval(() => {
+    sessionStorage.removeItem(SESSION_KEY);
+    runRulesProbe();
+  }, 30 * 60 * 1000);
   unsubscribers.push(() => clearInterval(rulesProbeInterval));
 
   unsubscribers.push(onValue(ref(database, SECURITY_LOGS_PATH), (snapshot) => {
