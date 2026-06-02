@@ -681,7 +681,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   categoryTile: {
-    width: '47%' as unknown as number,
+    width: '47%',
     flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -696,8 +696,6 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     shadowOffset: { width: 1, height: 4 },
     elevation: 5,
-    position: 'relative' as const,
-    overflow: 'hidden' as const,
   },
   categoryTileActive: {
     borderColor: '#FFFFFF',
