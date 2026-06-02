@@ -412,8 +412,16 @@
       }
     },
 
+    "user_support_ticket_ref": {
+      "$userId": {
+        ".read": "auth != null && auth.uid === $userId",
+        ".write": "auth != null && auth.uid === $userId",
+        ".validate": "newData.isString() && newData.val().length > 0"
+      }
+    },
+
     "support_tickets": {
-      ".read": "auth != null && (root.child('user_roles').child(auth.uid).child('role').val() === 'admin')",
+      ".read": "auth != null && root.child('user_roles').child(auth.uid).child('role').val() === 'admin'",
       ".indexOn": ["userId", "status", "updatedAt"],
       "$ticketId": {
         ".read": "auth != null && (data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin')",

@@ -9,6 +9,7 @@ import {
   equalTo,
   limitToLast,
   onValue,
+  remove,
   DataSnapshot,
   Unsubscribe,
 } from 'firebase/database';
@@ -19,6 +20,9 @@ import { MAX_MESSAGE_LENGTH, MOBILE_MESSAGES_LIMIT } from '../constants/supportC
 
 const TICKETS_PATH = 'support_tickets';
 const MESSAGES_PATH = 'support_messages';
+// Per-user index: /user_support_ticket_ref/{userId} = ticketId | null
+// User has direct read/write on own path — no collection-level query needed
+const USER_TICKET_REF_PATH = 'user_support_ticket_ref';
 
 // ── Helpers ──
 
@@ -39,22 +43,15 @@ const snapshotToMessages = (snap: DataSnapshot): SupportMessage[] => {
 // ── Read ──
 
 export const getUserOpenTicket = async (userId: string): Promise<SupportTicket | null> => {
-  const q = query(
-    ref(database, TICKETS_PATH),
-    orderByChild('userId'),
-    equalTo(userId),
-  );
-  const snap = await get(q);
-  if (!snap.exists()) return null;
+  // Read from index to avoid collection-level query
+  const idxSnap = await get(ref(database, `${USER_TICKET_REF_PATH}/${userId}`));
+  const ticketId = idxSnap.val() as string | null;
+  if (!ticketId) return null;
 
-  let openTicket: SupportTicket | null = null;
-  snap.forEach((child) => {
-    const ticket = snapshotToTicket(child);
-    if (ticket && ticket.status === 'open') {
-      openTicket = ticket;
-    }
-  });
-  return openTicket;
+  const ticketSnap = await get(ref(database, `${TICKETS_PATH}/${ticketId}`));
+  const ticket = snapshotToTicket(ticketSnap);
+  if (!ticket || ticket.status !== 'open') return null;
+  return ticket;
 };
 
 export const getTicketMessages = async (ticketId: string): Promise<SupportMessage[]> => {
@@ -81,29 +78,60 @@ export const subscribeToTicketMessages = (
   });
 };
 
+/**
+ * Subscribe to user's active ticket via per-user index.
+ * /user_support_ticket_ref/{userId} → ticketId
+ * Then reads /support_tickets/{ticketId} directly.
+ * No collection-level query → no permission_denied.
+ */
 export const subscribeToUserTicket = (
   userId: string,
   callback: (ticket: SupportTicket | null) => void,
 ): Unsubscribe => {
-  const q = query(
-    ref(database, TICKETS_PATH),
-    orderByChild('userId'),
-    equalTo(userId),
-  );
-  return onValue(q, (snap) => {
-    if (!snap.exists()) {
-      callback(null);
-      return;
-    }
-    let latest: SupportTicket | null = null;
-    snap.forEach((child) => {
-      const ticket = snapshotToTicket(child);
-      if (ticket && ticket.status === 'open') {
-        latest = ticket;
+  const indexRef = ref(database, `${USER_TICKET_REF_PATH}/${userId}`);
+
+  // Inner unsub for ticket subscription
+  let ticketUnsub: Unsubscribe | null = null;
+
+  const indexUnsub = onValue(
+    indexRef,
+    (idxSnap) => {
+      // Clean up previous ticket subscription
+      if (ticketUnsub) {
+        ticketUnsub();
+        ticketUnsub = null;
       }
-    });
-    callback(latest);
-  });
+
+      const ticketId = idxSnap.val() as string | null;
+      if (!ticketId) {
+        callback(null);
+        return;
+      }
+
+      // Subscribe directly to the ticket by ID
+      ticketUnsub = onValue(
+        ref(database, `${TICKETS_PATH}/${ticketId}`),
+        (ticketSnap) => {
+          const ticket = snapshotToTicket(ticketSnap);
+          // If ticket is closed, treat as no active ticket
+          callback(ticket && ticket.status === 'open' ? ticket : null);
+        },
+        () => {
+          // Read error on ticket node — surface as no ticket
+          callback(null);
+        },
+      );
+    },
+    () => {
+      // Read error on index — surface as no ticket, not infinite loading
+      callback(null);
+    },
+  );
+
+  return () => {
+    indexUnsub();
+    if (ticketUnsub) ticketUnsub();
+  };
 };
 
 // ── Create ──
@@ -120,7 +148,7 @@ export const createTicket = async (
     throw new Error(`Message exceeds ${MAX_MESSAGE_LENGTH} characters`);
   }
 
-  // Close any existing open ticket
+  // Close any existing open ticket via index
   const existing = await getUserOpenTicket(userId);
   if (existing) {
     await update(ref(database, `${TICKETS_PATH}/${existing.ticketId}`), {
@@ -148,6 +176,9 @@ export const createTicket = async (
     lastReadByAdmin: 0,
   };
   await set(ticketRef, ticket);
+
+  // Write to per-user index
+  await set(ref(database, `${USER_TICKET_REF_PATH}/${userId}`), ticketId);
 
   // Create first message
   const msgRef = push(ref(database, `${MESSAGES_PATH}/${ticketId}`));

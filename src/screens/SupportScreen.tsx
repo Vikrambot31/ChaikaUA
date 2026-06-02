@@ -132,12 +132,18 @@ const SupportScreen: React.FC<Props> = ({ navigation }) => {
       setLoading(false);
       return;
     }
+    let settled = false;
     const unsub = subscribeToUserTicket(user.id, (t) => {
+      settled = true;
       setTicket(t);
       if (t) setSelectedCategory(t.category);
       setLoading(false);
     });
-    return unsub;
+    // Safety timeout: if callback never fires (permission error), stop spinner
+    const timeout = setTimeout(() => {
+      if (!settled) setLoading(false);
+    }, 8000);
+    return () => { unsub(); clearTimeout(timeout); };
   }, [user?.id]);
 
   // Subscribe to messages
