@@ -375,6 +375,10 @@ const ProfileScreen: React.FC = () => {
     navigation.navigate('EditProfileScreen');
   }, [navigation]);
 
+  const handleSupportPress = useCallback(() => {
+    navigation.navigate('SupportScreen');
+  }, [navigation]);
+
   const openServiceModerationPin = useCallback(() => {
     if (!hasPrimaryModerationAccess) {
       return;
@@ -769,6 +773,14 @@ const ProfileScreen: React.FC = () => {
           </View>
 
         </TactileCard>
+
+        <TactileButton
+          title={language === 'ua' ? 'Служба підтримки' : language === 'ru' ? 'Служба поддержки' : 'Support service'}
+          onPress={handleSupportPress}
+          variant="secondary"
+          style={styles.supportButton}
+          icon={<MaterialCommunityIcons name="headset" size={22} color="#4E5F43" />}
+        />
 
         <TactileButton
           title={isLoggedIn ? text.exit : text.login}
@@ -1214,6 +1226,7 @@ const styles = StyleSheet.create({
   pinConfirmButton: { backgroundColor: '#6C47A6' },
   pinCancelText: { fontSize: 14, fontWeight: '900', color: SCREEN_THEME.textSecondary },
   pinConfirmText: { fontSize: 14, fontWeight: '900', color: '#FFFFFF' },
+  supportButton: { marginBottom: 12 },
 
   langPicker: {
     flexDirection: 'row',
