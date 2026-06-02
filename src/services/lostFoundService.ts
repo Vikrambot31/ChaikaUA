@@ -243,6 +243,13 @@ export const lostFoundService = {
           category: 'lost_found',
           group: 'lost_found',
           subcategory: existing.type,
+          photoUri: existing.photoUri,
+          photoStoragePath: existing.photoStoragePath,
+          sourceItemId: id,
+          sourceType: existing.type,
+          sourceCategory: existing.category,
+          sourceTitle: existing.category,
+          sourceDescription: existing.description,
           text: `[${existing.type === 'lost' ? 'Потеряно' : 'Найдено'}] ${existing.category}: ${existing.name}`,
         });
       }

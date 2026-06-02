@@ -368,6 +368,42 @@ const splitChatTopic = (item: ChatRequest, language: keyof typeof TOPIC_LABELS) 
   };
 };
 
+const isProblemChatRequest = (item: ChatRequest) =>
+  item.category === 'problem' || item.group === 'problems';
+
+const isLostFoundChatRequest = (item: ChatRequest) =>
+  item.category === 'lost_found' || item.group === 'lost_found';
+
+const getProblemTitle = (item: ChatRequest, fallback: string) =>
+  String(item.sourceTitle || item.description || item.text || fallback).trim();
+
+const getProblemAddressParts = (item: ChatRequest) => {
+  const building = String(item.building || '').trim();
+  const [street, ...rest] = building.split(',').map((part) => part.trim()).filter(Boolean);
+  return {
+    street: street || building,
+    house: rest.join(', '),
+  };
+};
+
+const getLostFoundType = (item: ChatRequest): 'lost' | 'found' =>
+  item.sourceType === 'found' || item.subcategory === 'found' ? 'found' : 'lost';
+
+const getLostFoundTypeLabel = (type: 'lost' | 'found', language: keyof typeof TOPIC_LABELS) => {
+  if (language === 'en') return type === 'lost' ? 'Lost' : 'Found';
+  if (language === 'ru') return type === 'lost' ? 'Потеряно' : 'Найдено';
+  return type === 'lost' ? 'Загублено' : 'Знайдено';
+};
+
+const getLostFoundItemLabel = (item: ChatRequest, language: keyof typeof TOPIC_LABELS) =>
+  String(item.sourceCategory || item.sourceTitle || formatTopicLabel(item.subcategory || 'lost_found', language)).trim();
+
+const getLostFoundDescription = (item: ChatRequest) => {
+  const direct = String(item.sourceDescription || '').trim();
+  if (direct) return direct;
+  return stripChatDescriptionPrefix(String(item.description || item.text || '').trim());
+};
+
 const OnlineChatScreen = () => {
   const navigation = useNavigation<ChatNavigation>();
   const navLock = useRef(false);
@@ -755,6 +791,179 @@ const OnlineChatScreen = () => {
               ? ((item.userId && avatarByUserId[item.userId]) || pickUserAvatarUri(item))
               : '';
             const canContact = !own && Boolean(item.userId);
+
+            if (isProblemChatRequest(item)) {
+              const title = getProblemTitle(item, description || topic);
+              const address = getProblemAddressParts(item);
+
+              return (
+                <View style={[styles.problemChatCard, !hasPhoto && styles.problemChatCardNoPhoto]}>
+                  <TouchableOpacity
+                    style={[styles.problemChatTopRow, !hasPhoto && styles.problemChatTopRowNoPhoto]}
+                    onPress={() => { if (navLock.current) return; navLock.current = true; navigation.navigate('RequestDetail', { request: item }); setTimeout(() => { navLock.current = false; }, 800); }}
+                    activeOpacity={0.86}
+                  >
+                    {hasPhoto ? (
+                      <View style={styles.problemChatVisualWrap}>
+                        <AppPhotoImage
+                          uri={item.photoUri}
+                          storagePath={item.photoStoragePath}
+                          style={styles.problemChatPhoto}
+                          resizeMode="cover"
+                          debugLabel={`OnlineChatProblem:${item.id}`}
+                          showDebugInfo={false}
+                        />
+                      </View>
+                    ) : null}
+
+                    <View style={[styles.problemChatCopy, !hasPhoto && styles.problemChatCopyNoPhoto]}>
+                      <View style={styles.problemChatTitleBox}>
+                        <Text style={styles.problemChatTitle} numberOfLines={2}>{title}</Text>
+                      </View>
+                      <View style={styles.problemChatAddressRow}>
+                        {!!address.street && <Text style={styles.problemChatAddressStreet} numberOfLines={1}>{address.street}</Text>}
+                        {!!address.house && <Text style={styles.problemChatAddressHouse} numberOfLines={1}>{address.house}</Text>}
+                      </View>
+                      <View style={styles.problemChatMetaRow}>
+                        <Text style={styles.problemChatMetaText} numberOfLines={1}>{topic} - {timeAgo}</Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+
+                  <View style={styles.problemChatActionsRow}>
+                    <View style={styles.problemChatActionsInner}>
+                      <MiniUserAvatar uri={avatarUri} name={item.name || ''} size={42} borderRadius={14} backgroundColor="#6A8BA5" />
+                      <TouchableOpacity
+                        style={[styles.problemChatActionPill, styles.problemChatProfilePill, !item.userId && styles.problemChatActionPillDisabled]}
+                        onPress={(event) => { event.stopPropagation(); if (!item.userId || navLock.current) return; navLock.current = true; navigation.navigate('ViewUserProfile', { userId: item.userId }); setTimeout(() => { navLock.current = false; }, 800); }}
+                        disabled={!item.userId}
+                        activeOpacity={item.userId ? 0.78 : 1}
+                      >
+                        <MaterialCommunityIcons name="badge-account-horizontal-outline" size={15} color="#7A1E5C" />
+                        <Text style={styles.problemChatActionText} numberOfLines={1}>{language === 'en' ? 'Profile' : language === 'ru' ? 'Профиль' : 'Профіль'}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.problemChatActionPill, styles.problemChatContactPill, (!item.userId && !item.phone) && styles.problemChatActionPillDisabled]}
+                        onPress={(event) => {
+                          event.stopPropagation();
+                          if (item.userId && !own) {
+                            openContactModal({ userId: item.userId, name: item.name ?? 'Unknown', sourceType: 'help', sourceId: item.id, sourceTitle: title });
+                            return;
+                          }
+                          if (item.phone) void safeCallPhone(item.phone, language);
+                        }}
+                        disabled={!item.userId && !item.phone}
+                        activeOpacity={item.userId || item.phone ? 0.78 : 1}
+                      >
+                        <MaterialCommunityIcons name="message-text-outline" size={15} color="#FFFFFF" />
+                        <Text style={[styles.problemChatActionText, styles.problemChatContactText]} numberOfLines={1}>{language === 'en' ? 'Contact' : language === 'ru' ? 'Связаться' : "Зв'язатися"}</Text>
+                      </TouchableOpacity>
+                      <FeedLikeButton
+                        currentUserId={currentUser?.id}
+                        likePath="feed_likes/requests"
+                        likeId={item.id}
+                        style={styles.problemChatLikeBtn}
+                      />
+                    </View>
+                  </View>
+                </View>
+              );
+            }
+
+            if (isLostFoundChatRequest(item)) {
+              const lostFoundType = getLostFoundType(item);
+              const itemLabel = getLostFoundItemLabel(item, language);
+              const itemDescription = getLostFoundDescription(item);
+
+              const cardContent = (
+                <View style={styles.lostFoundChatCopy}>
+                  <View style={styles.lostFoundChatTopRow}>
+                    <Text
+                      style={[styles.lostFoundTypeBadge, lostFoundType === 'lost' ? styles.lostFoundLostBadge : styles.lostFoundFoundBadge]}
+                      numberOfLines={1}
+                    >
+                      {getLostFoundTypeLabel(lostFoundType, language)}
+                    </Text>
+                    <View style={styles.lostFoundDateRow}>
+                      <Text style={styles.lostFoundDateText}>{timeAgo}</Text>
+                      <MaterialCommunityIcons name="check-circle" size={15} color={SCREEN_THEME.woodGreenDark} />
+                    </View>
+                  </View>
+
+                  <View style={styles.lostFoundTitleBox}>
+                    <Text style={styles.lostFoundTitle} numberOfLines={2}>{itemLabel}</Text>
+                    {!!itemDescription && (
+                      <Text style={styles.lostFoundDescription} numberOfLines={2}>{itemDescription}</Text>
+                    )}
+                  </View>
+
+                  <View style={styles.lostFoundBottomRow}>
+                    <View style={styles.lostFoundPersonRow}>
+                      <MiniUserAvatar uri={avatarUri} name={item.name || ''} size={28} borderRadius={10} backgroundColor="#6A8BA5" />
+                      <Text style={styles.lostFoundMeta} numberOfLines={1}>{item.name || 'Chaika'}</Text>
+                    </View>
+                    <FeedLikeButton
+                      currentUserId={currentUser?.id}
+                      likePath="feed_likes/lost_found"
+                      likeId={item.sourceItemId || item.id}
+                      style={styles.lostFoundLikeAction}
+                    />
+                    {item.phone ? (
+                      <TouchableOpacity style={styles.lostFoundIconAction} onPress={(event) => { event.stopPropagation(); void safeCallPhone(item.phone as string, language); }} activeOpacity={0.75}>
+                        <TactileIcon icon="phone-outline" size={34} iconSize={14} backgroundColor="#403933" />
+                      </TouchableOpacity>
+                    ) : null}
+                    {!own && item.userId ? (
+                      <TouchableOpacity
+                        style={styles.lostFoundIconAction}
+                        onPress={(event) => {
+                          event.stopPropagation();
+                          openContactModal({ userId: item.userId as string, name: item.name || 'Chaika', sourceType: 'help', sourceId: item.sourceItemId || item.id, sourceTitle: itemLabel });
+                        }}
+                        activeOpacity={0.75}
+                      >
+                        <TactileIcon icon="account-arrow-right-outline" size={34} iconSize={14} backgroundColor="#7A1E5C" />
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                </View>
+              );
+
+              if (hasPhoto) {
+                return (
+                  <TouchableOpacity
+                    style={styles.lostFoundChatCard}
+                    onPress={() => { if (navLock.current) return; navLock.current = true; navigation.navigate('RequestDetail', { request: item }); setTimeout(() => { navLock.current = false; }, 800); }}
+                    activeOpacity={0.86}
+                  >
+                    <View style={styles.lostFoundVisualWrap}>
+                      <AppPhotoImage
+                        uri={item.photoUri}
+                        storagePath={item.photoStoragePath}
+                        style={styles.lostFoundPhoto}
+                        resizeMode="contain"
+                        debugLabel={`OnlineChatLostFound:${item.id}`}
+                        showDebugInfo={false}
+                      />
+                      <View style={[styles.lostFoundTypeDot, lostFoundType === 'lost' ? styles.lostFoundLostDot : styles.lostFoundFoundDot]}>
+                        <MaterialCommunityIcons name={lostFoundType === 'lost' ? 'alert-circle-outline' : 'check-circle-outline'} size={13} color="#fff" />
+                      </View>
+                    </View>
+                    {cardContent}
+                  </TouchableOpacity>
+                );
+              }
+
+              return (
+                <TouchableOpacity
+                  style={[styles.lostFoundChatCard, styles.lostFoundChatCardNoPhoto]}
+                  onPress={() => { if (navLock.current) return; navLock.current = true; navigation.navigate('RequestDetail', { request: item }); setTimeout(() => { navLock.current = false; }, 800); }}
+                  activeOpacity={0.86}
+                >
+                  {cardContent}
+                </TouchableOpacity>
+              );
+            }
 
             return (
               <TouchableOpacity
@@ -1161,6 +1370,232 @@ const styles = StyleSheet.create({
   },
 
   // ── Chat card (ProfileRequests-style) ──────────────────────────────────────
+  problemChatCard: {
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderRadius: 22,
+    padding: 10,
+    marginBottom: 10,
+    flexDirection: 'column',
+    borderWidth: 1,
+    borderColor: '#E4D0AB',
+  },
+  problemChatCardNoPhoto: { padding: 12 },
+  problemChatTopRow: { flexDirection: 'row', gap: 8 },
+  problemChatTopRowNoPhoto: { flexDirection: 'column' },
+  problemChatVisualWrap: {
+    position: 'relative',
+    width: '40%',
+    minWidth: 118,
+    maxWidth: 132,
+    flexShrink: 0,
+  },
+  problemChatPhoto: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: 20,
+    backgroundColor: '#F0E8D8',
+  },
+  problemChatCopy: { flex: 1, minWidth: 0 },
+  problemChatCopyNoPhoto: { width: '100%' },
+  problemChatTitleBox: {
+    borderRadius: 16,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    backgroundColor: '#7A1E5C',
+    minHeight: 52,
+    justifyContent: 'center',
+  },
+  problemChatTitle: { fontSize: 20, lineHeight: 24, fontWeight: '900', color: '#fff' },
+  problemChatAddressRow: {
+    marginTop: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    minHeight: 22,
+  },
+  problemChatAddressStreet: {
+    color: '#4E4237',
+    fontSize: 12,
+    fontWeight: '800',
+    flex: 1,
+    minWidth: 0,
+  },
+  problemChatAddressHouse: {
+    color: '#4E4237',
+    fontSize: 12,
+    fontWeight: '800',
+    flexShrink: 0,
+    maxWidth: 58,
+  },
+  problemChatMetaRow: { marginTop: 3, flexDirection: 'row', alignItems: 'center' },
+  problemChatMetaText: { color: '#77695A', fontSize: 12, fontWeight: '800' },
+  problemChatActionsRow: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#E4D0AB',
+  },
+  problemChatActionsInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    justifyContent: 'space-between',
+  },
+  problemChatActionPill: {
+    height: 36,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingHorizontal: 9,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#D4B9A8',
+    backgroundColor: '#FFF8EA',
+    flexShrink: 1,
+  },
+  problemChatProfilePill: { flex: 1.2, minWidth: 0 },
+  problemChatContactPill: {
+    flex: 0.9,
+    minWidth: 0,
+    backgroundColor: '#8F1238',
+    borderColor: '#8F1238',
+  },
+  problemChatActionPillDisabled: { opacity: 0.45 },
+  problemChatActionText: {
+    color: '#7A1E5C',
+    fontSize: 11,
+    fontWeight: '900',
+    flexShrink: 1,
+  },
+  problemChatContactText: { color: '#FFFFFF' },
+  problemChatLikeBtn: { minWidth: 54, minHeight: 36, flexShrink: 0 },
+  lostFoundChatCard: {
+    flexDirection: 'row',
+    borderRadius: 20,
+    padding: 8,
+    marginBottom: 10,
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderWidth: 1,
+    borderColor: '#E4D0AB',
+    gap: 8,
+  },
+  lostFoundChatCardNoPhoto: { flexDirection: 'column' },
+  lostFoundVisualWrap: {
+    position: 'relative',
+    width: '38%',
+    minWidth: 118,
+    maxWidth: 132,
+    flexShrink: 0,
+  },
+  lostFoundPhoto: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: 20,
+    backgroundColor: '#F0E8D8',
+  },
+  lostFoundTypeDot: {
+    position: 'absolute',
+    left: 8,
+    top: 8,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: SCREEN_THEME.paperStrong,
+  },
+  lostFoundFoundDot: { backgroundColor: SCREEN_THEME.woodGreenDark },
+  lostFoundLostDot: { backgroundColor: SCREEN_THEME.terracottaDark },
+  lostFoundChatCopy: { flex: 1, justifyContent: 'space-between', minWidth: 0 },
+  lostFoundChatTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 6,
+    marginBottom: 5,
+  },
+  lostFoundTypeBadge: {
+    maxWidth: '66%',
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    fontSize: 11,
+    lineHeight: 13,
+    fontWeight: '900',
+    overflow: 'hidden',
+  },
+  lostFoundFoundBadge: {
+    color: SCREEN_THEME.woodGreenDark,
+    backgroundColor: 'rgba(155, 183, 123, 0.20)',
+  },
+  lostFoundLostBadge: {
+    color: SCREEN_THEME.terracottaDark,
+    backgroundColor: 'rgba(199, 122, 93, 0.16)',
+  },
+  lostFoundDateRow: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 0 },
+  lostFoundDateText: {
+    color: SCREEN_THEME.textSecondary,
+    fontSize: 12,
+    lineHeight: 15,
+    fontWeight: '800',
+  },
+  lostFoundTitleBox: {
+    borderWidth: 1.5,
+    borderColor: '#1E1A17',
+    borderRadius: 16,
+    backgroundColor: '#FFF8EA',
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    minHeight: 52,
+    justifyContent: 'center',
+  },
+  lostFoundTitle: {
+    fontSize: 20,
+    lineHeight: 24,
+    fontWeight: '900',
+    color: SCREEN_THEME.textPrimary,
+  },
+  lostFoundDescription: {
+    fontSize: 12,
+    lineHeight: 16,
+    color: '#fff',
+    fontWeight: '800',
+    marginTop: 4,
+    backgroundColor: '#7A1E5C',
+    borderRadius: 10,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    overflow: 'hidden',
+  },
+  lostFoundBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 6,
+    gap: 5,
+  },
+  lostFoundPersonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    flex: 1,
+    minWidth: 42,
+  },
+  lostFoundMeta: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 16,
+    color: SCREEN_THEME.textPrimary,
+    fontWeight: '800',
+  },
+  lostFoundLikeAction: { minWidth: 44, minHeight: 34, paddingHorizontal: 8 },
+  lostFoundIconAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   chatCard: {
     backgroundColor: SCREEN_THEME.paperStrong,
     borderRadius: 18,

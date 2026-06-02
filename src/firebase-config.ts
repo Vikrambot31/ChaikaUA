@@ -131,6 +131,11 @@ interface DbRequestValue {
   photoStoragePath?: unknown;
   userPhotoURL?: unknown;
   startAvatarKey?: unknown;
+  sourceItemId?: unknown;
+  sourceType?: unknown;
+  sourceCategory?: unknown;
+  sourceTitle?: unknown;
+  sourceDescription?: unknown;
   expires_at?: unknown;
   moderatedAt?: unknown;
   moderatedBy?: unknown;
@@ -495,6 +500,11 @@ const mapDbRequestToAppRequest = (id: string, value: unknown): AppRequest => {
     photoStoragePath: typeof v?.photoStoragePath === 'string' ? v.photoStoragePath : undefined,
     userPhotoURL: typeof v?.userPhotoURL === 'string' ? v.userPhotoURL : undefined,
     startAvatarKey: typeof v?.startAvatarKey === 'string' ? v.startAvatarKey : undefined,
+    sourceItemId: typeof v?.sourceItemId === 'string' ? v.sourceItemId : undefined,
+    sourceType: typeof v?.sourceType === 'string' ? v.sourceType : undefined,
+    sourceCategory: typeof v?.sourceCategory === 'string' ? v.sourceCategory : undefined,
+    sourceTitle: typeof v?.sourceTitle === 'string' ? v.sourceTitle : undefined,
+    sourceDescription: typeof v?.sourceDescription === 'string' ? v.sourceDescription : undefined,
   };
 };
 

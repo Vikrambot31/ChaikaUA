@@ -10,6 +10,13 @@ type ActivityPayload = {
   subcategory?: string;
   text: string;
   building?: string;
+  photoUri?: string;
+  photoStoragePath?: string;
+  sourceItemId?: string;
+  sourceType?: string;
+  sourceCategory?: string;
+  sourceTitle?: string;
+  sourceDescription?: string;
 };
 
 const trimText = (value: string, maxLength: number) => String(value || '').trim().slice(0, maxLength);
@@ -27,6 +34,9 @@ export const publishApprovedActivity = async (payload: ActivityPayload): Promise
   }
 
   try {
+    const photoStoragePath = trimText(payload.photoStoragePath || payload.photoUri || '', 500);
+    const photoUri = payload.photoStoragePath ? '' : trimText(payload.photoUri || '', 500);
+
     await push(ref(database, 'requests'), {
     userId: payload.userId,
     name,
@@ -37,6 +47,12 @@ export const publishApprovedActivity = async (payload: ActivityPayload): Promise
     building: trimText(payload.building || 'Чайка', 100),
     text,
     description: text,
+    ...(photoStoragePath || photoUri ? { photoStoragePath, photoUri } : {}),
+    ...(payload.sourceItemId ? { sourceItemId: trimText(payload.sourceItemId, 120) } : {}),
+    ...(payload.sourceType ? { sourceType: trimText(payload.sourceType, 80) } : {}),
+    ...(payload.sourceCategory ? { sourceCategory: trimText(payload.sourceCategory, 120) } : {}),
+    ...(payload.sourceTitle ? { sourceTitle: trimText(payload.sourceTitle, 160) } : {}),
+    ...(payload.sourceDescription ? { sourceDescription: trimText(payload.sourceDescription, 280) } : {}),
     status: 'approved',
     isApproved: true,
     isCensored: false,

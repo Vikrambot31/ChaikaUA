@@ -186,6 +186,11 @@ export interface Request {
   photoStoragePath?: string;
   userPhotoURL?: string;
   startAvatarKey?: string;
+  sourceItemId?: string;
+  sourceType?: string;
+  sourceCategory?: string;
+  sourceTitle?: string;
+  sourceDescription?: string;
 }
 
 export interface HelpRequest {
