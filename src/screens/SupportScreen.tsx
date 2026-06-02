@@ -16,7 +16,6 @@ import { selectUser } from '../redux/selectors';
 import { selectIsOnline } from '../redux/slices/networkSlice';
 import { useTranslation } from '../i18n/useTranslation';
 import { SCREEN_THEME } from '../utils/screenTheme';
-import { checkYellowList } from '../utils/yellowListCheck';
 import { SUPPORT_CATEGORIES, MAX_MESSAGE_LENGTH } from '../constants/supportCategories';
 import {
   subscribeToUserTicket,
@@ -124,17 +123,8 @@ const SupportScreen: React.FC<Props> = ({ navigation }) => {
   const [selectedCategory, setSelectedCategory] = useState<SupportCategory | null>(null);
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [isYellowListed, setIsYellowListed] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const flatListRef = useRef<FlatList>(null);
-
-  // Check yellow list
-  useEffect(() => {
-    if (!user?.id) return;
-    checkYellowList(user.id).then((blocked) => {
-      setIsYellowListed(blocked);
-    });
-  }, [user?.id]);
 
   // Subscribe to user's ticket
   useEffect(() => {
@@ -173,7 +163,6 @@ const SupportScreen: React.FC<Props> = ({ navigation }) => {
   const canSend =
     !sending &&
     !isClosed &&
-    !isYellowListed &&
     isOnline &&
     messageText.trim().length > 0 &&
     messageText.length <= MAX_MESSAGE_LENGTH &&
@@ -309,14 +298,6 @@ const SupportScreen: React.FC<Props> = ({ navigation }) => {
         }
       />
 
-      {/* Yellow list warning */}
-      {isYellowListed && (
-        <View style={styles.warningBanner}>
-          <MaterialCommunityIcons name="alert-circle-outline" size={18} color="#B8860B" />
-          <Text style={styles.warningText}>{text.yellowBlocked}</Text>
-        </View>
-      )}
-
       {/* Closed ticket banner */}
       {isClosed && (
         <View style={styles.closedBanner}>
@@ -336,7 +317,7 @@ const SupportScreen: React.FC<Props> = ({ navigation }) => {
       )}
 
       {/* Input area */}
-      {!isClosed && !isYellowListed && (
+      {!isClosed && (
         <View style={styles.inputArea}>
           <View style={styles.inputRow}>
             <TextInput
