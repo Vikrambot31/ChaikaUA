@@ -13,23 +13,27 @@ const COPY = {
     defaultMessage: 'Ми проводимо технічне обслуговування.',
     updateHint: 'Оновіть застосунок на сайті:',
     retry: 'Повторити',
+    support: 'Написати в підтримку',
   },
   ru: {
     title: 'Сервис временно недоступен',
     defaultMessage: 'Выполняются технические работы.',
     updateHint: 'Обновите приложение на сайте:',
     retry: 'Повторить',
+    support: 'Написать в поддержку',
   },
   en: {
     title: 'Service temporarily unavailable',
     defaultMessage: 'We are performing maintenance.',
     updateHint: 'Update the app at:',
     retry: 'Retry',
+    support: 'Contact support',
   },
 } as const;
 
 const CHAIKA_URL = 'https://chaika-life.netlify.app/';
 const CHAIKA_URL_DISPLAY = 'chaika-life.netlify.app';
+const SUPPORT_EMAIL_URL = 'mailto:support_chaika_ua@ukr.net';
 
 type MaintenanceScreenProps = {
   message?: string;
@@ -64,6 +68,14 @@ const MaintenanceScreen: React.FC<MaintenanceScreenProps> = ({ message, onRetry 
           activeOpacity={0.78}
         >
           <Text style={styles.urlLink}>{CHAIKA_URL_DISPLAY}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.supportButton}
+          onPress={() => void Linking.openURL(SUPPORT_EMAIL_URL).catch(() => null)}
+          activeOpacity={0.82}
+        >
+          <Text style={styles.supportButtonText}>{text.support}</Text>
         </TouchableOpacity>
 
         {onRetry ? (
@@ -140,6 +152,21 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     alignSelf: 'stretch',
     alignItems: 'center',
+  },
+  supportButton: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: SCREEN_THEME.terracotta,
+    paddingHorizontal: 22,
+    paddingVertical: 13,
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  supportButtonText: {
+    color: SCREEN_THEME.terracottaDark,
+    fontSize: 14,
+    fontWeight: '900',
   },
   retryButtonText: {
     color: '#fff',

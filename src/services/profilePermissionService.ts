@@ -1,5 +1,7 @@
 import { ref, get, set, update, onValue, serverTimestamp } from 'firebase/database';
 import { database } from '../firebase-core';
+import { logClientError } from '../utils/errorLogger';
+import { RATE_LIMITERS } from '../utils/rateLimiter';
 
 export type ProfilePrivacyMode = 'open' | 'request';
 export type ViewRequestContext = 'lyudi' | 'help' | 'sport' | 'buysell' | 'job';
@@ -194,6 +196,11 @@ export const profilePermissionService = {
       throw new Error('Invalid requestView arguments');
     }
 
+    const cooldownLeft = RATE_LIMITERS.profileViewRequest.cooldownSecondsLeft();
+    if (cooldownLeft > 0) {
+      throw new Error(`Занадто часто. Спробуйте через ${cooldownLeft} сек.`);
+    }
+
     const path = `profileViewRequests/${targetUserId}/${requester.id}`;
     const existing = await get(ref(database, path));
     if (existing.exists()) {
@@ -227,6 +234,7 @@ export const profilePermissionService = {
       [path]: payload,
       [`outgoingProfileRequestsByUser/${requester.id}/${targetUserId}`]: payload,
     });
+    RATE_LIMITERS.profileViewRequest.recordSubmit();
     return 'sent';
   },
 
@@ -235,8 +243,9 @@ export const profilePermissionService = {
       const snap = await get(ref(database, `profileViewRequests/${targetUserId}/${requesterId}`));
       if (!snap.exists()) return null;
       return (snap.val()?.status as ViewRequestStatus) ?? null;
-    } catch {
-      return null;
+    } catch (error) {
+      void logClientError('profilePermissionService.checkAccess', error, { targetUserId, requesterId });
+      throw error;
     }
   },
 
@@ -249,8 +258,9 @@ export const profilePermissionService = {
       const status = (snap.val()?.status as ViewRequestStatus) ?? null;
       const sharedContact = typeof snap.val()?.sharedContact === 'string' ? snap.val().sharedContact : undefined;
       return { status, sharedContact };
-    } catch {
-      return { status: null };
+    } catch (error) {
+      void logClientError('profilePermissionService.getAccessRecord', error, { targetUserId, requesterId });
+      throw error;
     }
   },
 

@@ -15,7 +15,7 @@
       ".read": "auth != null",
       ".indexOn": ["status", "category", "userId", "timestamp"],
       "$requestId": {
-        ".write": "auth != null && ((!data.exists() && (root.child('yellow_list').child(auth.uid).child('active').val() !== true || root.child('yellow_list').child(auth.uid).child('bannedUntil').val() <= now)) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
+        ".write": "auth != null && ((!data.exists() && (!(root.child('yellow_list').child(auth.uid).child('active').val() !== false && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now))) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
       }
     },
 
@@ -23,7 +23,7 @@
       ".read": "auth != null",
       ".indexOn": ["status", "sourceScreen"],
       "$photoId": {
-        ".write": "auth != null && ((!data.exists() && (root.child('yellow_list').child(auth.uid).child('active').val() !== true || root.child('yellow_list').child(auth.uid).child('bannedUntil').val() <= now)) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
+        ".write": "auth != null && ((!data.exists() && (!(root.child('yellow_list').child(auth.uid).child('active').val() !== false && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now))) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
       }
     },
 
@@ -31,7 +31,7 @@
       ".read": "auth != null",
       ".indexOn": "status",
       "$photoId": {
-        ".write": "auth != null && ((!data.exists() && (root.child('yellow_list').child(auth.uid).child('active').val() !== true || root.child('yellow_list').child(auth.uid).child('bannedUntil').val() <= now)) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
+        ".write": "auth != null && ((!data.exists() && (!(root.child('yellow_list').child(auth.uid).child('active').val() !== false && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now))) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
       }
     },
 
@@ -39,7 +39,7 @@
       ".read": "auth != null",
       ".indexOn": ["moderationStatus", "userId"],
       "$listingId": {
-        ".write": "auth != null && ((!data.exists() && (root.child('yellow_list').child(auth.uid).child('active').val() !== true || root.child('yellow_list').child(auth.uid).child('bannedUntil').val() <= now)) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
+        ".write": "auth != null && ((!data.exists() && (!(root.child('yellow_list').child(auth.uid).child('active').val() !== false && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now))) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
       }
     },
 
@@ -47,7 +47,7 @@
       ".read": "auth != null",
       ".indexOn": ["moderationStatus", "userId"],
       "$itemId": {
-        ".write": "auth != null && ((!data.exists() && (root.child('yellow_list').child(auth.uid).child('active').val() !== true || root.child('yellow_list').child(auth.uid).child('bannedUntil').val() <= now)) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
+        ".write": "auth != null && ((!data.exists() && (!(root.child('yellow_list').child(auth.uid).child('active').val() !== false && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now))) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
       }
     },
 
@@ -55,7 +55,7 @@
       ".read": "auth != null",
       ".indexOn": ["moderationStatus", "userId"],
       "$itemId": {
-        ".write": "auth != null && ((!data.exists() && (root.child('yellow_list').child(auth.uid).child('active').val() !== true || root.child('yellow_list').child(auth.uid).child('bannedUntil').val() <= now)) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
+        ".write": "auth != null && ((!data.exists() && (!(root.child('yellow_list').child(auth.uid).child('active').val() !== false && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now))) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
       }
     },
 
@@ -63,7 +63,7 @@
       ".read": "auth != null",
       ".indexOn": ["moderationStatus", "userId"],
       "$listingId": {
-        ".write": "auth != null && ((!data.exists() && (root.child('yellow_list').child(auth.uid).child('active').val() !== true || root.child('yellow_list').child(auth.uid).child('bannedUntil').val() <= now)) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
+        ".write": "auth != null && ((!data.exists() && (!(root.child('yellow_list').child(auth.uid).child('active').val() !== false && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now))) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
       }
     },
 
@@ -71,7 +71,7 @@
       ".read": "auth != null",
       ".indexOn": "moderationStatus",
       "$suggestionId": {
-        ".write": "auth != null && ((!data.exists() && (root.child('yellow_list').child(auth.uid).child('active').val() !== true || root.child('yellow_list').child(auth.uid).child('bannedUntil').val() <= now)) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
+        ".write": "auth != null && ((!data.exists() && (!(root.child('yellow_list').child(auth.uid).child('active').val() !== false && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now))) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
       }
     },
 
@@ -79,7 +79,7 @@
       ".read": "auth != null",
       ".indexOn": "moderationStatus",
       "$itemId": {
-        ".write": "auth != null && ((!data.exists() && (root.child('yellow_list').child(auth.uid).child('active').val() !== true || root.child('yellow_list').child(auth.uid).child('bannedUntil').val() <= now)) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
+        ".write": "auth != null && ((!data.exists() && (!(root.child('yellow_list').child(auth.uid).child('active').val() !== false && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now))) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
       }
     },
 
@@ -87,7 +87,7 @@
       ".read": "auth != null",
       ".indexOn": "moderationStatus",
       "$voteId": {
-        ".write": "auth != null && ((!data.exists() && (root.child('yellow_list').child(auth.uid).child('active').val() !== true || root.child('yellow_list').child(auth.uid).child('bannedUntil').val() <= now)) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
+        ".write": "auth != null && ((!data.exists() && (!(root.child('yellow_list').child(auth.uid).child('active').val() !== false && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now))) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
       }
     },
 
@@ -95,7 +95,7 @@
       ".read": "auth != null",
       ".indexOn": "moderationStatus",
       "$topicId": {
-        ".write": "auth != null && ((!data.exists() && (root.child('yellow_list').child(auth.uid).child('active').val() !== true || root.child('yellow_list').child(auth.uid).child('bannedUntil').val() <= now)) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
+        ".write": "auth != null && ((!data.exists() && (!(root.child('yellow_list').child(auth.uid).child('active').val() !== false && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now))) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
       }
     },
 
@@ -103,7 +103,7 @@
       ".read": "auth != null",
       ".indexOn": "moderationStatus",
       "$collectionId": {
-        ".write": "auth != null && ((!data.exists() && (root.child('yellow_list').child(auth.uid).child('active').val() !== true || root.child('yellow_list').child(auth.uid).child('bannedUntil').val() <= now)) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
+        ".write": "auth != null && ((!data.exists() && (!(root.child('yellow_list').child(auth.uid).child('active').val() !== false && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now))) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
       }
     },
 
@@ -112,7 +112,7 @@
       ".indexOn": "moderationStatus",
       "$profileId": {
         ".read": "auth != null && (data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
-        ".write": "auth != null && ((!data.exists() && (root.child('yellow_list').child(auth.uid).child('active').val() !== true || root.child('yellow_list').child(auth.uid).child('bannedUntil').val() <= now)) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
+        ".write": "auth != null && ((!data.exists() && (!(root.child('yellow_list').child(auth.uid).child('active').val() !== false && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now))) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
       }
     },
 
@@ -121,7 +121,7 @@
       ".indexOn": "moderationStatus",
       "$anketaId": {
         ".read": "auth != null && (data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
-        ".write": "auth != null && ((!data.exists() && (root.child('yellow_list').child(auth.uid).child('active').val() !== true || root.child('yellow_list').child(auth.uid).child('bannedUntil').val() <= now)) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
+        ".write": "auth != null && ((!data.exists() && (!(root.child('yellow_list').child(auth.uid).child('active').val() !== false && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now))) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
       }
     },
 
@@ -130,7 +130,7 @@
       ".indexOn": "moderationStatus",
       "$requestId": {
         ".read": "auth != null && (root.child('age_verifications').child(auth.uid).child('status').val() === 'approved' || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
-        ".write": "auth != null && ((!data.exists() && (root.child('yellow_list').child(auth.uid).child('active').val() !== true || root.child('yellow_list').child(auth.uid).child('bannedUntil').val() <= now)) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
+        ".write": "auth != null && ((!data.exists() && (!(root.child('yellow_list').child(auth.uid).child('active').val() !== false && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now))) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
       }
     },
 
@@ -138,14 +138,14 @@
       ".read": "auth != null",
       ".indexOn": ["status", "moderationStatus"],
       "$businessId": {
-        ".write": "auth != null && ((!data.exists() && (root.child('yellow_list').child(auth.uid).child('active').val() !== true || root.child('yellow_list').child(auth.uid).child('bannedUntil').val() <= now)) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
+        ".write": "auth != null && ((!data.exists() && (!(root.child('yellow_list').child(auth.uid).child('active').val() !== false && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now))) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
       }
     },
 
     "sports_listings": {
       ".read": "auth != null",
       "$listingId": {
-        ".write": "auth != null && ((!data.exists() && (root.child('yellow_list').child(auth.uid).child('active').val() !== true || root.child('yellow_list').child(auth.uid).child('bannedUntil').val() <= now)) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
+        ".write": "auth != null && ((!data.exists() && (!(root.child('yellow_list').child(auth.uid).child('active').val() !== false && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now))) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
       }
     },
 
@@ -425,7 +425,7 @@
       ".indexOn": ["userId", "status", "updatedAt"],
       "$ticketId": {
         ".read": "auth != null && (data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin')",
-        ".write": "auth != null && ((!data.exists() && newData.child('userId').val() === auth.uid) || (data.exists() && data.child('userId').val() === auth.uid && newData.child('userId').val() === auth.uid && newData.child('status').val() === data.child('status').val() && newData.child('category').val() === data.child('category').val()) || root.child('user_roles').child(auth.uid).child('role').val() === 'admin')",
+        ".write": "auth != null && ((!data.exists() && newData.child('userId').val() === auth.uid) || (data.exists() && data.child('userId').val() === auth.uid && newData.child('userId').val() === auth.uid) || root.child('user_roles').child(auth.uid).child('role').val() === 'admin')",
         ".validate": "newData.hasChildren(['ticketId', 'userId', 'userName', 'category', 'status', 'createdAt', 'updatedAt'])",
         "status": {
           ".validate": "newData.val() === 'open' || newData.val() === 'closed'"
@@ -444,7 +444,7 @@
         ".read": "auth != null && (root.child('support_tickets').child($ticketId).child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin')",
         ".indexOn": ["timestamp"],
         "$messageId": {
-          ".write": "auth != null && root.child('support_tickets').child($ticketId).child('status').val() === 'open' && (root.child('support_tickets').child($ticketId).child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin')",
+          ".write": "auth != null && (root.child('support_tickets').child($ticketId).child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin')",
           ".validate": "newData.hasChildren(['messageId', 'ticketId', 'senderId', 'senderRole', 'text', 'timestamp']) && newData.child('text').isString() && newData.child('text').val().length <= 500 && newData.child('text').val().length > 0 && (newData.child('senderRole').val() === 'user' || newData.child('senderRole').val() === 'admin')"
         }
       }

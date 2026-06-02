@@ -6,10 +6,8 @@ import {
   update,
   query,
   orderByChild,
-  equalTo,
   limitToLast,
   onValue,
-  remove,
   DataSnapshot,
   Unsubscribe,
 } from 'firebase/database';
@@ -112,9 +110,7 @@ export const subscribeToUserTicket = (
       ticketUnsub = onValue(
         ref(database, `${TICKETS_PATH}/${ticketId}`),
         (ticketSnap) => {
-          const ticket = snapshotToTicket(ticketSnap);
-          // If ticket is closed, treat as no active ticket
-          callback(ticket && ticket.status === 'open' ? ticket : null);
+          callback(snapshotToTicket(ticketSnap));
         },
         () => {
           // Read error on ticket node — surface as no ticket
@@ -207,12 +203,6 @@ export const sendUserMessage = async (
     throw new Error(`Message exceeds ${MAX_MESSAGE_LENGTH} characters`);
   }
 
-  // Verify ticket is open
-  const ticketSnap = await get(ref(database, `${TICKETS_PATH}/${ticketId}/status`));
-  if (ticketSnap.val() !== 'open') {
-    throw new Error('Ticket is closed');
-  }
-
   const now = Date.now();
 
   const msgRef = push(ref(database, `${MESSAGES_PATH}/${ticketId}`));
@@ -228,6 +218,7 @@ export const sendUserMessage = async (
 
   // Update ticket timestamps
   await update(ref(database, `${TICKETS_PATH}/${ticketId}`), {
+    status: 'open',
     updatedAt: now,
     lastUserMessage: now,
   });

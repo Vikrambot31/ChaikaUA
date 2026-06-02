@@ -1,7 +1,8 @@
-import { get, off, onValue, ref } from 'firebase/database';
+import { get, onValue, ref } from 'firebase/database';
 import { auth, database } from '../firebase-core';
 import { hasPrimaryServiceAccess } from '../firebase-auth-session';
 import { CACHE_TTL, cacheGet, cacheSet, cacheInvalidate } from '../utils/cacheLayer';
+import { logClientError } from '../utils/errorLogger';
 
 export type SecurityRole = 'admin' | 'moderator' | 'user';
 
@@ -70,8 +71,9 @@ export const getSecurityRole = async (uid: string): Promise<SecurityRoleSnapshot
       updatedAt: Date.now(),
       source: 'remote',
     };
-  } catch {
-    return (await getCachedSecurityRole(uid)) ?? { role: 'user', updatedAt: 0, source: 'default' };
+  } catch (error) {
+    void logClientError('securityRoles.getSecurityRole', error, { uid });
+    throw error;
   }
 };
 
@@ -109,9 +111,12 @@ export const subscribeCurrentUserSecurityRole = (
       updatedAt: Date.now(),
       source: 'remote',
     });
+  }, (error) => {
+    void logClientError('securityRoles.subscribeCurrentUserSecurityRole', error, { uid });
+    callback({ role: 'user', updatedAt: 0, source: 'default' });
   });
 
-  return () => off(roleRef, 'value', unsubscribe);
+  return unsubscribe;
 };
 
 export const isPrivilegedSecurityRole = (role: SecurityRole): boolean =>

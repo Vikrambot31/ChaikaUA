@@ -1,10 +1,11 @@
 import { Alert } from 'react-native';
 import { ref, get } from 'firebase/database';
 import { database } from '../firebase-core';
+import { logClientError } from './errorLogger';
 
 type YellowListEntry = {
-  active: boolean;
-  bannedUntil: number;
+  active?: boolean;
+  bannedUntil?: number;
 };
 
 const TEXT = {
@@ -43,14 +44,15 @@ export async function checkYellowList(uid: string | undefined, language?: string
     const snap = await get(ref(database, `yellow_list/${uid}`));
     if (!snap.exists()) return false;
     const entry = snap.val() as YellowListEntry;
-    if (!entry.active || entry.bannedUntil <= Date.now()) return false;
+    const bannedUntil = typeof entry.bannedUntil === 'number' ? entry.bannedUntil : 0;
+    if (!(entry.active !== false && bannedUntil > Date.now())) return false;
 
     const text = TEXT[normalizeLanguage(language)];
-    const date = new Date(entry.bannedUntil).toLocaleDateString();
+    const date = new Date(bannedUntil).toLocaleDateString();
     Alert.alert(text.title, text.body(date), [{ text: text.ok, style: 'cancel' }]);
     return true;
-  } catch {
-    // При ошибке чтения — не блокируем пользователя
-    return false;
+  } catch (error) {
+    void logClientError('yellowListCheck.checkYellowList', error, { uid });
+    throw error;
   }
 }

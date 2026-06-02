@@ -6,6 +6,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ExpoLinking from 'expo-linking';
 import { useSelector } from 'react-redux';
+import Toast from 'react-native-toast-message';
 
 import { COLORS } from '../utils/constants';
 
@@ -416,6 +417,7 @@ function GuardedScreen({
   const [isPrivilegedRole, setIsPrivilegedRole] = useState<boolean | null>(
     mode === 'trusted' ? null : false,
   );
+  const deniedToastShownRef = useRef(false);
 
   const navigation = useNavigation();
 
@@ -457,9 +459,24 @@ function GuardedScreen({
 
   useEffect(() => {
     if (roleStatus === 'denied') {
+      if (!deniedToastShownRef.current) {
+        const reason = mode === 'trusted'
+          ? 'Потрібна модерація'
+          : mode === 'admin' || mode === 'moderator'
+            ? 'Невірна роль'
+            : 'Адміністратор заблокував доступ';
+        Toast.show({
+          type: 'error',
+          text1: 'Доступ закрито',
+          text2: reason,
+        });
+        deniedToastShownRef.current = true;
+      }
       navigation.reset({ index: 0, routes: [{ name: 'MainTabs' as never }] });
+    } else if (roleStatus === 'allowed') {
+      deniedToastShownRef.current = false;
     }
-  }, [roleStatus, navigation]);
+  }, [mode, roleStatus, navigation]);
 
   if (roleStatus === 'loading') {
     return <GuardFallback />;
@@ -852,7 +869,7 @@ function AuthNavigation() {
         <Stack.Screen name="MyApprovedPhotosScreen" component={MyApprovedPhotosScreen} options={{ headerShown: false }} />
         <Stack.Screen name="AppVersionInfoScreen" component={AppVersionInfoScreen} />
         <Stack.Screen name="AppMonitorScreen" component={withGuard(AppMonitorScreen, 'auth')} />
-        <Stack.Screen name="SupportScreen" component={withGuard(SupportScreen, 'auth')} />
+        <Stack.Screen name="SupportScreen" component={SupportScreen} />
       </Stack.Navigator>
       <ScreenFileInfoOverlay />
     </NavigationContainer>

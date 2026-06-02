@@ -66,4 +66,5 @@ export const RATE_LIMITERS = {
   contacts: createRateLimiter('contacts', 120_000),             // 2 min
   osbbCollection: createRateLimiter('osbb_collection', 60_000), // 1 min
   osbbTopic: createRateLimiter('osbb_topic', 30_000),           // 30 sec
+  profileViewRequest: createRateLimiter('profile_view_request', 30_000), // 30 sec
 } as const;

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import MiniTabBar from '../components/MiniTabBar';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, SafeAreaView, ActivityIndicator, ScrollView } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationProp, ParamListBase, RouteProp } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
@@ -19,6 +20,7 @@ import { getRequestTopicLabel } from '../data/categories';
 import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 import { loadProfileRecord } from '../services/authProfileService';
 import { offerHelp, checkIfHelped } from '../services/bonusService';
+import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
 
 type RequestDetailParams = {
   request: Request;
@@ -147,6 +149,12 @@ const getGenderShortLabel = (gender?: string) => {
   return '';
 };
 
+const CONTACT_ACTION_TEXT = {
+  ua: { call: 'Зателефонувати', viber: 'Viber', copy: 'Копія', profile: 'Профіль' },
+  ru: { call: 'Позвонить', viber: 'Viber', copy: 'Копия', profile: 'Профиль' },
+  en: { call: 'Call', viber: 'Viber', copy: 'Copy', profile: 'Profile' },
+} as const;
+
 const RequestDetailScreen = ({
   route,
   navigation,
@@ -157,6 +165,7 @@ const RequestDetailScreen = ({
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
   const currentUser = useSelector((state: RootState) => state.auth.user);
   const text = UI_TEXT[language];
+  const contactActionText = CONTACT_ACTION_TEXT[language];
   const { request } = route.params;
   const [deleting, setDeleting] = useState(false);
   const [accessStatus, setAccessStatus] = useState<'pending' | 'approved' | 'denied' | null>(null);
@@ -293,7 +302,19 @@ const RequestDetailScreen = ({
     }
   };
 
-  const handleCopyPhone = () => Alert.alert(text.numberTitle, request.phone);
+  const hasPhone = Boolean(request.phone?.trim());
+  const canOpenProfile = Boolean(request.userId && request.userId !== currentUser?.id);
+
+  const handleCopyPhone = async () => {
+    if (!request.phone) return;
+    await Clipboard.setStringAsync(request.phone);
+    Alert.alert(text.numberTitle, request.phone);
+  };
+
+  const handleProfile = () => {
+    if (!canOpenProfile || !request.userId) return;
+    navigation.navigate('ViewUserProfile', { userId: request.userId });
+  };
 
   const isOwnRequest = useMemo(() => {
     if (!currentUser) return false;
@@ -421,11 +442,41 @@ const RequestDetailScreen = ({
 
         <View style={styles.card}>
           <Text style={styles.cardLabel}>{text.contact}</Text>
-          <View style={styles.phoneRow}>
-            <Text style={styles.phoneText}>{request.phone}</Text>
-            <TouchableOpacity onPress={handleCopyPhone} style={styles.copyBtn}>
-              <TactileIcon icon="content-copy" size={38} iconSize={16} backgroundColor={SCREEN_THEME.enamelBlueDark} tint="#F6F9FF" />
+          <Text style={styles.phoneText}>{request.phone || '—'}</Text>
+          <View style={styles.contactActions}>
+            <TouchableOpacity
+              style={[styles.smallAction, !canOpenProfile && styles.disabledContactAction]}
+              onPress={handleProfile}
+              disabled={!canOpenProfile}
+              activeOpacity={0.82}
+            >
+              <MaterialCommunityIcons name="account-circle-outline" size={16} color={canOpenProfile ? '#fff' : '#9F958E'} />
+              <Text style={[styles.smallActionText, !canOpenProfile && styles.disabledContactText]}>{contactActionText.profile}</Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.smallAction, !hasPhone && styles.disabledContactAction]}
+              onPress={() => void safeCallPhone(request.phone, language)}
+              disabled={!hasPhone}
+              activeOpacity={0.82}
+            >
+              <MaterialCommunityIcons name="phone-outline" size={16} color={hasPhone ? '#fff' : '#9F958E'} />
+              <Text style={[styles.smallActionText, !hasPhone && styles.disabledContactText]}>{contactActionText.call}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.smallAction, !hasPhone && styles.disabledContactAction]}
+              onPress={() => void safeOpenViber(request.phone, language)}
+              disabled={!hasPhone}
+              activeOpacity={0.82}
+            >
+              <MaterialCommunityIcons name="message-text-outline" size={16} color={hasPhone ? '#fff' : '#9F958E'} />
+              <Text style={[styles.smallActionText, !hasPhone && styles.disabledContactText]}>{contactActionText.viber}</Text>
+            </TouchableOpacity>
+            {hasPhone ? (
+              <TouchableOpacity style={styles.smallActionAlt} onPress={() => void handleCopyPhone()} activeOpacity={0.82}>
+                <MaterialCommunityIcons name="content-copy" size={16} color="#403933" />
+                <Text style={styles.smallActionAltText}>{contactActionText.copy}</Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
         </View>
 
@@ -525,9 +576,30 @@ const styles = StyleSheet.create({
   cardLabel: { fontSize: 12, color: SCREEN_THEME.textMuted, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.7, fontWeight: '800' },
   requestText: { fontSize: 15, color: SCREEN_THEME.textPrimary, lineHeight: 23 },
   requestPhoto: { width: '100%', height: 220, borderRadius: 18, backgroundColor: '#E7DDD0' },
-  phoneRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  phoneText: { fontSize: 18, fontWeight: '800', color: SCREEN_THEME.textPrimary },
-  copyBtn: { padding: 4 },
+  phoneText: { fontSize: 18, fontWeight: '800', color: SCREEN_THEME.textPrimary, marginBottom: 10 },
+  contactActions: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  smallAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#403933',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+  },
+  smallActionText: { color: '#fff', fontSize: 12, fontWeight: '900' },
+  smallActionAlt: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#E8DDD3',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+  },
+  smallActionAltText: { color: '#403933', fontSize: 12, fontWeight: '900' },
+  disabledContactAction: { backgroundColor: '#E1D7CF' },
+  disabledContactText: { color: '#9F958E' },
   callButton: { backgroundColor: SCREEN_THEME.woodGreen, borderRadius: 20, minHeight: 58, borderWidth: 1, borderColor: SCREEN_THEME.woodGreenDark, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 12 },
   callButtonText: { color: '#FFF9EE', fontSize: 16, fontWeight: '900' },
   actionButtonDisabled: { opacity: 0.7 },

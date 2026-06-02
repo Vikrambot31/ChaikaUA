@@ -35,6 +35,7 @@ const shouldShowPending = (snapshot: InviteRequestSnapshot | null): snapshot is 
   snapshot?.featureEnabled === true && (
     snapshot.status === 'denied' ||
     snapshot.status === 'auto_denied' ||
+    snapshot.status === 'needs_manual_review' ||
     snapshot.accessStatus === 'blocked'
   );
 
@@ -246,12 +247,17 @@ export default function SoftInviteAccessGate({ children }: SoftInviteAccessGateP
   }
 
   // в"Ђв"Ђ Feature disabled globally в"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђ
-  // When featureEnabled is false/undefined the invite system is turned off вЂ"
-  // no restrictions apply.
+  // Fail closed for trusted access when the invite config is missing/disabled.
   if (snapshot!.featureEnabled !== true) {
     return (
-      <TrustedAccessContext.Provider value={trustedValue(true, false, false)}>
-        {children}
+      <TrustedAccessContext.Provider value={trustedValue(false, false, false)}>
+        <View style={styles.runtimeAccessRoot}>
+          {children}
+          <View pointerEvents="none" style={styles.registeredBanner}>
+            <Text style={styles.registeredBannerTitle}>Обмежений доступ</Text>
+            <Text style={styles.registeredBannerText}>Систему підтвердження доступу тимчасово вимкнено. Базові розділи доступні, розширені функції закриті.</Text>
+          </View>
+        </View>
       </TrustedAccessContext.Provider>
     );
   }
@@ -289,17 +295,20 @@ export default function SoftInviteAccessGate({ children }: SoftInviteAccessGateP
   }
 
   if (shouldShowPending(snapshot)) {
+    const isManualReview = snapshot!.status === 'needs_manual_review';
     return (
-      <PendingApprovalScreen
-        initialStatus={snapshot!}
-        onRefreshStatus={setSnapshot}
-        onCreateNewRequest={() => {
-          setSnapshot({ featureEnabled: true, status: 'none' });
-          setForcedInviteVisible(true);
-        }}
-        allowContinue={false}
-        onContinue={() => {}}
-      />
+      <TrustedAccessContext.Provider value={trustedValue(false, false, isManualReview)}>
+        <PendingApprovalScreen
+          initialStatus={snapshot!}
+          onRefreshStatus={setSnapshot}
+          onCreateNewRequest={() => {
+            setSnapshot({ featureEnabled: true, status: 'none' });
+            setForcedInviteVisible(true);
+          }}
+          allowContinue={isManualReview}
+          onContinue={() => setDismissedForSession(true)}
+        />
+      </TrustedAccessContext.Provider>
     );
   }
 

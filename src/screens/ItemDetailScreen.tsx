@@ -98,10 +98,12 @@ export default function ItemDetailScreen({
   const text = UI_TEXT[language];
   const hasPhone = Boolean(item.phone?.trim());
   const canRequestContact = Boolean(item.userId && item.userId !== currentUser?.id);
+  const canOpenProfile = Boolean(item.userId && item.userId !== currentUser?.id);
   const canContact = canRequestContact || hasPhone;
   const hasPhoto = Boolean(item.photoUri || item.photoStoragePath);
   const hasOwnerAvatar = Boolean(item.ownerAvatarUri);
   const categoryLabel = item.category ? getRequestTopicLabel({ category: item.category }, language) : '';
+  const profileLabel = language === 'ua' ? 'Профіль' : language === 'ru' ? 'Профиль' : 'Profile';
 
   const fields = [
     { label: text.description, value: item.description },
@@ -135,6 +137,11 @@ export default function ItemDetailScreen({
       { text: text.viber, onPress: () => { void safeOpenViber(item.phone, language); } },
       { text: language === 'en' ? 'Cancel' : '\u041e\u0442\u043c\u0435\u043d\u0430', style: 'cancel' },
     ]);
+  };
+
+  const handleProfile = () => {
+    if (!canOpenProfile || !item.userId) return;
+    navigation.navigate('ViewUserProfile', { userId: item.userId });
   };
 
   return (
@@ -201,6 +208,15 @@ export default function ItemDetailScreen({
           <Text style={styles.infoLabel}>{text.phone}</Text>
           {hasPhone ? <Text style={styles.phoneValue}>{item.phone}</Text> : null}
           <View style={styles.contactActions}>
+            <TouchableOpacity
+              style={[styles.smallAction, !canOpenProfile && styles.disabledAction]}
+              onPress={handleProfile}
+              disabled={!canOpenProfile}
+              activeOpacity={0.82}
+            >
+              <MaterialCommunityIcons name="account-circle-outline" size={16} color={canOpenProfile ? '#fff' : '#9F958E'} />
+              <Text style={[styles.smallActionText, !canOpenProfile && styles.disabledText]}>{profileLabel}</Text>
+            </TouchableOpacity>
             <TouchableOpacity
               style={[styles.smallAction, !hasPhone && styles.disabledAction]}
               onPress={() => void safeCallPhone(item.phone, language)}

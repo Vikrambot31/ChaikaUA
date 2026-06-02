@@ -4,7 +4,7 @@ import { database } from '../firebase-core';
 import { firebaseApp } from '../firebase-core';
 import { getCurrentUser } from '../firebase-auth-session';
 import { sanitizeStoredText } from '../utils/textUtils';
-import { logClientEvent } from '../utils/errorLogger';
+import { logClientError, logClientEvent } from '../utils/errorLogger';
 
 const BLOCKED_USERS_PATH = 'service_moderation/blocked_users';
 const DELETED_USERS_PATH = 'service_moderation/deleted_users';
@@ -59,7 +59,8 @@ export const getUserAccessControlStatus = async (
     ]);
   } catch (err) {
     console.error('[serviceModeration] getUserAccessControlStatus failed:', err);
-    return { isBlocked: false, isDeleted: false };
+    void logClientError('serviceModeration.getUserAccessControlStatus', err, { uid });
+    throw err;
   }
 
   const blockedValue = blockedSnap.val() as Partial<BlockedUserRecord> | null;

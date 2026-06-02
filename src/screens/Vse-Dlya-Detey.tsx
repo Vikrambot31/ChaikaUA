@@ -9,9 +9,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-
-const TILE_GAP = 10;
-const TILE_W = (Dimensions.get('window').width - 32 - TILE_GAP) / 2;
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
@@ -23,6 +20,9 @@ import { SCREEN_THEME } from '../utils/screenTheme';
 
 type Lang = 'ua' | 'ru' | 'en';
 type AppNavigation = NavigationProp<Record<string, object | undefined>>;
+
+const TILE_GAP = 10;
+const TILE_W = (Dimensions.get('window').width - 32 - TILE_GAP) / 2;
 type CategoryKey = 'all' | ChildCategory;
 type ScreenText = (typeof UI_TEXT)[Lang];
 
@@ -356,6 +356,12 @@ export default function VseDlyaDeteyScreen() {
     navigation.navigate('DetalDetskogoPredlozheniyaScreen', { offer });
   };
 
+  const handleCategoryPress = (category: CategoryKey) => {
+    setActiveCategory(category);
+    setIsRecommendedExpanded(false);
+    setIsAllPlacesExpanded(category !== 'event');
+  };
+
   const renderOfferCard = (offer: ChildOffer, wide = false) => {
     const offerPlace = chaykaPlaces.find((p) => p.id === offer.placeId);
     const offerMeta = getOfferMeta(offer, text);
@@ -491,8 +497,11 @@ export default function VseDlyaDeteyScreen() {
                   isRightCol && styles.categoryTileRight,
                   isActive && styles.categoryTileActive,
                 ]}
-                onPress={() => setActiveCategory(category.key)}
+                onPress={() => handleCategoryPress(category.key)}
                 activeOpacity={0.82}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isActive }}
               >
                 <View pointerEvents="none" style={styles.categoryTileIconWrap}>
                   <MaterialCommunityIcons

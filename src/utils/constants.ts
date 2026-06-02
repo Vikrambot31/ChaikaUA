@@ -8,7 +8,7 @@ const { width, height } = Dimensions.get('window');
 
 // App Name and Version
 export const APP_NAME = 'Chaika Life';
-export const APP_VERSION = '1.1.368';
+export const APP_VERSION = '1.1.369';
 export const APP_BUILD_DATE = '2026-06-02';
 export const APP_BUILD_STAMP = '2026-05-16_13-00';
 export const APP_COMMIT_HASH = 'no-git';

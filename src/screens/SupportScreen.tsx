@@ -26,6 +26,7 @@ import {
   hasUnreadAdminReply,
 } from '../services/supportService';
 import type { SupportTicket, SupportMessage, SupportCategory } from '../types/support';
+import { ensureFirebaseAuth } from '../firebase-auth-session';
 
 const UI_TEXT = {
   ua: {
@@ -38,7 +39,7 @@ const UI_TEXT = {
     statusClosed: 'Закрито',
     ticketClosed: 'Звернення закрито. Ви можете створити нове.',
     newTicket: 'Нове звернення',
-    yellowBlocked: 'Ваш акаунт обмежено. Зверніться до адміністратора.',
+    accountNotice: 'Щоб писати в службу підтримки, спочатку потрібно отримати статус користувача з акаунтом. Для цього пройдіть реєстрацію.',
     noConnection: "Немає з'єднання з Інтернетом",
     sendError: 'Не вдалося відправити повідомлення',
     you: 'Ви',
@@ -54,7 +55,7 @@ const UI_TEXT = {
     statusClosed: 'Закрыто',
     ticketClosed: 'Обращение закрыто. Вы можете создать новое.',
     newTicket: 'Новое обращение',
-    yellowBlocked: 'Ваш аккаунт ограничен. Обратитесь к администратору.',
+    accountNotice: 'Чтобы писать в службу поддержки, сначала нужно получить статус пользователя с аккаунтом. Для этого пройдите регистрацию.',
     noConnection: 'Нет подключения к Интернету',
     sendError: 'Не удалось отправить сообщение',
     you: 'Вы',
@@ -70,7 +71,7 @@ const UI_TEXT = {
     statusClosed: 'Closed',
     ticketClosed: 'This ticket is closed. You can create a new one.',
     newTicket: 'New ticket',
-    yellowBlocked: 'Your account is restricted. Please contact an administrator.',
+    accountNotice: 'To write to support, you first need user-with-account status. Please complete registration.',
     noConnection: 'No internet connection',
     sendError: 'Failed to send message',
     you: 'You',
@@ -123,17 +124,36 @@ const SupportScreen: React.FC<Props> = ({ navigation }) => {
   const [selectedCategory, setSelectedCategory] = useState<SupportCategory | null>(null);
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [supportUserId, setSupportUserId] = useState<string | null>(null);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    void ensureFirebaseAuth()
+      .then((firebaseUser) => {
+        if (active) {
+          setSupportUserId(firebaseUser?.uid ?? null);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setSupportUserId(null);
+          setLoading(false);
+        }
+      });
+    return () => { active = false; };
+  }, []);
+
   // Subscribe to user's ticket
   useEffect(() => {
-    if (!user?.id) {
+    if (!supportUserId) {
       setLoading(false);
       return;
     }
     let settled = false;
-    const unsub = subscribeToUserTicket(user.id, (t) => {
+    const unsub = subscribeToUserTicket(supportUserId, (t) => {
       settled = true;
       setTicket(t);
       if (t) setSelectedCategory(t.category);
@@ -144,7 +164,7 @@ const SupportScreen: React.FC<Props> = ({ navigation }) => {
       if (!settled) setLoading(false);
     }, 8000);
     return () => { unsub(); clearTimeout(timeout); };
-  }, [user?.id]);
+  }, [supportUserId]);
 
   // Subscribe to messages
   useEffect(() => {
@@ -168,19 +188,19 @@ const SupportScreen: React.FC<Props> = ({ navigation }) => {
   const isClosed = ticket?.status === 'closed';
   const canSend =
     !sending &&
-    !isClosed &&
     isOnline &&
+    Boolean(supportUserId) &&
     messageText.trim().length > 0 &&
     messageText.length <= MAX_MESSAGE_LENGTH &&
     (ticket != null || selectedCategory != null);
 
   const handleSend = useCallback(async () => {
-    if (!canSend || !user) return;
+    if (!canSend) return;
 
     setSending(true);
     try {
       if (!ticket && selectedCategory) {
-        await createTicket(selectedCategory, messageText.trim(), user.name || 'User');
+        await createTicket(selectedCategory, messageText.trim(), user?.name || 'User');
       } else if (ticket) {
         await sendUserMessage(ticket.ticketId, messageText.trim());
       }
@@ -190,14 +210,7 @@ const SupportScreen: React.FC<Props> = ({ navigation }) => {
     } finally {
       setSending(false);
     }
-  }, [canSend, user, ticket, selectedCategory, messageText, text.sendError]);
-
-  const handleNewTicket = useCallback(() => {
-    setTicket(null);
-    setMessages([]);
-    setSelectedCategory(null);
-    setMessageText('');
-  }, []);
+  }, [canSend, user?.name, ticket, selectedCategory, messageText, text.sendError]);
 
   const formatTime = (ts: number) => {
     const d = new Date(ts);
@@ -238,6 +251,11 @@ const SupportScreen: React.FC<Props> = ({ navigation }) => {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{text.title}</Text>
         <View style={{ width: 42 }} />
+      </View>
+
+      <View style={styles.accountNotice}>
+        <MaterialCommunityIcons name="account-check-outline" size={18} color="#7C5A16" />
+        <Text style={styles.accountNoticeText}>{text.accountNotice}</Text>
       </View>
 
       {/* Category picker */}
@@ -304,16 +322,6 @@ const SupportScreen: React.FC<Props> = ({ navigation }) => {
         }
       />
 
-      {/* Closed ticket banner */}
-      {isClosed && (
-        <View style={styles.closedBanner}>
-          <Text style={styles.closedText}>{text.ticketClosed}</Text>
-          <TouchableOpacity style={styles.newTicketBtn} onPress={handleNewTicket} activeOpacity={0.7}>
-            <Text style={styles.newTicketBtnText}>{text.newTicket}</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
       {/* No connection banner */}
       {!isOnline && (
         <View style={styles.warningBanner}>
@@ -323,37 +331,35 @@ const SupportScreen: React.FC<Props> = ({ navigation }) => {
       )}
 
       {/* Input area */}
-      {!isClosed && (
-        <View style={styles.inputArea}>
-          <View style={styles.inputRow}>
-            <TextInput
-              style={styles.textInput}
-              placeholder={text.inputPlaceholder}
-              placeholderTextColor={SCREEN_THEME.textMuted}
-              value={messageText}
-              onChangeText={setMessageText}
-              maxLength={MAX_MESSAGE_LENGTH}
-              multiline
-              editable={!sending}
-            />
-            <TouchableOpacity
-              style={[styles.sendBtn, !canSend && styles.sendBtnDisabled]}
-              onPress={handleSend}
-              disabled={!canSend}
-              activeOpacity={0.7}
-            >
-              {sending ? (
-                <ActivityIndicator size="small" color="#FFF" />
-              ) : (
-                <MaterialCommunityIcons name="send" size={20} color="#FFF" />
-              )}
-            </TouchableOpacity>
-          </View>
-          <Text style={[styles.charCounter, messageText.length > MAX_MESSAGE_LENGTH && styles.charCounterOver]}>
-            {text.chars}: {messageText.length}/{MAX_MESSAGE_LENGTH}
-          </Text>
+      <View style={styles.inputArea}>
+        <View style={styles.inputRow}>
+          <TextInput
+            style={styles.textInput}
+            placeholder={text.inputPlaceholder}
+            placeholderTextColor={SCREEN_THEME.textMuted}
+            value={messageText}
+            onChangeText={setMessageText}
+            maxLength={MAX_MESSAGE_LENGTH}
+            multiline
+            editable={!sending}
+          />
+          <TouchableOpacity
+            style={[styles.sendBtn, !canSend && styles.sendBtnDisabled]}
+            onPress={handleSend}
+            disabled={!canSend}
+            activeOpacity={0.7}
+          >
+            {sending ? (
+              <ActivityIndicator size="small" color="#FFF" />
+            ) : (
+              <MaterialCommunityIcons name="send" size={20} color="#FFF" />
+            )}
+          </TouchableOpacity>
         </View>
-      )}
+        <Text style={[styles.charCounter, messageText.length > MAX_MESSAGE_LENGTH && styles.charCounterOver]}>
+          {text.chars}: {messageText.length}/{MAX_MESSAGE_LENGTH}
+        </Text>
+      </View>
     </SafeAreaView>
   );
 };
@@ -386,6 +392,26 @@ const styles = StyleSheet.create({
     color: SCREEN_THEME.textPrimary,
   },
   // Category
+  accountNotice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginHorizontal: 16,
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: '#FFF3CD',
+    borderWidth: 1,
+    borderColor: '#E4D0AB',
+  },
+  accountNoticeText: {
+    flex: 1,
+    color: '#7C5A16',
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '700',
+  },
   categorySection: {
     paddingHorizontal: 16,
     paddingTop: 12,

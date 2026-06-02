@@ -1,4 +1,4 @@
-import { get, ref, set, remove, onValue, off } from 'firebase/database';
+import { get, push, ref, set, remove, onValue, off } from 'firebase/database';
 import { database } from '../firebase-core';
 import { getCurrentUser } from '../firebase-auth-session';
 import { normalizeSecurityRole, type SecurityRole } from './securityRoles';
@@ -46,6 +46,13 @@ export const assignRole = async (
     };
 
     await set(ref(database, `user_roles/${targetUid}`), record);
+    void push(ref(database, 'security_logs'), {
+      event: 'role_assigned',
+      targetUid,
+      role,
+      actorUid,
+      timestamp: Date.now(),
+    });
     void logClientEvent('role_assigned', { targetUid, role, actorUid });
     return { success: true };
   } catch (error: unknown) {
@@ -60,6 +67,12 @@ export const revokeRole = async (targetUid: string): Promise<ApiVoidResult> => {
     const actorUid = currentUser?.uid ?? 'pin_operator';
 
     await remove(ref(database, `user_roles/${targetUid}/role`));
+    void push(ref(database, 'security_logs'), {
+      event: 'role_revoked',
+      targetUid,
+      actorUid,
+      timestamp: Date.now(),
+    });
     void logClientEvent('role_revoked', { targetUid, actorUid });
     return { success: true };
   } catch (error: unknown) {

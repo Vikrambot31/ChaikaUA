@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, AppStateStatus, StyleSheet, Text, View } from 'react-native';
 import { useSelector } from 'react-redux';
 import Constants from 'expo-constants';
+import Toast from 'react-native-toast-message';
 import SplashAnimation from './SplashAnimation';
 import MaintenanceScreen from './MaintenanceScreen';
 import ForceUpdateScreen from './ForceUpdateScreen';
@@ -32,6 +33,7 @@ import {
   subscribeEmergencyAccess,
   type EmergencyAccessCurrent,
 } from '../services/emergencyAccess';
+import { logClientError } from '../utils/errorLogger';
 
 type AppAccessGuardProps = {
   children: React.ReactNode;
@@ -48,6 +50,8 @@ const createUnknownDeviceStatus = (): DeviceAuthorizationStatus => ({
 
 const FOREGROUND_REFRESH_THROTTLE_MS = 4000;
 const DEVICE_REFRESH_TIMEOUT_MS = 5000;
+const DEVICE_AUTH_MAX_RETRIES = 3;
+const DEVICE_AUTH_RETRY_DELAY_MS = 1000;
 
 const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> =>
   Promise.race([
@@ -129,6 +133,8 @@ const AppAccessGuard: React.FC<AppAccessGuardProps> = ({
   const onRemoteConfigSnapshotRef = useRef(onRemoteConfigSnapshot);
   const deviceSubscriptionUidRef = useRef<string | null>(null);
   const deviceRefreshRequestIdRef = useRef(0);
+  const deviceRefreshFailureCountRef = useRef(0);
+  const deviceRefreshRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastForegroundRefreshAtRef = useRef(0);
   const emergencyBypassActive = isBypassUser && isEmergencyAccessActive(emergencyAccess);
 
@@ -240,6 +246,11 @@ const AppAccessGuard: React.FC<AppAccessGuardProps> = ({
   const refreshDeviceStatus = async () => {
     const currentUid = currentUserIdRef.current;
     if (!currentUid) {
+      if (deviceRefreshRetryTimerRef.current) {
+        clearTimeout(deviceRefreshRetryTimerRef.current);
+        deviceRefreshRetryTimerRef.current = null;
+      }
+      deviceRefreshFailureCountRef.current = 0;
       deviceUnsubscribeRef.current?.();
       deviceUnsubscribeRef.current = null;
       deviceSubscriptionUidRef.current = null;
@@ -277,6 +288,7 @@ const AppAccessGuard: React.FC<AppAccessGuardProps> = ({
       }
 
       setDeviceStatus(synced);
+      deviceRefreshFailureCountRef.current = 0;
 
       if (deviceSubscriptionUidRef.current !== currentUid) {
         deviceUnsubscribeRef.current?.();
@@ -299,19 +311,39 @@ const AppAccessGuard: React.FC<AppAccessGuardProps> = ({
         deviceUnsubscribeRef.current = newUnsub;
         deviceSubscriptionUidRef.current = currentUid;
       }
-    } catch {
+    } catch (error) {
       if (!mountedRef.current || requestId !== deviceRefreshRequestIdRef.current) {
         return;
       }
 
-      setDeviceStatus((previous) => (
-        previous.status === 'unknown'
-          ? {
-            ...previous,
-            error: 'device_status_timeout',
-          }
-          : previous
-      ));
+      const failureCount = deviceRefreshFailureCountRef.current + 1;
+      deviceRefreshFailureCountRef.current = failureCount;
+      void logClientError('AppAccessGuard.refreshDeviceStatus', error, {
+        uid: currentUid,
+        failureCount,
+      });
+
+      if (failureCount < DEVICE_AUTH_MAX_RETRIES) {
+        if (deviceRefreshRetryTimerRef.current) {
+          clearTimeout(deviceRefreshRetryTimerRef.current);
+        }
+        deviceRefreshRetryTimerRef.current = setTimeout(() => {
+          deviceRefreshRetryTimerRef.current = null;
+          void refreshDeviceStatus();
+        }, DEVICE_AUTH_RETRY_DELAY_MS);
+        return;
+      }
+
+      Toast.show({
+        type: 'error',
+        text1: 'Помилка авторизації девайсу',
+        text2: 'Перевірте мережу і повторіть спробу.',
+      });
+      setDeviceStatus((previous) => ({
+        ...previous,
+        status: 'unknown',
+        error: 'device_auth_failed',
+      }));
     }
   };
 
@@ -319,6 +351,10 @@ const AppAccessGuard: React.FC<AppAccessGuardProps> = ({
     void refreshDeviceStatus();
 
     return () => {
+      if (deviceRefreshRetryTimerRef.current) {
+        clearTimeout(deviceRefreshRetryTimerRef.current);
+        deviceRefreshRetryTimerRef.current = null;
+      }
       deviceUnsubscribeRef.current?.();
       deviceUnsubscribeRef.current = null;
       deviceSubscriptionUidRef.current = null;
@@ -477,6 +513,19 @@ const AppAccessGuard: React.FC<AppAccessGuardProps> = ({
           ? 'Этот девайс заблокирован администратором.'
           : 'Этот девайс ожидает разрешения администратора.'}
         onRetry={() => {
+          void refreshDeviceStatus();
+        }}
+      />
+    );
+  }
+
+  if (!shouldBypassRestrictions && deviceStatus.error === 'device_auth_failed') {
+    return (
+      <MaintenanceScreen
+        message="Помилка авторизації девайсу. Перевірте мережу і повторіть спробу."
+        onRetry={() => {
+          deviceRefreshFailureCountRef.current = 0;
+          setDeviceStatus(createUnknownDeviceStatus());
           void refreshDeviceStatus();
         }}
       />
