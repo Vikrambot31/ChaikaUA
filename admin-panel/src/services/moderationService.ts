@@ -379,12 +379,10 @@ export const deleteModerationItem = async (item: ModerationItem): Promise<void> 
   if (!config) throw new Error('Неизвестный раздел модерации.');
   if (!functions) throw new Error('Firebase Functions не инициализированы.');
 
-  const callable = httpsCallable<AdminModerationPayload, CallableResult>(functions, 'adminModerateContentItem');
+  const callable = httpsCallable<{ section: ModerationSectionKey; path: string }, CallableResult>(functions, 'adminDeleteContentItem');
   await callable({
     section: item.section,
     path: item.path,
-    currentStatus: item.status,
-    action: 'delete',
   });
 };
 

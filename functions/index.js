@@ -1060,6 +1060,47 @@ exports.adminModerateContentItem = functionsV1.https.onCall(async (data, context
   }
 });
 
+exports.adminDeleteContentItem = functionsV1.https.onCall(async (data, context) => {
+  try {
+    const actor = await assertAdminModerationAccess(context);
+    const section = String(data?.section || '').trim();
+    const config = ADMIN_MODERATION_SECTIONS[section];
+
+    if (!config) {
+      throw new functionsV1.https.HttpsError('invalid-argument', 'Unknown moderation section');
+    }
+
+    const targetPath = assertModerationTargetPath(data, config);
+    const db = admin.database();
+    const targetRef = db.ref(targetPath);
+    const snapshot = await targetRef.once('value');
+    if (!snapshot.exists()) {
+      throw new functionsV1.https.HttpsError('not-found', 'Moderation item not found');
+    }
+
+    await targetRef.remove();
+
+    await writeOpsEvent('admin_moderation_action', {
+      actorUid: actor.uid,
+      actorRole: actor.role,
+      section,
+      action: 'delete',
+      path: targetPath,
+    });
+
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof functionsV1.https.HttpsError) throw error;
+    console.error('[adminDeleteContentItem] unexpected error:', error?.message || error, error?.stack);
+    await writeOpsError('adminDeleteContentItem', error, {
+      uid: context.auth?.uid || null,
+      section: data?.section || null,
+      path: data?.path || null,
+    });
+    throw new functionsV1.https.HttpsError('internal', 'Failed to delete moderation item');
+  }
+});
+
 const parseRecordTimeMs = (value) => {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   if (typeof value === 'string' && value.trim()) {
