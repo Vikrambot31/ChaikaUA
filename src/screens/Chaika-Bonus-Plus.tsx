@@ -43,6 +43,7 @@ const UI_TEXT: Record<'ua' | 'ru' | 'en', SectionedItems> = {
       { label: 'Спорт на Чайці', desc: 'Баскетбол, футбол і теніс з сусідами', screen: 'SportNaChaykeScreen', icon: 'run-fast', accent: '#4F8D5F' },
     ] as BonusItem[],
     market: [
+      { label: 'Їжа на Чайці', desc: 'Поїсти, продукти, акції поруч', screen: 'EdaNaChaykeScreen', icon: 'food-fork-drink', accent: '#FFD400' },
       { label: 'Все для дітей', desc: 'Садочки, школи, гуртки та події', screen: 'VseDlyaDeteyScreen', icon: 'baby-face-outline', accent: '#C77A5D' },
       { label: 'Пошук роботи', desc: 'Вакансії та резюме', screen: 'JobSearchScreen', icon: 'briefcase-search-outline', accent: '#4D7892' },
       { label: 'Куплю / продам', desc: 'Оголошення мешканців', screen: 'BuySellScreen', icon: 'shopping-outline', accent: '#C96E3E' },
@@ -65,6 +66,7 @@ const UI_TEXT: Record<'ua' | 'ru' | 'en', SectionedItems> = {
       { label: 'Спорт на Чайке', desc: 'Баскетбол, футбол и теннис с соседями', screen: 'SportNaChaykeScreen', icon: 'run-fast', accent: '#4F8D5F' },
     ] as BonusItem[],
     market: [
+      { label: 'Еда на Чайке', desc: 'Поесть, продукты, акции рядом', screen: 'EdaNaChaykeScreen', icon: 'food-fork-drink', accent: '#FFD400' },
       { label: 'Все для детей', desc: 'Садики, школы, кружки и события', screen: 'VseDlyaDeteyScreen', icon: 'baby-face-outline', accent: '#C77A5D' },
       { label: 'Поиск работы', desc: 'Вакансии и резюме', screen: 'JobSearchScreen', icon: 'briefcase-search-outline', accent: '#4D7892' },
       { label: 'Куплю / продам', desc: 'Объявления жителей', screen: 'BuySellScreen', icon: 'shopping-outline', accent: '#C96E3E' },
@@ -87,6 +89,7 @@ const UI_TEXT: Record<'ua' | 'ru' | 'en', SectionedItems> = {
       { label: 'Sports in Chaika', desc: 'Basketball, football, and tennis with neighbors', screen: 'SportNaChaykeScreen', icon: 'run-fast', accent: '#4F8D5F' },
     ] as BonusItem[],
     market: [
+      { label: 'Food at Chaika', desc: 'Eat, groceries, deals nearby', screen: 'EdaNaChaykeScreen', icon: 'food-fork-drink', accent: '#FFD400' },
       { label: 'Everything for Kids', desc: 'Kindergartens, schools, clubs and events', screen: 'VseDlyaDeteyScreen', icon: 'baby-face-outline', accent: '#C77A5D' },
       { label: 'Job search', desc: 'Vacancies and resumes', screen: 'JobSearchScreen', icon: 'briefcase-search-outline', accent: '#4D7892' },
       { label: 'Buy / sell', desc: 'Resident marketplace', screen: 'BuySellScreen', icon: 'shopping-outline', accent: '#C96E3E' },
@@ -105,21 +108,31 @@ const ChaikaBonusPlusScreen: React.FC = () => {
       ? { label: 'Photos for the Soul', desc: 'A separate warm photo gallery from residents', screen: 'SoulPhotosScreen', icon: 'tag-heart-outline', accent: '#C97959' }
       : { label: 'Фото для душі', desc: 'Особлива галерея теплих фото від мешканців', screen: 'SoulPhotosScreen', icon: 'tag-heart-outline', accent: '#C97959' };
 
-  const renderItem = (item: BonusItem) => (
-    <TouchableOpacity
-      key={item.screen}
-      style={styles.card}
-      onPress={() => safeNavigate(navigation, item.screen)}
-      activeOpacity={0.86}
-    >
-      <TactileIcon icon={item.icon} size={46} iconSize={21} backgroundColor={item.accent} />
-      <View style={styles.copy}>
-        <Text style={styles.label}>{item.label}</Text>
-        <Text style={styles.desc}>{item.desc}</Text>
-      </View>
-      <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
-    </TouchableOpacity>
-  );
+  const renderItem = (item: BonusItem) => {
+    const isFoodHub = item.screen === 'EdaNaChaykeScreen';
+
+    return (
+      <TouchableOpacity
+        key={item.screen}
+        style={[styles.card, isFoodHub && styles.foodCard]}
+        onPress={() => safeNavigate(navigation, item.screen)}
+        activeOpacity={0.86}
+      >
+        <TactileIcon
+          icon={item.icon}
+          size={46}
+          iconSize={21}
+          backgroundColor={isFoodHub ? '#C89000' : item.accent}
+          tint={isFoodHub ? '#FFF8CF' : undefined}
+        />
+        <View style={styles.copy}>
+          <Text style={[styles.label, isFoodHub && styles.foodText]}>{item.label}</Text>
+          <Text style={[styles.desc, isFoodHub && styles.foodDesc]}>{item.desc}</Text>
+        </View>
+        <MaterialCommunityIcons name="chevron-right" size={20} color={isFoodHub ? '#4A3300' : SCREEN_THEME.textSecondary} />
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -175,9 +188,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     ...SCREEN_THEME.raisedShadow,
   },
+  foodCard: {
+    backgroundColor: '#FFD400',
+    borderColor: '#F0B800',
+  },
   copy: { flex: 1, marginLeft: 12, marginRight: 8 },
   label: { fontSize: 15, fontWeight: '900', color: SCREEN_THEME.textPrimary },
+  foodText: { color: '#3A2800' },
   desc: { fontSize: 12, color: SCREEN_THEME.textSecondary, marginTop: 3, fontWeight: '600' },
+  foodDesc: { color: '#5C4200' },
 });
 
 export default ChaikaBonusPlusScreen;

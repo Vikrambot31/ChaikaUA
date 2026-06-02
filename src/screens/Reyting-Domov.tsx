@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Alert, FlatList, Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { NavigationProp, useNavigation } from '@react-navigation/native';
+import { NavigationProp, RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -39,6 +39,11 @@ type RatingValue = {
 
 type RatingsByBuilding = Record<string, RatingValue>;
 type RatingCategoryKey = keyof Pick<RatingValue, 'cleaning' | 'elevator' | 'electricity' | 'services'>;
+type RatingCategory = {
+  key: RatingCategoryKey;
+  label: string;
+  icon: React.ComponentProps<typeof MaterialCommunityIcons>['name'];
+};
 
 const RATING_EXPLANATION = {
   ua: {
@@ -69,6 +74,10 @@ const getEmptyRating = (): RatingValue => ({
   votes: 0,
   complaints: 0,
 });
+
+const getBuildingScoreValue = (b: Pick<RatingValue, 'cleaning' | 'elevator' | 'electricity' | 'services'>): number => {
+  return (b.cleaning + b.elevator + b.electricity + b.services) / 4;
+};
 
 function StarRow({ value }: { value: number | null }) {
   if (value === null) {
@@ -102,7 +111,7 @@ export default function RatingScreen() {
   const [voted, setVoted] = useState(false);
   const [ratingModalCategory, setRatingModalCategory] = useState<RatingCategoryKey | null>(null);
 
-  const CATEGORIES = [
+  const CATEGORIES: RatingCategory[] = [
     { key: 'cleaning', label: t.ratingScreen.categories.cleaning, icon: 'broom' as const },
     { key: 'elevator', label: t.ratingScreen.categories.elevator, icon: 'elevator' as const },
     { key: 'electricity', label: t.ratingScreen.categories.electricity, icon: 'lightning-bolt' as const },
@@ -192,10 +201,6 @@ export default function RatingScreen() {
     AlertHelper.success(t.ratingScreen.thankYou);
   };
 
-  function getBuildingScoreValue(b: Building | RatingValue): number {
-    return (b.cleaning + b.elevator + b.electricity + b.services) / 4;
-  }
-
   const getBuildingScore = (b: Building): string => {
     return getBuildingScoreValue(b).toFixed(1);
   };
@@ -244,7 +249,11 @@ export default function RatingScreen() {
                 </>
               )}
               renderItem={({ item, index }) => (
-                <View style={[styles.buildingCard, index < 3 && styles.buildingCardTop]}>
+                <TouchableOpacity
+                  style={[styles.buildingCard, index < 3 && styles.buildingCardTop]}
+                  activeOpacity={0.84}
+                  onPress={() => navigation.navigate('BuildingRatingDetailScreen', { buildingId: item.id })}
+                >
                   <Image source={require('../../assets/WEBP-version/Dom1.webp')} style={styles.buildingCardDom} resizeMode="cover" />
                   <View style={styles.buildingCardInner}>
                     <View style={styles.buildingRank}>
@@ -267,6 +276,7 @@ export default function RatingScreen() {
                       <View style={styles.complaintsBadge}>
                         <Text style={styles.complaintsText}>{item.votes} {t.ratingScreen.votes}</Text>
                       </View>
+                      <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textMuted} style={styles.detailsChevron} />
                     </View>
                   </View>
                   <TouchableOpacity
@@ -277,7 +287,7 @@ export default function RatingScreen() {
                   <MaterialCommunityIcons name="map-marker-outline" size={13} color={SCREEN_THEME.enamelBlue} />
                   <Text style={styles.showOnMapText}>{t.ratingScreen.showOnMap}</Text>
                 </TouchableOpacity>
-                </View>
+                </TouchableOpacity>
               )}
             />
           ) : (
@@ -354,6 +364,183 @@ export default function RatingScreen() {
   );
 }
 
+export function BuildingRatingDetailScreen() {
+  const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
+  const route = useRoute<RouteProp<{ BuildingRatingDetailScreen: { buildingId: string } }, 'BuildingRatingDetailScreen'>>();
+  const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
+  const { t } = useTranslation();
+  const building = BUILDINGS.find((item) => item.id === route.params?.buildingId) ?? BUILDINGS[0];
+  const [storedRatings, setStoredRatings] = useState<RatingsByBuilding>({});
+  const [lastVotes, setLastVotes] = useState<LastRatingMap>({});
+  const [ratings, setRatings] = useState<Record<string, number>>({ cleaning: 0, elevator: 0, electricity: 0, services: 0 });
+  const [ratingModalCategory, setRatingModalCategory] = useState<RatingCategoryKey | null>(null);
+
+  const CATEGORIES: RatingCategory[] = [
+    { key: 'cleaning', label: t.ratingScreen.categories.cleaning, icon: 'broom' as const },
+    { key: 'elevator', label: t.ratingScreen.categories.elevator, icon: 'elevator' as const },
+    { key: 'electricity', label: t.ratingScreen.categories.electricity, icon: 'lightning-bolt' as const },
+    { key: 'services', label: t.ratingScreen.categories.services, icon: 'office-building' as const },
+  ];
+
+  useEffect(() => {
+    ErrorHandler.setLanguage(language);
+    AlertHelper.setAlertLanguage(language);
+  }, [language]);
+
+  useEffect(() => {
+    const loadRatings = async () => {
+      try {
+        const [raw, rawVotes] = await Promise.all([
+          AsyncStorage.getItem(STORAGE_KEY),
+          AsyncStorage.getItem(LAST_VOTE_KEY),
+        ]);
+        setStoredRatings(raw ? (JSON.parse(raw) as RatingsByBuilding) : {});
+        setLastVotes(rawVotes ? (JSON.parse(rawVotes) as LastRatingMap) : {});
+      } catch {
+        setStoredRatings({});
+        setLastVotes({});
+      }
+    };
+
+    void loadRatings();
+  }, []);
+
+  const currentRating = storedRatings[building.id] ?? getEmptyRating();
+  const score = getBuildingScoreValue(currentRating);
+  const daysLeft = getRatingDaysLeft(lastVotes[building.id]);
+  const voted = daysLeft > 0;
+
+  const handleVote = (category: string, value: number) => {
+    setRatings((prev) => ({ ...prev, [category]: value }));
+    setRatingModalCategory(null);
+  };
+
+  const handleSubmitVote = async () => {
+    if (daysLeft > 0) {
+      Alert.alert(t.ratingScreen.ratingAlreadySubmitted, `${t.ratingScreen.canRateAgainIn} ${daysLeft} ${t.ratingScreen.days}`);
+      return;
+    }
+    const allFilled = CATEGORIES.every((c) => ratings[c.key] > 0);
+    if (!allFilled) {
+      AlertHelper.rateAllCategories();
+      return;
+    }
+
+    const nextVotes = currentRating.votes + 1;
+    const nextRating: RatingValue = {
+      cleaning: (currentRating.cleaning * currentRating.votes + ratings.cleaning) / nextVotes,
+      elevator: (currentRating.elevator * currentRating.votes + ratings.elevator) / nextVotes,
+      electricity: (currentRating.electricity * currentRating.votes + ratings.electricity) / nextVotes,
+      services: (currentRating.services * currentRating.votes + ratings.services) / nextVotes,
+      votes: nextVotes,
+      complaints: currentRating.complaints,
+    };
+    const next = { ...storedRatings, [building.id]: nextRating };
+    const nextLastVotes = { ...lastVotes, [building.id]: new Date().toISOString() };
+    setStoredRatings(next);
+    setLastVotes(nextLastVotes);
+    await Promise.all([
+      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)),
+      AsyncStorage.setItem(LAST_VOTE_KEY, JSON.stringify(nextLastVotes)),
+    ]);
+    AlertHelper.success(t.ratingScreen.thankYou);
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.backgroundLayer}>
+        {LIGHT_ORBS.map((orb, index) => (
+          <View key={index} style={[styles.orb, orb]} />
+        ))}
+      </View>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
+          <MaterialCommunityIcons name="arrow-left" size={20} color={SCREEN_THEME.textPrimary} />
+        </TouchableOpacity>
+        <Text style={styles.title} numberOfLines={1}>{t.ratingScreen.title}</Text>
+        <TouchableOpacity
+          onPress={() => navigation.navigate('MainTabs', { screen: 'MapTab', params: { focusBuildingId: building.id } })}
+          style={styles.headerButton}
+        >
+          <MaterialCommunityIcons name="map-marker-outline" size={20} color={SCREEN_THEME.enamelBlue} />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.detailScroll}>
+        <Image source={require('../../assets/WEBP-version/Dom1.webp')} style={styles.detailHeroImage} resizeMode="cover" />
+        <View style={styles.detailHeroCard}>
+          <Text style={styles.detailAddress}>{getFullAddress(building)}</Text>
+          <View style={styles.detailScoreRow}>
+            <View style={styles.detailScoreBox}>
+              <Text style={styles.detailScoreNum}>{score.toFixed(1)}</Text>
+              <Text style={styles.detailScoreLabel}>{t.ratingScreen.average}</Text>
+            </View>
+            <View style={styles.detailVotesBox}>
+              <MaterialCommunityIcons name="account-group-outline" size={22} color={SCREEN_THEME.woodGreenDark} />
+              <Text style={styles.detailVotesText}>{currentRating.votes} {t.ratingScreen.votes}</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.detailCard}>
+          {CATEGORIES.map((cat) => (
+            <View key={cat.key} style={styles.detailStatRow}>
+              <View style={styles.ratingLabel}>
+                <MaterialCommunityIcons name={cat.icon} size={20} color={SCREEN_THEME.terracottaDark} />
+                <Text style={styles.ratingLabelText}>{cat.label}</Text>
+              </View>
+              <StarRow value={currentRating[cat.key]} />
+            </View>
+          ))}
+        </View>
+
+        <View style={styles.voteCard}>
+          <Text style={styles.voteTitle}>{t.ratingScreen.rateYourHome}</Text>
+          <Text style={styles.voteSubtitle}>{t.ratingScreen.rateSubtitle}</Text>
+          {voted ? (
+            <View style={styles.votedBanner}>
+              <MaterialCommunityIcons name="check-circle" size={28} color="#4F7A3D" />
+              <Text style={styles.votedText}>{t.ratingScreen.votedTitle}</Text>
+              <Text style={styles.votedSub}>{`${t.ratingScreen.canRateAgainIn} ${daysLeft} ${t.ratingScreen.days}`}</Text>
+            </View>
+          ) : (
+            <>
+              {CATEGORIES.map((cat) => (
+                <View key={cat.key} style={styles.ratingRow}>
+                  <View style={styles.ratingLabel}>
+                    <MaterialCommunityIcons name={cat.icon} size={20} color={SCREEN_THEME.terracottaDark} />
+                    <Text style={styles.ratingLabelText}>{cat.label}</Text>
+                  </View>
+                  <View style={styles.starsInput}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <TouchableOpacity key={star} onPress={() => setRatingModalCategory(cat.key as RatingCategoryKey)} activeOpacity={0.7}>
+                        <MaterialCommunityIcons name={star <= (ratings[cat.key] || 0) ? 'star' : 'star-outline'} size={30} color={star <= (ratings[cat.key] || 0) ? '#FFA000' : '#D6C4A3'} />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              ))}
+              <TouchableOpacity style={styles.submitVoteBtn} onPress={handleSubmitVote} activeOpacity={0.85}>
+                <Text style={styles.submitVoteBtnText}>{t.ratingScreen.submitRating}</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      </ScrollView>
+
+      <StarRatingModal
+        visible={Boolean(ratingModalCategory)}
+        title={CATEGORIES.find((cat) => cat.key === ratingModalCategory)?.label ?? t.ratingScreen.submitRating}
+        subtitle={RATING_MODAL_HINT[language]}
+        value={ratingModalCategory ? ratings[ratingModalCategory] || 0 : 0}
+        onSelect={(value) => { if (ratingModalCategory) handleVote(ratingModalCategory, value); }}
+        onClose={() => setRatingModalCategory(null)}
+      />
+      <MiniTabBar />
+    </SafeAreaView>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: SCREEN_THEME.appBg },
   backgroundLayer: { ...StyleSheet.absoluteFillObject },
@@ -397,6 +584,7 @@ const styles = StyleSheet.create({
   buildingScore: { alignItems: 'center', marginLeft: 8 },
   scoreNum: { fontSize: 20, fontWeight: '900', color: SCREEN_THEME.enamelBlueDark },
   scoreLabel: { fontSize: 10, color: SCREEN_THEME.textMuted },
+  detailsChevron: { marginTop: 4 },
   complaintsBadge: { backgroundColor: '#FFF1E7', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 4, marginTop: 4 },
   complaintsText: { fontSize: 10, color: SCREEN_THEME.terracottaDark, fontWeight: '700' },
   voteScroll: { padding: 16, paddingBottom: 110 },
@@ -437,4 +625,16 @@ const styles = StyleSheet.create({
   votedBanner: { alignItems: 'center', paddingVertical: 24, gap: 8 },
   votedText: { fontSize: 16, fontWeight: '900', color: '#4F7A3D' },
   votedSub: { fontSize: 13, color: SCREEN_THEME.textSecondary },
+  detailScroll: { padding: 16, paddingBottom: 110 },
+  detailHeroImage: { width: '100%', height: 180, borderRadius: 22, borderWidth: 1, borderColor: '#E4D0AB' },
+  detailHeroCard: { backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 22, padding: 16, marginTop: -26, marginHorizontal: 10, borderWidth: 1, borderColor: '#E4D0AB' },
+  detailAddress: { fontSize: 20, lineHeight: 25, fontWeight: '900', color: SCREEN_THEME.textPrimary, marginBottom: 14 },
+  detailScoreRow: { flexDirection: 'row', alignItems: 'stretch', gap: 10 },
+  detailScoreBox: { minWidth: 94, borderRadius: 16, backgroundColor: '#EDF7FA', borderWidth: 1, borderColor: '#D7E5EA', padding: 12, alignItems: 'center' },
+  detailScoreNum: { fontSize: 34, fontWeight: '900', color: SCREEN_THEME.enamelBlueDark },
+  detailScoreLabel: { fontSize: 11, fontWeight: '800', color: SCREEN_THEME.textMuted },
+  detailVotesBox: { flex: 1, borderRadius: 16, backgroundColor: '#F3F7E9', borderWidth: 1, borderColor: '#DCE8C9', padding: 12, justifyContent: 'center', alignItems: 'center', gap: 6 },
+  detailVotesText: { color: SCREEN_THEME.woodGreenDark, fontWeight: '900', fontSize: 14 },
+  detailCard: { backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 22, padding: 16, marginTop: 14, marginBottom: 14, borderWidth: 1, borderColor: '#E4D0AB' },
+  detailStatRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#EFE0C1' },
 });

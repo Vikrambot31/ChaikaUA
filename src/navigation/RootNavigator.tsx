@@ -40,7 +40,7 @@ import SectionScreen from '../screens/Razdel';
 import TopCafeScreen from '../screens/Top-Kafe';
 import TopStoresScreen from '../screens/Top-Magaziny';
 import SubscriptionScreen from '../screens/Podpiska-Premium';
-import RatingScreen from '../screens/Reyting-Domov';
+import RatingScreen, { BuildingRatingDetailScreen } from '../screens/Reyting-Domov';
 import QRCodeScreen from '../screens/QR-Kod';
 import ScrollableTabBar from '../components/ScrollableTabBar';
 import ErrorBoundary from '../components/ErrorBoundary';
@@ -69,6 +69,7 @@ import EdaNaChaykeScreen from '../screens/Eda-Na-Chayke';
 import SpisokPokupokScreen from '../screens/Spisok-Pokupok';
 import ProfileRequestsScreen from '../screens/ProfileRequestsScreen';
 import AppVersionInfoScreen from '../screens/AppVersionInfoScreen';
+import SupportScreen from '../screens/SupportScreen';
 import CrashDiagnosticsScreen from '../screens/CrashDiagnosticsScreen';
 import AppMonitorScreen from '../screens/AppMonitorScreen';
 import type { Request, Place } from '../types/app';
@@ -152,6 +153,7 @@ export type RootStackParamList = {
   RequestTopicScreen: undefined;
   SubscriptionScreen: undefined;
   RatingScreen: undefined;
+  BuildingRatingDetailScreen: { buildingId: string };
   QRCodeScreen: undefined;
   EditProfileScreen: undefined;
   PlacesAndPeopleHub: undefined;
@@ -187,6 +189,7 @@ export type RootStackParamList = {
   AppVersionInfoScreen: undefined;
   AppMonitorScreen: undefined;
   ViewUserProfile: { userId: string };
+  SupportScreen: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -225,6 +228,7 @@ const linking: LinkingOptions<RootStackParamList> = {
       PlacesScreen: 'screen/places/:tab?',
       SubscriptionScreen: 'screen/premium',
       RatingScreen: 'screen/rating',
+      BuildingRatingDetailScreen: 'screen/rating/building/:buildingId',
       EditProfileScreen: 'screen/profile/edit',
       OsbbHubScreen: 'screen/osbb',
       OsbbSborScreen: 'screen/osbb/collections',
@@ -303,6 +307,7 @@ const ROUTE_FILE_MAP: Record<string, string> = {
   RequestTopicScreen: 'Vibor-Temy-Zayavki.tsx',
   SubscriptionScreen: 'Podpiska-Premium.tsx',
   RatingScreen: 'Reyting-Domov.tsx',
+  BuildingRatingDetailScreen: 'Reyting-Domov.tsx',
   QRCodeScreen: 'QR-Kod.tsx',
   EditProfileScreen: 'EditProfileScreen.tsx',
   PlacesAndPeopleHub: 'Mistsa-i-Lyudi-Hub.tsx',
@@ -337,6 +342,7 @@ const ROUTE_FILE_MAP: Record<string, string> = {
   AppVersionInfoScreen: 'AppVersionInfoScreen.tsx',
   AppMonitorScreen: 'AppMonitorScreen.tsx',
   ViewUserProfile: 'ViewUserProfileScreen.tsx',
+  SupportScreen: 'SupportScreen.tsx',
 };
 
 function ScreenFileInfoOverlay() {
@@ -810,6 +816,7 @@ function AuthNavigation() {
         <Stack.Screen name="RequestTopicScreen" component={RequestTopicScreen} />
         <Stack.Screen name="SubscriptionScreen" component={SubscriptionScreen} />
         <Stack.Screen name="RatingScreen" component={RatingScreen} />
+        <Stack.Screen name="BuildingRatingDetailScreen" component={BuildingRatingDetailScreen} />
         <Stack.Screen name="QRCodeScreen" component={QRCodeScreen} />
         <Stack.Screen name="EditProfileScreen" component={withGuard(EditProfileScreen, 'auth')} />
         <Stack.Screen name="ViewUserProfile" component={withGuard(ViewUserProfileScreen, 'trusted')} />
@@ -845,6 +852,7 @@ function AuthNavigation() {
         <Stack.Screen name="MyApprovedPhotosScreen" component={MyApprovedPhotosScreen} options={{ headerShown: false }} />
         <Stack.Screen name="AppVersionInfoScreen" component={AppVersionInfoScreen} />
         <Stack.Screen name="AppMonitorScreen" component={withGuard(AppMonitorScreen, 'auth')} />
+        <Stack.Screen name="SupportScreen" component={withGuard(SupportScreen, 'auth')} />
       </Stack.Navigator>
       <ScreenFileInfoOverlay />
     </NavigationContainer>

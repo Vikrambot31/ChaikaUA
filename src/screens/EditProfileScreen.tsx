@@ -36,6 +36,7 @@ import MiniUserAvatar from '../components/MiniUserAvatar';
 import { getStartAvatarByKey, saveSelectedStartAvatar, START_AVATARS, START_AVATAR_URI_PREFIX } from '../utils/startAvatars';
 import { pickPhotoFromLibrary } from '../utils/photoPicker';
 import useSoftToast from '../hooks/useSoftToast';
+import { subscribeToUserTicket, hasUnreadAdminReply } from '../services/supportService';
 
 const UI_TEXT = {
   ua: {
@@ -172,6 +173,16 @@ const EditProfileScreen: React.FC<{ navigation: { goBack: () => void; navigate: 
     profession: '',
     about: '',
   }));
+  const [supportUnread, setSupportUnread] = useState(false);
+
+  useEffect(() => {
+    const uid = auth.currentUser?.uid || user?.id;
+    if (!uid) return;
+    const unsub = subscribeToUserTicket(uid, (ticket) => {
+      setSupportUnread(hasUnreadAdminReply(ticket));
+    });
+    return unsub;
+  }, [user?.id]);
 
   useEffect(() => {
     const syncProfile = async () => {
@@ -708,6 +719,23 @@ const EditProfileScreen: React.FC<{ navigation: { goBack: () => void; navigate: 
           <Text style={styles.sectionHint}>{text.sectionLangHint}</Text>
           <LanguageSelector />
         </View>
+
+        {user ? (
+          <TouchableOpacity
+            style={styles.supportButton}
+            onPress={() => navigation.navigate('SupportScreen')}
+            activeOpacity={0.86}
+          >
+            <View>
+              <MaterialCommunityIcons name="headset" size={20} color={SCREEN_THEME.textPrimary} />
+              {supportUnread && <View style={styles.supportBadge} />}
+            </View>
+            <Text style={styles.supportButtonText}>
+              {language === 'ru' ? 'Служба Поддержки' : language === 'en' ? 'Support' : 'Служба Підтримки'}
+            </Text>
+            <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
+          </TouchableOpacity>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -1060,6 +1088,34 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     color: SCREEN_THEME.textPrimary,
     fontWeight: '500',
+  },
+  supportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderRadius: 16,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: '#E4D0AB',
+    gap: 10,
+  },
+  supportButtonText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: SCREEN_THEME.textPrimary,
+  },
+  supportBadge: {
+    position: 'absolute',
+    top: -3,
+    right: -3,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#EF4444',
+    borderWidth: 1.5,
+    borderColor: '#FFF',
   },
 });
 

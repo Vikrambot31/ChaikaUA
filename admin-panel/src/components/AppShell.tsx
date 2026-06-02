@@ -10,7 +10,7 @@ import { useViewMode, type ViewMode } from '../contexts/ViewModeContext';
 import { useDashboardContext } from '../contexts/DashboardContext';
 import type { DashboardStats } from '../services/dashboardService';
 
-export type AdminPageKey = 'dashboard' | 'moderation' | 'archive' | 'invite_access' | 'guarantor_tree' | 'access_control' | 'security' | 'errors' | 'photo_approval' | 'releases' | 'ai_diagnostics' | 'app_rules';
+export type AdminPageKey = 'dashboard' | 'moderation' | 'archive' | 'invite_access' | 'guarantor_tree' | 'access_control' | 'security' | 'errors' | 'photo_approval' | 'releases' | 'ai_diagnostics' | 'app_rules' | 'support';
 
 type AppShellProps = {
   children: ReactNode;
@@ -82,6 +82,11 @@ const navItems: Array<{ key: AdminPageKey; label: string; hint: string }> = [
     label: 'Серверні правила',
     hint: 'Живая карта текущих правил: Firebase Rules, Storage Rules, runtime-конфиги, upload pipeline, доступ, модерация и риски.',
   },
+  {
+    key: 'support',
+    label: 'Служба Підтримки',
+    hint: 'Звернення користувачів: перегляд, відповідь, закриття тикетів.',
+  },
 ];
 
 const navItemIcons: Record<AdminPageKey, string> = {
@@ -97,6 +102,7 @@ const navItemIcons: Record<AdminPageKey, string> = {
   releases: '\u{1F4E6}',
   ai_diagnostics: '\u{1F9E0}',
   app_rules: '\u{1F4CB}',
+  support: '\u{1F3A7}',
 };
 
 type AttentionLevel = 'low' | 'medium' | 'high';

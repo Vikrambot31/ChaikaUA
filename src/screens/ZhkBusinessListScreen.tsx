@@ -1029,17 +1029,6 @@ export default function ZhkBusinessListScreen() {
         </ScrollView>
       )}
 
-      {!loading && !error && topItems.length > 0 ? (
-        <View style={styles.topSection}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>{t.topForYou}</Text>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.topBusinessRow}>
-            {topItems.map((item) => renderTopBusinessCard(item))}
-          </ScrollView>
-        </View>
-      ) : null}
-
       {/* Content */}
       {loading ? (
         <View style={styles.center}>
@@ -1072,6 +1061,16 @@ export default function ZhkBusinessListScreen() {
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
         >
+          {topItems.length > 0 ? (
+            <View style={styles.topSectionInList}>
+              <View style={styles.sectionHeaderRowInList}>
+                <Text style={styles.sectionTitle}>{t.topForYou}</Text>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.topBusinessRowInList}>
+                {topItems.map((item) => renderTopBusinessCard(item))}
+              </ScrollView>
+            </View>
+          ) : null}
           {filtered.map((item) => {
             const likesByUserId = {
               ...(item.likesByUserId ?? {}),
@@ -1450,7 +1449,20 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 13, fontWeight: '700', color: SCREEN_THEME.textSecondary },
   chipTextActive: { color: '#fff' },
   topSection: { marginBottom: 4 },
+  topSectionInList: {
+    marginHorizontal: -16,
+    marginTop: 2,
+    marginBottom: 12,
+  },
   sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    marginTop: 2,
+    marginBottom: 10,
+  },
+  sectionHeaderRowInList: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -1460,6 +1472,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { fontSize: 18, fontWeight: '900', color: SCREEN_THEME.textPrimary },
   topBusinessRow: { paddingHorizontal: 16, paddingBottom: 14, gap: 10 },
+  topBusinessRowInList: { paddingHorizontal: 16, paddingBottom: 14, gap: 10 },
   topBusinessCard: {
     width: 232,
     minHeight: 226,
