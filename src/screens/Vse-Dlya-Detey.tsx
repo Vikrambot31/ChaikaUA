@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
+  Dimensions,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -8,6 +9,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+
+const TILE_GAP = 10;
+const TILE_W = (Dimensions.get('window').width - 32 - TILE_GAP) / 2;
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
@@ -475,21 +479,22 @@ export default function VseDlyaDeteyScreen() {
           <Text style={styles.sectionTitle}>{text.categoriesTitle}</Text>
         </View>
         <View style={styles.categoryGrid}>
-          {CATEGORIES.map((category) => {
+          {CATEGORIES.map((category, index) => {
             const isActive = activeCategory === category.key;
+            const isRightCol = index % 2 === 1;
             return (
               <TouchableOpacity
                 key={category.key}
                 style={[
                   styles.categoryTile,
                   { backgroundColor: category.bg },
+                  isRightCol && styles.categoryTileRight,
                   isActive && styles.categoryTileActive,
                 ]}
                 onPress={() => setActiveCategory(category.key)}
                 activeOpacity={0.82}
               >
-                {isActive && <View style={styles.categoryTileRing} />}
-                <View style={styles.categoryTileIconWrap}>
+                <View pointerEvents="none" style={styles.categoryTileIconWrap}>
                   <MaterialCommunityIcons
                     name={category.icon}
                     size={34}
@@ -499,7 +504,7 @@ export default function VseDlyaDeteyScreen() {
                 <Text style={styles.categoryTileText}>
                   {text.categories[category.key]}
                 </Text>
-                <View style={styles.categoryTileCountBadge}>
+                <View pointerEvents="none" style={styles.categoryTileCountBadge}>
                   <Text style={styles.categoryTileCount}>{categoryCounts[category.key]}</Text>
                 </View>
               </TouchableOpacity>
@@ -677,12 +682,10 @@ const styles = StyleSheet.create({
   categoryGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 16,
+    marginBottom: 6,
   },
   categoryTile: {
-    width: '47%',
-    flexGrow: 1,
+    width: TILE_W,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 20,
@@ -696,6 +699,10 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     shadowOffset: { width: 1, height: 4 },
     elevation: 5,
+    marginBottom: TILE_GAP,
+  },
+  categoryTileRight: {
+    marginLeft: TILE_GAP,
   },
   categoryTileActive: {
     borderColor: '#FFFFFF',
@@ -704,45 +711,34 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 8,
   },
-  categoryTileRing: {
-    position: 'absolute' as const,
-    top: -10,
-    right: -10,
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-  },
   categoryTileIconWrap: {
     width: 54,
     height: 54,
     borderRadius: 27,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.2)',
     marginBottom: 6,
   },
   categoryTileText: {
     fontSize: 14,
-    fontWeight: '800' as const,
+    fontWeight: '800',
     color: '#FFFFFF',
-    textAlign: 'center' as const,
+    textAlign: 'center',
   },
   categoryTileCountBadge: {
-    position: 'absolute' as const,
-    top: 8,
-    right: 8,
+    marginTop: 6,
     minWidth: 22,
-    height: 22,
-    borderRadius: 11,
+    height: 20,
+    borderRadius: 10,
     backgroundColor: 'rgba(255,255,255,0.28)',
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-    paddingHorizontal: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
   },
   categoryTileCount: {
     fontSize: 11,
-    fontWeight: '900' as const,
+    fontWeight: '900',
     color: '#FFFFFF',
   },
   expandButton: {
