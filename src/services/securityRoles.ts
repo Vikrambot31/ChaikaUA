@@ -73,6 +73,10 @@ export const getSecurityRole = async (uid: string): Promise<SecurityRoleSnapshot
     };
   } catch (error) {
     void logClientError('securityRoles.getSecurityRole', error, { uid });
+    const cached = await getCachedSecurityRole(uid);
+    if (cached) {
+      return cached;
+    }
     throw error;
   }
 };

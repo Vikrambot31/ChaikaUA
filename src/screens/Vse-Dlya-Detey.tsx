@@ -37,13 +37,10 @@ const UI_TEXT = {
     actualEmptyTitle: 'Тут зʼявляться відкриті дні та акції',
     actualEmptyText: 'Садочки, школи та гуртки зможуть показувати набори, пробні заняття й події для мешканців району.',
     categoriesTitle: 'Категорії',
-    recommendedTitle: 'Є місця / Рекомендуємо поруч',
     allPlacesTitle: 'Всі місця для дітей',
     eventsListTitle: 'Події та пропозиції',
     noResults: 'Нічого не знайдено. Спробуйте змінити пошук або категорію.',
     noOffers: 'Поки що немає активних подій або пропозицій.',
-    showPlaces: 'Розгорнути / показати місця',
-    hidePlaces: 'Згорнути місця',
     details: 'Детальніше',
     call: 'Подзвонити',
     telegram: 'Telegram',
@@ -104,13 +101,10 @@ const UI_TEXT = {
     actualEmptyTitle: 'Здесь появятся открытые дни и акции',
     actualEmptyText: 'Садики, школы и кружки смогут показывать наборы, пробные занятия и события для жителей района.',
     categoriesTitle: 'Категории',
-    recommendedTitle: 'Есть места / Рекомендуем рядом',
     allPlacesTitle: 'Все места для детей',
     eventsListTitle: 'События и предложения',
     noResults: 'Ничего не найдено. Попробуйте изменить поиск или категорию.',
     noOffers: 'Пока нет активных событий или предложений.',
-    showPlaces: 'Развернуть / показать места',
-    hidePlaces: 'Свернуть места',
     details: 'Подробнее',
     call: 'Позвонить',
     telegram: 'Telegram',
@@ -171,13 +165,10 @@ const UI_TEXT = {
     actualEmptyTitle: 'Open days and offers will appear here',
     actualEmptyText: 'Kindergartens, schools and clubs will be able to show enrollments, trial lessons and local events.',
     categoriesTitle: 'Categories',
-    recommendedTitle: 'Available spots / Nearby picks',
     allPlacesTitle: 'All kids places',
     eventsListTitle: 'Events and offers',
     noResults: 'Nothing found. Try changing search or category.',
     noOffers: 'No active events or offers yet.',
-    showPlaces: 'Expand / show places',
-    hidePlaces: 'Collapse places',
     details: 'Details',
     call: 'Call',
     telegram: 'Telegram',
@@ -309,8 +300,6 @@ export default function VseDlyaDeteyScreen() {
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
   const [activeCategory, setActiveCategory] = useState<CategoryKey>('all');
   const [query, setQuery] = useState('');
-  const [isRecommendedExpanded, setIsRecommendedExpanded] = useState(false);
-  const [isAllPlacesExpanded, setIsAllPlacesExpanded] = useState(false);
 
   const childPlaces = useMemo(() => (
     chaykaPlaces
@@ -343,8 +332,6 @@ export default function VseDlyaDeteyScreen() {
     });
   }, [activeCategory, childPlaces, query]);
 
-  const recommendedPlaces = useMemo(() => filteredPlaces.slice(0, 4), [filteredPlaces]);
-
   const activeOffers = useMemo(() => getActiveOffers(), []);
   const isEventsCategory = activeCategory === 'event';
 
@@ -358,8 +345,6 @@ export default function VseDlyaDeteyScreen() {
 
   const handleCategoryPress = (category: CategoryKey) => {
     setActiveCategory(category);
-    setIsRecommendedExpanded(false);
-    setIsAllPlacesExpanded(category !== 'event');
   };
 
   const renderOfferCard = (offer: ChildOffer, wide = false) => {
@@ -426,17 +411,6 @@ export default function VseDlyaDeteyScreen() {
       </TouchableOpacity>
     );
   };
-
-  const renderExpandButton = (expanded: boolean, onPress: () => void) => (
-    <TouchableOpacity style={styles.expandButton} activeOpacity={0.86} onPress={onPress}>
-      <Text style={styles.expandButtonText}>{expanded ? text.hidePlaces : text.showPlaces}</Text>
-      <MaterialCommunityIcons
-        name={expanded ? 'chevron-up' : 'chevron-down'}
-        size={22}
-        color={SCREEN_THEME.enamelBlueDark}
-      />
-    </TouchableOpacity>
-  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -521,28 +495,10 @@ export default function VseDlyaDeteyScreen() {
           })}
         </View>
 
-        {!isEventsCategory && recommendedPlaces.length > 0 ? (
-          <>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>{text.recommendedTitle}</Text>
-            </View>
-            {renderExpandButton(isRecommendedExpanded, () => setIsRecommendedExpanded((current) => !current))}
-            {isRecommendedExpanded ? (
-              <View style={styles.cardList}>
-                {recommendedPlaces.map((item) => renderPlaceCard(item, true))}
-              </View>
-            ) : null}
-          </>
-        ) : null}
-
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>{isEventsCategory ? text.eventsListTitle : text.allPlacesTitle}</Text>
           <Text style={styles.resultCount}>{isEventsCategory ? activeOffers.length : filteredPlaces.length}</Text>
         </View>
-
-        {!isEventsCategory && filteredPlaces.length > 0 ? (
-          renderExpandButton(isAllPlacesExpanded, () => setIsAllPlacesExpanded((current) => !current))
-        ) : null}
 
         {isEventsCategory ? (
           activeOffers.length > 0 ? (
@@ -555,11 +511,11 @@ export default function VseDlyaDeteyScreen() {
               <Text style={styles.emptyText}>{text.noOffers}</Text>
             </View>
           )
-        ) : filteredPlaces.length > 0 && isAllPlacesExpanded ? (
+        ) : filteredPlaces.length > 0 ? (
           <View style={styles.cardList}>
             {filteredPlaces.map((item) => renderPlaceCard(item))}
           </View>
-        ) : filteredPlaces.length > 0 ? null : (
+        ) : (
           <View style={styles.emptyState}>
             <MaterialCommunityIcons name="magnify-close" size={34} color={SCREEN_THEME.textMuted} />
             <Text style={styles.emptyText}>{text.noResults}</Text>
@@ -749,24 +705,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '900',
     color: '#FFFFFF',
-  },
-  expandButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: SCREEN_THEME.paperStrong,
-    borderRadius: 18,
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-    borderWidth: 1,
-    borderColor: SCREEN_THEME.borderSoft,
-    marginBottom: 12,
-  },
-  expandButtonText: {
-    flex: 1,
-    color: SCREEN_THEME.enamelBlueDark,
-    fontSize: 15,
-    fontWeight: '900',
   },
   cardList: {
     gap: 10,

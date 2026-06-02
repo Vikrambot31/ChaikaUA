@@ -9,7 +9,6 @@ import { get, ref } from 'firebase/database';
 import { database, firebaseChatAPI } from '../firebase-config';
 import type { RootState } from '../redux/store';
 import type { Request } from '../types/app';
-import TactileIcon from '../components/TactileIcon';
 import AppPhotoImage from '../components/AppPhotoImage';
 import MiniUserAvatar from '../components/MiniUserAvatar';
 import { LIGHT_ORBS, SCREEN_THEME } from '../utils/screenTheme';
@@ -21,6 +20,8 @@ import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 import { loadProfileRecord } from '../services/authProfileService';
 import { offerHelp, checkIfHelped } from '../services/bonusService';
 import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
+import ContactReasonModal from '../components/ContactReasonModal';
+import { useContactRequest } from '../hooks/useContactRequest';
 
 type RequestDetailParams = {
   request: Request;
@@ -166,10 +167,10 @@ const RequestDetailScreen = ({
   const currentUser = useSelector((state: RootState) => state.auth.user);
   const text = UI_TEXT[language];
   const contactActionText = CONTACT_ACTION_TEXT[language];
+  const { modalVisible, pending, currentTarget, openModal, closeModal, sendRequest } = useContactRequest();
   const { request } = route.params;
   const [deleting, setDeleting] = useState(false);
   const [accessStatus, setAccessStatus] = useState<'pending' | 'approved' | 'denied' | null>(null);
-  const [sendingConnect, setSendingConnect] = useState(false);
   const [profileName, setProfileName] = useState('');
   const [profileAge, setProfileAge] = useState<number | undefined>();
   const [profileGender, setProfileGender] = useState('');
@@ -262,48 +263,10 @@ const RequestDetailScreen = ({
     };
   }, [request.id]);
 
-  const handleConnect = async () => {
-    if (!currentUser?.id || !request.userId || currentUser.id === request.userId) {
-      Alert.alert(text.connectCant, text.connectCant);
-      return;
-    }
-
-    setSendingConnect(true);
-    try {
-      const result = await profilePermissionService.requestView(
-        request.userId,
-        {
-          id: currentUser.id,
-          name: currentUser.name || text.fallbackName,
-          photoURL: currentUser.photoURL,
-        },
-        'help',
-        {
-          name: displayName,
-          photoURL: resolvedAvatarUri,
-        },
-      );
-
-      if (result === 'already_approved') {
-        setAccessStatus('approved');
-        return;
-      }
-      if (result === 'already_pending') {
-        setAccessStatus('pending');
-        return;
-      }
-
-      setAccessStatus('pending');
-      Alert.alert(text.connectSentTitle, text.connectSentBody);
-    } catch {
-      Alert.alert(text.connectCant, text.connectCant);
-    } finally {
-      setSendingConnect(false);
-    }
-  };
-
   const hasPhone = Boolean(request.phone?.trim());
+  const canRequestContact = Boolean(request.userId && request.userId !== currentUser?.id);
   const canOpenProfile = Boolean(request.userId && request.userId !== currentUser?.id);
+  const canContact = canRequestContact || hasPhone;
 
   const handleCopyPhone = async () => {
     if (!request.phone) return;
@@ -314,6 +277,27 @@ const RequestDetailScreen = ({
   const handleProfile = () => {
     if (!canOpenProfile || !request.userId) return;
     navigation.navigate('ViewUserProfile', { userId: request.userId });
+  };
+
+  const handleContact = () => {
+    if (canRequestContact && request.userId) {
+      void openModal({
+        userId: request.userId,
+        name: displayName,
+        photoURL: resolvedAvatarUri,
+        sourceType: 'help',
+        sourceId: request.id,
+        sourceTitle: (request.text || request.description || '').slice(0, 60),
+      });
+      return;
+    }
+
+    if (!hasPhone) return;
+    Alert.alert(text.connect, displayName, [
+      { text: contactActionText.call, onPress: () => { void safeCallPhone(request.phone, language); } },
+      { text: contactActionText.viber, onPress: () => { void safeOpenViber(request.phone, language); } },
+      { text: text.cancel, style: 'cancel' },
+    ]);
   };
 
   const isOwnRequest = useMemo(() => {
@@ -481,18 +465,12 @@ const RequestDetailScreen = ({
         </View>
 
         <TouchableOpacity
-          style={[styles.callButton, sendingConnect && styles.actionButtonDisabled]}
-          onPress={() => void handleConnect()}
-          disabled={sendingConnect || isOwnRequest}
+          style={[styles.contactBtn, !canContact && styles.disabledContactAction]}
+          onPress={handleContact}
+          disabled={!canContact}
+          activeOpacity={0.86}
         >
-          {sendingConnect ? (
-            <ActivityIndicator color="#FFF9EE" />
-          ) : (
-            <>
-              <TactileIcon icon="account-arrow-right-outline" size={42} iconSize={18} backgroundColor="#4F7A3D" tint="#F5FBEF" />
-              <Text style={styles.callButtonText}>{text.connect}</Text>
-            </>
-          )}
+          <Text style={[styles.contactBtnText, !canContact && styles.disabledContactText]}>{text.connect}</Text>
         </TouchableOpacity>
 
         {!isOwnRequest && accessStatus ? (
@@ -549,6 +527,13 @@ const RequestDetailScreen = ({
         </TouchableOpacity>
       </ScrollView>
       <MiniTabBar />
+      <ContactReasonModal
+        visible={modalVisible}
+        pending={pending}
+        target={currentTarget}
+        onSelect={(reason) => void sendRequest(reason)}
+        onClose={closeModal}
+      />
     </SafeAreaView>
   );
 };
@@ -600,8 +585,8 @@ const styles = StyleSheet.create({
   smallActionAltText: { color: '#403933', fontSize: 12, fontWeight: '900' },
   disabledContactAction: { backgroundColor: '#E1D7CF' },
   disabledContactText: { color: '#9F958E' },
-  callButton: { backgroundColor: SCREEN_THEME.woodGreen, borderRadius: 20, minHeight: 58, borderWidth: 1, borderColor: SCREEN_THEME.woodGreenDark, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 12 },
-  callButtonText: { color: '#FFF9EE', fontSize: 16, fontWeight: '900' },
+  contactBtn: { alignItems: 'center', backgroundColor: '#7A1E5C', borderRadius: 16, paddingVertical: 14, marginBottom: 12 },
+  contactBtnText: { color: '#fff', fontSize: 15, fontWeight: '900' },
   actionButtonDisabled: { opacity: 0.7 },
   connectStatusText: { marginBottom: 10, textAlign: 'center', color: SCREEN_THEME.textSecondary, fontSize: 13, fontWeight: '700' },
   deleteButton: {

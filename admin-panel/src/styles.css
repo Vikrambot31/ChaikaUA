@@ -4824,3 +4824,70 @@ td {
   font-weight: 900;
   cursor: pointer;
 }
+
+/* ── Reject Modal ── */
+.rejectModalDialog {
+  width: min(92vw, 520px);
+  max-height: 92vh;
+  overflow: auto;
+  background: #ffffff;
+  border: 1px solid #d6e2f4;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(13, 22, 38, 0.25);
+  display: flex;
+  flex-direction: column;
+}
+.rejectModalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e8eef6;
+}
+.rejectModalBody {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.rejectTextarea {
+  width: 100%;
+  min-height: 80px;
+  resize: vertical;
+  font-size: 14px;
+  padding: 10px;
+  border: 1px solid #d6e2f4;
+  border-radius: 8px;
+  font-family: inherit;
+}
+.rejectTextarea:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+.rejectTemplates small {
+  color: #64748b;
+  font-size: 12px;
+}
+.rejectTemplateButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.rejectTemplateBtn {
+  font-size: 12px !important;
+  padding: 4px 10px !important;
+  background: #f1f5f9 !important;
+  border: 1px solid #d6e2f4 !important;
+}
+.rejectTemplateBtn:hover {
+  background: #e2e8f0 !important;
+}
+.rejectModalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid #e8eef6;
+}

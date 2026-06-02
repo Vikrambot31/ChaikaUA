@@ -16,11 +16,6 @@ import { TrustedAccessContext } from '../contexts/TrustedAccessContext';
 import { isPrimaryServiceEmail } from '../firebase-auth-session';
 import { auth } from '../firebase-core';
 import { getCurrentUserSecurityRole } from '../services/securityRoles';
-import {
-  isEmergencyAccessActive,
-  subscribeEmergencyAccess,
-  type EmergencyAccessCurrent,
-} from '../services/emergencyAccess';
 
 type SoftInviteAccessGateProps = {
   children: React.ReactNode;
@@ -75,8 +70,8 @@ export default function SoftInviteAccessGate({ children }: SoftInviteAccessGateP
   const [forcedInviteVisible, setForcedInviteVisible] = useState(false);
   const [inviteIntroSeen, setInviteIntroSeen] = useState(false);
   const [lastRefreshAt, setLastRefreshAt] = useState(0);
-  const [emergencyAccess, setEmergencyAccess] = useState<EmergencyAccessCurrent | null>(null);
   const [isPrivilegedUser, setIsPrivilegedUser] = useState(() => isPrimaryServiceEmail(auth.currentUser));
+  const [isPrivilegeResolved, setIsPrivilegeResolved] = useState(() => isPrimaryServiceEmail(auth.currentUser));
   const wasInviteRequiredRef = useRef(false);
   const previousAccessStatusRef = useRef<string | null>(null);
   const requesterPhone = user?.phone || '';
@@ -128,31 +123,28 @@ export default function SoftInviteAccessGate({ children }: SoftInviteAccessGateP
   }, [user?.id]);
 
   useEffect(() => {
-    const unsubscribe = subscribeEmergencyAccess(
-      setEmergencyAccess,
-      () => setEmergencyAccess(null),
-    );
-    return unsubscribe;
-  }, []);
-
-  useEffect(() => {
     if (isPrimaryServiceEmail(auth.currentUser)) {
       setIsPrivilegedUser(true);
+      setIsPrivilegeResolved(true);
       return;
     }
     if (!user?.id) {
       setIsPrivilegedUser(false);
+      setIsPrivilegeResolved(true);
       return;
     }
 
+    setIsPrivilegeResolved(false);
     let active = true;
     void getCurrentUserSecurityRole().then((roleSnapshot) => {
       if (active) {
         setIsPrivilegedUser(roleSnapshot.role === 'admin' || roleSnapshot.role === 'moderator');
+        setIsPrivilegeResolved(true);
       }
     }).catch(() => {
       if (active) {
         setIsPrivilegedUser(false);
+        setIsPrivilegeResolved(true);
       }
     });
 
@@ -206,11 +198,7 @@ export default function SoftInviteAccessGate({ children }: SoftInviteAccessGateP
     );
   }
 
-  if (
-    isPrivilegedUser &&
-    isEmergencyAccessActive(emergencyAccess) &&
-    emergencyAccess?.bypassInviteAccess
-  ) {
+  if (isPrivilegedUser) {
     return (
       <TrustedAccessContext.Provider value={trustedValue(true, false, false)}>
         {children}
@@ -247,6 +235,15 @@ export default function SoftInviteAccessGate({ children }: SoftInviteAccessGateP
   }
 
   // в"Ђв"Ђ Feature disabled globally в"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђ
+  // Wait for privilege check before showing restricted banners.
+  if (!isPrivilegeResolved) {
+    return (
+      <TrustedAccessContext.Provider value={trustedValue(false, true, false)}>
+        {children}
+      </TrustedAccessContext.Provider>
+    );
+  }
+
   // Fail closed for trusted access when the invite config is missing/disabled.
   if (snapshot!.featureEnabled !== true) {
     return (

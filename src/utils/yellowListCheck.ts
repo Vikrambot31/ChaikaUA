@@ -53,6 +53,6 @@ export async function checkYellowList(uid: string | undefined, language?: string
     return true;
   } catch (error) {
     void logClientError('yellowListCheck.checkYellowList', error, { uid });
-    throw error;
+    return false;
   }
 }

@@ -216,6 +216,11 @@
       ".write": "auth != null && root.child('user_roles').child(auth.uid).child('role').val() === 'admin'"
     },
 
+    "app_releases": {
+      ".read": "auth != null && root.child('user_roles').child(auth.uid).child('role').val() === 'admin'",
+      ".write": "auth != null && root.child('user_roles').child(auth.uid).child('role').val() === 'admin'"
+    },
+
     "app_version": {
       ".read": true,
       ".write": "auth != null && root.child('user_roles').child(auth.uid).child('role').val() === 'admin'"

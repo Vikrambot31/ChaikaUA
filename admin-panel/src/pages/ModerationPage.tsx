@@ -3,6 +3,7 @@ import type { User } from 'firebase/auth';
 import { InfoHint } from '../components/InfoHint';
 import { AiAnalysisButton } from '../components/AiAnalysisButton';
 import { EditRequestModal } from '../components/EditRequestModal';
+import { RejectModal } from '../components/RejectModal';
 import { analyzeText } from '../services/aiAnalysisService';
 import { logDisagreement } from '../services/aiFeedbackService';
 import { addToYellowList, subscribeYellowList, removeFromYellowList, getServerNow, type YellowListEntry } from '../services/yellowListService';
@@ -26,7 +27,11 @@ type ModerationPageProps = {
 
 type StatusFilter = 'all' | ModerationStatus;
 type AiVerdictFilter = 'all' | AiVerdict;
+type PriorityFilter = 'all' | 'urgent' | 'standard' | 'low';
 type MassAnalysisStrategy = 'oldest-first' | 'high-risk-first' | 'newest-first';
+
+/** Target for the rejection modal — single item or batch */
+type RejectTarget = { kind: 'single'; item: ModerationItem } | { kind: 'batch'; items: ModerationItem[] };
 
 const HIGH_RISK_SECTIONS = new Set<ModerationSectionKey>(['buySell', 'jobs', 'lostFound']);
 const AUTO_APPROVE_SECTIONS = new Set<ModerationSectionKey>(['requests', 'appSuggestions', 'contactsListings']);
@@ -39,9 +44,13 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
   const [items, setItems] = useState<ModerationItem[]>([]);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(initialStatusFilter);
   const [sectionFilter, setSectionFilter] = useState<'all' | ModerationSectionKey>('all');
+  const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [search, setSearch] = useState('');
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
+  const [rejectTarget, setRejectTarget] = useState<RejectTarget | null>(null);
   const [visibleLimit, setVisibleLimit] = useState(100);
   const [loading, setLoading] = useState(true);
   const [busyActions, setBusyActions] = useState<Set<string>>(new Set());
@@ -242,10 +251,15 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
   const filteredItems = useMemo(
     () => {
       const normalizedSearch = search.trim().toLowerCase();
+      const fromTs = dateFrom ? new Date(dateFrom).getTime() : 0;
+      const toTs = dateTo ? new Date(dateTo + 'T23:59:59').getTime() : Infinity;
       return items
         .filter((item) =>
           (statusFilter === 'all' || item.status === statusFilter) &&
-          (sectionFilter === 'all' || item.section === sectionFilter),
+          (sectionFilter === 'all' || item.section === sectionFilter) &&
+          (priorityFilter === 'all' || item.priority === priorityFilter) &&
+          item.timestamp >= fromTs &&
+          item.timestamp <= toTs,
         )
         .filter((item) => {
           if (aiVerdictFilter === 'all') return true;
@@ -268,12 +282,13 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
         })
         .sort((left, right) => sortOrder === 'newest' ? right.timestamp - left.timestamp : left.timestamp - right.timestamp);
     },
-    [items, search, sectionFilter, sortOrder, statusFilter, aiVerdictFilter, aiResults],
+    [items, search, sectionFilter, sortOrder, statusFilter, aiVerdictFilter, aiResults, priorityFilter, dateFrom, dateTo],
   );
 
   const visibleItems = filteredItems.slice(0, visibleLimit);
   const selectedItems = visibleItems.filter((item) => selectedPaths.has(item.path));
   const approvableSelectedItems = selectedItems.filter((item) => item.status !== 'approved');
+  const rejectableSelectedItems = selectedItems.filter((item) => item.status !== 'rejected');
   const deletableSelectedItems = selectedItems;
 
   const runAction = async (
@@ -463,6 +478,15 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
           />
         </label>
         <label className="field">
+          <span>Приоритет</span>
+          <select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value as PriorityFilter)}>
+            <option value="all">Все</option>
+            <option value="urgent">Срочные</option>
+            <option value="standard">Стандартные</option>
+            <option value="low">Низкие</option>
+          </select>
+        </label>
+        <label className="field">
           <span>AI вердикт</span>
           <select value={aiVerdictFilter} onChange={(event) => setAiVerdictFilter(event.target.value as AiVerdictFilter)}>
             <option value="all">Все</option>
@@ -470,6 +494,14 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
             <option value="review">AI: проверить</option>
             <option value="suspicious">AI: подозрительно</option>
           </select>
+        </label>
+        <label className="field">
+          <span>Дата от</span>
+          <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+        </label>
+        <label className="field">
+          <span>Дата до</span>
+          <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
         </label>
         <label className="field">
           <span>Сортировка</span>
@@ -513,6 +545,14 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
             onClick={() => void approveSelected()}
           >
             Одобрить все
+          </button>
+          <button
+            type="button"
+            className="smallButton dangerButton"
+            disabled={!rejectableSelectedItems.length || busyActions.size > 0}
+            onClick={() => setRejectTarget({ kind: 'batch', items: [...rejectableSelectedItems] })}
+          >
+            Отклонить выбранные
           </button>
           <button
             type="button"
@@ -647,10 +687,7 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
                         type="button"
                         className="smallButton dangerButton"
                         disabled={busyActions.size > 0}
-                        onClick={() => {
-                          const reason = window.prompt('Причина отклонения (необязательно):') ?? undefined;
-                          void runAction(item, 'rejected', { reason: reason?.trim() || undefined });
-                        }}
+                        onClick={() => setRejectTarget({ kind: 'single', item })}
                       >
                         Отклонить
                       </button>
@@ -809,6 +846,24 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
             setItems((prev) => prev.filter((i) => i.path !== updated.path));
             setEditModalItem(null);
             setMessage('Запись отредактирована и одобрена.');
+          }}
+        />
+      ) : null}
+
+      {rejectTarget ? (
+        <RejectModal
+          count={rejectTarget.kind === 'single' ? 1 : rejectTarget.items.length}
+          onCancel={() => setRejectTarget(null)}
+          onConfirm={async (reason) => {
+            const target = rejectTarget;
+            setRejectTarget(null);
+            if (target.kind === 'single') {
+              await runAction(target.item, 'rejected', { reason });
+            } else {
+              for (const item of target.items) {
+                await runAction(item, 'rejected', { reason });
+              }
+            }
           }}
         />
       ) : null}

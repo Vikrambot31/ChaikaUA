@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   RefreshControl,
   SafeAreaView,
   ScrollView,
@@ -428,18 +429,23 @@ export default function TopGirlsBoysScreen() {
     if (!user?.id || !permModal.targetId) return;
     setPermModal((prev) => ({ ...prev, state: 'sending' }));
     const target = filteredRanked.find((p) => p.id === permModal.targetId);
-    const result = await profilePermissionService.requestView(
-      permModal.targetId,
-      { id: user.id, name: user.name ?? '', photoURL: user.photoURL },
-      'lyudi',
-      { name: target?.name, photoURL: target?.photoURL }
-    );
-    if (result === 'already_approved') {
-      setPermModal((prev) => ({ ...prev, state: 'open', contactInfo: target?.phone ?? '' }));
-    } else if (result === 'already_pending') {
-      setPermModal((prev) => ({ ...prev, state: 'pending' }));
-    } else {
-      setPermModal((prev) => ({ ...prev, state: 'sent' }));
+    try {
+      const result = await profilePermissionService.requestView(
+        permModal.targetId,
+        { id: user.id, name: user.name ?? '', photoURL: user.photoURL },
+        'lyudi',
+        { name: target?.name, photoURL: target?.photoURL }
+      );
+      if (result === 'already_approved') {
+        setPermModal((prev) => ({ ...prev, state: 'open', contactInfo: target?.phone ?? '' }));
+      } else if (result === 'already_pending') {
+        setPermModal((prev) => ({ ...prev, state: 'pending' }));
+      } else {
+        setPermModal((prev) => ({ ...prev, state: 'sent' }));
+      }
+    } catch (error) {
+      setPermModal((prev) => ({ ...prev, state: 'confirm' }));
+      Alert.alert('Помилка', error instanceof Error ? error.message : 'Не вдалося надіслати запит');
     }
   }, [user?.id, user?.name, user?.photoURL, permModal.targetId, filteredRanked]);
 
