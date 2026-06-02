@@ -1,13 +1,10 @@
-import { off, onValue, push, ref, set } from 'firebase/database';
+import { onValue, push, ref, set, update } from 'firebase/database';
 import { database } from '../firebase/firebase';
-import { LOCAL_MODE } from '../local/LOCAL_MODE';
 
 const BASE = 'diagnostics/runtime_moderation';
-const TRIGGER_PATH = `${BASE}/_audit_trigger`;
 const STATUS_PATH = `${BASE}/_audit_status`;
 const LOGS_PATH = `${BASE}/_audit_logs`;
 const HISTORY_PATH = `${BASE}/_audit_history`;
-const HEARTBEAT_PATH = `${BASE}/_daemon_heartbeat`;
 
 export type AuditStatus = 'idle' | 'running' | 'completed' | 'failed' | 'cancelled';
 
@@ -75,46 +72,234 @@ export type FindingRecord = {
   memoryImpact?: string;
 };
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+const statusRef = () => ref(database, STATUS_PATH);
+const logsRef = () => ref(database, LOGS_PATH);
+
+async function fbUpdateStatus(data: Record<string, unknown>) {
+  try { await update(statusRef(), data); } catch (err) { console.error('[audit] RTDB status write error', err); }
+}
+
+async function fbPushLog(entry: { message: string; severity: string; scanner: string; at: number }) {
+  try { await push(logsRef(), entry); } catch (err) { console.error('[audit] RTDB log write error', err); }
+}
+
+async function fbClearLogs() {
+  try { await set(logsRef(), null); } catch { /* ok if empty */ }
+}
+
+async function fbAddHistory(entry: Record<string, unknown>) {
+  const id = `audit-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}`;
+  try { await set(ref(database, `${HISTORY_PATH}/${id}`), entry); } catch (err) { console.error('[audit] RTDB history write error', err); }
+}
+
+// ── Local API detection ─────────────────────────────────────────────────────
+
+async function isLocalAuditAvailable(): Promise<boolean> {
+  try {
+    const resp = await fetch('/api/audit/health', { signal: AbortSignal.timeout(2000) });
+    if (!resp.ok) return false;
+    const data = await resp.json();
+    return data?.ok === true;
+  } catch {
+    return false;
+  }
+}
+
+// ── SSE stream reader ───────────────────────────────────────────────────────
+
+async function processAuditStream(resp: Response, email: string, startedAt: number): Promise<void> {
+  const reader = resp.body?.getReader();
+  if (!reader) return;
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  const parseSse = (chunk: string): unknown[] => {
+    const messages: unknown[] = [];
+    buffer += chunk;
+    const parts = buffer.split('\n\n');
+    buffer = parts.pop() || '';
+    for (const part of parts) {
+      for (const line of part.split('\n')) {
+        if (line.startsWith('data: ')) {
+          try { messages.push(JSON.parse(line.slice(6))); } catch { /* skip */ }
+        }
+      }
+    }
+    return messages;
+  };
+
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const messages = parseSse(decoder.decode(value, { stream: true }));
+    for (const msg of messages) {
+      await handleAgentMessage(msg as Record<string, unknown>, email, startedAt);
+    }
+  }
+}
+
+async function handleAgentMessage(msg: Record<string, unknown>, email: string, startedAt: number): Promise<void> {
+  const now = Date.now();
+
+  switch (msg.type) {
+    case 'progress':
+      await fbUpdateStatus({
+        progress: {
+          currentStep: msg.scanner || msg.step || '',
+          stepNum: msg.stepNum || 0,
+          totalSteps: msg.totalSteps || 8,
+          percent: msg.percent || 0,
+          message: msg.message || '',
+        },
+      });
+      await fbPushLog({
+        message: (msg.message as string) || `Scanning ${msg.scanner}...`,
+        severity: 'info',
+        scanner: (msg.scanner as string) || '',
+        at: now,
+      });
+      break;
+
+    case 'finding':
+      await fbPushLog({
+        message: `[${msg.severity}] ${msg.file}:${msg.line} — ${msg.rule}: ${msg.why}`,
+        severity: msg.severity === 'CRITICAL' || msg.severity === 'HIGH' ? 'error' : msg.severity === 'MEDIUM' ? 'warn' : 'info',
+        scanner: (msg.scanner as string) || '',
+        at: now,
+      });
+      break;
+
+    case 'complete': {
+      const completedAt = now;
+      const duration = (msg.duration as number) || completedAt - startedAt;
+      await fbUpdateStatus({
+        status: 'completed',
+        completedAt,
+        duration,
+        healthScore: msg.healthScore || 0,
+        verifiedScore: msg.verifiedScore ?? null,
+        severityCounts: msg.severityCounts || {},
+        summary: msg.summary || '',
+        findingsCount: msg.findingsCount || 0,
+        progress: {
+          currentStep: 'done',
+          stepNum: (msg.totalSteps as number) || 8,
+          totalSteps: (msg.totalSteps as number) || 8,
+          percent: 100,
+          message: 'Audit complete',
+        },
+      });
+      // Upload findings array if present
+      if (Array.isArray(msg.findings) && msg.findings.length > 0) {
+        try { await set(ref(database, `${STATUS_PATH}/findings`), msg.findings); } catch { /* ok */ }
+      }
+      await fbAddHistory({
+        completedAt,
+        healthScore: msg.healthScore || 0,
+        verifiedScore: msg.verifiedScore ?? null,
+        severityCounts: msg.severityCounts || {},
+        duration,
+      });
+      await fbPushLog({ message: `Audit completed in ${Math.round(duration / 1000)}s`, severity: 'info', scanner: 'daemon', at: now });
+      break;
+    }
+
+    case 'log':
+      await fbPushLog({
+        message: (msg.message as string) || '',
+        severity: (msg.severity as string) || 'info',
+        scanner: (msg.scanner as string) || '',
+        at: now,
+      });
+      break;
+
+    case 'stream-end': {
+      // Agent process ended — if not already completed, mark as failed
+      const code = msg.code as number | null;
+      if (code !== 0 && code !== null) {
+        await fbUpdateStatus({ status: 'failed', completedAt: now, duration: now - startedAt });
+        await fbPushLog({ message: `Agent exited with code ${code}`, severity: 'error', scanner: 'daemon', at: now });
+      }
+      break;
+    }
+
+    case 'error':
+      await fbUpdateStatus({ status: 'failed', completedAt: now, duration: now - startedAt });
+      await fbPushLog({ message: (msg.message as string) || 'Unknown error', severity: 'error', scanner: 'daemon', at: now });
+      break;
+
+    default:
+      break;
+  }
+}
+
+// ── Public API ──────────────────────────────────────────────────────────────
+
+/**
+ * Start an audit. If the local Vite audit plugin is running, uses it directly.
+ * The function resolves quickly after writing initial state; the SSE stream
+ * continues in the background and relays progress to Firebase RTDB.
+ */
 export const triggerAudit = async (email: string): Promise<void> => {
-  // LOCAL_MODE: stub — audit trigger is a no-op (agent not running locally)
-  if (LOCAL_MODE) {
-    console.info('[aiDiagnosticsService] LOCAL_MODE: triggerAudit stub for', email);
-    return;
+  const local = await isLocalAuditAvailable();
+  if (!local) {
+    throw new Error('Audit server not available. Restart the admin panel dev server.');
   }
 
-  await set(ref(database, TRIGGER_PATH), {
-    action: 'start',
-    requestedBy: email,
-    at: Date.now(),
+  const startedAt = Date.now();
+
+  // Write initial running state
+  await fbClearLogs();
+  await set(statusRef(), {
+    status: 'running',
+    startedAt,
+    completedAt: null,
+    duration: null,
+    progress: { currentStep: 'initializing', stepNum: 0, totalSteps: 8, percent: 0, message: 'Initializing audit...' },
+    healthScore: null,
+    verifiedScore: null,
+    severityCounts: null,
+    summary: null,
+    findingsCount: null,
+    findings: null,
   });
+
+  await fbPushLog({ message: `Audit started by ${email}`, severity: 'info', scanner: 'daemon', at: startedAt });
+
+  // Start the audit stream — fire and forget (background relay to Firebase)
+  fetch('/api/audit/start', { method: 'POST' })
+    .then((resp) => {
+      if (!resp.ok) throw new Error(`Audit API returned ${resp.status}`);
+      return processAuditStream(resp, email, startedAt);
+    })
+    .catch(async (err) => {
+      console.error('[audit] stream error', err);
+      await fbUpdateStatus({ status: 'failed', completedAt: Date.now(), duration: Date.now() - startedAt });
+      await fbPushLog({ message: `Stream error: ${err.message}`, severity: 'error', scanner: 'daemon', at: Date.now() });
+    });
 };
 
-export const cancelAudit = async (email: string): Promise<void> => {
-  // LOCAL_MODE: stub
-  if (LOCAL_MODE) {
-    console.info('[aiDiagnosticsService] LOCAL_MODE: cancelAudit stub for', email);
-    return;
-  }
-
-  await set(ref(database, TRIGGER_PATH), {
-    action: 'cancel',
-    requestedBy: email,
-    at: Date.now(),
-  });
+/**
+ * Cancel a running audit.
+ */
+export const cancelAudit = async (_email: string): Promise<void> => {
+  try { await fetch('/api/audit/cancel', { method: 'POST' }); } catch { /* ok */ }
+  await fbUpdateStatus({ status: 'cancelled', completedAt: Date.now() });
+  await fbPushLog({ message: 'Audit cancelled by user', severity: 'warn', scanner: 'daemon', at: Date.now() });
 };
+
+// ── Firebase subscriptions (unchanged — UI reads from RTDB) ─────────────────
 
 export const subscribeAuditStatus = (
   onData: (status: AuditStatusData) => void,
   onError?: (error: Error) => void,
 ): (() => void) => {
-  // LOCAL_MODE: return idle state immediately, no real-time subscription
-  if (LOCAL_MODE) {
-    onData({ status: 'idle' });
-    return () => {};
-  }
-
-  const statusRef = ref(database, STATUS_PATH);
-  const unsubscribe = onValue(statusRef, (snapshot) => {
+  const sRef = ref(database, STATUS_PATH);
+  const unsubscribe = onValue(sRef, (snapshot) => {
     const raw = snapshot.val();
     if (!raw || typeof raw !== 'object') {
       onData({ status: 'idle' });
@@ -141,14 +326,8 @@ export const subscribeAuditLogs = (
   onData: (logs: AuditLogEntry[]) => void,
   onError?: (error: Error) => void,
 ): (() => void) => {
-  // LOCAL_MODE: return empty logs
-  if (LOCAL_MODE) {
-    onData([]);
-    return () => {};
-  }
-
-  const logsRef = ref(database, LOGS_PATH);
-  const unsubscribe = onValue(logsRef, (snapshot) => {
+  const lRef = ref(database, LOGS_PATH);
+  const unsubscribe = onValue(lRef, (snapshot) => {
     const raw = snapshot.val();
     if (!raw || typeof raw !== 'object') { onData([]); return; }
     const logs = Object.entries(raw)
@@ -171,14 +350,8 @@ export const subscribeFindings = (
   onData: (findings: FindingRecord[]) => void,
   onError?: (error: Error) => void,
 ): (() => void) => {
-  // LOCAL_MODE: return empty findings
-  if (LOCAL_MODE) {
-    onData([]);
-    return () => {};
-  }
-
-  const findingsRef = ref(database, `${STATUS_PATH}/findings`);
-  const unsubscribe = onValue(findingsRef, (snapshot) => {
+  const fRef = ref(database, `${STATUS_PATH}/findings`);
+  const unsubscribe = onValue(fRef, (snapshot) => {
     const raw = snapshot.val();
     if (!raw) { onData([]); return; }
     const arr: FindingRecord[] = Array.isArray(raw) ? raw : Object.values(raw);
@@ -187,35 +360,29 @@ export const subscribeFindings = (
   return () => { unsubscribe(); };
 };
 
-// Daemon is considered online if heartbeat was written within the last 90 seconds
-const HEARTBEAT_TIMEOUT_MS = 90_000;
-
+/**
+ * Daemon heartbeat — checks the local Vite audit plugin health endpoint.
+ * Polls every 30 seconds (matching the old daemon heartbeat interval).
+ */
 export const subscribeDaemonHeartbeat = (
   onData: (online: boolean) => void,
 ): (() => void) => {
-  if (LOCAL_MODE) {
-    onData(false);
-    return () => {};
-  }
+  let active = true;
 
-  const hbRef = ref(database, HEARTBEAT_PATH);
-  let intervalId: ReturnType<typeof setInterval> | null = null;
-  let lastAt = 0;
+  const check = async () => {
+    if (!active) return;
+    const ok = await isLocalAuditAvailable();
+    if (active) onData(ok);
+  };
 
-  const unsubscribe = onValue(hbRef, (snapshot) => {
-    const raw = snapshot.val();
-    lastAt = raw?.at || 0;
-    onData(lastAt > 0 && Date.now() - lastAt < HEARTBEAT_TIMEOUT_MS);
-  });
-
-  // Re-evaluate online status every 15s in case heartbeat stops coming
-  intervalId = setInterval(() => {
-    onData(lastAt > 0 && Date.now() - lastAt < HEARTBEAT_TIMEOUT_MS);
-  }, 15_000);
+  // Initial check
+  check();
+  // Re-check every 30s
+  const intervalId = setInterval(check, 30_000);
 
   return () => {
-    unsubscribe();
-    if (intervalId) clearInterval(intervalId);
+    active = false;
+    clearInterval(intervalId);
   };
 };
 
@@ -223,14 +390,8 @@ export const subscribeAuditHistory = (
   onData: (history: AuditHistoryEntry[]) => void,
   onError?: (error: Error) => void,
 ): (() => void) => {
-  // LOCAL_MODE: return empty history
-  if (LOCAL_MODE) {
-    onData([]);
-    return () => {};
-  }
-
-  const histRef = ref(database, HISTORY_PATH);
-  const unsubscribe = onValue(histRef, (snapshot) => {
+  const hRef = ref(database, HISTORY_PATH);
+  const unsubscribe = onValue(hRef, (snapshot) => {
     const raw = snapshot.val();
     if (!raw || typeof raw !== 'object') { onData([]); return; }
     const history = Object.entries(raw)

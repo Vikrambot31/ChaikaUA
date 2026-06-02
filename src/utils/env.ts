@@ -23,7 +23,7 @@ const loadEnv = (): Record<string, string> => {
         return env;
       }
     } catch (e) {
-      // Env file not loaded, using defaults (silent in production)
+      console.warn('[env] Failed to load .env file:', e);
     }
   }
   return {};

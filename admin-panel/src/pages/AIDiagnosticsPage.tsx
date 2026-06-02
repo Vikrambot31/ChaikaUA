@@ -152,11 +152,11 @@ export const AIDiagnosticsPage = ({ userEmail }: Props) => {
       <div className="daemonBar">
         <span className={`daemonDot ${daemonOnline ? 'online' : 'offline'}`} />
         <span className={`daemonLabel ${daemonOnline ? 'online' : 'offline'}`}>
-          Daemon: {daemonOnline ? 'online' : 'offline'}
+          Audit Engine: {daemonOnline ? 'ready' : 'unavailable'}
         </span>
         {!daemonOnline && (
           <span className="daemonCmd">
-            — запустите в терминале проекта: <code>npm run daemon</code>
+            — перезапустите dev-сервер: <code>npm run dev</code>
           </span>
         )}
       </div>

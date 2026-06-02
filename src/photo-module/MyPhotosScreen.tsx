@@ -396,6 +396,7 @@ const MyPhotosScreen: React.FC = () => {
           ? photoService.addFromCamera({ userId, type: 'gallery' })
           : photoService.addFromLibrary({ userId, type: 'gallery' }));
       } catch (error) {
+        safeLogError('MyPhotosScreen.runAdd', error, { source, userId });
         showUserError(language, 'upload', error);
       } finally {
         setAdding(false);
@@ -439,6 +440,7 @@ const MyPhotosScreen: React.FC = () => {
       })));
       setSelectedForReview((prev) => prev.filter((photoId) => !reviewablePhotoIds.includes(photoId)));
     } catch (error) {
+      safeLogError('MyPhotosScreen.submitSelectedForReview', error, { uid, count: reviewablePhotoIds.length });
       showUserError(language, 'upload', error);
     } finally {
       setSubmittingReview(false);

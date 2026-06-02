@@ -1,28 +1,44 @@
-import { defineConfig, type Plugin, type ViteDevServer } from 'vite';
-import react from '@vitejs/plugin-react';
-import { spawn, type ChildProcess } from 'child_process';
-import { resolve } from 'path';
+/**
+ * Vite plugin: local audit runner.
+ *
+ * Adds dev-server middleware that spawns agents/ai-diagnostics/agent.mjs
+ * and streams JSON progress lines via SSE.
+ *
+ * Endpoints:
+ *   POST /api/audit/start  → SSE stream of agent JSON messages
+ *   POST /api/audit/cancel → kills running agent
+ *   GET  /api/audit/health → { ok: true } (used by daemon-online check)
+ */
 
-function auditPlugin(): Plugin {
+import { spawn, type ChildProcess } from 'child_process';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import type { Plugin, ViteDevServer } from 'vite';
+
+export function auditPlugin(): Plugin {
   let agentProcess: ChildProcess | null = null;
 
   return {
     name: 'chaika-local-audit',
     configureServer(server: ViteDevServer) {
-      const projectRoot = resolve(__dirname, '..');
+      const pluginDir = typeof __dirname !== 'undefined'
+        ? __dirname
+        : dirname(fileURLToPath(import.meta.url));
+      const projectRoot = resolve(pluginDir, '../..');
 
+      // Single middleware that routes all /api/audit/* requests
       server.middlewares.use((req, res, next) => {
         const url = req.url || '';
 
-        // GET /api/audit/health
-        if (url === '/api/audit/health') {
+        // ── GET /api/audit/health ──
+        if (url === '/api/audit/health' && (!req.method || req.method === 'GET')) {
           res.setHeader('Content-Type', 'application/json');
           res.statusCode = 200;
           res.end(JSON.stringify({ ok: true, pid: process.pid, at: Date.now() }));
           return;
         }
 
-        // POST /api/audit/cancel
+        // ── POST /api/audit/cancel ──
         if (url === '/api/audit/cancel' && req.method === 'POST') {
           res.setHeader('Content-Type', 'application/json');
           if (agentProcess) {
@@ -35,7 +51,7 @@ function auditPlugin(): Plugin {
           return;
         }
 
-        // POST /api/audit/start
+        // ── POST /api/audit/start ──
         if (url === '/api/audit/start' && req.method === 'POST') {
           if (agentProcess) {
             res.setHeader('Content-Type', 'application/json');
@@ -44,6 +60,7 @@ function auditPlugin(): Plugin {
             return;
           }
 
+          // SSE headers
           res.writeHead(200, {
             'Content-Type': 'text/event-stream',
             'Cache-Control': 'no-cache',
@@ -51,6 +68,7 @@ function auditPlugin(): Plugin {
           });
 
           const agentScript = resolve(projectRoot, 'agents/ai-diagnostics/agent.mjs');
+
           agentProcess = spawn('node', [agentScript, '--root', projectRoot, '--json-output'], {
             cwd: projectRoot,
             stdio: ['pipe', 'pipe', 'pipe'],
@@ -68,7 +86,12 @@ function auditPlugin(): Plugin {
             buffer = lines.pop() || '';
             for (const line of lines) {
               if (!line.trim()) continue;
-              try { send(JSON.parse(line)); } catch { send({ type: 'log', message: line, severity: 'info', scanner: 'agent' }); }
+              try {
+                const msg = JSON.parse(line);
+                send(msg);
+              } catch {
+                send({ type: 'log', message: line, severity: 'info', scanner: 'agent' });
+              }
             }
           });
 
@@ -89,27 +112,13 @@ function auditPlugin(): Plugin {
             agentProcess = null;
           });
 
-          req.on('close', () => { /* let agent finish */ });
+          req.on('close', () => { /* let agent keep running */ });
           return;
         }
 
+        // Not our route — pass through
         next();
       });
     },
   };
 }
-
-export default defineConfig({
-  plugins: [react(), auditPlugin()],
-  resolve: {
-    preserveSymlinks: true,
-  },
-  server: {
-    host: 'localhost',
-    port: 5174,
-    strictPort: true,
-    fs: {
-      allow: ['..'],
-    },
-  },
-});
