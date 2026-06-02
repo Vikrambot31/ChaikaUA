@@ -228,14 +228,14 @@ const UI_TEXT = {
   },
 } as const;
 
-const CATEGORIES: { key: CategoryKey; icon: React.ComponentProps<typeof MaterialCommunityIcons>['name'] }[] = [
-  { key: 'all', icon: 'view-grid-outline' },
-  { key: 'kindergarten', icon: 'baby-face-outline' },
-  { key: 'school', icon: 'school-outline' },
-  { key: 'development', icon: 'puzzle-outline' },
-  { key: 'sport', icon: 'basketball' },
-  { key: 'medical', icon: 'medical-bag' },
-  { key: 'event', icon: 'calendar-star' },
+const CATEGORIES: { key: CategoryKey; icon: React.ComponentProps<typeof MaterialCommunityIcons>['name']; bg: string; iconColor: string }[] = [
+  { key: 'all', icon: 'view-grid-outline', bg: '#7E9D69', iconColor: '#FFF7DE' },
+  { key: 'kindergarten', icon: 'baby-face-outline', bg: '#C77A5D', iconColor: '#FFF0E6' },
+  { key: 'school', icon: 'school-outline', bg: '#5F84B4', iconColor: '#F7FAFF' },
+  { key: 'development', icon: 'puzzle-outline', bg: '#9BB77B', iconColor: '#F5FBEF' },
+  { key: 'sport', icon: 'basketball', bg: '#E8A44A', iconColor: '#FFF8EC' },
+  { key: 'medical', icon: 'medical-bag', bg: '#D87B8C', iconColor: '#FFF0F3' },
+  { key: 'event', icon: 'calendar-star', bg: '#8D7AB8', iconColor: '#F3EEFF' },
 ];
 
 const mergeChildInfo = (place: Place): Place => {
@@ -474,29 +474,38 @@ export default function VseDlyaDeteyScreen() {
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>{text.categoriesTitle}</Text>
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryList}>
+        <View style={styles.categoryGrid}>
           {CATEGORIES.map((category) => {
             const isActive = activeCategory === category.key;
             return (
               <TouchableOpacity
                 key={category.key}
-                style={[styles.categoryChip, isActive && styles.categoryChipActive]}
+                style={[
+                  styles.categoryTile,
+                  { backgroundColor: category.bg },
+                  isActive && styles.categoryTileActive,
+                ]}
                 onPress={() => setActiveCategory(category.key)}
-                activeOpacity={0.84}
+                activeOpacity={0.82}
               >
-                <MaterialCommunityIcons
-                  name={category.icon}
-                  size={18}
-                  color={isActive ? '#FFFFFF' : SCREEN_THEME.enamelBlueDark}
-                />
-                <Text style={[styles.categoryChipText, isActive && styles.categoryChipTextActive]}>
+                {isActive && <View style={styles.categoryTileRing} />}
+                <View style={styles.categoryTileIconWrap}>
+                  <MaterialCommunityIcons
+                    name={category.icon}
+                    size={34}
+                    color={category.iconColor}
+                  />
+                </View>
+                <Text style={styles.categoryTileText}>
                   {text.categories[category.key]}
                 </Text>
-                <Text style={[styles.categoryCount, isActive && styles.categoryCountActive]}>{categoryCounts[category.key]}</Text>
+                <View style={styles.categoryTileCountBadge}>
+                  <Text style={styles.categoryTileCount}>{categoryCounts[category.key]}</Text>
+                </View>
               </TouchableOpacity>
             );
           })}
-        </ScrollView>
+        </View>
 
         {!isEventsCategory && recommendedPlaces.length > 0 ? (
           <>
@@ -665,42 +674,78 @@ const styles = StyleSheet.create({
     color: SCREEN_THEME.textSecondary,
     fontWeight: '600',
   },
-  categoryList: {
-    paddingBottom: 16,
-    gap: 8,
-  },
-  categoryChip: {
+  categoryGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 16,
+  },
+  categoryTile: {
+    width: '47%' as unknown as number,
+    flexGrow: 1,
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 18,
-    backgroundColor: SCREEN_THEME.paperStrong,
-    borderWidth: 1,
-    borderColor: SCREEN_THEME.borderSoft,
-    marginRight: 8,
+    justifyContent: 'center',
+    borderRadius: 20,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    minHeight: 96,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.18)',
+    shadowColor: '#5C3A1E',
+    shadowOpacity: 0.22,
+    shadowRadius: 6,
+    shadowOffset: { width: 1, height: 4 },
+    elevation: 5,
+    position: 'relative' as const,
+    overflow: 'hidden' as const,
   },
-  categoryChipActive: {
-    backgroundColor: SCREEN_THEME.enamelBlueDark,
-    borderColor: SCREEN_THEME.enamelBlueDark,
+  categoryTileActive: {
+    borderColor: '#FFFFFF',
+    borderWidth: 3,
+    shadowOpacity: 0.36,
+    shadowRadius: 10,
+    elevation: 8,
   },
-  categoryChipText: {
-    marginLeft: 6,
-    fontSize: 13,
-    color: SCREEN_THEME.textPrimary,
-    fontWeight: '900',
+  categoryTileRing: {
+    position: 'absolute' as const,
+    top: -10,
+    right: -10,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255,255,255,0.15)',
   },
-  categoryChipTextActive: {
+  categoryTileIconWrap: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    marginBottom: 6,
+  },
+  categoryTileText: {
+    fontSize: 14,
+    fontWeight: '800' as const,
     color: '#FFFFFF',
+    textAlign: 'center' as const,
   },
-  categoryCount: {
-    marginLeft: 7,
-    fontSize: 12,
-    color: SCREEN_THEME.textMuted,
-    fontWeight: '900',
+  categoryTileCountBadge: {
+    position: 'absolute' as const,
+    top: 8,
+    right: 8,
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(255,255,255,0.28)',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    paddingHorizontal: 5,
   },
-  categoryCountActive: {
-    color: 'rgba(255,255,255,0.82)',
+  categoryTileCount: {
+    fontSize: 11,
+    fontWeight: '900' as const,
+    color: '#FFFFFF',
   },
   expandButton: {
     flexDirection: 'row',
