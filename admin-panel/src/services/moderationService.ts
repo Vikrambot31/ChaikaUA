@@ -253,14 +253,21 @@ const flattenNested = (config: SectionConfig, raw: Record<string, unknown> | nul
   if (!raw) return [];
 
   return Object.entries(raw).flatMap(([buildingId, records]) => {
-    if (!records || typeof records !== 'object') return [];
+    if (!records || typeof records !== 'object') {
+      console.warn(`[moderationService] "${config.label}" — ожидался объект на уровне buildingId="${buildingId}", получено:`, typeof records);
+      return [];
+    }
 
-    return Object.entries(records as Record<string, Record<string, unknown>>).map(([id, value]) =>
-      normalizeItem(config, id, `${config.path}/${buildingId}/${id}`, {
-        ...value,
+    return Object.entries(records as Record<string, unknown>).flatMap(([id, value]) => {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        console.warn(`[moderationService] "${config.label}" — ожидался объект-запись для id="${id}" в buildingId="${buildingId}", получено:`, typeof value);
+        return [];
+      }
+      return [normalizeItem(config, id, `${config.path}/${buildingId}/${id}`, {
+        ...(value as Record<string, unknown>),
         buildingId,
-      }),
-    );
+      })];
+    });
   });
 };
 
@@ -291,10 +298,16 @@ export const loadModerationItems = async (): Promise<ModerationItem[]> => {
     if (config.nested) return flattenNested(config, raw);
     if (!raw) return [];
 
-    return Object.entries(raw).flatMap(([id, value]) => {
+    const entries = Object.entries(raw).flatMap(([id, value]) => {
       if (!value || typeof value !== 'object') return [];
       return [normalizeItem(config, id, `${config.path}/${id}`, value as Record<string, unknown>)];
     });
+
+    if (entries.length >= 500) {
+      console.warn(`[moderationService] Раздел "${config.label}" вернул 500 записей — возможна трункация. Часть данных может быть не загружена.`);
+    }
+
+    return entries;
   });
 
   items.sort((left, right) =>
@@ -302,17 +315,25 @@ export const loadModerationItems = async (): Promise<ModerationItem[]> => {
     right.timestamp - left.timestamp,
   );
 
-  return Promise.all(
-    items.map(async (item) => {
-      const mediaUrls = await Promise.all(item.photoUrls.map((url) => resolveMediaUrl(url)));
-      const resolved = mediaUrls.filter(Boolean);
-      return {
-        ...item,
-        mediaUrls: resolved,
-        mediaUrl: resolved[0] ?? '',
-      };
-    }),
-  );
+  // Resolve media URLs in batches to avoid Storage rate limiting
+  const MEDIA_BATCH_SIZE = 10;
+  const resolvedItems: ModerationItem[] = [];
+  for (let i = 0; i < items.length; i += MEDIA_BATCH_SIZE) {
+    const batch = items.slice(i, i + MEDIA_BATCH_SIZE);
+    const batchResult = await Promise.all(
+      batch.map(async (item) => {
+        const mediaUrls = await Promise.all(item.photoUrls.map((url) => resolveMediaUrl(url)));
+        const resolved = mediaUrls.filter(Boolean);
+        return {
+          ...item,
+          mediaUrls: resolved,
+          mediaUrl: resolved[0] ?? '',
+        };
+      }),
+    );
+    resolvedItems.push(...batchResult);
+  }
+  return resolvedItems;
 };
 
 export const getModerationSummary = (items: ModerationItem[]): ModerationSummary => ({

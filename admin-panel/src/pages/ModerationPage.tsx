@@ -5,7 +5,7 @@ import { AiAnalysisButton } from '../components/AiAnalysisButton';
 import { EditRequestModal } from '../components/EditRequestModal';
 import { analyzeText } from '../services/aiAnalysisService';
 import { logDisagreement } from '../services/aiFeedbackService';
-import { addToYellowList, subscribeYellowList, removeFromYellowList, type YellowListEntry } from '../services/yellowListService';
+import { addToYellowList, subscribeYellowList, removeFromYellowList, getServerNow, type YellowListEntry } from '../services/yellowListService';
 import type { AnalysisResult, AiVerdict } from '../types/ai';
 import {
   deleteModerationItem,
@@ -96,7 +96,7 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
 
   const isUserInYellowList = (uid: string): boolean => {
     const entry = yellowList.get(uid);
-    return Boolean(entry && entry.active && entry.bannedUntil > Date.now());
+    return Boolean(entry && entry.active && entry.bannedUntil > getServerNow());
   };
 
   const handleAddToYellowList = async (item: ModerationItem) => {
@@ -189,18 +189,27 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
     setMassProgress({ current: 0, total: batch.length });
     massCancelRef.current = false;
 
+    let failedCount = 0;
     for (let i = 0; i < batch.length; i++) {
       if (massCancelRef.current) break;
       try {
         const result = await analyzeText(batch[i]);
         onAiResult(batch[i].path, result);
-      } catch { /* skip failed */ }
+      } catch {
+        failedCount++;
+      }
       setMassProgress({ current: i + 1, total: batch.length });
       if (i < batch.length - 1) await new Promise((r) => setTimeout(r, 500));
     }
 
     setMassAnalyzing(false);
-    setMessage(massCancelRef.current ? 'Масс-анализ отменён.' : 'Масс-анализ завершён.');
+    if (massCancelRef.current) {
+      setMessage('Масс-анализ отменён.');
+    } else if (failedCount > 0) {
+      setMessage(`Масс-анализ завершён: ${batch.length - failedCount} успешно, ${failedCount} ошибок.`);
+    } else {
+      setMessage('Масс-анализ завершён.');
+    }
   };
 
   const cancelMassAnalysis = () => { massCancelRef.current = true; };
@@ -223,6 +232,9 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
 
   useEffect(() => {
     void refresh();
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    };
   }, []);
 
   const summary = useMemo(() => getModerationSummary(items), [items]);
@@ -267,7 +279,7 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
   const runAction = async (
     item: ModerationItem,
     action: 'approved' | 'rejected' | 'delete',
-    options?: { skipDeleteConfirm?: boolean },
+    options?: { skipDeleteConfirm?: boolean; reason?: string },
   ) => {
     if (action === 'delete' && !options?.skipDeleteConfirm) {
       const confirmed = window.confirm(`Удалить запись "${item.title}" из раздела ${sectionLabel(item.section)}?`);
@@ -282,7 +294,7 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
         await deleteModerationItem(item);
         setMessage('Запись удалена.');
       } else {
-        await moderateItem(item, action);
+        await moderateItem(item, action, options?.reason);
         setMessage(action === 'approved' ? 'Запись одобрена.' : 'Запись отклонена.');
 
         // Disagreement logging: если AI дал вердикт и модератор пошёл против
@@ -418,7 +430,7 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
       <div className="filtersRow">
         <label className="field">
           <span>Статус</span>
-          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}>
+          <select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value as StatusFilter); setSelectedPaths(new Set()); }}>
             <option value="all">Все</option>
             <option value="pending">Ожидают</option>
             <option value="approved">Одобрены</option>
@@ -428,7 +440,7 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
         </label>
         <label className="field">
           <span>Раздел</span>
-          <select value={sectionFilter} onChange={(event) => setSectionFilter(event.target.value as 'all' | ModerationSectionKey)}>
+          <select value={sectionFilter} onChange={(event) => { setSectionFilter(event.target.value as 'all' | ModerationSectionKey); setSelectedPaths(new Set()); }}>
             <option value="all">Все разделы</option>
             {MODERATION_SECTIONS.map((section) => (
               <option key={section.key} value={section.key}>{section.label}</option>
@@ -601,6 +613,8 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
                       <button type="button" className="smallButton" onClick={() => openPreview(item)}>
                         Открыть URL
                       </button>
+                    ) : item.photoUrls.length > 0 ? (
+                      <span title={`Медиа есть (${item.photoUrls.length} шт.), но не загрузилось из Storage`}>&#9888; Медиа недоступно</span>
                     ) : '-'}
                   </td>
                   <td>
@@ -633,7 +647,10 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
                         type="button"
                         className="smallButton dangerButton"
                         disabled={busyActions.size > 0}
-                        onClick={() => void runAction(item, 'rejected')}
+                        onClick={() => {
+                          const reason = window.prompt('Причина отклонения (необязательно):') ?? undefined;
+                          void runAction(item, 'rejected', { reason: reason?.trim() || undefined });
+                        }}
                       >
                         Отклонить
                       </button>
@@ -749,7 +766,7 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
                 </thead>
                 <tbody>
                   {[...yellowList.values()].map((entry) => {
-                    const isActive = entry.active && entry.bannedUntil > Date.now();
+                    const isActive = entry.active && entry.bannedUntil > getServerNow();
                     return (
                       <tr key={entry.uid} className={isActive ? 'ylBannedRow' : ''}>
                         <td><strong className={isActive ? 'ylFlaggedName' : ''}>{entry.displayName}</strong><br /><small>{entry.uid}</small></td>

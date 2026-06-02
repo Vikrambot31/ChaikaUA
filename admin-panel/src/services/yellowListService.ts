@@ -6,6 +6,20 @@ import { ref, get, set, remove, onValue, type Unsubscribe } from 'firebase/datab
 import { database } from '../firebase/firebase';
 import { LOCAL_MODE } from '../local/LOCAL_MODE';
 
+// Дельта между серверным и клиентским временем Firebase RTDB
+let _serverTimeOffset = 0;
+let _offsetInitialized = false;
+
+const initServerOffset = () => {
+  if (_offsetInitialized || LOCAL_MODE) return;
+  _offsetInitialized = true;
+  onValue(ref(database, '.info/serverTimeOffset'), (snap) => {
+    if (typeof snap.val() === 'number') _serverTimeOffset = snap.val();
+  });
+};
+
+export const getServerNow = (): number => Date.now() + _serverTimeOffset;
+
 export type YellowListEntry = {
   uid: string;
   displayName: string;
@@ -36,7 +50,7 @@ export async function addToYellowList(entry: {
     console.log('[LOCAL_MODE] addToYellowList:', entry);
     return;
   }
-  const now = Date.now();
+  const now = getServerNow();
   const data: YellowListEntry = {
     uid: entry.uid,
     displayName: entry.displayName,
@@ -70,7 +84,7 @@ export async function isUserBanned(uid: string): Promise<boolean> {
   const snap = await get(ref(database, `${YELLOW_LIST_PATH}/${uid}`));
   if (!snap.exists()) return false;
   const entry = snap.val() as YellowListEntry;
-  return entry.active && entry.bannedUntil > Date.now();
+  return entry.active && entry.bannedUntil > getServerNow();
 }
 
 /**
@@ -91,6 +105,7 @@ export function subscribeYellowList(callback: (entries: YellowListEntry[]) => vo
     callback([]);
     return () => {};
   }
+  initServerOffset();
   return onValue(ref(database, YELLOW_LIST_PATH), (snap) => {
     const entries: YellowListEntry[] = [];
     if (snap.exists()) {
@@ -101,8 +116,9 @@ export function subscribeYellowList(callback: (entries: YellowListEntry[]) => vo
     }
     // Сортировка: активные баны первыми, потом по дате
     entries.sort((a, b) => {
-      const aActive = a.active && a.bannedUntil > Date.now() ? 0 : 1;
-      const bActive = b.active && b.bannedUntil > Date.now() ? 0 : 1;
+      const now = getServerNow();
+      const aActive = a.active && a.bannedUntil > now ? 0 : 1;
+      const bActive = b.active && b.bannedUntil > now ? 0 : 1;
       return aActive - bActive || b.bannedAt - a.bannedAt;
     });
     callback(entries);
