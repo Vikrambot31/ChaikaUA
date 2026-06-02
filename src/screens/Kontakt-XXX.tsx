@@ -182,6 +182,7 @@ const UI_TEXT = {
     authRequired: 'Для публікації контакту потрібна реєстрація.',
     live: 'НАЖИВО',
     liveCount: (count: number) => `всього ${count} людей шукають знайомств`,
+    topAnketyTitle: 'Топ анкети',
   },
   ru: {
     title: 'Контакты Чайки',
@@ -274,6 +275,7 @@ const UI_TEXT = {
     authRequired: 'Для публикации контакта требуется регистрация.',
     live: 'В ЭФИРЕ',
     liveCount: (count: number) => `всего ${count} людей ищут знакомства`,
+    topAnketyTitle: 'Топ анкеты',
   },
   en: {
     title: 'Chaika Contacts',
@@ -366,6 +368,7 @@ const UI_TEXT = {
     authRequired: 'Registration is required to publish a contact.',
     live: 'LIVE',
     liveCount: (count: number) => `${count} people looking for contacts`,
+    topAnketyTitle: 'Top profiles',
   },
 } as const;
 
@@ -608,6 +611,13 @@ const KontaktiChaikyScreen: React.FC = () => {
     searchPriceTo,
     selectedFilterCategory,
   ]);
+
+  const topListings = useMemo(() => {
+    return [...listings]
+      .filter((item) => !item.isArchived && item.photoUri)
+      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+      .slice(0, 10);
+  }, [listings]);
 
   const hasAdvancedSearch = useMemo(
     () =>
@@ -889,6 +899,44 @@ const KontaktiChaikyScreen: React.FC = () => {
             <Text style={styles.liveCount}>{text.liveCount(listings.length)}</Text>
           </View>
         </View>
+
+        {topListings.length > 0 && (
+          <View style={styles.topAnketySection}>
+            <Text style={styles.topAnketyTitle}>{text.topAnketyTitle}</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.topAnketyScroll}>
+              {topListings.map((item) => {
+                const profile = item.userId ? profileByUserId[item.userId] : undefined;
+                const avatarUri = (item.userId && avatarByUserId[item.userId]) || profile?.avatarUri || '';
+                const displayName = profile?.name || item.itemName;
+                const ageText = item.price ? `${item.price}` : '';
+                return (
+                  <TouchableOpacity
+                    key={`top-${item.id}`}
+                    style={styles.topAnketyItem}
+                    activeOpacity={0.82}
+                    onPress={() => {
+                      if (navLock.current) return;
+                      navLock.current = true;
+                      navigation.navigate('ItemDetailScreen', { item: mapToDetailData(item, avatarUri || undefined) });
+                      setTimeout(() => { navLock.current = false; }, 800);
+                    }}
+                  >
+                    <AppPhotoImage
+                      uri={item.photoUri}
+                      storagePath={item.photoStoragePath}
+                      style={styles.topAnketyPhoto}
+                      resizeMode="cover"
+                    />
+                    <View style={styles.topAnketyNameRow}>
+                      <Text style={styles.topAnketyName} numberOfLines={1}>{displayName}</Text>
+                      {ageText ? <Text style={styles.topAnketyAge}>{ageText}</Text> : null}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
 
         {listings.length > 0 && (
           <View style={styles.listingsSection}>
@@ -1259,6 +1307,14 @@ const styles = StyleSheet.create({
   picker: { color: SCREEN_THEME.textPrimary, height: 50 },
   submitBtn: { backgroundColor: SCREEN_THEME.terracotta, borderRadius: 16, paddingVertical: 14, alignItems: 'center', marginTop: 14 },
   submitBtnText: { color: '#FFFFFF', fontWeight: '800' },
+  topAnketySection: { marginBottom: 16 },
+  topAnketyTitle: { fontSize: 14, fontWeight: '900', color: SCREEN_THEME.textPrimary, marginBottom: 8 },
+  topAnketyScroll: { gap: 8 },
+  topAnketyItem: { width: 80, alignItems: 'center' },
+  topAnketyPhoto: { width: 80, height: 80, borderRadius: 10, backgroundColor: '#FFF3E0' },
+  topAnketyNameRow: { flexDirection: 'row', alignItems: 'baseline', gap: 3, marginTop: 4, maxWidth: 80, justifyContent: 'center' },
+  topAnketyName: { fontSize: 12, fontWeight: '700', color: SCREEN_THEME.textPrimary, flexShrink: 1 },
+  topAnketyAge: { fontSize: 10, fontWeight: '700', color: SCREEN_THEME.textSecondary },
   listingsSection: { marginBottom: 16 },
   listingsHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 8 },
   listingsSectionTitle: { fontSize: 16, fontWeight: '900', color: SCREEN_THEME.textPrimary },

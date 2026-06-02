@@ -7,9 +7,16 @@ import {
   ActivityIndicator,
   ScrollView,
   Alert,
+  TouchableOpacity,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRoute } from '@react-navigation/native';
+import { useSelector } from 'react-redux';
+import ContactReasonModal from '../components/ContactReasonModal';
+import { useContactRequest } from '../hooks/useContactRequest';
 import { useTranslation } from '../i18n/useTranslation';
+import type { RootState } from '../redux/store';
 import { LIGHT_ORBS, SCREEN_THEME } from '../utils/screenTheme';
 import {
   loadProfileRecord,
@@ -18,6 +25,7 @@ import { query, ref, get, orderByChild, equalTo } from 'firebase/database';
 import { database } from '../firebase-config';
 import type { JobListing } from '../services/jobService';
 import { getDaysInApp } from '../utils/chaikaLevels';
+import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
 
 const UI_TEXT = {
   ua: {
@@ -73,6 +81,36 @@ const UI_TEXT = {
   },
 } as const;
 
+const CONTACT_TEXT = {
+  ua: {
+    call: 'Зателефонувати',
+    viber: 'Viber',
+    copy: 'Копія',
+    copiedTitle: 'Скопійовано',
+    copiedBody: 'Номер телефону скопійовано.',
+    contact: "Зв'язатися",
+    cancel: 'Скасувати',
+  },
+  ru: {
+    call: 'Позвонить',
+    viber: 'Viber',
+    copy: 'Копия',
+    copiedTitle: 'Скопировано',
+    copiedBody: 'Номер телефона скопирован.',
+    contact: 'Связаться',
+    cancel: 'Отмена',
+  },
+  en: {
+    call: 'Call',
+    viber: 'Viber',
+    copy: 'Copy',
+    copiedTitle: 'Copied',
+    copiedBody: 'Phone number copied.',
+    contact: 'Contact',
+    cancel: 'Cancel',
+  },
+} as const;
+
 interface RouteParams {
   userId: string;
   userName?: string;
@@ -92,6 +130,9 @@ const ViewUserProfileScreen: React.FC = () => {
   const { userId } = (route.params as RouteParams) || {};
   const { language } = useTranslation();
   const text = UI_TEXT[language];
+  const contactText = CONTACT_TEXT[language];
+  const currentUser = useSelector((state: RootState) => state.auth.user);
+  const { modalVisible, pending, currentTarget, openModal, closeModal, sendRequest } = useContactRequest();
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -172,6 +213,36 @@ const ViewUserProfileScreen: React.FC = () => {
     `${profileLikes} likes`,
   ].filter(Boolean).join(' · ');
 
+  const hasPhone = Boolean(phone.trim());
+  const canRequestContact = Boolean(userId && userId !== currentUser?.id);
+  const canContact = canRequestContact || hasPhone;
+
+  const handleCopyPhone = async () => {
+    if (!phone) return;
+    await Clipboard.setStringAsync(phone);
+    Alert.alert(contactText.copiedTitle, contactText.copiedBody);
+  };
+
+  const handleContact = () => {
+    if (canRequestContact && userId) {
+      openModal({
+        userId,
+        name: name || text.title,
+        sourceType: 'lyudi',
+        sourceId: userId,
+        sourceTitle: name || text.title,
+      });
+      return;
+    }
+
+    if (!hasPhone) return;
+    Alert.alert(contactText.contact, name || text.title, [
+      { text: contactText.call, onPress: () => { void safeCallPhone(phone, language); } },
+      { text: contactText.viber, onPress: () => { void safeOpenViber(phone, language); } },
+      { text: contactText.cancel, style: 'cancel' },
+    ]);
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -211,6 +282,41 @@ const ViewUserProfileScreen: React.FC = () => {
             <Text style={styles.valueText}>{phone || '—'}</Text>
           </View>
 
+          <View style={styles.contactActions}>
+            <TouchableOpacity
+              style={[styles.smallAction, !hasPhone && styles.disabledAction]}
+              onPress={() => void safeCallPhone(phone, language)}
+              disabled={!hasPhone}
+              activeOpacity={0.82}
+            >
+              <MaterialCommunityIcons name="phone-outline" size={16} color={hasPhone ? '#fff' : '#9F958E'} />
+              <Text style={[styles.smallActionText, !hasPhone && styles.disabledText]}>{contactText.call}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.smallAction, !hasPhone && styles.disabledAction]}
+              onPress={() => void safeOpenViber(phone, language)}
+              disabled={!hasPhone}
+              activeOpacity={0.82}
+            >
+              <MaterialCommunityIcons name="message-text-outline" size={16} color={hasPhone ? '#fff' : '#9F958E'} />
+              <Text style={[styles.smallActionText, !hasPhone && styles.disabledText]}>{contactText.viber}</Text>
+            </TouchableOpacity>
+            {hasPhone ? (
+              <TouchableOpacity style={styles.smallActionAlt} onPress={() => void handleCopyPhone()} activeOpacity={0.82}>
+                <MaterialCommunityIcons name="content-copy" size={16} color="#403933" />
+                <Text style={styles.smallActionAltText}>{contactText.copy}</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+          <TouchableOpacity
+            style={[styles.contactBtn, !canContact && styles.disabledAction]}
+            onPress={handleContact}
+            disabled={!canContact}
+            activeOpacity={0.86}
+          >
+            <Text style={[styles.contactBtnText, !canContact && styles.disabledText]}>{contactText.contact}</Text>
+          </TouchableOpacity>
+
           <Text style={styles.inputLabel}>{text.cityLabel}</Text>
           <View style={styles.valueBox}>
             <Text style={styles.valueText}>{city || '—'}</Text>
@@ -228,6 +334,13 @@ const ViewUserProfileScreen: React.FC = () => {
           </View>
         )}
       </ScrollView>
+      <ContactReasonModal
+        visible={modalVisible}
+        pending={pending}
+        target={currentTarget}
+        onSelect={(reason) => void sendRequest(reason)}
+        onClose={closeModal}
+      />
     </SafeAreaView>
   );
 };
@@ -318,6 +431,58 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: SCREEN_THEME.textPrimary,
     fontWeight: '500',
+  },
+  contactActions: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+    marginTop: 10,
+  },
+  smallAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#403933',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+  },
+  smallActionText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  smallActionAlt: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#E8DDD3',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+  },
+  smallActionAltText: {
+    color: '#403933',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  contactBtn: {
+    alignItems: 'center',
+    backgroundColor: '#7A1E5C',
+    borderRadius: 16,
+    paddingVertical: 14,
+    marginTop: 10,
+  },
+  contactBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  disabledAction: {
+    backgroundColor: '#E1D7CF',
+  },
+  disabledText: {
+    color: '#9F958E',
   },
   metaText: {
     marginTop: 5,
