@@ -26,7 +26,8 @@ export const publishApprovedActivity = async (payload: ActivityPayload): Promise
     return;
   }
 
-  await push(ref(database, 'requests'), {
+  try {
+    await push(ref(database, 'requests'), {
     userId: payload.userId,
     name,
     phone,
@@ -46,5 +47,8 @@ export const publishApprovedActivity = async (payload: ActivityPayload): Promise
     timestamp: Date.now(),
     createdAt: Date.now(),
     expires_at: Date.now() + 30 * 24 * 60 * 60 * 1000,
-  });
+    });
+  } catch (e) {
+    console.error('[publishApprovedActivity] push failed:', e);
+  }
 };

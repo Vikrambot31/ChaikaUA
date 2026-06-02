@@ -190,186 +190,206 @@ const RequestsScreen: React.FC = () => {
   );
 
   const loadPendingPhotos = useCallback(async () => {
-    const snapshot = await get(ref(database, 'community_photos'));
-    if (!snapshot.exists()) {
-      setPendingPhotos([]);
-      return;
+    try {
+      const snapshot = await get(ref(database, 'community_photos'));
+      if (!snapshot.exists()) {
+        setPendingPhotos([]);
+        return;
+      }
+      const value = snapshot.val() as Record<string, Record<string, unknown>>;
+      const sources = new Set<string>(PHOTO_SOURCE_SCREENS);
+      const items = Object.entries(value)
+        .map<ModerationPhoto | null>(([id, raw]) => {
+          if (!raw || typeof raw !== 'object') return null;
+          const sourceScreen = toStr(raw.sourceScreen);
+          if (!sources.has(sourceScreen)) return null;
+          const status = toStr(raw.status) || 'pending';
+          if (status !== 'pending') return null;
+          return {
+            id,
+            uri: toStr(raw.thumbnailUrl) || toStr(raw.imageUri) || undefined,
+            storagePath: toStr(raw.storagePath) || undefined,
+            title: toStr(raw.title) || undefined,
+            description: toStr(raw.description) || undefined,
+            userName: toStr(raw.userName) || toStr(raw.uploadedBy) || undefined,
+            sourceScreen,
+            createdAt: toNumber(raw.createdAt) || toNumber(raw.uploadedAt),
+            status: 'pending',
+          };
+        })
+        .filter((item): item is ModerationPhoto => item !== null)
+        .sort((a, b) => b.createdAt - a.createdAt);
+      setPendingPhotos(items);
+    } catch (e) {
+      console.error('[loadPendingPhotos]', e);
     }
-    const value = snapshot.val() as Record<string, Record<string, unknown>>;
-    const sources = new Set<string>(PHOTO_SOURCE_SCREENS);
-    const items = Object.entries(value)
-      .map<ModerationPhoto | null>(([id, raw]) => {
-        if (!raw || typeof raw !== 'object') return null;
-        const sourceScreen = toStr(raw.sourceScreen);
-        if (!sources.has(sourceScreen)) return null;
-        const status = toStr(raw.status) || 'pending';
-        if (status !== 'pending') return null;
-        return {
-          id,
-          uri: toStr(raw.thumbnailUrl) || toStr(raw.imageUri) || undefined,
-          storagePath: toStr(raw.storagePath) || undefined,
-          title: toStr(raw.title) || undefined,
-          description: toStr(raw.description) || undefined,
-          userName: toStr(raw.userName) || toStr(raw.uploadedBy) || undefined,
-          sourceScreen,
-          createdAt: toNumber(raw.createdAt) || toNumber(raw.uploadedAt),
-          status: 'pending',
-        };
-      })
-      .filter((item): item is ModerationPhoto => item !== null)
-      .sort((a, b) => b.createdAt - a.createdAt);
-    setPendingPhotos(items);
   }, []);
 
   const loadPendingLostFound = useCallback(async () => {
-    const snapshot = await get(ref(database, 'lost_found'));
-    if (!snapshot.exists()) {
-      setPendingLostFound([]);
-      return;
+    try {
+      const snapshot = await get(ref(database, 'lost_found'));
+      if (!snapshot.exists()) {
+        setPendingLostFound([]);
+        return;
+      }
+
+      const typeLabels = {
+        lost: language === 'ru' ? 'Потеряно' : language === 'en' ? 'Lost' : 'Загублено',
+        found: language === 'ru' ? 'Найдено' : language === 'en' ? 'Found' : 'Знайдено',
+      } as const;
+
+      const value = snapshot.val() as Record<string, Record<string, unknown>>;
+      const items = Object.entries(value)
+        .map<ModerationPhoto | null>(([id, raw]) => {
+          if (!raw || typeof raw !== 'object') return null;
+          const status = toStr(raw.moderationStatus) || 'pending';
+          if (status !== 'pending') return null;
+          const type = toStr(raw.type) === 'lost' ? 'lost' : 'found';
+          const category = toStr(raw.category);
+          const description = toStr(raw.description);
+          const summary = [typeLabels[type], category, description].filter(Boolean).join(' • ');
+          return {
+            id,
+            uri: toStr(raw.photoUri) || undefined,
+            storagePath: toStr(raw.photoStoragePath) || undefined,
+            title: toStr(raw.name) || category || typeLabels[type],
+            description: summary,
+            userName: toStr(raw.name) || undefined,
+            sourceScreen: 'LostFoundScreen',
+            createdAt: toTimestamp(raw.createdAt) || toTimestamp(raw.submittedForModerationAt),
+            status: 'pending',
+          };
+        })
+        .filter((item): item is ModerationPhoto => item !== null)
+        .sort((a, b) => b.createdAt - a.createdAt);
+      setPendingLostFound(items);
+    } catch (e) {
+      console.error('[loadPendingLostFound]', e);
     }
-
-    const typeLabels = {
-      lost: language === 'ru' ? 'Потеряно' : language === 'en' ? 'Lost' : 'Загублено',
-      found: language === 'ru' ? 'Найдено' : language === 'en' ? 'Found' : 'Знайдено',
-    } as const;
-
-    const value = snapshot.val() as Record<string, Record<string, unknown>>;
-    const items = Object.entries(value)
-      .map<ModerationPhoto | null>(([id, raw]) => {
-        if (!raw || typeof raw !== 'object') return null;
-        const status = toStr(raw.moderationStatus) || 'pending';
-        if (status !== 'pending') return null;
-        const type = toStr(raw.type) === 'lost' ? 'lost' : 'found';
-        const category = toStr(raw.category);
-        const description = toStr(raw.description);
-        const summary = [typeLabels[type], category, description].filter(Boolean).join(' • ');
-        return {
-          id,
-          uri: toStr(raw.photoUri) || undefined,
-          storagePath: toStr(raw.photoStoragePath) || undefined,
-          title: toStr(raw.name) || category || typeLabels[type],
-          description: summary,
-          userName: toStr(raw.name) || undefined,
-          sourceScreen: 'LostFoundScreen',
-          createdAt: toTimestamp(raw.createdAt) || toTimestamp(raw.submittedForModerationAt),
-          status: 'pending',
-        };
-      })
-      .filter((item): item is ModerationPhoto => item !== null)
-      .sort((a, b) => b.createdAt - a.createdAt);
-    setPendingLostFound(items);
   }, [language]);
 
   const loadPendingBuySell = useCallback(async () => {
-    const snapshot = await get(ref(database, 'buy_sell_listings'));
-    if (!snapshot.exists()) {
-      setPendingBuySell([]);
-      return;
+    try {
+      const snapshot = await get(ref(database, 'buy_sell_listings'));
+      if (!snapshot.exists()) {
+        setPendingBuySell([]);
+        return;
+      }
+
+      const typeLabels = {
+        buy: language === 'ru' ? 'Куплю' : language === 'en' ? 'Buy' : 'Куплю',
+        sell: language === 'ru' ? 'Продам' : language === 'en' ? 'Sell' : 'Продам',
+      } as const;
+
+      const value = snapshot.val() as Record<string, Record<string, unknown>>;
+      const items = Object.entries(value)
+        .map<ModerationPhoto | null>(([id, raw]) => {
+          if (!raw || typeof raw !== 'object') return null;
+          const status = toStr(raw.moderationStatus) || 'pending';
+          if (status !== 'pending') return null;
+          const listingType = toStr(raw.listingType) === 'buy' ? 'buy' : 'sell';
+          const itemName = toStr(raw.itemName);
+          const price = toStr(raw.price);
+          const description = toStr(raw.description);
+          const summary = [typeLabels[listingType], toStr(raw.category), price, description].filter(Boolean).join(' • ');
+          return {
+            id,
+            uri: toStr(raw.photoUri) || undefined,
+            storagePath: toStr(raw.photoStoragePath) || undefined,
+            title: itemName || typeLabels[listingType],
+            description: summary,
+            userName: itemName || undefined,
+            sourceScreen: 'BuySellScreen',
+            createdAt: toTimestamp(raw.createdAt) || toTimestamp(raw.submittedForModerationAt),
+            status: 'pending',
+          };
+        })
+        .filter((item): item is ModerationPhoto => item !== null)
+        .sort((a, b) => b.createdAt - a.createdAt);
+      setPendingBuySell(items);
+    } catch (e) {
+      console.error('[loadPendingBuySell]', e);
     }
-
-    const typeLabels = {
-      buy: language === 'ru' ? 'Куплю' : language === 'en' ? 'Buy' : 'Куплю',
-      sell: language === 'ru' ? 'Продам' : language === 'en' ? 'Sell' : 'Продам',
-    } as const;
-
-    const value = snapshot.val() as Record<string, Record<string, unknown>>;
-    const items = Object.entries(value)
-      .map<ModerationPhoto | null>(([id, raw]) => {
-        if (!raw || typeof raw !== 'object') return null;
-        const status = toStr(raw.moderationStatus) || 'pending';
-        if (status !== 'pending') return null;
-        const listingType = toStr(raw.listingType) === 'buy' ? 'buy' : 'sell';
-        const itemName = toStr(raw.itemName);
-        const price = toStr(raw.price);
-        const description = toStr(raw.description);
-        const summary = [typeLabels[listingType], toStr(raw.category), price, description].filter(Boolean).join(' • ');
-        return {
-          id,
-          uri: toStr(raw.photoUri) || undefined,
-          storagePath: toStr(raw.photoStoragePath) || undefined,
-          title: itemName || typeLabels[listingType],
-          description: summary,
-          userName: itemName || undefined,
-          sourceScreen: 'BuySellScreen',
-          createdAt: toTimestamp(raw.createdAt) || toTimestamp(raw.submittedForModerationAt),
-          status: 'pending',
-        };
-      })
-      .filter((item): item is ModerationPhoto => item !== null)
-      .sort((a, b) => b.createdAt - a.createdAt);
-    setPendingBuySell(items);
   }, [language]);
 
   const loadPendingContacts = useCallback(async () => {
-    const snapshot = await get(ref(database, 'contacts_listings'));
-    if (!snapshot.exists()) {
-      setPendingContacts([]);
-      return;
-    }
+    try {
+      const snapshot = await get(ref(database, 'contacts_listings'));
+      if (!snapshot.exists()) {
+        setPendingContacts([]);
+        return;
+      }
 
-    const value = snapshot.val() as Record<string, Record<string, unknown>>;
-    const items = Object.entries(value)
-      .map<ModerationPhoto | null>(([id, raw]) => {
-        if (!raw || typeof raw !== 'object') return null;
-        const status = toStr(raw.moderationStatus) || 'pending';
-        if (status !== 'pending') return null;
-        const itemName = toStr(raw.itemName);
-        const price = toStr(raw.price);
-        const description = toStr(raw.description);
-        const summary = [toStr(raw.category), toStr(raw.condition), price, description].filter(Boolean).join(' • ');
-        return {
-          id,
-          uri: toStr(raw.photoUri) || undefined,
-          storagePath: toStr(raw.photoStoragePath) || undefined,
-          title: itemName || (language === 'ru' ? 'Контакт' : language === 'en' ? 'Contact' : 'Контакт'),
-          description: summary,
-          userName: itemName || undefined,
-          sourceScreen: 'ContactsScreen',
-          createdAt: toTimestamp(raw.createdAt) || toTimestamp(raw.submittedForModerationAt),
-          status: 'pending',
-        };
-      })
-      .filter((item): item is ModerationPhoto => item !== null)
-      .sort((a, b) => b.createdAt - a.createdAt);
-    setPendingContacts(items);
+      const value = snapshot.val() as Record<string, Record<string, unknown>>;
+      const items = Object.entries(value)
+        .map<ModerationPhoto | null>(([id, raw]) => {
+          if (!raw || typeof raw !== 'object') return null;
+          const status = toStr(raw.moderationStatus) || 'pending';
+          if (status !== 'pending') return null;
+          const itemName = toStr(raw.itemName);
+          const price = toStr(raw.price);
+          const description = toStr(raw.description);
+          const summary = [toStr(raw.category), toStr(raw.condition), price, description].filter(Boolean).join(' • ');
+          return {
+            id,
+            uri: toStr(raw.photoUri) || undefined,
+            storagePath: toStr(raw.photoStoragePath) || undefined,
+            title: itemName || (language === 'ru' ? 'Контакт' : language === 'en' ? 'Contact' : 'Контакт'),
+            description: summary,
+            userName: itemName || undefined,
+            sourceScreen: 'ContactsScreen',
+            createdAt: toTimestamp(raw.createdAt) || toTimestamp(raw.submittedForModerationAt),
+            status: 'pending',
+          };
+        })
+        .filter((item): item is ModerationPhoto => item !== null)
+        .sort((a, b) => b.createdAt - a.createdAt);
+      setPendingContacts(items);
+    } catch (e) {
+      console.error('[loadPendingContacts]', e);
+    }
   }, [language]);
 
   const loadPendingLocalBusiness = useCallback(async () => {
-    const snapshot = await get(ref(database, 'local_business'));
-    if (!snapshot.exists()) {
-      setPendingLocalBusiness([]);
-      return;
-    }
+    try {
+      const snapshot = await get(ref(database, 'local_business'));
+      if (!snapshot.exists()) {
+        setPendingLocalBusiness([]);
+        return;
+      }
 
-    const value = snapshot.val() as Record<string, Record<string, unknown>>;
-    const items = Object.entries(value)
-      .map<ModerationPhoto | null>(([id, raw]) => {
-        if (!raw || typeof raw !== 'object') return null;
-        const status = toStr(raw.status) || 'pending';
-        if (status !== 'pending') return null;
-        const contactName = toStr(raw.contactName);
-        const category = toStr(raw.categoryLabel) || toStr(raw.categoryKey);
-        const subcategory = toStr(raw.subcategoryLabel) || toStr(raw.subcategoryKey);
-        const priceMin = toNumber(raw.priceMin);
-        const priceMax = toNumber(raw.priceMax);
-        const priceText = priceMin || priceMax ? [priceMin ? `${priceMin}` : '', priceMax ? `${priceMax}` : ''].filter(Boolean).join('-') : '';
-        const description = toStr(raw.description);
-        const summary = [category, subcategory, priceText, description].filter(Boolean).join(' • ');
-        return {
-          id,
-          uri: toStr(raw.photoUri) || undefined,
-          storagePath: toStr(raw.photoStoragePath) || undefined,
-          title: contactName || subcategory || (language === 'ru' ? 'Бизнес/услуга' : language === 'en' ? 'Business/service' : 'Бізнес/послуга'),
-          description: summary,
-          userName: contactName || undefined,
-          sourceScreen: 'LocalBusinessScreen',
-          createdAt: toTimestamp(raw.updatedAt) || toTimestamp(raw.createdAt),
-          status: 'pending',
-        };
-      })
-      .filter((item): item is ModerationPhoto => item !== null)
-      .sort((a, b) => b.createdAt - a.createdAt);
-    setPendingLocalBusiness(items);
+      const value = snapshot.val() as Record<string, Record<string, unknown>>;
+      const items = Object.entries(value)
+        .map<ModerationPhoto | null>(([id, raw]) => {
+          if (!raw || typeof raw !== 'object') return null;
+          const status = toStr(raw.status) || 'pending';
+          if (status !== 'pending') return null;
+          const contactName = toStr(raw.contactName);
+          const category = toStr(raw.categoryLabel) || toStr(raw.categoryKey);
+          const subcategory = toStr(raw.subcategoryLabel) || toStr(raw.subcategoryKey);
+          const priceMin = toNumber(raw.priceMin);
+          const priceMax = toNumber(raw.priceMax);
+          const priceText = priceMin || priceMax ? [priceMin ? `${priceMin}` : '', priceMax ? `${priceMax}` : ''].filter(Boolean).join('-') : '';
+          const description = toStr(raw.description);
+          const summary = [category, subcategory, priceText, description].filter(Boolean).join(' • ');
+          return {
+            id,
+            uri: toStr(raw.photoUri) || undefined,
+            storagePath: toStr(raw.photoStoragePath) || undefined,
+            title: contactName || subcategory || (language === 'ru' ? 'Бизнес/услуга' : language === 'en' ? 'Business/service' : 'Бізнес/послуга'),
+            description: summary,
+            userName: contactName || undefined,
+            sourceScreen: 'LocalBusinessScreen',
+            createdAt: toTimestamp(raw.updatedAt) || toTimestamp(raw.createdAt),
+            status: 'pending',
+          };
+        })
+        .filter((item): item is ModerationPhoto => item !== null)
+        .sort((a, b) => b.createdAt - a.createdAt);
+      setPendingLocalBusiness(items);
+    } catch (e) {
+      console.error('[loadPendingLocalBusiness]', e);
+    }
   }, [language]);
 
   const loadPendingAppSuggestions = useCallback(async () => {
