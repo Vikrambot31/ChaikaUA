@@ -146,6 +146,7 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
     for (const [path, result] of aiResults) {
       if (result.verdict !== 'approve') continue;
       if (result.confidence < 0.95 || result.confidence >= 1.0) continue;
+      if (busyActions.has(`approved:${path}`)) continue;
       const item = items.find((i) => i.path === path);
       if (!item || item.status !== 'pending') continue;
       if (!AUTO_APPROVE_SECTIONS.has(item.section)) continue;
@@ -155,7 +156,7 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
       void runAction(item, 'approved');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aiResults, autoApproveEnabled]);
+  }, [aiResults, autoApproveEnabled, busyActions]);
 
   // AI stats
   const aiStats = useMemo(() => {

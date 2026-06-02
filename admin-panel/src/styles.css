@@ -4341,129 +4341,357 @@ td {
 
 /* ===== Full Tree View ===== */
 .full-tree-container {
-  padding: 20px;
-}
-
-.tree-node-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
-  border-radius: 12px;
+  gap: 14px;
+}
+
+/* ── Graph canvas (scrollable) ── */
+.graph-canvas {
+  position: relative;
+  max-height: 75vh;
+  overflow: auto;
+  border: 1px solid rgba(203, 213, 225, 0.6);
+  border-radius: 20px;
+  background:
+    linear-gradient(rgba(148, 163, 184, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.07) 1px, transparent 1px),
+    radial-gradient(circle at 50% 80%, rgba(34, 197, 94, 0.08), transparent 40%),
+    #fafcff;
+  background-size: 40px 40px, 40px 40px, auto, auto;
+}
+
+.graph-canvas-inner {
+  position: relative;
+  min-height: 400px;
+}
+
+/* ── SVG edges ── */
+.graph-edges {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+.graph-edge {
+  fill: none;
+  stroke: #94a3b8;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+/* ── Node card ── */
+.graph-card {
+  position: absolute;
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 2px solid rgba(203, 213, 225, 0.7);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.96);
   cursor: pointer;
-  transition: background 0.15s;
+  box-shadow: 0 4px 16px rgba(30, 64, 117, 0.1);
+  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+  user-select: none;
 }
 
-.tree-node-row:hover {
-  background: rgba(59, 130, 246, 0.06);
+.graph-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(30, 64, 117, 0.16);
+  border-color: rgba(59, 130, 246, 0.5);
+  z-index: 10;
 }
 
-.tree-node-row.selected {
-  background: rgba(59, 130, 246, 0.12);
-  border: 1px solid rgba(59, 130, 246, 0.3);
+.graph-card.selected {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2), 0 10px 30px rgba(59, 130, 246, 0.15);
+  z-index: 11;
 }
 
-.tree-node-row.risk {
-  background: rgba(239, 68, 68, 0.06);
+.graph-card.highlighted {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.25), 0 10px 30px rgba(245, 158, 11, 0.12);
 }
 
-.tree-node-row.blocked {
-  background: rgba(239, 68, 68, 0.1);
-  opacity: 0.7;
+.graph-card.root {
+  border-color: rgba(34, 197, 94, 0.6);
+  background: linear-gradient(145deg, rgba(240, 253, 244, 0.97), rgba(239, 246, 255, 0.95));
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.1), 0 10px 30px rgba(21, 128, 61, 0.15);
 }
 
-.tree-children {
-  margin-left: 24px;
-  padding-left: 16px;
-  border-left: 2px solid rgba(148, 163, 184, 0.3);
+.graph-card.risk {
+  border-color: rgba(251, 191, 36, 0.6);
+  background: rgba(255, 251, 235, 0.95);
 }
 
-.tree-children.depth-1 { border-color: rgba(34, 197, 94, 0.4); }
-.tree-children.depth-2 { border-color: rgba(59, 130, 246, 0.4); }
-.tree-children.depth-3 { border-color: rgba(168, 85, 247, 0.4); }
+.graph-card.blocked {
+  border-color: rgba(239, 68, 68, 0.5);
+  background: rgba(255, 247, 247, 0.95);
+  opacity: 0.75;
+}
 
-.tree-node-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
+.graph-card.orphan {
+  border-style: dashed;
+}
+
+/* Card content */
+.graph-card-name {
+  font-size: 14px;
+  font-weight: 900;
+  color: #1f2a44;
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+.graph-card-phone {
+  font-size: 13px;
+  color: #2563eb;
+  font-weight: 800;
+}
+
+.graph-card-address {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Collapse toggle (+N / -) */
+.graph-card-toggle {
+  position: absolute;
+  bottom: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 26px;
+  height: 22px;
+  padding: 0 6px;
+  border: 2px solid rgba(148, 163, 184, 0.5);
+  border-radius: 999px;
+  background: white;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 900;
+  cursor: pointer;
+  z-index: 5;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.graph-card-toggle:hover {
+  border-color: #3b82f6;
+  color: #3b82f6;
+}
+
+.graph-card-toggle.open {
+  background: #f1f5f9;
+}
+
+/* Menu button (⋮) */
+.graph-card-menu-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #475569;
+  font-size: 18px;
+  font-weight: 900;
+  cursor: pointer;
   display: grid;
   place-items: center;
-  color: white;
-  font-weight: 900;
-  font-size: 14px;
-  background: linear-gradient(135deg, #16a34a, #60a5fa);
+  line-height: 1;
+  z-index: 5;
 }
 
-.tree-node-avatar.risk { background: linear-gradient(135deg, #ef4444, #fb7185); }
-.tree-node-avatar.blocked { background: #94a3b8; }
+.graph-card-menu-btn:hover {
+  background: #f1f5f9;
+  border-color: #3b82f6;
+  color: #3b82f6;
+}
 
-.tree-node-info {
+/* Dropdown menu */
+.graph-card-dropdown {
+  position: absolute;
+  top: 36px;
+  right: 4px;
+  min-width: 200px;
+  padding: 6px 0;
+  border: 1px solid rgba(203, 213, 225, 0.7);
+  border-radius: 12px;
+  background: white;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
+  z-index: 100;
+}
+
+.graph-card-dropdown button {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  color: #1f2a44;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+}
+
+.graph-card-dropdown button:hover {
+  background: #f1f5f9;
+}
+
+.graph-card-dropdown button.danger {
+  color: #dc2626;
+}
+
+.graph-card-dropdown button.danger:hover {
+  background: #fef2f2;
+}
+
+/* Toolbar (zoom/expand) */
+.graph-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.graph-toolbar button {
+  min-width: 36px;
+  min-height: 36px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 10px;
+  background: white;
+  color: #1f2a44;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.graph-toolbar button:hover {
+  border-color: #3b82f6;
+}
+
+.graph-toolbar span {
+  font-weight: 900;
+  color: #475569;
+  min-width: 44px;
+  text-align: center;
+}
+
+.graph-toolbar-hint {
+  font-size: 12px;
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+/* ── Unlinked / Orphan sections ── */
+.tree-unlinked-section {
+  padding: 20px;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 16px;
+  background: rgba(239, 246, 255, 0.5);
+}
+
+.tree-unlinked-section h4 {
+  color: #1d4ed8;
+  margin: 0 0 4px;
+}
+
+.tree-section-hint {
+  font-size: 12px;
+  color: #64748b;
+  margin: 0 0 14px;
+  font-weight: 700;
+}
+
+.unlinked-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.unlinked-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid rgba(203, 213, 225, 0.6);
+  border-radius: 12px;
+  background: white;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.unlinked-card:hover {
+  border-color: rgba(59, 130, 246, 0.5);
+}
+
+.unlinked-card.selected {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+.unlinked-card.orphan {
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(255, 247, 247, 0.6);
+}
+
+.unlinked-card-info {
   display: grid;
   gap: 2px;
+  min-width: 0;
 }
 
-.tree-node-name {
+.unlinked-card-info strong {
+  font-size: 14px;
   font-weight: 900;
   color: #1f2a44;
 }
 
-.tree-node-details {
-  font-size: 12px;
-  color: #64748b;
+.unlinked-card-info span {
+  font-size: 13px;
+  color: #2563eb;
   font-weight: 800;
 }
 
-.tree-node-actions {
+.unlinked-card-info small {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 700;
+}
+
+.unlinked-card-actions {
   display: flex;
   gap: 6px;
-  opacity: 0;
-  transition: opacity 0.15s;
 }
 
-.tree-node-row:hover .tree-node-actions {
-  opacity: 1;
-}
-
-.tree-action-btn {
-  padding: 4px 10px;
+.unlinked-btn {
+  padding: 6px 12px;
   border: 1px solid rgba(148, 163, 184, 0.4);
   border-radius: 8px;
   background: white;
   color: #475569;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   cursor: pointer;
 }
 
-.tree-action-btn:hover { border-color: #3b82f6; color: #3b82f6; }
-.tree-action-btn.danger:hover { border-color: #ef4444; color: #ef4444; }
-
-.tree-toggle {
-  width: 20px;
-  height: 20px;
-  display: grid;
-  place-items: center;
-  border: none;
-  background: transparent;
-  color: #64748b;
-  cursor: pointer;
-  font-size: 12px;
-  transition: transform 0.2s;
+.unlinked-btn:hover {
+  border-color: #3b82f6;
+  color: #3b82f6;
 }
 
-.tree-toggle.expanded { transform: rotate(90deg); }
+.unlinked-btn.danger {
+  color: #dc2626;
+}
 
-.tree-root-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: rgba(34, 197, 94, 0.12);
-  color: #047857;
-  font-size: 11px;
-  font-weight: 900;
+.unlinked-btn.danger:hover {
+  border-color: #dc2626;
+  background: #fef2f2;
 }
 
 .tree-orphans-section {

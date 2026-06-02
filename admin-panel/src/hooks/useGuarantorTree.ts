@@ -4,6 +4,7 @@ import {
   attachToParent,
   buildChainEntries,
   deleteNode,
+  deleteUserRecord,
   grantRootAccessByPhones,
   loadChildrenNodes,
   loadFullTree,
@@ -38,6 +39,7 @@ export const useGuarantorTree = (adminUid?: string, canLoadInviteRequests = fals
   // Full tree state
   const [fullTree, setFullTree] = useState<FullTreeNode | null>(null);
   const [orphans, setOrphans] = useState<FullTreeNode[]>([]);
+  const [unlinked, setUnlinked] = useState<FullTreeNode[]>([]);
   const [treeStats, setTreeStats] = useState<FullTreeStats | null>(null);
   const [treeLoading, setTreeLoading] = useState(false);
   const [treeError, setTreeError] = useState('');
@@ -54,6 +56,7 @@ export const useGuarantorTree = (adminUid?: string, canLoadInviteRequests = fals
       const result = await loadFullTree();
       setFullTree(result.root);
       setOrphans(result.orphans);
+      setUnlinked(result.unlinked);
       setTreeStats(result.stats);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Не удалось загрузить дерево.';
@@ -155,6 +158,11 @@ export const useGuarantorTree = (adminUid?: string, canLoadInviteRequests = fals
     await loadTree();
   }, [adminUid, loadTree]);
 
+  const handleDeleteUser = useCallback(async (uid: string) => {
+    await deleteUserRecord(uid, adminUid || 'unknown_admin');
+    await loadTree();
+  }, [adminUid, loadTree]);
+
   // CSV export
   const exportCsv = useCallback(() => {
     if (!fullTree) return;
@@ -195,6 +203,7 @@ export const useGuarantorTree = (adminUid?: string, canLoadInviteRequests = fals
     // Full tree
     fullTree,
     orphans,
+    unlinked,
     treeStats,
     treeLoading,
     treeError,
@@ -210,6 +219,7 @@ export const useGuarantorTree = (adminUid?: string, canLoadInviteRequests = fals
     handleAttachToParent,
     handleReparent,
     handleDelete,
+    handleDeleteUser,
     // Export
     exportCsv,
   };

@@ -101,6 +101,7 @@ export type FullTreeStats = {
   active: number;
   blocked: number;
   orphaned: number;
+  unlinked: number;
   maxDepth: number;
 };
 

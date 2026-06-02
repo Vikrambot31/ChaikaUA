@@ -1,4 +1,4 @@
-import { equalTo, get, limitToFirst, orderByChild, query, ref } from 'firebase/database';
+import { equalTo, get, limitToFirst, orderByChild, query, ref, remove } from 'firebase/database';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { database, firebaseApp } from '../firebase/firebase';
 import { LOCAL_MODE, localGet } from '../local/LOCAL_MODE';
@@ -476,7 +476,7 @@ export const grantRootAccessByPhones = async (phones: string[], adminUid: string
   return results;
 };
 
-export const loadFullTree = async (): Promise<{ root: FullTreeNode; orphans: FullTreeNode[]; stats: FullTreeStats }> => {
+export const loadFullTree = async (): Promise<{ root: FullTreeNode; orphans: FullTreeNode[]; unlinked: FullTreeNode[]; stats: FullTreeStats }> => {
   let allNodes: TrustChainNode[] = [];
   let allUsers: Map<string, UserProfile> = new Map();
   let allAccess: Map<string, UserAccessRecord> = new Map();
@@ -505,10 +505,10 @@ export const loadFullTree = async (): Promise<{ root: FullTreeNode; orphans: Ful
       }
     }
   } else {
-    const [nodesSnap, usersSnap, accessSnap] = await Promise.all([
+    // Load trust_tree and users (required); user_access may be forbidden by rules
+    const [nodesSnap, usersSnap] = await Promise.all([
       get(ref(database, TRUST_TREE_PATH)),
       get(query(ref(database, USERS_PATH), limitToFirst(10000))),
-      get(ref(database, ACCESS_PATH)),
     ]);
 
     const nodesRaw = nodesSnap.val() as Record<string, unknown> | null;
@@ -523,10 +523,17 @@ export const loadFullTree = async (): Promise<{ root: FullTreeNode; orphans: Ful
       if (profile) allUsers.set(uid, profile);
     }
 
-    const accessRaw = accessSnap.val() as Record<string, unknown> | null;
-    for (const [uid, value] of Object.entries(accessRaw ?? {})) {
-      const record = normalizeUserAccess(uid, value);
-      if (record) allAccess.set(uid, record);
+    // user_access — try bulk read first, fallback to skipping (path may not be in Firebase rules)
+    try {
+      const accessSnap = await get(ref(database, ACCESS_PATH));
+      const accessRaw = accessSnap.val() as Record<string, unknown> | null;
+      for (const [uid, value] of Object.entries(accessRaw ?? {})) {
+        const record = normalizeUserAccess(uid, value);
+        if (record) allAccess.set(uid, record);
+      }
+    } catch {
+      // user_access not readable — tree will render without status badges
+      console.warn('[GuarantorTree] user_access not accessible, building tree without status data');
     }
   }
 
@@ -569,7 +576,17 @@ export const loadFullTree = async (): Promise<{ root: FullTreeNode; orphans: Ful
 
   const root = buildNode(ROOT_GUARANTOR_UID, 0);
 
-  // Collect orphans: nodes whose childUid wasn't visited
+  // Users WITHOUT trust_tree entry → separate "unlinked" list (не в дерево)
+  const unlinked: FullTreeNode[] = [];
+  for (const [uid, user] of allUsers) {
+    if (uid === ROOT_GUARANTOR_UID || visited.has(uid)) continue;
+    visited.add(uid);
+    const access = allAccess.get(uid) ?? null;
+    unlinked.push({ uid, user, node: null, access, children: [], depth: -1 });
+  }
+  unlinked.sort((a, b) => (a.user.name || '').localeCompare(b.user.name || '', 'uk'));
+
+  // Collect orphans: trust_tree nodes whose childUid wasn't visited (broken links)
   const orphans: FullTreeNode[] = [];
   for (const node of allNodes) {
     if (!visited.has(node.childUid)) {
@@ -592,17 +609,18 @@ export const loadFullTree = async (): Promise<{ root: FullTreeNode; orphans: Ful
   countStats(root);
 
   const countNodes = (treeNode: FullTreeNode): number => 1 + treeNode.children.reduce((sum, c) => sum + countNodes(c), 0);
-  const total = countNodes(root) - 1 + orphans.length; // exclude root itself
+  const total = countNodes(root) - 1 + orphans.length + unlinked.length;
 
   const stats: FullTreeStats = {
     total,
     active,
     blocked,
     orphaned: orphans.length,
+    unlinked: unlinked.length,
     maxDepth,
   };
 
-  return { root, orphans, stats };
+  return { root, orphans, unlinked, stats };
 };
 
 export const attachToParent = async (childUid: string, parentUid: string, adminUid: string): Promise<void> => {
@@ -624,4 +642,15 @@ export const deleteNode = async (uid: string, strategy: 'promote' | 'orphan', ad
   if (LOCAL_MODE) return;
   const callable = httpsCallable(functions!, 'adminDeleteNode');
   await callable({ uid, strategy, adminUid });
+};
+
+export const deleteUserRecord = async (uid: string, adminUid: string): Promise<void> => {
+  logAudit('delete_user_record', { adminUid, targetUid: uid });
+  if (LOCAL_MODE) return;
+  // Remove from users, trust_tree, user_access
+  await Promise.allSettled([
+    remove(ref(database, `${USERS_PATH}/${uid}`)),
+    remove(ref(database, `${TRUST_TREE_PATH}/${uid}`)),
+    remove(ref(database, `${ACCESS_PATH}/${uid}`)),
+  ]);
 };

@@ -1,9 +1,10 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FullTreeNode, FullTreeStats } from '../types/guarantorTree';
 
 type FullTreeViewProps = {
   root: FullTreeNode;
   orphans: FullTreeNode[];
+  unlinked: FullTreeNode[];
   stats: FullTreeStats;
   selectedUid: string | null;
   filterLevel: string;
@@ -13,192 +14,90 @@ type FullTreeViewProps = {
   onAddChild: (parentUid: string) => void;
   onReparent: (uid: string) => void;
   onDelete: (uid: string) => void;
+  onDeleteUser: (uid: string) => void;
   isAdmin: boolean;
 };
 
+/* ── Layout constants ── */
+const CARD_W = 220;
+const CARD_H = 90;
+const GAP_X = 40;
+const GAP_Y = 120;
+const PAD = 60;
+
+/* ── Helpers ── */
 const getStatusClass = (node: FullTreeNode): string => {
-  const status = node.access?.status;
-  if (status === 'blocked' || status === 'denied') return 'blocked';
-  if (status === 'pending' || status === 'pending_sponsor' || status === 'needs_review' || status === 'needs_manual_review') return 'risk';
+  const s = node.access?.status;
+  if (s === 'blocked' || s === 'denied') return 'blocked';
+  if (s === 'pending' || s === 'pending_sponsor' || s === 'needs_review' || s === 'needs_manual_review') return 'risk';
   return '';
 };
 
-const getStatusLabel = (node: FullTreeNode): string => {
-  const status = node.access?.status;
-  if (!status || status === 'unknown') return '';
-  if (status === 'active' || status === 'approved' || status === 'whitelist_access') return 'active';
-  if (status === 'temporary_access') return 'temp';
-  if (status === 'blocked') return 'blocked';
-  if (status === 'denied') return 'denied';
-  if (status === 'pending' || status === 'pending_sponsor') return 'pending';
-  if (status === 'needs_review' || status === 'needs_manual_review') return 'review';
-  return status;
-};
-
-const matchesFilter = (node: FullTreeNode, filterLevel: string, filterStatus: string, searchQuery: string): boolean => {
-  if (filterLevel !== 'all') {
-    if (filterLevel === '3+') {
-      if (node.depth < 3) return false;
-    } else {
-      if (node.depth !== Number(filterLevel)) return false;
-    }
+const matchesFilter = (node: FullTreeNode, fl: string, fs: string, sq: string): boolean => {
+  if (fl !== 'all') {
+    if (fl === '3+') { if (node.depth < 3) return false; }
+    else if (node.depth !== Number(fl)) return false;
   }
-  if (filterStatus !== 'all') {
-    const statusClass = getStatusClass(node);
-    const isActive = statusClass === '';
-    if (filterStatus === 'active' && !isActive) return false;
-    if (filterStatus === 'risk' && statusClass !== 'risk') return false;
-    if (filterStatus === 'blocked' && statusClass !== 'blocked') return false;
+  if (fs !== 'all') {
+    const sc = getStatusClass(node);
+    if (fs === 'active' && sc !== '') return false;
+    if (fs === 'risk' && sc !== 'risk') return false;
+    if (fs === 'blocked' && sc !== 'blocked') return false;
   }
-  if (searchQuery.trim()) {
-    const q = searchQuery.trim().toLowerCase();
-    const name = node.user.name.toLowerCase();
-    const phone = node.user.phone.replace(/\D/g, '');
-    const uid = node.uid.toLowerCase();
-    if (!name.includes(q) && !phone.includes(q.replace(/\D/g, '')) && !uid.includes(q)) return false;
+  if (sq.trim()) {
+    const q = sq.trim().toLowerCase();
+    if (!node.user.name.toLowerCase().includes(q) && !node.user.phone.replace(/\D/g, '').includes(q.replace(/\D/g, '')) && !node.uid.toLowerCase().includes(q)) return false;
   }
   return true;
 };
 
-const hasVisibleDescendant = (node: FullTreeNode, filterLevel: string, filterStatus: string, searchQuery: string): boolean => {
-  if (matchesFilter(node, filterLevel, filterStatus, searchQuery)) return true;
-  return node.children.some((child) => hasVisibleDescendant(child, filterLevel, filterStatus, searchQuery));
+const hasVisible = (n: FullTreeNode, fl: string, fs: string, sq: string): boolean =>
+  matchesFilter(n, fl, fs, sq) || n.children.some((c) => hasVisible(c, fl, fs, sq));
+
+/* ── Position calculation ── */
+type PositionedNode = { node: FullTreeNode; x: number; y: number; children: PositionedNode[] };
+
+const subtreeWidth = (node: FullTreeNode, fl: string, fs: string, sq: string, collapsed: Set<string>): number => {
+  const vis = node.children.filter((c) => hasVisible(c, fl, fs, sq));
+  if (vis.length === 0 || collapsed.has(node.uid)) return CARD_W + GAP_X;
+  const childrenW = vis.reduce((sum, c) => sum + subtreeWidth(c, fl, fs, sq, collapsed), 0);
+  return Math.max(CARD_W + GAP_X, childrenW);
 };
 
-type TreeNodeProps = {
-  node: FullTreeNode;
-  selectedUid: string | null;
-  filterLevel: string;
-  filterStatus: string;
-  searchQuery: string;
-  onSelectNode: (uid: string) => void;
-  onAddChild: (parentUid: string) => void;
-  onReparent: (uid: string) => void;
-  onDelete: (uid: string) => void;
-  isAdmin: boolean;
-  expandedSet: Set<string>;
-  toggleExpanded: (uid: string) => void;
+const layoutTree = (node: FullTreeNode, x: number, y: number, fl: string, fs: string, sq: string, collapsed: Set<string>): PositionedNode => {
+  const vis = node.children.filter((c) => hasVisible(c, fl, fs, sq));
+  if (vis.length === 0 || collapsed.has(node.uid)) {
+    return { node, x, y, children: [] };
+  }
+  const widths = vis.map((c) => subtreeWidth(c, fl, fs, sq, collapsed));
+  const totalW = widths.reduce((s, w) => s + w, 0);
+  let cx = x - totalW / 2;
+  const posChildren: PositionedNode[] = vis.map((child, i) => {
+    const w = widths[i];
+    const childX = cx + w / 2;
+    cx += w;
+    return layoutTree(child, childX, y + CARD_H + GAP_Y, fl, fs, sq, collapsed);
+  });
+  return { node, x, y, children: posChildren };
 };
 
-const TreeNodeRow = ({
-  node,
-  selectedUid,
-  filterLevel,
-  filterStatus,
-  searchQuery,
-  onSelectNode,
-  onAddChild,
-  onReparent,
-  onDelete,
-  isAdmin,
-  expandedSet,
-  toggleExpanded,
-}: TreeNodeProps) => {
-  const statusClass = getStatusClass(node);
-  const statusLabel = getStatusLabel(node);
-  const isSelected = selectedUid === node.uid;
-  const isExpanded = expandedSet.has(node.uid);
-  const hasChildren = node.children.length > 0;
-  const isRoot = node.depth === 0 && node.user.system;
-
-  const visibleChildren = node.children.filter((child) =>
-    hasVisibleDescendant(child, filterLevel, filterStatus, searchQuery)
-  );
-
-  const depthClass = node.depth === 1 ? 'depth-1' : node.depth === 2 ? 'depth-2' : 'depth-3';
-
-  return (
-    <div>
-      <div
-        className={`tree-node-row ${statusClass} ${isSelected ? 'selected' : ''}`}
-        onClick={() => onSelectNode(node.uid)}
-        id={`tree-node-${node.uid}`}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {hasChildren ? (
-            <button
-              type="button"
-              className={`tree-toggle ${isExpanded ? 'expanded' : ''}`}
-              onClick={(e) => { e.stopPropagation(); toggleExpanded(node.uid); }}
-            >
-              &#9654;
-            </button>
-          ) : (
-            <span style={{ width: '20px', display: 'inline-block' }} />
-          )}
-          <div className={`tree-node-avatar ${statusClass}`}>
-            {node.user.name ? node.user.name.charAt(0).toUpperCase() : '?'}
-          </div>
-        </div>
-
-        <div className="tree-node-info">
-          <span className="tree-node-name">
-            {isRoot ? (
-              <span className="tree-root-badge">&#9733; {node.user.name}</span>
-            ) : (
-              node.user.name || node.uid.slice(0, 12)
-            )}
-            {statusLabel ? (
-              <span style={{
-                marginLeft: '8px',
-                fontSize: '11px',
-                padding: '2px 8px',
-                borderRadius: '999px',
-                background: statusClass === 'blocked' ? 'rgba(239, 68, 68, 0.12)' : statusClass === 'risk' ? 'rgba(251, 191, 36, 0.15)' : 'rgba(34, 197, 94, 0.12)',
-                color: statusClass === 'blocked' ? '#dc2626' : statusClass === 'risk' ? '#d97706' : '#047857',
-                fontWeight: 800,
-              }}>
-                {statusLabel}
-              </span>
-            ) : null}
-          </span>
-          <span className="tree-node-details">
-            {node.user.phone || '-'} {node.user.address ? ` | ${node.user.address}` : ''} {node.depth > 0 ? ` | Уровень ${node.depth}` : ''}
-            {hasChildren ? ` | ${node.children.length} потомков` : ''}
-          </span>
-        </div>
-
-        {isAdmin && !isRoot ? (
-          <div className="tree-node-actions">
-            <button type="button" className="tree-action-btn" onClick={(e) => { e.stopPropagation(); onAddChild(node.uid); }}>+ Ребёнок</button>
-            <button type="button" className="tree-action-btn" onClick={(e) => { e.stopPropagation(); onReparent(node.uid); }}>Переместить</button>
-            <button type="button" className="tree-action-btn danger" onClick={(e) => { e.stopPropagation(); onDelete(node.uid); }}>Удалить</button>
-          </div>
-        ) : isAdmin && isRoot ? (
-          <div className="tree-node-actions">
-            <button type="button" className="tree-action-btn" onClick={(e) => { e.stopPropagation(); onAddChild(node.uid); }}>+ Ребёнок</button>
-          </div>
-        ) : null}
-      </div>
-
-      {isExpanded && visibleChildren.length > 0 ? (
-        <div className={`tree-children ${depthClass}`}>
-          {visibleChildren.map((child) => (
-            <TreeNodeRow
-              key={child.uid}
-              node={child}
-              selectedUid={selectedUid}
-              filterLevel={filterLevel}
-              filterStatus={filterStatus}
-              searchQuery={searchQuery}
-              onSelectNode={onSelectNode}
-              onAddChild={onAddChild}
-              onReparent={onReparent}
-              onDelete={onDelete}
-              isAdmin={isAdmin}
-              expandedSet={expandedSet}
-              toggleExpanded={toggleExpanded}
-            />
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
+const collectAll = (p: PositionedNode): { positions: Array<{ node: FullTreeNode; x: number; y: number }>; edges: Array<{ x1: number; y1: number; x2: number; y2: number }> } => {
+  const positions: Array<{ node: FullTreeNode; x: number; y: number }> = [{ node: p.node, x: p.x, y: p.y }];
+  const edges: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
+  for (const c of p.children) {
+    edges.push({ x1: p.x, y1: p.y + CARD_H, x2: c.x, y2: c.y });
+    const sub = collectAll(c);
+    positions.push(...sub.positions);
+    edges.push(...sub.edges);
+  }
+  return { positions, edges };
 };
 
+/* ── Component ── */
 export const FullTreeView = ({
   root,
   orphans,
+  unlinked,
   stats,
   selectedUid,
   filterLevel,
@@ -208,105 +107,257 @@ export const FullTreeView = ({
   onAddChild,
   onReparent,
   onDelete,
+  onDeleteUser,
   isAdmin,
 }: FullTreeViewProps) => {
-  const [expandedSet, setExpandedSet] = useState<Set<string>>(() => new Set([root.uid]));
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [menuUid, setMenuUid] = useState<string | null>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
 
-  const toggleExpanded = useCallback((uid: string) => {
-    setExpandedSet((prev) => {
+  // Close menu on click outside
+  useEffect(() => {
+    if (!menuUid) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.graph-card-dropdown') && !target.closest('.graph-card-menu-btn')) {
+        setMenuUid(null);
+      }
+    };
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, [menuUid]);
+
+  const toggleCollapse = useCallback((uid: string) => {
+    setCollapsed((prev) => {
       const next = new Set(prev);
-      if (next.has(uid)) next.delete(uid);
-      else next.add(uid);
+      if (next.has(uid)) next.delete(uid); else next.add(uid);
       return next;
     });
   }, []);
 
-  const expandAll = useCallback(() => {
+  const expandAll = useCallback(() => setCollapsed(new Set()), []);
+  const collapseAll = useCallback(() => {
     const all = new Set<string>();
-    const collect = (node: FullTreeNode) => {
-      all.add(node.uid);
-      node.children.forEach(collect);
-    };
+    const collect = (n: FullTreeNode) => { all.add(n.uid); n.children.forEach(collect); };
     collect(root);
-    setExpandedSet(all);
+    all.delete(root.uid);
+    setCollapsed(all);
   }, [root]);
 
-  const collapseAll = useCallback(() => {
-    setExpandedSet(new Set([root.uid]));
-  }, [root.uid]);
+  /* Layout */
+  const tree = useMemo(() => layoutTree(root, 0, 0, filterLevel, filterStatus, searchQuery, collapsed), [root, filterLevel, filterStatus, searchQuery, collapsed]);
+  const { positions, edges } = useMemo(() => collectAll(tree), [tree]);
+
+  /* Bounds */
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const p of positions) {
+    if (p.x - CARD_W / 2 < minX) minX = p.x - CARD_W / 2;
+    if (p.x + CARD_W / 2 > maxX) maxX = p.x + CARD_W / 2;
+    if (p.y < minY) minY = p.y;
+    if (p.y + CARD_H > maxY) maxY = p.y + CARD_H;
+  }
+  const offsetX = -minX + PAD;
+  const offsetY = -minY + PAD;
+  const canvasW = maxX - minX + PAD * 2;
+  const canvasH = maxY - minY + PAD * 2 + 60; // extra for menus
+
+  const renderCard = (n: FullTreeNode, x: number, y: number, inTree: boolean) => {
+    const sc = getStatusClass(n);
+    const isSelected = selectedUid === n.uid;
+    const isRoot = n.depth === 0 && n.user.system;
+    const hasKids = n.children.length > 0;
+    const isCollapsed = collapsed.has(n.uid);
+    const visKids = n.children.filter((c) => hasVisible(c, filterLevel, filterStatus, searchQuery)).length;
+    const matched = searchQuery.trim() && matchesFilter(n, 'all', 'all', searchQuery);
+    const showMenu = menuUid === n.uid;
+
+    return (
+      <div
+        key={n.uid}
+        id={`tree-node-${n.uid}`}
+        className={`graph-card ${sc} ${isSelected ? 'selected' : ''} ${isRoot ? 'root' : ''} ${matched ? 'highlighted' : ''}`}
+        style={{
+          left: x - CARD_W / 2,
+          top: y,
+          width: CARD_W,
+          minHeight: CARD_H,
+        }}
+        onClick={() => onSelectNode(n.uid)}
+      >
+        <div className="graph-card-name">
+          {isRoot ? '★ ' : ''}{n.user.name || `ID: ${n.uid.slice(0, 12)}`}
+        </div>
+        <div className="graph-card-phone">
+          {n.user.phone || 'Нет телефона'}
+        </div>
+        {n.user.address ? (
+          <div className="graph-card-address">{n.user.address}{n.user.apartment ? `, кв.${n.user.apartment}` : ''}</div>
+        ) : null}
+
+        {/* Collapse toggle */}
+        {hasKids && inTree ? (
+          <button
+            type="button"
+            className={`graph-card-toggle ${isCollapsed ? '' : 'open'}`}
+            onClick={(e) => { e.stopPropagation(); toggleCollapse(n.uid); }}
+          >
+            {isCollapsed ? `▶ ${visKids}` : '▼'}
+          </button>
+        ) : null}
+
+        {/* Menu button ⋮ */}
+        {isAdmin ? (
+          <button
+            type="button"
+            className="graph-card-menu-btn"
+            onClick={(e) => { e.stopPropagation(); setMenuUid(showMenu ? null : n.uid); }}
+          >
+            ⋮
+          </button>
+        ) : null}
+
+        {/* Dropdown menu */}
+        {showMenu && isAdmin ? (
+          <div className="graph-card-dropdown">
+            {inTree ? (
+              <>
+                <button type="button" onClick={(e) => { e.stopPropagation(); setMenuUid(null); onAddChild(n.uid); }}>
+                  + Добавить приглашённого
+                </button>
+                {!isRoot ? (
+                  <button type="button" onClick={(e) => { e.stopPropagation(); setMenuUid(null); onReparent(n.uid); }}>
+                    ↔ Переместить к другому
+                  </button>
+                ) : null}
+                {!isRoot ? (
+                  <button type="button" className="danger" onClick={(e) => { e.stopPropagation(); setMenuUid(null); onDelete(n.uid); }}>
+                    ✕ Убрать из дерева
+                  </button>
+                ) : null}
+              </>
+            ) : null}
+            <button type="button" className="danger" onClick={(e) => { e.stopPropagation(); setMenuUid(null); onDeleteUser(n.uid); }}>
+              🗑 Удалить пользователя из базы
+            </button>
+          </div>
+        ) : null}
+      </div>
+    );
+  };
 
   return (
     <div className="full-tree-container">
+      {/* Stats */}
       <div className="tree-stats-bar">
-        <div className="tree-stat-item">
-          <strong>{stats.total}</strong>
-          <span>Всего</span>
-        </div>
-        <div className="tree-stat-item">
-          <strong>{stats.active}</strong>
-          <span>Активных</span>
-        </div>
-        <div className="tree-stat-item">
-          <strong>{stats.blocked}</strong>
-          <span>Заблокир.</span>
-        </div>
-        <div className="tree-stat-item">
-          <strong>{stats.orphaned}</strong>
-          <span>Сироты</span>
-        </div>
-        <div className="tree-stat-item">
-          <strong>{stats.maxDepth}</strong>
-          <span>Макс. глубина</span>
+        <div className="tree-stat-item"><strong>{stats.total}</strong><span>Всего</span></div>
+        <div className="tree-stat-item"><strong>{stats.active}</strong><span>Активных</span></div>
+        <div className="tree-stat-item"><strong>{stats.blocked}</strong><span>Заблокир.</span></div>
+        <div className="tree-stat-item"><strong>{stats.orphaned}</strong><span>Сироты</span></div>
+        <div className="tree-stat-item"><strong>{stats.unlinked}</strong><span>Без поручителя</span></div>
+        <div className="tree-stat-item"><strong>{stats.maxDepth}</strong><span>Макс. глубина</span></div>
+      </div>
+
+      {/* Toolbar */}
+      <div className="graph-toolbar">
+        <button type="button" onClick={expandAll}>Развернуть все</button>
+        <button type="button" onClick={collapseAll}>Свернуть все</button>
+        <span className="graph-toolbar-hint">Прокручивайте для перемещения по дереву</span>
+      </div>
+
+      {/* Scrollable canvas */}
+      <div ref={canvasRef} className="graph-canvas">
+        <div className="graph-canvas-inner" style={{ width: canvasW, height: canvasH }}>
+          {/* SVG edges */}
+          <svg className="graph-edges" width={canvasW} height={canvasH}>
+            <defs>
+              <marker id="arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                <path d="M0,0 L8,3 L0,6" fill="#94a3b8" />
+              </marker>
+            </defs>
+            {edges.map((e, i) => {
+              const x1 = e.x1 + offsetX;
+              const y1 = e.y1 + offsetY;
+              const x2 = e.x2 + offsetX;
+              const y2 = e.y2 + offsetY;
+              const midY = (y1 + y2) / 2;
+              return (
+                <path
+                  key={i}
+                  d={`M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`}
+                  className="graph-edge"
+                  markerEnd="url(#arrow)"
+                />
+              );
+            })}
+          </svg>
+
+          {/* Node cards */}
+          {positions.map(({ node: n, x, y }) => renderCard(n, x + offsetX, y + offsetY, true))}
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '8px', margin: '12px 0' }}>
-        <button type="button" className="tree-expand-btn" onClick={expandAll}>Развернуть все</button>
-        <button type="button" className="tree-expand-btn" onClick={collapseAll}>Свернуть все</button>
-      </div>
+      {/* Unlinked users — без поручителя */}
+      {unlinked.length > 0 ? (
+        <div className="tree-unlinked-section">
+          <h4>Без поручителя — {unlinked.length} чел.</h4>
+          <p className="tree-section-hint">Пользователи, которые зарегистрировались без приглашения или пробовали войти. Не связаны с деревом доверия.</p>
+          <div className="unlinked-grid">
+            {unlinked.map((o) => (
+              <div
+                key={o.uid}
+                className={`unlinked-card ${selectedUid === o.uid ? 'selected' : ''}`}
+                onClick={() => onSelectNode(o.uid)}
+              >
+                <div className="unlinked-card-info">
+                  <strong>{o.user.name || o.uid.slice(0, 12)}</strong>
+                  <span>{o.user.phone || 'Нет телефона'}</span>
+                  {o.user.address ? <small>{o.user.address}</small> : null}
+                </div>
+                {isAdmin ? (
+                  <div className="unlinked-card-actions">
+                    <button type="button" className="unlinked-btn" onClick={(e) => { e.stopPropagation(); onAddChild(o.uid); }} title="Привязать к поручителю">
+                      Привязать
+                    </button>
+                    <button type="button" className="unlinked-btn danger" onClick={(e) => { e.stopPropagation(); onDeleteUser(o.uid); }} title="Удалить из базы">
+                      Удалить
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
-      <TreeNodeRow
-        node={root}
-        selectedUid={selectedUid}
-        filterLevel={filterLevel}
-        filterStatus={filterStatus}
-        searchQuery={searchQuery}
-        onSelectNode={onSelectNode}
-        onAddChild={onAddChild}
-        onReparent={onReparent}
-        onDelete={onDelete}
-        isAdmin={isAdmin}
-        expandedSet={expandedSet}
-        toggleExpanded={toggleExpanded}
-      />
-
+      {/* Orphans */}
       {orphans.length > 0 ? (
         <div className="tree-orphans-section">
-          <h4>Сироты ({orphans.length})</h4>
-          {orphans.map((orphan) => (
-            <div
-              key={orphan.uid}
-              className={`tree-node-row ${getStatusClass(orphan)} ${selectedUid === orphan.uid ? 'selected' : ''}`}
-              onClick={() => onSelectNode(orphan.uid)}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ width: '20px', display: 'inline-block' }} />
-                <div className={`tree-node-avatar ${getStatusClass(orphan)}`}>
-                  {orphan.user.name ? orphan.user.name.charAt(0).toUpperCase() : '?'}
+          <h4>Потерянные связи ({orphans.length})</h4>
+          <p className="tree-section-hint">Есть запись в дереве, но поручитель не найден.</p>
+          <div className="unlinked-grid">
+            {orphans.map((o) => (
+              <div
+                key={o.uid}
+                className={`unlinked-card orphan ${selectedUid === o.uid ? 'selected' : ''}`}
+                onClick={() => onSelectNode(o.uid)}
+              >
+                <div className="unlinked-card-info">
+                  <strong>{o.user.name || o.uid.slice(0, 12)}</strong>
+                  <span>{o.user.phone || '-'}</span>
                 </div>
+                {isAdmin ? (
+                  <div className="unlinked-card-actions">
+                    <button type="button" className="unlinked-btn" onClick={(e) => { e.stopPropagation(); onReparent(o.uid); }}>
+                      Привязать
+                    </button>
+                    <button type="button" className="unlinked-btn danger" onClick={(e) => { e.stopPropagation(); onDeleteUser(o.uid); }}>
+                      Удалить
+                    </button>
+                  </div>
+                ) : null}
               </div>
-              <div className="tree-node-info">
-                <span className="tree-node-name">{orphan.user.name || orphan.uid.slice(0, 12)}</span>
-                <span className="tree-node-details">{orphan.user.phone || '-'} | Родитель: {orphan.node?.parentUid?.slice(0, 10) || '?'}...</span>
-              </div>
-              {isAdmin ? (
-                <div className="tree-node-actions" style={{ opacity: 1 }}>
-                  <button type="button" className="tree-action-btn" onClick={(e) => { e.stopPropagation(); onReparent(orphan.uid); }}>Переместить</button>
-                  <button type="button" className="tree-action-btn danger" onClick={(e) => { e.stopPropagation(); onDelete(orphan.uid); }}>Удалить</button>
-                </div>
-              ) : null}
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       ) : null}
     </div>

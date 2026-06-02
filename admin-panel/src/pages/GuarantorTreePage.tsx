@@ -169,14 +169,19 @@ export const GuarantorTreePage = ({ user, role, onNavigate }: GuarantorTreePageP
       </div>
 
       {/* Tree error */}
-      {tree.treeError ? <div className="error-toast">{tree.treeError}</div> : null}
+      {tree.treeError ? (
+        <div className="panel" style={{ background: '#fff0f0', border: '1px solid #f1aaaa', borderRadius: '14px', padding: '16px' }}>
+          <strong style={{ color: '#991b1b' }}>Ошибка загрузки дерева:</strong>
+          <p style={{ color: '#991b1b', margin: '6px 0 0' }}>{tree.treeError}</p>
+          <button type="button" className="smallButton" style={{ marginTop: '10px' }} onClick={() => void tree.loadTree()}>Повторить загрузку</button>
+        </div>
+      ) : null}
 
       {/* Loading */}
       {tree.treeLoading ? (
-        <div className="loading-skeleton">
-          <div className="skeleton-chain" />
-          <div className="skeleton-card" />
-          <div className="skeleton-accordion" />
+        <div className="panel" style={{ textAlign: 'center', padding: '40px' }}>
+          <div className="search-spinner" style={{ width: '32px', height: '32px', margin: '0 auto 12px' }} />
+          <p style={{ color: '#475569', fontWeight: 800 }}>Загрузка дерева доверия...</p>
         </div>
       ) : null}
 
@@ -185,6 +190,7 @@ export const GuarantorTreePage = ({ user, role, onNavigate }: GuarantorTreePageP
         <FullTreeView
           root={tree.fullTree}
           orphans={tree.orphans}
+          unlinked={tree.unlinked}
           stats={tree.treeStats}
           selectedUid={selectedTreeUid}
           filterLevel={tree.filterLevel}
@@ -194,8 +200,16 @@ export const GuarantorTreePage = ({ user, role, onNavigate }: GuarantorTreePageP
           onAddChild={handleAddChild}
           onReparent={handleReparent}
           onDelete={handleDelete}
+          onDeleteUser={(uid) => { if (window.confirm('Удалить пользователя из базы? Это действие нельзя отменить.')) void tree.handleDeleteUser(uid); }}
           isAdmin={isAdmin}
         />
+      ) : null}
+
+      {/* No data state */}
+      {!tree.treeLoading && !tree.treeError && !tree.fullTree ? (
+        <div className="panel" style={{ textAlign: 'center', padding: '40px' }}>
+          <p style={{ color: '#475569', fontWeight: 800 }}>Дерево пустое. Нажмите «Обновить дерево» чтобы загрузить.</p>
+        </div>
       ) : null}
 
       {/* Focused user detail (chain visualization) */}

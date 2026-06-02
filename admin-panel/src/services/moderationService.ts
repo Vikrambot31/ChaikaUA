@@ -271,12 +271,20 @@ export const loadModerationItems = async (): Promise<ModerationItem[]> => {
     return Array.isArray(raw) ? raw : [];
   }
 
-  const snapshots = await Promise.all(
+  const results = await Promise.allSettled(
     MODERATION_SECTIONS.map(async (config) => ({
       config,
       snapshot: await get(query(ref(database, config.path), limitToFirst(500))),
     })),
   );
+
+  const snapshots = results.flatMap((result) => {
+    if (result.status === 'rejected') {
+      console.warn('[moderationService] Не удалось загрузить раздел:', result.reason);
+      return [];
+    }
+    return [result.value];
+  });
 
   const items = snapshots.flatMap(({ config, snapshot }) => {
     const raw = snapshot.val() as Record<string, unknown> | null;
