@@ -150,7 +150,12 @@ export const InviteAccessPage = ({ role }: InviteAccessPageProps) => {
       setState(freshState);
       setDataLoaded(true);
     } catch (error) {
-      setMessage(`Не удалось загрузить данные: ${error instanceof Error ? error.message : 'Firebase недоступен'}`);
+      const msg = error instanceof Error ? error.message : 'Firebase недоступен';
+      const isPermDenied = msg.toLowerCase().includes('permission_denied') || msg.toLowerCase().includes('permission denied');
+      if (!isPermDenied) {
+        setMessage(`Не удалось загрузить данные: ${msg}`);
+      }
+      // permission_denied handled via state.rulesNotConfigured banner below
     } finally {
       setLoading(false);
     }
@@ -338,12 +343,16 @@ export const InviteAccessPage = ({ role }: InviteAccessPageProps) => {
       </div>
 
       {message ? <p className="infoMessage">{message}</p> : null}
-      {!loading && !dataLoaded && (
+      {!loading && state.rulesNotConfigured && (
         <div style={{
-          background: '#3a1a00', color: '#ffcc80', padding: '12px 16px', borderRadius: 6,
-          marginBottom: 16, fontSize: 13, fontWeight: 600,
+          background: '#1a1a2e', color: '#a0b0d0', padding: '12px 16px', borderRadius: 6,
+          marginBottom: 16, fontSize: 13, border: '1px solid #2a3a5a',
         }}>
-          {'Данные не загружены — Firebase RTDB недоступен. Проверьте соединение и нажмите «Обновить».'}
+          <strong style={{ color: '#c0d0f0' }}>Firebase Rules не настроены для этого раздела.</strong>
+          {' '}Добавьте правила чтения для путей:{' '}
+          <code style={{ background: '#0d1117', padding: '1px 5px', borderRadius: 3 }}>feature_flags/invite_access</code>,{' '}
+          <code style={{ background: '#0d1117', padding: '1px 5px', borderRadius: 3 }}>trusted_sponsors</code>,{' '}
+          <code style={{ background: '#0d1117', padding: '1px 5px', borderRadius: 3 }}>invite_requests</code>.
         </div>
       )}
 

@@ -61,6 +61,7 @@ export type InviteAccessState = {
   sponsors: TrustedSponsor[];
   requests: InviteRequest[];
   hasMore: boolean;
+  rulesNotConfigured?: boolean;
 };
 
 type CallableResult = {
@@ -197,13 +198,9 @@ export const loadInviteAccessState = async (): Promise<InviteAccessState> => {
     get(query(ref(database, INVITE_REQUESTS_PATH), orderByChild('createdAt'), limitToLast(PAGE_SIZE))),
   ]);
 
-  const denied = [flagResult, sponsorsResult, requestsResult].filter(
-    (r): r is PromiseRejectedResult => r.status === 'rejected',
+  const allDenied = [flagResult, sponsorsResult, requestsResult].every(
+    (r) => r.status === 'rejected',
   );
-  if (denied.length === 3) {
-    // All paths denied — surface the first error so the UI can show it
-    throw denied[0].reason instanceof Error ? denied[0].reason : new Error(String(denied[0].reason));
-  }
 
   const rawSponsors = sponsorsResult.status === 'fulfilled'
     ? (sponsorsResult.value.val() as Record<string, unknown> | null)
@@ -228,6 +225,7 @@ export const loadInviteAccessState = async (): Promise<InviteAccessState> => {
     sponsors,
     requests,
     hasMore: requests.length >= PAGE_SIZE,
+    rulesNotConfigured: allDenied,
   };
 };
 
