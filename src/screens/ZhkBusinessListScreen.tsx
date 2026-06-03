@@ -1331,7 +1331,7 @@ export default function ZhkBusinessListScreen() {
                   <PhotoUploadField
                     uid={user.id}
                     userName={user?.name ?? ''}
-                    maxPhotos={5}
+                    maxPhotos={1}
                     storagePath="local_business"
                     onPhotosChange={setFormPhotos}
                   />
