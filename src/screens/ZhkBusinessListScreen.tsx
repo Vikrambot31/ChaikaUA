@@ -8,6 +8,7 @@ import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -34,11 +35,16 @@ import ContactReasonModal from '../components/ContactReasonModal';
 import { safeCallPhone } from '../utils/communicationActions';
 import type { DetailItemData } from '../utils/detailViewTypes';
 import { normalizePhoneText } from '../utils/textUtils';
-import { normalizeUkrainianPhoneStrict } from '../utils/validators';
 import { safeLogError } from '../utils/errorLogger';
 import StarRatingModal from '../components/StarRatingModal';
 import { DailyRatingUsage, canUseDailyRating, recordDailyRatingUse } from '../utils/monthlyRating';
 import { getDonePhotos, validateSubmissionRequirements } from '../utils/submissionRequirements';
+import { checkYellowList } from '../utils/yellowListCheck';
+import { getLanguageValidationError } from '../utils/contentLanguageGuard';
+import { useOperationTrace } from '../hooks/useOperationTrace';
+import InlineFieldHint from '../components/InlineFieldHint';
+import { FormFieldError } from '../components/ValidationErrorMessage';
+import { useSoftToast } from '../hooks/useSoftToast';
 
 // --- Types --------------------------------------------------------------------
 
@@ -70,8 +76,8 @@ type BusinessItem = {
   promotedPriority?: number;
 };
 
-type MyBusinessRequest = Pick<BusinessItem, 'status' | 'rejectionReason' | 'version' | 'createdAt'> | null;
-type SubmitStage = 'validate' | 'checkPending' | 'write';
+type MyBusinessRequest = Pick<BusinessItem, 'status' | 'rejectionReason' | 'createdAt'> | null;
+type SubmitStage = 'validate' | 'write';
 
 type BusinessSubcategory = { key: string; ua: string; ru: string; en: string };
 type BusinessCategory = {
@@ -184,6 +190,20 @@ const BUSINESS_CATEGORIES: BusinessCategory[] = [
 ];
 
 const DESC_MAX = 400;
+const BUSINESS_LISTING_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const DRAFT_SAVE_DEBOUNCE_MS = 900;
+const BUSINESS_DRAFT_KEY = '@chaika:business_draft';
+
+type BusinessDraft = Partial<{
+  formCategoryKey: string;
+  formSubcategoryKey: string;
+  contactName: string;
+  phone: string;
+  description: string;
+  addFormVisible: boolean;
+  showPhoneOnCard: boolean;
+}>;
+
 const DAILY_USAGE_KEY = '@chaika:place_rating_daily_usage_v1';
 
 // --- i18n ---------------------------------------------------------------------
@@ -251,6 +271,12 @@ const UI_TEXT = {
     pendingSoftGuardUpdate: 'Оновити поточну заявку',
     pendingSoftGuardCancel: 'Скасувати',
     phoneInvalidStrict: 'Введіть телефон у форматі +380XXXXXXXXX, 380XXXXXXXXX або 0XXXXXXXXX.',
+    closeFormTitle: 'Закрити форму?',
+    closeFormMsg: 'Ви ще не надіслали заявку. Закрити?',
+    closeFormNo: 'Ні',
+    closeFormYes: 'Так',
+    showPhoneToggle: 'Показувати телефон на картці',
+    phoneHint: 'Залиште номер, за яким з вами можна зв\'язатися.',
   },
   ru: {
     title: 'Услуги Жителей ЖК',
@@ -314,6 +340,12 @@ const UI_TEXT = {
     pendingSoftGuardUpdate: 'Обновить текущую заявку',
     pendingSoftGuardCancel: 'Отмена',
     phoneInvalidStrict: 'Введите телефон в формате +380XXXXXXXXX, 380XXXXXXXXX или 0XXXXXXXXX.',
+    closeFormTitle: 'Закрыть форму?',
+    closeFormMsg: 'Вы ещё не отправили заявку. Закрыть?',
+    closeFormNo: 'Нет',
+    closeFormYes: 'Да',
+    showPhoneToggle: 'Показывать телефон на карточке',
+    phoneHint: 'Оставьте номер, по которому с вами можно связаться.',
   },
   en: {
     title: 'Residents\' Services',
@@ -377,6 +409,12 @@ const UI_TEXT = {
     pendingSoftGuardUpdate: 'Update current request',
     pendingSoftGuardCancel: 'Cancel',
     phoneInvalidStrict: 'Enter a phone in +380XXXXXXXXX, 380XXXXXXXXX, or 0XXXXXXXXX format.',
+    closeFormTitle: 'Close form?',
+    closeFormMsg: 'You have not submitted yet. Close?',
+    closeFormNo: 'No',
+    closeFormYes: 'Yes',
+    showPhoneToggle: 'Show phone on card',
+    phoneHint: 'Leave a number people can use to contact you.',
   },
 };
 
@@ -472,6 +510,14 @@ export default function ZhkBusinessListScreen() {
   const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [myRequest, setMyRequest] = useState<MyBusinessRequest>(null);
+  const [showPhoneOnCard, setShowPhoneOnCard] = useState(true);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestDraftRef = useRef({ formCategoryKey: '', formSubcategoryKey: '', contactName: '', phone: '', description: '', addFormVisible: false, showPhoneOnCard: true });
+  const previousAddFormVisibleRef = useRef(false);
+  const skipNextDraftFlushRef = useRef(false);
+  const { startOperation, trace } = useOperationTrace('ZhkBusiness');
+  const toast = useSoftToast();
 
   useEffect(() => {
     AsyncStorage.getItem(DAILY_USAGE_KEY)
@@ -574,7 +620,6 @@ export default function ZhkBusinessListScreen() {
       setMyRequest({
         status: typeof value.status === 'string' ? value.status : 'pending',
         rejectionReason: typeof value.rejectionReason === 'string' ? value.rejectionReason : '',
-        version: typeof value.version === 'number' ? value.version : undefined,
         createdAt: value.createdAt,
       });
     } catch {
@@ -589,6 +634,82 @@ export default function ZhkBusinessListScreen() {
       setContactName(user.name);
     }
   }, [contactName, user?.name]);
+
+  // Restore draft on mount
+  useEffect(() => {
+    let isMounted = true;
+    void (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(BUSINESS_DRAFT_KEY);
+        if (!isMounted || !raw) return;
+        const draft = JSON.parse(raw) as BusinessDraft;
+        if (draft.formCategoryKey) setFormCategoryKey(draft.formCategoryKey);
+        if (draft.formSubcategoryKey) setFormSubcategoryKey(draft.formSubcategoryKey);
+        if (draft.contactName) setContactName(draft.contactName);
+        if (draft.phone) setPhone(draft.phone);
+        if (draft.description) setDescription(draft.description);
+        if (draft.showPhoneOnCard !== undefined) setShowPhoneOnCard(draft.showPhoneOnCard);
+        if (draft.addFormVisible) setAddFormVisible(true);
+        await AsyncStorage.removeItem(BUSINESS_DRAFT_KEY);
+      } catch { /* ignore */ }
+    })();
+    return () => { isMounted = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Keep latestDraftRef in sync
+  useEffect(() => {
+    latestDraftRef.current = { formCategoryKey, formSubcategoryKey, contactName, phone, description, addFormVisible, showPhoneOnCard };
+  }, [addFormVisible, formCategoryKey, formSubcategoryKey, contactName, phone, description, showPhoneOnCard]);
+
+  const saveDraftNow = useCallback((visible = latestDraftRef.current.addFormVisible) => {
+    if (!visible) return;
+    const { formCategoryKey: draftCategory, formSubcategoryKey: draftSubcategory, contactName: draftName, phone: draftPhone, description: draftDescription, showPhoneOnCard: draftShowPhone } = latestDraftRef.current;
+    void AsyncStorage.setItem(
+      BUSINESS_DRAFT_KEY,
+      JSON.stringify({ formCategoryKey: draftCategory, formSubcategoryKey: draftSubcategory, contactName: draftName, phone: draftPhone, description: draftDescription, addFormVisible: true, showPhoneOnCard: draftShowPhone }),
+    ).catch(() => {});
+  }, []);
+
+  // Save draft when form closes without submitting
+  useEffect(() => {
+    const wasVisible = previousAddFormVisibleRef.current;
+    previousAddFormVisibleRef.current = addFormVisible;
+    if (!wasVisible || addFormVisible) return;
+    if (skipNextDraftFlushRef.current) {
+      skipNextDraftFlushRef.current = false;
+      return;
+    }
+    saveDraftNow(true);
+  }, [addFormVisible, saveDraftNow]);
+
+  // Debounced draft save while form is open
+  useEffect(() => {
+    if (draftSaveTimerRef.current) {
+      clearTimeout(draftSaveTimerRef.current);
+      draftSaveTimerRef.current = null;
+    }
+    if (!addFormVisible) return;
+    draftSaveTimerRef.current = setTimeout(() => {
+      draftSaveTimerRef.current = null;
+      saveDraftNow(true);
+    }, DRAFT_SAVE_DEBOUNCE_MS);
+    return () => {
+      if (draftSaveTimerRef.current) {
+        clearTimeout(draftSaveTimerRef.current);
+        draftSaveTimerRef.current = null;
+      }
+    };
+  }, [addFormVisible, formCategoryKey, formSubcategoryKey, contactName, phone, description, showPhoneOnCard, saveDraftNow]);
+
+  // Cleanup on unmount
+  useEffect(() => () => {
+    if (draftSaveTimerRef.current) {
+      clearTimeout(draftSaveTimerRef.current);
+      draftSaveTimerRef.current = null;
+    }
+    saveDraftNow();
+  }, [saveDraftNow]);
 
   // Unique categories from loaded data
   const categories = Array.from(
@@ -631,116 +752,104 @@ export default function ZhkBusinessListScreen() {
 
   const selectedFormCategory = BUSINESS_CATEGORIES.find((category) => category.key === formCategoryKey);
   const selectedFormSubcategory = selectedFormCategory?.subs.find((subcategory) => subcategory.key === formSubcategoryKey);
-  const isSubmitFormValid = Boolean(formCategoryKey && formSubcategoryKey && contactName.trim() && normalizeUkrainianPhoneStrict(phone));
-  const hasUploadingPhotos = formPhotos.some((photo) => photo.status === 'uploading');
-  const hasPhotoErrors = formPhotos.some((photo) => photo.status === 'error');
+  const isSubmitFormValid = Boolean(formCategoryKey && formSubcategoryKey && contactName.trim() && phone.replace(/\D/g, '').length >= 7);
   const addBusinessText = language === 'ru' ? '+ Добавить бизнес' : language === 'en' ? '+ Add business' : '+ Додати бізнес';
-  const photoUploadingText = language === 'ru'
-    ? 'Дождитесь завершения загрузки фото.'
-    : language === 'en'
-      ? 'Wait until the photo upload is complete.'
-      : 'Дочекайтеся завершення завантаження фото.';
-  const photoUploadErrorText = language === 'ru'
-    ? 'Не удалось загрузить фото. Удалите его или попробуйте ещё раз.'
-    : language === 'en'
-      ? 'Photo upload failed. Remove it or try again.'
-      : 'Не вдалося завантажити фото. Видаліть його або спробуйте ще раз.';
 
   const resetAddForm = useCallback(() => {
+    skipNextDraftFlushRef.current = true;
+    if (draftSaveTimerRef.current) {
+      clearTimeout(draftSaveTimerRef.current);
+      draftSaveTimerRef.current = null;
+    }
     setFormCategoryKey('');
     setFormSubcategoryKey('');
     setContactName(user?.name ?? '');
     setPhone('+380');
     setDescription('');
     setFormPhotos([]);
+    setShowPhoneOnCard(true);
+    setSubmitAttempted(false);
+    void AsyncStorage.removeItem(BUSINESS_DRAFT_KEY).catch(() => {});
   }, [user?.name]);
 
   const handleRequestCloseAddForm = useCallback(() => {
-    setAddFormVisible(false);
-  }, []);
+    Alert.alert(
+      t.closeFormTitle,
+      t.closeFormMsg,
+      [
+        { text: t.closeFormNo, style: 'cancel' },
+        { text: t.closeFormYes, onPress: () => setAddFormVisible(false) },
+      ],
+    );
+  }, [t.closeFormTitle, t.closeFormMsg, t.closeFormNo, t.closeFormYes]);
 
   const handleFormCategoryChange = useCallback((nextCategory: string) => {
     setFormCategoryKey(nextCategory);
     setFormSubcategoryKey('');
   }, []);
 
-  const logSubmitError = useCallback((errorValue: unknown, stage: SubmitStage, uid?: string, existingStatus?: string) => {
+  const logSubmitError = useCallback((errorValue: unknown, stage: SubmitStage, uid?: string) => {
     safeLogError('ZhkBusinessListScreen.submitBusiness', errorValue, {
       uid: uid ?? user?.id ?? '',
       categoryKey: formCategoryKey,
       subcategoryKey: formSubcategoryKey,
       hasPhoto: formPhotos.some((photo) => photo.status === 'done'),
-      existingStatus,
       stage,
     });
   }, [formCategoryKey, formPhotos, formSubcategoryKey, user?.id]);
 
-  const confirmPendingUpdate = useCallback((): Promise<boolean> => new Promise((resolve) => {
-    Alert.alert(
-      t.pendingSoftGuardTitle,
-      t.pendingSoftGuardText,
-      [
-        { text: t.pendingSoftGuardCancel, style: 'cancel', onPress: () => resolve(false) },
-        { text: t.pendingSoftGuardUpdate, onPress: () => resolve(true) },
-      ],
-      { cancelable: true, onDismiss: () => resolve(false) },
-    );
-  }), [t.pendingSoftGuardCancel, t.pendingSoftGuardText, t.pendingSoftGuardTitle, t.pendingSoftGuardUpdate]);
-
   const handleSubmitBusiness = useCallback(async () => {
-    if (!isSubmitFormValid || !selectedFormCategory || !selectedFormSubcategory) {
-      logSubmitError(new Error('Business submit validation failed: missing required fields'), 'validate');
-      Alert.alert(t.errorTitle, t.errorFill);
-      return;
-    }
-    const normalizedPhone = normalizeUkrainianPhoneStrict(phone);
-    if (!normalizedPhone) {
-      logSubmitError(new Error('Business submit validation failed: invalid phone format'), 'validate');
-      Alert.alert(t.errorTitle, t.phoneInvalidStrict);
-      return;
-    }
+    startOperation();
+    setSubmitAttempted(true);
+
+    trace('validate', 'start');
     if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, userStartAvatarKey: user?.startAvatarKey, navigation })) {
+      trace('validate', 'fail', { missing: 'submissionRequirements' });
       return;
     }
-    if (hasUploadingPhotos) {
-      Alert.alert(t.errorTitle, photoUploadingText);
+    if (await checkYellowList(user?.id, language)) {
+      trace('validate', 'fail', { missing: 'yellowList' });
       return;
     }
-    if (hasPhotoErrors) {
-      Alert.alert(t.errorTitle, photoUploadErrorText);
+    if (!formCategoryKey || !formSubcategoryKey || !selectedFormCategory || !selectedFormSubcategory) {
+      trace('validate', 'fail', { missing: 'category' });
+      toast.showWarning(t.errorTitle, t.errorFill);
       return;
     }
+    if (!contactName.trim()) {
+      trace('validate', 'fail', { missing: 'name' });
+      toast.showWarning(t.errorTitle, t.errorFill);
+      return;
+    }
+    if (phone.replace(/\D/g, '').length < 7) {
+      trace('validate', 'fail', { missing: 'phone' });
+      toast.showWarning(t.errorTitle, t.errorPhone);
+      return;
+    }
+    const langError = getLanguageValidationError(description.trim(), language as 'ua' | 'ru' | 'en');
+    if (langError) {
+      trace('validate', 'fail', { missing: 'language' });
+      toast.showWarning(t.errorTitle, langError);
+      return;
+    }
+    trace('validate', 'success');
 
     setSubmitting(true);
     let uidForLog = user?.id ?? '';
-    let existingStatusForLog: string | undefined;
     try {
+      trace('auth', 'start');
       const firebaseUser = await ensureFirebaseAuth();
       const uid = firebaseUser.uid;
       uidForLog = uid;
-      const businessRef = ref(database, `local_business/${uid}`);
-      let existingSnap;
-      try {
-        existingSnap = await get(businessRef);
-      } catch (errorValue) {
-        logSubmitError(errorValue, 'checkPending', uid);
-        Alert.alert(t.errorTitle, t.errorLoad);
-        return;
-      }
-      const existing = existingSnap.exists() ? existingSnap.val() as Partial<BusinessItem> : null;
-      const existingStatus = typeof existing?.status === 'string' ? existing.status : undefined;
-      existingStatusForLog = existingStatus;
+      trace('auth', 'success');
 
-      if (existingStatus === 'pending') {
-        const shouldUpdate = await confirmPendingUpdate();
-        if (!shouldUpdate) {
-          return;
-        }
-      }
+      const businessRef = ref(database, `local_business/${uid}`);
+      const existingSnap = await get(businessRef).catch(() => null);
+      const existing = existingSnap?.exists() ? existingSnap.val() as Partial<BusinessItem> : null;
 
       const firstPhoto = getDonePhotos(formPhotos)[0];
-      const previousVersion = typeof existing?.version === 'number' ? existing.version : (existing ? 1 : 0);
       const now = new Date().toISOString();
+      const createdAt = existing?.createdAt ?? now;
       const entry = {
         uid,
         userId: uid,
@@ -749,72 +858,75 @@ export default function ZhkBusinessListScreen() {
         subcategoryKey: formSubcategoryKey,
         subcategoryLabel: selectedFormSubcategory[language],
         contactName: contactName.trim() || user?.name || selectedFormSubcategory[language],
-        phone: normalizedPhone,
+        phone: normalizePhoneText(phone),
         description: description.trim(),
         photoStoragePath: firstPhoto?.storagePath ?? '',
         photoUri: firstPhoto?.downloadUrl ?? '',
         language,
-        createdAt: existing?.createdAt ?? now,
+        createdAt,
         updatedAt: now,
-        version: previousVersion + 1,
+        expiresAt: new Date(new Date(typeof createdAt === 'string' ? createdAt : now).getTime() + BUSINESS_LISTING_TTL_MS).toISOString(),
         status: 'pending',
+        showPhone: showPhoneOnCard,
         moderatedAt: null,
         moderatedBy: null,
         moderationReason: null,
         rejectionReason: null,
-        // Preserve social data when updating an existing listing
         likesByUserId: existing?.likesByUserId ?? {},
         likeCount: typeof existing?.likeCount === 'number' ? existing.likeCount : 0,
         ratingByUserId: existing?.ratingByUserId ?? {},
       };
 
+      trace('write', 'start');
       await set(businessRef, entry);
-      Alert.alert(t.successTitle, t.successMsg);
+      trace('write', 'success');
+
+      toast.showSuccess(t.successTitle, t.successMsg);
       resetAddForm();
       setAddFormVisible(false);
       setMyRequest({
         status: 'pending',
         rejectionReason: '',
-        version: entry.version,
         createdAt: entry.createdAt,
       });
       void loadMyRequest();
       void loadData();
     } catch (errorValue) {
-      logSubmitError(errorValue, 'write', uidForLog, existingStatusForLog);
-      Alert.alert(t.errorTitle, t.errorLoad);
+      trace('write', 'fail', {}, errorValue);
+      logSubmitError(errorValue, 'write', uidForLog);
+      toast.showError(t.errorTitle, t.errorLoad);
     } finally {
       setSubmitting(false);
     }
   }, [
-    contactName,
-    description,
-    formCategoryKey,
-    formPhotos,
-    formSubcategoryKey,
-    hasPhotoErrors,
-    hasUploadingPhotos,
-    isSubmitFormValid,
+    startOperation,
+    trace,
     language,
-    loadData,
-    loadMyRequest,
-    logSubmitError,
+    user?.id,
+    user?.photoURL,
+    user?.startAvatarKey,
+    user?.name,
     navigation,
-    phone,
-    photoUploadErrorText,
-    photoUploadingText,
-    resetAddForm,
+    formCategoryKey,
+    formSubcategoryKey,
     selectedFormCategory,
     selectedFormSubcategory,
-    confirmPendingUpdate,
-    t.errorFill,
-    t.errorLoad,
+    contactName,
+    phone,
+    description,
+    formPhotos,
+    showPhoneOnCard,
+    logSubmitError,
+    resetAddForm,
+    loadMyRequest,
+    loadData,
     t.errorTitle,
-    t.phoneInvalidStrict,
+    t.errorFill,
+    t.errorPhone,
+    t.errorLoad,
     t.successMsg,
     t.successTitle,
-    user?.id,
-    user?.name,
+    toast,
   ]);
 
   const handleLike = useCallback(async (itemId: string) => {
@@ -1187,6 +1299,8 @@ export default function ZhkBusinessListScreen() {
                   keyboardType="phone-pad"
                   maxLength={18}
                 />
+                <InlineFieldHint message={t.phoneHint} type={phone.replace(/\D/g, '').length >= 7 ? 'success' : 'hint'} />
+                <FormFieldError error={submitAttempted && phone.replace(/\D/g, '').length < 7 ? t.errorPhone : undefined} />
 
                 <TextInput
                   style={[styles.input, styles.inputMultiline]}
@@ -1198,6 +1312,8 @@ export default function ZhkBusinessListScreen() {
                   numberOfLines={4}
                   textAlignVertical="top"
                 />
+                <InlineFieldHint message={t.descriptionPlaceholder} type={description.trim() ? 'success' : 'hint'} />
+                <FormFieldError error={submitAttempted && !description.trim() ? t.errorFill : undefined} />
 
                 <Text style={styles.fieldLabel}>{t.photoLabel}</Text>
                 {user?.id ? (
@@ -1212,16 +1328,26 @@ export default function ZhkBusinessListScreen() {
                   <Text style={styles.signInNote}>{t.signInToSubmit}</Text>
                 )}
 
+                <View style={styles.toggleRow}>
+                  <Text style={styles.fieldLabel}>{t.showPhoneToggle}</Text>
+                  <Switch
+                    value={showPhoneOnCard}
+                    onValueChange={setShowPhoneOnCard}
+                    trackColor={{ false: '#E8DDD3', true: '#6A8BA5' }}
+                    thumbColor={showPhoneOnCard ? '#403933' : '#A0938D'}
+                  />
+                </View>
+
                 <TouchableOpacity
-                  style={[styles.submitButton, (!isSubmitFormValid || submitting || hasUploadingPhotos) && styles.submitButtonDisabled]}
+                  style={[styles.submitButton, (!isSubmitFormValid || submitting) && styles.submitButtonDisabled]}
                   onPress={() => void handleSubmitBusiness()}
                   activeOpacity={0.86}
-                  disabled={!isSubmitFormValid || submitting || hasUploadingPhotos}
+                  disabled={!isSubmitFormValid || submitting}
                 >
                   {submitting ? (
                     <ActivityIndicator color="#fff" />
                   ) : (
-                    <Text style={styles.submitButtonText}>{hasUploadingPhotos ? photoUploadingText : t.submitBtn}</Text>
+                    <Text style={styles.submitButtonText}>{t.submitBtn}</Text>
                   )}
                 </TouchableOpacity>
               </ScrollView>
@@ -1682,6 +1808,19 @@ const styles = StyleSheet.create({
   },
   submitButtonDisabled: { opacity: 0.65 },
   submitButtonText: { color: '#fff', fontWeight: '900', fontSize: 15 },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 8,
+    backgroundColor: '#F7F3EE',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#E8DDD3',
+    marginBottom: 10,
+  },
 });
 
 const card = StyleSheet.create({
