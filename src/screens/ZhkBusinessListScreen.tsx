@@ -16,7 +16,6 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
-import { Picker } from '@react-native-picker/picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { equalTo, get, onValue, orderByChild, query, ref, runTransaction, set } from 'firebase/database';
@@ -471,8 +470,6 @@ export default function ZhkBusinessListScreen() {
   const [phone, setPhone] = useState('+380');
   const [description, setDescription] = useState('');
   const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
-  const [priceMin, setPriceMin] = useState('');
-  const [priceMax, setPriceMax] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [myRequest, setMyRequest] = useState<MyBusinessRequest>(null);
 
@@ -635,6 +632,19 @@ export default function ZhkBusinessListScreen() {
   const selectedFormCategory = BUSINESS_CATEGORIES.find((category) => category.key === formCategoryKey);
   const selectedFormSubcategory = selectedFormCategory?.subs.find((subcategory) => subcategory.key === formSubcategoryKey);
   const isSubmitFormValid = Boolean(formCategoryKey && formSubcategoryKey && contactName.trim() && normalizeUkrainianPhoneStrict(phone));
+  const hasUploadingPhotos = formPhotos.some((photo) => photo.status === 'uploading');
+  const hasPhotoErrors = formPhotos.some((photo) => photo.status === 'error');
+  const addBusinessText = language === 'ru' ? '+ Добавить бизнес' : language === 'en' ? '+ Add business' : '+ Додати бізнес';
+  const photoUploadingText = language === 'ru'
+    ? 'Дождитесь завершения загрузки фото.'
+    : language === 'en'
+      ? 'Wait until the photo upload is complete.'
+      : 'Дочекайтеся завершення завантаження фото.';
+  const photoUploadErrorText = language === 'ru'
+    ? 'Не удалось загрузить фото. Удалите его или попробуйте ещё раз.'
+    : language === 'en'
+      ? 'Photo upload failed. Remove it or try again.'
+      : 'Не вдалося завантажити фото. Видаліть його або спробуйте ще раз.';
 
   const resetAddForm = useCallback(() => {
     setFormCategoryKey('');
@@ -643,8 +653,6 @@ export default function ZhkBusinessListScreen() {
     setPhone('+380');
     setDescription('');
     setFormPhotos([]);
-    setPriceMin('');
-    setPriceMax('');
   }, [user?.name]);
 
   const handleRequestCloseAddForm = useCallback(() => {
@@ -694,6 +702,14 @@ export default function ZhkBusinessListScreen() {
     if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, userStartAvatarKey: user?.startAvatarKey, navigation })) {
       return;
     }
+    if (hasUploadingPhotos) {
+      Alert.alert(t.errorTitle, photoUploadingText);
+      return;
+    }
+    if (hasPhotoErrors) {
+      Alert.alert(t.errorTitle, photoUploadErrorText);
+      return;
+    }
 
     setSubmitting(true);
     let uidForLog = user?.id ?? '';
@@ -725,8 +741,6 @@ export default function ZhkBusinessListScreen() {
       const firstPhoto = getDonePhotos(formPhotos)[0];
       const previousVersion = typeof existing?.version === 'number' ? existing.version : (existing ? 1 : 0);
       const now = new Date().toISOString();
-      const parsedPriceMin = priceMin.trim() ? Number(priceMin.trim()) : undefined;
-      const parsedPriceMax = priceMax.trim() ? Number(priceMax.trim()) : undefined;
       const entry = {
         uid,
         userId: uid,
@@ -752,10 +766,6 @@ export default function ZhkBusinessListScreen() {
         likesByUserId: existing?.likesByUserId ?? {},
         likeCount: typeof existing?.likeCount === 'number' ? existing.likeCount : 0,
         ratingByUserId: existing?.ratingByUserId ?? {},
-        // Price (optional)
-        ...(parsedPriceMin != null ? { priceMin: parsedPriceMin } : {}),
-        ...(parsedPriceMax != null ? { priceMax: parsedPriceMax } : {}),
-        ...(parsedPriceMin != null || parsedPriceMax != null ? { currency: '₴' } : {}),
       };
 
       await set(businessRef, entry);
@@ -782,6 +792,8 @@ export default function ZhkBusinessListScreen() {
     formCategoryKey,
     formPhotos,
     formSubcategoryKey,
+    hasPhotoErrors,
+    hasUploadingPhotos,
     isSubmitFormValid,
     language,
     loadData,
@@ -789,8 +801,8 @@ export default function ZhkBusinessListScreen() {
     logSubmitError,
     navigation,
     phone,
-    priceMin,
-    priceMax,
+    photoUploadErrorText,
+    photoUploadingText,
     resetAddForm,
     selectedFormCategory,
     selectedFormSubcategory,
@@ -951,126 +963,128 @@ export default function ZhkBusinessListScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <MaterialCommunityIcons name="arrow-left" size={22} color={SCREEN_THEME.textPrimary} />
-        </TouchableOpacity>
-        <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>{t.title}</Text>
-          <Text style={styles.headerSub}>{t.subtitle}</Text>
-        </View>
-        <View style={{ width: 42 }} />
-      </View>
-
-      {/* Search */}
-      <View style={styles.searchWrap}>
-        <MaterialCommunityIcons name="magnify" size={20} color={SCREEN_THEME.textMuted} style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder={t.searchPlaceholder}
-          placeholderTextColor={SCREEN_THEME.textMuted}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          returnKeyType="search"
-        />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <MaterialCommunityIcons name="close-circle" size={18} color={SCREEN_THEME.textMuted} />
+      <ScrollView
+        style={styles.screenScroll}
+        contentContainerStyle={styles.screenContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <MaterialCommunityIcons name="arrow-left" size={22} color={SCREEN_THEME.textPrimary} />
           </TouchableOpacity>
-        )}
-      </View>
-
-      {isAuthenticated && myRequest ? (
-        <View style={styles.myRequestCard}>
-          <View style={styles.myRequestHeader}>
-            <MaterialCommunityIcons name="clipboard-text-clock-outline" size={18} color={SCREEN_THEME.terracotta} />
-            <Text style={styles.myRequestTitle}>{t.myRequestStatusTitle}</Text>
+          <View style={styles.headerCenter}>
+            <Text style={styles.headerTitle}>{t.title}</Text>
+            <Text style={styles.headerSub}>{t.subtitle}</Text>
           </View>
-          <Text style={styles.myRequestStatus}>{getMyRequestStatusText(myRequest.status, t)}</Text>
-          {myRequest.status === 'pending' ? (
-            <Text style={styles.myRequestHint}>{t.myRequestPendingHint}</Text>
-          ) : null}
-          {myRequest.status === 'rejected' && myRequest.rejectionReason ? (
-            <Text style={styles.myRequestReason}>
-              {t.myRequestRejectedReason}: {myRequest.rejectionReason}
-            </Text>
-          ) : null}
+          <View style={{ width: 42 }} />
         </View>
-      ) : null}
 
-      {/* Category filter chips */}
-      {!loading && !error && categories.length > 0 && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.chipsScroll}
-          contentContainerStyle={styles.chipsContent}
-        >
-          <TouchableOpacity
-            style={[styles.chip, !selectedCategory && styles.chipActive]}
-            onPress={() => setSelectedCategory('')}
-            activeOpacity={0.75}
+        {/* Search */}
+        <View style={styles.searchWrap}>
+          <MaterialCommunityIcons name="magnify" size={20} color={SCREEN_THEME.textMuted} style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder={t.searchPlaceholder}
+            placeholderTextColor={SCREEN_THEME.textMuted}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            returnKeyType="search"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <MaterialCommunityIcons name="close-circle" size={18} color={SCREEN_THEME.textMuted} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {isAuthenticated && myRequest ? (
+          <View style={styles.myRequestCard}>
+            <View style={styles.myRequestHeader}>
+              <MaterialCommunityIcons name="clipboard-text-clock-outline" size={18} color={SCREEN_THEME.terracotta} />
+              <Text style={styles.myRequestTitle}>{t.myRequestStatusTitle}</Text>
+            </View>
+            <Text style={styles.myRequestStatus}>{getMyRequestStatusText(myRequest.status, t)}</Text>
+            {myRequest.status === 'pending' ? (
+              <Text style={styles.myRequestHint}>{t.myRequestPendingHint}</Text>
+            ) : null}
+            {myRequest.status === 'rejected' && myRequest.rejectionReason ? (
+              <Text style={styles.myRequestReason}>
+                {t.myRequestRejectedReason}: {myRequest.rejectionReason}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
+
+        {/* Category filter chips */}
+        {!loading && !error && categories.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.chipsScroll}
+            contentContainerStyle={styles.chipsContent}
           >
-            <Text style={[styles.chipText, !selectedCategory && styles.chipTextActive]}>{t.allCategories}</Text>
-          </TouchableOpacity>
-          {categories.map(([key, label]) => (
             <TouchableOpacity
-              key={key}
-              style={[styles.chip, selectedCategory === key && styles.chipActive]}
-              onPress={() => setSelectedCategory(selectedCategory === key ? '' : key)}
+              style={[styles.chip, !selectedCategory && styles.chipActive]}
+              onPress={() => setSelectedCategory('')}
               activeOpacity={0.75}
             >
-              <Text style={[styles.chipText, selectedCategory === key && styles.chipTextActive]}>{label}</Text>
+              <Text style={[styles.chipText, !selectedCategory && styles.chipTextActive]}>{t.allCategories}</Text>
             </TouchableOpacity>
-          ))}
-        </ScrollView>
-      )}
-
-      {!loading && !error && topItems.length > 0 ? (
-        <View style={styles.topSection}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>{t.topForYou}</Text>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.topBusinessRow}>
-            {topItems.map((item) => renderTopBusinessCard(item))}
+            {categories.map(([key, label]) => (
+              <TouchableOpacity
+                key={key}
+                style={[styles.chip, selectedCategory === key && styles.chipActive]}
+                onPress={() => setSelectedCategory(selectedCategory === key ? '' : key)}
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.chipText, selectedCategory === key && styles.chipTextActive]}>{label}</Text>
+              </TouchableOpacity>
+            ))}
           </ScrollView>
-        </View>
-      ) : null}
+        )}
 
-      {/* Content */}
-      {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={SCREEN_THEME.terracotta} />
-          <Text style={styles.centerText}>{t.loading}</Text>
-        </View>
-      ) : error ? (
-        <View style={styles.center}>
-          <MaterialCommunityIcons name="wifi-off" size={48} color={SCREEN_THEME.textMuted} />
-          <Text style={styles.centerText}>{t.errorLoad}</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={() => { void loadData(); }}>
-            <Text style={styles.retryText}>{t.retry}</Text>
-          </TouchableOpacity>
-        </View>
-      ) : items.length === 0 ? (
-        <View style={styles.center}>
-          <MaterialCommunityIcons name="store-outline" size={56} color={SCREEN_THEME.textMuted} />
-          <Text style={styles.centerText}>{t.emptyList}</Text>
-          <Text style={styles.centerSub}>{t.emptyListSub}</Text>
-        </View>
-      ) : filtered.length === 0 ? (
-        <View style={styles.center}>
-          <MaterialCommunityIcons name="filter-off-outline" size={48} color={SCREEN_THEME.textMuted} />
-          <Text style={styles.centerText}>{t.noResults}</Text>
-          <Text style={styles.centerSub}>{t.noResultsSub}</Text>
-        </View>
-      ) : (
-        <ScrollView
-          style={styles.list}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {filtered.map((item) => {
+        {!loading && !error && topItems.length > 0 ? (
+          <View style={styles.topSection}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>{t.topForYou}</Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.topBusinessRow}>
+              {topItems.map((item) => renderTopBusinessCard(item))}
+            </ScrollView>
+          </View>
+        ) : null}
+
+        {/* Content */}
+        {loading ? (
+          <View style={styles.center}>
+            <ActivityIndicator size="large" color={SCREEN_THEME.terracotta} />
+            <Text style={styles.centerText}>{t.loading}</Text>
+          </View>
+        ) : error ? (
+          <View style={styles.center}>
+            <MaterialCommunityIcons name="wifi-off" size={48} color={SCREEN_THEME.textMuted} />
+            <Text style={styles.centerText}>{t.errorLoad}</Text>
+            <TouchableOpacity style={styles.retryBtn} onPress={() => { void loadData(); }}>
+              <Text style={styles.retryText}>{t.retry}</Text>
+            </TouchableOpacity>
+          </View>
+        ) : items.length === 0 ? (
+          <View style={styles.center}>
+            <MaterialCommunityIcons name="store-outline" size={56} color={SCREEN_THEME.textMuted} />
+            <Text style={styles.centerText}>{t.emptyList}</Text>
+            <Text style={styles.centerSub}>{t.emptyListSub}</Text>
+          </View>
+        ) : filtered.length === 0 ? (
+          <View style={styles.center}>
+            <MaterialCommunityIcons name="filter-off-outline" size={48} color={SCREEN_THEME.textMuted} />
+            <Text style={styles.centerText}>{t.noResults}</Text>
+            <Text style={styles.centerSub}>{t.noResultsSub}</Text>
+          </View>
+        ) : (
+          <View style={styles.listContent}>
+            {filtered.map((item) => {
             const likesByUserId = {
               ...(item.likesByUserId ?? {}),
               ...(localBusinessLikes[item.id] ?? {}),
@@ -1087,19 +1101,29 @@ export default function ZhkBusinessListScreen() {
               />
             );
           })}
-        </ScrollView>
-      )}
+          </View>
+        )}
+      </ScrollView>
 
       <View style={styles.addBar}>
-        <TouchableOpacity style={styles.addBarBtn} onPress={() => setAddFormVisible(true)} activeOpacity={0.85}>
-          <Text style={styles.addBarBtnText}>{t.addRequest}</Text>
+        <TouchableOpacity
+          style={styles.addBarBtn}
+          onPress={() => {
+            if (!user) {
+              Alert.alert(t.formTitle, t.signInToSubmit);
+              return;
+            }
+            setAddFormVisible(true);
+          }}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.addBarBtnText}>{addBusinessText}</Text>
         </TouchableOpacity>
       </View>
 
       <Modal visible={addFormVisible} transparent animationType="slide" onRequestClose={handleRequestCloseAddForm}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.sheetOverlay}>
-          <TouchableOpacity style={styles.sheetBackdrop} activeOpacity={1} onPress={handleRequestCloseAddForm} />
-          <View style={styles.sheetWrapper}>
+        <TouchableOpacity style={styles.sheetBackdrop} activeOpacity={1} onPress={handleRequestCloseAddForm} />
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.sheetWrapper}>
             <View style={styles.sheet}>
               <View style={styles.sheetHandle} />
               <View style={styles.sheetHeader}>
@@ -1112,34 +1136,39 @@ export default function ZhkBusinessListScreen() {
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
                 contentContainerStyle={styles.sheetContent}
-                style={styles.sheetScroll}
               >
-                <Text style={styles.formLabel}>{t.categoryLabelForm} *</Text>
-                <View style={styles.pickerWrapper}>
-                  <Picker selectedValue={formCategoryKey} onValueChange={handleFormCategoryChange} style={styles.picker}>
-                    <Picker.Item label={t.selectCategory} value="" />
-                    {BUSINESS_CATEGORIES.map((category) => (
-                      <Picker.Item key={category.key} label={category[language]} value={category.key} />
-                    ))}
-                  </Picker>
-                </View>
+                <Text style={styles.fieldLabel}>{t.categoryLabelForm}</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={styles.categoryScroller}>
+                  {BUSINESS_CATEGORIES.map((category) => (
+                    <TouchableOpacity
+                      key={category.key}
+                      style={[styles.categoryChip, formCategoryKey === category.key && styles.categoryChipActive]}
+                      onPress={() => handleFormCategoryChange(category.key)}
+                      activeOpacity={0.78}
+                    >
+                      <Text style={[styles.categoryText, formCategoryKey === category.key && styles.categoryTextActive]}>
+                        {category[language]}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
 
-                <Text style={styles.formLabel}>{t.subcategoryLabelForm} *</Text>
-                <View style={styles.pickerWrapper}>
-                  <Picker
-                    selectedValue={formSubcategoryKey}
-                    enabled={Boolean(selectedFormCategory)}
-                    onValueChange={setFormSubcategoryKey}
-                    style={styles.picker}
-                  >
-                    <Picker.Item label={t.selectSubcategory} value="" />
-                    {(selectedFormCategory?.subs ?? []).map((subcategory) => (
-                      <Picker.Item key={subcategory.key} label={subcategory[language]} value={subcategory.key} />
-                    ))}
-                  </Picker>
-                </View>
+                <Text style={styles.fieldLabel}>{t.subcategoryLabelForm}</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={styles.categoryScroller}>
+                  {(selectedFormCategory?.subs ?? []).map((subcategory) => (
+                    <TouchableOpacity
+                      key={subcategory.key}
+                      style={[styles.categoryChip, formSubcategoryKey === subcategory.key && styles.categoryChipActive]}
+                      onPress={() => setFormSubcategoryKey(subcategory.key)}
+                      activeOpacity={0.78}
+                    >
+                      <Text style={[styles.categoryText, formSubcategoryKey === subcategory.key && styles.categoryTextActive]}>
+                        {subcategory[language]}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
 
-                <Text style={styles.formLabel}>{t.nameLabel} *</Text>
                 <TextInput
                   style={styles.input}
                   value={contactName}
@@ -1149,7 +1178,6 @@ export default function ZhkBusinessListScreen() {
                   maxLength={60}
                 />
 
-                <Text style={styles.formLabel}>{t.phoneLabel} *</Text>
                 <TextInput
                   style={styles.input}
                   value={phone}
@@ -1160,9 +1188,8 @@ export default function ZhkBusinessListScreen() {
                   maxLength={18}
                 />
 
-                <Text style={styles.formLabel}>{t.descriptionLabel}</Text>
                 <TextInput
-                  style={[styles.input, styles.textarea]}
+                  style={[styles.input, styles.inputMultiline]}
                   value={description}
                   onChangeText={(value) => setDescription(value.slice(0, DESC_MAX))}
                   placeholder={t.descriptionPlaceholder}
@@ -1171,39 +1198,14 @@ export default function ZhkBusinessListScreen() {
                   numberOfLines={4}
                   textAlignVertical="top"
                 />
-                <Text style={styles.charCount}>{description.length}/{DESC_MAX} {t.charCount}</Text>
 
-                <Text style={styles.formLabel}>{t.priceLabelForm}</Text>
-                <View style={styles.formPriceRow}>
-                  <TextInput
-                    style={[styles.input, styles.formPriceInputHalf]}
-                    value={priceMin}
-                    onChangeText={setPriceMin}
-                    placeholder={t.priceFrom}
-                    placeholderTextColor={SCREEN_THEME.textMuted}
-                    keyboardType="numeric"
-                    maxLength={8}
-                  />
-                  <Text style={styles.formPriceSep}>–</Text>
-                  <TextInput
-                    style={[styles.input, styles.formPriceInputHalf]}
-                    value={priceMax}
-                    onChangeText={setPriceMax}
-                    placeholder={t.priceTo}
-                    placeholderTextColor={SCREEN_THEME.textMuted}
-                    keyboardType="numeric"
-                    maxLength={8}
-                  />
-                  <Text style={styles.formPriceCurrency}>{t.currencyDefault}</Text>
-                </View>
-
-                <Text style={styles.formLabel}>{t.photoLabel}</Text>
+                <Text style={styles.fieldLabel}>{t.photoLabel}</Text>
                 {user?.id ? (
                   <PhotoUploadField
                     uid={user.id}
                     userName={user?.name ?? ''}
                     maxPhotos={1}
-                    storagePath="local_business"
+                    storagePath="lost_found"
                     onPhotosChange={setFormPhotos}
                   />
                 ) : (
@@ -1211,20 +1213,19 @@ export default function ZhkBusinessListScreen() {
                 )}
 
                 <TouchableOpacity
-                  style={[styles.submitBtn, (!isSubmitFormValid || submitting) && styles.submitBtnDisabled]}
+                  style={[styles.submitButton, (!isSubmitFormValid || submitting || hasUploadingPhotos) && styles.submitButtonDisabled]}
                   onPress={() => void handleSubmitBusiness()}
-                  activeOpacity={0.85}
-                  disabled={!isSubmitFormValid || submitting}
+                  activeOpacity={0.86}
+                  disabled={!isSubmitFormValid || submitting || hasUploadingPhotos}
                 >
                   {submitting ? (
                     <ActivityIndicator color="#fff" />
                   ) : (
-                    <Text style={styles.submitBtnText}>{t.submitBtn}</Text>
+                    <Text style={styles.submitButtonText}>{hasUploadingPhotos ? photoUploadingText : t.submitBtn}</Text>
                   )}
                 </TouchableOpacity>
               </ScrollView>
             </View>
-          </View>
         </KeyboardAvoidingView>
       </Modal>
 
@@ -1399,6 +1400,8 @@ function BusinessCard({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: SCREEN_THEME.appBg },
+  screenScroll: { flex: 1 },
+  screenContent: { paddingBottom: 100 },
   header: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 16, paddingTop: 10, paddingBottom: 8,
@@ -1568,8 +1571,8 @@ const styles = StyleSheet.create({
   },
   topBusinessCtaText: { color: '#fff', fontSize: 12, fontWeight: '900' },
   list: { flex: 1 },
-  listContent: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 100 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 12 },
+  listContent: { paddingHorizontal: 16, paddingTop: 4 },
+  center: { minHeight: 280, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 12 },
   centerText: { fontSize: 16, fontWeight: '700', color: SCREEN_THEME.textSecondary, textAlign: 'center' },
   centerSub: { fontSize: 13, color: SCREEN_THEME.textMuted, textAlign: 'center' },
   retryBtn: {
@@ -1592,14 +1595,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   addBarBtnText: { color: '#fff', fontSize: 16, fontWeight: '900', letterSpacing: 0.3 },
-  sheetOverlay: { flex: 1, justifyContent: 'flex-end' },
   sheetBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
-  sheetWrapper: { justifyContent: 'flex-end' },
+  sheetWrapper: { position: 'absolute', bottom: 0, left: 0, right: 0 },
   sheet: {
     backgroundColor: '#FFFAF4',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: '92%',
+    maxHeight: '94%',
+    minHeight: '88%',
     paddingBottom: 32,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
@@ -1607,7 +1610,6 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 20,
   },
-  sheetScroll: { flexGrow: 0 },
   sheetHandle: {
     width: 40,
     height: 4,
@@ -1638,41 +1640,48 @@ const styles = StyleSheet.create({
     borderColor: '#E4D0AB',
   },
   sheetCloseTxt: { fontSize: 16, color: '#7A6D64', fontWeight: '900' },
-  sheetContent: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 28 },
-  formLabel: { fontWeight: '700', color: SCREEN_THEME.textPrimary, marginBottom: 8, marginTop: 8 },
+  sheetContent: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24 },
+  fieldLabel: { color: SCREEN_THEME.textPrimary, fontWeight: '900', marginBottom: 8 },
   input: {
-    backgroundColor: '#F7F3EE',
-    borderRadius: 16,
+    minHeight: 48,
+    backgroundColor: '#FFF8EA',
+    borderRadius: 15,
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    marginBottom: 10,
     color: SCREEN_THEME.textPrimary,
+    fontWeight: '800',
     borderWidth: 1,
-    borderColor: '#E8DDD3',
+    borderColor: '#E4D0AB',
   },
-  textarea: { minHeight: 92, textAlignVertical: 'top' },
-  charCount: { alignSelf: 'flex-end', color: SCREEN_THEME.textMuted, fontSize: 11, marginTop: 4, fontWeight: '700' },
+  inputMultiline: {
+    minHeight: 72,
+    paddingTop: 12,
+    paddingBottom: 12,
+    textAlignVertical: 'top',
+  },
   signInNote: { color: SCREEN_THEME.textSecondary, fontSize: 13, fontWeight: '700', paddingVertical: 10, lineHeight: 18 },
-  formPriceRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  formPriceInputHalf: { flex: 1 },
-  formPriceSep: { fontSize: 16, color: SCREEN_THEME.textMuted, fontWeight: '700' },
-  formPriceCurrency: { fontSize: 16, color: SCREEN_THEME.textSecondary, fontWeight: '800', minWidth: 18 },
-  pickerWrapper: {
-    backgroundColor: '#F7F3EE',
-    borderRadius: 16,
+  categoryScroller: { gap: 8, paddingRight: 20, paddingBottom: 12 },
+  categoryChip: {
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    backgroundColor: SCREEN_THEME.cardCream,
     borderWidth: 1,
-    borderColor: '#E8DDD3',
-    overflow: 'hidden',
+    borderColor: '#E4D0AB',
   },
-  picker: { color: SCREEN_THEME.textPrimary, height: 50 },
-  submitBtn: {
-    backgroundColor: SCREEN_THEME.terracotta,
+  categoryChipActive: { backgroundColor: '#DCE8D0', borderColor: SCREEN_THEME.woodGreenDark },
+  categoryText: { color: SCREEN_THEME.textSecondary, fontSize: 12, fontWeight: '900' },
+  categoryTextActive: { color: SCREEN_THEME.woodGreenDark },
+  submitButton: {
+    minHeight: 48,
     borderRadius: 16,
-    paddingVertical: 14,
+    backgroundColor: SCREEN_THEME.woodGreenDark,
     alignItems: 'center',
-    marginTop: 14,
+    justifyContent: 'center',
+    marginTop: 8,
   },
-  submitBtnDisabled: { opacity: 0.55 },
-  submitBtnText: { color: '#FFFFFF', fontWeight: '800' },
+  submitButtonDisabled: { opacity: 0.65 },
+  submitButtonText: { color: '#fff', fontWeight: '900', fontSize: 15 },
 });
 
 const card = StyleSheet.create({

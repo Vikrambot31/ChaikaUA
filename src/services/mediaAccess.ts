@@ -9,6 +9,7 @@ export type MediaCollection =
   | 'lost_found'
   | 'buy_sell_listings'
   | 'contacts_listings'
+  | 'biznes_chaika_listings'
   | 'local_business'
   | 'requests';
 

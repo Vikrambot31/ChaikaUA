@@ -27,6 +27,7 @@ import HelpScreen from '../screens/Spravka';
 import JobSearchScreen from '../screens/Poisk-Raboty';
 import BuySellScreen from '../screens/Kuplu-Prodam';
 import KontaktiChaikyScreen from '../screens/Kontakt-XXX';
+import BizznesChaikaScreen from '../screens/Bizznes-Chaika';
 import AppInfoScreen from '../screens/Pro-Prilozhenie';
 import LoginScreen from '../screens/Vkhod';
 import RegisterScreenFull from '../screens/Registraciya-Polnaya';
@@ -124,6 +125,7 @@ export type RootStackParamList = {
   JobSearchScreen: undefined;
   BuySellScreen: undefined;
   KontaktiChaikyScreen: undefined;
+  BizznesChaikaScreen: undefined;
   AppInfoScreen: undefined;
   LoginScreen: RedirectRouteParams | undefined;
   RegisterScreenFull: RegisterScreenFullParams;
@@ -249,6 +251,7 @@ const linking: LinkingOptions<RootStackParamList> = {
        FotoRayonaScreen: 'screen/foto-rayona',
        PhotoUploadScreen: 'screen/photo-upload',
        StartAvatarPickerScreen: 'screen/start-avatar',
+       BizznesChaikaScreen: 'screen/business/chaika',
        ZhkBusinessListScreen: 'screen/business/list',
        VseDlyaDeteyScreen: 'screen/kids',
        DetalDetskogoMestaScreen: 'screen/kids/place',
@@ -293,6 +296,7 @@ const ROUTE_FILE_MAP: Record<string, string> = {
   JobSearchScreen: 'Poisk-Raboty.tsx',
   BuySellScreen: 'Kuplu-Prodam.tsx',
   KontaktiChaikyScreen: 'Kontakt-XXX.tsx',
+  BizznesChaikaScreen: 'Bizznes-Chaika.tsx',
   AppInfoScreen: 'Pro-Prilozhenie.tsx',
   LoginScreen: 'Vkhod.tsx',
   RegisterScreenFull: 'Registraciya-Polnaya.tsx',
@@ -843,6 +847,7 @@ function AuthNavigation() {
         <Stack.Screen name="JobSearchScreen" component={JobSearchScreen} />
         <Stack.Screen name="BuySellScreen" component={BuySellScreen} />
         <Stack.Screen name="KontaktiChaikyScreen" component={KontaktiChaikyScreen} />
+        <Stack.Screen name="BizznesChaikaScreen" component={BizznesChaikaScreen} />
         <Stack.Screen name="ItemDetailScreen" component={ItemDetailScreen} />
         <Stack.Screen name="AppInfoScreen" component={AppInfoScreen} />
         <Stack.Screen name="LoginScreen" component={LoginScreen} />

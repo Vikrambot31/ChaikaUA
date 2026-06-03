@@ -45,6 +45,7 @@ const UI_TEXT: Record<'ua' | 'ru' | 'en', SectionedItems> = {
     market: [
       { label: 'Їжа на Чайці', desc: 'Поїсти, продукти, акції поруч', screen: 'EdaNaChaykeScreen', icon: 'food-fork-drink', accent: '#FFD400' },
       { label: 'Все для дітей', desc: 'Садочки, школи, гуртки та події', screen: 'VseDlyaDeteyScreen', icon: 'baby-face-outline', accent: '#C77A5D' },
+      { label: 'Бізнес на Чайці', desc: 'Розмістіть свій бізнес для мешканців', screen: 'BizznesChaikaScreen', icon: 'store-plus-outline', accent: '#6E7F47' },
       { label: 'Салони краси', desc: 'Перукарні, манікюр, косметологія', screen: 'SalonyKrasotyScreen', icon: 'content-cut', accent: '#D4668E' },
       { label: 'Пошук роботи', desc: 'Вакансії та резюме', screen: 'JobSearchScreen', icon: 'briefcase-search-outline', accent: '#4D7892' },
       { label: 'Куплю / продам', desc: 'Оголошення мешканців', screen: 'BuySellScreen', icon: 'shopping-outline', accent: '#C96E3E' },
@@ -69,6 +70,7 @@ const UI_TEXT: Record<'ua' | 'ru' | 'en', SectionedItems> = {
     market: [
       { label: 'Еда на Чайке', desc: 'Поесть, продукты, акции рядом', screen: 'EdaNaChaykeScreen', icon: 'food-fork-drink', accent: '#FFD400' },
       { label: 'Все для детей', desc: 'Садики, школы, кружки и события', screen: 'VseDlyaDeteyScreen', icon: 'baby-face-outline', accent: '#C77A5D' },
+      { label: 'Бизнес на Чайке', desc: 'Разместить свой бизнес для жителей', screen: 'BizznesChaikaScreen', icon: 'store-plus-outline', accent: '#6E7F47' },
       { label: 'Салоны красоты', desc: 'Парикмахерские, маникюр, косметология', screen: 'SalonyKrasotyScreen', icon: 'content-cut', accent: '#D4668E' },
       { label: 'Поиск работы', desc: 'Вакансии и резюме', screen: 'JobSearchScreen', icon: 'briefcase-search-outline', accent: '#4D7892' },
       { label: 'Куплю / продам', desc: 'Объявления жителей', screen: 'BuySellScreen', icon: 'shopping-outline', accent: '#C96E3E' },
@@ -93,6 +95,7 @@ const UI_TEXT: Record<'ua' | 'ru' | 'en', SectionedItems> = {
     market: [
       { label: 'Food at Chaika', desc: 'Eat, groceries, deals nearby', screen: 'EdaNaChaykeScreen', icon: 'food-fork-drink', accent: '#FFD400' },
       { label: 'Everything for Kids', desc: 'Kindergartens, schools, clubs and events', screen: 'VseDlyaDeteyScreen', icon: 'baby-face-outline', accent: '#C77A5D' },
+      { label: 'Business at Chaika', desc: 'Place your business for residents', screen: 'BizznesChaikaScreen', icon: 'store-plus-outline', accent: '#6E7F47' },
       { label: 'Beauty salons', desc: 'Hair, nails, cosmetology', screen: 'SalonyKrasotyScreen', icon: 'content-cut', accent: '#D4668E' },
       { label: 'Job search', desc: 'Vacancies and resumes', screen: 'JobSearchScreen', icon: 'briefcase-search-outline', accent: '#4D7892' },
       { label: 'Buy / sell', desc: 'Resident marketplace', screen: 'BuySellScreen', icon: 'shopping-outline', accent: '#C96E3E' },
