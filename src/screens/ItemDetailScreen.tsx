@@ -40,7 +40,6 @@ const UI_TEXT = {
     copiedTitle: 'Скопійовано',
     copiedBody: 'Номер телефону скопійовано.',
     contact: "Зв'язатися",
-    noPhoto: 'Фото немає',
   },
   ru: {
     headerTitle: 'Детали',
@@ -57,7 +56,6 @@ const UI_TEXT = {
     copiedTitle: 'Скопировано',
     copiedBody: 'Номер телефона скопирован.',
     contact: 'Связаться',
-    noPhoto: 'Фото нет',
   },
   en: {
     headerTitle: 'Details',
@@ -74,7 +72,6 @@ const UI_TEXT = {
     copiedTitle: 'Copied',
     copiedBody: 'Phone number copied.',
     contact: 'Contact',
-    noPhoto: 'No photo',
   },
 } as const;
 
@@ -181,12 +178,7 @@ export default function ItemDetailScreen({
             resizeMode="cover"
             debugLabel={`ItemDetail:ownerAvatar:${item.userId}`}
           />
-        ) : (
-          <View style={styles.photoPlaceholder}>
-            <MaterialCommunityIcons name="image-off-outline" size={44} color="#8E7D72" />
-            <Text style={styles.photoPlaceholderText}>{text.noPhoto}</Text>
-          </View>
-        )}
+        ) : null}
 
         <View style={styles.titleCard}>
           <Text style={styles.title}>{item.title}</Text>
@@ -286,16 +278,6 @@ const styles = StyleSheet.create({
   headerSpacer: { width: 78 },
   content: { padding: 16, paddingBottom: 112, gap: 12 },
   photo: { width: '100%', height: 300, borderRadius: 22, backgroundColor: '#F0EDE8' },
-  photoPlaceholder: {
-    height: 220,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#EFE4D8',
-    borderWidth: 1,
-    borderColor: '#E1CEB7',
-  },
-  photoPlaceholderText: { marginTop: 8, color: '#7A6D64', fontWeight: '800' },
   titleCard: {
     backgroundColor: SCREEN_THEME.paperStrong,
     borderRadius: 20,

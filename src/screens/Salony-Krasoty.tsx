@@ -1,6 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
-  Dimensions,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -22,7 +21,6 @@ type Lang = 'ua' | 'ru' | 'en';
 type AppNavigation = NavigationProp<Record<string, object | undefined>>;
 
 const TILE_GAP = 10;
-const TILE_W = (Dimensions.get('window').width - 32 - TILE_GAP) / 2;
 type CategoryKey = 'all' | BeautyCategory;
 type ScreenText = (typeof UI_TEXT)[Lang];
 
@@ -272,6 +270,8 @@ export default function SalonyKrasotyScreen() {
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
   const [activeCategory, setActiveCategory] = useState<CategoryKey>('all');
   const [query, setQuery] = useState('');
+  const scrollRef = useRef<ScrollView>(null);
+  const resultsAnchorY = useRef(0);
 
   const beautyPlaces = useMemo(() => (
     chaykaPlaces
@@ -312,6 +312,16 @@ export default function SalonyKrasotyScreen() {
 
   const openOffer = (offer: BeautyOffer) => {
     navigation.navigate('DetalPredlozheniyaSalonaScreen', { offer });
+  };
+
+  const handleCategoryPress = (category: CategoryKey) => {
+    setActiveCategory(category);
+    setTimeout(() => {
+      scrollRef.current?.scrollTo({
+        y: Math.max(resultsAnchorY.current - 10, 0),
+        animated: true,
+      });
+    }, 80);
   };
 
   const renderOfferCard = (offer: BeautyOffer, wide = false) => {
@@ -379,7 +389,7 @@ export default function SalonyKrasotyScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} activeOpacity={0.8}>
             <MaterialCommunityIcons name="chevron-left" size={28} color={SCREEN_THEME.textPrimary} />
@@ -424,19 +434,17 @@ export default function SalonyKrasotyScreen() {
           <Text style={styles.sectionTitle}>{text.categoriesTitle}</Text>
         </View>
         <View style={styles.categoryGrid}>
-          {CATEGORIES.map((category, index) => {
+          {CATEGORIES.map((category) => {
             const isActive = activeCategory === category.key;
-            const isRightCol = index % 2 === 1;
             return (
               <TouchableOpacity
                 key={category.key}
                 style={[
                   styles.categoryTile,
                   { backgroundColor: category.bg },
-                  isRightCol && styles.categoryTileRight,
                   isActive && styles.categoryTileActive,
                 ]}
-                onPress={() => setActiveCategory(category.key)}
+                onPress={() => handleCategoryPress(category.key)}
                 activeOpacity={0.82}
                 hitSlop={6}
                 accessibilityRole="button"
@@ -445,13 +453,11 @@ export default function SalonyKrasotyScreen() {
                 <View pointerEvents="none" style={styles.categoryTileIconWrap}>
                   <MaterialCommunityIcons
                     name={category.icon}
-                    size={34}
+                    size={24}
                     color={category.iconColor}
                   />
                 </View>
-                <Text style={styles.categoryTileText}>
-                  {text.categories[category.key]}
-                </Text>
+                <Text style={styles.categoryTileText} numberOfLines={1}>{text.categories[category.key]}</Text>
                 <View pointerEvents="none" style={styles.categoryTileCountBadge}>
                   <Text style={styles.categoryTileCount}>{categoryCounts[category.key]}</Text>
                 </View>
@@ -460,21 +466,28 @@ export default function SalonyKrasotyScreen() {
           })}
         </View>
 
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>{text.allPlacesTitle}</Text>
-          <Text style={styles.resultCount}>{filteredPlaces.length}</Text>
-        </View>
+        <View
+          style={styles.resultsBlock}
+          onLayout={(event) => {
+            resultsAnchorY.current = event.nativeEvent.layout.y;
+          }}
+        >
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>{text.allPlacesTitle}</Text>
+            <Text style={styles.resultCount}>{filteredPlaces.length}</Text>
+          </View>
 
-        {filteredPlaces.length > 0 ? (
-          <View style={styles.cardList}>
-            {filteredPlaces.map((item) => renderPlaceCard(item))}
-          </View>
-        ) : (
-          <View style={styles.emptyState}>
-            <MaterialCommunityIcons name="magnify-close" size={34} color={SCREEN_THEME.textMuted} />
-            <Text style={styles.emptyText}>{text.noResults}</Text>
-          </View>
-        )}
+          {filteredPlaces.length > 0 ? (
+            <View style={styles.cardList}>
+              {filteredPlaces.map((item) => renderPlaceCard(item))}
+            </View>
+          ) : (
+            <View style={styles.emptyState}>
+              <MaterialCommunityIcons name="magnify-close" size={34} color={SCREEN_THEME.textMuted} />
+              <Text style={styles.emptyText}>{text.noResults}</Text>
+            </View>
+          )}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -599,18 +612,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   categoryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    gap: TILE_GAP,
     marginBottom: 6,
   },
   categoryTile: {
-    width: TILE_W,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 20,
-    paddingVertical: 14,
-    paddingHorizontal: 8,
-    minHeight: 96,
+    borderRadius: 18,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    minHeight: 60,
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.18)',
     shadowColor: '#5C3A1E',
@@ -618,10 +629,6 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     shadowOffset: { width: 1, height: 4 },
     elevation: 5,
-    marginBottom: TILE_GAP,
-  },
-  categoryTileRight: {
-    marginLeft: TILE_GAP,
   },
   categoryTileActive: {
     borderColor: '#FFFFFF',
@@ -631,34 +638,36 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   categoryTileIconWrap: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+    width: 42,
+    height: 42,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.2)',
-    marginBottom: 6,
+    marginRight: 12,
   },
   categoryTileText: {
-    fontSize: 14,
-    fontWeight: '800',
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '900',
     color: '#FFFFFF',
-    textAlign: 'center',
   },
   categoryTileCountBadge: {
-    marginTop: 6,
-    minWidth: 22,
-    height: 20,
-    borderRadius: 10,
+    minWidth: 28,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: 'rgba(255,255,255,0.28)',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 6,
   },
   categoryTileCount: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '900',
     color: '#FFFFFF',
+  },
+  resultsBlock: {
+    marginTop: 2,
   },
   cardList: {
     gap: 10,

@@ -1,6 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
 import {
-  Dimensions,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -13,7 +12,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { chaykaPlaces } from '../services/chaykaPlacesData';
-import { childInfoSeed, getActiveOffers } from '../services/childrenSeed';
+import { CHILDREN_SCREEN_BLACKLIST, childInfoSeed, getActiveOffers } from '../services/childrenSeed';
 import { ChildCategory, ChildFeature, ChildOffer, Place, PlaceType } from '../types/app';
 import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
@@ -22,7 +21,6 @@ type Lang = 'ua' | 'ru' | 'en';
 type AppNavigation = NavigationProp<Record<string, object | undefined>>;
 
 const TILE_GAP = 10;
-const TILE_W = (Dimensions.get('window').width - 32 - TILE_GAP) / 2;
 type CategoryKey = 'all' | ChildCategory;
 type ScreenText = (typeof UI_TEXT)[Lang];
 
@@ -305,6 +303,7 @@ export default function VseDlyaDeteyScreen() {
 
   const childPlaces = useMemo(() => (
     chaykaPlaces
+      .filter((raw) => !CHILDREN_SCREEN_BLACKLIST.has(raw.id))
       .map((raw) => {
         const place = mergeChildInfo(raw);
         return { place, category: getChildCategory(place) };
@@ -467,16 +466,14 @@ export default function VseDlyaDeteyScreen() {
           <Text style={styles.sectionTitle}>{text.categoriesTitle}</Text>
         </View>
         <View style={styles.categoryGrid}>
-          {CATEGORIES.map((category, index) => {
+          {CATEGORIES.map((category) => {
             const isActive = activeCategory === category.key;
-            const isRightCol = index % 2 === 1;
             return (
               <TouchableOpacity
                 key={category.key}
                 style={[
                   styles.categoryTile,
                   { backgroundColor: category.bg },
-                  isRightCol && styles.categoryTileRight,
                   isActive && styles.categoryTileActive,
                 ]}
                 onPress={() => handleCategoryPress(category.key)}
@@ -488,13 +485,11 @@ export default function VseDlyaDeteyScreen() {
                 <View pointerEvents="none" style={styles.categoryTileIconWrap}>
                   <MaterialCommunityIcons
                     name={category.icon}
-                    size={34}
+                    size={24}
                     color={category.iconColor}
                   />
                 </View>
-                <Text style={styles.categoryTileText}>
-                  {text.categories[category.key]}
-                </Text>
+                <Text style={styles.categoryTileText} numberOfLines={1}>{text.categories[category.key]}</Text>
                 <View pointerEvents="none" style={styles.categoryTileCountBadge}>
                   <Text style={styles.categoryTileCount}>{categoryCounts[category.key]}</Text>
                 </View>
@@ -660,18 +655,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   categoryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    gap: TILE_GAP,
     marginBottom: 6,
   },
   categoryTile: {
-    width: TILE_W,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 20,
-    paddingVertical: 14,
-    paddingHorizontal: 8,
-    minHeight: 96,
+    borderRadius: 18,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    minHeight: 60,
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.18)',
     shadowColor: '#5C3A1E',
@@ -679,10 +672,6 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     shadowOffset: { width: 1, height: 4 },
     elevation: 5,
-    marginBottom: TILE_GAP,
-  },
-  categoryTileRight: {
-    marginLeft: TILE_GAP,
   },
   categoryTileActive: {
     borderColor: '#FFFFFF',
@@ -692,32 +681,31 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   categoryTileIconWrap: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+    width: 42,
+    height: 42,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.2)',
-    marginBottom: 6,
+    marginRight: 12,
   },
   categoryTileText: {
-    fontSize: 14,
-    fontWeight: '800',
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '900',
     color: '#FFFFFF',
-    textAlign: 'center',
   },
   categoryTileCountBadge: {
-    marginTop: 6,
-    minWidth: 22,
-    height: 20,
-    borderRadius: 10,
+    minWidth: 28,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: 'rgba(255,255,255,0.28)',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 6,
   },
   categoryTileCount: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '900',
     color: '#FFFFFF',
   },

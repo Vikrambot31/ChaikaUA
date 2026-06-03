@@ -25,6 +25,7 @@ import { lostFoundService } from '../services/lostFoundService';
 import { buySellService } from '../services/buySellService';
 import { contactsService } from '../services/contactsService';
 import { appSuggestionsService } from '../services/appSuggestionsService';
+import type { DetailItemData } from '../utils/detailViewTypes';
 
 type RequestsNavigation = NativeStackNavigationProp<Record<string, object | undefined>>;
 type AppLanguage = 'ua' | 'ru' | 'en';
@@ -124,6 +125,17 @@ const toTimestamp = (value: unknown): number => {
 };
 const PAGE_SIZE = 20;
 
+const SOURCE_DETAIL_TYPES: Record<string, string> = {
+  FotoRayonaScreen: 'photo',
+  SoulPhotosScreen: 'photo',
+  PhotoUploadScreen: 'photo',
+  LostFoundScreen: 'lostfound',
+  BuySellScreen: 'buysell',
+  ContactsScreen: 'lyudi',
+  LocalBusinessScreen: 'buysell',
+  AppSuggestionScreen: 'help',
+};
+
 const RequestsScreen: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const navigation = useNavigation<RequestsNavigation>();
@@ -212,6 +224,10 @@ const RequestsScreen: React.FC = () => {
             title: toStr(raw.title) || undefined,
             description: toStr(raw.description) || undefined,
             userName: toStr(raw.userName) || toStr(raw.uploadedBy) || undefined,
+            userId: toStr(raw.userId) || toStr(raw.uploadedById) || undefined,
+            phone: toStr(raw.phone) || undefined,
+            category: toStr(raw.category) || undefined,
+            address: toStr(raw.address) || toStr(raw.location) || undefined,
             sourceScreen,
             createdAt: toNumber(raw.createdAt) || toNumber(raw.uploadedAt),
             status: 'pending',
@@ -255,6 +271,10 @@ const RequestsScreen: React.FC = () => {
             title: toStr(raw.name) || category || typeLabels[type],
             description: summary,
             userName: toStr(raw.name) || undefined,
+            userId: toStr(raw.userId) || undefined,
+            phone: toStr(raw.phone) || undefined,
+            category: typeLabels[type],
+            address: toStr(raw.address) || toStr(raw.location) || undefined,
             sourceScreen: 'LostFoundScreen',
             createdAt: toTimestamp(raw.createdAt) || toTimestamp(raw.submittedForModerationAt),
             status: 'pending',
@@ -299,6 +319,10 @@ const RequestsScreen: React.FC = () => {
             title: itemName || typeLabels[listingType],
             description: summary,
             userName: itemName || undefined,
+            userId: toStr(raw.userId) || undefined,
+            phone: toStr(raw.phone) || undefined,
+            category: toStr(raw.category) || typeLabels[listingType],
+            price: price ? `${price} грн` : undefined,
             sourceScreen: 'BuySellScreen',
             createdAt: toTimestamp(raw.createdAt) || toTimestamp(raw.submittedForModerationAt),
             status: 'pending',
@@ -337,6 +361,10 @@ const RequestsScreen: React.FC = () => {
             title: itemName || (language === 'ru' ? 'Контакт' : language === 'en' ? 'Contact' : 'Контакт'),
             description: summary,
             userName: itemName || undefined,
+            userId: toStr(raw.userId) || undefined,
+            phone: raw.showPhone === false ? undefined : toStr(raw.phone) || undefined,
+            category: toStr(raw.category) || toStr(raw.condition) || undefined,
+            price: price || undefined,
             sourceScreen: 'ContactsScreen',
             createdAt: toTimestamp(raw.createdAt) || toTimestamp(raw.submittedForModerationAt),
             status: 'pending',
@@ -379,6 +407,11 @@ const RequestsScreen: React.FC = () => {
             title: contactName || subcategory || (language === 'ru' ? 'Бизнес/услуга' : language === 'en' ? 'Business/service' : 'Бізнес/послуга'),
             description: summary,
             userName: contactName || undefined,
+            userId: toStr(raw.userId) || undefined,
+            phone: toStr(raw.phone) || undefined,
+            category: category || subcategory || undefined,
+            price: priceText || undefined,
+            address: toStr(raw.address) || toStr(raw.serviceArea) || undefined,
             sourceScreen: 'LocalBusinessScreen',
             createdAt: toTimestamp(raw.updatedAt) || toTimestamp(raw.createdAt),
             status: 'pending',
@@ -400,6 +433,8 @@ const RequestsScreen: React.FC = () => {
         title: language === 'ru' ? 'Предложение по приложению' : language === 'en' ? 'App suggestion' : 'Пропозиція щодо додатку',
         description: item.text,
         userName: item.name || undefined,
+        userId: item.userId || undefined,
+        phone: item.phone || undefined,
         sourceScreen: 'AppSuggestionScreen',
         createdAt: toTimestamp(item.createdAt) || toTimestamp(item.submittedForModerationAt),
         status: 'pending',
@@ -797,6 +832,33 @@ const RequestsScreen: React.FC = () => {
     [moderationBusyId, text.actionFailed, text.cancel, text.deleteBody, text.deleteBtn, text.deleteTitle, text.loadingError],
   );
 
+  const openModerationItemDetail = useCallback((item: ModerationPhoto) => {
+    if (navLock.current) return;
+    navLock.current = true;
+
+    const detailItem: DetailItemData = {
+      id: item.id,
+      title: item.title?.trim() || item.userName?.trim() || item.sourceScreen,
+      description: item.description,
+      photoUri: item.uri,
+      photoStoragePath: item.storagePath,
+      phone: item.phone,
+      category: item.category,
+      price: item.price,
+      address: item.address,
+      status: item.status,
+      userId: item.userId,
+      createdAt: item.createdAt ? new Date(item.createdAt).toISOString() : undefined,
+      sourceType: SOURCE_DETAIL_TYPES[item.sourceScreen] ?? 'help',
+      sourceId: item.id,
+    };
+
+    navigation.navigate('ItemDetailScreen', { item: detailItem });
+    setTimeout(() => {
+      navLock.current = false;
+    }, 800);
+  }, [navigation]);
+
   const sortedRequests = useMemo(() => {
     const resolveStatus = (item: Request): RequestStatusFilter => {
       if (item.status === 'approved' || item.status === 'pending' || item.status === 'rejected') {
@@ -970,6 +1032,7 @@ const RequestsScreen: React.FC = () => {
           onApprove={() => void moderatePhoto(item.photo.id, 'approved')}
           onReject={() => void moderatePhoto(item.photo.id, 'rejected')}
           onDelete={() => deletePhoto(item.photo.id)}
+          onPress={() => openModerationItemDetail(item.photo)}
           busy={moderationBusyId === `photo:${item.photo.id}`}
           language={language}
         />
@@ -983,6 +1046,7 @@ const RequestsScreen: React.FC = () => {
           onApprove={() => void moderateLostFound(item.item.id, 'approved')}
           onReject={() => void moderateLostFound(item.item.id, 'rejected')}
           onDelete={() => deleteLostFound(item.item.id)}
+          onPress={() => openModerationItemDetail(item.item)}
           busy={moderationBusyId === `lost_found:${item.item.id}`}
           language={language}
         />
@@ -996,6 +1060,7 @@ const RequestsScreen: React.FC = () => {
           onApprove={() => void moderateBuySell(item.item.id, 'approved')}
           onReject={() => void moderateBuySell(item.item.id, 'rejected')}
           onDelete={() => deleteBuySell(item.item.id)}
+          onPress={() => openModerationItemDetail(item.item)}
           busy={moderationBusyId === `buy_sell:${item.item.id}`}
           language={language}
         />
@@ -1009,6 +1074,7 @@ const RequestsScreen: React.FC = () => {
           onApprove={() => void moderateContacts(item.item.id, 'approved')}
           onReject={() => void moderateContacts(item.item.id, 'rejected')}
           onDelete={() => deleteContacts(item.item.id)}
+          onPress={() => openModerationItemDetail(item.item)}
           busy={moderationBusyId === `contacts:${item.item.id}`}
           language={language}
         />
@@ -1022,6 +1088,7 @@ const RequestsScreen: React.FC = () => {
           onApprove={() => void moderateLocalBusiness(item.item.id, 'approved')}
           onReject={() => void moderateLocalBusiness(item.item.id, 'rejected')}
           onDelete={() => deleteLocalBusiness(item.item.id)}
+          onPress={() => openModerationItemDetail(item.item)}
           busy={moderationBusyId === `local_business:${item.item.id}`}
           language={language}
         />
@@ -1035,6 +1102,7 @@ const RequestsScreen: React.FC = () => {
           onApprove={() => void moderateAppSuggestion(item.item.id, 'approved')}
           onReject={() => void moderateAppSuggestion(item.item.id, 'rejected')}
           onDelete={() => deleteAppSuggestion(item.item.id)}
+          onPress={() => openModerationItemDetail(item.item)}
           busy={moderationBusyId === `app_suggestion:${item.item.id}`}
           language={language}
         />
@@ -1062,7 +1130,7 @@ const RequestsScreen: React.FC = () => {
         language={language}
       />
     );
-  }, [avatarByUserId, deleteAppSuggestion, deleteBuySell, deleteContacts, deleteLocalBusiness, deleteLostFound, deletePhoto, isModerator, language, moderate, moderateAppSuggestion, moderateBuySell, moderateContacts, moderateLocalBusiness, moderateLostFound, moderatePhoto, moderationBusyId, navigation, openContactModal, removeRequest, user?.id]);
+  }, [avatarByUserId, deleteAppSuggestion, deleteBuySell, deleteContacts, deleteLocalBusiness, deleteLostFound, deletePhoto, isModerator, language, moderate, moderateAppSuggestion, moderateBuySell, moderateContacts, moderateLocalBusiness, moderateLostFound, moderatePhoto, moderationBusyId, navigation, openContactModal, openModerationItemDetail, removeRequest, user?.id]);
 
   return (
     <SafeAreaView style={styles.container}>

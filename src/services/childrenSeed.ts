@@ -12,6 +12,14 @@ import { ChildInfo, ChildOffer, Place } from '../types/app';
  * сервисом, а интерфейс (getChildrenPlaces / getActiveOffers) остаётся прежним.
  */
 
+/**
+ * Місця, які НЕ повинні відображатися на екрані "Все для дітей",
+ * незалежно від типу або назви (наприклад, хибний авто-матч по слову "клуб").
+ */
+export const CHILDREN_SCREEN_BLACKLIST = new Set([
+  'place-114', // "Гей клуб" — дорослий заклад, потрапляє через авто-матч 'клуб'
+]);
+
 // childInfo по id существующего места из chaykaPlacesData.ts
 export const childInfoSeed: Record<string, ChildInfo> = {
   // Unique Kids — приватний садочок щасливих дітей

@@ -187,6 +187,19 @@ const BUSINESS_CATEGORIES: BusinessCategory[] = [
 
 const DESC_MAX = 400;
 const DAILY_USAGE_KEY = '@chaika:place_rating_daily_usage_v1';
+const BUSINESS_DRAFT_KEY = '@chaika:business_draft';
+const DRAFT_SAVE_DEBOUNCE_MS = 900;
+
+type BusinessDraft = Partial<{
+  formCategoryKey: string;
+  formSubcategoryKey: string;
+  contactName: string;
+  phone: string;
+  description: string;
+  priceMin: string;
+  priceMax: string;
+  addFormVisible: boolean;
+}>;
 
 // --- i18n ---------------------------------------------------------------------
 
@@ -477,10 +490,37 @@ export default function ZhkBusinessListScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [myRequest, setMyRequest] = useState<MyBusinessRequest>(null);
 
+  const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestDraftRef = useRef({ formCategoryKey, formSubcategoryKey, contactName, phone, description, priceMin, priceMax, addFormVisible });
+  const previousAddFormVisibleRef = useRef(addFormVisible);
+  const skipNextDraftFlushRef = useRef(false);
+
   useEffect(() => {
     AsyncStorage.getItem(DAILY_USAGE_KEY)
       .then((raw) => setDailyRatingUsage(raw ? (JSON.parse(raw) as DailyRatingUsage) : null))
       .catch(() => setDailyRatingUsage(null));
+  }, []);
+
+  // Restore draft if Android restarted the activity while picker was open
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(BUSINESS_DRAFT_KEY);
+        if (!isMounted || !raw) return;
+        const draft = JSON.parse(raw) as BusinessDraft;
+        if (draft.formCategoryKey) setFormCategoryKey(draft.formCategoryKey);
+        if (draft.formSubcategoryKey) setFormSubcategoryKey(draft.formSubcategoryKey);
+        if (draft.contactName) setContactName(draft.contactName);
+        if (draft.phone) setPhone(draft.phone);
+        if (draft.description !== undefined) setDescription(draft.description);
+        if (draft.priceMin !== undefined) setPriceMin(draft.priceMin);
+        if (draft.priceMax !== undefined) setPriceMax(draft.priceMax);
+        if (draft.addFormVisible) setAddFormVisible(true);
+        await AsyncStorage.removeItem(BUSINESS_DRAFT_KEY);
+      } catch { /* ignore */ }
+    })();
+    return () => { isMounted = false; };
   }, []);
 
   const loadData = useCallback(async () => {
@@ -589,6 +629,56 @@ export default function ZhkBusinessListScreen() {
   useEffect(() => { void loadMyRequest(); }, [loadMyRequest]);
 
   useEffect(() => {
+    latestDraftRef.current = { formCategoryKey, formSubcategoryKey, contactName, phone, description, priceMin, priceMax, addFormVisible };
+  }, [addFormVisible, contactName, description, formCategoryKey, formSubcategoryKey, phone, priceMax, priceMin]);
+
+  const saveDraftNow = useCallback((visible = latestDraftRef.current.addFormVisible) => {
+    if (!visible) return;
+    const { formCategoryKey: dc, formSubcategoryKey: ds, contactName: dn, phone: dp, description: dd, priceMin: dmi, priceMax: dma } = latestDraftRef.current;
+    void AsyncStorage.setItem(
+      BUSINESS_DRAFT_KEY,
+      JSON.stringify({ formCategoryKey: dc, formSubcategoryKey: ds, contactName: dn, phone: dp, description: dd, priceMin: dmi, priceMax: dma, addFormVisible: true }),
+    ).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const wasVisible = previousAddFormVisibleRef.current;
+    previousAddFormVisibleRef.current = addFormVisible;
+    if (!wasVisible || addFormVisible) return;
+    if (skipNextDraftFlushRef.current) {
+      skipNextDraftFlushRef.current = false;
+      return;
+    }
+    saveDraftNow(true);
+  }, [addFormVisible, saveDraftNow]);
+
+  useEffect(() => {
+    if (draftSaveTimerRef.current) {
+      clearTimeout(draftSaveTimerRef.current);
+      draftSaveTimerRef.current = null;
+    }
+    if (!addFormVisible) return;
+    draftSaveTimerRef.current = setTimeout(() => {
+      draftSaveTimerRef.current = null;
+      saveDraftNow(true);
+    }, DRAFT_SAVE_DEBOUNCE_MS);
+    return () => {
+      if (draftSaveTimerRef.current) {
+        clearTimeout(draftSaveTimerRef.current);
+        draftSaveTimerRef.current = null;
+      }
+    };
+  }, [addFormVisible, contactName, description, formCategoryKey, formSubcategoryKey, phone, priceMax, priceMin, saveDraftNow]);
+
+  useEffect(() => () => {
+    if (draftSaveTimerRef.current) {
+      clearTimeout(draftSaveTimerRef.current);
+      draftSaveTimerRef.current = null;
+    }
+    saveDraftNow();
+  }, [saveDraftNow]);
+
+  useEffect(() => {
     if (!contactName.trim() && user?.name) {
       setContactName(user.name);
     }
@@ -638,6 +728,11 @@ export default function ZhkBusinessListScreen() {
   const isSubmitFormValid = Boolean(formCategoryKey && formSubcategoryKey && contactName.trim() && normalizeUkrainianPhoneStrict(phone));
 
   const resetAddForm = useCallback(() => {
+    skipNextDraftFlushRef.current = true;
+    if (draftSaveTimerRef.current) {
+      clearTimeout(draftSaveTimerRef.current);
+      draftSaveTimerRef.current = null;
+    }
     setFormCategoryKey('');
     setFormSubcategoryKey('');
     setContactName(user?.name ?? '');
@@ -646,6 +741,7 @@ export default function ZhkBusinessListScreen() {
     setFormPhotos([]);
     setPriceMin('');
     setPriceMax('');
+    void AsyncStorage.removeItem(BUSINESS_DRAFT_KEY).catch(() => {});
   }, [user?.name]);
 
   const handleRequestCloseAddForm = useCallback(() => {
@@ -1206,6 +1302,7 @@ export default function ZhkBusinessListScreen() {
                     maxPhotos={1}
                     storagePath="local_business"
                     onPhotosChange={setFormPhotos}
+                    onBeforePickerOpen={saveDraftNow}
                   />
                 ) : (
                   <Text style={styles.signInNote}>{t.signInToSubmit}</Text>

@@ -12,6 +12,11 @@ export type ModerationPhoto = {
   title?: string;
   description?: string;
   userName?: string;
+  userId?: string;
+  phone?: string;
+  category?: string;
+  price?: string;
+  address?: string;
   sourceScreen: string;
   createdAt: number;
   status: 'pending' | 'approved' | 'rejected';
@@ -22,6 +27,7 @@ interface ModerationPhotoCardProps {
   onApprove?: () => void;
   onReject?: () => void;
   onDelete?: () => void;
+  onPress?: () => void;
   busy?: boolean;
   language?: 'ua' | 'ru' | 'en';
 }
@@ -49,6 +55,7 @@ const ModerationPhotoCard: React.FC<ModerationPhotoCardProps> = ({
   onApprove,
   onReject,
   onDelete,
+  onPress,
   busy,
   language = 'ua',
 }) => {
@@ -65,7 +72,7 @@ const ModerationPhotoCard: React.FC<ModerationPhotoCardProps> = ({
     ?? photo.sourceScreen;
 
   return (
-    <TactileCard style={styles.card}>
+    <TactileCard onPress={onPress} style={styles.card}>
       <View style={styles.topRow}>
         <View style={styles.iconBadge}>
           <MaterialCommunityIcons name="image-multiple-outline" size={20} color="#FFF9EE" />
@@ -85,6 +92,14 @@ const ModerationPhotoCard: React.FC<ModerationPhotoCardProps> = ({
             <View style={styles.statusPill}>
               <Text style={styles.statusPillText}>{L.pending}</Text>
             </View>
+            {onPress ? (
+              <View style={styles.detailsPill}>
+                <MaterialCommunityIcons name="open-in-new" size={10} color="#5F3D12" />
+                <Text style={styles.detailsPillText}>
+                  {language === 'ru' ? 'Подробнее' : language === 'en' ? 'Details' : 'Деталі'}
+                </Text>
+              </View>
+            ) : null}
           </View>
         </View>
       </View>
@@ -212,6 +227,21 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '800',
     color: '#8a5b00',
+  },
+  detailsPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    borderRadius: 999,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    flexShrink: 0,
+    backgroundColor: '#F3E2C4',
+  },
+  detailsPillText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#5F3D12',
   },
   datePill: {
     backgroundColor: '#DDEAF0',
