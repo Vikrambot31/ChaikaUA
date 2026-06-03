@@ -167,6 +167,15 @@ export const getUserErrorMessage = (
       : rawError ?? '',
   ).toLowerCase();
 
+  if (raw.includes('write_session_no_auth') || raw.includes('write_session_anonymous')) {
+    return MESSAGES[language].loginRequired;
+  }
+  if (raw.includes('write_session_auth_mismatch') || raw.includes('write_session_token_refresh_failed')) {
+    return MESSAGES[language].permissionDenied;
+  }
+  if (raw.includes('owner_required')) {
+    return MESSAGES[language].notFound;
+  }
   if (raw.includes('auth/network-request-failed') || raw.includes('network') || raw.includes('offline') || raw.includes('fetch') || raw.includes('internet')) {
     return MESSAGES[language].network;
   }

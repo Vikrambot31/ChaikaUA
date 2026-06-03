@@ -12,7 +12,7 @@ import { uploadPhotoToNamespace } from './services/photoUploadService';
 import { canPublishImage } from './utils/imageSafety';
 import { safePromiseTimeout } from './utils/safePromiseTimeout';
 import { auth, database, storage } from './firebase-core';
-import { ensureFirebaseAuth, isModeratorUser } from './firebase-auth-session';
+import { ensureFirebaseAuth, isModeratorUser, requireWriteSession } from './firebase-auth-session';
 import { Request as AppRequest, CommunityPhoto as AppPhoto, AudioAttachment } from './types/app';
 import { resolveMediaAccessUrls } from './services/mediaAccess';
 import { assertTextMatchesLanguage, normalizeAppLang } from './utils/contentLanguageGuard';
@@ -719,7 +719,10 @@ export const firebaseChatAPI = {
     requestData: AddRequestPayload,
   ): Promise<ApiResult<{ id: string | null }> | FailResult> => {
     try {
-      const user: FirebaseUser = await ensureFirebaseAuth();
+      const user: FirebaseUser = await requireWriteSession({
+        operation: 'create',
+        screen: 'firebaseChatAPI.addRequest',
+      });
       const dailyRequestsCount = await countCurrentDayItemsByUser('requests', user.uid);
       if (dailyRequestsCount >= DAILY_REQUEST_LIMIT) {
         throw new Error(`Daily request limit reached (${DAILY_REQUEST_LIMIT})`);
@@ -1841,4 +1844,3 @@ export const socialAuthAPI = {
     }
   },
 };
-

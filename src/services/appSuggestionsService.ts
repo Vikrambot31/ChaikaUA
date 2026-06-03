@@ -2,7 +2,7 @@ import { get, onValue, push, ref, remove, set, update } from 'firebase/database'
 import { database } from '../firebase-core';
 import { createPendingModeration, ModerationStatus } from '../utils/moderation';
 import { sanitizeStoredText } from '../utils/textUtils';
-import { ensureFirebaseAuth, getCurrentUser } from '../firebase-auth-session';
+import { requireWriteSession } from '../firebase-auth-session';
 import { assertTextMatchesLanguage, normalizeAppLang, type AppLang } from '../utils/contentLanguageGuard';
 
 export interface AppSuggestion {
@@ -23,18 +23,12 @@ const PATH = 'app_suggestions';
 const MAX_TEXT_LENGTH = 200;
 
 const resolveSuggestionUserId = async (fallbackUserId?: string): Promise<string> => {
-  const currentUser = getCurrentUser();
-  if (currentUser) {
-    return currentUser.uid;
-  }
-
-  try {
-    const user = await ensureFirebaseAuth();
-    return user.uid;
-  } catch (error) {
-    console.warn('[appSuggestionsService] resolveSuggestionUserId using guest fallback:', error);
-    return sanitizeStoredText(fallbackUserId || `guest_${Date.now()}`).slice(0, 64);
-  }
+  const user = await requireWriteSession({
+    expectedUserId: fallbackUserId,
+    operation: 'create',
+    screen: 'Pro-Prilozhenie',
+  });
+  return user.uid;
 };
 
 const mapSuggestion = (id: string, value: Record<string, unknown>): AppSuggestion => ({

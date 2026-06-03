@@ -3,7 +3,7 @@ import { database } from '../firebase-core';
 import { createPendingModeration, ModerationStatus } from '../utils/moderation';
 import { sanitizeStoredText } from '../utils/textUtils';
 import { publishApprovedActivity } from './activityMirror';
-import { ensureFirebaseAuth } from '../firebase-auth-session';
+import { requireWriteSession } from '../firebase-auth-session';
 import { LOCAL_MODE, LOCAL_API } from '../local/LOCAL_MODE';
 import { assertTextMatchesLanguage, normalizeAppLang, type AppLang } from '../utils/contentLanguageGuard';
 
@@ -152,7 +152,11 @@ export const lostFoundService = {
     }
     try {
       const listRef = ref(database, PATH);
-      const user = await ensureFirebaseAuth();
+      const user = await requireWriteSession({
+        expectedUserId: item.userId,
+        operation: 'create',
+        screen: 'Kto-Poteryal',
+      });
       const pendingModeration = createPendingModeration();
       const expiresAt = item.expiresAt || new Date(Date.now() + DEFAULT_TTL_MS).toISOString();
       const photoStoragePath = item.photoStoragePath || item.photoUri;
@@ -181,11 +185,14 @@ export const lostFoundService = {
 
   async remove(id: string): Promise<void> {
     try {
-      const user = await ensureFirebaseAuth();
+      const user = await requireWriteSession({
+        operation: 'remove',
+        screen: 'Kto-Poteryal',
+      });
       const snapshot = await get(ref(database, `${PATH}/${id}`));
       const existing = snapshot.exists() ? snapshot.val() as Partial<LostFoundItem> : null;
       if (!existing || existing.userId !== user.uid) {
-        throw new Error('permission-denied');
+        throw new Error('owner_required');
       }
       await remove(ref(database, `${PATH}/${id}`));
     } catch (error) {
@@ -196,11 +203,14 @@ export const lostFoundService = {
 
   async close(id: string): Promise<void> {
     try {
-      const user = await ensureFirebaseAuth();
+      const user = await requireWriteSession({
+        operation: 'close',
+        screen: 'Kto-Poteryal',
+      });
       const snapshot = await get(ref(database, `${PATH}/${id}`));
       const existing = snapshot.exists() ? snapshot.val() as Partial<LostFoundItem> : null;
       if (!existing || existing.userId !== user.uid) {
-        throw new Error('permission-denied');
+        throw new Error('owner_required');
       }
       await update(ref(database, `${PATH}/${id}`), {
         moderationStatus: 'expired',

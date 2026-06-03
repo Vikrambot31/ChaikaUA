@@ -14,7 +14,7 @@ import { SCREEN_THEME } from '../utils/screenTheme';
 import TactileIcon from '../components/TactileIcon';
 import { sanitizeStoredText } from '../utils/textUtils';
 import { firebaseChatAPI } from '../firebase-config';
-import { ensureFirebaseAuth } from '../firebase-auth-session';
+import { ensureFirebaseAuth, requireWriteSession } from '../firebase-auth-session';
 import { showUserError } from '../utils/userFacingErrors';
 import { BUILDINGS } from '../data/buildings';
 import RequestPhotoUploadField, { UploadedPhoto } from '../components/RequestPhotoUploadField';
@@ -621,7 +621,11 @@ const text = CLEAN_PROBLEMS_TEXT[language];
     setVotingBusyId(id);
     const db = database;
     try {
-      const firebaseUser = await ensureFirebaseAuth();
+      const firebaseUser = await requireWriteSession({
+        expectedUserId: user?.id,
+        operation: 'vote',
+        screen: 'Problemy-Chayki',
+      });
       const uid = firebaseUser.uid;
       if (!uid) throw new Error('Missing Firebase user id for vote');
       setVoteUserId(uid);

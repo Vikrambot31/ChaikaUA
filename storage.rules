@@ -6,12 +6,16 @@ service firebase.storage {
       return request.auth != null;
     }
 
+    function registered() {
+      return signedIn() && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
     function isOwner(userId) {
-      return signedIn() && request.auth.uid == userId;
+      return registered() && request.auth.uid == userId;
     }
 
     function isAdmin() {
-      return signedIn() && request.auth.token.admin == true;
+      return registered() && request.auth.token.admin == true;
     }
 
     // ── Группа E: Storage (Этап 1, шаги 1.3 Дни 9-10) ──────────────────────
@@ -56,7 +60,7 @@ service firebase.storage {
     // Читает любой auth. Пишет любой auth — модерация на уровне CF и RTDB rules.
     match /{allPaths=**} {
       allow get, list: if signedIn();
-      allow write: if signedIn();
+      allow write: if registered();
     }
   }
 }

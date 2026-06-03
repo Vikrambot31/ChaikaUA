@@ -21,7 +21,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { equalTo, get, onValue, orderByChild, query, ref, runTransaction, set } from 'firebase/database';
 import { database } from '../firebase-config';
-import { ensureFirebaseAuth } from '../firebase-auth-session';
+import { requireWriteSession } from '../firebase-auth-session';
 import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import MiniTabBar from '../components/MiniTabBar';
@@ -699,7 +699,11 @@ export default function ZhkBusinessListScreen() {
     let uidForLog = user?.id ?? '';
     let existingStatusForLog: string | undefined;
     try {
-      const firebaseUser = await ensureFirebaseAuth();
+      const firebaseUser = await requireWriteSession({
+        expectedUserId: user?.id,
+        operation: 'create_or_update',
+        screen: 'ZhkBusinessListScreen',
+      });
       const uid = firebaseUser.uid;
       uidForLog = uid;
       const businessRef = ref(database, `local_business/${uid}`);

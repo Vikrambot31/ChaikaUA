@@ -4,7 +4,7 @@ import { createPendingModeration, ModerationStatus } from '../utils/moderation';
 import { sanitizeStoredText } from '../utils/textUtils';
 import { resolveMediaAccessUrls } from './mediaAccess';
 import { publishApprovedActivity } from './activityMirror';
-import { ensureFirebaseAuth } from '../firebase-auth-session';
+import { requireWriteSession } from '../firebase-auth-session';
 import { LOCAL_MODE, LOCAL_API } from '../local/LOCAL_MODE';
 import { assertTextMatchesLanguage, normalizeAppLang, type AppLang } from '../utils/contentLanguageGuard';
 
@@ -167,7 +167,11 @@ export const buySellService = {
     }
     try {
       const listRef = ref(database, PATH);
-      const user = await ensureFirebaseAuth();
+      const user = await requireWriteSession({
+        expectedUserId: item.userId,
+        operation: 'create',
+        screen: 'Kuplu-Prodam',
+      });
       const pendingModeration = createPendingModeration();
       const expiresAt = item.expiresAt || new Date(Date.now() + DEFAULT_LISTING_TTL_MS).toISOString();
       const photoStoragePath = item.photoStoragePath || item.photoUri;
@@ -200,11 +204,14 @@ export const buySellService = {
 
   async remove(id: string): Promise<void> {
     try {
-      const user = await ensureFirebaseAuth();
+      const user = await requireWriteSession({
+        operation: 'remove',
+        screen: 'Kuplu-Prodam',
+      });
       const snapshot = await get(ref(database, `${PATH}/${id}`));
       const existing = snapshot.exists() ? snapshot.val() as Partial<BuySellListing> : null;
       if (!existing || existing.userId !== user.uid) {
-        throw new Error('permission-denied');
+        throw new Error('owner_required');
       }
       await remove(ref(database, `${PATH}/${id}`));
     } catch (error) {

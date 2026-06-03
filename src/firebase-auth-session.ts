@@ -46,6 +46,26 @@ export class AuthBootstrapTimeoutError extends Error {
   }
 }
 
+export type WriteSessionReason =
+  | 'no_auth'
+  | 'anonymous'
+  | 'auth_mismatch'
+  | 'token_refresh_failed';
+
+export class WriteSessionError extends Error {
+  code: string;
+  reason: WriteSessionReason;
+  details: Record<string, unknown>;
+
+  constructor(reason: WriteSessionReason, details: Record<string, unknown> = {}) {
+    super(`write_session_${reason}`);
+    this.name = 'WriteSessionError';
+    this.code = `write_session_${reason}`;
+    this.reason = reason;
+    this.details = details;
+  }
+}
+
 const createAuthTimeoutPromise = (timeoutMs: number): Promise<never> =>
   new Promise((_, reject) => {
     setTimeout(() => reject(new AuthBootstrapTimeoutError()), timeoutMs);
@@ -105,6 +125,45 @@ export const ensureFirebaseAuth = async (): Promise<any> => {
   }
 
   return anonymousSignInPromise;
+};
+
+export const requireWriteSession = async (options?: {
+  expectedUserId?: string | null;
+  operation?: string;
+  screen?: string;
+  requireRealUser?: boolean;
+}): Promise<any> => {
+  const user = await ensureFirebaseAuth();
+  const details = {
+    operation: options?.operation,
+    screen: options?.screen,
+    expectedUserId: options?.expectedUserId || null,
+    authUid: user?.uid || null,
+    isAnonymous: Boolean(user?.isAnonymous),
+  };
+
+  if (!user?.uid) {
+    throw new WriteSessionError('no_auth', details);
+  }
+
+  if (options?.requireRealUser !== false && isAnonymousFirebaseUser(user)) {
+    throw new WriteSessionError('anonymous', details);
+  }
+
+  if (options?.expectedUserId && options.expectedUserId !== user.uid) {
+    throw new WriteSessionError('auth_mismatch', details);
+  }
+
+  try {
+    await user.getIdToken(true);
+  } catch (error) {
+    throw new WriteSessionError('token_refresh_failed', {
+      ...details,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  return user;
 };
 
 export const isPrimaryServiceEmail = (user: EmailUser = auth.currentUser): boolean => {

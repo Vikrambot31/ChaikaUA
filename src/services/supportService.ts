@@ -12,7 +12,7 @@ import {
   Unsubscribe,
 } from 'firebase/database';
 import { database } from '../firebase-core';
-import { ensureFirebaseAuth } from '../firebase-auth-session';
+import { requireWriteSession } from '../firebase-auth-session';
 import { SupportTicket, SupportMessage, SupportCategory } from '../types/support';
 import { MAX_MESSAGE_LENGTH, MOBILE_MESSAGES_LIMIT } from '../constants/supportCategories';
 
@@ -137,7 +137,10 @@ export const createTicket = async (
   firstMessage: string,
   userName: string,
 ): Promise<{ ticketId: string }> => {
-  const user = await ensureFirebaseAuth();
+  const user = await requireWriteSession({
+    operation: 'create_ticket',
+    screen: 'SupportScreen',
+  });
   const userId = user.uid;
 
   if (firstMessage.length > MAX_MESSAGE_LENGTH) {
@@ -197,7 +200,10 @@ export const sendUserMessage = async (
   ticketId: string,
   text: string,
 ): Promise<void> => {
-  const user = await ensureFirebaseAuth();
+  const user = await requireWriteSession({
+    operation: 'send_message',
+    screen: 'SupportScreen',
+  });
 
   if (text.length > MAX_MESSAGE_LENGTH) {
     throw new Error(`Message exceeds ${MAX_MESSAGE_LENGTH} characters`);
@@ -227,6 +233,10 @@ export const sendUserMessage = async (
 // ── Mark as read ──
 
 export const markTicketReadByUser = async (ticketId: string): Promise<void> => {
+  await requireWriteSession({
+    operation: 'mark_read',
+    screen: 'SupportScreen',
+  });
   await update(ref(database, `${TICKETS_PATH}/${ticketId}`), {
     lastReadByUser: Date.now(),
   });

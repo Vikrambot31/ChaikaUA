@@ -72,6 +72,23 @@ maybeDescribe('Realtime Database emulator security rules', () => {
         firebase: { sign_in_provider: 'password' },
       }).database();
 
+  const anonymousDb = (uid = 'anonUser') =>
+    testEnv.authenticatedContext(uid, {
+      firebase: { sign_in_provider: 'anonymous' },
+    }).database();
+
+  const registeredListing = (uid: string) => ({
+    userId: uid,
+    name: 'Test User',
+    phone: '+380501234567',
+    category: 'test',
+    description: 'Valid test description',
+    moderationStatus: 'pending',
+    submittedForModerationAt: '2026-06-03T00:00:00.000Z',
+    createdAt: '2026-06-03T00:00:00.000Z',
+    expiresAt: '2099-01-01T00:00:00.000Z',
+  });
+
   const deviceRecord = (deviceId = 'device-a', allowNewDevices = true) => ({
     device_id: deviceId,
     device_name: 'Pixel Test',
@@ -178,6 +195,105 @@ maybeDescribe('Realtime Database emulator security rules', () => {
     await assertFails(db.ref('authorized_devices/userA/device-b').set({
       ...deviceRecord('device-b'),
       security_flags: ['x'.repeat(65)],
+    }));
+  });
+
+  it('allows registered users to create main public submissions with their own userId', async () => {
+    const db = authedDb('userA');
+    const base = registeredListing('userA');
+
+    await assertSucceeds(db.ref('requests/request-a').set({
+      ...base,
+      text: 'Need help with a test request',
+      status: 'pending',
+      timestamp: 1760000000000,
+    }));
+    await assertSucceeds(db.ref('lost_found/item-a').set({
+      ...base,
+      type: 'lost',
+      photoUri: '',
+      photoStoragePath: '',
+    }));
+    await assertSucceeds(db.ref('buy_sell_listings/item-a').set({
+      ...base,
+      listingType: 'sell',
+      itemName: 'Test item',
+      condition: 'good',
+      price: '100',
+    }));
+    await assertSucceeds(db.ref('contacts_listings/listing-a').set({
+      ...base,
+      itemName: 'Test contact',
+      condition: 'new',
+      price: '0',
+    }));
+    await assertSucceeds(db.ref('job_listings/listing-a').set({
+      ...base,
+      listingKind: 'resume',
+      age: '30',
+      workType: 'other',
+      about: 'Looking for test work',
+    }));
+    await assertSucceeds(db.ref('app_suggestions/suggestion-a').set({
+      ...base,
+      text: 'Please add a test feature',
+    }));
+    await assertSucceeds(db.ref('local_business/userA').set({
+      uid: 'userA',
+      userId: 'userA',
+      categoryKey: 'services',
+      categoryLabel: 'Services',
+      subcategoryKey: 'test',
+      subcategoryLabel: 'Test',
+      contactName: 'Test User',
+      phone: '+380501234567',
+      description: 'Test business listing',
+      status: 'pending',
+      createdAt: '2026-06-03T00:00:00.000Z',
+      updatedAt: '2026-06-03T00:00:00.000Z',
+      version: 1,
+    }));
+  });
+
+  it('blocks anonymous or mismatched userId writes to main public submissions', async () => {
+    await assertFails(anonymousDb().ref('lost_found/anon-item').set({
+      ...registeredListing('anonUser'),
+      type: 'lost',
+    }));
+
+    await assertFails(authedDb('userA').ref('lost_found/wrong-owner').set({
+      ...registeredListing('userB'),
+      type: 'lost',
+    }));
+  });
+
+  it('allows owners to close or remove their own pending listings', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.database().ref('lost_found/item-a').set({
+        ...registeredListing('userA'),
+        type: 'lost',
+      });
+    });
+
+    const db = authedDb('userA');
+    await assertSucceeds(db.ref('lost_found/item-a').update({
+      moderationStatus: 'expired',
+      closedAt: '2026-06-03T00:00:00.000Z',
+    }));
+    await assertSucceeds(db.ref('lost_found/item-a').remove());
+  });
+
+  it('blocks yellow-listed users before public submission create', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.database().ref('yellow_list/userA').set({
+        active: true,
+        bannedUntil: 4102444800000,
+      });
+    });
+
+    await assertFails(authedDb('userA').ref('lost_found/item-a').set({
+      ...registeredListing('userA'),
+      type: 'lost',
     }));
   });
 });
