@@ -929,7 +929,7 @@ const KontaktiChaikyScreen: React.FC = () => {
                     />
                     <View style={styles.topAnketyNameRow}>
                       <Text style={styles.topAnketyName} numberOfLines={1}>{displayName}</Text>
-                      {ageText ? <Text style={styles.topAnketyAge}>{ageText}</Text> : null}
+                      {ageText ? <Text style={styles.topAnketyAge} numberOfLines={1}>{ageText}</Text> : null}
                     </View>
                   </TouchableOpacity>
                 );
@@ -1312,9 +1312,9 @@ const styles = StyleSheet.create({
   topAnketyScroll: { gap: 8 },
   topAnketyItem: { width: 80, alignItems: 'center' },
   topAnketyPhoto: { width: 80, height: 80, borderRadius: 10, backgroundColor: '#FFF3E0' },
-  topAnketyNameRow: { flexDirection: 'row', alignItems: 'baseline', gap: 3, marginTop: 4, maxWidth: 80, justifyContent: 'center' },
-  topAnketyName: { fontSize: 12, fontWeight: '700', color: SCREEN_THEME.textPrimary, flexShrink: 1 },
-  topAnketyAge: { fontSize: 10, fontWeight: '700', color: SCREEN_THEME.textSecondary },
+  topAnketyNameRow: { flexDirection: 'row', alignItems: 'baseline', gap: 3, marginTop: 4, width: 80, justifyContent: 'center', overflow: 'hidden' },
+  topAnketyName: { fontSize: 12, fontWeight: '700', color: SCREEN_THEME.textPrimary, flexShrink: 1, minWidth: 0 },
+  topAnketyAge: { fontSize: 10, fontWeight: '700', color: SCREEN_THEME.textSecondary, flexShrink: 0 },
   listingsSection: { marginBottom: 16 },
   listingsHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 8 },
   listingsSectionTitle: { fontSize: 16, fontWeight: '900', color: SCREEN_THEME.textPrimary },

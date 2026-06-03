@@ -31,17 +31,6 @@ const FEATURE_PRIORITY: BeautyFeature[] = [
   'parking', 'certificate', 'discount_first',
 ];
 
-const FEATURE_ICONS: Record<BeautyFeature, React.ComponentProps<typeof MaterialCommunityIcons>['name']> = {
-  home_visit: 'home-outline',
-  online_booking: 'calendar-check-outline',
-  kids_friendly: 'baby-face-outline',
-  women: 'face-woman-outline',
-  men: 'face-man-outline',
-  parking: 'parking',
-  certificate: 'gift-outline',
-  discount_first: 'percent-outline',
-};
-
 const UI_TEXT = {
   ua: {
     title: 'Салони краси',

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   Dimensions,
   SafeAreaView,
@@ -300,6 +300,8 @@ export default function VseDlyaDeteyScreen() {
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
   const [activeCategory, setActiveCategory] = useState<CategoryKey>('all');
   const [query, setQuery] = useState('');
+  const scrollRef = useRef<ScrollView>(null);
+  const resultsAnchorY = useRef(0);
 
   const childPlaces = useMemo(() => (
     chaykaPlaces
@@ -345,6 +347,12 @@ export default function VseDlyaDeteyScreen() {
 
   const handleCategoryPress = (category: CategoryKey) => {
     setActiveCategory(category);
+    setTimeout(() => {
+      scrollRef.current?.scrollTo({
+        y: Math.max(resultsAnchorY.current - 10, 0),
+        animated: true,
+      });
+    }, 80);
   };
 
   const renderOfferCard = (offer: ChildOffer, wide = false) => {
@@ -414,7 +422,7 @@ export default function VseDlyaDeteyScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} activeOpacity={0.8}>
             <MaterialCommunityIcons name="chevron-left" size={28} color={SCREEN_THEME.textPrimary} />
@@ -495,32 +503,39 @@ export default function VseDlyaDeteyScreen() {
           })}
         </View>
 
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>{isEventsCategory ? text.eventsListTitle : text.allPlacesTitle}</Text>
-          <Text style={styles.resultCount}>{isEventsCategory ? activeOffers.length : filteredPlaces.length}</Text>
-        </View>
+        <View
+          style={styles.resultsBlock}
+          onLayout={(event) => {
+            resultsAnchorY.current = event.nativeEvent.layout.y;
+          }}
+        >
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>{isEventsCategory ? text.eventsListTitle : text.allPlacesTitle}</Text>
+            <Text style={styles.resultCount}>{isEventsCategory ? activeOffers.length : filteredPlaces.length}</Text>
+          </View>
 
-        {isEventsCategory ? (
-          activeOffers.length > 0 ? (
+          {isEventsCategory ? (
+            activeOffers.length > 0 ? (
+              <View style={styles.cardList}>
+                {activeOffers.map((offer) => renderOfferCard(offer, true))}
+              </View>
+            ) : (
+              <View style={styles.emptyState}>
+                <MaterialCommunityIcons name="calendar-remove-outline" size={34} color={SCREEN_THEME.textMuted} />
+                <Text style={styles.emptyText}>{text.noOffers}</Text>
+              </View>
+            )
+          ) : filteredPlaces.length > 0 ? (
             <View style={styles.cardList}>
-              {activeOffers.map((offer) => renderOfferCard(offer, true))}
+              {filteredPlaces.map((item) => renderPlaceCard(item))}
             </View>
           ) : (
             <View style={styles.emptyState}>
-              <MaterialCommunityIcons name="calendar-remove-outline" size={34} color={SCREEN_THEME.textMuted} />
-              <Text style={styles.emptyText}>{text.noOffers}</Text>
+              <MaterialCommunityIcons name="magnify-close" size={34} color={SCREEN_THEME.textMuted} />
+              <Text style={styles.emptyText}>{text.noResults}</Text>
             </View>
-          )
-        ) : filteredPlaces.length > 0 ? (
-          <View style={styles.cardList}>
-            {filteredPlaces.map((item) => renderPlaceCard(item))}
-          </View>
-        ) : (
-          <View style={styles.emptyState}>
-            <MaterialCommunityIcons name="magnify-close" size={34} color={SCREEN_THEME.textMuted} />
-            <Text style={styles.emptyText}>{text.noResults}</Text>
-          </View>
-        )}
+          )}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -705,6 +720,9 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '900',
     color: '#FFFFFF',
+  },
+  resultsBlock: {
+    marginTop: 2,
   },
   cardList: {
     gap: 10,
