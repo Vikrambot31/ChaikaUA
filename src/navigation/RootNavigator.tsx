@@ -76,6 +76,7 @@ import AppVersionInfoScreen from '../screens/AppVersionInfoScreen';
 import SupportScreen from '../screens/SupportScreen';
 import CrashDiagnosticsScreen from '../screens/CrashDiagnosticsScreen';
 import AppMonitorScreen from '../screens/AppMonitorScreen';
+import AccessRestrictedScreen from '../screens/AccessRestrictedScreen';
 import type { Request, Place } from '../types/app';
 import type { NewsItem as OsbbEditableNewsItem } from '../screens/OSBB-AddNews';
 import { selectAuthBootstrapped, selectIsAuthenticated, selectUser } from '../redux/selectors';
@@ -420,7 +421,12 @@ function GuardedScreen({
 }) {
   const isBootstrapped = useSelector(selectAuthBootstrapped);
   const isAuthenticated = useSelector(selectIsAuthenticated);
-  const { isTrusted, isLoading: isTrustedLoading } = useContext(TrustedAccessContext);
+  const {
+    isTrusted,
+    isLoading: isTrustedLoading,
+    hasPendingInvite,
+    openInviteAccess,
+  } = useContext(TrustedAccessContext);
 
   const [roleStatus, setRoleStatus] = useState<'loading' | 'allowed' | 'denied'>(
     mode === 'admin' || mode === 'moderator' || mode === 'trusted' ? 'loading' : 'allowed',
@@ -470,13 +476,15 @@ function GuardedScreen({
   }, [mode, isPrivilegedRole, isTrusted, isTrustedLoading]);
 
   useEffect(() => {
+    if (mode === 'trusted') {
+      deniedToastShownRef.current = false;
+      return;
+    }
     if (roleStatus === 'denied') {
       if (!deniedToastShownRef.current) {
-        const reason = mode === 'trusted'
-          ? 'Потрібна модерація'
-          : mode === 'admin' || mode === 'moderator'
-            ? 'Невірна роль'
-            : 'Адміністратор заблокував доступ';
+        const reason = mode === 'admin' || mode === 'moderator'
+          ? 'Невірна роль'
+          : 'Адміністратор заблокував доступ';
         Toast.show({
           type: 'error',
           text1: 'Доступ закрито',
@@ -492,6 +500,22 @@ function GuardedScreen({
 
   if (roleStatus === 'loading') {
     return <GuardFallback />;
+  }
+
+  if (mode === 'trusted' && roleStatus === 'denied') {
+    return (
+      <AccessRestrictedScreen
+        pendingInvite={hasPendingInvite}
+        onOpenInviteAccess={openInviteAccess}
+        onGoBack={() => {
+          if (navigation.canGoBack()) {
+            navigation.goBack();
+            return;
+          }
+          navigation.reset({ index: 0, routes: [{ name: 'MainTabs' as never }] });
+        }}
+      />
+    );
   }
 
   return children;

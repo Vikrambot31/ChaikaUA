@@ -335,9 +335,9 @@ const AppAccessGuard: React.FC<AppAccessGuardProps> = ({
       }
 
       Toast.show({
-        type: 'error',
-        text1: 'Помилка авторизації девайсу',
-        text2: 'Перевірте мережу і повторіть спробу.',
+        type: 'warning',
+        text1: 'Перевірка пристрою тимчасово недоступна',
+        text2: 'Застосунок продовжить працювати. Перевірте мережу, ми повторимо перевірку автоматично.',
       });
       setDeviceStatus((previous) => ({
         ...previous,
@@ -513,19 +513,6 @@ const AppAccessGuard: React.FC<AppAccessGuardProps> = ({
           ? 'Этот девайс заблокирован администратором.'
           : 'Этот девайс ожидает разрешения администратора.'}
         onRetry={() => {
-          void refreshDeviceStatus();
-        }}
-      />
-    );
-  }
-
-  if (!shouldBypassRestrictions && deviceStatus.error === 'device_auth_failed') {
-    return (
-      <MaintenanceScreen
-        message="Помилка авторизації девайсу. Перевірте мережу і повторіть спробу."
-        onRetry={() => {
-          deviceRefreshFailureCountRef.current = 0;
-          setDeviceStatus(createUnknownDeviceStatus());
           void refreshDeviceStatus();
         }}
       />

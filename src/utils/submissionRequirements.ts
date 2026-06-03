@@ -70,8 +70,6 @@ export const getFirstDoneRequestPhoto = (photos: UploadedPhoto[]): { photoUri: s
 export const validateSubmissionRequirements = ({
   language,
   userId,
-  userPhotoURL,
-  userStartAvatarKey,
   navigation,
 }: {
   language: string | undefined;
@@ -81,43 +79,15 @@ export const validateSubmissionRequirements = ({
   navigation?: NavigationProp<ParamListBase> | NavigationProp<Record<string, object | undefined>>;
 }): boolean => {
   const text = TEXT[normalizeLanguage(language)];
-  const hasAvatar = Boolean(userPhotoURL?.trim()) || Boolean(userStartAvatarKey?.trim());
 
-  if (userId && hasAvatar) return true;
+  if (userId) return true;
 
   const nav = navigation as NavigationProp<ParamListBase> | undefined;
 
   // No account at all — show simple login dialog
-  if (!userId) {
-    Alert.alert(text.noAccountTitle, text.noAccountBody, [
-      ...(nav ? [{ text: text.noAccountBtn, onPress: () => nav.navigate('LoginScreen', {}) }] : []),
-      { text: text.ok, style: 'cancel' as const },
-    ]);
-    return false;
-  }
-
-  // Has account but no avatar — show avatar options
-  const routeState = nav?.getState?.();
-  const currentRoute = routeState?.routes?.[routeState.index ?? routeState.routes.length - 1];
-
-  Alert.alert(text.title, text.body, [
-    ...(nav
-      ? [
-          {
-            text: text.uploadOwn,
-            onPress: () => nav.navigate('MyPhotosScreen'),
-          },
-          {
-            text: text.chooseAvatar,
-            onPress: () =>
-              nav.navigate('StartAvatarPickerScreen', {
-                redirectTo: currentRoute?.name,
-                redirectParams: currentRoute?.params,
-              }),
-          },
-        ]
-      : []),
-    { text: text.ok },
+  Alert.alert(text.noAccountTitle, text.noAccountBody, [
+    ...(nav ? [{ text: text.noAccountBtn, onPress: () => nav.navigate('LoginScreen', {}) }] : []),
+    { text: text.ok, style: 'cancel' as const },
   ]);
   return false;
 };

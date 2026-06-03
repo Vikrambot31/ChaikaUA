@@ -369,11 +369,12 @@ const getSubmitFailureMessage = (rawError: unknown, t: (typeof TEXT_BY_LANG)[Lan
   if (
     raw.includes('permission-denied') ||
     raw.includes('permission_denied') ||
+    raw.includes('permission denied') ||
     raw.includes('missing or insufficient permissions') ||
     raw.includes('unauthorized') ||
     raw.includes('forbidden')
   ) {
-    return t.permissionDenied;
+    return t.serverUnavailable;
   }
 
   if (

@@ -1,4 +1,4 @@
-import { Alert } from 'react-native';
+import Toast from 'react-native-toast-message';
 import { ref, get } from 'firebase/database';
 import { database } from '../firebase-core';
 import { logClientError } from './errorLogger';
@@ -6,23 +6,24 @@ import { logClientError } from './errorLogger';
 type YellowListEntry = {
   active?: boolean;
   bannedUntil?: number;
+  reason?: string;
 };
 
 const TEXT = {
   ua: {
-    title: 'Тимчасове обмеження',
-    body: (date: string) => `Ваші заявки тимчасово обмежені до ${date}. Ви можете читати стрічку та використовувати інші функції.`,
-    ok: 'Зрозуміло',
+    title: 'Публікації тимчасово на паузі',
+    body: (date: string, reason?: string) =>
+      `Можна читати стрічку й користуватися іншими розділами. Нові публікації доступні після ${date}.${reason ? ` Причина: ${reason}` : ''}`,
   },
   ru: {
-    title: 'Временное ограничение',
-    body: (date: string) => `Ваши заявки временно ограничены до ${date}. Вы можете читать ленту и использовать другие функции.`,
-    ok: 'Понятно',
+    title: 'Публикации временно на паузе',
+    body: (date: string, reason?: string) =>
+      `Можно читать ленту и пользоваться другими разделами. Новые публикации доступны после ${date}.${reason ? ` Причина: ${reason}` : ''}`,
   },
   en: {
-    title: 'Temporary restriction',
-    body: (date: string) => `Your submissions are temporarily restricted until ${date}. You can still read the feed and use other features.`,
-    ok: 'OK',
+    title: 'Posting is temporarily paused',
+    body: (date: string, reason?: string) =>
+      `You can still read the feed and use other sections. New posts are available after ${date}.${reason ? ` Reason: ${reason}` : ''}`,
   },
 } as const;
 
@@ -33,9 +34,25 @@ const normalizeLanguage = (language: string | undefined): AppLanguage => {
   return 'ua';
 };
 
+const formatRestrictionDate = (timestamp: number, language: AppLanguage): string => {
+  const locale = language === 'ua' ? 'uk-UA' : language === 'ru' ? 'ru-RU' : 'en-US';
+  return new Date(timestamp).toLocaleString(locale, {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+
+const normalizeReason = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') return undefined;
+  const reason = value.trim().replace(/\s+/g, ' ').slice(0, 140);
+  return reason || undefined;
+};
+
 /**
  * Проверяет, есть ли пользователь в жёлтом списке.
- * Если да — показывает Alert и возвращает true (заблокирован).
+ * Если да — показывает мягкое уведомление и возвращает true (публикация ограничена).
  * Если нет или бан истёк — возвращает false (можно отправлять).
  */
 export async function checkYellowList(uid: string | undefined, language?: string): Promise<boolean> {
@@ -47,9 +64,16 @@ export async function checkYellowList(uid: string | undefined, language?: string
     const bannedUntil = typeof entry.bannedUntil === 'number' ? entry.bannedUntil : 0;
     if (!(entry.active !== false && bannedUntil > Date.now())) return false;
 
-    const text = TEXT[normalizeLanguage(language)];
-    const date = new Date(bannedUntil).toLocaleDateString();
-    Alert.alert(text.title, text.body(date), [{ text: text.ok, style: 'cancel' }]);
+    const normalizedLanguage = normalizeLanguage(language);
+    const text = TEXT[normalizedLanguage];
+    const date = formatRestrictionDate(bannedUntil, normalizedLanguage);
+    Toast.show({
+      type: 'warning',
+      text1: text.title,
+      text2: text.body(date, normalizeReason(entry.reason)),
+      visibilityTime: 6500,
+      position: 'top',
+    });
     return true;
   } catch (error) {
     void logClientError('yellowListCheck.checkYellowList', error, { uid });

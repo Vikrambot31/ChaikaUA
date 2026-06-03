@@ -128,6 +128,34 @@ const MESSAGES = {
 
 export const getErrorTitle = (language: AppLanguage = 'ua') => MESSAGES[language].title;
 
+const isPermissionLikeError = (raw: string): boolean =>
+  raw.includes('permission-denied') ||
+  raw.includes('permission_denied') ||
+  raw.includes('permission denied') ||
+  raw.includes('missing or insufficient permissions') ||
+  raw.includes('unauthorized') ||
+  raw.includes('forbidden');
+
+const isExplicitAccessBlock = (raw: string): boolean =>
+  raw.includes('blocked device') ||
+  raw.includes('device_blocked') ||
+  raw.includes('blocked_access_attempt') ||
+  raw.includes('security violation') ||
+  raw.includes('security_violation') ||
+  raw.includes('yellow_list') ||
+  raw.includes('banned') ||
+  raw.includes('service_moderation') ||
+  raw.includes('account blocked') ||
+  raw.includes('profile blocked') ||
+  raw.includes('access blocked');
+
+const isRetryableActionContext = (context: UserErrorContext): boolean =>
+  context === 'load' ||
+  context === 'save' ||
+  context === 'send' ||
+  context === 'delete' ||
+  context === 'moderation';
+
 export const getUserErrorMessage = (
   language: AppLanguage = 'ua',
   context: UserErrorContext = 'unknown',
@@ -160,11 +188,20 @@ export const getUserErrorMessage = (
   if (raw.includes('missing required fields') || raw.includes('required fields') || raw.includes('obligatory fields')) {
     return MESSAGES[language].missingRequiredFields;
   }
-  if (raw.includes('permission-denied') || raw.includes('permission_denied') || raw.includes('missing or insufficient permissions') || raw.includes('unauthorized') || raw.includes('forbidden')) {
+  if (isPermissionLikeError(raw)) {
     if (context === 'upload') {
       return MESSAGES[language].upload;
     }
-    return MESSAGES[language].permissionDenied;
+    if (isExplicitAccessBlock(raw)) {
+      return MESSAGES[language].permissionDenied;
+    }
+    if (context === 'auth') {
+      return MESSAGES[language].loginRequired;
+    }
+    if (isRetryableActionContext(context)) {
+      return MESSAGES[language][context];
+    }
+    return MESSAGES[language].noPermission;
   }
   if (context === 'upload' && (raw.includes('upload') || raw.includes('storage') || raw.includes('blob'))) {
     return MESSAGES[language].uploadFailed;
