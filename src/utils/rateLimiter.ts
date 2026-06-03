@@ -59,12 +59,12 @@ export function createRateLimiter(key: string, cooldownMs: number): RateLimiter 
 
 // Pre-built limiters for known forms
 export const RATE_LIMITERS = {
-  helpRequest: createRateLimiter('help_request', 30_000),      // 30 sec
+  helpRequest: createRateLimiter('help_request', 120_000),     // 2 min
   requestForm: createRateLimiter('request_form', 60_000),      // 1 min
   lostFound: createRateLimiter('lost_found', 120_000),          // 2 min
   buySell: createRateLimiter('buy_sell', 120_000),              // 2 min
   contacts: createRateLimiter('contacts', 120_000),             // 2 min
   osbbCollection: createRateLimiter('osbb_collection', 60_000), // 1 min
   osbbTopic: createRateLimiter('osbb_topic', 30_000),           // 30 sec
-  profileViewRequest: createRateLimiter('profile_view_request', 30_000), // 30 sec
+  profileViewRequest: createRateLimiter('profile_view_request', 10_000), // 10 sec
 } as const;
