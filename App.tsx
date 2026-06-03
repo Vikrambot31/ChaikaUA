@@ -27,7 +27,6 @@ import { STORAGE_KEYS } from './src/utils/constants';
 import ForceUpdateScreen from './src/components/ForceUpdateScreen';
 import { checkAppVersion, VersionCheckResult } from './src/services/appVersion';
 import { loadProfileRecord, mapFirebaseUserToAppUser } from './src/services/authProfileService';
-import { getUserAccessControlStatus, subscribeUserAccessControlStatus } from './src/services/serviceModeration';
 import { identifyCrashUser, initCrashReporting } from './src/services/crashReporting';
 import { logClientError } from './src/utils/errorLogger';
 import { initRuntimeMonitorGlobalHandlers, recordRuntimeTrace } from './src/services/runtimeMonitorService';
@@ -243,28 +242,7 @@ function AppWithAuthSync({ remoteConfigSnapshot, onRemoteConfigSnapshot }: AppWi
     };
   }, [currentUser?.id]);
 
-  useEffect(() => {
-    if (!currentUser?.id) {
-      return undefined;
-    }
-
-    return subscribeUserAccessControlStatus(currentUser.id, (accessControl) => {
-      if (!accessControl.isBlocked && !accessControl.isDeleted) {
-        return;
-      }
-
-      void fcmAPI.removeTokenForUser(currentUser.id).catch((e: unknown) => logClientError('fcm.removeToken.blocked', e));
-      void signOutPrimarySession().catch((e: unknown) => logClientError('auth.signOut.blocked', e));
-      dispatch(logout());
-      identifyCrashUser(null);
-      void persistor.purge();
-      Toast.show({
-        type: 'error',
-        text1: 'Access denied',
-        text2: accessControl.reason || 'Your profile is blocked by moderation.',
-      });
-    });
-  }, [currentUser?.id, dispatch]);
+  // access control subscription disabled
 
   useEffect(() => {
     // ─── LOCAL_MODE: пропускаем Firebase Auth, читаем currentUser из localhost:3001 ──
@@ -412,42 +390,6 @@ function AppWithAuthSync({ remoteConfigSnapshot, onRemoteConfigSnapshot }: AppWi
             return;
           }
           // Non-critical token refresh error — continue with existing token
-        }
-
-        void recordRuntimeTrace({
-          screen: 'AppAuthSync',
-          action: 'moderation_access_check',
-          status: 'start',
-          feature: 'auth',
-          stage: 'getUserAccessControlStatus',
-          firebasePath: `users/${user.uid}/accessControl`,
-        });
-        const accessControl = await getUserAccessControlStatus(user.uid);
-        void recordRuntimeTrace({
-          screen: 'AppAuthSync',
-          action: 'moderation_access_check',
-          status: accessControl.isBlocked || accessControl.isDeleted ? 'fail' : 'success',
-          feature: 'auth',
-          stage: 'getUserAccessControlStatus',
-          firebasePath: `users/${user.uid}/accessControl`,
-          details: { isBlocked: accessControl.isBlocked, isDeleted: accessControl.isDeleted },
-        });
-        if (!active) {
-          return;
-        }
-
-        if (accessControl.isBlocked || accessControl.isDeleted) {
-          void fcmAPI.removeTokenForUser(user.uid).catch((e: unknown) => logClientError('fcm.removeToken.accessBlocked', e));
-          await signOutPrimarySession().catch((e: unknown) => logClientError('auth.signOut.accessBlocked', e));
-          dispatch(logout());
-          identifyCrashUser(null);
-          void persistor.purge();
-          Toast.show({
-            type: 'error',
-            text1: 'Access denied',
-            text2: accessControl.reason || 'Your profile is blocked by moderation.',
-          });
-          return;
         }
 
         void recordRuntimeTrace({
