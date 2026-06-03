@@ -120,6 +120,19 @@ const ModerationPhotoCard: React.FC<ModerationPhotoCardProps> = ({
       ) : null}
 
       <View style={styles.actionsRow}>
+        {onPress ? (
+          <TouchableOpacity
+            style={[styles.modBtn, styles.modBtnDetails]}
+            onPress={onPress}
+            disabled={busy}
+            activeOpacity={0.85}
+          >
+            <MaterialCommunityIcons name="open-in-new" size={16} color="#fff" />
+            <Text style={styles.modBtnText}>
+              {language === 'ru' ? 'Подробнее' : language === 'en' ? 'Details' : 'Деталі'}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
         {onApprove ? (
           <TouchableOpacity
             style={[styles.modBtn, styles.modBtnApprove]}
@@ -291,6 +304,9 @@ const styles = StyleSheet.create({
   },
   modBtnApprove: {
     backgroundColor: '#2A7B41',
+  },
+  modBtnDetails: {
+    backgroundColor: '#5F6F52',
   },
   modBtnReject: {
     backgroundColor: '#C77A2B',

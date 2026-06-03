@@ -745,8 +745,20 @@ export default function ZhkBusinessListScreen() {
   }, [user?.name]);
 
   const handleRequestCloseAddForm = useCallback(() => {
-    setAddFormVisible(false);
-  }, []);
+    const hasData = Boolean(formCategoryKey || formSubcategoryKey || description.trim() || formPhotos.length > 0 || (priceMin || priceMax));
+    if (!hasData) {
+      setAddFormVisible(false);
+      return;
+    }
+    Alert.alert(
+      language === 'ru' ? 'Закрыть форму?' : language === 'en' ? 'Close form?' : 'Закрити форму?',
+      language === 'ru' ? 'Данные не сохранятся.' : language === 'en' ? 'Your data will not be saved.' : 'Дані не збережуться.',
+      [
+        { text: language === 'ru' ? 'Нет' : language === 'en' ? 'No' : 'Ні', style: 'cancel' },
+        { text: language === 'ru' ? 'Закрыть' : language === 'en' ? 'Close' : 'Закрити', onPress: () => setAddFormVisible(false) },
+      ],
+    );
+  }, [description, formCategoryKey, formPhotos.length, formSubcategoryKey, language, priceMax, priceMin]);
 
   const handleFormCategoryChange = useCallback((nextCategory: string) => {
     setFormCategoryKey(nextCategory);
