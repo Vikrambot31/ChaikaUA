@@ -836,6 +836,14 @@ const RequestsScreen: React.FC = () => {
     if (navLock.current) return;
     navLock.current = true;
 
+    if (item.sourceScreen === 'ContactsScreen' && item.userId) {
+      navigation.navigate('ViewUserProfile', { userId: item.userId });
+      setTimeout(() => {
+        navLock.current = false;
+      }, 800);
+      return;
+    }
+
     const detailItem: DetailItemData = {
       id: item.id,
       title: item.title?.trim() || item.userName?.trim() || item.sourceScreen,
