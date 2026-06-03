@@ -5,6 +5,7 @@
 
     "users": {
       ".read": "auth != null && (root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
+      ".indexOn": ["phone"],
       "$uid": {
         ".read": "auth != null",
         ".write": "auth != null && (auth.uid === $uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin')"
@@ -173,12 +174,12 @@
 
     "voice_messages": {
       ".read": "auth != null",
-      ".write": "auth != null"
+      ".write": false
     },
 
     "chat_messages": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      ".read": "auth != null && (root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
+      ".write": "auth != null && (root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
     },
 
     "stats": {
@@ -304,8 +305,27 @@
     },
 
     "invite_access": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      ".read": "auth != null && (root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
+      ".write": false,
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid"
+      }
+    },
+
+    "feature_flags": {
+      ".read": "auth != null && (root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
+      ".write": "auth != null && root.child('user_roles').child(auth.uid).child('role').val() === 'admin'"
+    },
+
+    "trusted_sponsors": {
+      ".read": "auth != null && (root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
+      ".write": "auth != null && root.child('user_roles').child(auth.uid).child('role').val() === 'admin'"
+    },
+
+    "invite_requests": {
+      ".read": "auth != null && (root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
+      ".write": false,
+      ".indexOn": ["status", "requesterUid", "createdAt"]
     },
 
     "authorized_devices": {

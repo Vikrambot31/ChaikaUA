@@ -267,14 +267,7 @@ const RegisterScreenFull: React.FC = () => {
         ...(tempProfile?.age ? { age: tempProfile.age } : {}),
         ...(referrerPhone ? { referrerPhone } : {}),
       });
-      if (referrerPhone && referrerVerified) {
-        const safeReferrer = referrerPhone.replace(/[^0-9]/g, '');
-        await dbSet(dbRef(database, `referrals/${safeReferrer}/${safePhone}`), {
-          name: normalizedName,
-          phone: normalizedPhone,
-          registeredAt: new Date().toISOString(),
-        });
-      }
+      // NOTE: legacy referrals write removed — trust_tree (Cloud Functions) handles this now
 
       dispatch(
         setUser(
