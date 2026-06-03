@@ -29,6 +29,7 @@ import { checkYellowList } from '../utils/yellowListCheck';
 import { getLanguageValidationError } from '../utils/contentLanguageGuard';
 import UserCardActionBar from '../components/UserCardActionBar';
 import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
+import { useOperationTrace } from '../hooks/useOperationTrace';
 
 const CONTACT_LISTING_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const PROFILE_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -380,6 +381,7 @@ const KontaktiChaikyScreen: React.FC = () => {
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const text = UI_TEXT[language];
   const toast = useSoftToast();
+  const { startOperation, trace } = useOperationTrace('Kontakt-XXX');
   const [category, setCategory] = useState('');
   const [condition, setCondition] = useState('');
   const [price, setPrice] = useState('');
@@ -672,42 +674,57 @@ const KontaktiChaikyScreen: React.FC = () => {
   };
 
   const handleSubmit = async () => {
+    startOperation();
     setSubmitAttempted(true);
+
+    trace('validate', 'start');
     if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, userStartAvatarKey: user?.startAvatarKey, navigation })) {
+      trace('validate', 'fail', { missing: 'submissionRequirements' });
       return;
     }
-    if (await checkYellowList(user?.id, language)) return;
+    if (await checkYellowList(user?.id, language)) {
+      trace('validate', 'fail', { missing: 'yellowList' });
+      return;
+    }
     const normalizedPrice = price.replace(',', '.').replace(/[^\d.]/g, '');
     const numericPrice = Number(normalizedPrice);
 
     if (!category || !condition || !description.trim() || !phone.trim() || !normalizedPrice) {
+      trace('validate', 'fail', { missing: 'requiredFields' });
       toast.showWarning(text.errorTitle, text.errorFill);
       return;
     }
     if (!Number.isFinite(numericPrice) || numericPrice <= 0 || numericPrice > 120) {
+      trace('validate', 'fail', { missing: 'price' });
       toast.showWarning(text.errorTitle, text.priceError);
       return;
     }
     if (phone.replace(/\D/g, '').length < 7) {
+      trace('validate', 'fail', { missing: 'phone' });
       toast.showWarning(text.errorTitle, text.errorPhone);
       return;
     }
 
     const langError = getLanguageValidationError(description.trim(), language as 'ua' | 'ru' | 'en');
     if (langError) {
+      trace('validate', 'fail', { missing: 'language' });
       toast.showWarning(text.errorTitle, langError);
       return;
     }
+    trace('validate', 'success');
 
     setSubmitting(true);
     try {
+      trace('photo_check', 'start');
       const donePhotos = getDonePhotos(formPhotos);
       const resolvedPhotoUri = donePhotos[0]?.downloadUrl ?? '';
       const resolvedStoragePath = donePhotos[0]?.storagePath ?? '';
+      trace('photo_check', 'success');
 
       const itemName = user?.name?.trim() || getCategoryLabel(category);
       const createdAt = new Date();
 
+      trace('api_call', 'start', { path: 'contacts' });
       await contactsService.add({
         itemName,
         category,
@@ -731,11 +748,14 @@ const KontaktiChaikyScreen: React.FC = () => {
         humanDesignProfile: isInterestingFormExpanded ? humanDesignProfile : '',
         language,
       });
+      trace('api_call', 'success');
 
+      trace('user_alert', 'success', { type: 'success' });
       toast.showSuccess(text.successTitle, text.successMsg);
       resetForm();
       setAddFormVisible(false);
     } catch (error) {
+      trace('api_call', 'fail', {}, error);
       toast.showError(text.errorTitle, text.errorSave);
       void error;
     } finally {

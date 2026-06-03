@@ -26,6 +26,7 @@ import { getFirstDoneRequestPhoto, hasPhotoUploadInProgress, validateSubmissionR
 import { checkYellowList } from '../utils/yellowListCheck';
 import { normalizePersonName, sanitizeStoredText } from '../utils/textUtils';
 import { normalizeUkrainianPhoneStrict, validateName, validatePhone } from '../utils/validators';
+import { useOperationTrace } from '../hooks/useOperationTrace';
 
 type Lang = 'ua' | 'ru' | 'en';
 type FieldKey = 'name' | 'phone' | 'helpType' | 'description';
@@ -406,6 +407,7 @@ const RequestFormScreen: React.FC = () => {
   const requestGroup = route.params?.group ?? 'requests';
   const language = useSelector((state: RootState) => normalizeLanguage(state.language?.current)) as Lang;
   const user = useSelector((state: RootState) => state.auth.user);
+  const { startOperation, trace } = useOperationTrace('Forma-Zayavki');
   const [name, setName] = useState(user?.name ?? '');
   const [phone, setPhone] = useState(() => formatPhoneInput(user?.phone || '+38'));
   const [helpType, setHelpType] = useState('');
@@ -564,48 +566,65 @@ const RequestFormScreen: React.FC = () => {
   };
 
   const submit = async () => {
+    startOperation();
+
+    trace('validate', 'start');
     if (!hasUserId) {
+      trace('validate', 'fail', { missing: 'userId' });
       promptAuthRequired();
       return;
     }
 
     if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, userStartAvatarKey: user?.startAvatarKey, navigation })) {
+      trace('validate', 'fail', { missing: 'submissionRequirements' });
       return;
     }
 
-    if (await checkYellowList(user?.id, language)) return;
+    if (await checkYellowList(user?.id, language)) {
+      trace('validate', 'fail', { missing: 'yellowList' });
+      return;
+    }
 
     setSubmittedOnce(true);
 
     if (!normalizedName || !normalizedPhone || !helpType || !cleanDescription) {
+      trace('validate', 'fail', { missing: 'requiredFields' });
       Alert.alert(t.errorTitle, t.required);
       return;
     }
 
     if (!validateName(normalizedName) || !validatePhone(normalizedPhone)) {
+      trace('validate', 'fail', { missing: 'nameOrPhone' });
       Alert.alert(t.errorTitle, t.invalidContact);
       return;
     }
 
     if (cleanDescription.length < 10) {
+      trace('validate', 'fail', { missing: 'descriptionLength' });
       Alert.alert(t.errorTitle, t.shortDescription);
       return;
     }
+    trace('validate', 'success');
 
+    trace('photo_check', 'start');
     if (photoUploadsInProgress) {
+      trace('photo_check', 'fail', { reason: 'uploadsInProgress' });
       Alert.alert(t.errorTitle, pt.waitUpload);
       return;
     }
 
     if (formPhotos.length > 0 && !getFirstDoneRequestPhoto(formPhotos)) {
+      trace('photo_check', 'fail', { reason: 'noDonePhoto' });
       Alert.alert(t.errorTitle, pt.waitUpload);
       return;
     }
+    trace('photo_check', 'success');
 
     setSubmitting(true);
     try {
       const requestPhoto = getFirstDoneRequestPhoto(formPhotos);
 
+      trace('api_call', 'start', { path: 'requests' });
       const result = await firebaseChatAPI.addRequest({
         name: normalizedName,
         phone: normalizedPhone,
@@ -622,10 +641,13 @@ const RequestFormScreen: React.FC = () => {
       if (!result.success) {
         const friendlyError = getSubmitFailureMessage(result.error || t.sendFailed, t);
         setSubmitError(friendlyError);
+        trace('api_call', 'fail', { reason: 'resultNotSuccess' });
         Alert.alert(t.errorTitle, friendlyError);
         return;
       }
+      trace('api_call', 'success');
 
+      trace('user_alert', 'success', { type: 'success' });
       Alert.alert(t.successTitle, t.successBody, [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
@@ -644,6 +666,7 @@ const RequestFormScreen: React.FC = () => {
       setFormPhotos([]);
       void AsyncStorage.removeItem(REQUEST_FORM_DRAFT_KEY).catch(() => undefined);
     } catch (error) {
+      trace('api_call', 'fail', {}, error);
       const friendlyError = getSubmitFailureMessage(error, t);
       setSubmitError(friendlyError);
       Alert.alert(t.errorTitle, friendlyError);

@@ -13,6 +13,7 @@ import { BUILDINGS, getFullAddress } from '../data/buildings';
 import { LastRatingMap, canRateNow, getRatingDaysLeft } from '../utils/monthlyRating';
 import { useTranslation } from '../i18n/useTranslation';
 import StarRatingModal from '../components/StarRatingModal';
+import { useOperationTrace } from '../hooks/useOperationTrace';
 
 const STORAGE_KEY = '@chaika:building_ratings_v1';
 const LAST_VOTE_KEY = '@chaika:building_rating_votes_v1';
@@ -101,6 +102,7 @@ export default function RatingScreen() {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const { t } = useTranslation();
+  const { startOperation, trace } = useOperationTrace('Reyting-Domov', 'rating');
   const explanation = RATING_EXPLANATION[language];
   const [tab, setTab] = useState<'top20' | 'vote'>('top20');
   const [ratings, setRatings] = useState<Record<string, number>>({ cleaning: 0, elevator: 0, electricity: 0, services: 0 });
@@ -169,16 +171,21 @@ export default function RatingScreen() {
     setRatingModalCategory(null);
   };
   const handleSubmitVote = async () => {
+    startOperation();
+    trace('validate', 'start');
     const daysLeft = getRatingDaysLeft(lastVotes[selectedBuildingId]);
     if (daysLeft > 0) {
+      trace('validate', 'fail', { reason: 'cooldown', daysLeft });
       Alert.alert(t.ratingScreen.ratingAlreadySubmitted, `${t.ratingScreen.canRateAgainIn} ${daysLeft} ${t.ratingScreen.days}`);
       return;
     }
     const allFilled = CATEGORIES.every((c) => ratings[c.key] > 0);
     if (!allFilled) {
+      trace('validate', 'fail', { reason: 'not_all_categories_rated' });
       AlertHelper.rateAllCategories();
       return;
     }
+    trace('validate', 'success');
     const previous = storedRatings[selectedBuildingId] ?? getEmptyRating();
     const nextVotes = previous.votes + 1;
     const nextRating: RatingValue = {
@@ -193,11 +200,14 @@ export default function RatingScreen() {
     const nextLastVotes = { ...lastVotes, [selectedBuildingId]: new Date().toISOString() };
     setStoredRatings(next);
     setLastVotes(nextLastVotes);
+    trace('api_call', 'start', { path: 'AsyncStorage' });
     await Promise.all([
       AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)),
       AsyncStorage.setItem(LAST_VOTE_KEY, JSON.stringify(nextLastVotes)),
     ]);
+    trace('api_call', 'success');
     setVoted(true);
+    trace('user_alert', 'success', { type: 'success' });
     AlertHelper.success(t.ratingScreen.thankYou);
   };
 

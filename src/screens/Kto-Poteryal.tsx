@@ -36,6 +36,7 @@ import type { DetailItemData } from '../utils/detailViewTypes';
 import { getDonePhotos, validateSubmissionRequirements } from '../utils/submissionRequirements';
 import { checkYellowList } from '../utils/yellowListCheck';
 import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
+import { useOperationTrace } from '../hooks/useOperationTrace';
 
 type AppLanguage = 'ua' | 'ru' | 'en';
 
@@ -180,6 +181,7 @@ const LostAndFoundScreen: React.FC = () => {
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as AppLanguage;
   const user = useSelector((state: RootState) => state.auth.user);
   const text = UI_TEXT[language];
+  const { startOperation, trace } = useOperationTrace('Kto-Poteryal');
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const [items, setItems] = useState<LostFoundItem[]>([]);
   const [type, setType] = useState<RequestType>('lost');
@@ -245,33 +247,50 @@ const LostAndFoundScreen: React.FC = () => {
   };
 
   const handleSubmit = async () => {
+    startOperation();
+
+    trace('validate', 'start');
     if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, userStartAvatarKey: user?.startAvatarKey, navigation })) {
+      trace('validate', 'fail', { missing: 'submissionRequirements' });
       return;
     }
-    if (await checkYellowList(user?.id, language)) return;
+    if (await checkYellowList(user?.id, language)) {
+      trace('validate', 'fail', { missing: 'yellowList' });
+      return;
+    }
     // Bug #3 fix: separate phone and category checks for precise error messages
     if (!phone.trim()) {
+      trace('validate', 'fail', { missing: 'phone' });
       Alert.alert(text.sendErrorTitle, text.phoneError);
       return;
     }
     if (!category) {
+      trace('validate', 'fail', { missing: 'category' });
       Alert.alert(text.formTitle, text.categoryError);
       return;
     }
     // Bug #4 fix: normalize Ukrainian formats (0XXXXXXXXX, 380XXXXXXXXX) before validation
     const normalizedPhone = normalizeUkrainianPhoneStrict(phone.trim()) ?? normalizePhoneText(phone);
     if (!validatePhone(normalizedPhone)) {
+      trace('validate', 'fail', { missing: 'phoneFormat' });
       Alert.alert(text.sendErrorTitle, text.phoneError);
       return;
     }
+    trace('validate', 'success');
+
+    trace('photo_check', 'start');
     if (hasUploadingPhotos) {
+      trace('photo_check', 'fail', { reason: 'uploadsInProgress' });
       Alert.alert(text.sendErrorTitle, text.photoUploading);
       return;
     }
     if (hasPhotoErrors) {
+      trace('photo_check', 'fail', { reason: 'photoErrors' });
       Alert.alert(text.sendErrorTitle, text.photoUploadError);
       return;
     }
+    trace('photo_check', 'success');
+
     const normalizedDescription = description.trim().toLowerCase();
     const hasDuplicate = items.some((item) => {
       if (item.isArchived || item.type !== type || item.category !== category) return false;
@@ -281,6 +300,7 @@ const LostAndFoundScreen: React.FC = () => {
       return samePhone && sameDescription;
     });
     if (hasDuplicate) {
+      trace('validate', 'fail', { missing: 'duplicate' });
       Alert.alert(text.duplicateTitle, text.duplicateBody);
       return;
     }
@@ -290,6 +310,7 @@ const LostAndFoundScreen: React.FC = () => {
       const donePhotos = getDonePhotos(formPhotos);
       const firstPhoto = donePhotos[0];
 
+      trace('api_call', 'start', { path: 'lost_found' });
       // Bug #6 fix: capture returned key for optimistic UI update
       const newId = await lostFoundService.add({
         type,
@@ -307,6 +328,7 @@ const LostAndFoundScreen: React.FC = () => {
         userId: user?.id || '',
         language,
       });
+      trace('api_call', 'success');
 
       // Bug #6 fix: immediately show the pending item in the list for the creator
       const optimisticItem: LostFoundItem = {
@@ -330,8 +352,10 @@ const LostAndFoundScreen: React.FC = () => {
 
       resetForm();
       setAddFormVisible(false);
+      trace('user_alert', 'success', { type: 'success' });
       Alert.alert(text.submittedTitle, text.submittedMessage);
     } catch (error) {
+      trace('api_call', 'fail', {}, error);
       showUserError(language, 'send', error);
     } finally {
       setSubmitting(false);

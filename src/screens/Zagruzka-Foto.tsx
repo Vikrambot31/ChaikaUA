@@ -23,6 +23,7 @@ import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField'
 import UploadedPhotosGrid from '../components/UploadedPhotosGrid';
 import InlineFieldHint from '../components/InlineFieldHint';
 import { useSoftToast } from '../hooks/useSoftToast';
+import { useOperationTrace } from '../hooks/useOperationTrace';
 
 const UI_TEXT = {
   ua: {
@@ -194,6 +195,7 @@ const PhotoUploadScreen: React.FC = () => {
   const user = useSelector((state: RootState) => state.auth.user);
   const text = UI_TEXT[language];
   const toast = useSoftToast();
+  const { startOperation, trace } = useOperationTrace('Zagruzka-Foto');
   const [author, setAuthor] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -280,14 +282,24 @@ const PhotoUploadScreen: React.FC = () => {
   };
 
   const submit = useCallback(async () => {
-    if (!canSubmit) return;
+    startOperation();
+
+    trace('validate', 'start');
+    if (!canSubmit) {
+      trace('validate', 'fail', { missing: 'canSubmit' });
+      return;
+    }
     if (!user?.id) {
+      trace('validate', 'fail', { missing: 'userId' });
       toast.showWarning(text.permissionError, text.signInRequired);
       return;
     }
+    trace('validate', 'success');
+
     setUploading(true);
     try {
       const uploadedBy = normalizePersonName(author || user?.name || user?.email || 'Anonymous');
+      trace('api_call', 'start', { path: 'community_photos', photoCount: donePhotos.length });
       const results = await Promise.all(
         donePhotos.map((photo) =>
           photoAPI.addPhoto({
@@ -314,9 +326,12 @@ const PhotoUploadScreen: React.FC = () => {
           firebasePath: 'community_photos',
           failedCount: failed.length,
         });
+        trace('api_call', 'fail', { failedCount: failed.length });
         toast.showError(text.permissionError, saveError || text.saveError);
         return;
       }
+      trace('api_call', 'success');
+      trace('user_alert', 'success', { type: 'success' });
       toast.showSuccess(text.moderationSuccess);
       void AsyncStorage.removeItem(PHOTO_UPLOAD_DRAFT_KEY).catch(() => {});
       setTitle('');
@@ -330,11 +345,12 @@ const PhotoUploadScreen: React.FC = () => {
         feature: 'gallery',
         stage: 'unexpected',
       });
+      trace('api_call', 'fail', {}, error);
       toast.showError(text.permissionError, error instanceof Error ? error.message : text.saveError);
     } finally {
       setUploading(false);
     }
-  }, [author, canSubmit, description, donePhotos, selectedLocation, text, title, toast, user?.email, user?.id, user?.name]);
+  }, [author, canSubmit, description, donePhotos, selectedLocation, startOperation, text, title, toast, trace, user?.email, user?.id, user?.name]);
 
   const needsLocationList = selectedCategory === 'building' || selectedCategory === 'place';
 

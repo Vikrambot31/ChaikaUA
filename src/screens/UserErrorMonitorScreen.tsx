@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -6,6 +6,7 @@ import {
   ScrollView,
   Share,
   StyleSheet,
+  Platform,
   Text,
   TouchableOpacity,
   View,
@@ -17,6 +18,11 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { database } from '../firebase-core';
 import { auth } from '../firebase-config';
 import { getLocalErrors } from '../utils/errorLogger';
+import {
+  subscribeRuntimeMonitor,
+  type RuntimeMonitorEntry,
+  type RuntimeMonitorStatus,
+} from '../services/runtimeMonitorService';
 import type { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import MiniTabBar from '../components/MiniTabBar';
@@ -134,12 +140,74 @@ const COPY = {
   },
 } as const;
 
+// --- Sensitive traces section helpers ---
+
+type OperationGroup = {
+  operationId: string;
+  screen: string;
+  steps: RuntimeMonitorEntry[];
+  startedAt: number;
+  hasFail: boolean;
+};
+
+const STATUS_COLOR: Record<RuntimeMonitorStatus, string> = {
+  start: '#5A7F6B',
+  progress: '#4A90D9',
+  success: '#4CAF50',
+  fail: '#C0392B',
+  cancel: '#9A6A16',
+  timeout: '#C05F2C',
+};
+
+const STATUS_ICON: Record<RuntimeMonitorStatus, keyof typeof MaterialCommunityIcons.glyphMap> = {
+  start: 'play-circle-outline',
+  progress: 'loading',
+  success: 'check-circle-outline',
+  fail: 'close-circle-outline',
+  cancel: 'cancel',
+  timeout: 'clock-alert-outline',
+};
+
+const groupTracesByOperation = (allEntries: RuntimeMonitorEntry[]): OperationGroup[] => {
+  const traces = allEntries.filter((e) => e.source === 'trace' && e.operationId);
+  const map = new Map<string, RuntimeMonitorEntry[]>();
+  for (const entry of traces) {
+    const key = entry.operationId!;
+    const list = map.get(key);
+    if (list) {
+      list.push(entry);
+    } else {
+      map.set(key, [entry]);
+    }
+  }
+  const groups: OperationGroup[] = [];
+  map.forEach((steps, operationId) => {
+    steps.sort((a, b) => a.at - b.at);
+    groups.push({
+      operationId,
+      screen: steps[0].screen,
+      steps,
+      startedAt: steps[0].at,
+      hasFail: steps.some((s) => s.status === 'fail' || s.status === 'timeout'),
+    });
+  });
+  groups.sort((a, b) => b.startedAt - a.startedAt);
+  return groups;
+};
+
 const UserErrorMonitorScreen: React.FC = () => {
   const navigation = useNavigation<AppNav>();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ru') as Lang;
   const user = useSelector((state: RootState) => state.auth.user);
   const text = COPY[language];
   const [sending, setSending] = useState(false);
+  const [traceEntries, setTraceEntries] = useState<RuntimeMonitorEntry[]>([]);
+
+  useEffect(() => {
+    return subscribeRuntimeMonitor(setTraceEntries);
+  }, []);
+
+  const operationGroups = groupTracesByOperation(traceEntries);
 
   const errors = getLocalErrors();
 
@@ -246,6 +314,74 @@ const UserErrorMonitorScreen: React.FC = () => {
                 </View>
               );
             })
+          )}
+
+          {/* --- Section 2: Чувствительный (Operation Traces) --- */}
+          <View style={styles.sensitiveHeader}>
+            <MaterialCommunityIcons name="timeline-clock-outline" size={20} color={SCREEN_THEME.terracottaDark} />
+            <Text style={styles.sensitiveTitle}>Чувствительный</Text>
+          </View>
+          <Text style={styles.sensitiveSubtitle}>
+            Пошаговая трассировка критических действий: отправка заявок, загрузка фото, публикация объявлений.
+          </Text>
+
+          {operationGroups.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <MaterialCommunityIcons name="timeline-check-outline" size={36} color="#4CAF50" />
+              <Text style={styles.emptyTitle}>Операций не записано</Text>
+              <Text style={styles.emptySubtitle}>Данные появятся после отправки заявки или загрузки фото.</Text>
+            </View>
+          ) : (
+            operationGroups.slice(0, 20).map((group) => (
+              <View
+                key={group.operationId}
+                style={[
+                  styles.opCard,
+                  group.hasFail && styles.opCardFail,
+                ]}
+              >
+                <View style={styles.opHeaderRow}>
+                  <MaterialCommunityIcons
+                    name={group.hasFail ? 'alert-circle' : 'check-circle'}
+                    size={16}
+                    color={group.hasFail ? '#C0392B' : '#4CAF50'}
+                  />
+                  <Text style={styles.opScreen}>{group.screen}</Text>
+                  <Text style={styles.opTime}>
+                    {new Date(group.startedAt).toLocaleTimeString()}
+                  </Text>
+                </View>
+
+                {group.steps.map((step, idx) => {
+                  const stepStatus = step.status ?? 'progress';
+                  const color = STATUS_COLOR[stepStatus] ?? '#888';
+                  const icon = STATUS_ICON[stepStatus] ?? 'circle-outline';
+                  const isLast = idx === group.steps.length - 1;
+                  return (
+                    <View key={step.id} style={styles.stepRow}>
+                      <View style={styles.stepTimeline}>
+                        <MaterialCommunityIcons name={icon} size={14} color={color} />
+                        {!isLast && <View style={[styles.stepLine, { backgroundColor: color }]} />}
+                      </View>
+                      <View style={styles.stepContent}>
+                        <View style={styles.stepTopRow}>
+                          <Text style={[styles.stepAction, { color }]}>{step.action ?? '—'}</Text>
+                          <Text style={styles.stepStatusBadge}>
+                            {stepStatus}
+                            {step.durationMs != null ? ` (${Math.round(step.durationMs / 1000)}s)` : ''}
+                          </Text>
+                        </View>
+                        {step.rawMessage && step.rawMessage !== `${step.action}:${stepStatus}` ? (
+                          <Text style={styles.stepMessage} numberOfLines={2}>{step.rawMessage}</Text>
+                        ) : null}
+                      </View>
+                    </View>
+                  );
+                })}
+
+                <Text style={styles.opId}>ID: {group.operationId}</Text>
+              </View>
+            ))
           )}
         </ScrollView>
 
@@ -412,6 +548,104 @@ const styles = StyleSheet.create({
   },
   sendBtnDisabled: { opacity: 0.55 },
   sendBtnText: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  // --- Sensitive section styles ---
+  sensitiveHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 22,
+    marginBottom: 4,
+  },
+  sensitiveTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: SCREEN_THEME.terracottaDark,
+  },
+  sensitiveSubtitle: {
+    color: SCREEN_THEME.textSecondary,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  opCard: {
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: SCREEN_THEME.borderSoft,
+    borderLeftWidth: 3,
+    borderLeftColor: '#4CAF50',
+    gap: 2,
+  },
+  opCardFail: {
+    borderLeftColor: '#C0392B',
+    borderColor: 'rgba(192,57,43,0.18)',
+  },
+  opHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  opScreen: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '800',
+    color: SCREEN_THEME.textPrimary,
+  },
+  opTime: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: SCREEN_THEME.textMuted,
+  },
+  stepRow: {
+    flexDirection: 'row',
+    minHeight: 28,
+  },
+  stepTimeline: {
+    width: 22,
+    alignItems: 'center',
+  },
+  stepLine: {
+    flex: 1,
+    width: 2,
+    marginVertical: 2,
+    borderRadius: 1,
+  },
+  stepContent: {
+    flex: 1,
+    paddingLeft: 6,
+    paddingBottom: 6,
+  },
+  stepTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  stepAction: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  stepStatusBadge: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: SCREEN_THEME.textMuted,
+  },
+  stepMessage: {
+    fontSize: 11,
+    color: SCREEN_THEME.textSecondary,
+    lineHeight: 15,
+    marginTop: 1,
+  },
+  opId: {
+    fontSize: 9,
+    color: SCREEN_THEME.textMuted,
+    fontWeight: '600',
+    marginTop: 4,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
 });
 
 export default UserErrorMonitorScreen;

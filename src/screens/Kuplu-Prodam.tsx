@@ -23,6 +23,7 @@ import { checkYellowList } from '../utils/yellowListCheck';
 import { getLanguageValidationError } from '../utils/contentLanguageGuard';
 import UserCardActionBar from '../components/UserCardActionBar';
 import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
+import { useOperationTrace } from '../hooks/useOperationTrace';
 
 const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000;
 
@@ -292,6 +293,7 @@ const BuySellScreen: React.FC = () => {
   const user = useSelector((state: RootState) => state.auth.user);
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const text = UI_TEXT[language];
+  const { startOperation, trace } = useOperationTrace('Kuplu-Prodam');
   const [itemName, setItemName] = useState('');
   const [listingType, setListingType] = useState<'buy' | 'sell'>('sell');
   const [category, setCategory] = useState('');
@@ -502,51 +504,72 @@ const BuySellScreen: React.FC = () => {
   }, [mapToDetailData, navigation]);
 
   const handleSubmit = async () => {
+    startOperation();
+
+    trace('validate', 'start');
     if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, userStartAvatarKey: user?.startAvatarKey, navigation })) {
+      trace('validate', 'fail', { missing: 'submissionRequirements' });
       return;
     }
-    if (await checkYellowList(user?.id, language)) return;
+    if (await checkYellowList(user?.id, language)) {
+      trace('validate', 'fail', { missing: 'yellowList' });
+      return;
+    }
     const normalizedPrice = price.replace(',', '.').replace(/[^\d.]/g, '');
     const numericPrice = Number(normalizedPrice);
 
     if (!itemName.trim()) {
+      trace('validate', 'fail', { missing: 'itemName' });
       Alert.alert(text.errorTitle, text.itemNameError);
       return;
     }
     if (!normalizedPrice) {
+      trace('validate', 'fail', { missing: 'price' });
       Alert.alert(text.errorTitle, text.priceError);
       return;
     }
     if (!Number.isFinite(numericPrice) || numericPrice < 0) {
+      trace('validate', 'fail', { missing: 'priceValue' });
       Alert.alert(text.errorTitle, text.priceError);
       return;
     }
     if (!category || !condition || !description.trim() || !phone.trim()) {
+      trace('validate', 'fail', { missing: 'requiredFields' });
       Alert.alert(text.errorTitle, text.errorFill);
       return;
     }
     if (phone.replace(/\D/g, '').length < 7) {
+      trace('validate', 'fail', { missing: 'phone' });
       Alert.alert(text.errorTitle, text.errorPhone);
       return;
     }
     const langError = getLanguageValidationError(`${itemName.trim()} ${description.trim()}`, language as 'ua' | 'ru' | 'en');
     if (langError) {
+      trace('validate', 'fail', { missing: 'language' });
       Alert.alert(text.errorTitle, langError);
       return;
     }
+    trace('validate', 'success');
+
+    trace('photo_check', 'start');
     if (hasUploadingPhotos) {
+      trace('photo_check', 'fail', { reason: 'uploadsInProgress' });
       Alert.alert(text.errorTitle, text.photoUploading);
       return;
     }
     if (hasPhotoErrors) {
+      trace('photo_check', 'fail', { reason: 'photoErrors' });
       Alert.alert(text.errorTitle, text.photoUploadError);
       return;
     }
     const donePhotos = getDonePhotos(formPhotos);
     if (donePhotos.length === 0) {
+      trace('photo_check', 'fail', { reason: 'noPhotos' });
       Alert.alert(text.errorTitle, text.photoRequired);
       return;
     }
+    trace('photo_check', 'success');
+
     setSubmitting(true);
     try {
       const resolvedPhotoUri = donePhotos[0]?.downloadUrl ?? '';
@@ -554,6 +577,7 @@ const BuySellScreen: React.FC = () => {
 
       const createdAt = new Date();
 
+      trace('api_call', 'start', { path: 'buy_sell' });
       await buySellService.add({
         listingType,
         itemName: itemName.trim(),
@@ -574,11 +598,14 @@ const BuySellScreen: React.FC = () => {
         userId: user?.id || '',
         language,
       });
+      trace('api_call', 'success');
 
+      trace('user_alert', 'success', { type: 'success' });
       Alert.alert(text.successTitle, text.successMsg, [
         { text: text.ok, onPress: () => { resetForm(); setAddFormVisible(false); } },
       ]);
     } catch (error) {
+      trace('api_call', 'fail', {}, error);
       showUserError(language, 'send', error);
       await AsyncStorage.removeItem('@chaika:buy_sell_draft').catch(() => {});
     } finally {
