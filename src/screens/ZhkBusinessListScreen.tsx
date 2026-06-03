@@ -41,6 +41,7 @@ import StarRatingModal from '../components/StarRatingModal';
 import { DailyRatingUsage, canUseDailyRating, recordDailyRatingUse } from '../utils/monthlyRating';
 import { getDonePhotos, validateSubmissionRequirements } from '../utils/submissionRequirements';
 import { checkYellowList } from '../utils/yellowListCheck';
+import { getLanguageValidationError } from '../utils/contentLanguageGuard';
 
 // --- Types --------------------------------------------------------------------
 
@@ -188,7 +189,6 @@ const BUSINESS_CATEGORIES: BusinessCategory[] = [
 const DESC_MAX = 400;
 const DAILY_USAGE_KEY = '@chaika:place_rating_daily_usage_v1';
 const BUSINESS_DRAFT_KEY = '@chaika:business_draft';
-const DRAFT_SAVE_DEBOUNCE_MS = 900;
 
 type BusinessDraft = Partial<{
   formCategoryKey: string;
@@ -199,6 +199,7 @@ type BusinessDraft = Partial<{
   priceMin: string;
   priceMax: string;
   addFormVisible: boolean;
+  hadPhotos: boolean;
 }>;
 
 // --- i18n ---------------------------------------------------------------------
@@ -243,9 +244,11 @@ const UI_TEXT = {
     phonePlaceholder: '+380...',
     descriptionLabel: 'Опис',
     descriptionPlaceholder: 'Що саме пропонуєте? Ціни, умови, досвід...',
-    photoLabel: 'Фото (необов\'язково)',
+    photoLabel: 'Фото',
     photoUploading: 'Дочекайтесь завершення завантаження фото.',
     photoUploadError: 'Не вдалося завантажити фото. Видаліть його або спробуйте ще раз.',
+    photoRequired: 'Додайте хоча б одне фото.',
+    photoRequiredMark: '(обов\'язкове)',
     priceLabelForm: 'Ціна (необов\'язково)',
     selectCategory: 'Оберіть категорію...',
     selectSubcategory: 'Оберіть підкатегорію...',
@@ -308,9 +311,11 @@ const UI_TEXT = {
     phonePlaceholder: '+380...',
     descriptionLabel: 'Описание',
     descriptionPlaceholder: 'Что именно предлагаете? Цены, условия, опыт...',
-    photoLabel: 'Фото (необязательно)',
+    photoLabel: 'Фото',
     photoUploading: 'Дождитесь завершения загрузки фото.',
     photoUploadError: 'Не удалось загрузить фото. Удалите его или попробуйте еще раз.',
+    photoRequired: 'Добавьте хотя бы одно фото.',
+    photoRequiredMark: '(обязательное)',
     priceLabelForm: 'Цена (необязательно)',
     selectCategory: 'Выберите категорию...',
     selectSubcategory: 'Выберите подкатегорию...',
@@ -373,9 +378,11 @@ const UI_TEXT = {
     phonePlaceholder: '+380...',
     descriptionLabel: 'Description',
     descriptionPlaceholder: 'What do you offer? Prices, conditions, experience...',
-    photoLabel: 'Photo (optional)',
+    photoLabel: 'Photo',
     photoUploading: 'Wait until the photo upload is complete.',
     photoUploadError: 'Photo upload failed. Remove it or try again.',
+    photoRequired: 'Add at least one photo.',
+    photoRequiredMark: '(required)',
     priceLabelForm: 'Price (optional)',
     selectCategory: 'Select category...',
     selectSubcategory: 'Select subcategory...',
@@ -497,11 +504,6 @@ export default function ZhkBusinessListScreen() {
   const [priceMax, setPriceMax] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [myRequest, setMyRequest] = useState<MyBusinessRequest>(null);
-
-  const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const latestDraftRef = useRef({ formCategoryKey, formSubcategoryKey, contactName, phone, description, priceMin, priceMax, addFormVisible });
-  const previousAddFormVisibleRef = useRef(addFormVisible);
-  const skipNextDraftFlushRef = useRef(false);
 
   useEffect(() => {
     AsyncStorage.getItem(DAILY_USAGE_KEY)
@@ -637,54 +639,12 @@ export default function ZhkBusinessListScreen() {
   useEffect(() => { void loadMyRequest(); }, [loadMyRequest]);
 
   useEffect(() => {
-    latestDraftRef.current = { formCategoryKey, formSubcategoryKey, contactName, phone, description, priceMin, priceMax, addFormVisible };
-  }, [addFormVisible, contactName, description, formCategoryKey, formSubcategoryKey, phone, priceMax, priceMin]);
-
-  const saveDraftNow = useCallback((visible = latestDraftRef.current.addFormVisible) => {
-    if (!visible) return;
-    const { formCategoryKey: dc, formSubcategoryKey: ds, contactName: dn, phone: dp, description: dd, priceMin: dmi, priceMax: dma } = latestDraftRef.current;
+    if (!addFormVisible) return;
     void AsyncStorage.setItem(
       BUSINESS_DRAFT_KEY,
-      JSON.stringify({ formCategoryKey: dc, formSubcategoryKey: ds, contactName: dn, phone: dp, description: dd, priceMin: dmi, priceMax: dma, addFormVisible: true }),
+      JSON.stringify({ formCategoryKey, formSubcategoryKey, contactName, phone, description, priceMin, priceMax, addFormVisible: true, hadPhotos: formPhotos.length > 0 }),
     ).catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    const wasVisible = previousAddFormVisibleRef.current;
-    previousAddFormVisibleRef.current = addFormVisible;
-    if (!wasVisible || addFormVisible) return;
-    if (skipNextDraftFlushRef.current) {
-      skipNextDraftFlushRef.current = false;
-      return;
-    }
-    saveDraftNow(true);
-  }, [addFormVisible, saveDraftNow]);
-
-  useEffect(() => {
-    if (draftSaveTimerRef.current) {
-      clearTimeout(draftSaveTimerRef.current);
-      draftSaveTimerRef.current = null;
-    }
-    if (!addFormVisible) return;
-    draftSaveTimerRef.current = setTimeout(() => {
-      draftSaveTimerRef.current = null;
-      saveDraftNow(true);
-    }, DRAFT_SAVE_DEBOUNCE_MS);
-    return () => {
-      if (draftSaveTimerRef.current) {
-        clearTimeout(draftSaveTimerRef.current);
-        draftSaveTimerRef.current = null;
-      }
-    };
-  }, [addFormVisible, contactName, description, formCategoryKey, formSubcategoryKey, phone, priceMax, priceMin, saveDraftNow]);
-
-  useEffect(() => () => {
-    if (draftSaveTimerRef.current) {
-      clearTimeout(draftSaveTimerRef.current);
-      draftSaveTimerRef.current = null;
-    }
-    saveDraftNow();
-  }, [saveDraftNow]);
+  }, [addFormVisible, contactName, description, formCategoryKey, formPhotos.length, formSubcategoryKey, phone, priceMax, priceMin]);
 
   useEffect(() => {
     if (!contactName.trim() && user?.name) {
@@ -736,11 +696,6 @@ export default function ZhkBusinessListScreen() {
   const isSubmitFormValid = Boolean(formCategoryKey && formSubcategoryKey && contactName.trim() && normalizeUkrainianPhoneStrict(phone));
 
   const resetAddForm = useCallback(() => {
-    skipNextDraftFlushRef.current = true;
-    if (draftSaveTimerRef.current) {
-      clearTimeout(draftSaveTimerRef.current);
-      draftSaveTimerRef.current = null;
-    }
     setFormCategoryKey('');
     setFormSubcategoryKey('');
     setContactName(user?.name ?? '');
@@ -755,6 +710,7 @@ export default function ZhkBusinessListScreen() {
   const handleRequestCloseAddForm = useCallback(() => {
     const hasData = Boolean(formCategoryKey || formSubcategoryKey || description.trim() || formPhotos.length > 0 || (priceMin || priceMax));
     if (!hasData) {
+      void AsyncStorage.removeItem(BUSINESS_DRAFT_KEY).catch(() => {});
       setAddFormVisible(false);
       return;
     }
@@ -763,7 +719,7 @@ export default function ZhkBusinessListScreen() {
       language === 'ru' ? 'Данные не сохранятся.' : language === 'en' ? 'Your data will not be saved.' : 'Дані не збережуться.',
       [
         { text: language === 'ru' ? 'Нет' : language === 'en' ? 'No' : 'Ні', style: 'cancel' },
-        { text: language === 'ru' ? 'Закрыть' : language === 'en' ? 'Close' : 'Закрити', onPress: () => setAddFormVisible(false) },
+        { text: language === 'ru' ? 'Закрыть' : language === 'en' ? 'Close' : 'Закрити', onPress: () => { void AsyncStorage.removeItem(BUSINESS_DRAFT_KEY).catch(() => {}); setAddFormVisible(false); } },
       ],
     );
   }, [description, formCategoryKey, formPhotos.length, formSubcategoryKey, language, priceMax, priceMin]);
@@ -808,12 +764,22 @@ export default function ZhkBusinessListScreen() {
       Alert.alert(t.errorTitle, t.phoneInvalidStrict);
       return;
     }
+    const langError = getLanguageValidationError(`${contactName.trim()} ${description.trim()}`, language);
+    if (langError) {
+      Alert.alert(t.errorTitle, langError);
+      return;
+    }
     if (hasUploadingPhotos) {
       Alert.alert(t.errorTitle, t.photoUploading);
       return;
     }
     if (hasPhotoErrors) {
       Alert.alert(t.errorTitle, t.photoUploadError);
+      return;
+    }
+    const donePhotos = getDonePhotos(formPhotos);
+    if (donePhotos.length === 0) {
+      Alert.alert(t.errorTitle, t.photoRequired);
       return;
     }
     if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, userStartAvatarKey: user?.startAvatarKey, navigation })) {
@@ -848,7 +814,7 @@ export default function ZhkBusinessListScreen() {
         }
       }
 
-      const firstPhoto = getDonePhotos(formPhotos)[0];
+      const firstPhoto = donePhotos[0];
       const previousVersion = typeof existing?.version === 'number' ? existing.version : (existing ? 1 : 0);
       const now = new Date().toISOString();
       const parsedPriceMin = priceMin.trim() ? Number(priceMin.trim()) : undefined;
@@ -927,6 +893,7 @@ export default function ZhkBusinessListScreen() {
     t.errorLoad,
     t.errorTitle,
     t.phoneInvalidStrict,
+    t.photoRequired,
     t.photoUploading,
     t.photoUploadError,
     t.successMsg,
@@ -1326,12 +1293,15 @@ export default function ZhkBusinessListScreen() {
                   <Text style={styles.formPriceCurrency}>{t.currencyDefault}</Text>
                 </View>
 
-                <Text style={styles.formLabel}>{t.photoLabel}</Text>
+                <View style={styles.photoLabelRow}>
+                  <Text style={styles.formLabel}>{t.photoLabel}</Text>
+                  <Text style={styles.requiredMark}>{t.photoRequiredMark}</Text>
+                </View>
                 {user?.id ? (
                   <PhotoUploadField
                     uid={user.id}
                     userName={user?.name ?? ''}
-                    maxPhotos={1}
+                    maxPhotos={5}
                     storagePath="local_business"
                     onPhotosChange={setFormPhotos}
                   />
@@ -1783,6 +1753,8 @@ const styles = StyleSheet.create({
   sheetCloseTxt: { fontSize: 16, color: '#7A6D64', fontWeight: '900' },
   sheetContent: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 28 },
   formLabel: { fontWeight: '700', color: SCREEN_THEME.textPrimary, marginBottom: 8, marginTop: 8 },
+  photoLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  requiredMark: { fontSize: 11, fontWeight: '700', color: SCREEN_THEME.terracottaDark, marginBottom: 8, marginTop: 8 },
   input: {
     backgroundColor: '#F7F3EE',
     borderRadius: 16,
