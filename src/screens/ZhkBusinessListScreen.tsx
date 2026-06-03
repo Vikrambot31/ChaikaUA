@@ -244,6 +244,8 @@ const UI_TEXT = {
     descriptionLabel: 'Опис',
     descriptionPlaceholder: 'Що саме пропонуєте? Ціни, умови, досвід...',
     photoLabel: 'Фото (необов\'язково)',
+    photoUploading: 'Дочекайтесь завершення завантаження фото.',
+    photoUploadError: 'Не вдалося завантажити фото. Видаліть його або спробуйте ще раз.',
     priceLabelForm: 'Ціна (необов\'язково)',
     selectCategory: 'Оберіть категорію...',
     selectSubcategory: 'Оберіть підкатегорію...',
@@ -307,6 +309,8 @@ const UI_TEXT = {
     descriptionLabel: 'Описание',
     descriptionPlaceholder: 'Что именно предлагаете? Цены, условия, опыт...',
     photoLabel: 'Фото (необязательно)',
+    photoUploading: 'Дождитесь завершения загрузки фото.',
+    photoUploadError: 'Не удалось загрузить фото. Удалите его или попробуйте еще раз.',
     priceLabelForm: 'Цена (необязательно)',
     selectCategory: 'Выберите категорию...',
     selectSubcategory: 'Выберите подкатегорию...',
@@ -370,6 +374,8 @@ const UI_TEXT = {
     descriptionLabel: 'Description',
     descriptionPlaceholder: 'What do you offer? Prices, conditions, experience...',
     photoLabel: 'Photo (optional)',
+    photoUploading: 'Wait until the photo upload is complete.',
+    photoUploadError: 'Photo upload failed. Remove it or try again.',
     priceLabelForm: 'Price (optional)',
     selectCategory: 'Select category...',
     selectSubcategory: 'Select subcategory...',
@@ -485,6 +491,8 @@ export default function ZhkBusinessListScreen() {
   const [phone, setPhone] = useState('+380');
   const [description, setDescription] = useState('');
   const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
+  const hasUploadingPhotos = formPhotos.some((photo) => photo.status === 'uploading');
+  const hasPhotoErrors = formPhotos.some((photo) => photo.status === 'error');
   const [priceMin, setPriceMin] = useState('');
   const [priceMax, setPriceMax] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -800,6 +808,14 @@ export default function ZhkBusinessListScreen() {
       Alert.alert(t.errorTitle, t.phoneInvalidStrict);
       return;
     }
+    if (hasUploadingPhotos) {
+      Alert.alert(t.errorTitle, t.photoUploading);
+      return;
+    }
+    if (hasPhotoErrors) {
+      Alert.alert(t.errorTitle, t.photoUploadError);
+      return;
+    }
     if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, userStartAvatarKey: user?.startAvatarKey, navigation })) {
       return;
     }
@@ -892,6 +908,8 @@ export default function ZhkBusinessListScreen() {
     formCategoryKey,
     formPhotos,
     formSubcategoryKey,
+    hasUploadingPhotos,
+    hasPhotoErrors,
     isSubmitFormValid,
     language,
     loadData,
@@ -909,6 +927,8 @@ export default function ZhkBusinessListScreen() {
     t.errorLoad,
     t.errorTitle,
     t.phoneInvalidStrict,
+    t.photoUploading,
+    t.photoUploadError,
     t.successMsg,
     t.successTitle,
     user?.id,
@@ -1311,25 +1331,24 @@ export default function ZhkBusinessListScreen() {
                   <PhotoUploadField
                     uid={user.id}
                     userName={user?.name ?? ''}
-                    maxPhotos={1}
+                    maxPhotos={5}
                     storagePath="local_business"
                     onPhotosChange={setFormPhotos}
-                    onBeforePickerOpen={saveDraftNow}
                   />
                 ) : (
                   <Text style={styles.signInNote}>{t.signInToSubmit}</Text>
                 )}
 
                 <TouchableOpacity
-                  style={[styles.submitBtn, (!isSubmitFormValid || submitting) && styles.submitBtnDisabled]}
+                  style={[styles.submitBtn, (!isSubmitFormValid || submitting || hasUploadingPhotos) && styles.submitBtnDisabled]}
                   onPress={() => void handleSubmitBusiness()}
                   activeOpacity={0.85}
-                  disabled={!isSubmitFormValid || submitting}
+                  disabled={!isSubmitFormValid || submitting || hasUploadingPhotos}
                 >
                   {submitting ? (
                     <ActivityIndicator color="#fff" />
                   ) : (
-                    <Text style={styles.submitBtnText}>{t.submitBtn}</Text>
+                    <Text style={styles.submitBtnText}>{hasUploadingPhotos ? t.photoUploading : t.submitBtn}</Text>
                   )}
                 </TouchableOpacity>
               </ScrollView>
