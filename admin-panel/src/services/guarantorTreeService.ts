@@ -455,15 +455,24 @@ export const findUsersByPhones = async (phones: string[]): Promise<Map<string, U
     return map;
   }
 
-  const snapshot = await get(ref(database, USERS_PATH));
-  const raw = snapshot.val() as Record<string, unknown> | null;
   const map = new Map<string, UserProfile>();
 
-  for (const [uid, value] of Object.entries(raw ?? {})) {
-    const user = normalizeUserProfile(uid, value);
-    if (!user) continue;
-    const normalized = normalizePhoneDigits(user.phone);
-    if (targets.has(normalized)) map.set(normalized, user);
+  // Query each phone individually — avoids downloading all users
+  const snapshots = await Promise.all(
+    [...targets].flatMap((normalized) => [
+      get(query(ref(database, USERS_PATH), orderByChild('phone'), equalTo(`+${normalized}`))),
+      get(query(ref(database, USERS_PATH), orderByChild('phone'), equalTo(normalized))),
+    ])
+  );
+
+  for (const snap of snapshots) {
+    const raw = snap.val() as Record<string, unknown> | null;
+    for (const [uid, value] of Object.entries(raw ?? {})) {
+      const user = normalizeUserProfile(uid, value);
+      if (!user) continue;
+      const norm = normalizePhoneDigits(user.phone);
+      if (targets.has(norm)) map.set(norm, user);
+    }
   }
 
   return map;
@@ -520,11 +529,8 @@ export const loadFullTree = async (): Promise<{ root: FullTreeNode; orphans: Ful
       }
     }
   } else {
-    // Load trust_tree and users (required); user_access may be forbidden by rules
-    const [nodesSnap, usersSnap] = await Promise.all([
-      get(ref(database, TRUST_TREE_PATH)),
-      get(query(ref(database, USERS_PATH), limitToFirst(10000))),
-    ]);
+    // Load trust_tree first, then only the users referenced in it
+    const nodesSnap = await get(ref(database, TRUST_TREE_PATH));
 
     const nodesRaw = nodesSnap.val() as Record<string, unknown> | null;
     for (const [id, value] of Object.entries(nodesRaw ?? {})) {
@@ -532,10 +538,25 @@ export const loadFullTree = async (): Promise<{ root: FullTreeNode; orphans: Ful
       if (node) allNodes.push(node);
     }
 
-    const usersRaw = usersSnap.val() as Record<string, unknown> | null;
-    for (const [uid, value] of Object.entries(usersRaw ?? {})) {
-      const profile = normalizeUserProfile(uid, value);
-      if (profile) allUsers.set(uid, profile);
+    // Collect unique UIDs from tree nodes — avoids loading all users
+    const uidsNeeded = new Set<string>();
+    for (const node of allNodes) {
+      uidsNeeded.add(node.childUid);
+      if (node.parentUid) uidsNeeded.add(node.parentUid);
+    }
+
+    const BATCH = 50;
+    const uids = [...uidsNeeded];
+    for (let i = 0; i < uids.length; i += BATCH) {
+      const batchSnaps = await Promise.all(
+        uids.slice(i, i + BATCH).map((uid) =>
+          get(ref(database, `${USERS_PATH}/${uid}`)).then((snap) => ({ uid, snap }))
+        )
+      );
+      for (const { uid, snap } of batchSnaps) {
+        const profile = normalizeUserProfile(uid, snap.val() as Record<string, unknown>);
+        if (profile) allUsers.set(uid, profile);
+      }
     }
 
     // user_access — try bulk read first, fallback to skipping (path may not be in Firebase rules)

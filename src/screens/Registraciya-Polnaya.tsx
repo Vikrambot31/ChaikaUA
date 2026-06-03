@@ -223,7 +223,6 @@ const RegisterScreenFull: React.FC = () => {
 
       // Verify referrer BEFORE creating the account so we don't leave orphaned auth records.
       let referrerVerified = false;
-      const safePhone = normalizedPhone.replace(/[^0-9]/g, '');
       if (referrerPhone) {
         const normalizedReferrer = normalizePhoneText(referrerPhone);
         const referrerSnap = await get(query(dbRef(database, 'users'), orderByChild('phone'), equalTo(normalizedReferrer)));

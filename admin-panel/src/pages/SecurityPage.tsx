@@ -100,18 +100,17 @@ export const SecurityPage = ({ user }: SecurityPageProps) => {
   }, [devices]);
 
   const uniqueUsers = useMemo<UserLastSeenRow[]>(() => {
-    const byName = new Map<string, UserLastSeenRow>();
+    const byUid = new Map<string, UserLastSeenRow>();
 
     devices.forEach((device) => {
       const rawName = (device.email || '').trim();
       const name = rawName || device.uid;
-      const key = name.toLowerCase();
       const lastSeenAt = device.last_seen_at || device.created_at || 0;
-      const current = byName.get(key);
+      const current = byUid.get(device.uid);
 
       if (!current || lastSeenAt > current.lastSeenAt) {
-        byName.set(key, {
-          key,
+        byUid.set(device.uid, {
+          key: device.uid,
           name,
           uid: device.uid,
           lastSeenAt,
@@ -122,7 +121,7 @@ export const SecurityPage = ({ user }: SecurityPageProps) => {
       }
     });
 
-    return Array.from(byName.values()).sort((a, b) => b.lastSeenAt - a.lastSeenAt);
+    return Array.from(byUid.values()).sort((a, b) => b.lastSeenAt - a.lastSeenAt);
   }, [devices]);
 
   const patchConfig = async (patch: Partial<RemoteAppControlConfig>, action: string) => {

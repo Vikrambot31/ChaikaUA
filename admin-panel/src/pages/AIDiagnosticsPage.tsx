@@ -584,8 +584,8 @@ export const AIDiagnosticsPage = ({ userEmail }: Props) => {
             const filtered = shadowDenyEvents.filter(ev => {
               if (shadowDenyFilter.path && !ev.path.toLowerCase().includes(shadowDenyFilter.path.toLowerCase())) return false;
               if (shadowDenyFilter.uid &&
-                !ev.uid.toLowerCase().includes(shadowDenyFilter.uid.toLowerCase()) &&
-                !ev.targetUid.toLowerCase().includes(shadowDenyFilter.uid.toLowerCase())) return false;
+                !(ev.uid ?? '').toLowerCase().includes(shadowDenyFilter.uid.toLowerCase()) &&
+                !(ev.targetUid ?? '').toLowerCase().includes(shadowDenyFilter.uid.toLowerCase())) return false;
               if (shadowDenyFilter.operation && ev.operation !== shadowDenyFilter.operation) return false;
               return true;
             });

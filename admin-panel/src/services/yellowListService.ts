@@ -9,13 +9,20 @@ import { LOCAL_MODE } from '../local/LOCAL_MODE';
 // Дельта между серверным и клиентским временем Firebase RTDB
 let _serverTimeOffset = 0;
 let _offsetInitialized = false;
+let _unsubscribeOffset: Unsubscribe | null = null;
 
 const initServerOffset = () => {
   if (_offsetInitialized || LOCAL_MODE) return;
   _offsetInitialized = true;
-  onValue(ref(database, '.info/serverTimeOffset'), (snap) => {
+  _unsubscribeOffset = onValue(ref(database, '.info/serverTimeOffset'), (snap) => {
     if (typeof snap.val() === 'number') _serverTimeOffset = snap.val();
   });
+};
+
+export const teardownServerOffset = () => {
+  _unsubscribeOffset?.();
+  _unsubscribeOffset = null;
+  _offsetInitialized = false;
 };
 
 export const getServerNow = (): number => Date.now() + _serverTimeOffset;

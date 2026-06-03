@@ -33,7 +33,10 @@ export const useDashboard = () => {
   const [state, setState] = useState<DashboardState>(initialState);
   const [error, setError] = useState('');
 
-  useEffect(() => subscribeDashboard(setState, (nextError) => setError(nextError.message)), []);
+  useEffect(() => subscribeDashboard(
+    (next) => { setState(next); setError(''); },
+    (nextError) => setError(nextError.message),
+  ), []);
 
   return { ...state, error };
 };

@@ -307,15 +307,8 @@ export const resolvePhotoUrl = async (photo: PhotoRecord): Promise<string> => {
   try {
     const res = await fetch(url);
     if (res.ok) {
-      const text = await res.text();
-      if (
-        text.startsWith('/9j/') ||
-        text.startsWith('iVBOR') ||
-        /^[A-Za-z0-9+/=]{100,}$/.test(text.slice(0, 100))
-      ) {
-        const blob = b64ToBlob(text, res.headers.get('content-type') || 'image/jpeg');
-        return URL.createObjectURL(blob);
-      }
+      const blob = await res.blob();
+      return URL.createObjectURL(blob);
     }
   } catch { /* ignore */ }
 

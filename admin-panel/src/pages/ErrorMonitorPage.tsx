@@ -11,16 +11,16 @@ const severityClass = (severity: string): string => {
 };
 
 /** Groups errors into 1-hour buckets for the last 24 hours. */
-const buildHourlyBuckets = (timestamps: number[]): { label: string; count: number; critical: number }[] => {
+const buildHourlyBuckets = (timestamps: number[]): { label: string; count: number }[] => {
   const now = Date.now();
   const HOUR_MS = 60 * 60 * 1000;
-  const buckets: { label: string; count: number; critical: number }[] = [];
+  const buckets: { label: string; count: number }[] = [];
   for (let i = 23; i >= 0; i--) {
     const start = now - (i + 1) * HOUR_MS;
     const end = now - i * HOUR_MS;
     const hour = new Date(end).getHours().toString().padStart(2, '0') + ':00';
     const count = timestamps.filter((t) => t >= start && t < end).length;
-    buckets.push({ label: hour, count, critical: 0 });
+    buckets.push({ label: hour, count });
   }
   return buckets;
 };

@@ -57,7 +57,9 @@ export const DashboardPage = ({ user, onNavigate }: DashboardPageProps) => {
   }, [runProbe]);
 
   useEffect(() => {
+    let mounted = true;
     loadInviteAccessState().then((state) => {
+      if (!mounted) return;
       const s = computeAccessStats(state.requests);
       setAccessSummary({
         enabled: state.flag.enabled,
@@ -67,6 +69,7 @@ export const DashboardPage = ({ user, onNavigate }: DashboardPageProps) => {
         needsReview: s.needsReview,
       });
     }).catch((err: unknown) => console.info('[Dashboard] Invite access summary skipped:', err));
+    return () => { mounted = false; };
   }, []);
 
   const runQuickAction = async (action: 'maintenance' | 'disable_app' | 'enable_app') => {

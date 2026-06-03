@@ -189,6 +189,7 @@ const SupportScreen: React.FC<Props> = ({ navigation }) => {
   const canSend =
     !sending &&
     isOnline &&
+    Boolean(user?.id) &&
     Boolean(supportUserId) &&
     messageText.trim().length > 0 &&
     messageText.length <= MAX_MESSAGE_LENGTH &&
@@ -253,10 +254,12 @@ const SupportScreen: React.FC<Props> = ({ navigation }) => {
         <View style={{ width: 42 }} />
       </View>
 
-      <View style={styles.accountNotice}>
-        <MaterialCommunityIcons name="account-check-outline" size={18} color="#7C5A16" />
-        <Text style={styles.accountNoticeText}>{text.accountNotice}</Text>
-      </View>
+      {!user && (
+        <View style={styles.accountNotice}>
+          <MaterialCommunityIcons name="account-check-outline" size={18} color="#7C5A16" />
+          <Text style={styles.accountNoticeText}>{text.accountNotice}</Text>
+        </View>
+      )}
 
       {/* Category picker */}
       {!ticket ? (

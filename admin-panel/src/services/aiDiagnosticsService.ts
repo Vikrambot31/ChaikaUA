@@ -1,6 +1,8 @@
 import { onValue, push, ref, set, update } from 'firebase/database';
 import { database } from '../firebase/firebase';
 
+let _auditStreamController: AbortController | null = null;
+
 const BASE = 'diagnostics/runtime_moderation';
 const STATUS_PATH = `${BASE}/_audit_status`;
 const LOGS_PATH = `${BASE}/_audit_logs`;
@@ -271,12 +273,14 @@ export const triggerAudit = async (email: string): Promise<void> => {
   await fbPushLog({ message: `Audit started by ${email}`, severity: 'info', scanner: 'daemon', at: startedAt });
 
   // Start the audit stream — fire and forget (background relay to Firebase)
-  fetch('/api/audit/start', { method: 'POST' })
+  _auditStreamController = new AbortController();
+  fetch('/api/audit/start', { method: 'POST', signal: _auditStreamController.signal })
     .then((resp) => {
       if (!resp.ok) throw new Error(`Audit API returned ${resp.status}`);
       return processAuditStream(resp, email, startedAt);
     })
     .catch(async (err) => {
+      if (err.name === 'AbortError') return;
       console.error('[audit] stream error', err);
       await fbUpdateStatus({ status: 'failed', completedAt: Date.now(), duration: Date.now() - startedAt });
       await fbPushLog({ message: `Stream error: ${err.message}`, severity: 'error', scanner: 'daemon', at: Date.now() });
@@ -287,6 +291,8 @@ export const triggerAudit = async (email: string): Promise<void> => {
  * Cancel a running audit.
  */
 export const cancelAudit = async (_email: string): Promise<void> => {
+  _auditStreamController?.abort();
+  _auditStreamController = null;
   try { await fetch('/api/audit/cancel', { method: 'POST' }); } catch { /* ok */ }
   await fbUpdateStatus({ status: 'cancelled', completedAt: Date.now() });
   await fbPushLog({ message: 'Audit cancelled by user', severity: 'warn', scanner: 'daemon', at: Date.now() });

@@ -164,8 +164,7 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
       // Одобрить
       void runAction(item, 'approved');
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aiResults, autoApproveEnabled, busyActions]);
+  }, [aiResults, autoApproveEnabled, busyActions, items]);
 
   // AI stats
   const aiStats = useMemo(() => {
@@ -856,13 +855,14 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
           onCancel={() => setRejectTarget(null)}
           onConfirm={async (reason) => {
             const target = rejectTarget;
-            setRejectTarget(null);
             if (target.kind === 'single') {
+              setRejectTarget(null);
               await runAction(target.item, 'rejected', { reason });
             } else {
-              for (const item of target.items) {
-                await runAction(item, 'rejected', { reason });
-              }
+              await Promise.allSettled(
+                target.items.map((item) => runAction(item, 'rejected', { reason }))
+              );
+              setRejectTarget(null);
             }
           }}
         />

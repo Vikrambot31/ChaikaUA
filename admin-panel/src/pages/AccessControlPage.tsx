@@ -170,17 +170,19 @@ export const AccessControlPage = ({ role, onNavigateToInvites }: AccessControlPa
   }, []);
 
   useEffect(() => {
+    let mounted = true;
     setVersionLoading(true);
     Promise.all([getApkDownloads(), getCurrentVersionRegistry()])
       .then(([downloads, registry]) => {
+        if (!mounted) return;
         setApkDownloads(downloads);
         setVersionRegistry(registry);
       })
       .catch((err: unknown) => console.warn('[AccessControl] Failed to load APK/version data:', err))
-      .finally(() => setVersionLoading(false));
+      .finally(() => { if (mounted) setVersionLoading(false); });
 
     const unsub = subscribeManagedAuthorizedDevices(setDevices);
-    return unsub;
+    return () => { mounted = false; unsub(); };
   }, []);
 
   const runAction = async (

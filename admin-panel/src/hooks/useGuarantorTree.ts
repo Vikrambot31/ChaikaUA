@@ -171,22 +171,19 @@ export const useGuarantorTree = (adminUid?: string, canLoadInviteRequests = fals
   // CSV export
   const exportCsv = useCallback(() => {
     if (!fullTree) return;
+    const csvField = (value: string) => `"${String(value).replace(/"/g, '""')}"`;
     const rows: string[] = ['uid,name,phone,parentUid,depth,status'];
     const walk = (node: FullTreeNode) => {
       const parentUid = node.node?.parentUid || '';
       const status = node.access?.status || 'unknown';
-      const name = node.user.name.replace(/,/g, ' ');
-      const phone = node.user.phone.replace(/,/g, '');
-      rows.push(`${node.uid},${name},${phone},${parentUid},${node.depth},${status}`);
+      rows.push([node.uid, node.user.name, node.user.phone, parentUid, String(node.depth), status].map(csvField).join(','));
       node.children.forEach(walk);
     };
     walk(fullTree);
     for (const orphan of orphans) {
       const parentUid = orphan.node?.parentUid || '';
       const status = orphan.access?.status || 'unknown';
-      const name = orphan.user.name.replace(/,/g, ' ');
-      const phone = orphan.user.phone.replace(/,/g, '');
-      rows.push(`${orphan.uid},${name},${phone},${parentUid},-1,${status}`);
+      rows.push([orphan.uid, orphan.user.name, orphan.user.phone, parentUid, '-1', status].map(csvField).join(','));
     }
     const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
