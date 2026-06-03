@@ -947,7 +947,7 @@ const BuySellScreen: React.FC = () => {
                   uid={user.id}
                   userName={user?.name ?? ''}
                   maxPhotos={5}
-                  storagePath="buy_sell"
+                  storagePath="buy_sell_listings"
                   onPhotosChange={setFormPhotos}
                 />
               ) : (

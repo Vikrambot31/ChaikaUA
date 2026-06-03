@@ -13,8 +13,7 @@ export type MediaCollection =
   | 'requests';
 
 const isStoragePath = (value: string): boolean =>
-  /^(community_photos|photo_uploads|lost_found|buy_sell|buy_sell_listings|contacts|contacts_listings|local_business|requests|profile_photos)\/[A-Za-z0-9_-]+\/[A-Za-z0-9_.-]+\.(jpg|jpeg|png|webp|heic|heif)$/i.test(value) ||
-  /^uploads\/users\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\/[A-Za-z0-9_.-]+\.(jpg|jpeg|png|webp|heic|heif)$/i.test(value);
+  /^.+\/.+\.(jpg|jpeg|png|webp|heic|heif)$/i.test(value);
 
 const MEDIA_ACCESS_CALLABLE_TIMEOUT_MS = 12_000;
 const MEDIA_ACCESS_CALLABLE_MAX_ATTEMPTS = 4;

@@ -1211,7 +1211,7 @@ const KontaktiChaikyScreen: React.FC = () => {
                   uid={user.id}
                   userName={user?.name ?? ''}
                   maxPhotos={5}
-                  storagePath="contacts"
+                  storagePath="contacts_listings"
                   onPhotosChange={setFormPhotos}
                 />
               ) : (
