@@ -334,26 +334,11 @@ export const UploadQueue = {
             continue;
           }
 
-          // If Storage upload succeeded but getDownloadURL failed — treat as error.
-          // A localUri stored as imageUrl would be sent to Firebase and shown as
-          // a broken photo to all other users (BUG-PHOTO-01).
-          if (!result.downloadUrl) {
-            const retryCount = task.retryCount + 1;
-            await ImageStorage.updatePhoto(task.photoId, {
-              status: retryCount >= MAX_RETRY_COUNT ? 'error' : 'queued',
-              error: 'Upload succeeded but download URL was not returned. Retrying.',
-              retryCount,
-            });
-            if (retryCount >= MAX_RETRY_COUNT) {
-              await removeTask(task.photoId);
-            } else {
-              await updateTask({ ...task, retryCount, updatedAt: Date.now() });
-            }
-            safeLogError('UploadQueue.process.no_download_url', new Error('downloadUrl missing after upload'), { photoId: task.photoId, storagePath: result.storagePath });
-            continue;
-          }
+          // downloadUrl may be undefined if getDownloadURL failed transiently.
+          // In that case fall back to storagePath — AppPhotoImage resolves it via
+          // getDownloadURL when rendering, so the photo will still display.
           await ImageStorage.updatePhoto(task.photoId, {
-            imageUrl: result.downloadUrl,
+            imageUrl: result.downloadUrl ?? result.storagePath,
             storagePath: result.storagePath,
             status: 'uploaded',
             moderationStatus: collection === 'community_photos' ? 'pending' : 'not_submitted',

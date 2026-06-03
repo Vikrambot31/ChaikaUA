@@ -271,14 +271,11 @@ export async function uploadPhotoWithEngine(
     throw lastError ?? new Error('Upload failed');
   }
 
-  // Guard: if Storage accepted the file but getDownloadURL failed, abort here.
-  // Writing an RTDB record with imageUri: storagePath would create an orphan
-  // record that other users cannot render (storagePath is not a public URL).
   if (!downloadUrl) {
-    const err = new Error('Upload succeeded but download URL could not be resolved.');
-    safeLogError(sourceLabel, err, { uid, collection, storagePath, stage: 'missing_download_url' });
-    await deleteUploadedStorageQuietly(storagePath, { uid, collection, stage: 'missing_download_url_cleanup' });
-    throw err;
+    // getDownloadURL failed but the file is already in Storage — keep it.
+    // Store storagePath as imageUri fallback so AppPhotoImage can resolve the
+    // URL later via getDownloadURL (it handles storage paths natively).
+    safeLogError(sourceLabel, new Error('Upload succeeded but download URL could not be resolved; using storagePath as fallback.'), { uid, collection, storagePath, stage: 'missing_download_url_fallback' });
   }
 
   onProgress?.(85);
@@ -346,7 +343,7 @@ export async function uploadPhotoWithEngine(
   const isPersonalPhoto = collection !== 'community_photos' && !isRequestPhoto;
   const rtdbPayload: Record<string, unknown> = {
     storagePath,
-    imageUri: downloadUrl,
+    imageUri: downloadUrl ?? storagePath,
     status: isPersonalPhoto ? 'saved' : 'pending',
     uploadStatus: 'saved',
     moderationStatus: isPersonalPhoto ? 'not_submitted' : 'pending',

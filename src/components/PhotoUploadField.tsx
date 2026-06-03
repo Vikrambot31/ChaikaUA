@@ -185,7 +185,12 @@ export default function PhotoUploadField({
         const q = QUEUE_FULL_ALERT_BY_LANG[language] ?? QUEUE_FULL_ALERT_BY_LANG.ua;
         Alert.alert(q.title, q.message);
       }
-    }).catch((error) => safeLogError('PhotoUploadField.UploadQueue.enqueue', error, { photoId: photo.id }));
+    }).catch((error) => {
+      safeLogError('PhotoUploadField.UploadQueue.enqueue', error, { photoId: photo.id });
+      setSelected((current) => current.filter((item) => item.id !== photo.id));
+      const e = PICK_ERROR_BY_LANG[language] ?? PICK_ERROR_BY_LANG.ua;
+      Alert.alert(e.title, e.body);
+    });
   }, [language, maxPhotos, metadata, storagePath, uid, userName]);
 
   // Picks an image directly via the system overlay (no screen navigation),
