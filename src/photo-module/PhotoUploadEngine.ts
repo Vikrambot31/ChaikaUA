@@ -272,10 +272,9 @@ export async function uploadPhotoWithEngine(
   }
 
   if (!downloadUrl) {
-    // getDownloadURL failed but the file is already in Storage — keep it.
-    // Store storagePath as imageUri fallback so AppPhotoImage can resolve the
-    // URL later via getDownloadURL (it handles storage paths natively).
-    safeLogError(sourceLabel, new Error('Upload succeeded but download URL could not be resolved; using storagePath as fallback.'), { uid, collection, storagePath, stage: 'missing_download_url_fallback' });
+    await deleteUploadedStorageQuietly(storagePath, { uid, collection, stage: 'missing_download_url_cleanup' });
+    safeLogError(sourceLabel, new Error('Upload succeeded but download URL could not be resolved.'), { uid, collection, storagePath, stage: 'missing_download_url' });
+    throw new Error('Upload succeeded but download URL could not be resolved.');
   }
 
   onProgress?.(85);

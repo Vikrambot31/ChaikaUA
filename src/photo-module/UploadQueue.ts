@@ -334,11 +334,12 @@ export const UploadQueue = {
             continue;
           }
 
-          // downloadUrl may be undefined if getDownloadURL failed transiently.
-          // In that case fall back to storagePath — AppPhotoImage resolves it via
-          // getDownloadURL when rendering, so the photo will still display.
+          if (!result.downloadUrl || !/^https?:\/\//i.test(result.downloadUrl)) {
+            throw new Error('Upload completed but download URL is missing.');
+          }
+
           await ImageStorage.updatePhoto(task.photoId, {
-            imageUrl: result.downloadUrl ?? result.storagePath,
+            imageUrl: result.downloadUrl,
             storagePath: result.storagePath,
             status: 'uploaded',
             moderationStatus: collection === 'community_photos' ? 'pending' : 'not_submitted',

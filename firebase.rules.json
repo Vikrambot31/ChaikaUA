@@ -214,13 +214,32 @@
     },
 
     "app_releases": {
-      ".read": "auth != null && root.child('user_roles').child(auth.uid).child('role').val() === 'admin'",
+      ".read": "auth != null",
       ".write": "auth != null && root.child('user_roles').child(auth.uid).child('role').val() === 'admin'"
     },
 
     "app_version": {
       ".read": true,
       ".write": "auth != null && root.child('user_roles').child(auth.uid).child('role').val() === 'admin'"
+    },
+
+    "app_version_registry": {
+      ".read": true,
+      "current": {
+        ".write": "auth != null && root.child('user_roles').child(auth.uid).child('role').val() === 'admin'"
+      },
+      "$versionId": {
+        ".write": "auth != null && root.child('user_roles').child(auth.uid).child('role').val() === 'admin'"
+      }
+    },
+
+    "apk_downloads": {
+      ".read": "auth != null && (root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
+      ".indexOn": ["version", "downloadedAt", "buildStamp"],
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
+        ".write": "auth != null && auth.uid === $uid"
+      }
     },
 
     "problem_votes": {
@@ -362,8 +381,8 @@
 
     "feed_likes": {
       "$section": {
+        ".read": "auth != null",
         "$itemId": {
-          ".read": "auth != null",
           "$uid": {
             ".write": "auth != null && auth.uid === $uid"
           }
@@ -388,9 +407,11 @@
       ".read": "auth != null && (root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
       ".write": "auth != null && (root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
       "errors": {
+        ".indexOn": ["functionName", "at", "uid", "stage"],
         ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous'"
       },
       "events": {
+        ".indexOn": ["type", "at", "uid"],
         ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous'"
       },
       "shadow_deny": {

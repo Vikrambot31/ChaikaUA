@@ -48,6 +48,9 @@ maybeDescribe('Realtime Database emulator security rules', () => {
       await context.database().ref('user_roles/moderatorUser').set({
         role: 'moderator',
       });
+      await context.database().ref('user_roles/adminUser').set({
+        role: 'admin',
+      });
       await context.database().ref('osbb_votes/b1/v1').set({
         title: 'Lobby repair',
         question: 'Approve repair?',
@@ -253,6 +256,23 @@ maybeDescribe('Realtime Database emulator security rules', () => {
       updatedAt: '2026-06-03T00:00:00.000Z',
       version: 1,
     }));
+  });
+
+  it('allows authenticated users, moderators, and admins to read feed likes by section', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.database().ref('feed_likes/local_business/business-a/userA').set(true);
+    });
+
+    await assertSucceeds(authedDb('userA').ref('feed_likes/local_business').get());
+    await assertSucceeds(authedDb('moderatorUser').ref('feed_likes/local_business').get());
+    await assertSucceeds(authedDb('adminUser').ref('feed_likes/local_business').get());
+    await assertFails(anonymousDb().ref('feed_likes/local_business').get());
+  });
+
+  it('keeps feed like writes limited to the authenticated user uid', async () => {
+    await assertSucceeds(authedDb('userA').ref('feed_likes/local_business/business-a/userA').set(true));
+    await assertFails(authedDb('userA').ref('feed_likes/local_business/business-a/userB').set(true));
+    await assertFails(anonymousDb().ref('feed_likes/local_business/business-a/anonUser').set(true));
   });
 
   it('blocks anonymous or mismatched userId writes to main public submissions', async () => {
