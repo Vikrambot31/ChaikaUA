@@ -31,6 +31,7 @@ import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField'
 import { resolveMediaAccessUrls } from '../services/mediaAccess';
 import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 import { useContactRequest } from '../hooks/useContactRequest';
+import { useOperationTrace } from '../hooks/useOperationTrace';
 import ContactReasonModal from '../components/ContactReasonModal';
 import { safeCallPhone } from '../utils/communicationActions';
 import type { DetailItemData } from '../utils/detailViewTypes';
@@ -453,6 +454,7 @@ export default function ZhkBusinessListScreen() {
   const user = useSelector((state: RootState) => state.auth.user);
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
+  const { startOperation, trace } = useOperationTrace('ZhkBusinessListScreen', 'local_business');
   const t = UI_TEXT[language];
 
   const [items, setItems] = useState<BusinessItem[]>([]);
@@ -533,7 +535,11 @@ export default function ZhkBusinessListScreen() {
       } else {
         setItems([]);
       }
-    } catch {
+    } catch (errorValue) {
+      safeLogError('ZhkBusinessListScreen.loadData', errorValue, {
+        stage: 'load_active_business',
+        firebasePath: 'local_business',
+      });
       setError(true);
     } finally {
       setLoading(false);
@@ -543,21 +549,30 @@ export default function ZhkBusinessListScreen() {
   useEffect(() => { void loadData(); }, [loadData]);
 
   useEffect(() => {
-    const unsubscribe = onValue(ref(database, 'feed_likes/local_business'), (snapshot) => {
-      const value = snapshot.val() as Record<string, unknown> | null;
-      const next: Record<string, Record<string, true>> = {};
-      if (value && typeof value === 'object') {
-        Object.entries(value).forEach(([itemId, likes]) => {
-          if (!likes || typeof likes !== 'object') return;
-          const normalizedLikes: Record<string, true> = {};
-          Object.entries(likes as Record<string, unknown>).forEach(([uid, liked]) => {
-            if (liked === true) normalizedLikes[uid] = true;
+    const unsubscribe = onValue(
+      ref(database, 'feed_likes/local_business'),
+      (snapshot) => {
+        const value = snapshot.val() as Record<string, unknown> | null;
+        const next: Record<string, Record<string, true>> = {};
+        if (value && typeof value === 'object') {
+          Object.entries(value).forEach(([itemId, likes]) => {
+            if (!likes || typeof likes !== 'object') return;
+            const normalizedLikes: Record<string, true> = {};
+            Object.entries(likes as Record<string, unknown>).forEach(([uid, liked]) => {
+              if (liked === true) normalizedLikes[uid] = true;
+            });
+            next[itemId] = normalizedLikes;
           });
-          next[itemId] = normalizedLikes;
+        }
+        setLocalBusinessLikes(next);
+      },
+      (errorValue) => {
+        safeLogError('ZhkBusinessListScreen.feedLikesListener', errorValue, {
+          stage: 'listen_likes',
+          firebasePath: 'feed_likes/local_business',
         });
-      }
-      setLocalBusinessLikes(next);
-    });
+      },
+    );
     return unsubscribe;
   }, []);
 
@@ -580,7 +595,12 @@ export default function ZhkBusinessListScreen() {
         version: typeof value.version === 'number' ? value.version : undefined,
         createdAt: value.createdAt,
       });
-    } catch {
+    } catch (errorValue) {
+      safeLogError('ZhkBusinessListScreen.loadMyRequest', errorValue, {
+        uid: user.id,
+        stage: 'load_my_request',
+        firebasePath: `local_business/${user.id}`,
+      });
       setMyRequest(null);
     }
   }, [user?.id]);
@@ -680,25 +700,33 @@ export default function ZhkBusinessListScreen() {
   }), [t.pendingSoftGuardCancel, t.pendingSoftGuardText, t.pendingSoftGuardTitle, t.pendingSoftGuardUpdate]);
 
   const handleSubmitBusiness = useCallback(async () => {
+    startOperation();
+    trace('validate', 'start');
+
     if (!isSubmitFormValid || !selectedFormCategory || !selectedFormSubcategory) {
       logSubmitError(new Error('Business submit validation failed: missing required fields'), 'validate');
+      trace('validate', 'fail', { missing: 'requiredFields' });
       Alert.alert(t.errorTitle, t.errorFill);
       return;
     }
     const normalizedPhone = normalizeUkrainianPhoneStrict(phone);
     if (!normalizedPhone) {
       logSubmitError(new Error('Business submit validation failed: invalid phone format'), 'validate');
+      trace('validate', 'fail', { missing: 'phone' });
       Alert.alert(t.errorTitle, t.phoneInvalidStrict);
       return;
     }
     if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, userStartAvatarKey: user?.startAvatarKey, navigation })) {
+      trace('validate', 'fail', { missing: 'submissionRequirements' });
       return;
     }
+    trace('validate', 'success');
 
     setSubmitting(true);
     let uidForLog = user?.id ?? '';
     let existingStatusForLog: string | undefined;
     try {
+      trace('auth_session', 'start', { operation: 'create_or_update' });
       const firebaseUser = await requireWriteSession({
         expectedUserId: user?.id,
         operation: 'create_or_update',
@@ -706,27 +734,38 @@ export default function ZhkBusinessListScreen() {
       });
       const uid = firebaseUser.uid;
       uidForLog = uid;
+      trace('auth_session', 'success', { uid });
+
       const businessRef = ref(database, `local_business/${uid}`);
       let existingSnap;
       try {
+        trace('check_pending', 'start', { path: 'local_business' });
         existingSnap = await get(businessRef);
       } catch (errorValue) {
         logSubmitError(errorValue, 'checkPending', uid);
+        trace('check_pending', 'fail', { path: 'local_business' }, errorValue);
         Alert.alert(t.errorTitle, t.errorLoad);
         return;
       }
       const existing = existingSnap.exists() ? existingSnap.val() as Partial<BusinessItem> : null;
       const existingStatus = typeof existing?.status === 'string' ? existing.status : undefined;
       existingStatusForLog = existingStatus;
+      trace('check_pending', 'success', { existingStatus: existingStatus ?? 'none' });
 
       if (existingStatus === 'pending') {
+        trace('pending_update_prompt', 'start');
         const shouldUpdate = await confirmPendingUpdate();
         if (!shouldUpdate) {
+          trace('pending_update_prompt', 'cancel');
           return;
         }
+        trace('pending_update_prompt', 'success');
       }
 
+      trace('photo_check', 'start', { photoCount: formPhotos.length });
       const firstPhoto = getDonePhotos(formPhotos)[0];
+      trace('photo_check', 'success', { hasPhoto: Boolean(firstPhoto) });
+
       const previousVersion = typeof existing?.version === 'number' ? existing.version : (existing ? 1 : 0);
       const now = new Date().toISOString();
       const parsedPriceMin = priceMin.trim() ? Number(priceMin.trim()) : undefined;
@@ -762,7 +801,11 @@ export default function ZhkBusinessListScreen() {
         ...(parsedPriceMin != null || parsedPriceMax != null ? { currency: '₴' } : {}),
       };
 
+      trace('api_call', 'start', { path: 'local_business' });
       await set(businessRef, entry);
+      trace('api_call', 'success', { path: 'local_business', status: entry.status, version: entry.version });
+      trace('user_alert', 'success', { type: 'success' });
+
       Alert.alert(t.successTitle, t.successMsg);
       resetAddForm();
       setAddFormVisible(false);
@@ -776,6 +819,7 @@ export default function ZhkBusinessListScreen() {
       void loadData();
     } catch (errorValue) {
       logSubmitError(errorValue, 'write', uidForLog, existingStatusForLog);
+      trace('api_call', 'fail', { path: 'local_business', existingStatus: existingStatusForLog }, errorValue);
       Alert.alert(t.errorTitle, t.errorLoad);
     } finally {
       setSubmitting(false);
@@ -798,6 +842,8 @@ export default function ZhkBusinessListScreen() {
     resetAddForm,
     selectedFormCategory,
     selectedFormSubcategory,
+    startOperation,
+    trace,
     confirmPendingUpdate,
     t.errorFill,
     t.errorLoad,
