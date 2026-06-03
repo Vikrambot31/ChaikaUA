@@ -14,6 +14,7 @@ export const MODERATION_PATHS = {
   coffeePrivate: 'coffee_request_private',
   buySell: 'buy_sell_listings',
   contactsListings: 'contacts_listings',
+  biznesChaikaListings: 'biznes_chaika_listings',
   localBusiness: 'local_business',
   jobs: 'job_listings',
   lostFound: 'lost_found',

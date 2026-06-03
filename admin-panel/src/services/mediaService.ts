@@ -10,7 +10,7 @@ const isHttpUrl = (value: string): boolean => /^https?:\/\//i.test(value);
 
 const isStoragePath = (value: string): boolean => {
   if (!value || isHttpUrl(value) || value.startsWith('file:') || value.startsWith('content:')) return false;
-  return /^(community_photos|dating|dating_profiles|dating_anketa|coffee_requests|buy_sell|buy_sell_listings|contacts|contacts_listings|lost_found|local_business|requests|job_listings|osbb_news|osbb_votes|osbb_house_topics|osbb_collections|uploads)\//.test(value);
+  return /^(community_photos|dating|dating_profiles|dating_anketa|coffee_requests|buy_sell|buy_sell_listings|contacts|contacts_listings|biznes_chaika_listings|lost_found|local_business|requests|job_listings|osbb_news|osbb_votes|osbb_house_topics|osbb_collections|uploads)\//.test(value);
 };
 
 export const resolveMediaUrl = async (value: string): Promise<string> => {

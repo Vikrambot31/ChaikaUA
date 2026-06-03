@@ -41,6 +41,7 @@ type Tab =
   | 'buysell'
   | 'contacts'
   | 'business'
+  | 'biznesChaika'
   | 'jobs'
   | 'lostfound'
   | 'osbbnews'
@@ -70,6 +71,19 @@ type LocalBusinessItem = {
   status?: string;
   moderationReason?: string;
   moderatedAt?: string;
+};
+
+type BiznesChaikaItem = {
+  id: string;
+  itemName?: string;
+  description?: string;
+  price?: string;
+  phone?: string;
+  category?: string;
+  condition?: string;
+  contactName?: string;
+  moderationStatus?: string;
+  submittedForModerationAt?: string;
 };
 
 type ModerationOsbbNews = OsbbNewsItem & {
@@ -119,6 +133,7 @@ const TABS: { key: Tab; label: Record<Lang, string> }[] = [
   { key: 'buysell', label: { ua: 'Оголошення', ru: 'Объявления', en: 'Buy/Sell' } },
   { key: 'contacts', label: { ua: 'Контакти', ru: 'Контакты', en: 'Contacts' } },
   { key: 'business', label: { ua: 'Business', ru: 'Business', en: 'Business' } },
+  { key: 'biznesChaika', label: { ua: 'Бізнес Чайка', ru: 'Бизнес Чайка', en: 'Biz Chaika' } },
   { key: 'jobs', label: { ua: 'Робота', ru: 'Работа', en: 'Jobs' } },
   { key: 'lostfound', label: { ua: 'Знахідки', ru: 'Потери', en: 'Lost/Found' } },
   { key: 'osbbnews', label: { ua: 'Новини', ru: 'Новости', en: 'News' } },
@@ -426,6 +441,7 @@ const ServiceModerationScreen: React.FC = () => {
   const [buysell, setBuysell] = useState<BuySellListing[]>([]);
   const [contacts, setContacts] = useState<ContactListing[]>([]);
   const [business, setBusiness] = useState<LocalBusinessItem[]>([]);
+  const [biznesChaika, setBiznesChaika] = useState<BiznesChaikaItem[]>([]);
   const [jobs, setJobs] = useState<JobListing[]>([]);
   const [lostfound, setLostfound] = useState<LostFoundItem[]>([]);
   const [osbbNews, setOsbbNews] = useState<ModerationOsbbNews[]>([]);
@@ -459,6 +475,7 @@ const ServiceModerationScreen: React.FC = () => {
       buysell: buysell as Array<{ moderationStatus?: string }>,
       contacts: contacts as Array<{ moderationStatus?: string }>,
       business: business as Array<{ status?: string }>,
+      biznesChaika: biznesChaika as Array<{ moderationStatus?: string }>,
       jobs, lostfound,
       osbbnews: osbbNews as Array<{ moderationStatus?: string }>,
       osbbvotes: osbbVotes, osbbtopics: osbbTopics, osbbcollections: osbbCollections,
@@ -471,7 +488,7 @@ const ServiceModerationScreen: React.FC = () => {
       approved: items.filter((i) => getStatus(i) === 'approved' || getStatus(i) === 'active').length,
       rejected: items.filter((i) => getStatus(i) === 'rejected').length,
     };
-  }, [activeTab, requests, suggestions, photos, buysell, contacts, business, jobs, lostfound, osbbNews, osbbVotes, osbbTopics, osbbCollections]);
+  }, [activeTab, requests, suggestions, photos, buysell, contacts, business, biznesChaika, jobs, lostfound, osbbNews, osbbVotes, osbbTopics, osbbCollections]);
 
   // Кількість підозрілих номерів (3+ заявок з одного телефону)
   const suspiciousPhones = useMemo(() => {
@@ -515,6 +532,7 @@ const ServiceModerationScreen: React.FC = () => {
         buysellSnap,
         contactsSnap,
         businessSnap,
+        biznesChaikaSnap,
         jobsSnap,
         lostSnap,
         osbbNewsSnap,
@@ -530,6 +548,7 @@ const ServiceModerationScreen: React.FC = () => {
           createSectionTimeoutPromise('buysell', get(ref(database, 'buy_sell_listings'))),
           createSectionTimeoutPromise('contacts', get(ref(database, 'contacts_listings'))),
           createSectionTimeoutPromise('business', get(ref(database, 'local_business'))),
+          createSectionTimeoutPromise('biznesChaika', get(ref(database, 'biznes_chaika_listings'))),
           createSectionTimeoutPromise('jobs', get(ref(database, 'job_listings'))),
           createSectionTimeoutPromise('lostfound', get(ref(database, 'lost_found'))),
           createSectionTimeoutPromise('osbbnews', get(ref(database, 'osbb_news'))),
@@ -652,6 +671,24 @@ const ServiceModerationScreen: React.FC = () => {
         }
       } else if (businessSnap.status === 'rejected') {
         pushWarning('business', businessSnap.reason);
+      }
+
+      if (biznesChaikaSnap.status === 'fulfilled' && biznesChaikaSnap.value.exists()) {
+        const raw = biznesChaikaSnap.value.val() as Record<string, Record<string, unknown>>;
+        const nextBiznesChaika = Object.entries(raw).map(([id, value]) => ({
+          ...(value as Omit<BiznesChaikaItem, 'id'>),
+          id,
+          moderationStatus: typeof value.moderationStatus === 'string' ? value.moderationStatus : 'pending',
+        }));
+        if (mountedRef.current) {
+          setBiznesChaika(nextBiznesChaika);
+        }
+      } else if (biznesChaikaSnap.status === 'fulfilled') {
+        if (mountedRef.current) {
+          setBiznesChaika([]);
+        }
+      } else if (biznesChaikaSnap.status === 'rejected') {
+        pushWarning('biznesChaika', biznesChaikaSnap.reason);
       }
 
       if (jobsSnap.status === 'fulfilled' && jobsSnap.value.exists()) {
@@ -896,6 +933,14 @@ const ServiceModerationScreen: React.FC = () => {
     });
   }, [moderateBusiness, runAction, text.confirmRejectMessage, text.confirmRejectTitle]);
 
+  const moderateBiznesChaika = useCallback(async (id: string, status: 'approved' | 'rejected') => {
+    await update(ref(database, `biznes_chaika_listings/${id}`), {
+      moderationStatus: status,
+      moderatedAt: new Date().toISOString(),
+      moderatedBy: auth.currentUser?.uid ?? 'service_owner',
+    });
+  }, []);
+
   const counts = useMemo<Record<Tab, number>>(() => ({
     requests: requests.length,
     suggestions: suggestions.length,
@@ -903,6 +948,7 @@ const ServiceModerationScreen: React.FC = () => {
     buysell: buysell.length,
     contacts: contacts.length,
     business: business.length,
+    biznesChaika: biznesChaika.length,
     jobs: jobs.length,
     lostfound: lostfound.length,
     osbbnews: osbbNews.length,
@@ -910,7 +956,7 @@ const ServiceModerationScreen: React.FC = () => {
     osbbtopics: osbbTopics.length,
     osbbcollections: osbbCollections.length,
     users: users.length,
-  }), [business.length, buysell.length, contacts.length, jobs.length, lostfound.length, osbbCollections.length, osbbNews.length, osbbTopics.length, osbbVotes.length, photos.length, requests.length, suggestions.length, users.length]);
+  }), [business.length, biznesChaika.length, buysell.length, contacts.length, jobs.length, lostfound.length, osbbCollections.length, osbbNews.length, osbbTopics.length, osbbVotes.length, photos.length, requests.length, suggestions.length, users.length]);
 
   const ActionButton = ({
     id,
@@ -1364,6 +1410,22 @@ const ServiceModerationScreen: React.FC = () => {
         );
       case 'business':
         return renderBusiness();
+      case 'biznesChaika':
+        return renderModeratedList(
+          filterItems(biznesChaika),
+          (item) => (
+            <>
+              <Text style={styles.cardTitle}>{item.itemName || item.contactName || '—'}</Text>
+              {item.category ? <Text style={styles.cardMeta}>{text.category}: {item.category}</Text> : null}
+              {item.description ? <Text style={styles.cardMeta}>{item.description}</Text> : null}
+              {item.price ? <Text style={styles.cardMeta}>{text.price}: {item.price}</Text> : null}
+              {item.phone ? <Text style={styles.cardMeta}>{text.phone}: {item.phone}</Text> : null}
+            </>
+          ),
+          (id) => moderateBiznesChaika(id, 'approved'),
+          (id) => moderateBiznesChaika(id, 'rejected'),
+          (id) => remove(ref(database, `biznes_chaika_listings/${id}`)),
+        );
       case 'jobs':
         return renderModeratedList(
           filterItems(jobs),

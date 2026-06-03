@@ -506,7 +506,7 @@ async function main() {
     moderationPriority: 'low',
   });
 
-  console.log('\n--- Business listing (ZhkBusinessListScreen) ---');
+  console.log('\n--- Business listing (contacts_listings) ---');
   await createBusinessListing(db);
 
   console.log('\n--- Photo uploads ---');

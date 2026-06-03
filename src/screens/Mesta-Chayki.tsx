@@ -467,7 +467,7 @@ const PlacesScreen: React.FC = () => {
     const icon = isGoods ? 'shopping-outline' : 'handshake-outline';
     const buttonText = isGoods ? text.openGoods : text.openServices;
     const openTarget = () => {
-      navigation.navigate(isGoods ? 'BuySellScreen' : 'ZhkBusinessListScreen');
+      navigation.navigate(isGoods ? 'BuySellScreen' : 'BizznesChaikaScreen');
     };
     const residentItems = isGoods ? residentGoods : residentServices;
 

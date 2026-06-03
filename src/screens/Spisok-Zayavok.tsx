@@ -110,6 +110,7 @@ type FeedRow =
   | { kind: 'buySell'; key: string; sortKey: number; item: ModerationPhoto }
   | { kind: 'contacts'; key: string; sortKey: number; item: ModerationPhoto }
   | { kind: 'localBusiness'; key: string; sortKey: number; item: ModerationPhoto }
+  | { kind: 'biznesChaika'; key: string; sortKey: number; item: ModerationPhoto }
   | { kind: 'appSuggestion'; key: string; sortKey: number; item: ModerationPhoto };
 
 const toNumber = (value: unknown): number => {
@@ -153,6 +154,7 @@ const RequestsScreen: React.FC = () => {
   const [pendingBuySell, setPendingBuySell] = useState<ModerationPhoto[]>([]);
   const [pendingContacts, setPendingContacts] = useState<ModerationPhoto[]>([]);
   const [pendingLocalBusiness, setPendingLocalBusiness] = useState<ModerationPhoto[]>([]);
+  const [pendingBiznesChaika, setPendingBiznesChaika] = useState<ModerationPhoto[]>([]);
   const [pendingAppSuggestions, setPendingAppSuggestions] = useState<ModerationPhoto[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -425,6 +427,49 @@ const RequestsScreen: React.FC = () => {
     }
   }, [language]);
 
+  const loadPendingBiznesChaika = useCallback(async () => {
+    try {
+      const snapshot = await get(ref(database, 'biznes_chaika_listings'));
+      if (!snapshot.exists()) {
+        setPendingBiznesChaika([]);
+        return;
+      }
+
+      const value = snapshot.val() as Record<string, Record<string, unknown>>;
+      const items = Object.entries(value)
+        .map<ModerationPhoto | null>(([id, raw]) => {
+          if (!raw || typeof raw !== 'object') return null;
+          const status = toStr(raw.moderationStatus) || 'pending';
+          if (status !== 'pending') return null;
+          const itemName = toStr(raw.itemName);
+          const contactName = toStr(raw.contactName);
+          const price = toStr(raw.price);
+          const description = toStr(raw.description);
+          const summary = [toStr(raw.category), price, description].filter(Boolean).join(' • ');
+          return {
+            id,
+            uri: toStr(raw.photoUri) || undefined,
+            storagePath: toStr(raw.photoStoragePath) || undefined,
+            title: itemName || contactName || (language === 'ru' ? 'Бизнес Чайка' : language === 'en' ? 'Biz Chaika' : 'Бізнес Чайка'),
+            description: summary,
+            userName: contactName || undefined,
+            userId: toStr(raw.userId) || undefined,
+            phone: toStr(raw.phone) || undefined,
+            category: toStr(raw.category) || undefined,
+            price: price || undefined,
+            sourceScreen: 'BizznesChaikaScreen',
+            createdAt: toTimestamp(raw.createdAt) || toTimestamp(raw.submittedForModerationAt),
+            status: 'pending',
+          };
+        })
+        .filter((item): item is ModerationPhoto => item !== null)
+        .sort((a, b) => b.createdAt - a.createdAt);
+      setPendingBiznesChaika(items);
+    } catch (e) {
+      console.error('[loadPendingBiznesChaika]', e);
+    }
+  }, [language]);
+
   const loadPendingAppSuggestions = useCallback(async () => {
     const items = (await appSuggestionsService.getSuggestionsOnce())
       .filter((item) => item.moderationStatus === 'pending')
@@ -457,6 +502,7 @@ const RequestsScreen: React.FC = () => {
             void loadPendingBuySell().catch(() => {});
             void loadPendingContacts().catch(() => {});
             void loadPendingLocalBusiness().catch(() => {});
+            void loadPendingBiznesChaika().catch(() => {});
             void loadPendingAppSuggestions().catch(() => {});
           }
         }
@@ -785,6 +831,56 @@ const RequestsScreen: React.FC = () => {
     [moderationBusyId, text.actionFailed, text.cancel, text.deleteBody, text.deleteBtn, text.deleteTitle, text.loadingError],
   );
 
+  const moderateBiznesChaika = useCallback(
+    async (itemId: string, status: 'approved' | 'rejected') => {
+      const busyId = `biznes_chaika:${itemId}`;
+      if (moderationBusyId) {
+        return;
+      }
+
+      setModerationBusyId(busyId);
+      try {
+        await update(ref(database, `biznes_chaika_listings/${itemId}`), {
+          moderationStatus: status,
+          moderatedAt: new Date().toISOString(),
+        });
+        setPendingBiznesChaika((prev) => prev.filter((item) => item.id !== itemId));
+      } catch (errorValue) {
+        Alert.alert(text.loadingError, errorValue instanceof Error ? errorValue.message : text.actionFailed);
+      } finally {
+        setModerationBusyId(null);
+      }
+    },
+    [moderationBusyId, text.actionFailed, text.loadingError],
+  );
+
+  const deleteBiznesChaika = useCallback(
+    (itemId: string) => {
+      if (moderationBusyId) {
+        return;
+      }
+
+      Alert.alert(text.deleteTitle, text.deleteBody, [
+        { text: text.cancel, style: 'cancel' },
+        {
+          text: text.deleteBtn,
+          style: 'destructive',
+          onPress: () => {
+            const busyId = `biznes_chaika:${itemId}`;
+            setModerationBusyId(busyId);
+            void remove(ref(database, `biznes_chaika_listings/${itemId}`))
+              .then(() => setPendingBiznesChaika((prev) => prev.filter((item) => item.id !== itemId)))
+              .catch((errorValue: unknown) => {
+                Alert.alert(text.loadingError, errorValue instanceof Error ? errorValue.message : text.actionFailed);
+              })
+              .finally(() => setModerationBusyId(null));
+          },
+        },
+      ]);
+    },
+    [moderationBusyId, text.actionFailed, text.cancel, text.deleteBody, text.deleteBtn, text.deleteTitle, text.loadingError],
+  );
+
   const moderateAppSuggestion = useCallback(
     async (itemId: string, status: 'approved' | 'rejected') => {
       const busyId = `app_suggestion:${itemId}`;
@@ -933,6 +1029,15 @@ const RequestsScreen: React.FC = () => {
         }))
       : [];
 
+    const biznesChaikaRows: FeedRow[] = isModerator && (statusFilter === 'all' || statusFilter === 'pending')
+      ? pendingBiznesChaika.map((item) => ({
+          kind: 'biznesChaika',
+          key: `biznes_chaika:${item.id}`,
+          sortKey: item.createdAt,
+          item,
+        }))
+      : [];
+
     const appSuggestionRows: FeedRow[] = isModerator && (statusFilter === 'all' || statusFilter === 'pending')
       ? pendingAppSuggestions.map((item) => ({
           kind: 'appSuggestion',
@@ -942,8 +1047,8 @@ const RequestsScreen: React.FC = () => {
         }))
       : [];
 
-    return [...requestRows, ...photoRows, ...lostFoundRows, ...buySellRows, ...contactsRows, ...localBusinessRows, ...appSuggestionRows].sort((a, b) => b.sortKey - a.sortKey);
-  }, [isModerator, pendingAppSuggestions, pendingBuySell, pendingContacts, pendingLocalBusiness, pendingLostFound, pendingPhotos, sortedRequests, statusFilter]);
+    return [...requestRows, ...photoRows, ...lostFoundRows, ...buySellRows, ...contactsRows, ...localBusinessRows, ...biznesChaikaRows, ...appSuggestionRows].sort((a, b) => b.sortKey - a.sortKey);
+  }, [isModerator, pendingAppSuggestions, pendingBiznesChaika, pendingBuySell, pendingContacts, pendingLocalBusiness, pendingLostFound, pendingPhotos, sortedRequests, statusFilter]);
 
   const emptyMessage = error ?? text.emptyRequests;
 
@@ -1098,6 +1203,20 @@ const RequestsScreen: React.FC = () => {
           onDelete={() => deleteLocalBusiness(item.item.id)}
           onPress={() => openModerationItemDetail(item.item)}
           busy={moderationBusyId === `local_business:${item.item.id}`}
+          language={language}
+        />
+      );
+    }
+
+    if (item.kind === 'biznesChaika') {
+      return (
+        <ModerationPhotoCard
+          photo={item.item}
+          onApprove={() => void moderateBiznesChaika(item.item.id, 'approved')}
+          onReject={() => void moderateBiznesChaika(item.item.id, 'rejected')}
+          onDelete={() => deleteBiznesChaika(item.item.id)}
+          onPress={() => openModerationItemDetail(item.item)}
+          busy={moderationBusyId === `biznes_chaika:${item.item.id}`}
           language={language}
         />
       );

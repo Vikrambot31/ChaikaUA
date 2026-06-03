@@ -42,6 +42,7 @@ const SECTION_FIELD_MAP: Record<string, string[]> = {
   communityPhotos: ['title', 'description'],
   buySell: ['title', 'description', 'price', 'phone', 'contactName'],
   contactsListings: ['description', 'phone', 'contactName'],
+  biznesChaikaListings: ['itemName', 'description', 'price', 'phone', 'contactName'],
   localBusiness: ['title', 'description', 'address', 'phone'],
   jobs: ['title', 'description', 'phone', 'contactName'],
   lostFound: ['title', 'description', 'phone', 'contactName'],

@@ -12,13 +12,13 @@ const CHAYKA_TELEGRAM_TOPIC = process.env.CHAYKA_TELEGRAM_TOPIC || '';
 const EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
 const PHONE_RE = /\+?\d[\d\s().-]{7,}\d/g;
 const OSBB_VOTE_PATH = 'osbb_votes';
-const PUBLIC_IMAGE_PREFIXES = ['community_photos/', 'lost_found/', 'buy_sell/', 'local_business/', 'requests/'];
+const PUBLIC_IMAGE_PREFIXES = ['community_photos/', 'lost_found/', 'buy_sell/', 'local_business/', 'biznes_chaika_listings/', 'requests/'];
 const FREE_PREMIUM_LIMIT = 500;
 const PREMIUM_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 const PREMIUM_PLANS = new Set(['premium', 'premium_plus']);
 const MEDIA_ACCESS_TTL_MS = 15 * 60 * 1000;
 const MEDIA_DATA_URL_MAX_BYTES = 8 * 1024 * 1024;
-const MEDIA_PATH_RE = /^(?:(?:community_photos|user_photos|lost_found|buy_sell|buy_sell_listings|profile_photos|local_business|requests)\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+|uploads\/users\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+)\.(jpg|jpeg|png|webp|heic|heif)$/i;
+const MEDIA_PATH_RE = /^(?:(?:community_photos|user_photos|lost_found|buy_sell|buy_sell_listings|profile_photos|local_business|biznes_chaika_listings|requests)\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+|uploads\/users\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+)\.(jpg|jpeg|png|webp|heic|heif)$/i;
 
 const redactText = (value = '') =>
   String(value || '')
@@ -512,6 +512,7 @@ const getMediaRecordRef = (collection, itemId, ownerUid = '') => {
   if (collection === 'lost_found') return db.ref(`lost_found/${itemId}`);
   if (collection === 'buy_sell_listings') return db.ref(`buy_sell_listings/${itemId}`);
   if (collection === 'local_business') return db.ref(`local_business/${itemId}`);
+  if (collection === 'biznes_chaika_listings') return db.ref(`biznes_chaika_listings/${itemId}`);
   throw new functionsV1.https.HttpsError('invalid-argument', 'Unsupported media collection');
 };
 
@@ -905,6 +906,7 @@ const EXPIRING_COLLECTIONS = [
   { path: 'job_listings', statusField: 'moderationStatus', ttlMs: 2 * MONTH_MS },
   { path: 'buy_sell_listings', statusField: 'moderationStatus', ttlMs: 3 * MONTH_MS },
   { path: 'contacts_listings', statusField: 'moderationStatus', ttlMs: 30 * DAY_MS },
+  { path: 'biznes_chaika_listings', statusField: 'moderationStatus', ttlMs: 30 * DAY_MS },
 ];
 
 const ADMIN_MODERATION_SECTIONS = {
@@ -917,6 +919,7 @@ const ADMIN_MODERATION_SECTIONS = {
   coffeeRequests: { path: 'coffee_requests', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
   buySell: { path: 'buy_sell_listings', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
   contactsListings: { path: 'contacts_listings', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
+  biznesChaikaListings: { path: 'biznes_chaika_listings', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
   localBusiness: { path: 'local_business', statusField: 'status', approvedValue: 'active', rejectedValue: 'rejected' },
   jobs: { path: 'job_listings', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
   lostFound: { path: 'lost_found', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
@@ -931,6 +934,7 @@ const ADMIN_MODERATION_RESTORE_TTL_MS = {
   jobs: 60 * DAY_MS,
   buySell: 90 * DAY_MS,
   contactsListings: 30 * DAY_MS,
+  biznesChaikaListings: 30 * DAY_MS,
   requests: 15 * DAY_MS,
 };
 
@@ -2675,6 +2679,11 @@ const AI_SECTION_RULES = {
 - Проверить: дублирующиеся контакты, отсутствие описания услуги
 - Отклонять: реклама сторонних сервисов, MLM, финансовые услуги без лицензии`,
 
+  biznesChaikaListings: `Правила для раздела "Бизнес на Чайке":
+- Одобрять: реальные бизнесы жителей/района с описанием, телефоном и понятной сферой
+- Проверить: неполное описание, спорные услуги, подозрительно агрессивная реклама
+- Отклонять: мошенничество, финансовые пирамиды, запрещённые услуги, спам`,
+
   localBusiness: `Правила для раздела "Местный бизнес":
 - Одобрять: реальные локальные предприятия с адресом и описанием
 - Проверить: бизнес без адреса, подозрительно агрессивная реклама
@@ -2709,6 +2718,7 @@ const AI_SECTION_LABELS = {
   appSuggestions: 'Предложения',
   communityPhotos: 'Фото сообщества',
   contactsListings: 'Контакты/Услуги',
+  biznesChaikaListings: 'Бизнес на Чайке',
   localBusiness: 'Местный бизнес',
   osbbNews: 'Новости ОСББ',
   osbbVotes: 'Голосования ОСББ',

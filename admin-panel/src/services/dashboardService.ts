@@ -130,6 +130,7 @@ const moderationDashboardPaths = [
   MODERATION_PATHS.communityPhotos,
   MODERATION_PATHS.buySell,
   MODERATION_PATHS.contactsListings,
+  MODERATION_PATHS.biznesChaikaListings,
   MODERATION_PATHS.localBusiness,
   MODERATION_PATHS.jobs,
   MODERATION_PATHS.lostFound,

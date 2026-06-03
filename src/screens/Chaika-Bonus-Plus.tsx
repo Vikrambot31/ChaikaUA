@@ -49,7 +49,6 @@ const UI_TEXT: Record<'ua' | 'ru' | 'en', SectionedItems> = {
       { label: 'Салони краси', desc: 'Перукарні, манікюр, косметологія', screen: 'SalonyKrasotyScreen', icon: 'content-cut', accent: '#D4668E' },
       { label: 'Пошук роботи', desc: 'Вакансії та резюме', screen: 'JobSearchScreen', icon: 'briefcase-search-outline', accent: '#4D7892' },
       { label: 'Куплю / продам', desc: 'Оголошення мешканців', screen: 'BuySellScreen', icon: 'shopping-outline', accent: '#C96E3E' },
-      { label: 'Послуги та бізнес на Чайці', desc: 'Компанії та послуги у ЖК', screen: 'ZhkBusinessListScreen', icon: 'storefront-outline', accent: '#6E7F47' },
     ] as BonusItem[],
   },
   ru: {
@@ -74,7 +73,6 @@ const UI_TEXT: Record<'ua' | 'ru' | 'en', SectionedItems> = {
       { label: 'Салоны красоты', desc: 'Парикмахерские, маникюр, косметология', screen: 'SalonyKrasotyScreen', icon: 'content-cut', accent: '#D4668E' },
       { label: 'Поиск работы', desc: 'Вакансии и резюме', screen: 'JobSearchScreen', icon: 'briefcase-search-outline', accent: '#4D7892' },
       { label: 'Куплю / продам', desc: 'Объявления жителей', screen: 'BuySellScreen', icon: 'shopping-outline', accent: '#C96E3E' },
-      { label: 'Услуги и Бизнес на Чайке', desc: 'Компании и услуги в ЖК', screen: 'ZhkBusinessListScreen', icon: 'storefront-outline', accent: '#6E7F47' },
     ] as BonusItem[],
   },
   en: {
@@ -99,7 +97,6 @@ const UI_TEXT: Record<'ua' | 'ru' | 'en', SectionedItems> = {
       { label: 'Beauty salons', desc: 'Hair, nails, cosmetology', screen: 'SalonyKrasotyScreen', icon: 'content-cut', accent: '#D4668E' },
       { label: 'Job search', desc: 'Vacancies and resumes', screen: 'JobSearchScreen', icon: 'briefcase-search-outline', accent: '#4D7892' },
       { label: 'Buy / sell', desc: 'Resident marketplace', screen: 'BuySellScreen', icon: 'shopping-outline', accent: '#C96E3E' },
-      { label: 'Services and Business in Chaika', desc: 'Companies and services in the complex', screen: 'ZhkBusinessListScreen', icon: 'storefront-outline', accent: '#6E7F47' },
     ] as BonusItem[],
   },
 };

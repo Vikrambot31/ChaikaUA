@@ -61,7 +61,6 @@ import ChaikaBonusPlusScreen from '../screens/Chaika-Bonus-Plus';
 import LostAndFoundScreen from '../screens/Kto-Poteryal';
 import ImportantNewsScreen from '../screens/Vazhnye-Novosti-Chayki';
 import NotificationSettingsScreen from '../screens/Nalashtuvannya-Spovishchen';
-import ZhkBusinessListScreen from '../screens/ZhkBusinessListScreen';
 import VseDlyaDeteyScreen from '../screens/Vse-Dlya-Detey';
 import DetalDetskogoMestaScreen from '../screens/Detal-Detskogo-Mesta';
 import DetalDetskogoPredlozheniyaScreen from '../screens/Detal-Detskogo-Predlozheniya';
@@ -185,7 +184,6 @@ export type RootStackParamList = {
   LostAndFoundScreen: undefined;
   ImportantNewsScreen: undefined;
   NotificationSettingsScreen: undefined;
-  ZhkBusinessListScreen: undefined;
   SportNaChaykeScreen: undefined;
   SportDetailScreen: { sportKey: 'basketball' | 'football' | 'tennis_big' | 'tennis_small'; sportTitle: string };
   EdaNaChaykeScreen: undefined;
@@ -252,7 +250,6 @@ const linking: LinkingOptions<RootStackParamList> = {
        PhotoUploadScreen: 'screen/photo-upload',
        StartAvatarPickerScreen: 'screen/start-avatar',
        BizznesChaikaScreen: 'screen/business/chaika',
-       ZhkBusinessListScreen: 'screen/business/list',
        VseDlyaDeteyScreen: 'screen/kids',
        DetalDetskogoMestaScreen: 'screen/kids/place',
        DetalDetskogoPredlozheniyaScreen: 'screen/kids/offer',
@@ -349,7 +346,6 @@ const ROUTE_FILE_MAP: Record<string, string> = {
   LostAndFoundScreen: 'Kto-Poteryal.tsx',
   ImportantNewsScreen: 'Vazhnye-Novosti-Chayki.tsx',
   NotificationSettingsScreen: 'Nalashtuvannya-Spovishchen.tsx',
-  ZhkBusinessListScreen: 'ZhkBusinessListScreen.tsx',
   SportNaChaykeScreen: 'Sport-Na-Chayke.tsx',
   SportDetailScreen: 'Sport-Detal.tsx',
   EdaNaChaykeScreen: 'Eda-Na-Chayke.tsx',
@@ -744,7 +740,6 @@ function AuthNavigation() {
       'ViewUserProfile',
       'TopGirlsBoysScreen',
       'KontaktiChaikyScreen',
-      'ZhkBusinessListScreen',
       'OnlineChatTab',
       'OnlineChatList',
       'PoruchitelScreen',
@@ -903,7 +898,6 @@ function AuthNavigation() {
         <Stack.Screen name="LostAndFoundScreen" component={LostAndFoundScreen} />
         <Stack.Screen name="ImportantNewsScreen" component={ImportantNewsScreen} />
         <Stack.Screen name="NotificationSettingsScreen" component={withGuard(NotificationSettingsScreen, 'auth')} />
-        <Stack.Screen name="ZhkBusinessListScreen" component={withGuard(ZhkBusinessListScreen, 'auth')} />
         <Stack.Screen name="SportNaChaykeScreen" component={withGuard(SportNaChaykeScreen, 'auth')} />
         <Stack.Screen name="SportDetailScreen" component={withGuard(SportDetailScreen, 'trusted')} />
         <Stack.Screen name="EdaNaChaykeScreen" component={EdaNaChaykeScreen} />

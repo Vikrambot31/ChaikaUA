@@ -325,29 +325,6 @@ async function screenFotoRayona(db, bucket, photo) {
   } catch (e) { err('Foto-Rayona', `Помилка: ${e.message}`); }
 }
 
-// ====================================================================
-//  12. ZHK-BUSINESS-LISTING — education / courses
-// ====================================================================
-async function screenZhkBusinessList(db, photo) {
-  console.log('\n━━━ [11] ZhkBusinessListScreen.tsx — Бізнес Чайки ━━━\n');
-  const entry = {
-    uid: BOT.uid, userId: BOT.uid,
-    categoryKey: 'education', categoryLabel: 'Освіта',
-    subcategoryKey: 'courses', subcategoryLabel: 'Курси та редакція',
-    contactName: BOT.name, phone: BOT.phone,
-    description: 'Редакція та копірайтинг — допоможу оформити текст заявки, оголошення або допис для спільноти. Виправлю граматику, зроблю текст чітким і безпечним. Недорого, за домовленістю.',
-    photoStoragePath: photo?.storagePath || '', photoUri: photo?.publicUrl || '',
-    language: 'ua',
-    createdAt: iso(), updatedAt: iso(), version: '1',
-    status: 'pending', moderatedAt: null, moderatedBy: null,
-    moderationReason: null, rejectionReason: null,
-    likesByUserId: {}, likeCount: 0, ratingByUserId: {},
-  };
-  try {
-    await db.ref(`local_business/${BOT.uid}`).set(entry);
-    ok('ZhkBusinessList', `Бізнес-листинг створено: /local_business/${BOT.uid}`);
-  } catch (e) { err('ZhkBusinessList', `Помилка: ${e.message}`); }
-}
 
 // ====================================================================
 //  13. PRO-PRILOZHENIE — feedback / suggestion
@@ -420,7 +397,6 @@ async function main() {
   await screenStatusSveta(db, photo);
   await screenZagruzkaFoto(db, bucket, photo);
   await screenFotoRayona(db, bucket, photo);
-  await screenZhkBusinessList(db, photo);
   await screenProPrilozhenie(db);
 
   // 13-15. OSBB
@@ -467,7 +443,6 @@ async function main() {
     'Status-Sveta (power_on)',
     'Zagruzka-Foto (gallery)',
     'Foto-Rayona (district)',
-    'ZhkBusinessList (education)',
     'Pro-Prilozhenie (feedback)',
   ];
   screens.forEach(s => console.log(`  ✅ ${s}`));

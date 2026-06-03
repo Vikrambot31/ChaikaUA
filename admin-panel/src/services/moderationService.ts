@@ -13,6 +13,7 @@ export type ModerationSectionKey =
   | 'communityPhotos'
   | 'buySell'
   | 'contactsListings'
+  | 'biznesChaikaListings'
   | 'localBusiness'
   | 'jobs'
   | 'lostFound'
@@ -96,6 +97,7 @@ export const MODERATION_SECTIONS: SectionConfig[] = [
   { key: 'communityPhotos', label: 'Фото сообщества', path: MODERATION_PATHS.communityPhotos, statusField: 'status', approvedValue: 'approved', rejectedValue: 'rejected' },
   { key: 'buySell', label: 'Куплю/Продам', path: MODERATION_PATHS.buySell, statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
   { key: 'contactsListings', label: 'Хочу связаться', path: MODERATION_PATHS.contactsListings, statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
+  { key: 'biznesChaikaListings', label: 'Бизнес на Чайке', path: MODERATION_PATHS.biznesChaikaListings, statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
   { key: 'localBusiness', label: 'Локальный бизнес', path: MODERATION_PATHS.localBusiness, statusField: 'status', approvedValue: 'active', rejectedValue: 'rejected' },
   { key: 'jobs', label: 'Работа', path: MODERATION_PATHS.jobs, statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
   { key: 'lostFound', label: 'Потеряно/Найдено', path: MODERATION_PATHS.lostFound, statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },

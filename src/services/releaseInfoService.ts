@@ -88,7 +88,6 @@ const SCREEN_NAME_MAP: Array<{ pattern: RegExp; name: string }> = [
   { pattern: /Kto-Poteryal/, name: 'Кто потерял' },
   { pattern: /Vazhnye-Novosti-Chayki/, name: 'Важные новости' },
   { pattern: /Nalashtuvannya-Spovishchen/, name: 'Настройки уведомлений' },
-  { pattern: /ZhkBusinessListScreen/, name: 'Список бизнесов ЖК' },
   { pattern: /Sport-Na-Chayke/, name: 'Спорт на Чайке' },
   { pattern: /Sport-Detal/, name: 'Детали спорта' },
   { pattern: /ProfileRequestsScreen/, name: 'Заявки профиля' },

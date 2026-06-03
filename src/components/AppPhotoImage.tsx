@@ -69,7 +69,7 @@ const isLikelyStoragePath = (value: unknown): value is string => {
   if (typeof value !== 'string') return false;
   const trimmed = value.trim();
   if (!trimmed || /^https?:\/\//i.test(trimmed) || /^file:\/\//i.test(trimmed) || /^content:\/\//i.test(trimmed)) return false;
-  return /^(community_photos|photo_uploads|user_photos|uploads|lost_found|buy_sell|buy_sell_listings|contacts|contacts_listings|local_business|requests|profile_photos|dating|dating_profiles|dating_anketa|dating_anketa_listings|coffee_requests|job_listings|osbb_news|osbb_votes|osbb_house_topics|osbb_collections)\//i.test(trimmed);
+  return /^(community_photos|photo_uploads|user_photos|uploads|lost_found|buy_sell|buy_sell_listings|contacts|contacts_listings|biznes_chaika_listings|local_business|requests|profile_photos|dating|dating_profiles|dating_anketa|dating_anketa_listings|coffee_requests|job_listings|osbb_news|osbb_votes|osbb_house_topics|osbb_collections)\//i.test(trimmed);
 };
 
 const stripQuery = (value: string): string => value.split('?')[0];
