@@ -64,6 +64,9 @@ import ZhkBusinessListScreen from '../screens/ZhkBusinessListScreen';
 import VseDlyaDeteyScreen from '../screens/Vse-Dlya-Detey';
 import DetalDetskogoMestaScreen from '../screens/Detal-Detskogo-Mesta';
 import DetalDetskogoPredlozheniyaScreen from '../screens/Detal-Detskogo-Predlozheniya';
+import SalonyKrasotyScreen from '../screens/Salony-Krasoty';
+import DetalSalonaScreen from '../screens/Detal-Salona';
+import DetalPredlozheniyaSalonaScreen from '../screens/Detal-Predlozheniya-Salona';
 import SportNaChaykeScreen from '../screens/Sport-Na-Chayke';
 import SportDetailScreen from '../screens/Sport-Detal';
 import EdaNaChaykeScreen from '../screens/Eda-Na-Chayke';
@@ -161,6 +164,9 @@ export type RootStackParamList = {
   VseDlyaDeteyScreen: undefined;
   DetalDetskogoMestaScreen: { place: Place };
   DetalDetskogoPredlozheniyaScreen: { offer: import('../types/app').ChildOffer };
+  SalonyKrasotyScreen: undefined;
+  DetalSalonaScreen: { place: Place };
+  DetalPredlozheniyaSalonaScreen: { offer: import('../types/app').BeautyOffer };
   PoruchitelScreen: undefined;
   OsbbHubScreen: undefined;
   OsbbSborScreen: undefined;
@@ -246,6 +252,9 @@ const linking: LinkingOptions<RootStackParamList> = {
        VseDlyaDeteyScreen: 'screen/kids',
        DetalDetskogoMestaScreen: 'screen/kids/place',
        DetalDetskogoPredlozheniyaScreen: 'screen/kids/offer',
+       SalonyKrasotyScreen: 'screen/beauty',
+       DetalSalonaScreen: 'screen/beauty/place',
+       DetalPredlozheniyaSalonaScreen: 'screen/beauty/offer',
       SportNaChaykeScreen: 'screen/sports',
       SportDetailScreen: 'screen/sports/detail',
       EdaNaChaykeScreen: 'screen/food',
@@ -315,6 +324,9 @@ const ROUTE_FILE_MAP: Record<string, string> = {
   VseDlyaDeteyScreen: 'Vse-Dlya-Detey.tsx',
   DetalDetskogoMestaScreen: 'Detal-Detskogo-Mesta.tsx',
   DetalDetskogoPredlozheniyaScreen: 'Detal-Detskogo-Predlozheniya.tsx',
+  SalonyKrasotyScreen: 'Salony-Krasoty.tsx',
+  DetalSalonaScreen: 'Detal-Salona.tsx',
+  DetalPredlozheniyaSalonaScreen: 'Detal-Predlozheniya-Salona.tsx',
   PoruchitelScreen: 'Poruchitel.tsx',
   OsbbHubScreen: 'OSBB-Hub.tsx',
   OsbbSborScreen: 'OSBB-Sbor.tsx',
@@ -841,6 +853,9 @@ function AuthNavigation() {
         <Stack.Screen name="VseDlyaDeteyScreen" component={VseDlyaDeteyScreen} />
         <Stack.Screen name="DetalDetskogoMestaScreen" component={DetalDetskogoMestaScreen} />
         <Stack.Screen name="DetalDetskogoPredlozheniyaScreen" component={DetalDetskogoPredlozheniyaScreen} />
+        <Stack.Screen name="SalonyKrasotyScreen" component={SalonyKrasotyScreen} />
+        <Stack.Screen name="DetalSalonaScreen" component={DetalSalonaScreen} />
+        <Stack.Screen name="DetalPredlozheniyaSalonaScreen" component={DetalPredlozheniyaSalonaScreen} />
         <Stack.Screen name="PoruchitelScreen" component={withGuard(PoruchitelScreen, 'trusted')} />
         <Stack.Screen name="OsbbHubScreen" component={withGuard(OsbbHubScreen, 'trusted')} />
         <Stack.Screen name="OsbbSborScreen" component={withGuard(OsbbSborScreen, 'trusted')} />

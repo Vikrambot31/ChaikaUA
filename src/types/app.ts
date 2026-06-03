@@ -25,6 +25,7 @@ export interface Place {
   createdAt: number;
   childInfo?: ChildInfo;
   foodInfo?: FoodInfo;
+  beautyInfo?: BeautyInfo;
 }
 
 // --- Food module (раздел "Еда на Чайке") ---
@@ -141,6 +142,60 @@ export interface ChildOffer {
   validUntil?: number;
   ageFrom?: number;
   ageTo?: number;
+  price?: number;
+  discountPercent?: number;
+  isFeatured?: boolean;
+  isActive: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+// --- Beauty module (раздел "Салоны красоты") ---
+
+export type BeautyCategory =
+  | 'hair'
+  | 'nails'
+  | 'cosmetology'
+  | 'massage'
+  | 'barbershop'
+  | 'spa';
+
+export type BeautyFeature =
+  | 'home_visit'
+  | 'online_booking'
+  | 'kids_friendly'
+  | 'men'
+  | 'women'
+  | 'parking'
+  | 'certificate'
+  | 'discount_first';
+
+export interface BeautyInfo {
+  category: BeautyCategory;
+  priceFrom?: number;
+  pricePeriod?: 'service' | 'hour' | 'session';
+  hasAvailableSlots?: boolean;
+  workingHours?: string;
+  shortDescription?: string;
+  fullDescription?: string;
+  telegram?: string;
+  instagram?: string;
+  photos?: string[];
+  features?: BeautyFeature[];
+  rating?: number;
+  masterName?: string;
+}
+
+export interface BeautyOffer {
+  id: string;
+  placeId: string;
+  type: 'promotion' | 'event' | 'new_master' | 'discount' | 'available_slots';
+  title: string;
+  shortText: string;
+  fullText?: string;
+  dateFrom?: number;
+  dateTo?: number;
+  validUntil?: number;
   price?: number;
   discountPercent?: number;
   isFeatured?: boolean;
