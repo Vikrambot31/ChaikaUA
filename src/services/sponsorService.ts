@@ -1,5 +1,5 @@
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { equalTo, get, onValue, orderByChild, query, ref } from 'firebase/database';
+import { get, onValue, ref } from 'firebase/database';
 import { auth, database, firebaseApp } from '../firebase-core';
 import { CACHE_TTL, cacheGet, cacheSet } from '../utils/cacheLayer';
 import { normalizeSponsorPhoneValue } from '../utils/rulesEngine';
@@ -345,24 +345,10 @@ export const getMyTrustChain = async (): Promise<TrustChainLink[]> => {
 };
 
 export const getMyInvitedChildren = async (): Promise<TrustTreeChild[]> => {
-  const uid = auth.currentUser?.uid;
-  if (!uid) return [];
-  const snap = await get(query(ref(database, 'trust_tree'), orderByChild('sponsorUid'), equalTo(uid)));
-  if (!snap.exists()) return [];
-  const children: TrustTreeChild[] = [];
-  snap.forEach((child) => {
-    const val = child.val();
-    if (val && typeof val === 'object') {
-      children.push({
-        uid: child.key || '',
-        name: String(val.sponsorName || val.phoneMasked || ''),
-        phoneMasked: String(val.phoneMasked || ''),
-        approvedAt: Number(val.approvedAt || val.createdAt || 0),
-        depthToRoot: Number(val.depthToRoot || 0),
-      });
-    }
-  });
-  return children;
+  if (!auth.currentUser) return [];
+  const fn = httpsCallable<unknown, { children: TrustTreeChild[] }>(getFunctions(firebaseApp), 'getMyInvitedChildren');
+  const result = await fn({});
+  return result.data.children ?? [];
 };
 
 export const subscribeMyTrustNode = (

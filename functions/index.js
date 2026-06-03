@@ -3496,3 +3496,26 @@ exports.getAiBudgetUsage = functionsV1.https.onCall(async (_data, context) => {
     throw new functionsV1.https.HttpsError('internal', 'Failed to get budget usage');
   }
 });
+
+exports.getMyInvitedChildren = functionsV1.https.onCall(async (data, context) => {
+  if (!context.auth || context.auth.token.firebase?.sign_in_provider === 'anonymous') {
+    throw new functionsV1.https.HttpsError('unauthenticated', 'Must be authenticated');
+  }
+  const uid = context.auth.uid;
+  const db = admin.database();
+  const snap = await db.ref(TRUST_TREE_PATH).orderByChild('sponsorUid').equalTo(uid).once('value');
+  const children = [];
+  snap.forEach((child) => {
+    const val = child.val();
+    if (val && typeof val === 'object') {
+      children.push({
+        uid: child.key || '',
+        name: String(val.sponsorName || val.phoneMasked || ''),
+        phoneMasked: String(val.phoneMasked || ''),
+        approvedAt: Number(val.approvedAt || val.createdAt || 0),
+        depthToRoot: Number(val.depthToRoot || 0),
+      });
+    }
+  });
+  return { children };
+});

@@ -4,7 +4,7 @@
     ".write": false,
 
     "users": {
-      ".read": "auth != null && (root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
+      ".read": "auth != null",
       ".indexOn": ["phone"],
       "$uid": {
         ".read": "auth != null",
@@ -109,19 +109,19 @@
     },
 
     "dating_profiles": {
-      ".read": "auth != null && (root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
+      ".read": "auth != null",
       ".indexOn": "moderationStatus",
       "$profileId": {
-        ".read": "auth != null && (data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
+        ".read": "auth != null",
         ".write": "auth != null && ((!data.exists() && (!(root.child('yellow_list').child(auth.uid).child('active').val() !== false && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now))) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
       }
     },
 
     "dating_anketa_listings": {
-      ".read": "auth != null && (root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
+      ".read": "auth != null",
       ".indexOn": "moderationStatus",
       "$anketaId": {
-        ".read": "auth != null && (data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
+        ".read": "auth != null",
         ".write": "auth != null && ((!data.exists() && (!(root.child('yellow_list').child(auth.uid).child('active').val() !== false && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now))) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
       }
     },
@@ -177,10 +177,6 @@
       ".write": false
     },
 
-    "chat_messages": {
-      ".read": "auth != null && (root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
-      ".write": "auth != null && (root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
-    },
 
     "stats": {
       ".read": "auth != null",
@@ -246,12 +242,16 @@
 
     "photo_uploads": {
       ".read": "auth != null",
-      ".write": "auth != null"
+      "$uid": {
+        ".write": "auth != null && auth.uid === $uid"
+      }
     },
 
     "profile_photos": {
       ".read": "auth != null",
-      ".write": "auth != null"
+      "$uid": {
+        ".write": "auth != null && auth.uid === $uid"
+      }
     },
 
     "user_photos": {
@@ -387,6 +387,12 @@
     "ops": {
       ".read": "auth != null && (root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
       ".write": "auth != null && (root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
+      "errors": {
+        ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous'"
+      },
+      "events": {
+        ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous'"
+      },
       "shadow_deny": {
         ".write": "auth != null",
         ".read": "auth != null && root.child('user_roles').child(auth.uid).child('role').val() === 'admin'"
@@ -422,11 +428,11 @@
     },
 
     "trust_tree": {
-      ".read": "auth != null",
+      ".read": "auth != null && (root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
       ".write": "auth != null && root.child('user_roles').child(auth.uid).child('role').val() === 'admin'",
       ".indexOn": ["sponsorUid"],
       "$uid": {
-        ".read": "auth != null"
+        ".read": "auth != null && auth.uid === $uid"
       }
     },
 
