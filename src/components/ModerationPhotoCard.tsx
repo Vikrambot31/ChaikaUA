@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SCREEN_THEME } from '../utils/screenTheme';
@@ -59,6 +59,7 @@ const ModerationPhotoCard: React.FC<ModerationPhotoCardProps> = ({
   busy,
   language = 'ua',
 }) => {
+  const [descExpanded, setDescExpanded] = useState(false);
   const L = useMemo(() => ({
     approve: language === 'ru' ? 'Одобрить' : language === 'en' ? 'Approve' : 'Схвалити',
     reject: language === 'ru' ? 'Отклонить' : language === 'en' ? 'Reject' : 'Відхилити',
@@ -115,7 +116,16 @@ const ModerationPhotoCard: React.FC<ModerationPhotoCardProps> = ({
 
       {photo.description ? (
         <View style={styles.descBox}>
-          <Text style={styles.descText} numberOfLines={3}>{photo.description}</Text>
+          <Text style={styles.descText} numberOfLines={descExpanded ? undefined : 3}>{photo.description}</Text>
+          {(photo.description?.length ?? 0) > 180 && (
+            <TouchableOpacity onPress={() => setDescExpanded((prev) => !prev)} activeOpacity={0.7}>
+              <Text style={styles.expandToggle}>
+                {descExpanded
+                  ? (language === 'ru' ? 'Свернуть' : language === 'en' ? 'Collapse' : 'Згорнути')
+                  : (language === 'ru' ? 'Читать далее' : language === 'en' ? 'Read more' : 'Читати далі')}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       ) : null}
 
@@ -287,6 +297,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#7A6D64',
     lineHeight: 17,
+  },
+  expandToggle: {
+    marginTop: 4,
+    fontSize: 11,
+    color: '#7A6D64',
+    fontWeight: '700',
   },
   actionsRow: {
     flexDirection: 'row',

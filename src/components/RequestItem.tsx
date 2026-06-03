@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Request } from '../types/app';
@@ -188,6 +188,7 @@ const RequestItem: React.FC<RequestItemProps> = ({
   moderationBusy,
   language = 'ua',
 }) => {
+  const [descExpanded, setDescExpanded] = useState(false);
   const topic = useMemo(() => getTopicVisual(request, language), [language, request]);
   const hasPhoto = Boolean(request.photoUri || request.photoStoragePath);
 
@@ -240,7 +241,16 @@ const RequestItem: React.FC<RequestItemProps> = ({
             {/* Description box */}
             {Boolean(request.description) && (
               <View style={styles.descBox}>
-                <Text style={styles.descText} numberOfLines={2}>{request.description}</Text>
+                <Text style={styles.descText} numberOfLines={descExpanded ? undefined : 2}>{request.description}</Text>
+                {(request.description?.length ?? 0) > 120 && (
+                  <TouchableOpacity onPress={() => setDescExpanded((prev) => !prev)} activeOpacity={0.7}>
+                    <Text style={styles.expandToggle}>
+                      {descExpanded
+                        ? (language === 'ru' ? 'Свернуть' : language === 'en' ? 'Collapse' : 'Згорнути')
+                        : (language === 'ru' ? 'Читать далее' : language === 'en' ? 'Read more' : 'Читати далі')}
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
             )}
           </View>
@@ -410,6 +420,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#7A6D64',
     lineHeight: 17,
+  },
+  expandToggle: {
+    marginTop: 4,
+    fontSize: 11,
+    color: '#7A6D64',
+    fontWeight: '700',
   },
   photo: {
     width: '100%',

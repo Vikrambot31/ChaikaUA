@@ -24,6 +24,8 @@ export interface RuntimeMonitorEntry {
   lastSeenAt?: number;
   repeatCount?: number;
   sessionId?: string;
+  /** Unique ID linking all steps of a single submit/upload attempt. */
+  operationId?: string;
   appVersion?: string;
   screen: string;
   action?: string;
@@ -65,6 +67,8 @@ type TraceInput = {
   action: string;
   status: RuntimeMonitorStatus;
   forceRecord?: boolean;
+  criticalFlow?: boolean;
+  operationId?: string;
   feature?: string;
   stage?: string;
   firebasePath?: string;
@@ -81,7 +85,8 @@ type TraceInput = {
 };
 
 const STORAGE_KEY = '@chaika:runtime_monitor_logs';
-const MAX_ENTRIES = 50;
+const MAX_ENTRIES = 150;
+const TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const MAX_STACK_LENGTH = 2000;
 const MAX_FORMATTED_LOG_LENGTH = 20000;
 
@@ -581,6 +586,7 @@ const createEntryFromTrace = ({
   screen,
   action,
   status,
+  operationId,
   feature,
   stage,
   firebasePath,
@@ -636,6 +642,7 @@ const createEntryFromTrace = ({
     stage: stage ? sanitizeString(stage) : undefined,
     code: error ? extractErrorCode(error) : undefined,
     firebaseCode: firebaseCode ? sanitizeString(firebaseCode) : error ? extractErrorCode(error) : undefined,
+    operationId: operationId ? sanitizeString(operationId) : undefined,
     details: sanitizeRecord(details),
     ...getRuntimeEnvironment(),
     breadcrumbs: severity === 'critical' ? getBreadcrumbs() : undefined,
@@ -712,8 +719,9 @@ export const initRuntimeMonitor = async (): Promise<void> => {
           return;
         }
 
+        const ttlCutoff = Date.now() - TTL_MS;
         entries = parsed
-          .filter((item) => item && typeof item === 'object')
+          .filter((item) => item && typeof item === 'object' && Number((item as { at?: unknown }).at ?? 0) > ttlCutoff)
           .map((item) => ({
             id: sanitizeString((item as { id?: unknown }).id ?? ''),
             at: Number((item as { at?: unknown }).at ?? Date.now()),
@@ -721,6 +729,9 @@ export const initRuntimeMonitor = async (): Promise<void> => {
             repeatCount: Number((item as { repeatCount?: unknown }).repeatCount ?? 1),
             sessionId: typeof (item as { sessionId?: unknown }).sessionId === 'string'
               ? sanitizeString((item as { sessionId?: string }).sessionId)
+              : undefined,
+            operationId: typeof (item as { operationId?: unknown }).operationId === 'string'
+              ? sanitizeString((item as { operationId?: string }).operationId)
               : undefined,
             appVersion: typeof (item as { appVersion?: unknown }).appVersion === 'string'
               ? sanitizeString((item as { appVersion?: string }).appVersion)
@@ -798,6 +809,7 @@ export const recordRuntimeMonitorError = async (input: LoggerInput): Promise<voi
 export const recordRuntimeTrace = async (input: TraceInput): Promise<void> => {
   const shouldRecord =
     input.forceRecord ||
+    input.criticalFlow ||
     input.status === 'fail' ||
     input.status === 'timeout' ||
     input.status === 'cancel' ||
@@ -810,6 +822,12 @@ export const recordRuntimeTrace = async (input: TraceInput): Promise<void> => {
   await initRuntimeMonitor();
   await appendEntry(createEntryFromTrace(input));
 };
+
+/** Returns all trace entries for a given operationId, ordered by time. */
+export const getTracesByOperationId = (opId: string): RuntimeMonitorEntry[] =>
+  entries
+    .filter((e) => e.operationId === opId)
+    .sort((a, b) => a.at - b.at);
 
 export const setRuntimeMonitorNetworkState = (state: string): void => {
   latestNetworkState = sanitizeString(state || 'unknown');

@@ -21,7 +21,9 @@ import {
   subscribeCurrentUserUpdateLock,
   type UserUpdateLockRecord,
 } from '../services/securityAdminService';
+import Toast from 'react-native-toast-message';
 import {
+  isEmergencyAccessActive,
   subscribeEmergencyAccess,
   type EmergencyAccessCurrent,
 } from '../services/emergencyAccess';
@@ -53,55 +55,6 @@ const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, errorMess
     }),
   ]);
 
-const toVersionCheckResult = (snapshot: RemoteConfigSnapshot): VersionCheckResult => ({
-  currentVersion: getCurrentAppVersion(),
-  requiresUpdate: true,
-  hasNewVersion: true,
-  configUrl: 'rtdb://security_config/app_control/current',
-  config: {
-    latestVersion: snapshot.config.minimum_required_version,
-    minSupportedVersion: snapshot.config.minimum_required_version,
-    forceUpdate: snapshot.config.force_update_required,
-    updateTitle: 'Update required',
-    updateText: snapshot.config.maintenance_message || 'Please update the app to continue using Chaika Life.',
-  },
-});
-
-const toPersonalUpdateResult = (lock: UserUpdateLockRecord): VersionCheckResult => {
-  const currentVersion = getCurrentAppVersion();
-  return {
-    currentVersion,
-    requiresUpdate: true,
-    hasNewVersion: true,
-    configUrl: `rtdb://user_update_locks/${lock.uid}`,
-    config: {
-      latestVersion: lock.required_version,
-      minSupportedVersion: lock.required_version,
-      forceUpdate: true,
-      updateTitle: 'Обновите приложение',
-      updateText: lock.message || PERSONAL_UPDATE_LOCK_MESSAGE,
-      landingUrl: 'https://chaika-life.netlify.app/',
-    },
-  };
-};
-
-const toPersonalDeviceUpdateResult = (uid: string | null, deviceId: string | null): VersionCheckResult => {
-  const currentVersion = getCurrentAppVersion();
-  return {
-    currentVersion,
-    requiresUpdate: true,
-    hasNewVersion: true,
-    configUrl: `rtdb://authorized_devices/${uid ?? 'unknown'}/${deviceId ?? 'unknown'}`,
-    config: {
-      latestVersion: currentVersion,
-      minSupportedVersion: currentVersion,
-      forceUpdate: true,
-      updateTitle: 'Оновіть додаток',
-      updateText: 'Для вашого пристрою доступне обовʼязкове оновлення застосунку.',
-      landingUrl: 'https://chaika-life.netlify.app/',
-    },
-  };
-};
 
 const AppAccessGuard: React.FC<AppAccessGuardProps> = ({
   children,
@@ -115,7 +68,7 @@ const AppAccessGuard: React.FC<AppAccessGuardProps> = ({
   );
   const [isRemoteReady, setIsRemoteReady] = useState(Boolean(initialRemoteConfigSnapshot));
   const [deviceStatus, setDeviceStatus] = useState<DeviceAuthorizationStatus>(createUnknownDeviceStatus());
-  const [personalUpdateLock, setPersonalUpdateLock] = useState<UserUpdateLockRecord | null>(null);
+  const [, setPersonalUpdateLock] = useState<UserUpdateLockRecord | null>(null);
   const [emergencyAccess, setEmergencyAccess] = useState<EmergencyAccessCurrent | null>(null);
   const deviceUnsubscribeRef = useRef<null | (() => void)>(null);
   const updateLockUnsubscribeRef = useRef<null | (() => void)>(null);
