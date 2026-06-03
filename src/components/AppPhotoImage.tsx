@@ -234,9 +234,12 @@ const AppPhotoImage: React.FC<Props> = ({
         const targetPath = await getCacheFilePath(path);
         if (!targetPath) return;
         const existing = await FileSystem.getInfoAsync(targetPath);
-        if (existing.exists) {
+        if (existing.exists && (!('size' in existing) || typeof existing.size !== 'number' || existing.size > 0)) {
           setLocalImageUri(targetPath);
           return;
+        }
+        if (existing.exists) {
+          await FileSystem.deleteAsync(targetPath, { idempotent: true });
         }
         const downloaded = await FileSystem.downloadAsync(url, targetPath);
         if (cancelled) return;
@@ -547,6 +550,11 @@ const AppPhotoImage: React.FC<Props> = ({
           style={StyleSheet.absoluteFill}
           resizeMode={resizeMode}
           onError={(event) => {
+            if (isFileUri(finalImageUri) && isHttpsUri(resolvedImageUri)) {
+              void FileSystem.deleteAsync(finalImageUri, { idempotent: true }).catch(() => undefined);
+              setLocalImageUri('');
+              return;
+            }
             console.warn('[AppPhotoImage] load failed:', {
               debugLabel,
               finalImageUriNoQuery: stripQuery(finalImageUri).slice(0, 180),
