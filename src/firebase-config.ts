@@ -1164,11 +1164,13 @@ export const photoAPI = {
         photos,
         'community_photos',
         (item) =>
-          typeof item.storagePath === 'string'
-            ? item.storagePath
-            : typeof item.imageUri === 'string'
-              ? item.imageUri
-              : '',
+          typeof item.imageUri === 'string' && /^https?:\/\//i.test(item.imageUri)
+            ? item.imageUri
+            : typeof item.storagePath === 'string'
+              ? item.storagePath
+              : typeof item.imageUri === 'string'
+                ? item.imageUri
+                : '',
         (item, url) => ({ ...item, imageUri: url || item.imageUri }),
       );
 

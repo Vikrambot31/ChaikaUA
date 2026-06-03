@@ -95,7 +95,7 @@ export const buySellService = {
       const ids = new Set(active.map((i) => i.id));
       const extras = ownPendingItems.filter((i) => !ids.has(i.id));
       const merged = [...extras, ...active];
-      void resolveMediaAccessUrls(merged, 'buy_sell_listings', (item) => item.photoStoragePath || item.photoUri || '', (item, url) => ({ ...item, photoUri: url })).then(callback);
+      void resolveMediaAccessUrls(merged, 'buy_sell_listings', (item) => item.photoUri || item.photoStoragePath || '', (item, url) => ({ ...item, photoUri: url })).then(callback);
     };
 
     const listRef = query(ref(database, PATH), orderByChild('moderationStatus'), equalTo('approved'), limitToLast(ACTIVE_LIMIT + ACTIVE_LIMIT_BUFFER));
@@ -146,7 +146,7 @@ export const buySellService = {
           : [];
         const ids = new Set(approvedItems.map((i) => i.id));
         const extras = ownPendingItems.filter((i) => !ids.has(i.id));
-        void resolveMediaAccessUrls([...extras, ...approvedItems], 'buy_sell_listings', (item) => item.photoStoragePath || item.photoUri || '', (item, url) => ({ ...item, photoUri: url })).then(callback);
+        void resolveMediaAccessUrls([...extras, ...approvedItems], 'buy_sell_listings', (item) => item.photoUri || item.photoStoragePath || '', (item, url) => ({ ...item, photoUri: url })).then(callback);
       }, () => { ownPendingItems = []; });
     }
 

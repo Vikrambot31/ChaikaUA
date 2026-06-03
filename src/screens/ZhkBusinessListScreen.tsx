@@ -526,7 +526,7 @@ export default function ZhkBusinessListScreen() {
         const resolved = await resolveMediaAccessUrls(
           active,
           'local_business',
-          (item) => item.photoStoragePath || item.photoUri || '',
+          (item) => item.photoUri || item.photoStoragePath || '',
           (item, url) => ({ ...item, photoUri: url }),
         );
         setItems(resolved);

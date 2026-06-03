@@ -102,7 +102,7 @@ export const contactsService = {
         const resolved = await resolveMediaAccessUrls(
           chunk,
           'contacts_listings',
-          (item) => item.photoStoragePath || item.photoUri || '',
+          (item) => item.photoUri || item.photoStoragePath || '',
           (item, url) => ({ ...item, photoUri: url }),
           { profile: 'list' },
         );
