@@ -349,7 +349,7 @@ const createPromotionFunctions = ({ functions, functionsV1, admin, writeOpsEvent
   // ────────────────────────────────────────────────────────────────────────
   //  expireBonusPromotions — Scheduled: mark expired promotions (hourly)
   // ────────────────────────────────────────────────────────────────────────
-  fns.expireBonusPromotions = functions.pubsub
+  fns.expireBonusPromotions = functionsV1.pubsub
     .schedule('every 60 minutes')
     .onRun(async () => {
       const now = Date.now();
@@ -504,7 +504,7 @@ const createPromotionFunctions = ({ functions, functionsV1, admin, writeOpsEvent
   // ────────────────────────────────────────────────────────────────────────
   //  checkExpiringSubscriptions — Scheduled daily: send notifications
   // ────────────────────────────────────────────────────────────────────────
-  fns.checkExpiringSubscriptions = functions.pubsub
+  fns.checkExpiringSubscriptions = functionsV1.pubsub
     .schedule('every day 09:00')
     .timeZone('Europe/Kyiv')
     .onRun(async () => {
@@ -570,7 +570,7 @@ const createPromotionFunctions = ({ functions, functionsV1, admin, writeOpsEvent
   // ────────────────────────────────────────────────────────────────────────
   //  autoRenewSubscriptions — Scheduled daily: auto-renew if sufficient credits
   // ────────────────────────────────────────────────────────────────────────
-  fns.autoRenewSubscriptions = functions.pubsub
+  fns.autoRenewSubscriptions = functionsV1.pubsub
     .schedule('every day 10:00')
     .timeZone('Europe/Kyiv')
     .onRun(async () => {
@@ -666,7 +666,7 @@ const createPromotionFunctions = ({ functions, functionsV1, admin, writeOpsEvent
   // ────────────────────────────────────────────────────────────────────────
   //  expireSubscriptions — Scheduled hourly: expire overdue subscriptions
   // ────────────────────────────────────────────────────────────────────────
-  fns.expireSubscriptions = functions.pubsub
+  fns.expireSubscriptions = functionsV1.pubsub
     .schedule('every 60 minutes')
     .onRun(async () => {
       const now = Date.now();
