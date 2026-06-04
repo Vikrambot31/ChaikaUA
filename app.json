@@ -1,102 +1,104 @@
-{
-  "expo": {
-    "name": "Chaika Life",
-    "slug": "chaika-ua",
-    "scheme": "chaikaua",
-    "version": "1.1.391",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
-    "updates": {
-      "enabled": false,
-      "checkAutomatically": "NEVER",
-      "fallbackToCacheTimeout": 60000,
-      "url": "https://u.expo.dev/56926acd-88c3-497c-a49e-f4e1b72bff52"
-    },
-    "platforms": [
-      "ios",
-      "android",
-      "web"
-    ],
-    "orientation": "portrait",
-    "userInterfaceStyle": "light",
-    "icon": "./assets/WEBP-version/Logo-Chaika LIFE-box.webp",
-    "splash": {
-      "image": "./assets/WEBP-version/logo-8.webp",
-      "backgroundColor": "#F7F3EE"
-    },
-    "android": {
-      "package": "com.chaikaua.mobile",
-      "permissions": [
-        "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.INTERNET",
-        "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO",
-        "android.permission.READ_MEDIA_IMAGES",
-        "android.permission.POST_NOTIFICATIONS",
-        "android.permission.RECEIVE_BOOT_COMPLETED",
-        "android.permission.REQUEST_INSTALL_PACKAGES"
-      ],
-      "googleServicesFile": "./android/app/google-services.json",
-      "icon": "./assets/WEBP-version/Logo-Chaika LIFE-box.webp",
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/WEBP-version/Logo-Chaika LIFE-box.webp",
-        "monochromeImage": "./assets/WEBP-version/Logo-Chaika LIFE-box.webp",
-        "backgroundColor": "#F7F3EE"
-      },
-      "versionCode": 391
-    },
-    "ios": {
-      "bundleIdentifier": "com.chaikaua.mobile",
-      "supportsTablet": true,
-      "icon": "./assets/WEBP-version/Logo-Chaika LIFE-box.webp",
-      "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Р”РѕРґР°С‚РєСѓ РїРѕС‚СЂС–Р±РµРЅ РґРѕСЃС‚СѓРї РґРѕ РіРµРѕР»РѕРєР°С†С–С— РґР»СЏ РїРѕС€СѓРєСѓ СЃСѓСЃС–РґС–РІ С‚Р° РјС–СЃС†СЊ РїРѕСЂСѓС‡",
-        "NSMicrophoneUsageDescription": "Р”РѕРґР°С‚РєСѓ РїРѕС‚СЂС–Р±РµРЅ РґРѕСЃС‚СѓРї РґРѕ РјС–РєСЂРѕС„РѕРЅР° РґР»СЏ Р·Р°РїРёСЃСѓ РіРѕР»РѕСЃРѕРІРёС… РїРѕРІС–РґРѕРјР»РµРЅСЊ",
-        "NSCameraUsageDescription": "Р”РѕРґР°С‚РєСѓ РїРѕС‚СЂС–Р±РµРЅ РґРѕСЃС‚СѓРї РґРѕ РєР°РјРµСЂРё РґР»СЏ СЃС‚РІРѕСЂРµРЅРЅСЏ С„РѕС‚Рѕ"
-      }
-    },
-    "plugins": [
-      [
-        "expo-image-picker",
-        {
-          "photosPermission": "Р”РѕРґР°С‚РєСѓ РїРѕС‚СЂС–Р±РµРЅ РґРѕСЃС‚СѓРї РґРѕ РіР°Р»РµСЂРµС— РґР»СЏ Р·Р°РІР°РЅС‚Р°Р¶РµРЅРЅСЏ С„РѕС‚Рѕ",
-          "cameraPermission": "Р”РѕРґР°С‚РєСѓ РїРѕС‚СЂС–Р±РµРЅ РґРѕСЃС‚СѓРї РґРѕ РіР°Р»РµСЂРµС— РґР»СЏ Р·Р°РІР°РЅС‚Р°Р¶РµРЅРЅСЏ С„РѕС‚Рѕ"
-        }
-      ],
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/WEBP-version/logo-chaika-intro.webp",
-          "color": "#F7F3EE",
-          "sounds": []
-        }
-      ],
-      [
-        "expo-av",
-        {
-          "microphonePermission": "Р”РѕРґР°С‚РєСѓ РїРѕС‚СЂС–Р±РµРЅ РґРѕСЃС‚СѓРї РґРѕ РјС–РєСЂРѕС„РѕРЅР° РґР»СЏ Р·Р°РїРёСЃСѓ РіРѕР»РѕСЃРѕРІРёС… РїРѕРІС–РґРѕРјР»РµРЅСЊ"
-        }
-      ]
-    ],
-    "extra": {
-      "firebaseApiKey": "AIzaSyDcohmy5PiUiEDQ5mholkY59HpOmeeoG6E",
-      "firebaseAuthDomain": "chaikaua-3cd9d.firebaseapp.com",
-      "firebaseDatabaseURL": "https://chaikaua-3cd9d-default-rtdb.firebaseio.com",
-      "firebaseProjectId": "chaikaua-3cd9d",
-      "firebaseStorageBucket": "chaikaua-3cd9d.firebasestorage.app",
-      "firebaseMessagingSenderId": "1027130010906",
-      "firebaseAppId": "1:1027130010906:web:db3714bfa38b2fb35410a3",
-      "firebaseMeasurementId": "G-0XP61P1NSS",
-      "googleWebClientId": "1027130010906-j9cltoe87n0hcupluudtb80avn2a09c5.apps.googleusercontent.com",
-      "googleWebClientIdDev": "1027130010906-j9cltoe87n0hcupluudtb80avn2a09c5.apps.googleusercontent.com",
-      "googleWebClientIdProd": "1027130010906-j9cltoe87n0hcupluudtb80avn2a09c5.apps.googleusercontent.com",
-      "adminServiceEmail": "vikramsave@ukr.net",
-      "versionConfigUrl": "https://chaika-life.netlify.app/app-version.json",
-      "eas": {
-        "projectId": "56926acd-88c3-497c-a49e-f4e1b72bff52"
-      }
-    }
-  }
+﻿{
+    "expo":  {
+                 "name":  "Chaika Life",
+                 "slug":  "chaika-ua",
+                 "scheme":  "chaikaua",
+                 "version":  "1.1.392",
+                 "runtimeVersion":  {
+                                        "policy":  "appVersion"
+                                    },
+                 "updates":  {
+                                 "enabled":  false,
+                                 "checkAutomatically":  "NEVER",
+                                 "fallbackToCacheTimeout":  60000,
+                                 "url":  "https://u.expo.dev/56926acd-88c3-497c-a49e-f4e1b72bff52"
+                             },
+                 "platforms":  [
+                                   "ios",
+                                   "android",
+                                   "web"
+                               ],
+                 "orientation":  "portrait",
+                 "userInterfaceStyle":  "light",
+                 "icon":  "./assets/WEBP-version/Logo-Chaika LIFE-box.webp",
+                 "splash":  {
+                                "image":  "./assets/WEBP-version/logo-8.webp",
+                                "backgroundColor":  "#F7F3EE"
+                            },
+                 "android":  {
+                                 "package":  "com.chaikaua.mobile",
+                                 "permissions":  [
+                                                     "android.permission.ACCESS_FINE_LOCATION",
+                                                     "android.permission.ACCESS_COARSE_LOCATION",
+                                                     "android.permission.INTERNET",
+                                                     "android.permission.CAMERA",
+                                                     "android.permission.RECORD_AUDIO",
+                                                     "android.permission.READ_MEDIA_IMAGES",
+                                                     "android.permission.POST_NOTIFICATIONS",
+                                                     "android.permission.RECEIVE_BOOT_COMPLETED",
+                                                     "android.permission.REQUEST_INSTALL_PACKAGES"
+                                                 ],
+                                 "googleServicesFile":  "./android/app/google-services.json",
+                                 "icon":  "./assets/WEBP-version/Logo-Chaika LIFE-box.webp",
+                                 "adaptiveIcon":  {
+                                                      "foregroundImage":  "./assets/WEBP-version/Logo-Chaika LIFE-box.webp",
+                                                      "monochromeImage":  "./assets/WEBP-version/Logo-Chaika LIFE-box.webp",
+                                                      "backgroundColor":  "#F7F3EE"
+                                                  },
+                                 "versionCode":  392
+                             },
+                 "ios":  {
+                             "bundleIdentifier":  "com.chaikaua.mobile",
+                             "supportsTablet":  true,
+                             "icon":  "./assets/WEBP-version/Logo-Chaika LIFE-box.webp",
+                             "infoPlist":  {
+                                               "NSLocationWhenInUseUsageDescription":  "Р вЂќР С•Р Т‘Р В°РЎвЂљР С”РЎС“ Р С—Р С•РЎвЂљРЎР‚РЎвЂ“Р В±Р ВµР Р… Р Т‘Р С•РЎРѓРЎвЂљРЎС“Р С— Р Т‘Р С• Р С–Р ВµР С•Р В»Р С•Р С”Р В°РЎвЂ РЎвЂ“РЎвЂ” Р Т‘Р В»РЎРЏ Р С—Р С•РЎв‚¬РЎС“Р С”РЎС“ РЎРѓРЎС“РЎРѓРЎвЂ“Р Т‘РЎвЂ“Р Р† РЎвЂљР В° Р СРЎвЂ“РЎРѓРЎвЂ РЎРЉ Р С—Р С•РЎР‚РЎС“РЎвЂЎ",
+                                               "NSMicrophoneUsageDescription":  "Р вЂќР С•Р Т‘Р В°РЎвЂљР С”РЎС“ Р С—Р С•РЎвЂљРЎР‚РЎвЂ“Р В±Р ВµР Р… Р Т‘Р С•РЎРѓРЎвЂљРЎС“Р С— Р Т‘Р С• Р СРЎвЂ“Р С”РЎР‚Р С•РЎвЂћР С•Р Р…Р В° Р Т‘Р В»РЎРЏ Р В·Р В°Р С—Р С‘РЎРѓРЎС“ Р С–Р С•Р В»Р С•РЎРѓР С•Р Р†Р С‘РЎвЂ¦ Р С—Р С•Р Р†РЎвЂ“Р Т‘Р С•Р СР В»Р ВµР Р…РЎРЉ",
+                                               "NSCameraUsageDescription":  "Р вЂќР С•Р Т‘Р В°РЎвЂљР С”РЎС“ Р С—Р С•РЎвЂљРЎР‚РЎвЂ“Р В±Р ВµР Р… Р Т‘Р С•РЎРѓРЎвЂљРЎС“Р С— Р Т‘Р С• Р С”Р В°Р СР ВµРЎР‚Р С‘ Р Т‘Р В»РЎРЏ РЎРѓРЎвЂљР Р†Р С•РЎР‚Р ВµР Р…Р Р…РЎРЏ РЎвЂћР С•РЎвЂљР С•"
+                                           }
+                         },
+                 "plugins":  [
+                                 [
+                                     "expo-image-picker",
+                                     {
+                                         "photosPermission":  "Р вЂќР С•Р Т‘Р В°РЎвЂљР С”РЎС“ Р С—Р С•РЎвЂљРЎР‚РЎвЂ“Р В±Р ВµР Р… Р Т‘Р С•РЎРѓРЎвЂљРЎС“Р С— Р Т‘Р С• Р С–Р В°Р В»Р ВµРЎР‚Р ВµРЎвЂ” Р Т‘Р В»РЎРЏ Р В·Р В°Р Р†Р В°Р Р…РЎвЂљР В°Р В¶Р ВµР Р…Р Р…РЎРЏ РЎвЂћР С•РЎвЂљР С•",
+                                         "cameraPermission":  "Р вЂќР С•Р Т‘Р В°РЎвЂљР С”РЎС“ Р С—Р С•РЎвЂљРЎР‚РЎвЂ“Р В±Р ВµР Р… Р Т‘Р С•РЎРѓРЎвЂљРЎС“Р С— Р Т‘Р С• Р С–Р В°Р В»Р ВµРЎР‚Р ВµРЎвЂ” Р Т‘Р В»РЎРЏ Р В·Р В°Р Р†Р В°Р Р…РЎвЂљР В°Р В¶Р ВµР Р…Р Р…РЎРЏ РЎвЂћР С•РЎвЂљР С•"
+                                     }
+                                 ],
+                                 [
+                                     "expo-notifications",
+                                     {
+                                         "icon":  "./assets/WEBP-version/logo-chaika-intro.webp",
+                                         "color":  "#F7F3EE",
+                                         "sounds":  [
+
+                                                    ]
+                                     }
+                                 ],
+                                 [
+                                     "expo-av",
+                                     {
+                                         "microphonePermission":  "Р вЂќР С•Р Т‘Р В°РЎвЂљР С”РЎС“ Р С—Р С•РЎвЂљРЎР‚РЎвЂ“Р В±Р ВµР Р… Р Т‘Р С•РЎРѓРЎвЂљРЎС“Р С— Р Т‘Р С• Р СРЎвЂ“Р С”РЎР‚Р С•РЎвЂћР С•Р Р…Р В° Р Т‘Р В»РЎРЏ Р В·Р В°Р С—Р С‘РЎРѓРЎС“ Р С–Р С•Р В»Р С•РЎРѓР С•Р Р†Р С‘РЎвЂ¦ Р С—Р С•Р Р†РЎвЂ“Р Т‘Р С•Р СР В»Р ВµР Р…РЎРЉ"
+                                     }
+                                 ]
+                             ],
+                 "extra":  {
+                               "firebaseApiKey":  "AIzaSyDcohmy5PiUiEDQ5mholkY59HpOmeeoG6E",
+                               "firebaseAuthDomain":  "chaikaua-3cd9d.firebaseapp.com",
+                               "firebaseDatabaseURL":  "https://chaikaua-3cd9d-default-rtdb.firebaseio.com",
+                               "firebaseProjectId":  "chaikaua-3cd9d",
+                               "firebaseStorageBucket":  "chaikaua-3cd9d.firebasestorage.app",
+                               "firebaseMessagingSenderId":  "1027130010906",
+                               "firebaseAppId":  "1:1027130010906:web:db3714bfa38b2fb35410a3",
+                               "firebaseMeasurementId":  "G-0XP61P1NSS",
+                               "googleWebClientId":  "1027130010906-j9cltoe87n0hcupluudtb80avn2a09c5.apps.googleusercontent.com",
+                               "googleWebClientIdDev":  "1027130010906-j9cltoe87n0hcupluudtb80avn2a09c5.apps.googleusercontent.com",
+                               "googleWebClientIdProd":  "1027130010906-j9cltoe87n0hcupluudtb80avn2a09c5.apps.googleusercontent.com",
+                               "adminServiceEmail":  "vikramsave@ukr.net",
+                               "versionConfigUrl":  "https://chaika-life.netlify.app/app-version.json",
+                               "eas":  {
+                                           "projectId":  "56926acd-88c3-497c-a49e-f4e1b72bff52"
+                                       }
+                           }
+             }
 }
