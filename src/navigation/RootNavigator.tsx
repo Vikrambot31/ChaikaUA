@@ -891,7 +891,7 @@ function AuthNavigation() {
         <Stack.Screen name="TopCafeScreen" component={TopCafeScreen} />
         <Stack.Screen name="TopStoresScreen" component={TopStoresScreen} />
         <Stack.Screen name="PlacesScreen" component={withGuard(PlacesScreen, 'auth')} />
-        <Stack.Screen name="RequestsScreen" component={withGuard(RequestsScreen, 'moderator')} />
+        <Stack.Screen name="RequestsScreen" component={withGuard(RequestsScreen, 'auth')} />
         <Stack.Screen name="RequestTopicScreen" component={RequestTopicScreen} />
         <Stack.Screen name="SubscriptionScreen" component={SubscriptionScreen} />
         <Stack.Screen name="RatingScreen" component={RatingScreen} />

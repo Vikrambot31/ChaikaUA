@@ -259,7 +259,7 @@ const OsbbAdminScreen: React.FC = () => {
       icon: 'clipboard-check-outline',
       labelKey: 'actionRequests',
       color: SCREEN_THEME.terracotta,
-      onPress: (nav) => nav.navigate('HelpNeighborsScreen'),
+      onPress: (nav) => nav.navigate('RequestsScreen'),
     },
     {
       icon: 'vote-outline',
