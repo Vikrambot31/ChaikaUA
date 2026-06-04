@@ -18,6 +18,7 @@ import { useSelector } from 'react-redux';
 import AppPhotoImage from '../components/AppPhotoImage';
 import MiniTabBar from '../components/MiniTabBar';
 import { database } from '../firebase-core';
+import { ensureFirebaseAuth } from '../firebase-auth-session';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import type { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
@@ -39,6 +40,7 @@ const UI_TEXT = {
     addPhoto: 'Додати фото',
     login: 'Увійдіть, щоб додати фото',
     empty: 'Поки немає фото району',
+    loadError: 'Не вдалося завантажити фото',
   },
   ru: {
     title: 'Фото района',
@@ -47,6 +49,7 @@ const UI_TEXT = {
     addPhoto: 'Добавить фото',
     login: 'Войдите, чтобы добавить фото',
     empty: 'Пока нет фото района',
+    loadError: 'Не удалось загрузить фото',
   },
   en: {
     title: 'District Photos',
@@ -55,6 +58,7 @@ const UI_TEXT = {
     addPhoto: 'Add photo',
     login: 'Sign in to add a photo',
     empty: 'No district photos yet',
+    loadError: 'Could not load photos',
   },
 } as const;
 
@@ -135,60 +139,71 @@ export default function FotoRayonaScreen() {
 
   const [remotePhotos, setRemotePhotos] = useState<SoulPhoto[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
-    const photosRef = ref(database, 'community_photos');
-    const unsubscribe = onValue(
-      photosRef,
-      (snapshot) => {
-        try {
-          const value = snapshot.val() as unknown;
-          if (!value || typeof value !== 'object' || Array.isArray(value)) {
-            setRemotePhotos([]);
-            setLoading(false);
-            return;
-          }
+    let active = true;
+    let unsubscribe: (() => void) | undefined;
 
-          const currentUid = user?.id ?? '';
-          const items = Object.entries(value as Record<string, unknown>)
-            .map<SoulPhoto | null>(([id, raw]) => {
-              if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-              const photo = raw as RawPhoto;
-              const status = clean(photo.status);
-              const sourceScreen = clean(photo.sourceScreen);
-              const owner = clean(photo.uid) || clean(photo.userId);
-              if (sourceScreen !== SCREEN_ID && sourceScreen !== PHOTO_UPLOAD_SCREEN_ID) return null;
-              const isApproved = status === 'approved';
-              const isOwnPending = status === 'pending' && Boolean(currentUid) && owner === currentUid;
-              if (!isApproved && !isOwnPending) return null;
-              return {
-                id,
-                uri: clean(photo.thumbnailUrl) || clean(photo.imageUri),
-                storagePath: clean(photo.storagePath),
-                createdAt: timestamp(photo.createdAt) || timestamp(photo.uploadedAt),
-                status: isApproved ? 'approved' : 'pending',
-              };
-            })
-            .filter((item): item is SoulPhoto => item !== null)
-            .sort((a, b) => b.createdAt - a.createdAt || b.id.localeCompare(a.id))
-            .slice(0, MAX_ITEMS);
+    void ensureFirebaseAuth()
+      .then(() => {
+        if (!active) return;
+        const photosRef = ref(database, 'community_photos');
+        unsubscribe = onValue(
+          photosRef,
+          (snapshot) => {
+            try {
+              const value = snapshot.val() as unknown;
+              if (!value || typeof value !== 'object' || Array.isArray(value)) {
+                if (active) { setRemotePhotos([]); setLoading(false); }
+                return;
+              }
 
-          setRemotePhotos(items);
-          setLoading(false);
-        } catch (error) {
-          void logClientError('FotoRayonaScreen.load', error);
-          setRemotePhotos([]);
-          setLoading(false);
-        }
-      },
-      (error) => {
-        void logClientError('FotoRayonaScreen.firebase', error);
-        setRemotePhotos([]);
-        setLoading(false);
-      },
-    );
+              const currentUid = user?.id ?? '';
+              const items = Object.entries(value as Record<string, unknown>)
+                .map<SoulPhoto | null>(([id, raw]) => {
+                  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+                  const photo = raw as RawPhoto;
+                  const status = clean(photo.status);
+                  const sourceScreen = clean(photo.sourceScreen);
+                  const owner = clean(photo.uid) || clean(photo.userId);
+                  if (sourceScreen !== SCREEN_ID && sourceScreen !== PHOTO_UPLOAD_SCREEN_ID) return null;
+                  const isApproved = status === 'approved';
+                  const isOwnPending = status === 'pending' && Boolean(currentUid) && owner === currentUid;
+                  if (!isApproved && !isOwnPending) return null;
+                  return {
+                    id,
+                    uri: clean(photo.thumbnailUrl) || clean(photo.imageUri),
+                    storagePath: clean(photo.storagePath),
+                    createdAt: timestamp(photo.createdAt) || timestamp(photo.uploadedAt),
+                    status: isApproved ? 'approved' : 'pending',
+                  };
+                })
+                .filter((item): item is SoulPhoto => item !== null)
+                .sort((a, b) => b.createdAt - a.createdAt || b.id.localeCompare(a.id))
+                .slice(0, MAX_ITEMS);
 
-    return unsubscribe;
+              if (active) { setRemotePhotos(items); setLoading(false); }
+            } catch (error) {
+              void logClientError('FotoRayonaScreen.load', error);
+              if (active) { setRemotePhotos([]); setLoading(false); }
+            }
+          },
+          (error) => {
+            void logClientError('FotoRayonaScreen.firebase', error);
+            if (active) { setRemotePhotos([]); setLoadError(true); setLoading(false); }
+          },
+        );
+      })
+      .catch((error) => {
+        void logClientError('FotoRayonaScreen.auth', error);
+        if (active) { setRemotePhotos([]); setLoadError(true); setLoading(false); }
+      });
+
+    return () => {
+      active = false;
+      unsubscribe?.();
+    };
   }, [user?.id]);
 
   const data = useMemo<SoulPhoto[]>(() => {
@@ -248,8 +263,12 @@ export default function FotoRayonaScreen() {
         <ActivityIndicator size="large" color={SCREEN_THEME.terracotta} />
       ) : (
         <>
-          <MaterialCommunityIcons name="image-outline" size={38} color="#8D735A" />
-          <Text style={styles.emptyText}>{text.empty}</Text>
+          <MaterialCommunityIcons
+            name={loadError ? 'wifi-alert' : 'image-outline'}
+            size={38}
+            color="#8D735A"
+          />
+          <Text style={styles.emptyText}>{loadError ? text.loadError : text.empty}</Text>
         </>
       )}
     </View>

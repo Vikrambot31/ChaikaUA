@@ -20,6 +20,7 @@ import AppPhotoImage from '../components/AppPhotoImage';
 import MiniTabBar from '../components/MiniTabBar';
 import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField';
 import { database } from '../firebase-core';
+import { ensureFirebaseAuth } from '../firebase-auth-session';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import type { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
@@ -47,6 +48,7 @@ const UI_TEXT = {
     addressPlaceholder: 'Адреса місця',
     login: 'Увійдіть, щоб додати фото',
     empty: 'Поки немає фото для душі',
+    loadError: 'Не вдалося завантажити фото',
   },
   ru: {
     title: 'Фото для Души',
@@ -61,6 +63,7 @@ const UI_TEXT = {
     addressPlaceholder: 'Адрес места',
     login: 'Войдите, чтобы добавить фото',
     empty: 'Пока нет фото для души',
+    loadError: 'Не удалось загрузить фото',
   },
   en: {
     title: 'Photos for the Soul',
@@ -75,6 +78,7 @@ const UI_TEXT = {
     addressPlaceholder: 'Place address',
     login: 'Sign in to add a photo',
     empty: 'No soul photos yet',
+    loadError: 'Could not load photos',
   },
 } as const;
 
@@ -184,58 +188,69 @@ export default function SoulPhotosScreen() {
   const [description, setDescription] = useState('');
   const [address, setAddress] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
-    const photosQuery = query(ref(database, 'community_photos'), orderByChild('sourceScreen'), equalTo(SCREEN_ID));
-    const unsubscribe = onValue(
-      photosQuery,
-      (snapshot) => {
-        try {
-          const value = snapshot.val() as unknown;
-          if (!value || typeof value !== 'object' || Array.isArray(value)) {
-            setRemotePhotos([]);
-            setLoading(false);
-            return;
-          }
+    let active = true;
+    let unsubscribe: (() => void) | undefined;
 
-          const currentUid = user?.id ?? '';
-          const items = Object.entries(value as Record<string, unknown>)
-            .map<SoulPhoto | null>(([id, raw]) => {
-              if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-              const photo = raw as RawPhoto;
-              const status = clean(photo.status);
-              const owner = clean(photo.uid) || clean(photo.userId);
-              const isApproved = status === 'approved';
-              const isOwnPending = status === 'pending' && Boolean(currentUid) && owner === currentUid;
-              if (!isApproved && !isOwnPending) return null;
-              return {
-                id,
-                uri: clean(photo.thumbnailUrl) || clean(photo.imageUri),
-                storagePath: clean(photo.storagePath),
-                createdAt: timestamp(photo.createdAt) || timestamp(photo.uploadedAt),
-                status: isApproved ? 'approved' : 'pending',
-              };
-            })
-            .filter((item): item is SoulPhoto => item !== null)
-            .sort((a, b) => b.createdAt - a.createdAt || b.id.localeCompare(a.id))
-            .slice(0, MAX_ITEMS);
+    void ensureFirebaseAuth()
+      .then(() => {
+        if (!active) return;
+        const photosQuery = query(ref(database, 'community_photos'), orderByChild('sourceScreen'), equalTo(SCREEN_ID));
+        unsubscribe = onValue(
+          photosQuery,
+          (snapshot) => {
+            try {
+              const value = snapshot.val() as unknown;
+              if (!value || typeof value !== 'object' || Array.isArray(value)) {
+                if (active) { setRemotePhotos([]); setLoading(false); }
+                return;
+              }
 
-          setRemotePhotos(items);
-          setLoading(false);
-        } catch (error) {
-          void logClientError('SoulPhotosScreen.load', error);
-          setRemotePhotos([]);
-          setLoading(false);
-        }
-      },
-      (error) => {
-        void logClientError('SoulPhotosScreen.firebase', error);
-        setRemotePhotos([]);
-        setLoading(false);
-      },
-    );
+              const currentUid = user?.id ?? '';
+              const items = Object.entries(value as Record<string, unknown>)
+                .map<SoulPhoto | null>(([id, raw]) => {
+                  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+                  const photo = raw as RawPhoto;
+                  const status = clean(photo.status);
+                  const owner = clean(photo.uid) || clean(photo.userId);
+                  const isApproved = status === 'approved';
+                  const isOwnPending = status === 'pending' && Boolean(currentUid) && owner === currentUid;
+                  if (!isApproved && !isOwnPending) return null;
+                  return {
+                    id,
+                    uri: clean(photo.thumbnailUrl) || clean(photo.imageUri),
+                    storagePath: clean(photo.storagePath),
+                    createdAt: timestamp(photo.createdAt) || timestamp(photo.uploadedAt),
+                    status: isApproved ? 'approved' : 'pending',
+                  };
+                })
+                .filter((item): item is SoulPhoto => item !== null)
+                .sort((a, b) => b.createdAt - a.createdAt || b.id.localeCompare(a.id))
+                .slice(0, MAX_ITEMS);
 
-    return unsubscribe;
+              if (active) { setRemotePhotos(items); setLoading(false); }
+            } catch (error) {
+              void logClientError('SoulPhotosScreen.load', error);
+              if (active) { setRemotePhotos([]); setLoading(false); }
+            }
+          },
+          (error) => {
+            void logClientError('SoulPhotosScreen.firebase', error);
+            if (active) { setRemotePhotos([]); setLoadError(true); setLoading(false); }
+          },
+        );
+      })
+      .catch((error) => {
+        void logClientError('SoulPhotosScreen.auth', error);
+        if (active) { setRemotePhotos([]); setLoadError(true); setLoading(false); }
+      });
+
+    return () => {
+      active = false;
+      unsubscribe?.();
+    };
   }, [user?.id]);
 
   const handlePhotosChange = useCallback((photos: UploadedPhoto[]) => {
@@ -370,8 +385,12 @@ export default function SoulPhotosScreen() {
         <ActivityIndicator size="large" color={SCREEN_THEME.terracotta} />
       ) : (
         <>
-          <MaterialCommunityIcons name="tag-heart-outline" size={38} color="#8D735A" />
-          <Text style={styles.emptyText}>{text.empty}</Text>
+          <MaterialCommunityIcons
+            name={loadError ? 'wifi-alert' : 'tag-heart-outline'}
+            size={38}
+            color="#8D735A"
+          />
+          <Text style={styles.emptyText}>{loadError ? text.loadError : text.empty}</Text>
         </>
       )}
     </View>
