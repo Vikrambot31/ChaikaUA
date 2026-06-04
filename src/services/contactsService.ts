@@ -170,6 +170,8 @@ export const contactsService = {
         latestApprovedArchived = active;
         resolvePhotosInBackground(buildMerged(active), currentRequestId);
       });
+    }, () => {
+      callback([]);
     });
 
     let unsubscribeOwn: (() => void) | undefined;

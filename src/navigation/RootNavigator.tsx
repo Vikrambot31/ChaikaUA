@@ -864,8 +864,8 @@ function AuthNavigation() {
         <Stack.Screen name="AnnouncementsScreen" component={AnnouncementsScreen} />
         <Stack.Screen name="JobSearchScreen" component={JobSearchScreen} />
         <Stack.Screen name="BuySellScreen" component={withGuard(BuySellScreen, 'auth')} />
-        <Stack.Screen name="KontaktiChaikyScreen" component={KontaktiChaikyScreen} />
-        <Stack.Screen name="BizznesChaikaScreen" component={BizznesChaikaScreen} />
+        <Stack.Screen name="KontaktiChaikyScreen" component={withGuard(KontaktiChaikyScreen, 'auth')} />
+        <Stack.Screen name="BizznesChaikaScreen" component={withGuard(BizznesChaikaScreen, 'auth')} />
         <Stack.Screen name="ItemDetailScreen" component={ItemDetailScreen} />
         <Stack.Screen name="AppInfoScreen" component={AppInfoScreen} />
         <Stack.Screen name="LoginScreen" component={LoginScreen} />

@@ -309,6 +309,8 @@ const biznesChaikaService = {
         latestApprovedArchived = active;
         resolvePhotosInBackground(buildMerged(active), currentRequestId);
       });
+    }, () => {
+      callback([]);
     });
 
     let unsubscribeOwn: (() => void) | undefined;

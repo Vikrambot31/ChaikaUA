@@ -190,19 +190,25 @@ export default function ProfileSetupScreen() {
   const handleQuickRegistrationPress = async () => {
     if (saving) return;
 
+    // Only proceed if all fields are filled to preserve data
+    if (!isNameDone || !isGenderDone || !isAgeDone || !selectedKey) {
+      Toast.show({
+        type: 'error',
+        text1: text.error,
+        text2: 'Заповніть усі поля для збереження даних',
+      });
+      return;
+    }
+
     setSaving(true);
     try {
-      if (selectedKey) {
-        await saveSelectedStartAvatar(selectedKey);
-      }
-      if (isNameDone && isGenderDone && isAgeDone && selectedKey) {
-        await saveTempProfileData({
-          name: trimmedName,
-          gender: gender!,
-          age: parsedAge,
-          startAvatarKey: selectedKey,
-        });
-      }
+      await saveSelectedStartAvatar(selectedKey);
+      await saveTempProfileData({
+        name: trimmedName,
+        gender: gender!,
+        age: parsedAge,
+        startAvatarKey: selectedKey,
+      });
       navigation.navigate('LoginScreen');
     } finally {
       setSaving(false);
