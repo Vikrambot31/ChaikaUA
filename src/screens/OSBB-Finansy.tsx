@@ -16,10 +16,12 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../redux/store';
 import {
+  CollectionPayment,
   OsbbCollection,
   calculateOsbbCollectionTotals,
+  recordCollectionPayment,
+  subscribeOsbbCollectionPayments,
   subscribeOsbbCollections,
-  updateOsbbCollection,
 } from '../services/osbbCollections';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { useOsbbMembership } from '../hooks/useOsbbMembership';
@@ -203,24 +205,7 @@ const MarkPaymentModal: React.FC<MarkPaymentModalProps> = ({
 
     setSaving(true);
     try {
-      // Build new payment entry
-      // Update the collection: increase collectedAmount and append payment entry
-      await updateOsbbCollection(buildingId, collection.id, (current) => {
-        const newCollected = current.collectedAmount + numericAmount;
-        // Store payments as a serialized key inside the collection.
-        // We encode them in a JSON string on the paymentUrl is NOT the right place.
-        // Instead, we track the aggregate here; named entries go into a
-        // 'payments' sub-object by timestamp key – but updateOsbbCollection
-        // only accepts OsbbCollection fields. We store a summary via
-        // collectedAmount increment only. The entry display relies on a
-        // local payments state managed separately below.
-        return {
-          ...current,
-          collectedAmount: Math.min(newCollected, current.targetAmount),
-        };
-      });
-
-      // Keep local log of payments for display within this session
+      await recordCollectionPayment(buildingId, collection.id, payerName.trim(), numericAmount);
       toast.showSuccess(t.paymentMarked);
       reset();
       onClose();
@@ -398,6 +383,15 @@ const OsbbFinansyScreen: React.FC = () => {
 
   // Track expanded collection for payers view
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [collectionPayments, setCollectionPayments] = useState<CollectionPayment[]>([]);
+
+  useEffect(() => {
+    if (!expandedId || !buildingId) {
+      setCollectionPayments([]);
+      return;
+    }
+    return subscribeOsbbCollectionPayments(buildingId, expandedId, setCollectionPayments);
+  }, [buildingId, expandedId]);
 
   // ---------------------------------------------------------------------------
   // Subscription
@@ -647,6 +641,23 @@ const OsbbFinansyScreen: React.FC = () => {
                           <Text style={styles.payersDeadline}>
                             {t.transactionsSection}: {formatDate(item.createdAt)}
                           </Text>
+                        )}
+
+                        {/* Payment entries list */}
+                        {collectionPayments.length > 0 && (
+                          <View style={styles.paymentsList}>
+                            <Text style={styles.payersStatLabel}>{t.paidLabel}:</Text>
+                            {collectionPayments.map((p) => (
+                              <View key={p.id} style={styles.paymentEntry}>
+                                <MaterialCommunityIcons name="check-circle" size={14} color={SCREEN_THEME.woodGreenDark} />
+                                <Text style={styles.paymentEntryName} numberOfLines={1}>{p.payerName || '—'}</Text>
+                                <Text style={styles.paymentEntryAmount}>{formatCurrency(p.amount)} {t.currency}</Text>
+                              </View>
+                            ))}
+                          </View>
+                        )}
+                        {collectionPayments.length === 0 && (
+                          <Text style={styles.noPayersText}>{t.noPayers}</Text>
                         )}
 
                         {/* Admin mark payment button */}
@@ -1054,6 +1065,27 @@ const styles = StyleSheet.create({
     color: SCREEN_THEME.textSecondary,
     textAlign: 'center',
     marginTop: 12,
+  },
+  paymentsList: {
+    marginTop: 8,
+    gap: 6,
+  },
+  paymentEntry: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 4,
+  },
+  paymentEntryName: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '700',
+    color: SCREEN_THEME.textPrimary,
+  },
+  paymentEntryAmount: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: SCREEN_THEME.woodGreenDark,
   },
 
   // Empty state card

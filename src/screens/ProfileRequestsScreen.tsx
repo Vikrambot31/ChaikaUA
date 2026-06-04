@@ -359,7 +359,7 @@ export default function ProfileRequestsScreen() {
       } catch (err) {
         if (!cancelled) {
           if ((err as { code?: string })?.code === 'PERMISSION_DENIED') {
-            navigation.navigate('Login');
+            navigation.navigate('LoginScreen');
           } else {
             Alert.alert(t.errTitle, t.errBody);
           }
@@ -397,7 +397,7 @@ export default function ProfileRequestsScreen() {
         }
       } catch (err) {
         if ((err as { code?: string })?.code === 'PERMISSION_DENIED') {
-          navigation.navigate('Login');
+          navigation.navigate('LoginScreen');
         } else {
           Alert.alert(t.errTitle, t.errBody);
         }
@@ -405,7 +405,7 @@ export default function ProfileRequestsScreen() {
         setLoading(false);
       }
     }, () => {
-      navigation.navigate('Login');
+      navigation.navigate('LoginScreen');
       setLoading(false);
     });
 

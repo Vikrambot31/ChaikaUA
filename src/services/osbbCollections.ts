@@ -154,3 +154,70 @@ export const updateOsbbCollection = async (
     };
   });
 };
+
+// ---------------------------------------------------------------------------
+// Payment entries
+// ---------------------------------------------------------------------------
+
+const PAYMENTS_PATH = 'osbb_collection_payments';
+
+export type CollectionPayment = {
+  id: string;
+  payerName: string;
+  amount: number;
+  paidAt: string;
+};
+
+export const recordCollectionPayment = async (
+  buildingId: string,
+  collectionId: string,
+  payerName: string,
+  amount: number,
+) => {
+  const collectionRef = ref(database, `${PATH}/${buildingId}/${collectionId}`);
+  await runTransaction(collectionRef, (current: StoredCollection | null) => {
+    if (!current) return current;
+    const newCollected = current.collectedAmount + amount;
+    return {
+      ...current,
+      collectedAmount: Math.min(newCollected, current.targetAmount),
+    };
+  });
+
+  const paymentsRef = ref(database, `${PAYMENTS_PATH}/${buildingId}/${collectionId}`);
+  await push(paymentsRef, {
+    payerName: sanitizeStoredText(payerName),
+    amount,
+    paidAt: new Date().toISOString(),
+  });
+};
+
+export const subscribeOsbbCollectionPayments = (
+  buildingId: string,
+  collectionId: string,
+  callback: (payments: CollectionPayment[]) => void,
+): (() => void) => {
+  const listRef = query(
+    ref(database, `${PAYMENTS_PATH}/${buildingId}/${collectionId}`),
+    orderByChild('paidAt'),
+    limitToLast(50),
+  );
+
+  return onValue(
+    listRef,
+    (snapshot) => {
+      const raw = snapshot.val() as Record<string, Omit<CollectionPayment, 'id'>> | null;
+      if (!raw) { callback([]); return; }
+      const payments = Object.entries(raw)
+        .map(([id, data]) => ({
+          id,
+          payerName: typeof data.payerName === 'string' ? data.payerName : '',
+          amount: typeof data.amount === 'number' ? data.amount : 0,
+          paidAt: typeof data.paidAt === 'string' ? data.paidAt : '',
+        }))
+        .sort((a, b) => b.paidAt.localeCompare(a.paidAt));
+      callback(payments);
+    },
+    () => { callback([]); },
+  );
+};
