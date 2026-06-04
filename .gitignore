@@ -111,3 +111,21 @@ PHOTO_BUGS_SUMMARY_*.md
 PHOTO_BUGS_AUDIT_*.md
 PHOTO_BUGS_FIXES_*.md
 TX-AUDIT-APK-NOT-INSTALL.md
+
+# Debug/diagnostic dump files and screenshots
+window_dump*.xml
+*_dump.xml
+*_dump*.xml
+screen*.png
+screen*.xml
+BUG_REPORT.md
+after_back.xml
+auth_screen.xml
+login_screen.xml
+home_screen_2.xml
+profile_2.xml
+lost_found_2.xml
+hamburger_2.xml
+output3_full.xml
+window_dump_pretty.xml
+window_dump_scroll1.xml
