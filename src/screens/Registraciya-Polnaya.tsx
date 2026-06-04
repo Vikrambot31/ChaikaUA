@@ -221,19 +221,6 @@ const RegisterScreenFull: React.FC = () => {
         }
       }
 
-      // Verify referrer BEFORE creating the account so we don't leave orphaned auth records.
-      let referrerVerified = false;
-      if (referrerPhone) {
-        const normalizedReferrer = normalizePhoneText(referrerPhone);
-        const referrerSnap = await get(query(dbRef(database, 'users'), orderByChild('phone'), equalTo(normalizedReferrer)));
-        const referrerSnapAlt = await get(query(dbRef(database, 'users'), orderByChild('phone'), equalTo(referrerPhone.trim())));
-        referrerVerified = referrerSnap.exists() || referrerSnapAlt.exists();
-        if (!referrerVerified) {
-          Toast.show({ type: 'error', text1: text.error, text2: text.referrerNotFound });
-          return;
-        }
-      }
-
       const authUser = isCompletingExistingAccount
         ? auth.currentUser
         : (await createUserWithEmailAndPassword(auth, normalizedEmail, password)).user;
@@ -243,6 +230,20 @@ const RegisterScreenFull: React.FC = () => {
       }
 
       await updateProfile(authUser, { displayName: normalizedName });
+
+      // Verify referrer AFTER creating account (Firebase Rules require auth != null)
+      let referrerVerified = true;
+      if (referrerPhone) {
+        const normalizedReferrer = normalizePhoneText(referrerPhone);
+        const referrerSnap = await get(query(dbRef(database, 'users'), orderByChild('phone'), equalTo(normalizedReferrer)));
+        const referrerSnapAlt = await get(query(dbRef(database, 'users'), orderByChild('phone'), equalTo(referrerPhone.trim())));
+        referrerVerified = referrerSnap.exists() || referrerSnapAlt.exists();
+        if (!referrerVerified) {
+          await authUser.delete();
+          Toast.show({ type: 'error', text1: text.error, text2: text.referrerNotFound });
+          return;
+        }
+      }
 
       const uid = authUser.uid;
       const selectedStartAvatar = await getSelectedStartAvatar();
@@ -289,11 +290,15 @@ const RegisterScreenFull: React.FC = () => {
         text2: text.done,
       });
       if (route.params?.redirectTo) {
-        navigation.reset({
-          index: 0,
-          routes: [{ name: route.params.redirectTo, params: route.params.redirectParams }],
-        });
-        return;
+        try {
+          navigation.reset({
+            index: 0,
+            routes: [{ name: route.params.redirectTo, params: route.params.redirectParams }],
+          });
+          return;
+        } catch {
+          // Invalid screen name, fall through to ProfileSetupScreen
+        }
       }
       navigation.reset({ index: 0, routes: [{ name: 'ProfileSetupScreen' }] });
     } catch (err: unknown) {

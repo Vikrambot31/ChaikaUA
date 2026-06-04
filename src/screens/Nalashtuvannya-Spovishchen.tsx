@@ -169,7 +169,7 @@ export default function NotificationSettingsScreen() {
   const requestPermission = useCallback(async () => {
     try {
       const token = await fcmAPI.registerToken();
-      const { status } = await Notifications.getPermissionsAsync();
+      const { status } = await Notifications.requestPermissionsAsync();
       const granted = status === 'granted';
 
       setPermissionGranted(granted);
@@ -236,7 +236,7 @@ export default function NotificationSettingsScreen() {
               <TactileIcon icon="bell-ring-outline" size={48} iconSize={22} backgroundColor={SCREEN_THEME.terracotta} />
               <View style={styles.enableCopy}>
                 <Text style={styles.enableTitle}>{text.enableButton}</Text>
-                <Text style={styles.enableText}>{text.permissionDenied}</Text>
+                <Text style={styles.enableText}>{text.enableText}</Text>
               </View>
             </View>
             <TouchableOpacity style={styles.enableBtn} onPress={requestPermission} activeOpacity={0.85}>
