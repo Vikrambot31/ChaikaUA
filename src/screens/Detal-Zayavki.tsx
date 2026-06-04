@@ -13,7 +13,7 @@ import AppPhotoImage from '../components/AppPhotoImage';
 import MiniUserAvatar from '../components/MiniUserAvatar';
 import { LIGHT_ORBS, SCREEN_THEME } from '../utils/screenTheme';
 import { showUserError } from '../utils/userFacingErrors';
-import { profilePermissionService } from '../services/profilePermissionService';
+import { profilePermissionService, type ContactReason } from '../services/profilePermissionService';
 import { pickUserAvatarUri } from '../utils/userAvatar';
 import { getRequestTopicLabel } from '../data/categories';
 import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
@@ -284,8 +284,12 @@ const RequestDetailScreen = ({
         setAccessStatus(null);
         return;
       }
-      const access = await profilePermissionService.checkAccess(request.userId, currentUser.id);
-      setAccessStatus(access);
+      try {
+        const access = await profilePermissionService.checkAccess(request.userId, currentUser.id);
+        setAccessStatus(access);
+      } catch {
+        setAccessStatus(null);
+      }
     };
     void loadAccess();
   }, [currentUser?.id, request.userId]);
@@ -398,8 +402,21 @@ const RequestDetailScreen = ({
     navigation.navigate('ViewUserProfile', { userId: request.userId });
   };
 
+  const handleSendContactRequest = async (reason: ContactReason) => {
+    await sendRequest(reason);
+    if (currentUser?.id && request.userId && currentUser.id !== request.userId) {
+      try {
+        const access = await profilePermissionService.checkAccess(request.userId, currentUser.id);
+        setAccessStatus(access);
+      } catch {
+        // ignore — status label will stay as-is
+      }
+    }
+  };
+
   const handleContact = () => {
     if (canRequestContact && request.userId) {
+      if (accessStatus === 'pending' || accessStatus === 'approved') return;
       void openModal({
         userId: request.userId,
         name: displayName,
@@ -795,7 +812,7 @@ const RequestDetailScreen = ({
         visible={modalVisible}
         pending={pending}
         target={currentTarget}
-        onSelect={(reason) => void sendRequest(reason)}
+        onSelect={(reason) => void handleSendContactRequest(reason)}
         onClose={closeModal}
       />
     </SafeAreaView>

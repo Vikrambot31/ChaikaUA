@@ -121,6 +121,7 @@ export default function ItemDetailScreen({
       openModal({
         userId: item.userId,
         name: item.title || text.headerTitle,
+        photoURL: item.ownerAvatarUri,
         sourceType: getContactContext(item.sourceType),
         sourceId: item.sourceId,
         sourceTitle: item.title,

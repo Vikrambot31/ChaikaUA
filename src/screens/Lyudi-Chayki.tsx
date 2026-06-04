@@ -437,14 +437,22 @@ export default function TopGirlsBoysScreen() {
         { name: target?.name, photoURL: target?.photoURL }
       );
       if (result === 'already_approved') {
-        setPermModal((prev) => ({ ...prev, state: 'open', contactInfo: target?.phone ?? '' }));
+        const record = await profilePermissionService.getAccessRecord(permModal.targetId, user.id);
+        setPermModal((prev) => ({ ...prev, state: 'open', contactInfo: record.sharedContact ?? '' }));
+      } else if (result === 'open_profile') {
+        let phone = '';
+        try {
+          const snap = await get(ref(database, `users/${permModal.targetId}/phone`));
+          phone = typeof snap.val() === 'string' ? (snap.val() as string) : '';
+        } catch { /* show modal without phone */ }
+        setPermModal((prev) => ({ ...prev, state: 'open', contactInfo: phone }));
       } else if (result === 'already_pending') {
         setPermModal((prev) => ({ ...prev, state: 'pending' }));
       } else {
         setPermModal((prev) => ({ ...prev, state: 'sent' }));
       }
     } catch (error) {
-      setPermModal((prev) => ({ ...prev, state: 'confirm' }));
+      setPermModal({ visible: false, state: 'confirm', targetId: '', targetName: '', contactInfo: '' });
       Alert.alert('Помилка', error instanceof Error ? error.message : 'Не вдалося надіслати запит');
     }
   }, [user?.id, user?.name, user?.photoURL, permModal.targetId, filteredRanked]);
@@ -576,7 +584,7 @@ export default function TopGirlsBoysScreen() {
                   currentUserId={user?.id}
                   language={language}
                   onProfile={!isCurrentUser ? () => navigation.navigate('ViewUserProfile', { userId: person.id }) : undefined}
-                  onContact={!isCurrentUser ? () => openContactModal({ userId: person.id, name: person.name, sourceType: 'lyudi', sourceId: person.id, sourceTitle: person.name }) : undefined}
+                  onContact={!isCurrentUser ? () => openContactModal({ userId: person.id, name: person.name, photoURL: person.photoURL, sourceType: 'lyudi', sourceId: person.id, sourceTitle: person.name }) : undefined}
                   contactDisabled={isCurrentUser}
                   likePath="feed_likes/people"
                   likeId={person.id}
