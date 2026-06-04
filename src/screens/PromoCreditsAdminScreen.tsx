@@ -13,6 +13,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import type { NavigationProp } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useTranslation } from '../i18n/useTranslation';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { subscribeToAllAdTickets } from '../services/adService';
 import {
@@ -62,6 +63,7 @@ const getPromotionTargetTitle = (promotion: BonusPromotion) => {
 
 const PromoCreditsAdminScreen: React.FC = () => {
   const navigation = useNavigation<AppNav>();
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<AdminTab>('topups');
   const [tickets, setTickets] = useState<AdTicket[]>([]);
   const [promotions, setPromotions] = useState<BonusPromotion[]>([]);
@@ -105,7 +107,7 @@ const PromoCreditsAdminScreen: React.FC = () => {
   const grantCredits = async (ticket: AdTicket) => {
     const credits = Number(ticket.requestedCredits || 0);
     if (!credits || credits <= 0) {
-      Alert.alert('Нельзя начислить', 'В заявке нет количества промо-кредитов.');
+      Alert.alert(t.common.error, t.promoCredits.topupDesc);
       return;
     }
 
@@ -117,9 +119,9 @@ const PromoCreditsAdminScreen: React.FC = () => {
         reason: `Promo credits top-up: ${credits} credits / ${ticket.expectedAmount || 0} ${ticket.currency || 'UAH'}`,
         ticketId: ticket.ticketId,
       });
-      Alert.alert('Готово', `Начислено ${credits}. Новый баланс: ${result.newBalance}`);
+      Alert.alert(t.common.success, `${t.common.ok} ${credits}. ${t.bonus.balance}: ${result.newBalance}`);
     } catch (error: any) {
-      Alert.alert('Не удалось начислить', error?.message || '');
+      Alert.alert(t.common.error, error?.message || '');
     } finally {
       setBusyTicketId(null);
     }
@@ -132,14 +134,14 @@ const PromoCreditsAdminScreen: React.FC = () => {
       await adminModeratePromotion({
         promotionId: promotion.id,
         action,
-        reason: action === 'reject' ? reason || 'Отклонено администратором' : undefined,
+        reason: action === 'reject' ? reason || t.common.error : undefined,
       });
-      Alert.alert('Готово', action === 'approve' ? 'Продвижение одобрено.' : 'Продвижение отклонено, средства возвращены.');
+      Alert.alert(t.common.success, action === 'approve' ? t.bonus.boostProfile : t.common.cancel);
       if (action === 'reject') {
         setRejectReasons((prev) => ({ ...prev, [promotion.id]: '' }));
       }
     } catch (error: any) {
-      Alert.alert('Не удалось выполнить действие', error?.message || '');
+      Alert.alert(t.common.error, error?.message || '');
     } finally {
       setBusyPromotionId(null);
     }
@@ -179,7 +181,7 @@ const PromoCreditsAdminScreen: React.FC = () => {
           ) : (
             <>
               <MaterialCommunityIcons name="check-decagram-outline" size={19} color="#FFF9EE" />
-              <Text style={styles.grantButtonText}>Начислить промо-кредиты</Text>
+              <Text style={styles.grantButtonText}>{t.promoCredits.chatAdmin}</Text>
             </>
           )}
         </TouchableOpacity>
@@ -219,7 +221,7 @@ const PromoCreditsAdminScreen: React.FC = () => {
             <TextInput
               value={rejectReasons[item.id] || ''}
               onChangeText={(value) => setRejectReasons((prev) => ({ ...prev, [item.id]: value }))}
-              placeholder="Причина отклонения"
+              placeholder={t.common.error}
               placeholderTextColor={SCREEN_THEME.textMuted}
               style={styles.reasonInput}
               multiline
@@ -233,7 +235,7 @@ const PromoCreditsAdminScreen: React.FC = () => {
                 activeOpacity={0.86}
               >
                 <MaterialCommunityIcons name="close-circle-outline" size={18} color="#FFF9EE" />
-                <Text style={styles.grantButtonText}>Отклонить</Text>
+                <Text style={styles.grantButtonText}>{t.common.cancel}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.approveButton, isBusy && styles.disabledButton]}
@@ -246,7 +248,7 @@ const PromoCreditsAdminScreen: React.FC = () => {
                 ) : (
                   <>
                     <MaterialCommunityIcons name="check-decagram-outline" size={18} color="#FFF9EE" />
-                    <Text style={styles.grantButtonText}>Одобрить</Text>
+                    <Text style={styles.grantButtonText}>{t.common.ok}</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -264,8 +266,8 @@ const PromoCreditsAdminScreen: React.FC = () => {
           <MaterialCommunityIcons name="arrow-left" size={22} color={SCREEN_THEME.textPrimary} />
         </TouchableOpacity>
         <View style={styles.headerCopy}>
-          <Text style={styles.headerTitle}>Промо-кредиты</Text>
-          <Text style={styles.headerSubtitle}>Заявки на пополнение</Text>
+          <Text style={styles.headerTitle}>{t.promoCredits.title}</Text>
+          <Text style={styles.headerSubtitle}>{t.promoCredits.topupTitle}</Text>
         </View>
       </View>
 
@@ -275,7 +277,7 @@ const PromoCreditsAdminScreen: React.FC = () => {
           onPress={() => setActiveTab('topups')}
           activeOpacity={0.84}
         >
-          <Text style={[styles.tabText, activeTab === 'topups' && styles.tabTextActive]}>Пополнения</Text>
+          <Text style={[styles.tabText, activeTab === 'topups' && styles.tabTextActive]}>{t.promoCredits.topupTitle}</Text>
           <Text style={[styles.tabCount, activeTab === 'topups' && styles.tabTextActive]}>{topupTickets.length}</Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -283,7 +285,7 @@ const PromoCreditsAdminScreen: React.FC = () => {
           onPress={() => setActiveTab('promotions')}
           activeOpacity={0.84}
         >
-          <Text style={[styles.tabText, activeTab === 'promotions' && styles.tabTextActive]}>Продвижения</Text>
+          <Text style={[styles.tabText, activeTab === 'promotions' && styles.tabTextActive]}>{t.bonus.boostProfile}</Text>
           <Text style={[styles.tabCount, activeTab === 'promotions' && styles.tabTextActive]}>
             {sortedPromotions.filter((item) => item.moderationStatus === 'pending').length}
           </Text>
@@ -301,7 +303,7 @@ const PromoCreditsAdminScreen: React.FC = () => {
           ListEmptyComponent={
             <View style={styles.emptyBox}>
               <MaterialCommunityIcons name="file-search-outline" size={44} color={SCREEN_THEME.textMuted} />
-              <Text style={styles.emptyText}>Нет заявок на пополнение.</Text>
+              <Text style={styles.emptyText}>{t.promoCredits.noSubscriptions}</Text>
             </View>
           }
         />
@@ -316,7 +318,7 @@ const PromoCreditsAdminScreen: React.FC = () => {
           ListEmptyComponent={
             <View style={styles.emptyBox}>
               <MaterialCommunityIcons name="bullhorn-outline" size={44} color={SCREEN_THEME.textMuted} />
-              <Text style={styles.emptyText}>Нет заявок на продвижение.</Text>
+              <Text style={styles.emptyText}>{t.bonus.noTransactions}</Text>
             </View>
           }
         />

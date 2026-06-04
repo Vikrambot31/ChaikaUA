@@ -21,6 +21,7 @@ import { purchaseBonusPromotion, subscribeMyBonuses, subscribeMyPromoCredits, ty
 import { chaykaPlaces } from '../services/chaykaPlacesData';
 import { getBeautyPlaces, getActiveBeautyOffers } from '../services/beautySeed';
 import { getChildrenPlaces, getActiveOffers } from '../services/childrenSeed';
+import { useTranslation } from '../i18n/useTranslation';
 
 type AppNav = NavigationProp<Record<string, object | undefined>>;
 type RouteParams = {
@@ -43,46 +44,46 @@ type PromotionTarget = {
   subtitle: string;
 };
 
-const OPTIONS: PromotionOption[] = [
+const buildOptions = (t: any): PromotionOption[] => [
   {
     promoType: 'contacts_top',
-    title: 'Профиль в Контактах',
-    subtitle: 'Ваш профиль выше на экране Контакты',
+    title: t.bonus.contactsTop,
+    subtitle: t.bonus.boostProfile,
     currency: 'trust',
     durations: { '24h': 80, '3d': 200, '7d': 420 },
   },
   {
     promoType: 'business_top',
-    title: 'Бизнес на Чайке',
-    subtitle: 'Ваша бизнес-карточка выше в списке',
+    title: t.bonus.businessTop,
+    subtitle: t.bonus.boostBusiness,
     currency: 'promo',
     durations: { '24h': 120, '3d': 300, '7d': 650, '30d': 2200 },
   },
   {
     promoType: 'beauty_salon_top',
-    title: 'Салон красоты',
-    subtitle: 'Салон выше в разделе красоты',
+    title: t.bonus.beautyTop,
+    subtitle: t.bonus.boostBeauty,
     currency: 'promo',
     durations: { '24h': 120, '7d': 650 },
   },
   {
     promoType: 'beauty_promo_top',
-    title: 'Акция салона',
-    subtitle: 'Предложение салона выше в актуальном блоке',
+    title: t.bonus.beautyTop,
+    subtitle: t.bonus.boostBeauty,
     currency: 'promo',
     durations: { '24h': 100, '7d': 550 },
   },
   {
     promoType: 'kids_place_top',
-    title: 'Место для детей',
-    subtitle: 'Детское место выше в разделе',
+    title: t.bonus.kidsTop,
+    subtitle: t.bonus.boostKids,
     currency: 'promo',
     durations: { '24h': 120, '7d': 650 },
   },
   {
     promoType: 'kids_event_top',
-    title: 'Детское событие',
-    subtitle: 'Мероприятие выше в актуальном блоке',
+    title: t.bonus.kidsTop,
+    subtitle: t.bonus.boostKids,
     currency: 'promo',
     durations: { '24h': 80, '7d': 420 },
   },
@@ -97,6 +98,7 @@ const normalizeBizTitle = (raw: Record<string, unknown>, id: string) =>
 const BonusPromotionPurchaseScreen: React.FC = () => {
   const navigation = useNavigation<AppNav>();
   const route = useRoute<RouteProp<RouteParams, 'BonusPromotionPurchaseScreen'>>();
+  const { t } = useTranslation();
   const user = useSelector(selectUser);
   const initialPromoType = route.params?.initialPromoType || 'contacts_top';
   const [selectedPromoType, setSelectedPromoType] = useState(initialPromoType);
@@ -108,6 +110,7 @@ const BonusPromotionPurchaseScreen: React.FC = () => {
   const [credits, setCredits] = useState<PromoCredits>(EMPTY_CREDITS);
   const [buying, setBuying] = useState(false);
 
+  const OPTIONS = buildOptions(t);
   const selectedOption = OPTIONS.find((item) => item.promoType === selectedPromoType) || OPTIONS[0];
   const durations = Object.entries(selectedOption.durations);
   const selectedPrice = selectedOption.durations[selectedDuration] ?? durations[0]?.[1] ?? 0;
@@ -171,11 +174,11 @@ const BonusPromotionPurchaseScreen: React.FC = () => {
 
   const targets = useMemo(() => {
     if (selectedPromoType === 'contacts_top') {
-      return [{ id: user?.id || '', title: user?.name || 'Мой профиль', subtitle: 'Контакты Чайки' }];
+      return [{ id: user?.id || '', title: user?.name || t.bonus.activePromotions, subtitle: t.bonus.trustBonuses }];
     }
     if (selectedPromoType === 'business_top') return businessTargets;
     return buildStaticTargets(selectedPromoType);
-  }, [businessTargets, selectedPromoType, user?.id, user?.name]);
+  }, [businessTargets, selectedPromoType, user?.id, user?.name, t.bonus.activePromotions, t.bonus.trustBonuses]);
 
   const canBuy = Boolean(selectedTargetId) && balance >= selectedPrice && !buying;
 
@@ -189,14 +192,14 @@ const BonusPromotionPurchaseScreen: React.FC = () => {
         targetId: selectedTargetId,
       });
       Alert.alert(
-        'Продвижение создано',
+        t.bonus.activePromotions,
         result.moderationStatus === 'pending'
-          ? 'Заявка создана и ожидает модерации.'
-          : `Активно до ${new Date(result.expiresAt).toLocaleString()}.`,
+          ? t.common.loading
+          : `${t.bonus.active_resident} ${new Date(result.expiresAt).toLocaleString()}.`,
       );
       navigation.goBack();
     } catch (error: any) {
-      Alert.alert('Не удалось купить продвижение', error?.message || '');
+      Alert.alert(t.common.error, error?.message || '');
     } finally {
       setBuying(false);
     }
@@ -209,18 +212,18 @@ const BonusPromotionPurchaseScreen: React.FC = () => {
           <MaterialCommunityIcons name="arrow-left" size={22} color={SCREEN_THEME.textPrimary} />
         </TouchableOpacity>
         <View style={styles.headerCopy}>
-          <Text style={styles.headerTitle}>Купить продвижение</Text>
-          <Text style={styles.headerSubtitle}>Списание только через Cloud Function</Text>
+          <Text style={styles.headerTitle}>{t.bonus.activePromotions}</Text>
+          <Text style={styles.headerSubtitle}>{t.promoCredits.topupDesc}</Text>
         </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.balanceRow}>
-          <BalanceCard label="Бонусы доверия" value={bonuses?.available ?? bonuses?.total ?? 0} icon="hand-heart" />
-          <BalanceCard label="Промо-кредиты" value={credits.balance} icon="storefront" />
+          <BalanceCard label={t.bonus.trustBonuses} value={bonuses?.available ?? bonuses?.total ?? 0} icon="hand-heart" />
+          <BalanceCard label={t.promoCredits.title} value={credits.balance} icon="storefront" />
         </View>
 
-        <Text style={styles.sectionTitle}>Тип продвижения</Text>
+        <Text style={styles.sectionTitle}>{t.adChat.promotion}</Text>
         <View style={styles.optionList}>
           {OPTIONS.map((option) => {
             const active = option.promoType === selectedPromoType;
@@ -241,13 +244,13 @@ const BonusPromotionPurchaseScreen: React.FC = () => {
           })}
         </View>
 
-        <Text style={styles.sectionTitle}>Что продвигать</Text>
+        <Text style={styles.sectionTitle}>{t.bonus.boostProfile}</Text>
         {targetsLoading ? (
           <ActivityIndicator size="small" color={SCREEN_THEME.terracotta} style={{ marginVertical: 14 }} />
         ) : targets.length === 0 ? (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyText}>
-              Для этого типа продвижения пока нет доступных карточек. Создайте и одобрите карточку, затем вернитесь сюда.
+              {t.common.noData}
             </Text>
           </View>
         ) : (
@@ -272,7 +275,7 @@ const BonusPromotionPurchaseScreen: React.FC = () => {
           </View>
         )}
 
-        <Text style={styles.sectionTitle}>Срок</Text>
+        <Text style={styles.sectionTitle}>{t.promoCredits.expiresIn}</Text>
         <View style={styles.durationRow}>
           {durations.map(([duration, price]) => {
             const active = duration === selectedDuration;
@@ -292,11 +295,11 @@ const BonusPromotionPurchaseScreen: React.FC = () => {
 
         <View style={styles.summaryCard}>
           <View>
-            <Text style={styles.summaryLabel}>К списанию</Text>
-            <Text style={styles.summaryValue}>{selectedPrice} {selectedOption.currency === 'trust' ? 'бонусов' : 'кредитов'}</Text>
+            <Text style={styles.summaryLabel}>{t.bonus.spent}</Text>
+            <Text style={styles.summaryValue}>{selectedPrice} {selectedOption.currency === 'trust' ? t.bonus.trustBonuses : t.promoCredits.balance}</Text>
           </View>
           <Text style={[styles.summaryBalance, balance < selectedPrice && styles.summaryBalanceBad]}>
-            Баланс: {balance}
+            {t.bonus.balance}: {balance}
           </Text>
         </View>
 
@@ -311,7 +314,7 @@ const BonusPromotionPurchaseScreen: React.FC = () => {
           ) : (
             <>
               <MaterialCommunityIcons name="bullhorn-outline" size={21} color="#FFF9EE" />
-              <Text style={styles.buyButtonText}>Купить продвижение</Text>
+              <Text style={styles.buyButtonText}>{t.adChat.promotion}</Text>
             </>
           )}
         </TouchableOpacity>

@@ -16,6 +16,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { selectUser } from '../redux/selectors';
 import { selectIsOnline } from '../redux/slices/networkSlice';
+import { useTranslation } from '../i18n/useTranslation';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { ensureFirebaseAuth } from '../firebase-auth-session';
 import {
@@ -62,6 +63,7 @@ const buildTopupMessage = (pack: typeof PACKAGES[number]) =>
 
 const PromoCreditsTopupScreen: React.FC = () => {
   const navigation = useNavigation<AppNav>();
+  const { t } = useTranslation();
   const user = useSelector(selectUser);
   const isOnline = useSelector(selectIsOnline);
   const [authUid, setAuthUid] = useState<string | null>(null);
@@ -140,9 +142,9 @@ const PromoCreditsTopupScreen: React.FC = () => {
         currency: 'UAH',
         packageId: selectedPackage.id,
       });
-      Alert.alert('Заявка создана', 'Администратор увидит заявку и подтвердит начисление после оплаты.');
+      Alert.alert(t.common.success, t.promoCredits.topupDesc);
     } catch (error: any) {
-      Alert.alert('Не удалось создать заявку', error?.message || '');
+      Alert.alert(t.common.error, error?.message || '');
     } finally {
       setCreating(false);
     }
@@ -155,7 +157,7 @@ const PromoCreditsTopupScreen: React.FC = () => {
       await sendAdUserMessage(ticket.ticketId, messageText.trim());
       setMessageText('');
     } catch (error: any) {
-      Alert.alert('Не удалось отправить сообщение', error?.message || '');
+      Alert.alert(t.common.error, error?.message || '');
     } finally {
       setSending(false);
     }
@@ -172,7 +174,7 @@ const PromoCreditsTopupScreen: React.FC = () => {
     return (
       <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleAdmin]}>
         <Text style={[styles.bubbleSender, isUser ? styles.bubbleSenderUser : styles.bubbleSenderAdmin]}>
-          {isUser ? 'Вы' : 'Админ'}
+          {isUser ? t.common.profile : 'Адмін'}
         </Text>
         <Text style={[styles.bubbleText, isUser ? styles.bubbleTextUser : styles.bubbleTextAdmin]}>
           {item.text}
@@ -199,14 +201,14 @@ const PromoCreditsTopupScreen: React.FC = () => {
           <MaterialCommunityIcons name="arrow-left" size={22} color={SCREEN_THEME.textPrimary} />
         </TouchableOpacity>
         <View style={styles.headerCopy}>
-          <Text style={styles.headerTitle}>Пополнение промо-кредитов</Text>
-          <Text style={styles.headerSubtitle}>Через подтверждение администратора</Text>
+          <Text style={styles.headerTitle}>{t.promoCredits.topupTitle}</Text>
+          <Text style={styles.headerSubtitle}>{t.promoCredits.topupDesc}</Text>
         </View>
       </View>
 
       <View style={styles.balanceCard}>
         <View>
-          <Text style={styles.balanceLabel}>Текущий баланс</Text>
+          <Text style={styles.balanceLabel}>{t.promoCredits.balance}</Text>
           <Text style={styles.balanceValue}>{credits.balance}</Text>
         </View>
         <MaterialCommunityIcons name="storefront" size={34} color={SCREEN_THEME.woodGreenDark} />
@@ -214,7 +216,7 @@ const PromoCreditsTopupScreen: React.FC = () => {
 
       {!ticket ? (
         <View style={styles.packageSection}>
-          <Text style={styles.sectionTitle}>Выберите пакет</Text>
+          <Text style={styles.sectionTitle}>{t.promoCredits.topupTitle}</Text>
           <View style={styles.packageGrid}>
             {PACKAGES.map((pack) => {
               const active = pack.id === selectedPackageId;
@@ -226,7 +228,7 @@ const PromoCreditsTopupScreen: React.FC = () => {
                   activeOpacity={0.84}
                 >
                   <Text style={[styles.packageCredits, active && styles.packageCreditsActive]}>{pack.credits}</Text>
-                  <Text style={[styles.packageLabel, active && styles.packageLabelActive]}>кредитов</Text>
+                  <Text style={[styles.packageLabel, active && styles.packageLabelActive]}>{t.common.loading}</Text>
                   <Text style={[styles.packageAmount, active && styles.packageAmountActive]}>{pack.amount} UAH</Text>
                 </TouchableOpacity>
               );
@@ -236,7 +238,7 @@ const PromoCreditsTopupScreen: React.FC = () => {
           <View style={styles.noticeCard}>
             <MaterialCommunityIcons name="shield-check-outline" size={20} color={SCREEN_THEME.woodGreenDark} />
             <Text style={styles.noticeText}>
-              Приложение только создает заявку. Кредиты начисляет администратор после проверки оплаты.
+              {t.promoCredits.topupDesc}
             </Text>
           </View>
 
@@ -251,7 +253,7 @@ const PromoCreditsTopupScreen: React.FC = () => {
             ) : (
               <>
                 <MaterialCommunityIcons name="file-document-outline" size={21} color="#FFF9EE" />
-                <Text style={styles.createButtonText}>Создать заявку</Text>
+                <Text style={styles.createButtonText}>{t.promoCredits.chatAdmin}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -260,13 +262,13 @@ const PromoCreditsTopupScreen: React.FC = () => {
         <>
           <View style={styles.ticketInfo}>
             <View style={styles.ticketCopy}>
-              <Text style={styles.ticketTitle}>Заявка #{ticket.ticketId.slice(-6)}</Text>
+              <Text style={styles.ticketTitle}>{t.promoCredits.topupTitle} #{ticket.ticketId.slice(-6)}</Text>
               <Text style={styles.ticketMeta}>
-                {ticket.requestedCredits || 0} кредитов · {ticket.expectedAmount || 0} {ticket.currency || 'UAH'}
+                {ticket.requestedCredits || 0} {t.bonus.trustBonuses} · {ticket.expectedAmount || 0} {ticket.currency || 'UAH'}
               </Text>
             </View>
             <View style={[styles.statusBadge, ticket.status === 'open' ? styles.statusOpen : styles.statusClosed]}>
-              <Text style={styles.statusText}>{ticket.status === 'open' ? 'Открыта' : 'Закрыта'}</Text>
+              <Text style={styles.statusText}>{ticket.status === 'open' ? t.common.ok : t.common.cancel}</Text>
             </View>
           </View>
 
@@ -287,7 +289,7 @@ const PromoCreditsTopupScreen: React.FC = () => {
           {!isOnline ? (
             <View style={styles.warningBanner}>
               <MaterialCommunityIcons name="wifi-off" size={18} color="#856404" />
-              <Text style={styles.warningText}>Нет подключения к интернету</Text>
+              <Text style={styles.warningText}>{t.common.warning}</Text>
             </View>
           ) : null}
 
@@ -295,7 +297,7 @@ const PromoCreditsTopupScreen: React.FC = () => {
             <View style={styles.inputRow}>
               <TextInput
                 style={styles.textInput}
-                placeholder="Напишите администратору..."
+                placeholder={t.promoCredits.chatAdmin}
                 placeholderTextColor={SCREEN_THEME.textMuted}
                 value={messageText}
                 onChangeText={setMessageText}
