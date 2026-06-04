@@ -15,20 +15,14 @@ const TEXT = {
   ua: {
     limitTitle: 'Ліміт на сьогодні',
     limitBody: 'Сьогодні ви вже надіслали {count} з {limit} прохань про допомогу. Нову заявку можна буде створити завтра.',
-    checkFailedTitle: 'Не вдалося перевірити ліміт',
-    checkFailedBody: 'Потрібен інтернет, щоб перевірити денний ліміт перед створенням заявки. Спробуйте ще раз.',
   },
   ru: {
     limitTitle: 'Лимит на сегодня',
     limitBody: 'Сегодня вы уже отправили {count} из {limit} просьб о помощи. Новую заявку можно будет создать завтра.',
-    checkFailedTitle: 'Не удалось проверить лимит',
-    checkFailedBody: 'Нужен интернет, чтобы проверить дневной лимит перед созданием заявки. Попробуйте ещё раз.',
   },
   en: {
     limitTitle: 'Daily limit reached',
     limitBody: 'You have already sent {count} of {limit} help requests today. You can create a new request tomorrow.',
-    checkFailedTitle: 'Could not check the limit',
-    checkFailedBody: 'Internet is needed to check the daily limit before creating a request. Try again.',
   },
 } as const;
 
@@ -44,8 +38,10 @@ export const openRequestFormWithLimitCheck = async (
   const result = await firebaseChatAPI.getHelpNeighborsDailyLimitStatus();
 
   if (!result.success) {
-    Alert.alert(text.checkFailedTitle, text.checkFailedBody);
-    return false;
+    // Limit check failed (network/auth/permission error) — let the user proceed.
+    // The form's own addRequest enforces the daily limit server-side anyway.
+    navigation.navigate('RequestFormScreen', { group: 'help_neighbors' });
+    return true;
   }
 
   if (!result.data.allowed) {

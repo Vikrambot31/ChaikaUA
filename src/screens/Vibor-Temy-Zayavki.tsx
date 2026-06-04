@@ -4,6 +4,7 @@ import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { equalTo, onValue, orderByChild, query, ref } from 'firebase/database';
+import { ensureFirebaseAuth } from '../firebase-auth-session';
 import { safeNavigate } from '../utils/safeNavigation';
 import { RootState } from '../redux/store';
 import { LIGHT_ORBS, SCREEN_THEME } from '../utils/screenTheme';
@@ -164,24 +165,33 @@ const RequestTopicScreen: React.FC = () => {
       publishUsers();
     });
 
+    let cancelled = false;
+    let unsubscribeBusiness: (() => void) = () => {};
+
     const activeBusinessQuery = query(ref(database, 'local_business'), orderByChild('status'), equalTo('active'));
-    const unsubscribeBusiness = onValue(activeBusinessQuery, (snapshot) => {
-      const raw = snapshot.val() as Record<string, { status?: string; createdAt?: string | number; userId?: string; contactName?: string; photoUri?: string }> | null;
-      const todaysBusiness = raw
-        ? Object.values(raw).filter((item) => item?.status === 'active' && isCreatedToday(item.createdAt))
-        : [];
-      businessCount = todaysBusiness.length;
-      businessUsers = todaysBusiness.map((item) => ({ userId: item.userId, name: item.contactName, photoUri: item.photoUri }));
-      publish();
-      publishUsers();
-    }, () => {
-      businessCount = 0;
-      businessUsers = [];
-      publish();
-      publishUsers();
-    });
+    void ensureFirebaseAuth().then(() => {
+      if (cancelled) return;
+      unsubscribeBusiness = onValue(activeBusinessQuery, (snapshot) => {
+        if (cancelled) return;
+        const raw = snapshot.val() as Record<string, { status?: string; createdAt?: string | number; userId?: string; contactName?: string; photoUri?: string }> | null;
+        const todaysBusiness = raw
+          ? Object.values(raw).filter((item) => item?.status === 'active' && isCreatedToday(item.createdAt))
+          : [];
+        businessCount = todaysBusiness.length;
+        businessUsers = todaysBusiness.map((item) => ({ userId: item.userId, name: item.contactName, photoUri: item.photoUri }));
+        publish();
+        publishUsers();
+      }, () => {
+        if (cancelled) return;
+        businessCount = 0;
+        businessUsers = [];
+        publish();
+        publishUsers();
+      });
+    }).catch(() => { /* auth failed, leave count at 0 */ });
 
     return () => {
+      cancelled = true;
       unsubscribeJobs();
       unsubscribeBusiness();
     };

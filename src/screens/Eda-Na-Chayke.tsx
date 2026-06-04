@@ -1,5 +1,9 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -16,9 +20,15 @@ import { useSelector } from 'react-redux';
 import { chaykaPlaces } from '../services/chaykaPlacesData';
 import { getFoodPlaces, getActiveFoodOffers, foodInfoSeed } from '../services/foodSeed';
 import { logFoodEvent } from '../services/foodAnalytics';
+import { foodTopService, type FoodTopListing } from '../services/foodTopService';
 import { FoodCategory, FoodOffer, Place } from '../types/app';
 import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
+import AppPhotoImage from '../components/AppPhotoImage';
+import PhotoUploadField, { type UploadedPhoto } from '../components/PhotoUploadField';
+import { getDonePhotos, validateSubmissionRequirements } from '../utils/submissionRequirements';
+import { getLanguageValidationError } from '../utils/contentLanguageGuard';
+import { showUserError } from '../utils/userFacingErrors';
 
 type Lang = 'ua' | 'ru' | 'en';
 type AppNavigation = NavigationProp<Record<string, object | undefined>>;
@@ -52,6 +62,23 @@ const UI_TEXT = {
     partner: 'Партнер',
     delivery: 'Доставка',
     validUntil: 'до',
+    topFoodTitle: 'Топ заклади',
+    addTop: 'Додати в топ',
+    addTopFormTitle: 'Картка для топу',
+    topNameLabel: 'Назва',
+    topNamePlaceholder: 'Наприклад: піца, кава, обід...',
+    topDescriptionLabel: 'Опис',
+    topDescriptionPlaceholder: 'Коротко: що саме смачного, де замовити або чим цікаво.',
+    topPhotoLabel: 'Фото',
+    topSubmit: 'Надіслати на модерацію',
+    topSuccessTitle: 'Готово',
+    topSuccessMsg: 'Картку надіслано на модерацію. Після перевірки вона зʼявиться в топі.',
+    topFillError: 'Додайте назву, опис і фото.',
+    topPhotoUploading: 'Дочекайтесь завершення завантаження фото.',
+    topPhotoError: 'Фото не завантажилось. Видаліть його або спробуйте ще раз.',
+    topPhotoRequired: 'Додайте фото для картки.',
+    errorTitle: 'Помилка',
+    ok: 'OK',
     filters: {
       all: 'Всі',
       pizza: 'Піца',
@@ -85,6 +112,23 @@ const UI_TEXT = {
     partner: 'Партнёр',
     delivery: 'Доставка',
     validUntil: 'до',
+    topFoodTitle: 'Топ заведения',
+    addTop: 'Добавить в топ',
+    addTopFormTitle: 'Карточка для топа',
+    topNameLabel: 'Название',
+    topNamePlaceholder: 'Например: пицца, кофе, обед...',
+    topDescriptionLabel: 'Описание',
+    topDescriptionPlaceholder: 'Коротко: что вкусного, где заказать или чем интересно.',
+    topPhotoLabel: 'Фото',
+    topSubmit: 'Отправить на модерацию',
+    topSuccessTitle: 'Готово',
+    topSuccessMsg: 'Карточка отправлена на модерацию. После проверки она появится в топе.',
+    topFillError: 'Добавьте название, описание и фото.',
+    topPhotoUploading: 'Дождитесь завершения загрузки фото.',
+    topPhotoError: 'Фото не загрузилось. Удалите его или попробуйте ещё раз.',
+    topPhotoRequired: 'Добавьте фото для карточки.',
+    errorTitle: 'Ошибка',
+    ok: 'OK',
     filters: {
       all: 'Все',
       pizza: 'Пицца',
@@ -118,6 +162,23 @@ const UI_TEXT = {
     partner: 'Partner',
     delivery: 'Delivery',
     validUntil: 'until',
+    topFoodTitle: 'Top places',
+    addTop: 'Add to top',
+    addTopFormTitle: 'Top card',
+    topNameLabel: 'Name',
+    topNamePlaceholder: 'For example: pizza, coffee, lunch...',
+    topDescriptionLabel: 'Description',
+    topDescriptionPlaceholder: 'Shortly: what is tasty, where to order, or why it is interesting.',
+    topPhotoLabel: 'Photo',
+    topSubmit: 'Send to moderation',
+    topSuccessTitle: 'Done',
+    topSuccessMsg: 'The card was sent to moderation. After review it will appear in the top.',
+    topFillError: 'Add a name, description, and photo.',
+    topPhotoUploading: 'Wait until the photo upload finishes.',
+    topPhotoError: 'The photo did not upload. Remove it or try again.',
+    topPhotoRequired: 'Add a photo for the card.',
+    errorTitle: 'Error',
+    ok: 'OK',
     filters: {
       all: 'All',
       pizza: 'Pizza',
@@ -204,17 +265,26 @@ const formatOfferDate = (timestamp?: number) => {
 export default function EdaNaChaykeScreen() {
   const navigation = useNavigation<AppNavigation>();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as Lang;
+  const user = useSelector((state: RootState) => state.auth.user);
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
 
   const [mode, setMode] = useState<ScreenMode>('home');
   const [eatFilter, setEatFilter] = useState<EatFilter>('all');
   const [query, setQuery] = useState('');
+  const [topListings, setTopListings] = useState<FoodTopListing[]>([]);
+  const [topFormVisible, setTopFormVisible] = useState(false);
+  const [topTitle, setTopTitle] = useState('');
+  const [topDescription, setTopDescription] = useState('');
+  const [topPhotos, setTopPhotos] = useState<UploadedPhoto[]>([]);
+  const [topSubmitting, setTopSubmitting] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const offersSectionY = useRef(0);
 
   useEffect(() => {
     logFoodEvent('food_open_screen');
   }, []);
+
+  useEffect(() => foodTopService.subscribe(setTopListings, user?.id), [user?.id]);
 
   const allFoodPlaces = useMemo(() => getFoodPlaces(chaykaPlaces), []);
 
@@ -256,6 +326,92 @@ export default function EdaNaChaykeScreen() {
       `${place.name} ${place.address}`.toLowerCase().includes(normalizedQuery),
     );
   }, [allFoodPlaces, query]);
+
+  const visibleTopListings = useMemo(() => topListings.slice(0, 10), [topListings]);
+  const hasTopUploadingPhotos = topPhotos.some((photo) => photo.status === 'uploading');
+  const hasTopPhotoErrors = topPhotos.some((photo) => photo.status === 'error');
+
+  const resetTopForm = useCallback(() => {
+    setTopTitle('');
+    setTopDescription('');
+    setTopPhotos([]);
+  }, []);
+
+  const handleOpenTopForm = useCallback(() => {
+    if (!validateSubmissionRequirements({ language, userId: user?.id, navigation })) return;
+    setTopFormVisible(true);
+  }, [language, navigation, user?.id]);
+
+  const handleSubmitTop = useCallback(async () => {
+    if (!validateSubmissionRequirements({ language, userId: user?.id, navigation })) return;
+    const trimmedTitle = topTitle.trim();
+    const trimmedDescription = topDescription.trim();
+    if (!trimmedTitle || !trimmedDescription) {
+      Alert.alert(text.errorTitle, text.topFillError);
+      return;
+    }
+    const langError = getLanguageValidationError(`${trimmedTitle} ${trimmedDescription}`, language);
+    if (langError) {
+      Alert.alert(text.errorTitle, langError);
+      return;
+    }
+    if (hasTopUploadingPhotos) {
+      Alert.alert(text.errorTitle, text.topPhotoUploading);
+      return;
+    }
+    if (hasTopPhotoErrors) {
+      Alert.alert(text.errorTitle, text.topPhotoError);
+      return;
+    }
+    const donePhotos = getDonePhotos(topPhotos);
+    if (donePhotos.length === 0) {
+      Alert.alert(text.errorTitle, text.topPhotoRequired);
+      return;
+    }
+
+    setTopSubmitting(true);
+    try {
+      const firstPhoto = donePhotos[0];
+      const createdAt = new Date().toISOString();
+      await foodTopService.add({
+        title: trimmedTitle,
+        description: trimmedDescription,
+        photoUri: firstPhoto.downloadUrl,
+        photoStoragePath: firstPhoto.storagePath,
+        photoId: firstPhoto.photoId,
+        moderationStatus: 'pending',
+        submittedForModerationAt: createdAt,
+        createdAt,
+        userId: user?.id || '',
+        language,
+      });
+      Alert.alert(text.topSuccessTitle, text.topSuccessMsg, [
+        { text: text.ok, onPress: () => { resetTopForm(); setTopFormVisible(false); } },
+      ]);
+    } catch (error) {
+      showUserError(language, 'send', error);
+    } finally {
+      setTopSubmitting(false);
+    }
+  }, [
+    hasTopPhotoErrors,
+    hasTopUploadingPhotos,
+    language,
+    navigation,
+    resetTopForm,
+    text.errorTitle,
+    text.ok,
+    text.topFillError,
+    text.topPhotoError,
+    text.topPhotoRequired,
+    text.topPhotoUploading,
+    text.topSuccessMsg,
+    text.topSuccessTitle,
+    topDescription,
+    topPhotos,
+    topTitle,
+    user?.id,
+  ]);
 
   const handleBack = useCallback(() => {
     if (mode === 'eat') {
@@ -343,6 +499,116 @@ export default function EdaNaChaykeScreen() {
       </View>
     );
   };
+
+  const renderTopFoodCard = (item: FoodTopListing) => {
+    const isPending = item.moderationStatus !== 'approved';
+    return (
+      <TouchableOpacity
+        key={`food-top-${item.id}`}
+        style={styles.topFoodItem}
+        activeOpacity={0.84}
+        onPress={() => {
+          navigation.navigate('ItemDetailScreen', {
+            item: {
+              id: item.id,
+              title: item.title,
+              description: item.description,
+              photoUri: item.photoUri,
+              photoStoragePath: item.photoStoragePath,
+              status: isPending ? text.topSubmit : text.topFoodTitle,
+              sourceType: 'food_top',
+              sourceId: item.id,
+            },
+          });
+        }}
+      >
+        <AppPhotoImage
+          uri={item.photoUri}
+          storagePath={item.photoStoragePath}
+          style={styles.topFoodPhoto}
+          resizeMode="cover"
+          debugLabel={`FoodTop:${item.id}`}
+        />
+        <Text style={styles.topFoodName} numberOfLines={1} ellipsizeMode="tail">{item.title}</Text>
+        <Text style={styles.topFoodMeta} numberOfLines={1} ellipsizeMode="tail">
+          {isPending ? text.topSubmit : item.description}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderTopFoodForm = () => (
+    <Modal visible={topFormVisible} transparent animationType="slide" onRequestClose={() => setTopFormVisible(false)}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.sheetOverlay}>
+        <TouchableOpacity style={styles.sheetBackdrop} activeOpacity={1} onPress={() => setTopFormVisible(false)} />
+        <View style={styles.sheetWrapper}>
+          <View style={styles.sheet}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>{text.addTopFormTitle}</Text>
+              <TouchableOpacity onPress={() => setTopFormVisible(false)} style={styles.sheetCloseBtn} activeOpacity={0.75}>
+                <MaterialCommunityIcons name="close" size={18} color={SCREEN_THEME.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.sheetContent}
+              style={styles.sheetScroll}
+            >
+              <Text style={styles.formLabel}>{text.topNameLabel}</Text>
+              <TextInput
+                value={topTitle}
+                onChangeText={setTopTitle}
+                placeholder={text.topNamePlaceholder}
+                placeholderTextColor="#A0938D"
+                style={styles.input}
+                maxLength={70}
+              />
+
+              <Text style={styles.formLabel}>{text.topDescriptionLabel}</Text>
+              <TextInput
+                value={topDescription}
+                onChangeText={setTopDescription}
+                placeholder={text.topDescriptionPlaceholder}
+                placeholderTextColor="#A0938D"
+                style={[styles.input, styles.textarea]}
+                multiline
+                maxLength={220}
+              />
+
+              {user?.id ? (
+                <>
+                  <Text style={styles.formLabel}>{text.topPhotoLabel}</Text>
+                  <PhotoUploadField
+                    uid={user.id}
+                    userName={user.name || user.email || user.id}
+                    maxPhotos={1}
+                    storagePath="food_top_listings"
+                    onPhotosChange={setTopPhotos}
+                    metadata={{ sourceScreen: 'Eda-Na-Chayke', sourceScreenLabel: text.addTop }}
+                  />
+                </>
+              ) : null}
+
+              <TouchableOpacity
+                style={[styles.submitBtn, (topSubmitting || hasTopUploadingPhotos) && styles.submitBtnDisabled]}
+                onPress={handleSubmitTop}
+                activeOpacity={0.86}
+                disabled={topSubmitting || hasTopUploadingPhotos}
+              >
+                {topSubmitting ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.submitBtnText}>{hasTopUploadingPhotos ? text.topPhotoUploading : text.topSubmit}</Text>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
 
   const renderPlaceCard = (place: Place) => {
     const info = foodInfoSeed[place.id];
@@ -465,7 +731,8 @@ export default function EdaNaChaykeScreen() {
   if (mode === 'eat') {
     return (
       <SafeAreaView style={styles.container}>
-        <ScrollView ref={scrollRef} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {renderTopFoodForm()}
+        <ScrollView ref={scrollRef} contentContainerStyle={[styles.content, styles.contentWithAddBar]} showsVerticalScrollIndicator={false}>
           {/* Header */}
           <View style={styles.hero}>
             <TouchableOpacity onPress={handleBack} style={styles.backButton} activeOpacity={0.8}>
@@ -516,6 +783,15 @@ export default function EdaNaChaykeScreen() {
             })}
           </ScrollView>
 
+          {visibleTopListings.length > 0 ? (
+            <View style={styles.topFoodSection}>
+              <Text style={styles.topFoodTitle}>{text.topFoodTitle}</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.topFoodScroll}>
+                {visibleTopListings.map((item) => renderTopFoodCard(item))}
+              </ScrollView>
+            </View>
+          ) : null}
+
           {/* Place list */}
           {eatPlaces.length > 0 ? (
             <View style={styles.cardList}>
@@ -528,6 +804,12 @@ export default function EdaNaChaykeScreen() {
             </View>
           )}
         </ScrollView>
+        <View style={styles.addTopBar}>
+          <TouchableOpacity style={styles.addTopButton} onPress={handleOpenTopForm} activeOpacity={0.88}>
+            <MaterialCommunityIcons name="plus-circle" size={20} color="#FFFFFF" />
+            <Text style={styles.addTopButtonText}>{text.addTop}</Text>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
     );
   }
@@ -535,6 +817,7 @@ export default function EdaNaChaykeScreen() {
   // --- HOME MODE ---
   return (
     <SafeAreaView style={styles.container}>
+      {renderTopFoodForm()}
       <ScrollView ref={scrollRef} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.hero}>
@@ -633,6 +916,9 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
     paddingBottom: 34,
+  },
+  contentWithAddBar: {
+    paddingBottom: 96,
   },
 
   // Hero
@@ -780,6 +1066,176 @@ const styles = StyleSheet.create({
   },
   categoryChipTextActive: {
     color: '#FFFFFF',
+  },
+
+  // Top food
+  topFoodSection: {
+    marginBottom: 16,
+  },
+  topFoodTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: SCREEN_THEME.textPrimary,
+    marginBottom: 8,
+  },
+  topFoodScroll: {
+    paddingHorizontal: 4,
+    paddingBottom: 4,
+    gap: 12,
+  },
+  topFoodItem: {
+    width: 118,
+    borderRadius: 14,
+    padding: 8,
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderWidth: 1,
+    borderColor: '#E4D0AB',
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+  },
+  topFoodPhoto: {
+    width: '100%',
+    height: 76,
+    borderRadius: 10,
+    backgroundColor: '#FFF3E0',
+    marginBottom: 7,
+  },
+  topFoodName: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: SCREEN_THEME.textPrimary,
+    width: '100%',
+    textAlign: 'left',
+  },
+  topFoodMeta: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: SCREEN_THEME.textSecondary,
+    width: '100%',
+    textAlign: 'left',
+    marginTop: 3,
+  },
+
+  // Add top sheet
+  addTopBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: Platform.OS === 'ios' ? 22 : 14,
+    backgroundColor: 'rgba(250, 244, 230, 0.96)',
+    borderTopWidth: 1,
+    borderTopColor: SCREEN_THEME.borderSoft,
+  },
+  addTopButton: {
+    minHeight: 52,
+    borderRadius: 18,
+    backgroundColor: '#E07B39',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    ...SCREEN_THEME.raisedShadow,
+  },
+  addTopButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  sheetOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  sheetBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  sheetWrapper: {
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    maxHeight: '88%',
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    paddingTop: 10,
+    borderWidth: 1,
+    borderColor: SCREEN_THEME.borderSoft,
+  },
+  sheetScroll: {
+    flexGrow: 0,
+  },
+  sheetHandle: {
+    width: 42,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: '#D9C69E',
+    alignSelf: 'center',
+    marginBottom: 10,
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  sheetTitle: {
+    fontSize: 17,
+    fontWeight: '900',
+    color: SCREEN_THEME.textPrimary,
+  },
+  sheetCloseBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: SCREEN_THEME.accentCream,
+  },
+  sheetContent: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 28,
+  },
+  formLabel: {
+    fontWeight: '800',
+    color: SCREEN_THEME.textPrimary,
+    marginBottom: 8,
+    marginTop: 8,
+  },
+  input: {
+    backgroundColor: '#F7F3EE',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: SCREEN_THEME.textPrimary,
+    borderWidth: 1,
+    borderColor: '#E8DDD3',
+    fontWeight: '700',
+  },
+  textarea: {
+    minHeight: 86,
+    textAlignVertical: 'top',
+  },
+  submitBtn: {
+    backgroundColor: '#E07B39',
+    borderRadius: 16,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 14,
+  },
+  submitBtnDisabled: {
+    opacity: 0.65,
+  },
+  submitBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '900',
   },
 
   // Place card

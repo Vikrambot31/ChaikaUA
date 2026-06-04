@@ -377,9 +377,14 @@ const text = CLEAN_PROBLEMS_TEXT[language];
   useEffect(() => {
     const db = database;
     const requestsRef = query(ref(db, 'requests'), orderByChild('category'), equalTo('problem'), limitToLast(360));
-    const unsub = onValue(
+    let cancelled = false;
+    let unsub: (() => void) = () => {};
+    void ensureFirebaseAuth().then(() => {
+      if (cancelled) return;
+      unsub = onValue(
       requestsRef,
       (snapshot) => {
+        if (cancelled) return;
         setLoading(false);
         const raw = snapshot.val() as Record<string, any> | null;
         if (!raw) { setRawItems([]); return; }
@@ -414,9 +419,10 @@ const text = CLEAN_PROBLEMS_TEXT[language];
           .sort((a, b) => b.id.localeCompare(a.id));
         setRawItems(problems);
       },
-      () => setLoading(false)
-    );
-    return unsub;
+      () => { if (!cancelled) setLoading(false); }
+      );
+    }).catch(() => setLoading(false));
+    return () => { cancelled = true; unsub(); };
   }, []);
 
   useEffect(() => {

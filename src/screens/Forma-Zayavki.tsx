@@ -362,7 +362,8 @@ const getSubmitFailureMessage = (rawError: unknown, t: (typeof TEXT_BY_LANG)[Lan
     raw.includes('authentication required') ||
     raw.includes('not authenticated') ||
     raw.includes('login required') ||
-    raw.includes('sign in')
+    raw.includes('sign in') ||
+    raw.includes('write_session')
   ) {
     return t.loginExpired;
   }

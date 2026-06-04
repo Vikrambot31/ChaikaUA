@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationProp, useNavigation, useRoute } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { onValue, ref } from 'firebase/database';
+import { ensureFirebaseAuth } from '../firebase-auth-session';
 import { LIGHT_ORBS, SCREEN_THEME } from '../utils/screenTheme';
 import { chaykaPlaces } from '../services/chaykaPlacesData';
 import { Place, PlaceType } from '../types/app';
@@ -359,32 +360,44 @@ const PlacesScreen: React.FC = () => {
       finishLoad();
     });
 
+    let cancelled = false;
+    let unsubscribeServices: (() => void) = () => {};
+
     const servicesRef = ref(database, 'local_business');
-    const unsubscribeServices = onValue(
-      servicesRef,
-      (snapshot) => {
-        const raw = snapshot.val() as Record<string, Omit<BusinessItem, 'id'>> | null;
-        const next = !raw
-          ? []
-          : Object.entries(raw)
-            .map(([id, value]) => ({ ...value, id }))
-            .filter((item) => item.status === 'active')
-            .sort((a, b) => {
-              const ta = typeof a.createdAt === 'number' ? a.createdAt : new Date(a.createdAt || 0).getTime();
-              const tb = typeof b.createdAt === 'number' ? b.createdAt : new Date(b.createdAt || 0).getTime();
-              return tb - ta;
-            });
-        setResidentServices(next);
-        servicesLoaded = true;
-        finishLoad();
-      },
-      () => {
-        servicesLoaded = true;
-        finishLoad();
-      },
-    );
+    void ensureFirebaseAuth().then(() => {
+      if (cancelled) return;
+      unsubscribeServices = onValue(
+        servicesRef,
+        (snapshot) => {
+          if (cancelled) return;
+          const raw = snapshot.val() as Record<string, Omit<BusinessItem, 'id'>> | null;
+          const next = !raw
+            ? []
+            : Object.entries(raw)
+              .map(([id, value]) => ({ ...value, id }))
+              .filter((item) => item.status === 'active')
+              .sort((a, b) => {
+                const ta = typeof a.createdAt === 'number' ? a.createdAt : new Date(a.createdAt || 0).getTime();
+                const tb = typeof b.createdAt === 'number' ? b.createdAt : new Date(b.createdAt || 0).getTime();
+                return tb - ta;
+              });
+          setResidentServices(next);
+          servicesLoaded = true;
+          finishLoad();
+        },
+        () => {
+          if (cancelled) return;
+          servicesLoaded = true;
+          finishLoad();
+        },
+      );
+    }).catch(() => {
+      servicesLoaded = true;
+      finishLoad();
+    });
 
     return () => {
+      cancelled = true;
       unsubscribeGoods();
       unsubscribeServices();
     };
