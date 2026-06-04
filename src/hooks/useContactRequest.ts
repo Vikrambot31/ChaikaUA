@@ -111,7 +111,7 @@ export function useContactRequest() {
           Toast.show({ type: 'success', text1: TOAST_TEXT.sent[language] });
         } else if (result === 'already_pending') {
           Toast.show({ type: 'info', text1: TOAST_TEXT.already_pending[language] });
-        } else if (result === 'already_approved') {
+        } else if (result === 'already_approved' || result === 'open_profile') {
           Toast.show({ type: 'success', text1: TOAST_TEXT.already_approved[language] });
         }
       } catch {

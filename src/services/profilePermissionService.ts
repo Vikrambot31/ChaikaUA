@@ -191,9 +191,15 @@ export const profilePermissionService = {
     context: ViewRequestContext,
     _targetProfile?: { name?: string; photoURL?: string },
     options?: ContactRequestOptions
-  ): Promise<'sent' | 'already_approved' | 'already_pending'> {
+  ): Promise<'sent' | 'already_approved' | 'already_pending' | 'open_profile'> {
     if (!targetUserId || !requester.id || targetUserId === requester.id) {
       throw new Error('Invalid requestView arguments');
+    }
+
+    // If target profile is open — no request needed, contact is freely accessible
+    const privacyMode = await profilePermissionService.getPrivacyMode(targetUserId);
+    if (privacyMode === 'open') {
+      return 'open_profile';
     }
 
     const cooldownLeft = RATE_LIMITERS.profileViewRequest.cooldownSecondsLeft();

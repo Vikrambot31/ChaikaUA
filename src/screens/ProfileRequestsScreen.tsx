@@ -16,6 +16,7 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { get, onValue, ref } from 'firebase/database';
+import { ensureFirebaseAuth } from '../firebase-auth-session';
 import { ContactReason, ProfileViewRequest, ViewRequestStatus, profilePermissionService } from '../services/profilePermissionService';
 import {
   PROFILE_REQUEST_CONTEXT_KEYS,
@@ -284,6 +285,7 @@ export default function ProfileRequestsScreen() {
       setIncomingVotes({});
       return;
     }
+    try { await ensureFirebaseAuth(); } catch { /* proceed anyway */ }
     const pairs = await Promise.all(
       uniqueRequesterIds.map(async (requesterId) => {
         try {
@@ -358,11 +360,7 @@ export default function ProfileRequestsScreen() {
         setTabInitialized(true);
       } catch (err) {
         if (!cancelled) {
-          if ((err as { code?: string })?.code === 'PERMISSION_DENIED') {
-            navigation.navigate('LoginScreen');
-          } else {
-            Alert.alert(t.errTitle, t.errBody);
-          }
+          Alert.alert(t.errTitle, t.errBody);
           setTabInitialized(true);
         }
       } finally {
@@ -382,35 +380,47 @@ export default function ProfileRequestsScreen() {
       ? `outgoingProfileRequestsByUser/${user.id}`
       : `profileViewRequests/${user.id}`;
 
-    const unsubscribe = onValue(ref(database, path), async (snap) => {
-      try {
-        const hidden = await profilePermissionService.getHiddenRequestKeys(user.id);
-        const raw = snap.exists() ? (snap.val() as Record<string, Partial<ProfileViewRequest>>) : null;
-        const nextRequests = activeTab === 'outgoing'
-          ? normalizeOutgoingRequests(raw, user.id)
-          : normalizeIncomingRequests(raw, activeTab === 'history');
+    let unsubscribe: (() => void) | undefined;
+    let cancelled = false;
 
-        setHiddenKeys(hidden);
-        setRequests(nextRequests);
-        if (activeTab === 'incoming') {
-          await loadIncomingPhones(nextRequests);
-        }
-      } catch (err) {
-        if ((err as { code?: string })?.code === 'PERMISSION_DENIED') {
-          navigation.navigate('LoginScreen');
-        } else {
+    void ensureFirebaseAuth().then(() => {
+      if (cancelled) return;
+
+      unsubscribe = onValue(ref(database, path), async (snap) => {
+        try {
+          const hidden = await profilePermissionService.getHiddenRequestKeys(user.id);
+          const raw = snap.exists() ? (snap.val() as Record<string, Partial<ProfileViewRequest>>) : null;
+          const nextRequests = activeTab === 'outgoing'
+            ? normalizeOutgoingRequests(raw, user.id)
+            : normalizeIncomingRequests(raw, activeTab === 'history');
+
+          setHiddenKeys(hidden);
+          if (activeTab === 'incoming') {
+            await loadIncomingPhones(nextRequests);
+          }
+          setRequests(nextRequests);
+        } catch {
           Alert.alert(t.errTitle, t.errBody);
+        } finally {
+          setLoading(false);
         }
-      } finally {
+      }, () => {
+        // onValue error — just show error, don't redirect
+        Alert.alert(t.errTitle, t.errBody);
+        setLoading(false);
+      });
+    }).catch(() => {
+      if (!cancelled) {
+        Alert.alert(t.errTitle, t.errBody);
         setLoading(false);
       }
-    }, () => {
-      navigation.navigate('LoginScreen');
-      setLoading(false);
     });
 
-    return unsubscribe;
-  }, [activeTab, loadIncomingPhones, navigation, t.errBody, t.errTitle, tabInitialized, user?.id]);
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
+  }, [activeTab, loadIncomingPhones, t.errBody, t.errTitle, tabInitialized, user?.id]);
 
   useEffect(() => {
     void (async () => {
