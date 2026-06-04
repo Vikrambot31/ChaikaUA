@@ -8,7 +8,7 @@ import { SCREEN_THEME } from '../utils/screenTheme';
 import TactileIcon from '../components/TactileIcon';
 import { RootState } from '../redux/store';
 
-type BonusItem = {
+type ServiceHubItem = {
   label: string;
   desc: string;
   screen: string;
@@ -21,9 +21,9 @@ type SectionedItems = {
   sectionFrequent: string;
   sectionCommunity: string;
   sectionMarket: string;
-  frequent: BonusItem[];
-  community: BonusItem[];
-  market: BonusItem[];
+  frequent: ServiceHubItem[];
+  community: ServiceHubItem[];
+  market: ServiceHubItem[];
 };
 
 const UI_TEXT: Record<'ua' | 'ru' | 'en', SectionedItems> = {
@@ -36,12 +36,12 @@ const UI_TEXT: Record<'ua' | 'ru' | 'en', SectionedItems> = {
       { label: 'Світло і повідомлення', desc: 'Що пишуть сусіди у будинку', screen: 'ElectricityStatusScreen', icon: 'lightning-bolt-outline', accent: '#C79C47' },
       { label: 'Місця Чайки', desc: 'Кафе, магазини та послуги поруч', screen: 'PlacesScreen', icon: 'map-marker-multiple', accent: '#00897B' },
       { label: 'Фото району', desc: 'Галерея фотографій ЖК Чайка', screen: 'FotoRayonaScreen', icon: 'image-plus', accent: '#5C6BC0' },
-    ] as BonusItem[],
+    ] as ServiceHubItem[],
     community: [
       { label: 'Люди Чайки', desc: 'Мешканці та спільнота', screen: 'TopGirlsBoysScreen', icon: 'account-multiple-outline', accent: '#7B6EB1' },
       { label: 'Контакти Чайки', desc: 'Знайдіть людей поруч для спілкування', screen: 'KontaktiChaikyScreen', icon: 'account-heart-outline', accent: '#6A8BA5' },
       { label: 'Спорт на Чайці', desc: 'Баскетбол, футбол і теніс з сусідами', screen: 'SportNaChaykeScreen', icon: 'run-fast', accent: '#4F8D5F' },
-    ] as BonusItem[],
+    ] as ServiceHubItem[],
     market: [
       { label: 'Їжа на Чайці', desc: 'Поїсти, продукти, акції поруч', screen: 'EdaNaChaykeScreen', icon: 'food-fork-drink', accent: '#FFD400' },
       { label: 'Все для дітей', desc: 'Садочки, школи, гуртки та події', screen: 'VseDlyaDeteyScreen', icon: 'baby-face-outline', accent: '#C77A5D' },
@@ -49,7 +49,7 @@ const UI_TEXT: Record<'ua' | 'ru' | 'en', SectionedItems> = {
       { label: 'Салони краси', desc: 'Перукарні, манікюр, косметологія', screen: 'SalonyKrasotyScreen', icon: 'content-cut', accent: '#D4668E' },
       { label: 'Пошук роботи', desc: 'Вакансії та резюме', screen: 'JobSearchScreen', icon: 'briefcase-search-outline', accent: '#4D7892' },
       { label: 'Куплю / продам', desc: 'Оголошення мешканців', screen: 'BuySellScreen', icon: 'shopping-outline', accent: '#C96E3E' },
-    ] as BonusItem[],
+    ] as ServiceHubItem[],
   },
   ru: {
     headerTitle: 'Сервисы',
@@ -60,12 +60,12 @@ const UI_TEXT: Record<'ua' | 'ru' | 'en', SectionedItems> = {
       { label: 'Есть ли СВЕТ?', desc: 'Что пишут соседи в доме', screen: 'ElectricityStatusScreen', icon: 'lightning-bolt-outline', accent: '#C79C47' },
       { label: 'Места Чайки', desc: 'Кафе, магазины и сервисы рядом', screen: 'PlacesScreen', icon: 'map-marker-multiple', accent: '#00897B' },
       { label: 'Фото района', desc: 'Галерея фотографий ЖК Чайка', screen: 'FotoRayonaScreen', icon: 'image-plus', accent: '#5C6BC0' },
-    ] as BonusItem[],
+    ] as ServiceHubItem[],
     community: [
       { label: 'Люди Чайки', desc: 'Жители и сообщество', screen: 'TopGirlsBoysScreen', icon: 'account-multiple-outline', accent: '#7B6EB1' },
       { label: 'Контакты Чайки', desc: 'Найдите людей рядом для общения', screen: 'KontaktiChaikyScreen', icon: 'account-heart-outline', accent: '#6A8BA5' },
       { label: 'Спорт на Чайке', desc: 'Баскетбол, футбол и теннис с соседями', screen: 'SportNaChaykeScreen', icon: 'run-fast', accent: '#4F8D5F' },
-    ] as BonusItem[],
+    ] as ServiceHubItem[],
     market: [
       { label: 'Еда на Чайке', desc: 'Поесть, продукты, акции рядом', screen: 'EdaNaChaykeScreen', icon: 'food-fork-drink', accent: '#FFD400' },
       { label: 'Все для детей', desc: 'Садики, школы, кружки и события', screen: 'VseDlyaDeteyScreen', icon: 'baby-face-outline', accent: '#C77A5D' },
@@ -73,7 +73,7 @@ const UI_TEXT: Record<'ua' | 'ru' | 'en', SectionedItems> = {
       { label: 'Салоны красоты', desc: 'Парикмахерские, маникюр, косметология', screen: 'SalonyKrasotyScreen', icon: 'content-cut', accent: '#D4668E' },
       { label: 'Поиск работы', desc: 'Вакансии и резюме', screen: 'JobSearchScreen', icon: 'briefcase-search-outline', accent: '#4D7892' },
       { label: 'Куплю / продам', desc: 'Объявления жителей', screen: 'BuySellScreen', icon: 'shopping-outline', accent: '#C96E3E' },
-    ] as BonusItem[],
+    ] as ServiceHubItem[],
   },
   en: {
     headerTitle: 'Services',
@@ -84,12 +84,12 @@ const UI_TEXT: Record<'ua' | 'ru' | 'en', SectionedItems> = {
       { label: 'Power reports', desc: 'Neighbor updates by building', screen: 'ElectricityStatusScreen', icon: 'lightning-bolt-outline', accent: '#C79C47' },
       { label: 'Chaika places', desc: 'Cafes, stores, and local services nearby', screen: 'PlacesScreen', icon: 'map-marker-multiple', accent: '#00897B' },
       { label: 'District Photos', desc: 'Photo gallery of Chaika neighborhood', screen: 'FotoRayonaScreen', icon: 'image-plus', accent: '#5C6BC0' },
-    ] as BonusItem[],
+    ] as ServiceHubItem[],
     community: [
       { label: 'Chaika Life people', desc: 'Residents and community', screen: 'TopGirlsBoysScreen', icon: 'account-multiple-outline', accent: '#7B6EB1' },
       { label: 'Chaika Contacts', desc: 'Find people nearby to connect with', screen: 'KontaktiChaikyScreen', icon: 'account-heart-outline', accent: '#6A8BA5' },
       { label: 'Sports in Chaika', desc: 'Basketball, football, and tennis with neighbors', screen: 'SportNaChaykeScreen', icon: 'run-fast', accent: '#4F8D5F' },
-    ] as BonusItem[],
+    ] as ServiceHubItem[],
     market: [
       { label: 'Food at Chaika', desc: 'Eat, groceries, deals nearby', screen: 'EdaNaChaykeScreen', icon: 'food-fork-drink', accent: '#FFD400' },
       { label: 'Everything for Kids', desc: 'Kindergartens, schools, clubs and events', screen: 'VseDlyaDeteyScreen', icon: 'baby-face-outline', accent: '#C77A5D' },
@@ -97,21 +97,21 @@ const UI_TEXT: Record<'ua' | 'ru' | 'en', SectionedItems> = {
       { label: 'Beauty salons', desc: 'Hair, nails, cosmetology', screen: 'SalonyKrasotyScreen', icon: 'content-cut', accent: '#D4668E' },
       { label: 'Job search', desc: 'Vacancies and resumes', screen: 'JobSearchScreen', icon: 'briefcase-search-outline', accent: '#4D7892' },
       { label: 'Buy / sell', desc: 'Resident marketplace', screen: 'BuySellScreen', icon: 'shopping-outline', accent: '#C96E3E' },
-    ] as BonusItem[],
+    ] as ServiceHubItem[],
   },
 };
 
-const ChaikaBonusPlusScreen: React.FC = () => {
+const ServicesHubScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const text = UI_TEXT[language];
-  const soulPhotosItem: BonusItem = language === 'ru'
+  const soulPhotosItem: ServiceHubItem = language === 'ru'
     ? { label: 'Фото для Души', desc: 'Отдельная галерея теплых фото от жителей', screen: 'SoulPhotosScreen', icon: 'tag-heart-outline', accent: '#C97959' }
     : language === 'en'
       ? { label: 'Photos for the Soul', desc: 'A separate warm photo gallery from residents', screen: 'SoulPhotosScreen', icon: 'tag-heart-outline', accent: '#C97959' }
       : { label: 'Фото для душі', desc: 'Особлива галерея теплих фото від мешканців', screen: 'SoulPhotosScreen', icon: 'tag-heart-outline', accent: '#C97959' };
 
-  const renderItem = (item: BonusItem) => {
+  const renderItem = (item: ServiceHubItem) => {
     const isFoodHub = item.screen === 'EdaNaChaykeScreen';
 
     return (
@@ -202,4 +202,4 @@ const styles = StyleSheet.create({
   foodDesc: { color: '#5C4200' },
 });
 
-export default ChaikaBonusPlusScreen;
+export default ServicesHubScreen;

@@ -36,7 +36,7 @@ const MainMenuModal: React.FC<MainMenuModalProps> = ({ visible, onClose }) => {
 
   const ADDITIONAL_MENU_ITEMS: MenuItem[] = [
     { labelKey: 'osbb', icon: 'office-building-cog-outline', screen: 'OsbbHubScreen' },
-    { labelKey: 'chaikaBonusPlus', icon: 'plus-circle-outline', screen: 'ChaikaBonusPlusScreen' },
+    { labelKey: 'servicesHub', icon: 'plus-circle-outline', screen: 'ServicesHubScreen' },
     { labelKey: 'helpNeighbors', icon: 'hand-heart', screen: 'HelpNeighborsScreen' },
     { labelKey: 'aboutApp', icon: 'information-outline', screen: 'AppInfoScreen' },
     { labelKey: 'loginRegister', icon: 'login', screen: 'LoginScreen' },

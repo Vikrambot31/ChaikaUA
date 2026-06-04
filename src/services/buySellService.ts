@@ -38,6 +38,20 @@ const ACTIVE_LIMIT = 300;
 const ACTIVE_LIMIT_BUFFER = 60;
 const FEED_MINIMUM = 10;
 const ARCHIVED_FALLBACK_LIMIT = 20;
+const BLOCKED_PUBLIC_TEXT_PATTERNS = [
+  /лплалала/iu,
+  /очоаоаоа/iu,
+];
+
+const isPublicListingContentVisible = (item: BuySellListing): boolean => {
+  const title = item.itemName.trim();
+  const description = item.description.trim();
+  if (!title && !description) return false;
+
+  const haystack = `${title} ${description}`;
+  return !BLOCKED_PUBLIC_TEXT_PATTERNS.some((pattern) => pattern.test(haystack));
+};
+
 const normalizePrice = (value: string): string => {
   const sanitized = value.replace(',', '.').replace(/[^\d.]/g, '');
   const numeric = Number(sanitized);
@@ -92,9 +106,10 @@ export const buySellService = {
     let ownPendingItems: BuySellListing[] = [];
 
     const emit = (active: BuySellListing[]) => {
-      const ids = new Set(active.map((i) => i.id));
-      const extras = ownPendingItems.filter((i) => !ids.has(i.id));
-      const merged = [...extras, ...active];
+      const visibleActive = active.filter(isPublicListingContentVisible);
+      const ids = new Set(visibleActive.map((i) => i.id));
+      const extras = ownPendingItems.filter((i) => !ids.has(i.id) && isPublicListingContentVisible(i));
+      const merged = [...extras, ...visibleActive];
       void resolveMediaAccessUrls(merged, 'buy_sell_listings', (item) => item.photoUri || item.photoStoragePath || '', (item, url) => ({ ...item, photoUri: url })).then(callback);
     };
 
@@ -104,11 +119,11 @@ export const buySellService = {
       const raw = snapshot.val();
       const now = Date.now();
       const active: BuySellListing[] = raw
-        ? Object.entries(raw as Record<string, any>)
+          ? Object.entries(raw as Record<string, any>)
             .map(([id, data]) => mapBuySellItem(id, data))
             .filter((item) => {
               const expired = item.expiresAt && new Date(item.expiresAt).getTime() < now;
-              return item.moderationStatus === 'approved' && !expired;
+              return item.moderationStatus === 'approved' && !expired && isPublicListingContentVisible(item);
             })
             .reverse()
             .slice(0, ACTIVE_LIMIT)
@@ -125,6 +140,7 @@ export const buySellService = {
         const archived: BuySellListing[] = expiredRaw
           ? Object.entries(expiredRaw as Record<string, any>)
               .map(([id, data]) => mapBuySellItem(id, data, true))
+              .filter(isPublicListingContentVisible)
               .reverse()
           : [];
         emit([...active, ...archived]);
@@ -142,7 +158,7 @@ export const buySellService = {
         ownPendingItems = raw
           ? Object.entries(raw as Record<string, any>)
               .map(([id, data]) => mapBuySellItem(id, data))
-              .filter((item) => item.moderationStatus !== 'approved')
+              .filter((item) => item.moderationStatus !== 'approved' && isPublicListingContentVisible(item))
           : [];
         const ids = new Set(approvedItems.map((i) => i.id));
         const extras = ownPendingItems.filter((i) => !ids.has(i.id));

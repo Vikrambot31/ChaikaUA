@@ -299,6 +299,26 @@ export default function EdaNaChaykeScreen() {
     openTelegram(telegram);
   }, []);
 
+  const handleOpenPlaceDetail = useCallback((place: Place) => {
+    const parsed = parseWorkingHours(place.workingHours);
+    logFoodEvent('food_open_place', { placeId: place.id });
+    navigation.navigate('ItemDetailScreen', {
+      item: {
+        id: place.id,
+        title: place.name,
+        address: place.address,
+        phone: place.phone,
+        status: parsed
+          ? parsed.isOpen
+            ? `${text.open} ${text.openUntil} ${parsed.closingTime}`
+            : text.closed
+          : text.hoursUnknown,
+        sourceType: 'place',
+        sourceId: place.id,
+      },
+    });
+  }, [navigation, text.closed, text.hoursUnknown, text.open, text.openUntil]);
+
   // --- Render helpers ---
 
   const renderStatusBadge = (place: Place) => {
@@ -332,7 +352,12 @@ export default function EdaNaChaykeScreen() {
     const hasDelivery = !!info?.deliveryAvailable;
 
     return (
-      <View key={place.id} style={styles.placeCard}>
+      <TouchableOpacity
+        key={place.id}
+        style={styles.placeCard}
+        activeOpacity={0.88}
+        onPress={() => handleOpenPlaceDetail(place)}
+      >
         <View style={styles.placeHeader}>
           <View style={styles.placeTitleBlock}>
             <Text style={styles.placeTitle} numberOfLines={2}>{place.name}</Text>
@@ -362,7 +387,10 @@ export default function EdaNaChaykeScreen() {
             <TouchableOpacity
               style={styles.actionButton}
               activeOpacity={0.85}
-              onPress={() => handleCallPlace(place)}
+              onPress={(event) => {
+                event.stopPropagation?.();
+                handleCallPlace(place);
+              }}
             >
               <MaterialCommunityIcons name="phone" size={16} color="#FFFFFF" />
               <Text style={styles.actionButtonText}>{text.call}</Text>
@@ -371,7 +399,10 @@ export default function EdaNaChaykeScreen() {
           <TouchableOpacity
             style={[styles.actionButton, styles.actionButtonSecondary]}
             activeOpacity={0.85}
-            onPress={() => handleRoutePlace(place)}
+            onPress={(event) => {
+              event.stopPropagation?.();
+              handleRoutePlace(place);
+            }}
           >
             <MaterialCommunityIcons name="map-marker-radius" size={16} color={SCREEN_THEME.enamelBlueDark} />
             <Text style={styles.actionButtonSecondaryText}>{text.route}</Text>
@@ -380,14 +411,17 @@ export default function EdaNaChaykeScreen() {
             <TouchableOpacity
               style={[styles.actionButton, styles.actionButtonTelegram]}
               activeOpacity={0.85}
-              onPress={() => handleTelegramPlace(place, info?.telegram)}
+              onPress={(event) => {
+                event.stopPropagation?.();
+                handleTelegramPlace(place, info?.telegram);
+              }}
             >
               <MaterialCommunityIcons name="send" size={16} color="#FFFFFF" />
               <Text style={styles.actionButtonText}>{text.telegram}</Text>
             </TouchableOpacity>
           )}
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 

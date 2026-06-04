@@ -663,7 +663,7 @@ const HomeScreen: React.FC = () => {
     { labelKey: 'mapButton', tab: 'MapTab', artwork: require('../../assets/WEBP-version/2-map.webp') },
     { labelKey: 'helpNeighbors', screen: 'HelpNeighborsScreen', artwork: require('../../assets/WEBP-version/1-help.webp') },
     { labelKey: 'homeProblems', screen: 'ChaikaProblemsScreen', artwork: require('../../assets/WEBP-version/3-broken.webp') },
-    { labelKey: 'chaikaBonus', screen: 'ChaikaBonusPlusScreen', artwork: require('../../assets/WEBP-version/4-people.webp') },
+    { labelKey: 'services', screen: 'ServicesHubScreen', artwork: require('../../assets/WEBP-version/4-people.webp') },
   ];
 
   const TOP_INFO: TopInfoItem[] = [
@@ -860,7 +860,7 @@ const HomeScreen: React.FC = () => {
         </View>
 
         <View style={styles.panel2Stage}>
-          <TouchableOpacity style={styles.panel2Shadow} onPress={() => navigation.navigate('ChaikaBonusPlusScreen')} activeOpacity={0.9}>
+          <TouchableOpacity style={styles.panel2Shadow} onPress={() => navigation.navigate('ServicesHubScreen')} activeOpacity={0.9}>
             <Image source={PANEL2_IMAGE} style={styles.panel2Img} resizeMode="cover" />
           </TouchableOpacity>
 

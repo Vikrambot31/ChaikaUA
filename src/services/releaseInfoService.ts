@@ -82,7 +82,7 @@ const SCREEN_NAME_MAP: Array<{ pattern: RegExp; name: string }> = [
   { pattern: /OSBB-Setup/, name: 'ОСББ настройка' },
   { pattern: /OSBB-AddNews/, name: 'ОСББ добавить новость' },
   { pattern: /OSBB-AdminPanel/, name: 'ОСББ администрирование' },
-  { pattern: /Chaika-Bonus-Plus/, name: 'Чайка Бонус Плюс' },
+  { pattern: /servicesHub/, name: 'Сервисы ЖК' },
   { pattern: /Foto-Rayona/, name: 'Фото района' },
   { pattern: /Mesta-Chayki/, name: 'Места Чайки' },
   { pattern: /Kto-Poteryal/, name: 'Кто потерял' },

@@ -19,7 +19,7 @@ type Props = {
 
 const LANGUAGES: { code: Language; label: string }[] = [
   { code: 'ua', label: 'UA 🇺🇦' },
-  { code: 'ru', label: 'РУ 🇷🇺' },
+  { code: 'ru', label: 'РУ' },
   { code: 'en', label: 'English' },
 ];
 

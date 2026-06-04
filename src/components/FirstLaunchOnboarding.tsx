@@ -14,6 +14,10 @@ import { useSelector } from 'react-redux';
 import { SCREEN_THEME } from '../utils/screenTheme';
 
 const { width, height } = Dimensions.get('window');
+const isCompactHeight = height < 720;
+const captionFontSize = isCompactHeight ? 16 : 18;
+const captionLineHeight = isCompactHeight ? 21 : 24;
+const imageCardHeight = height * (isCompactHeight ? 0.58 : 0.62);
 
 type Slide = {
   key: string;
@@ -180,7 +184,7 @@ const styles = StyleSheet.create({
     paddingTop: 2,
   },
   imageCard: {
-    height: height * 0.65,
+    height: imageCardHeight,
     borderRadius: 24,
     overflow: 'hidden',
     position: 'relative',
@@ -194,19 +198,20 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   captionChip: {
-    marginHorizontal: 10,
+    marginHorizontal: 12,
     borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: 12,
+    paddingVertical: isCompactHeight ? 9 : 10,
     backgroundColor: 'rgba(255, 249, 238, 0.95)',
     zIndex: 20,
   },
   captionText: {
     color: SCREEN_THEME.textPrimary,
-    fontSize: 22,
-    lineHeight: 28,
-    fontWeight: '900',
-    textAlign: 'left',
+    fontSize: captionFontSize,
+    lineHeight: captionLineHeight,
+    fontWeight: '800',
+    textAlign: 'center',
+    flexShrink: 1,
   },
   footer: {
     paddingHorizontal: 20,

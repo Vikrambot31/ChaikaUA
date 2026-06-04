@@ -22,7 +22,7 @@ const ICONS: Record<string, IconName> = {
   HomeTab: 'home',
   MapTab: 'map-search',
   HelpTab: 'hand-heart-outline',
-  BonusTab: 'plus-circle-outline',
+  ServicesTab: 'plus-circle-outline',
   ProfileTab: 'account-circle',
 };
 
@@ -30,7 +30,7 @@ const ACTIVE_COLORS: Record<string, string> = {
   HomeTab: SCREEN_THEME.woodGreenDark,
   MapTab: SCREEN_THEME.terracottaDark,
   HelpTab: SCREEN_THEME.linenOliveDark,
-  BonusTab: SCREEN_THEME.enamelBlueDark,
+  ServicesTab: SCREEN_THEME.enamelBlueDark,
   ProfileTab: '#6D8B55',
 };
 
@@ -93,7 +93,7 @@ const ScrollableTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, nav
             route.name === 'HomeTab' ? t.menu.home :
             route.name === 'MapTab' ? t.menu.mapChaika :
             route.name === 'HelpTab' ? t.menu.helpNeighbors :
-            route.name === 'BonusTab' ? t.mainScreen.chaikaBonus :
+            route.name === 'ServicesTab' ? t.mainScreen.services :
             route.name === 'ProfileTab' ? t.menu.profile :
             fallbackLabel;
           const isFocused = state.index === index;

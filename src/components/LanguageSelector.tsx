@@ -12,7 +12,7 @@ const LanguageSelector: React.FC = () => {
 
   const languages: { code: Language; label: string; flag: string }[] = [
     { code: 'ua', label: 'UA', flag: '🇺🇦' },
-    { code: 'ru', label: 'РУ', flag: '🇷🇺' },
+    { code: 'ru', label: 'РУ', flag: '' },
     { code: 'en', label: 'English', flag: '🇬🇧' },
   ];
 
@@ -109,5 +109,4 @@ const styles = StyleSheet.create({
 });
 
 export default LanguageSelector;
-
 
