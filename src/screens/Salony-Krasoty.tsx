@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   SafeAreaView,
   ScrollView,
@@ -16,6 +16,7 @@ import { beautyInfoSeed, getActiveBeautyOffers } from '../services/beautySeed';
 import { BeautyCategory, BeautyFeature, BeautyOffer, Place } from '../types/app';
 import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
+import { subscribeActiveBonusPromotions, type BonusPromotion } from '../services/bonusService';
 
 type Lang = 'ua' | 'ru' | 'en';
 type AppNavigation = NavigationProp<Record<string, object | undefined>>;
@@ -270,8 +271,13 @@ export default function SalonyKrasotyScreen() {
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
   const [activeCategory, setActiveCategory] = useState<CategoryKey>('all');
   const [query, setQuery] = useState('');
+  const [activePromotions, setActivePromotions] = useState<BonusPromotion[]>([]);
   const scrollRef = useRef<ScrollView>(null);
   const resultsAnchorY = useRef(0);
+
+  useEffect(() => {
+    return subscribeActiveBonusPromotions('beauty', setActivePromotions);
+  }, []);
 
   const beautyPlaces = useMemo(() => (
     chaykaPlaces
@@ -297,14 +303,46 @@ export default function SalonyKrasotyScreen() {
 
   const filteredPlaces = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    return beautyPlaces.filter(({ place, category }) => {
-      if (activeCategory !== 'all' && category !== activeCategory) return false;
-      if (!normalizedQuery) return true;
-      return `${place.name} ${place.address}`.toLowerCase().includes(normalizedQuery);
-    });
-  }, [activeCategory, beautyPlaces, query]);
+    const promotedSalonIds = new Map(
+      activePromotions
+        .filter((promotion) => promotion.targetType === 'beauty_salon')
+        .map((promotion, index) => [promotion.targetId, index]),
+    );
+    return beautyPlaces
+      .filter(({ place, category }) => {
+        if (activeCategory !== 'all' && category !== activeCategory) return false;
+        if (!normalizedQuery) return true;
+        return `${place.name} ${place.address}`.toLowerCase().includes(normalizedQuery);
+      })
+      .sort((a, b) => {
+        const aPromoted = promotedSalonIds.get(a.place.id);
+        const bPromoted = promotedSalonIds.get(b.place.id);
+        if (aPromoted !== undefined || bPromoted !== undefined) {
+          if (aPromoted === undefined) return 1;
+          if (bPromoted === undefined) return -1;
+          return aPromoted - bPromoted;
+        }
+        return 0;
+      });
+  }, [activeCategory, activePromotions, beautyPlaces, query]);
 
-  const activeOffers = useMemo(() => getActiveBeautyOffers(), []);
+  const activeOffers = useMemo(() => {
+    const promotedOfferIds = new Map(
+      activePromotions
+        .filter((promotion) => promotion.targetType === 'beauty_promo')
+        .map((promotion, index) => [promotion.targetId, index]),
+    );
+    return [...getActiveBeautyOffers()].sort((a, b) => {
+      const aPromoted = promotedOfferIds.get(a.id);
+      const bPromoted = promotedOfferIds.get(b.id);
+      if (aPromoted !== undefined || bPromoted !== undefined) {
+        if (aPromoted === undefined) return 1;
+        if (bPromoted === undefined) return -1;
+        return aPromoted - bPromoted;
+      }
+      return 0;
+    });
+  }, [activePromotions]);
 
   const openPlace = (place: Place) => {
     navigation.navigate('DetalSalonaScreen', { place });

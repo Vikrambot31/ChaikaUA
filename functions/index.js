@@ -3,6 +3,8 @@ const functionsV1 = require('firebase-functions/v1');
 const admin = require('firebase-admin');
 const crypto = require('crypto');
 const { createInviteAccessFunctions, BONUS_LIKE_POINTS, BONUS_LIKE_CAP, BONUS_TOTAL_CAP, resolveBadge, USER_BONUSES_PATH } = require('./inviteAccess');
+const { createBonusFunctions } = require('./bonusFunctions');
+const { createPromotionFunctions } = require('./promotionFunctions');
 
 admin.initializeApp();
 
@@ -271,6 +273,23 @@ Object.assign(exports, createInviteAccessFunctions({
   writeOpsError,
   isPrimaryServiceOwnerContext,
   isAdminRoleContext,
+  getRoleForUid,
+}));
+
+Object.assign(exports, createBonusFunctions({
+  functions,
+  admin,
+  writeOpsEvent,
+  writeOpsError,
+  getRoleForUid,
+}));
+
+Object.assign(exports, createPromotionFunctions({
+  functions,
+  functionsV1,
+  admin,
+  writeOpsEvent,
+  writeOpsError,
   getRoleForUid,
 }));
 

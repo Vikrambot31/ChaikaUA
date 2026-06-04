@@ -16,13 +16,15 @@ import { ReleasesPage } from './pages/ReleasesPage';
 import { SecurityPage } from './pages/SecurityPage';
 import { AIDiagnosticsPage } from './pages/AIDiagnosticsPage';
 import { SupportPage } from './pages/SupportPage';
+import { BonusCreditsPage } from './pages/BonusCreditsPage';
+import { AdChatPage } from './pages/AdChatPage';
 import { ViewModeProvider } from './contexts/ViewModeContext';
 import { DashboardProvider } from './contexts/DashboardContext';
 
 const AppRulesPage = lazy(() => import('./pages/AppRulesPage'));
 
 const VALID_PAGES = new Set<AdminPageKey>([
-  'dashboard', 'moderation', 'archive', 'invite_access', 'guarantor_tree', 'access_control', 'security', 'errors', 'photo_approval', 'releases', 'ai_diagnostics', 'app_rules', 'support',
+  'dashboard', 'moderation', 'archive', 'invite_access', 'guarantor_tree', 'access_control', 'security', 'errors', 'photo_approval', 'releases', 'ai_diagnostics', 'app_rules', 'support', 'bonus_credits', 'ad_chat',
 ]);
 
 const getPageFromHash = (): AdminPageKey => {
@@ -72,6 +74,8 @@ export const App = () => {
     ai_diagnostics: 'AI Diagnostics',
     app_rules: 'Серверні правила',
     support: 'Служба Підтримки',
+    bonus_credits: 'Бонуси та кредити',
+    ad_chat: 'Рекламний чат',
   };
 
   const renderPage = () => {
@@ -86,6 +90,8 @@ export const App = () => {
     if (activePage === 'releases') return <ReleasesPage />;
     if (activePage === 'ai_diagnostics') return <AIDiagnosticsPage role={access.role} userEmail={access.user.email || ''} />;
     if (activePage === 'support') return <SupportPage />;
+    if (activePage === 'bonus_credits') return <BonusCreditsPage />;
+    if (activePage === 'ad_chat') return <AdChatPage />;
     if (activePage === 'app_rules') {
       return (
         <Suspense fallback={<div className="loadingScreen">Завантаження серверних правил...</div>}>

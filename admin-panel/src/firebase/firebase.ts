@@ -2,6 +2,7 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getDatabase } from 'firebase/database';
 import { getStorage } from 'firebase/storage';
+import { getFunctions } from 'firebase/functions';
 import { LOCAL_MODE } from '../local/LOCAL_MODE';
 
 const requiredEnv = (name: string): string => {
@@ -29,3 +30,4 @@ export const firebaseApp = getApps().length > 0 ? getApp() : initializeApp(fireb
 export const auth = getAuth(firebaseApp);
 export const database = getDatabase(firebaseApp);
 export const storage = getStorage(firebaseApp);
+export const functions = getFunctions(firebaseApp);

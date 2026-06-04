@@ -30,6 +30,7 @@ import { getLanguageValidationError } from '../utils/contentLanguageGuard';
 import UserCardActionBar from '../components/UserCardActionBar';
 import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 import { useOperationTrace } from '../hooks/useOperationTrace';
+import { subscribeActiveBonusPromotions, type BonusPromotion } from '../services/bonusService';
 
 const CONTACT_LISTING_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const PROFILE_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -408,6 +409,7 @@ const KontaktiChaikyScreen: React.FC = () => {
   const [searchContact, setSearchContact] = useState('');
   const [searchDescription, setSearchDescription] = useState('');
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [activePromotions, setActivePromotions] = useState<BonusPromotion[]>([]);
   const blinkAnim = useRef(new Animated.Value(1)).current;
   const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestDraftRef = useRef({ category, condition, price, description, phone, addFormVisible, isInterestingFormExpanded, zodiacSign, humanDesignType, humanDesignProfile });
@@ -462,6 +464,10 @@ const KontaktiChaikyScreen: React.FC = () => {
       unsubscribe();
     };
   }, [user?.id]);
+
+  useEffect(() => {
+    return subscribeActiveBonusPromotions('contacts', setActivePromotions);
+  }, []);
 
   useEffect(() => {
     latestDraftRef.current = { category, condition, price, description, phone, addFormVisible, isInterestingFormExpanded, zodiacSign, humanDesignType, humanDesignProfile };
@@ -620,11 +626,25 @@ const KontaktiChaikyScreen: React.FC = () => {
   ]);
 
   const topListings = useMemo(() => {
+    const promotedByUserId = new Map(
+      activePromotions
+        .filter((promotion) => promotion.targetId)
+        .map((promotion, index) => [promotion.targetId, index]),
+    );
     return [...listings]
-      .filter((item) => !item.isArchived && item.photoUri)
-      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+      .filter((item) => !item.isArchived && (item.photoUri || promotedByUserId.has(item.userId)))
+      .sort((a, b) => {
+        const aPromoted = promotedByUserId.get(a.userId);
+        const bPromoted = promotedByUserId.get(b.userId);
+        if (aPromoted !== undefined || bPromoted !== undefined) {
+          if (aPromoted === undefined) return 1;
+          if (bPromoted === undefined) return -1;
+          return aPromoted - bPromoted;
+        }
+        return (b.createdAt || '').localeCompare(a.createdAt || '');
+      })
       .slice(0, 10);
-  }, [listings]);
+  }, [activePromotions, listings]);
 
   const hasAdvancedSearch = useMemo(
     () =>

@@ -33,6 +33,7 @@ import { createPendingModeration, type ModerationStatus } from '../utils/moderat
 import { resolveMediaAccessUrls } from '../services/mediaAccess';
 import { ensureFirebaseAuth, requireWriteSession } from '../firebase-auth-session';
 import { getBuildingsByStreet, getStreets } from '../data/buildings';
+import { subscribeActiveBonusPromotions, type BonusPromotion } from '../services/bonusService';
 
 const BIZ_LISTING_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const BIZ_LISTINGS_PATH = 'biznes_chaika_listings';
@@ -798,6 +799,7 @@ const KontaktiChaikyScreen: React.FC = () => {
   const [searchContact, setSearchContact] = useState('');
   const [searchDescription, setSearchDescription] = useState('');
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [activePromotions, setActivePromotions] = useState<BonusPromotion[]>([]);
   const blinkAnim = useRef(new Animated.Value(1)).current;
   const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestDraftRef = useRef({ itemName, category, condition, priceFrom, priceTo, description, phone, contactName, addFormVisible, isExtraExpanded, workFormat, workHours, locationArea, locationStreet, locationHouseNumber });
@@ -873,6 +875,10 @@ const KontaktiChaikyScreen: React.FC = () => {
       unsubscribe();
     };
   }, [user?.id]);
+
+  useEffect(() => {
+    return subscribeActiveBonusPromotions('business', setActivePromotions);
+  }, []);
 
   useEffect(() => {
     latestDraftRef.current = { itemName, category, condition, priceFrom, priceTo, description, phone, contactName, addFormVisible, isExtraExpanded, workFormat, workHours, locationArea, locationStreet, locationHouseNumber };
@@ -1034,11 +1040,25 @@ const KontaktiChaikyScreen: React.FC = () => {
   ]);
 
   const topListings = useMemo(() => {
+    const promotedByListingId = new Map(
+      activePromotions
+        .filter((promotion) => promotion.targetId)
+        .map((promotion, index) => [promotion.targetId, index]),
+    );
     return [...listings]
-      .filter((item) => !item.isArchived && item.photoUri)
-      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+      .filter((item) => !item.isArchived && (item.photoUri || promotedByListingId.has(item.id)))
+      .sort((a, b) => {
+        const aPromoted = promotedByListingId.get(a.id);
+        const bPromoted = promotedByListingId.get(b.id);
+        if (aPromoted !== undefined || bPromoted !== undefined) {
+          if (aPromoted === undefined) return 1;
+          if (bPromoted === undefined) return -1;
+          return aPromoted - bPromoted;
+        }
+        return (b.createdAt || '').localeCompare(a.createdAt || '');
+      })
       .slice(0, 10);
-  }, [listings]);
+  }, [activePromotions, listings]);
 
   const hasAdvancedSearch = useMemo(
     () =>

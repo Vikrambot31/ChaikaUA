@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   SafeAreaView,
   ScrollView,
@@ -16,6 +16,7 @@ import { CHILDREN_SCREEN_BLACKLIST, childInfoSeed, getActiveOffers } from '../se
 import { ChildCategory, ChildFeature, ChildOffer, Place, PlaceType } from '../types/app';
 import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
+import { subscribeActiveBonusPromotions, type BonusPromotion } from '../services/bonusService';
 
 type Lang = 'ua' | 'ru' | 'en';
 type AppNavigation = NavigationProp<Record<string, object | undefined>>;
@@ -298,8 +299,13 @@ export default function VseDlyaDeteyScreen() {
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
   const [activeCategory, setActiveCategory] = useState<CategoryKey>('all');
   const [query, setQuery] = useState('');
+  const [activePromotions, setActivePromotions] = useState<BonusPromotion[]>([]);
   const scrollRef = useRef<ScrollView>(null);
   const resultsAnchorY = useRef(0);
+
+  useEffect(() => {
+    return subscribeActiveBonusPromotions('kids', setActivePromotions);
+  }, []);
 
   const childPlaces = useMemo(() => (
     chaykaPlaces
@@ -326,14 +332,46 @@ export default function VseDlyaDeteyScreen() {
 
   const filteredPlaces = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    return childPlaces.filter(({ place, category }) => {
-      if (activeCategory !== 'all' && category !== activeCategory) return false;
-      if (!normalizedQuery) return true;
-      return `${place.name} ${place.address}`.toLowerCase().includes(normalizedQuery);
-    });
-  }, [activeCategory, childPlaces, query]);
+    const promotedPlaceIds = new Map(
+      activePromotions
+        .filter((promotion) => promotion.targetType === 'kids_place')
+        .map((promotion, index) => [promotion.targetId, index]),
+    );
+    return childPlaces
+      .filter(({ place, category }) => {
+        if (activeCategory !== 'all' && category !== activeCategory) return false;
+        if (!normalizedQuery) return true;
+        return `${place.name} ${place.address}`.toLowerCase().includes(normalizedQuery);
+      })
+      .sort((a, b) => {
+        const aPromoted = promotedPlaceIds.get(a.place.id);
+        const bPromoted = promotedPlaceIds.get(b.place.id);
+        if (aPromoted !== undefined || bPromoted !== undefined) {
+          if (aPromoted === undefined) return 1;
+          if (bPromoted === undefined) return -1;
+          return aPromoted - bPromoted;
+        }
+        return 0;
+      });
+  }, [activeCategory, activePromotions, childPlaces, query]);
 
-  const activeOffers = useMemo(() => getActiveOffers(), []);
+  const activeOffers = useMemo(() => {
+    const promotedEventIds = new Map(
+      activePromotions
+        .filter((promotion) => promotion.targetType === 'kids_event')
+        .map((promotion, index) => [promotion.targetId, index]),
+    );
+    return [...getActiveOffers()].sort((a, b) => {
+      const aPromoted = promotedEventIds.get(a.id);
+      const bPromoted = promotedEventIds.get(b.id);
+      if (aPromoted !== undefined || bPromoted !== undefined) {
+        if (aPromoted === undefined) return 1;
+        if (bPromoted === undefined) return -1;
+        return aPromoted - bPromoted;
+      }
+      return 0;
+    });
+  }, [activePromotions]);
   const isEventsCategory = activeCategory === 'event';
 
   const openPlace = (place: Place) => {

@@ -480,6 +480,117 @@
       }
     },
 
+    "promo_credits": {
+      ".read": "auth != null && (root.child('user_roles').child(auth.uid).child('role').val() === 'admin')",
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin')",
+        ".write": false
+      }
+    },
+
+    "bonus_transactions": {
+      ".read": "auth != null && root.child('user_roles').child(auth.uid).child('role').val() === 'admin'",
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin')",
+        ".write": false,
+        ".indexOn": ["createdAt", "currency", "type"]
+      }
+    },
+
+    "bonus_idempotency": {
+      ".read": false,
+      ".write": false
+    },
+
+    "bonus_pair_frequency": {
+      ".read": "auth != null && root.child('user_roles').child(auth.uid).child('role').val() === 'admin'",
+      ".write": false
+    },
+
+    "bonus_fraud_flags": {
+      ".read": "auth != null && root.child('user_roles').child(auth.uid).child('role').val() === 'admin'",
+      ".write": false,
+      ".indexOn": ["at", "type"]
+    },
+
+    "bonus_blocks": {
+      ".read": "auth != null && root.child('user_roles').child(auth.uid).child('role').val() === 'admin'",
+      ".write": false
+    },
+
+    "help_confirmations": {
+      "$requestId": {
+        ".read": "auth != null",
+        "$helperUid": {
+          ".read": "auth != null",
+          ".write": false
+        }
+      }
+    },
+
+    "bonus_promotions": {
+      ".read": "auth != null",
+      ".indexOn": ["screen", "status", "expiresAt", "uid"],
+      "$promotionId": {
+        ".write": false
+      }
+    },
+
+    "promo_subscriptions": {
+      ".read": "auth != null && root.child('user_roles').child(auth.uid).child('role').val() === 'admin'",
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin')",
+        ".write": false,
+        ".indexOn": ["status", "expiresAt"]
+      }
+    },
+
+    "notifications": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": false,
+        ".indexOn": ["createdAt", "read"]
+      }
+    },
+
+    "ad_ticket_ref": {
+      "$userId": {
+        ".read": "auth != null && auth.uid === $userId",
+        ".write": "auth != null && auth.uid === $userId",
+        ".validate": "newData.isString() && newData.val().length > 0"
+      }
+    },
+
+    "ad_tickets": {
+      ".read": "auth != null && root.child('user_roles').child(auth.uid).child('role').val() === 'admin'",
+      ".indexOn": ["userId", "status", "updatedAt"],
+      "$ticketId": {
+        ".read": "auth != null && (data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin')",
+        ".write": "auth != null && ((!data.exists() && newData.child('userId').val() === auth.uid) || (data.exists() && data.child('userId').val() === auth.uid && newData.child('userId').val() === auth.uid) || root.child('user_roles').child(auth.uid).child('role').val() === 'admin')",
+        ".validate": "newData.hasChildren(['ticketId', 'userId', 'userName', 'category', 'status', 'createdAt', 'updatedAt'])",
+        "status": {
+          ".validate": "newData.val() === 'open' || newData.val() === 'closed'"
+        },
+        "category": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 30"
+        },
+        "userName": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 100"
+        }
+      }
+    },
+
+    "ad_messages": {
+      "$ticketId": {
+        ".read": "auth != null && (root.child('ad_tickets').child($ticketId).child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin')",
+        ".indexOn": ["timestamp"],
+        "$messageId": {
+          ".write": "auth != null && (root.child('ad_tickets').child($ticketId).child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin')",
+          ".validate": "newData.hasChildren(['messageId', 'ticketId', 'senderId', 'senderRole', 'text', 'timestamp']) && newData.child('text').isString() && newData.child('text').val().length <= 500 && newData.child('text').val().length > 0 && (newData.child('senderRole').val() === 'user' || newData.child('senderRole').val() === 'admin')"
+        }
+      }
+    },
+
     "user_support_ticket_ref": {
       "$userId": {
         ".read": "auth != null && auth.uid === $userId",

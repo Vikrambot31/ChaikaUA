@@ -582,7 +582,7 @@ const ProfileScreen: React.FC = () => {
         {/* Trust bonuses card */}
         <TouchableOpacity
           activeOpacity={0.86}
-          onPress={() => navigation.navigate('PoruchitelScreen')}
+          onPress={() => navigation.navigate('BonusWalletScreen')}
           style={styles.bonusCard}
         >
           <View style={styles.bonusHeader}>
@@ -705,15 +705,26 @@ const ProfileScreen: React.FC = () => {
           </TouchableOpacity>
 
           {isAdmin ? (
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => navigation.navigate('RequestsScreen')}
-              activeOpacity={0.84}
-            >
-              <TactileIcon icon="clipboard-list-outline" size={40} iconSize={18} backgroundColor="#7A1E5C" />
-              <Text style={styles.menuLabel}>{text.requestsAdmin}</Text>
-              <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => navigation.navigate('RequestsScreen')}
+                activeOpacity={0.84}
+              >
+                <TactileIcon icon="clipboard-list-outline" size={40} iconSize={18} backgroundColor="#7A1E5C" />
+                <Text style={styles.menuLabel}>{text.requestsAdmin}</Text>
+                <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => navigation.navigate('PromoCreditsAdminScreen')}
+                activeOpacity={0.84}
+              >
+                <TactileIcon icon="credit-card-check-outline" size={40} iconSize={18} backgroundColor="#5F7B4D" />
+                <Text style={styles.menuLabel}>Промо-кредиты</Text>
+                <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
+              </TouchableOpacity>
+            </>
           ) : null}
 
           {moderationUnlocked && hasPrimaryModerationAccess ? (

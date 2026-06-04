@@ -10,7 +10,7 @@ import { useViewMode, type ViewMode } from '../contexts/ViewModeContext';
 import { useDashboardContext } from '../contexts/DashboardContext';
 import type { DashboardStats } from '../services/dashboardService';
 
-export type AdminPageKey = 'dashboard' | 'moderation' | 'archive' | 'invite_access' | 'guarantor_tree' | 'access_control' | 'security' | 'errors' | 'photo_approval' | 'releases' | 'ai_diagnostics' | 'app_rules' | 'support';
+export type AdminPageKey = 'dashboard' | 'moderation' | 'archive' | 'invite_access' | 'guarantor_tree' | 'access_control' | 'security' | 'errors' | 'photo_approval' | 'releases' | 'ai_diagnostics' | 'app_rules' | 'support' | 'bonus_credits' | 'ad_chat';
 
 type AppShellProps = {
   children: ReactNode;
@@ -87,6 +87,16 @@ const navItems: Array<{ key: AdminPageKey; label: string; hint: string }> = [
     label: 'Служба Підтримки',
     hint: 'Звернення користувачів: перегляд, відповідь, закриття тикетів.',
   },
+  {
+    key: 'bonus_credits',
+    label: 'Бонуси та кредити',
+    hint: 'Управління бонусами довіри та промо-кредитами: баланси, транзакції, промоції, фрод-моніторинг.',
+  },
+  {
+    key: 'ad_chat',
+    label: 'Рекламний чат',
+    hint: 'Звернення з питань реклами та промо-кредитів: перегляд, відповідь, закриття.',
+  },
 ];
 
 const navItemIcons: Record<AdminPageKey, string> = {
@@ -103,6 +113,8 @@ const navItemIcons: Record<AdminPageKey, string> = {
   ai_diagnostics: '\u{1F9E0}',
   app_rules: '\u{1F4CB}',
   support: '\u{1F3A7}',
+  bonus_credits: '\u{1F4B0}',
+  ad_chat: '\u{1F4E2}',
 };
 
 type AttentionLevel = 'low' | 'medium' | 'high';

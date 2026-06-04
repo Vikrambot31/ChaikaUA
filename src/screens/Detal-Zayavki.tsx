@@ -18,7 +18,17 @@ import { pickUserAvatarUri } from '../utils/userAvatar';
 import { getRequestTopicLabel } from '../data/categories';
 import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 import { loadProfileRecord } from '../services/authProfileService';
-import { offerHelp, checkIfHelped } from '../services/bonusService';
+import {
+  awardGratitudeBonus,
+  awardHelpRespondBonus,
+  checkIfHelped,
+  closeRequestWithBonus,
+  confirmHelperForRequest,
+  subscribeHelpConfirmations,
+  subscribeHelpResponses,
+  type HelpConfirmation,
+  type HelpResponse,
+} from '../services/bonusService';
 import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
 import ContactReasonModal from '../components/ContactReasonModal';
 import { useContactRequest } from '../hooks/useContactRequest';
@@ -150,10 +160,75 @@ const getGenderShortLabel = (gender?: string) => {
   return '';
 };
 
+const formatHelperTime = (timestamp: number) => {
+  if (!timestamp) return '-';
+  return new Date(timestamp).toLocaleString();
+};
+
 const CONTACT_ACTION_TEXT = {
   ua: { call: 'Зателефонувати', viber: 'Viber', copy: 'Копія', profile: 'Профіль' },
   ru: { call: 'Позвонить', viber: 'Viber', copy: 'Копия', profile: 'Профиль' },
   en: { call: 'Call', viber: 'Viber', copy: 'Copy', profile: 'Profile' },
+} as const;
+
+const HELP_FLOW_TEXT = {
+  ua: {
+    respond: 'Можу допомогти',
+    responded: 'Відгук надіслано',
+    respondSuccess: 'Відгук надіслано. +5 бонусів довіри, якщо тижневий ліміт дозволяє.',
+    respondFlagged: 'Відгук надіслано, але бонус очікує перевірки.',
+    confirmHelp: 'Підтвердити допомогу',
+    confirmed: 'Підтверджено',
+    confirmSuccess: 'Помічника підтверджено. +20 бонусів, якщо ліміти дозволяють.',
+    thank: 'Подякувати',
+    thanked: 'Подяку надіслано',
+    thanksSuccess: 'Подяку надіслано. +10 бонусів, якщо ліміти дозволяють.',
+    closeSolved: 'Закрити як вирішену',
+    closed: 'Заявку закрито',
+    closeSuccess: 'Заявку закрито. +5 бонусів, якщо ліміти дозволяють.',
+    helpersTitle: 'Помічники',
+    helpersEmpty: 'Поки ніхто не відгукнувся.',
+    flagged: 'Перевірка',
+    bonusError: 'Не вдалося оновити бонуси допомоги',
+  },
+  ru: {
+    respond: 'Могу помочь',
+    responded: 'Отклик отправлен',
+    respondSuccess: 'Отклик отправлен. +5 бонусов доверия, если лимит недели позволяет.',
+    respondFlagged: 'Отклик отправлен, но бонус ожидает проверки.',
+    confirmHelp: 'Подтвердить помощь',
+    confirmed: 'Подтверждено',
+    confirmSuccess: 'Помощник подтвержден. +20 бонусов, если лимиты позволяют.',
+    thank: 'Поблагодарить',
+    thanked: 'Спасибо отправлено',
+    thanksSuccess: 'Благодарность отправлена. +10 бонусов, если лимиты позволяют.',
+    closeSolved: 'Закрыть как решенную',
+    closed: 'Заявка закрыта',
+    closeSuccess: 'Заявка закрыта. +5 бонусов, если лимиты позволяют.',
+    helpersTitle: 'Помощники',
+    helpersEmpty: 'Пока никто не откликнулся.',
+    flagged: 'Проверка',
+    bonusError: 'Не удалось обновить бонусы помощи',
+  },
+  en: {
+    respond: 'I can help',
+    responded: 'Response sent',
+    respondSuccess: 'Response sent. +5 trust bonuses if weekly limit allows.',
+    respondFlagged: 'Response sent, but bonus is waiting for review.',
+    confirmHelp: 'Confirm help',
+    confirmed: 'Confirmed',
+    confirmSuccess: 'Helper confirmed. +20 bonuses if limits allow.',
+    thank: 'Thank',
+    thanked: 'Thanks sent',
+    thanksSuccess: 'Thanks sent. +10 bonuses if limits allow.',
+    closeSolved: 'Close as solved',
+    closed: 'Request closed',
+    closeSuccess: 'Request closed. +5 bonuses if limits allow.',
+    helpersTitle: 'Helpers',
+    helpersEmpty: 'No helpers have responded yet.',
+    flagged: 'Review',
+    bonusError: 'Could not update help bonuses',
+  },
 } as const;
 
 const RequestDetailScreen = ({
@@ -166,6 +241,7 @@ const RequestDetailScreen = ({
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
   const currentUser = useSelector((state: RootState) => state.auth.user);
   const text = UI_TEXT[language];
+  const helpText = HELP_FLOW_TEXT[language];
   const contactActionText = CONTACT_ACTION_TEXT[language];
   const { modalVisible, pending, currentTarget, openModal, closeModal, sendRequest } = useContactRequest();
   const { request } = route.params;
@@ -176,7 +252,15 @@ const RequestDetailScreen = ({
   const [profileGender, setProfileGender] = useState('');
   const [requestLikes, setRequestLikes] = useState(0);
   const [helpStatus, setHelpStatus] = useState<'idle' | 'sending' | 'helped' | 'already'>('idle');
-  const avatarByUserId = useUserAvatarMap([request.userId]);
+  const [helpResponses, setHelpResponses] = useState<HelpResponse[]>([]);
+  const [helpConfirmations, setHelpConfirmations] = useState<HelpConfirmation[]>([]);
+  const [helperNames, setHelperNames] = useState<Record<string, string>>({});
+  const [busyHelperUid, setBusyHelperUid] = useState<string | null>(null);
+  const [thankedHelpers, setThankedHelpers] = useState<Record<string, boolean>>({});
+  const [closingRequest, setClosingRequest] = useState(false);
+  const [requestSolved, setRequestSolved] = useState(false);
+  const helperIds = useMemo(() => helpResponses.map((item) => item.helperUid).filter(Boolean), [helpResponses]);
+  const avatarByUserId = useUserAvatarMap([request.userId, ...helperIds].filter(Boolean));
   const resolvedAvatarUri = (request.userId && avatarByUserId[request.userId]) || pickUserAvatarUri({ userPhotoURL: request.userPhotoURL, startAvatarKey: request.startAvatarKey }) || pickUserAvatarUri(request);
   const displayName = profileName || request.name || text.fallbackName;
   const ageGenderLabel = [
@@ -263,6 +347,41 @@ const RequestDetailScreen = ({
     };
   }, [request.id]);
 
+  useEffect(() => {
+    const unsubResponses = subscribeHelpResponses(request.id, setHelpResponses);
+    const unsubConfirmations = subscribeHelpConfirmations(request.id, setHelpConfirmations);
+    return () => {
+      unsubResponses();
+      unsubConfirmations();
+    };
+  }, [request.id]);
+
+  useEffect(() => {
+    if (helperIds.length === 0) {
+      setHelperNames({});
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      const entries = await Promise.all(
+        helperIds.map(async (uid) => {
+          try {
+            const profile = await loadProfileRecord(uid);
+            return [uid, profile?.name || uid.slice(0, 6)] as const;
+          } catch {
+            return [uid, uid.slice(0, 6)] as const;
+          }
+        }),
+      );
+      if (!cancelled) setHelperNames(Object.fromEntries(entries));
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [helperIds]);
+
   const hasPhone = Boolean(request.phone?.trim());
   const canRequestContact = Boolean(request.userId && request.userId !== currentUser?.id);
   const canOpenProfile = Boolean(request.userId && request.userId !== currentUser?.id);
@@ -324,17 +443,70 @@ const RequestDetailScreen = ({
     if (!request.id || helpStatus !== 'idle') return;
     setHelpStatus('sending');
     try {
-      const result = await offerHelp(request.id);
-      if (result.status === 'already_helped') {
+      const result = await awardHelpRespondBonus(request.id);
+      if (result.status === 'already_helped' || result.status === 'already_responded') {
         setHelpStatus('already');
         Alert.alert(text.ok, text.alreadyHelped);
+      } else if (result.status === 'flagged') {
+        setHelpStatus('helped');
+        Alert.alert(text.ok, helpText.respondFlagged);
       } else {
         setHelpStatus('helped');
-        Alert.alert(text.ok, text.helpedSuccess);
+        Alert.alert(text.ok, helpText.respondSuccess);
       }
     } catch {
       setHelpStatus('idle');
-      Alert.alert(text.helpError, text.helpError);
+      Alert.alert(helpText.bonusError, text.helpError);
+    }
+  };
+
+  const confirmedHelperIds = useMemo(
+    () => new Set(helpConfirmations.map((item) => item.helperUid)),
+    [helpConfirmations],
+  );
+
+  const handleConfirmHelper = async (helperUid: string) => {
+    if (!request.id || busyHelperUid) return;
+    setBusyHelperUid(helperUid);
+    try {
+      const result = await confirmHelperForRequest(request.id, helperUid);
+      if (result.ok) {
+        Alert.alert(text.ok, helpText.confirmSuccess);
+      } else {
+        Alert.alert(helpText.bonusError, result.status || helpText.bonusError);
+      }
+    } catch {
+      Alert.alert(helpText.bonusError, helpText.bonusError);
+    } finally {
+      setBusyHelperUid(null);
+    }
+  };
+
+  const handleThankHelper = async (helperUid: string) => {
+    if (!request.id || busyHelperUid) return;
+    setBusyHelperUid(helperUid);
+    try {
+      const result = await awardGratitudeBonus(request.id, helperUid);
+      setThankedHelpers((prev) => ({ ...prev, [helperUid]: true }));
+      Alert.alert(text.ok, result.awarded ? helpText.thanksSuccess : helpText.thanked);
+    } catch {
+      Alert.alert(helpText.bonusError, helpText.bonusError);
+    } finally {
+      setBusyHelperUid(null);
+    }
+  };
+
+  const handleCloseSolved = async () => {
+    if (!request.id || closingRequest || requestSolved) return;
+    setClosingRequest(true);
+    try {
+      const result = await closeRequestWithBonus(request.id);
+      setRequestSolved(true);
+      Alert.alert(text.ok, result.ok ? helpText.closeSuccess : helpText.closed);
+    } catch {
+      Alert.alert(helpText.bonusError, helpText.bonusError);
+    } finally {
+      setClosingRequest(false);
     }
   };
 
@@ -479,6 +651,80 @@ const RequestDetailScreen = ({
           </Text>
         ) : null}
 
+        {isOwnRequest ? (
+          <View style={styles.card}>
+            <View style={styles.helpPanelHeader}>
+              <View style={styles.helpPanelTitleRow}>
+                <MaterialCommunityIcons name="account-heart-outline" size={20} color={SCREEN_THEME.woodGreenDark} />
+                <Text style={styles.helpPanelTitle}>{helpText.helpersTitle}</Text>
+              </View>
+              <Text style={styles.helpPanelCount}>{helpResponses.length}</Text>
+            </View>
+
+            {helpResponses.length === 0 ? (
+              <Text style={styles.helperEmptyText}>{helpText.helpersEmpty}</Text>
+            ) : helpResponses.map((response) => {
+              const isConfirmed = confirmedHelperIds.has(response.helperUid);
+              const isBusy = busyHelperUid === response.helperUid;
+              const helperAvatar = avatarByUserId[response.helperUid];
+              return (
+                <View key={response.helperUid} style={styles.helperRow}>
+                  <MiniUserAvatar
+                    uri={helperAvatar}
+                    name={helperNames[response.helperUid] || response.helperUid}
+                    size={42}
+                    borderRadius={21}
+                    backgroundColor={SCREEN_THEME.enamelBlue}
+                  />
+                  <View style={styles.helperInfo}>
+                    <Text style={styles.helperName} numberOfLines={1}>{helperNames[response.helperUid] || response.helperUid}</Text>
+                    <Text style={styles.helperMeta}>
+                      {response.flagged ? helpText.flagged : formatHelperTime(response.at)}
+                    </Text>
+                  </View>
+                  {response.flagged ? (
+                    <View style={styles.flaggedPill}>
+                      <Text style={styles.flaggedPillText}>{helpText.flagged}</Text>
+                    </View>
+                  ) : isConfirmed ? (
+                    <View style={styles.helperActions}>
+                      <View style={styles.confirmedPill}>
+                        <MaterialCommunityIcons name="check" size={13} color="#2E6B38" />
+                        <Text style={styles.confirmedPillText}>{helpText.confirmed}</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={[styles.thankButton, (isBusy || thankedHelpers[response.helperUid]) && styles.actionButtonDisabled]}
+                        onPress={() => void handleThankHelper(response.helperUid)}
+                        disabled={isBusy || thankedHelpers[response.helperUid]}
+                        activeOpacity={0.82}
+                      >
+                        {isBusy ? (
+                          <ActivityIndicator size="small" color="#7A1E5C" />
+                        ) : (
+                          <Text style={styles.thankButtonText}>{thankedHelpers[response.helperUid] ? helpText.thanked : `${helpText.thank} +10`}</Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.confirmHelperButton, isBusy && styles.actionButtonDisabled]}
+                      onPress={() => void handleConfirmHelper(response.helperUid)}
+                      disabled={isBusy}
+                      activeOpacity={0.82}
+                    >
+                      {isBusy ? (
+                        <ActivityIndicator size="small" color="#FFF9EE" />
+                      ) : (
+                        <Text style={styles.confirmHelperButtonText}>{helpText.confirmHelp} +20</Text>
+                      )}
+                    </TouchableOpacity>
+                  )}
+                </View>
+              );
+            })}
+          </View>
+        ) : null}
+
         {!isOwnRequest && currentUser?.id ? (
           <TouchableOpacity
             style={[
@@ -500,10 +746,28 @@ const RequestDetailScreen = ({
                   color="#FFF9EE"
                 />
                 <Text style={styles.helpButtonText}>
-                  {helpStatus === 'helped' || helpStatus === 'already' ? text.alreadyHelped : text.iHelped}
+                  {helpStatus === 'helped' || helpStatus === 'already' ? helpText.responded : helpText.respond}
                 </Text>
                 <MaterialCommunityIcons name="circle-multiple" size={14} color="#FFD54F" />
-                <Text style={styles.helpBonusHint}>+20</Text>
+                <Text style={styles.helpBonusHint}>+5</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        ) : null}
+
+        {isOwnRequest ? (
+          <TouchableOpacity
+            style={[styles.closeSolvedButton, (closingRequest || requestSolved) && styles.actionButtonDisabled]}
+            onPress={() => void handleCloseSolved()}
+            disabled={closingRequest || requestSolved}
+            activeOpacity={0.84}
+          >
+            {closingRequest ? (
+              <ActivityIndicator color="#FFF9EE" />
+            ) : (
+              <>
+                <MaterialCommunityIcons name={requestSolved ? 'check-circle' : 'check-decagram-outline'} size={18} color="#FFF9EE" />
+                <Text style={styles.closeSolvedButtonText}>{requestSolved ? helpText.closed : `${helpText.closeSolved} +5`}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -589,6 +853,120 @@ const styles = StyleSheet.create({
   contactBtnText: { color: '#fff', fontSize: 15, fontWeight: '900' },
   actionButtonDisabled: { opacity: 0.7 },
   connectStatusText: { marginBottom: 10, textAlign: 'center', color: SCREEN_THEME.textSecondary, fontSize: 13, fontWeight: '700' },
+  helpPanelHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  helpPanelTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  helpPanelTitle: {
+    color: SCREEN_THEME.textPrimary,
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  helpPanelCount: {
+    minWidth: 28,
+    textAlign: 'center',
+    color: '#FFF9EE',
+    backgroundColor: SCREEN_THEME.woodGreenDark,
+    borderRadius: 999,
+    overflow: 'hidden',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  helperEmptyText: {
+    color: SCREEN_THEME.textSecondary,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  helperRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(123, 86, 56, 0.12)',
+  },
+  helperInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  helperName: {
+    color: SCREEN_THEME.textPrimary,
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  helperMeta: {
+    color: SCREEN_THEME.textMuted,
+    fontSize: 11,
+    marginTop: 2,
+  },
+  helperActions: {
+    alignItems: 'flex-end',
+    gap: 6,
+  },
+  confirmHelperButton: {
+    minHeight: 38,
+    borderRadius: 12,
+    backgroundColor: SCREEN_THEME.woodGreenDark,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmHelperButtonText: {
+    color: '#FFF9EE',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  confirmedPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: '#E3F2E5',
+  },
+  confirmedPillText: {
+    color: '#2E6B38',
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  thankButton: {
+    minHeight: 32,
+    borderRadius: 10,
+    paddingHorizontal: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F7E7F0',
+    borderWidth: 1,
+    borderColor: '#E5C0D5',
+  },
+  thankButtonText: {
+    color: '#7A1E5C',
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  flaggedPill: {
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    backgroundColor: '#FFF3CE',
+    borderWidth: 1,
+    borderColor: '#E8C66F',
+  },
+  flaggedPillText: {
+    color: '#8A6A1D',
+    fontSize: 11,
+    fontWeight: '900',
+  },
   deleteButton: {
     backgroundColor: '#C85D4A',
     borderRadius: 18,
@@ -627,6 +1005,23 @@ const styles = StyleSheet.create({
   helpBonusHint: {
     color: '#FFD54F',
     fontSize: 13,
+    fontWeight: '900',
+  },
+  closeSolvedButton: {
+    backgroundColor: SCREEN_THEME.woodGreenDark,
+    borderRadius: 18,
+    minHeight: 54,
+    borderWidth: 1,
+    borderColor: '#49613B',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginBottom: 12,
+  },
+  closeSolvedButtonText: {
+    color: '#FFF9EE',
+    fontSize: 15,
     fontWeight: '900',
   },
   backButton: { alignItems: 'center', paddingVertical: 12 },

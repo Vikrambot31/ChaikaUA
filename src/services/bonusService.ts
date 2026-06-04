@@ -1,4 +1,4 @@
-import { get, onValue, ref } from 'firebase/database';
+import { equalTo, get, limitToLast, onValue, orderByChild, query, ref } from 'firebase/database';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { auth, database, firebaseApp } from '../firebase-core';
 
@@ -11,21 +11,114 @@ export type BonusCategory = {
 
 export type UserBonuses = {
   total: number;
+  available: number;
   invites: BonusCategory;
   likes: BonusCategory;
   help: BonusCategory;
+  gratitude: BonusCategory;
+  activity: BonusCategory;
+  earned: {
+    total: number;
+    weeklyTotal: number;
+    weekKey: string;
+    weeklyByCategory: Record<string, number>;
+  };
+  spent: {
+    total: number;
+    contactsTop: number;
+    businessTop: number;
+    beautyTop: number;
+    kidsTop: number;
+  };
   badge: string;
   updatedAt: number;
+};
+
+export type PromoCredits = {
+  balance: number;
+  lifetime: number;
+  spent: {
+    total: number;
+  };
+  updatedAt: number;
+};
+
+export type BonusTransaction = {
+  id: string;
+  type: string;
+  currency: 'trust' | 'promo' | string;
+  category: string;
+  points: number;
+  balanceAfter: number;
+  sourceId: string;
+  sourceType: string;
+  status: string;
+  createdAt: number;
+  createdBy: string;
+  note: string;
+};
+
+export type BonusPromotion = {
+  id: string;
+  uid: string;
+  currency: 'trust' | 'promo' | string;
+  targetType: string;
+  targetId: string;
+  screen: string;
+  pointsSpent: number;
+  status: string;
+  startsAt: number;
+  expiresAt: number;
+  createdAt: number;
+  moderationStatus: string;
+  badge: string;
+};
+
+export type HelpResponse = {
+  helperUid: string;
+  requestId: string;
+  at: number;
+  flagged: boolean;
+};
+
+export type HelpConfirmation = {
+  helperUid: string;
+  confirmedBy: string;
+  at: number;
+  bonusAwarded: boolean;
 };
 
 export type BonusBadge = 'newcomer' | 'good_neighbor' | 'active_resident' | 'guardian' | 'ambassador';
 
 const EMPTY_BONUSES: UserBonuses = {
   total: 0,
+  available: 0,
   invites: { count: 0, points: 0 },
   likes: { count: 0, points: 0 },
   help: { count: 0, points: 0 },
+  gratitude: { count: 0, points: 0 },
+  activity: { count: 0, points: 0 },
+  earned: {
+    total: 0,
+    weeklyTotal: 0,
+    weekKey: '',
+    weeklyByCategory: {},
+  },
+  spent: {
+    total: 0,
+    contactsTop: 0,
+    businessTop: 0,
+    beautyTop: 0,
+    kidsTop: 0,
+  },
   badge: 'newcomer',
+  updatedAt: 0,
+};
+
+const EMPTY_PROMO_CREDITS: PromoCredits = {
+  balance: 0,
+  lifetime: 0,
+  spent: { total: 0 },
   updatedAt: 0,
 };
 
@@ -43,13 +136,89 @@ const normalizeCategory = (value: unknown): BonusCategory => {
 const normalizeBonuses = (raw: unknown): UserBonuses => {
   if (!raw || typeof raw !== 'object') return EMPTY_BONUSES;
   const data = raw as Record<string, unknown>;
+  const earnedRaw = data.earned && typeof data.earned === 'object' ? data.earned as Record<string, unknown> : {};
+  const spentRaw = data.spent && typeof data.spent === 'object' ? data.spent as Record<string, unknown> : {};
+  const earnedTotal = Number(earnedRaw.total || data.total || 0);
+  const spentTotal = Number(spentRaw.total || 0);
   return {
-    total: Number(data.total || 0),
+    total: Number(data.total || earnedTotal || 0),
+    available: Number(data.available ?? Math.max(0, earnedTotal - spentTotal)),
     invites: normalizeCategory(data.invites),
     likes: normalizeCategory(data.likes),
     help: normalizeCategory(data.help),
+    gratitude: normalizeCategory(data.gratitude),
+    activity: normalizeCategory(data.activity),
+    earned: {
+      total: earnedTotal,
+      weeklyTotal: Number(earnedRaw.weeklyTotal || 0),
+      weekKey: typeof earnedRaw.weekKey === 'string' ? earnedRaw.weekKey : '',
+      weeklyByCategory: earnedRaw.weeklyByCategory && typeof earnedRaw.weeklyByCategory === 'object'
+        ? Object.fromEntries(
+          Object.entries(earnedRaw.weeklyByCategory as Record<string, unknown>)
+            .map(([key, value]) => [key, Number(value || 0)])
+        )
+        : {},
+    },
+    spent: {
+      total: spentTotal,
+      contactsTop: Number(spentRaw.contactsTop || spentRaw.contacts_top || 0),
+      businessTop: Number(spentRaw.businessTop || spentRaw.business_top || 0),
+      beautyTop: Number(spentRaw.beautyTop || spentRaw.beauty_top || 0),
+      kidsTop: Number(spentRaw.kidsTop || spentRaw.kids_top || 0),
+    },
     badge: typeof data.badge === 'string' ? data.badge : 'newcomer',
     updatedAt: Number(data.updatedAt || 0),
+  };
+};
+
+const normalizePromoCredits = (raw: unknown): PromoCredits => {
+  if (!raw || typeof raw !== 'object') return EMPTY_PROMO_CREDITS;
+  const data = raw as Record<string, unknown>;
+  const spentRaw = data.spent && typeof data.spent === 'object' ? data.spent as Record<string, unknown> : {};
+  return {
+    balance: Number(data.balance || 0),
+    lifetime: Number(data.lifetime || 0),
+    spent: {
+      total: Number(spentRaw.total || 0),
+    },
+    updatedAt: Number(data.updatedAt || 0),
+  };
+};
+
+const normalizeTransaction = (id: string, raw: unknown): BonusTransaction => {
+  const data = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
+  return {
+    id,
+    type: String(data.type || ''),
+    currency: String(data.currency || ''),
+    category: String(data.category || ''),
+    points: Number(data.points || 0),
+    balanceAfter: Number(data.balanceAfter || 0),
+    sourceId: String(data.sourceId || ''),
+    sourceType: String(data.sourceType || ''),
+    status: String(data.status || ''),
+    createdAt: Number(data.createdAt || 0),
+    createdBy: String(data.createdBy || ''),
+    note: String(data.note || ''),
+  };
+};
+
+const normalizePromotion = (id: string, raw: unknown): BonusPromotion => {
+  const data = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
+  return {
+    id,
+    uid: String(data.uid || ''),
+    currency: String(data.currency || ''),
+    targetType: String(data.targetType || ''),
+    targetId: String(data.targetId || ''),
+    screen: String(data.screen || ''),
+    pointsSpent: Number(data.pointsSpent || 0),
+    status: String(data.status || ''),
+    startsAt: Number(data.startsAt || 0),
+    expiresAt: Number(data.expiresAt || 0),
+    createdAt: Number(data.createdAt || 0),
+    moderationStatus: String(data.moderationStatus || ''),
+    badge: String(data.badge || ''),
   };
 };
 
@@ -76,6 +245,168 @@ export const subscribeMyBonuses = (
   }
   return onValue(ref(database, `user_bonuses/${uid}`), (snapshot) => {
     onChanged(normalizeBonuses(snapshot.val()));
+  });
+};
+
+export const subscribeMyPromoCredits = (
+  onChanged: (credits: PromoCredits) => void,
+): (() => void) => {
+  const uid = auth.currentUser?.uid;
+  if (!uid) {
+    onChanged(EMPTY_PROMO_CREDITS);
+    return () => {};
+  }
+  return onValue(ref(database, `promo_credits/${uid}`), (snapshot) => {
+    onChanged(normalizePromoCredits(snapshot.val()));
+  });
+};
+
+export const subscribeMyBonusTransactions = (
+  onChanged: (transactions: BonusTransaction[]) => void,
+  maxItems = 30,
+): (() => void) => {
+  const uid = auth.currentUser?.uid;
+  if (!uid) {
+    onChanged([]);
+    return () => {};
+  }
+  const transactionsQuery = query(
+    ref(database, `bonus_transactions/${uid}`),
+    orderByChild('createdAt'),
+    limitToLast(maxItems),
+  );
+  return onValue(transactionsQuery, (snapshot) => {
+    const items: BonusTransaction[] = [];
+    snapshot.forEach((child) => {
+      items.push(normalizeTransaction(child.key || '', child.val()));
+    });
+    items.sort((a, b) => b.createdAt - a.createdAt);
+    onChanged(items);
+  });
+};
+
+export const subscribeMyBonusPromotions = (
+  onChanged: (promotions: BonusPromotion[]) => void,
+): (() => void) => {
+  const uid = auth.currentUser?.uid;
+  if (!uid) {
+    onChanged([]);
+    return () => {};
+  }
+  const promotionsQuery = query(
+    ref(database, 'bonus_promotions'),
+    orderByChild('uid'),
+    equalTo(uid),
+  );
+  return onValue(promotionsQuery, (snapshot) => {
+    const items: BonusPromotion[] = [];
+    snapshot.forEach((child) => {
+      items.push(normalizePromotion(child.key || '', child.val()));
+    });
+    items.sort((a, b) => b.createdAt - a.createdAt);
+    onChanged(items);
+  });
+};
+
+export const subscribeActiveBonusPromotions = (
+  screen: string,
+  onChanged: (promotions: BonusPromotion[]) => void,
+): (() => void) => {
+  if (!screen) {
+    onChanged([]);
+    return () => {};
+  }
+  const promotionsQuery = query(
+    ref(database, 'bonus_promotions'),
+    orderByChild('screen'),
+    equalTo(screen),
+  );
+  return onValue(promotionsQuery, (snapshot) => {
+    const now = Date.now();
+    const items: BonusPromotion[] = [];
+    snapshot.forEach((child) => {
+      const item = normalizePromotion(child.key || '', child.val());
+      if (item.status === 'active' && item.moderationStatus === 'approved' && item.expiresAt > now) {
+        items.push(item);
+      }
+    });
+    items.sort((a, b) => b.createdAt - a.createdAt);
+    onChanged(items);
+  });
+};
+
+export const subscribeAdminBonusPromotions = (
+  onChanged: (promotions: BonusPromotion[]) => void,
+  maxItems = 100,
+): (() => void) => {
+  const promotionsQuery = query(
+    ref(database, 'bonus_promotions'),
+    orderByChild('createdAt'),
+    limitToLast(maxItems),
+  );
+  return onValue(promotionsQuery, (snapshot) => {
+    const items: BonusPromotion[] = [];
+    snapshot.forEach((child) => {
+      items.push(normalizePromotion(child.key || '', child.val()));
+    });
+    items.sort((a, b) => b.createdAt - a.createdAt);
+    onChanged(items);
+  });
+};
+
+const normalizeHelpResponse = (helperUid: string, raw: unknown): HelpResponse => {
+  const data = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
+  return {
+    helperUid: String(data.helperUid || helperUid),
+    requestId: String(data.requestId || ''),
+    at: Number(data.at || 0),
+    flagged: data.flagged === true,
+  };
+};
+
+const normalizeHelpConfirmation = (helperUid: string, raw: unknown): HelpConfirmation => {
+  const data = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
+  return {
+    helperUid,
+    confirmedBy: String(data.confirmedBy || ''),
+    at: Number(data.at || 0),
+    bonusAwarded: data.bonusAwarded === true,
+  };
+};
+
+export const subscribeHelpResponses = (
+  requestId: string,
+  onChanged: (responses: HelpResponse[]) => void,
+): (() => void) => {
+  if (!requestId) {
+    onChanged([]);
+    return () => {};
+  }
+  return onValue(ref(database, `help_responses/${requestId}`), (snapshot) => {
+    const items: HelpResponse[] = [];
+    snapshot.forEach((child) => {
+      items.push(normalizeHelpResponse(child.key || '', child.val()));
+    });
+    items.sort((a, b) => a.at - b.at);
+    onChanged(items);
+  });
+};
+
+export const subscribeHelpConfirmations = (
+  requestId: string,
+  onChanged: (confirmations: HelpConfirmation[]) => void,
+): (() => void) => {
+  if (!requestId) {
+    onChanged([]);
+    return () => {};
+  }
+  return onValue(ref(database, `help_confirmations/${requestId}`), (snapshot) => {
+    const items: HelpConfirmation[] = [];
+    snapshot.forEach((child) => {
+      items.push(normalizeHelpConfirmation(child.key || '', child.val()));
+    });
+    items.sort((a, b) => a.at - b.at);
+    onChanged(items);
   });
 };
 
@@ -109,7 +440,7 @@ export const BONUS_CAPS = {
 
 type OfferHelpResponse = {
   ok: boolean;
-  status: 'helped' | 'already_helped';
+  status: 'helped' | 'already_helped' | 'responded' | 'already_responded' | 'flagged' | string;
   points?: number;
 };
 
@@ -124,4 +455,98 @@ export const checkIfHelped = async (requestId: string): Promise<boolean> => {
   if (!uid || !requestId) return false;
   const snap = await get(ref(database, `help_responses/${requestId}/${uid}`));
   return snap.exists();
+};
+
+export const awardHelpRespondBonus = async (requestId: string): Promise<OfferHelpResponse> => {
+  const callable = httpsCallable<{ requestId: string }, OfferHelpResponse>(functions, 'awardHelpRespondBonus');
+  const result = await callable({ requestId });
+  return result.data;
+};
+
+export const confirmHelperForRequest = async (
+  requestId: string,
+  helperUid: string,
+): Promise<{ ok: boolean; status: string; points?: number }> => {
+  const callable = httpsCallable<{ requestId: string; helperUid: string }, { ok: boolean; status: string; points?: number }>(
+    functions,
+    'confirmHelperForRequest',
+  );
+  const result = await callable({ requestId, helperUid });
+  return result.data;
+};
+
+export const closeRequestWithBonus = async (
+  requestId: string,
+): Promise<{ ok: boolean; status: string; points?: number }> => {
+  const callable = httpsCallable<{ requestId: string }, { ok: boolean; status: string; points?: number }>(
+    functions,
+    'closeRequestWithBonus',
+  );
+  const result = await callable({ requestId });
+  return result.data;
+};
+
+export const awardGratitudeBonus = async (
+  requestId: string,
+  helperUid: string,
+): Promise<{ ok: boolean; awarded: boolean; points?: number }> => {
+  const callable = httpsCallable<{ requestId: string; helperUid: string }, { ok: boolean; awarded: boolean; points?: number }>(
+    functions,
+    'awardGratitudeBonus',
+  );
+  const result = await callable({ requestId, helperUid });
+  return result.data;
+};
+
+export const adminGrantPromoCredits = async ({
+  targetUid,
+  amount,
+  reason,
+  ticketId,
+}: {
+  targetUid: string;
+  amount: number;
+  reason: string;
+  ticketId?: string;
+}): Promise<{ ok: boolean; newBalance: number }> => {
+  const callable = httpsCallable<
+    { targetUid: string; amount: number; reason: string; ticketId?: string },
+    { ok: boolean; newBalance: number }
+  >(functions, 'adminGrantPromoCredits');
+  const result = await callable({ targetUid, amount, reason, ticketId });
+  return result.data;
+};
+
+export const adminModeratePromotion = async ({
+  promotionId,
+  action,
+  reason,
+}: {
+  promotionId: string;
+  action: 'approve' | 'reject';
+  reason?: string;
+}): Promise<{ ok: boolean; action: 'approve' | 'reject' }> => {
+  const callable = httpsCallable<
+    { promotionId: string; action: 'approve' | 'reject'; reason?: string },
+    { ok: boolean; action: 'approve' | 'reject' }
+  >(functions, 'adminModeratePromotion');
+  const result = await callable({ promotionId, action, reason });
+  return result.data;
+};
+
+export const purchaseBonusPromotion = async ({
+  promoType,
+  duration,
+  targetId,
+}: {
+  promoType: string;
+  duration: string;
+  targetId: string;
+}): Promise<{ ok: boolean; promotionId: string; expiresAt: number; moderationStatus: string }> => {
+  const callable = httpsCallable<
+    { promoType: string; duration: string; targetId: string },
+    { ok: boolean; promotionId: string; expiresAt: number; moderationStatus: string }
+  >(functions, 'purchaseBonusPromotion');
+  const result = await callable({ promoType, duration, targetId });
+  return result.data;
 };

@@ -74,6 +74,10 @@ import SpisokPokupokScreen from '../screens/Spisok-Pokupok';
 import ProfileRequestsScreen from '../screens/ProfileRequestsScreen';
 import AppVersionInfoScreen from '../screens/AppVersionInfoScreen';
 import SupportScreen from '../screens/SupportScreen';
+import BonusWalletScreen from '../screens/BonusWalletScreen';
+import PromoCreditsTopupScreen from '../screens/PromoCreditsTopupScreen';
+import PromoCreditsAdminScreen from '../screens/PromoCreditsAdminScreen';
+import BonusPromotionPurchaseScreen from '../screens/BonusPromotionPurchaseScreen';
 import CrashDiagnosticsScreen from '../screens/CrashDiagnosticsScreen';
 import AppMonitorScreen from '../screens/AppMonitorScreen';
 import AccessRestrictedScreen from '../screens/AccessRestrictedScreen';
@@ -198,6 +202,10 @@ export type RootStackParamList = {
   AppMonitorScreen: undefined;
   ViewUserProfile: { userId: string };
   SupportScreen: undefined;
+  BonusWalletScreen: undefined;
+  PromoCreditsTopupScreen: undefined;
+  PromoCreditsAdminScreen: undefined;
+  BonusPromotionPurchaseScreen: { initialPromoType?: string } | undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -262,6 +270,10 @@ const linking: LinkingOptions<RootStackParamList> = {
       SpisokPokupokScreen: 'screen/food/shopping',
       CrashDiagnosticsScreen: 'screen/crash-diagnostics',
       AppMonitorScreen: 'screen/app-monitor',
+      BonusWalletScreen: 'screen/bonus-wallet',
+      PromoCreditsTopupScreen: 'screen/promo-credits-topup',
+      PromoCreditsAdminScreen: 'screen/admin/promo-credits',
+      BonusPromotionPurchaseScreen: 'screen/bonus-promotion',
     },
   },
 };
@@ -295,6 +307,10 @@ const ROUTE_FILE_MAP: Record<string, string> = {
   KontaktiChaikyScreen: 'Kontakt-XXX.tsx',
   BizznesChaikaScreen: 'Bizznes-Chaika.tsx',
   AppInfoScreen: 'Pro-Prilozhenie.tsx',
+  BonusWalletScreen: 'BonusWalletScreen.tsx',
+  PromoCreditsTopupScreen: 'PromoCreditsTopupScreen.tsx',
+  PromoCreditsAdminScreen: 'PromoCreditsAdminScreen.tsx',
+  BonusPromotionPurchaseScreen: 'BonusPromotionPurchaseScreen.tsx',
   LoginScreen: 'Vkhod.tsx',
   RegisterScreenFull: 'Registraciya-Polnaya.tsx',
   DownloadCodeScreen: 'Ekran-Koda-Zagruzki.tsx',
@@ -934,6 +950,10 @@ function AuthNavigation() {
         <Stack.Screen name="AppVersionInfoScreen" component={AppVersionInfoScreen} />
         <Stack.Screen name="AppMonitorScreen" component={withGuard(AppMonitorScreen, 'auth')} />
         <Stack.Screen name="SupportScreen" component={SupportScreen} />
+        <Stack.Screen name="BonusWalletScreen" component={withGuard(BonusWalletScreen, 'auth')} />
+        <Stack.Screen name="PromoCreditsTopupScreen" component={withGuard(PromoCreditsTopupScreen, 'auth')} />
+        <Stack.Screen name="PromoCreditsAdminScreen" component={withGuard(PromoCreditsAdminScreen, 'admin')} />
+        <Stack.Screen name="BonusPromotionPurchaseScreen" component={withGuard(BonusPromotionPurchaseScreen, 'auth')} />
       </Stack.Navigator>
       <ScreenFileInfoOverlay />
     </NavigationContainer>
