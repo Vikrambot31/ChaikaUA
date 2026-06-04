@@ -57,7 +57,7 @@ import OsbbNovostyScreen from '../screens/OSBB-Novosti';
 import OsbbSetupScreen from '../screens/OSBB-Setup';
 import OsbbAddNewsScreen from '../screens/OSBB-AddNews';
 import OsbbAdminScreen from '../screens/OSBB-AdminPanel';
-import ChaikaBonusPlusScreen from '../screens/Chaika-Bonus-Plus';
+import ServicesHubScreen from '../screens/servicesHub';
 import LostAndFoundScreen from '../screens/Kto-Poteryal';
 import ImportantNewsScreen from '../screens/Vazhnye-Novosti-Chayki';
 import NotificationSettingsScreen from '../screens/Nalashtuvannya-Spovishchen';
@@ -178,7 +178,7 @@ export type RootStackParamList = {
   OsbbSetupScreen: undefined;
   OsbbAddNewsScreen: { editItem?: OsbbEditableNewsItem } | undefined;
   OsbbAdminScreen: undefined;
-  ChaikaBonusPlusScreen: undefined;
+  ServicesHubScreen: undefined;
   SoulPhotosScreen: undefined;
   FotoRayonaScreen: undefined;
   LostAndFoundScreen: undefined;
@@ -220,7 +220,7 @@ const linking: LinkingOptions<RootStackParamList> = {
           HomeTab: 'screen/home',
           MapTab: 'screen/map',
           HelpTab: 'screen/help',
-          BonusTab: 'screen/bonus',
+          ServicesTab: 'screen/services',
           ProfileTab: 'screen/profile',
         },
       },
@@ -271,7 +271,7 @@ const ROUTE_FILE_MAP: Record<string, string> = {
   HomeTab: 'Glavny-Ekran.tsx',
   MapTab: 'Karta-Chayki.tsx',
   HelpTab: 'Vibor-Temy-Zayavki.tsx',
-  BonusTab: 'Chaika-Bonus-Plus.tsx',
+  ServicesTab: 'servicesHub.tsx',
   ProfileTab: 'Profil-Polzovatelya.tsx',
   OnlineChatTab: 'Onlayn-Chat.tsx',
   OnlineChatList: 'Onlayn-Chat.tsx',
@@ -338,7 +338,7 @@ const ROUTE_FILE_MAP: Record<string, string> = {
   OsbbSetupScreen: 'OSBB-Setup.tsx',
   OsbbAddNewsScreen: 'OSBB-AddNews.tsx',
   OsbbAdminScreen: 'OSBB-AdminPanel.tsx',
-  ChaikaBonusPlusScreen: 'Chaika-Bonus-Plus.tsx',
+  ServicesHubScreen: 'servicesHub.tsx',
   SoulPhotosScreen: 'Foto-Dlya-Dushi.tsx',
   FotoRayonaScreen: 'Foto-Rayona.tsx',
   PhotoUploadScreen: 'Zagruzka-Foto.tsx',
@@ -459,11 +459,26 @@ function GuardedScreen({
     return unsubscribe;
   }, [mode, isAuthenticated, isBootstrapped]);
 
+  // For auth/complete: check isAuthenticated
+  useEffect(() => {
+    if (mode !== 'auth' && mode !== 'complete') return;
+    if (!isBootstrapped) return;
+    setRoleStatus(isAuthenticated ? 'allowed' : 'denied');
+  }, [mode, isAuthenticated, isBootstrapped]);
+
   // For trusted mode: derive roleStatus from role subscription + TrustedAccessContext.
   // isPrivilegedRole === null means the role subscription hasn't fired yet — keep loading
   // to avoid premature denial while Firebase resolves.
   useEffect(() => {
     if (mode !== 'trusted') return;
+    if (!isBootstrapped) {
+      setRoleStatus('loading');
+      return;
+    }
+    if (!isAuthenticated) {
+      setRoleStatus('denied');
+      return;
+    }
     if (isPrivilegedRole === true) {
       setRoleStatus('allowed');
       return;
@@ -473,7 +488,7 @@ function GuardedScreen({
       return;
     }
     setRoleStatus(isTrusted ? 'allowed' : 'denied');
-  }, [mode, isPrivilegedRole, isTrusted, isTrustedLoading]);
+  }, [mode, isBootstrapped, isAuthenticated, isPrivilegedRole, isTrusted, isTrustedLoading]);
 
   useEffect(() => {
     if (mode === 'trusted') {
@@ -593,7 +608,7 @@ const withErrorBoundary = <P extends object>(Component: React.ComponentType<P>) 
 const HomeScreenWithBoundary = withErrorBoundary(HomeScreen);
 const MapScreenWithBoundary = withErrorBoundary(MapScreen);
 const RequestTopicScreenWithBoundary = withErrorBoundary(RequestTopicScreen);
-const ChaikaBonusPlusScreenWithBoundary = withErrorBoundary(ChaikaBonusPlusScreen);
+const ServicesHubScreenWithBoundary = withErrorBoundary(ServicesHubScreen);
 const ProfileScreenWithBoundary = withErrorBoundary(ProfileScreen);
 const FotoRayonaScreenWithBoundary = withErrorBoundary(FotoRayonaScreen);
 
@@ -625,7 +640,7 @@ function MainTabNavigator() {
             HomeTab: 'home',
             MapTab: 'map',
             HelpTab: 'hand-heart-outline',
-            BonusTab: 'plus-circle-outline',
+            ServicesTab: 'plus-circle-outline',
             ProfileTab: 'account-circle',
           };
           return <MaterialCommunityIcons name={icons[route.name] ?? 'home'} size={size} color={color} />;
@@ -635,7 +650,7 @@ function MainTabNavigator() {
       <Tab.Screen name="HomeTab" component={HomeScreenWithBoundary} options={{ title: t.menu.home }} />
       <Tab.Screen name="MapTab" component={MapScreenWithBoundary} options={{ title: t.menu.mapChaika }} />
       <Tab.Screen name="HelpTab" component={RequestTopicScreenWithBoundary} options={{ title: t.menu.helpNeighbors }} />
-      <Tab.Screen name="BonusTab" component={ChaikaBonusPlusScreenWithBoundary} options={{ title: t.mainScreen.chaikaBonus }} />
+      <Tab.Screen name="ServicesTab" component={ServicesHubScreenWithBoundary} options={{ title: t.mainScreen.services }} />
       <Tab.Screen name="ProfileTab" component={ProfileScreenWithBoundary} options={{ title: t.menu.profile }} />
     </Tab.Navigator>
   );
@@ -840,7 +855,7 @@ function AuthNavigation() {
         <Stack.Screen name="HelpScreen" component={HelpScreen} />
         <Stack.Screen name="AnnouncementsScreen" component={AnnouncementsScreen} />
         <Stack.Screen name="JobSearchScreen" component={JobSearchScreen} />
-        <Stack.Screen name="BuySellScreen" component={BuySellScreen} />
+        <Stack.Screen name="BuySellScreen" component={withGuard(BuySellScreen, 'auth')} />
         <Stack.Screen name="KontaktiChaikyScreen" component={KontaktiChaikyScreen} />
         <Stack.Screen name="BizznesChaikaScreen" component={BizznesChaikaScreen} />
         <Stack.Screen name="ItemDetailScreen" component={ItemDetailScreen} />
@@ -889,7 +904,7 @@ function AuthNavigation() {
         <Stack.Screen name="OsbbSetupScreen" component={withGuard(OsbbSetupScreen, 'trusted')} />
         <Stack.Screen name="OsbbAddNewsScreen" component={withGuard(OsbbAddNewsScreen, 'trusted')} />
         <Stack.Screen name="OsbbAdminScreen" component={withGuard(OsbbAdminScreen, 'auth')} />
-        <Stack.Screen name="ChaikaBonusPlusScreen" component={ChaikaBonusPlusScreen} />
+        <Stack.Screen name="ServicesHubScreen" component={ServicesHubScreen} />
         <Stack.Screen name="SoulPhotosScreen" component={SoulPhotosScreen} />
         <Stack.Screen name="FotoRayonaScreen" component={FotoRayonaScreenWithBoundary} />
         <Stack.Screen name="PhotoUploadScreen" component={PhotoUploadScreen} options={{ headerShown: false }} />
