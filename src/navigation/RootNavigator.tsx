@@ -619,6 +619,9 @@ const RequestTopicScreenWithBoundary = withErrorBoundary(RequestTopicScreen);
 const ServicesHubScreenWithBoundary = withErrorBoundary(ServicesHubScreen);
 const ProfileScreenWithBoundary = withErrorBoundary(ProfileScreen);
 const FotoRayonaScreenWithBoundary = withErrorBoundary(FotoRayonaScreen);
+const FotoRayonaScreenGuarded = withGuard(FotoRayonaScreenWithBoundary, 'trusted');
+const SoulPhotosScreenGuarded = withGuard(SoulPhotosScreen, 'trusted');
+const RequestFormScreenGuarded = withGuard(RequestFormScreen, 'complete');
 
 function OnlineChatNavigator() {
   return (
@@ -852,7 +855,7 @@ function AuthNavigation() {
         <Stack.Screen name="RequestsTab" component={RequestTopicScreen} />
         <Stack.Screen name="ListScreen" component={ListScreen} />
         <Stack.Screen name="PlaceDetailsPanel" component={PlaceDetailsPanel as React.ComponentType<unknown>} />
-        <Stack.Screen name="RequestFormScreen" component={RequestFormScreen} />
+        <Stack.Screen name="RequestFormScreen" component={RequestFormScreenGuarded} />
         <Stack.Screen name="HelpNeighborsScreen" component={HelpNeighborsScreen} />
         <Stack.Screen name="HelpRequestScreen" component={HelpRequestScreen} />
         <Stack.Screen name="TopPlacesScreen" component={TopPlacesScreen} />
@@ -913,8 +916,8 @@ function AuthNavigation() {
         <Stack.Screen name="OsbbAddNewsScreen" component={withGuard(OsbbAddNewsScreen, 'trusted')} />
         <Stack.Screen name="OsbbAdminScreen" component={withGuard(OsbbAdminScreen, 'auth')} />
         <Stack.Screen name="ServicesHubScreen" component={ServicesHubScreen} />
-        <Stack.Screen name="SoulPhotosScreen" component={SoulPhotosScreen} />
-        <Stack.Screen name="FotoRayonaScreen" component={FotoRayonaScreenWithBoundary} />
+        <Stack.Screen name="SoulPhotosScreen" component={SoulPhotosScreenGuarded} />
+        <Stack.Screen name="FotoRayonaScreen" component={FotoRayonaScreenGuarded} />
         <Stack.Screen name="PhotoUploadScreen" component={PhotoUploadScreen} options={{ headerShown: false }} />
         <Stack.Screen name="StartAvatarPickerScreen" component={StartAvatarPickerScreen} options={{ headerShown: false }} />
         <Stack.Screen name="ProfileSetupScreen" component={ProfileSetupScreen} options={{ headerShown: false, gestureEnabled: false }} />
