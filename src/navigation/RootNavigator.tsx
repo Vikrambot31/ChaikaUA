@@ -445,7 +445,9 @@ function GuardedScreen({
     if (mode !== 'admin' && mode !== 'moderator' && mode !== 'trusted') {
       return;
     }
-    if (!isAuthenticated || !isBootstrapped) {
+    if (!isBootstrapped) return;
+    if (!isAuthenticated) {
+      setRoleStatus('denied');
       return;
     }
     const unsubscribe = subscribeCurrentUserSecurityRole((snapshot: { role: SecurityRole }) => {
