@@ -239,7 +239,9 @@ const RegisterScreenFull: React.FC = () => {
         const referrerSnapAlt = await get(query(dbRef(database, 'users'), orderByChild('phone'), equalTo(referrerPhone.trim())));
         referrerVerified = referrerSnap.exists() || referrerSnapAlt.exists();
         if (!referrerVerified) {
-          await authUser.delete();
+          if (!isCompletingExistingAccount) {
+            await authUser.delete();
+          }
           Toast.show({ type: 'error', text1: text.error, text2: text.referrerNotFound });
           return;
         }

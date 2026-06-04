@@ -429,7 +429,9 @@ function GuardedScreen({
   } = useContext(TrustedAccessContext);
 
   const [roleStatus, setRoleStatus] = useState<'loading' | 'allowed' | 'denied'>(
-    mode === 'admin' || mode === 'moderator' || mode === 'trusted' ? 'loading' : 'allowed',
+    mode === 'admin' || mode === 'moderator' || mode === 'trusted' ? 'loading'
+    : mode === 'auth' || mode === 'complete' ? 'loading'
+    : 'allowed',
   );
   // For trusted mode: null = role subscription hasn't fired yet (still loading)
   const [isPrivilegedRole, setIsPrivilegedRole] = useState<boolean | null>(
@@ -496,6 +498,10 @@ function GuardedScreen({
       return;
     }
     if (roleStatus === 'denied') {
+      if (mode === 'auth' || mode === 'complete') {
+        navigation.reset({ index: 0, routes: [{ name: 'LoginScreen' as never }] });
+        return;
+      }
       if (!deniedToastShownRef.current) {
         const reason = mode === 'admin' || mode === 'moderator'
           ? 'Невірна роль'
