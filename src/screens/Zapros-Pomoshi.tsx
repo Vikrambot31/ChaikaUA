@@ -327,6 +327,7 @@ const HelpRequestScreen: React.FC = () => {
   const hasSubtypes = subtypes.length > 0;
 
   const canSubmit = useMemo(() => {
+    if (!user?.id) return false;
     const normalizedName = normalizePersonName(name);
     const normalizedPhone = normalizePhoneText(phone);
     return (
@@ -336,7 +337,7 @@ const HelpRequestScreen: React.FC = () => {
       (!hasSubtypes || Boolean(subType)) &&
       description.trim().length >= 10
     );
-  }, [hasSubtypes, helpType, name, phone, subType, description]);
+  }, [user?.id, hasSubtypes, helpType, name, phone, subType, description]);
   const isNameComplete = useMemo(() => validateName(normalizePersonName(name)), [name]);
   const isPhoneComplete = useMemo(() => validatePhone(normalizePhoneText(phone)), [phone]);
   const isHelpTypeComplete = Boolean(helpType);

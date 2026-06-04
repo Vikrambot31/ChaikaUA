@@ -303,6 +303,7 @@ const PlacesScreen: React.FC = () => {
   const navLock = useRef(false);
   const route = useRoute<import('@react-navigation/native').RouteProp<Record<string, PlacesScreenRouteParams>, string>>();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as Lang;
+  const userId = useSelector((state: RootState) => state.auth?.user?.id);
   const text = UI_TEXT[language];
 
   const defaultSection: SectionKey = route.params?.section ?? mapLegacyTabToSection(route.params?.tab) ?? 'restaurants';
@@ -339,6 +340,11 @@ const PlacesScreen: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    if (!userId) {
+      setResidentDataLoading(false);
+      return;
+    }
+
     let servicesLoaded = false;
     let goodsLoaded = false;
     const finishLoad = () => {
@@ -354,28 +360,35 @@ const PlacesScreen: React.FC = () => {
     });
 
     const servicesRef = ref(database, 'local_business');
-    const unsubscribeServices = onValue(servicesRef, (snapshot) => {
-      const raw = snapshot.val() as Record<string, Omit<BusinessItem, 'id'>> | null;
-      const next = !raw
-        ? []
-        : Object.entries(raw)
-          .map(([id, value]) => ({ ...value, id }))
-          .filter((item) => item.status === 'active')
-          .sort((a, b) => {
-            const ta = typeof a.createdAt === 'number' ? a.createdAt : new Date(a.createdAt || 0).getTime();
-            const tb = typeof b.createdAt === 'number' ? b.createdAt : new Date(b.createdAt || 0).getTime();
-            return tb - ta;
-          });
-      setResidentServices(next);
-      servicesLoaded = true;
-      finishLoad();
-    });
+    const unsubscribeServices = onValue(
+      servicesRef,
+      (snapshot) => {
+        const raw = snapshot.val() as Record<string, Omit<BusinessItem, 'id'>> | null;
+        const next = !raw
+          ? []
+          : Object.entries(raw)
+            .map(([id, value]) => ({ ...value, id }))
+            .filter((item) => item.status === 'active')
+            .sort((a, b) => {
+              const ta = typeof a.createdAt === 'number' ? a.createdAt : new Date(a.createdAt || 0).getTime();
+              const tb = typeof b.createdAt === 'number' ? b.createdAt : new Date(b.createdAt || 0).getTime();
+              return tb - ta;
+            });
+        setResidentServices(next);
+        servicesLoaded = true;
+        finishLoad();
+      },
+      () => {
+        servicesLoaded = true;
+        finishLoad();
+      },
+    );
 
     return () => {
       unsubscribeGoods();
       unsubscribeServices();
     };
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
     const targetSection = route.params?.section ?? mapLegacyTabToSection(route.params?.tab);
