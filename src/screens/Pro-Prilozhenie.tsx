@@ -209,7 +209,6 @@ const AppInfoScreen: React.FC = () => {
             <Text style={styles.sectionTitle}>{text.title}</Text>
           </View>
           <Text style={styles.paragraph}>{text.intro}</Text>
-          <Text style={styles.formHint}>{text.authHint}</Text>
           <TextInput
             value={suggestion}
             onChangeText={(value: string) => setSuggestion(value.slice(0, SUGGESTION_MAX_LENGTH))}
