@@ -132,6 +132,9 @@ const BOTS = [
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
+const randomGender = () => (Math.random() > 0.5 ? 'male' : 'female');
+const randomAge = () => Math.floor(Math.random() * (75 - 20 + 1)) + 20; // 20-75
+
 const makeProfile = (bot, uid) => ({
   name: bot.name,
   phone: bot.phone,
@@ -142,6 +145,8 @@ const makeProfile = (bot, uid) => ({
   registrationStatus: 'complete',
   registeredAt: REGISTERED_AT,
   startAvatarKey: bot.avatarKey,
+  gender: randomGender(),
+  age: randomAge(),
   provider: 'email',
   providerId: uid,
   photoURL: `start-avatar://${bot.avatarKey}`,
