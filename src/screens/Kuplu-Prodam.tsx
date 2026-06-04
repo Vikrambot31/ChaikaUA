@@ -853,7 +853,7 @@ const BuySellScreen: React.FC = () => {
               currentUserId={user?.id}
               language={language}
               onProfile={item.userId ? () => { if (navLock.current) return; navLock.current = true; navigation.navigate('ViewUserProfile', { userId: item.userId as string }); setTimeout(() => { navLock.current = false; }, 800); } : undefined}
-              onContact={item.userId && item.userId !== user?.id ? () => openContactModal({ userId: item.userId as string, name: item.itemName ?? 'Unknown', sourceType: 'buysell', sourceId: item.id, sourceTitle: item.itemName }) : item.phone ? () => void safeCallPhone(item.phone, language) : undefined}
+              onContact={item.userId && item.userId !== user?.id ? () => openContactModal({ userId: item.userId as string, name: item.itemName ?? 'Unknown', photoURL: authorAvatarUri || undefined, sourceType: 'buysell', sourceId: item.id, sourceTitle: item.itemName }) : item.phone ? () => void safeCallPhone(item.phone, language) : undefined}
               contactDisabled={!item.phone && (!item.userId || item.userId === user?.id)}
               likePath="feed_likes/buysell"
               likeId={item.id}

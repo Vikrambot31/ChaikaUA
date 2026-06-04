@@ -627,7 +627,7 @@ const JobSearchScreen: React.FC = () => {
 
   const handleContact = (userId: string, name: string) => {
     setActionModal({ visible: false, userId: '', userName: '' });
-    openContactModal({ userId, name, sourceType: 'job' });
+    openContactModal({ userId, name, photoURL: avatarByUserId[userId] || undefined, sourceType: 'job' });
   };
 
   const mapToDetailData = (item: JobListing): DetailItemData => ({

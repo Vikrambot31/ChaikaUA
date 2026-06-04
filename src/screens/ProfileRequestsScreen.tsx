@@ -88,6 +88,8 @@ const UI = {
     deny: 'Відхилити',
     errTitle: 'Помилка',
     errBody: 'Не вдалося відповісти. Спробуйте ще раз.',
+    loadErrBody: 'Не вдалося завантажити запити. Перевірте інтернет і спробуйте ще раз.',
+    authErrBody: 'Не вдалося підключити гостьову сесію. Перевірте інтернет і відкрийте розділ ще раз.',
     sourceBoxTitle: 'Джерело:',
     call: 'Подзвонити',
     callUnavailable: 'Немає телефону',
@@ -135,6 +137,8 @@ const UI = {
     deny: 'Отклонить',
     errTitle: 'Ошибка',
     errBody: 'Не удалось ответить. Попробуйте снова.',
+    loadErrBody: 'Не удалось загрузить запросы. Проверьте интернет и попробуйте снова.',
+    authErrBody: 'Не удалось подключить гостевую сессию. Проверьте интернет и откройте раздел еще раз.',
     sourceBoxTitle: 'Источник:',
     call: 'Позвонить',
     callUnavailable: 'Нет телефона',
@@ -182,6 +186,8 @@ const UI = {
     deny: 'Deny',
     errTitle: 'Error',
     errBody: 'Failed to respond. Please try again.',
+    loadErrBody: 'Failed to load requests. Check your internet connection and try again.',
+    authErrBody: 'Failed to start the guest session. Check your internet connection and open this section again.',
     sourceBoxTitle: 'Source:',
     call: 'Call',
     callUnavailable: 'No phone',
@@ -259,9 +265,13 @@ const normalizeOutgoingRequests = (
 export default function ProfileRequestsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const navLock = useRef(false);
+  const authAlertShownRef = useRef(false);
   const user = useSelector(selectUser);
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
   const t = UI[language];
+  const [sessionUserId, setSessionUserId] = useState(user?.id ?? '');
+  const [sessionResolved, setSessionResolved] = useState(Boolean(user?.id));
+  const currentUserId = user?.id || sessionUserId || '';
   const [requests, setRequests] = useState<ProfileViewRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<RequestsTab>('incoming');
@@ -327,7 +337,45 @@ export default function ProfileRequestsScreen() {
   }, []);
 
   useEffect(() => {
-    if (!user?.id) {
+    let cancelled = false;
+    if (user?.id) {
+      setSessionUserId('');
+      setSessionResolved(true);
+      return () => { cancelled = true; };
+    }
+
+    setSessionResolved(false);
+    setSessionUserId('');
+    void ensureFirebaseAuth()
+      .then((firebaseUser) => {
+        if (!cancelled) {
+          setSessionUserId(firebaseUser?.uid ?? '');
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSessionUserId('');
+          if (!authAlertShownRef.current) {
+            Alert.alert(t.errTitle, t.authErrBody);
+            authAlertShownRef.current = true;
+          }
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setSessionResolved(true);
+        }
+      });
+
+    return () => { cancelled = true; };
+  }, [t.authErrBody, t.errTitle, user?.id]);
+
+  useEffect(() => {
+    if (!sessionResolved) {
+      setLoading(true);
+      return;
+    }
+    if (!currentUserId) {
       setLoading(false);
       return;
     }
@@ -336,10 +384,10 @@ export default function ProfileRequestsScreen() {
       setLoading(true);
       try {
         const [hidden, incomingRequests, outgoingRequests, historyRequests] = await Promise.all([
-          profilePermissionService.getHiddenRequestKeys(user.id),
-          profilePermissionService.getAllRequests(user.id),
-          profilePermissionService.getOutgoingRequests(user.id),
-          profilePermissionService.getAllRequestsWithHistory(user.id),
+          profilePermissionService.getHiddenRequestKeys(currentUserId),
+          profilePermissionService.getAllRequests(currentUserId),
+          profilePermissionService.getOutgoingRequests(currentUserId),
+          profilePermissionService.getAllRequestsWithHistory(currentUserId),
         ]);
         if (cancelled) return;
         setHiddenKeys(hidden);
@@ -360,7 +408,7 @@ export default function ProfileRequestsScreen() {
         setTabInitialized(true);
       } catch (err) {
         if (!cancelled) {
-          Alert.alert(t.errTitle, t.errBody);
+          Alert.alert(t.errTitle, t.loadErrBody);
           setTabInitialized(true);
         }
       } finally {
@@ -370,15 +418,15 @@ export default function ProfileRequestsScreen() {
       }
     })();
     return () => { cancelled = true; };
-  }, [loadIncomingPhones, navigation, t.errBody, t.errTitle, user?.id]);
+  }, [currentUserId, loadIncomingPhones, navigation, sessionResolved, t.errTitle, t.loadErrBody]);
 
   useEffect(() => {
-    if (!tabInitialized || !user?.id) return undefined;
+    if (!tabInitialized || !currentUserId) return undefined;
 
     setLoading(true);
     const path = activeTab === 'outgoing'
-      ? `outgoingProfileRequestsByUser/${user.id}`
-      : `profileViewRequests/${user.id}`;
+      ? `outgoingProfileRequestsByUser/${currentUserId}`
+      : `profileViewRequests/${currentUserId}`;
 
     let unsubscribe: (() => void) | undefined;
     let cancelled = false;
@@ -388,10 +436,10 @@ export default function ProfileRequestsScreen() {
 
       unsubscribe = onValue(ref(database, path), async (snap) => {
         try {
-          const hidden = await profilePermissionService.getHiddenRequestKeys(user.id);
+          const hidden = await profilePermissionService.getHiddenRequestKeys(currentUserId);
           const raw = snap.exists() ? (snap.val() as Record<string, Partial<ProfileViewRequest>>) : null;
           const nextRequests = activeTab === 'outgoing'
-            ? normalizeOutgoingRequests(raw, user.id)
+            ? normalizeOutgoingRequests(raw, currentUserId)
             : normalizeIncomingRequests(raw, activeTab === 'history');
 
           setHiddenKeys(hidden);
@@ -400,18 +448,18 @@ export default function ProfileRequestsScreen() {
           }
           setRequests(nextRequests);
         } catch {
-          Alert.alert(t.errTitle, t.errBody);
+          Alert.alert(t.errTitle, t.loadErrBody);
         } finally {
           setLoading(false);
         }
       }, () => {
         // onValue error — just show error, don't redirect
-        Alert.alert(t.errTitle, t.errBody);
+        Alert.alert(t.errTitle, t.loadErrBody);
         setLoading(false);
       });
     }).catch(() => {
       if (!cancelled) {
-        Alert.alert(t.errTitle, t.errBody);
+        Alert.alert(t.errTitle, t.loadErrBody);
         setLoading(false);
       }
     });
@@ -420,7 +468,7 @@ export default function ProfileRequestsScreen() {
       cancelled = true;
       unsubscribe?.();
     };
-  }, [activeTab, loadIncomingPhones, t.errBody, t.errTitle, tabInitialized, user?.id]);
+  }, [activeTab, currentUserId, loadIncomingPhones, t.errBody, t.errTitle, tabInitialized]);
 
   useEffect(() => {
     void (async () => {
@@ -451,7 +499,7 @@ export default function ProfileRequestsScreen() {
   };
 
   const filteredRequests = requests.filter((item) => {
-    const targetUserId = activeTab === 'outgoing' ? (item.targetUserId ?? '') : (user?.id ?? '');
+    const targetUserId = activeTab === 'outgoing' ? (item.targetUserId ?? '') : currentUserId;
     const hiddenKey = profilePermissionService.requestKey(targetUserId, item.requesterId);
     const isHidden = Boolean(hiddenKeys[hiddenKey]);
     if (!showHidden && isHidden) return false;
@@ -462,18 +510,18 @@ export default function ProfileRequestsScreen() {
   });
 
   const clearContactHistory = useCallback(async () => {
-    if (!user?.id || clearingHistory) return;
+    if (!currentUserId || clearingHistory) return;
     setClearingHistory(true);
     try {
       const [incoming, outgoing, history] = await Promise.all([
-        profilePermissionService.getAllRequests(user.id),
-        profilePermissionService.getOutgoingRequests(user.id),
-        profilePermissionService.getAllRequestsWithHistory(user.id),
+        profilePermissionService.getAllRequests(currentUserId),
+        profilePermissionService.getOutgoingRequests(currentUserId),
+        profilePermissionService.getAllRequestsWithHistory(currentUserId),
       ]);
 
       const archiveTargets = new Map<string, { targetUserId: string; requesterId: string }>();
       [...incoming, ...history].forEach((item) => {
-        const targetUserId = user.id;
+        const targetUserId = currentUserId;
         const requesterId = item.requesterId;
         if (!requesterId) return;
         archiveTargets.set(profilePermissionService.requestKey(targetUserId, requesterId), { targetUserId, requesterId });
@@ -481,13 +529,13 @@ export default function ProfileRequestsScreen() {
       outgoing.forEach((item) => {
         const targetUserId = item.targetUserId ?? '';
         if (!targetUserId) return;
-        const requesterId = user.id;
+        const requesterId = currentUserId;
         archiveTargets.set(profilePermissionService.requestKey(targetUserId, requesterId), { targetUserId, requesterId });
       });
 
       await Promise.all(
         Array.from(archiveTargets.values()).map((entry) =>
-          profilePermissionService.hideRequestForUser(user.id, entry.targetUserId, entry.requesterId),
+          profilePermissionService.hideRequestForUser(currentUserId, entry.targetUserId, entry.requesterId),
         ),
       );
       setHiddenKeys((prev) => {
@@ -496,7 +544,7 @@ export default function ProfileRequestsScreen() {
         return next;
       });
       setRequests((prev) => prev.filter((item) => {
-        const targetUserId = activeTab === 'outgoing' ? (item.targetUserId ?? '') : user.id;
+        const targetUserId = activeTab === 'outgoing' ? (item.targetUserId ?? '') : currentUserId;
         return !archiveTargets.has(profilePermissionService.requestKey(targetUserId, item.requesterId));
       }));
     } catch {
@@ -504,7 +552,7 @@ export default function ProfileRequestsScreen() {
     } finally {
       setClearingHistory(false);
     }
-  }, [activeTab, clearingHistory, t.errBody, t.errTitle, user?.id]);
+  }, [activeTab, clearingHistory, currentUserId, t.errBody, t.errTitle]);
 
   const confirmClearContactHistory = useCallback(() => {
     Alert.alert(t.clearConfirmTitle, t.clearConfirmBody, [
@@ -514,17 +562,17 @@ export default function ProfileRequestsScreen() {
   }, [clearContactHistory, t.clearConfirmBody, t.clearConfirmNo, t.clearConfirmTitle, t.clearConfirmYes]);
 
   const handleRespondToIncoming = useCallback(async (requesterId: string, approved: boolean) => {
-    if (!user?.id || !requesterId || respondingRequestId) return;
+    if (!currentUserId || !requesterId || respondingRequestId) return;
     setRespondingRequestId(requesterId);
     try {
-      await profilePermissionService.respondToRequest(user.id, requesterId, approved);
+      await profilePermissionService.respondToRequest(currentUserId, requesterId, approved);
       setRequests((prev) => prev.filter((item) => item.requesterId !== requesterId));
     } catch {
       Alert.alert(t.errTitle, t.errBody);
     } finally {
       setRespondingRequestId(null);
     }
-  }, [respondingRequestId, t.errBody, t.errTitle, user?.id]);
+  }, [currentUserId, respondingRequestId, t.errBody, t.errTitle]);
 
   const handleCall = async (phoneRaw?: string) => {
     await safeCallPhone(phoneRaw, language);
@@ -715,7 +763,7 @@ export default function ProfileRequestsScreen() {
                     avatarUri={item.requesterPhotoURL || ''}
                     name={item.requesterName}
                     userId={item.requesterId}
-                    currentUserId={user?.id}
+                    currentUserId={currentUserId}
                     language={language}
                     onProfile={() => { if (navLock.current) return; navLock.current = true; navigation.navigate('ViewUserProfile', { userId: item.requesterId }); setTimeout(() => { navLock.current = false; }, 800); }}
                     onContact={phone ? () => void handleCall(phone) : undefined}
@@ -801,7 +849,7 @@ export default function ProfileRequestsScreen() {
                   avatarUri={photo || ''}
                   name={displayName}
                   userId={displayId}
-                  currentUserId={user?.id}
+                  currentUserId={currentUserId}
                   language={language}
                   onProfile={displayId ? () => { if (navLock.current) return; navLock.current = true; navigation.navigate('ViewUserProfile', { userId: displayId }); setTimeout(() => { navLock.current = false; }, 800); } : undefined}
                   onContact={phone ? () => {

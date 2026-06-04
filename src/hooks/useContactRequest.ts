@@ -95,7 +95,7 @@ export function useContactRequest() {
           currentTarget.userId,
           { id: requesterId, name: user?.name ?? GUEST_NAME[language], photoURL: user?.photoURL ?? '' },
           currentTarget.sourceType ?? 'lyudi',
-          undefined,
+          { name: currentTarget.name, photoURL: currentTarget.photoURL },
           {
             reason,
             sourceId: currentTarget.sourceId,

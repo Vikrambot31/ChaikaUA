@@ -29,6 +29,7 @@ import { syncFromRequests } from '../redux/slices/helpRequestsSlice';
 import { normalizeLanguage } from '../redux/slices/languageSlice';
 import { firebaseChatAPI } from '../firebase-config';
 import { safeOpenExternalUrl } from '../utils/communicationActions';
+import { safeNavigate } from '../utils/safeNavigation';
 import type { Request as AppRequest } from '../types/app';
 import { logClientError } from '../utils/errorLogger';
 import { pickUserAvatarUri } from '../utils/userAvatar';
@@ -713,10 +714,10 @@ const HomeScreen: React.FC = () => {
       return;
     }
     if (item.tab) {
-      navigation.navigate('MainTabs', { screen: item.tab });
+      safeNavigate(navigation, 'MainTabs', { screen: item.tab });
       return;
     }
-    if (item.screen) navigation.navigate(item.screen, (item as TopInfoItem).params);
+    if (item.screen) safeNavigate(navigation, item.screen, (item as TopInfoItem).params);
   };
 
   const panelBodyHeight = Math.max(videoNaturalH, 190);
@@ -1198,7 +1199,7 @@ const styles = StyleSheet.create({
     left: 0,
     width: '100%',
     height: PANEL2_H,
-    zIndex: 8,
+    zIndex: 2,
   },
   chatListWrap: {
     position: 'absolute',

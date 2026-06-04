@@ -606,7 +606,7 @@ const text = CLEAN_PROBLEMS_TEXT[language];
 
   const openContactOptions = (problem: Problem) => {
     if (problem.userId && problem.userId !== user?.id) {
-      openContactModal({ userId: problem.userId, name: problem.name || problem.title, sourceType: 'help', sourceId: problem.id, sourceTitle: problem.title });
+      openContactModal({ userId: problem.userId, name: problem.name || problem.title, photoURL: (problem.userId && avatarByUserId[problem.userId]) || problem.avatarUri || undefined, sourceType: 'help', sourceId: problem.id, sourceTitle: problem.title });
       return;
     }
 

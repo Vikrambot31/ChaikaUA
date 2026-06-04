@@ -479,7 +479,7 @@ const LostAndFoundScreen: React.FC = () => {
                       style={styles.phoneAction}
                       onPress={(event) => {
                         event.stopPropagation();
-                        openContactModal({ userId: item.userId as string, name: item.name || text.anonymous, sourceType: 'help', sourceId: item.id, sourceTitle: getLostFoundCategoryLabel(item.category, language) });
+                        openContactModal({ userId: item.userId as string, name: item.name || text.anonymous, photoURL: (item.userId && avatarByUserId[item.userId]) || item.userPhotoURL || undefined, sourceType: 'help', sourceId: item.id, sourceTitle: getLostFoundCategoryLabel(item.category, language) });
                       }}
                       activeOpacity={0.75}
                     >

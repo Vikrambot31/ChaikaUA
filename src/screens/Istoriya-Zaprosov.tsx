@@ -512,7 +512,7 @@ const HelpHistoryScreen: React.FC = () => {
               currentUserId={user?.id}
               language={language}
               onProfile={item.userId ? () => { if (navLock.current) return; navLock.current = true; navigation.navigate('ViewUserProfile', { userId: item.userId as string }); setTimeout(() => { navLock.current = false; }, 800); } : undefined}
-              onContact={!isOwnRequest(item) && item.userId ? () => openContactModal({ userId: item.userId as string, name: item.name || 'Unknown', sourceType: 'help', sourceId: item.id, sourceTitle: item.description?.slice(0, 60) }) : item.phone ? () => void safeCallPhone(item.phone, language) : undefined}
+              onContact={!isOwnRequest(item) && item.userId ? () => openContactModal({ userId: item.userId as string, name: item.name || 'Unknown', photoURL: avatarByUserId[item.userId as string] || undefined, sourceType: 'help', sourceId: item.id, sourceTitle: item.description?.slice(0, 60) }) : item.phone ? () => void safeCallPhone(item.phone, language) : undefined}
               contactDisabled={!item.phone && (!item.userId || isOwnRequest(item))}
               likePath="feed_likes/help_history"
               likeId={item.id}

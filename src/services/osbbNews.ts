@@ -1,5 +1,6 @@
 import { ref, push, update, onValue, query, orderByChild, equalTo, limitToLast, runTransaction, remove } from 'firebase/database';
 import { database, auth } from '../firebase-core';
+import { ensureFirebaseAuth } from '../firebase-auth-session';
 import { createPendingModeration, ModerationStatus } from '../utils/moderation';
 import { sanitizeStoredText } from '../utils/textUtils';
 
@@ -71,23 +72,29 @@ export const subscribeOsbbNews = (
     ? query(ref(database, `${PATH}/${buildingId}`), orderByChild('publishedAt'), limitToLast(100))
     : query(ref(database, `${PATH}/${buildingId}`), orderByChild('moderationStatus'), equalTo('approved'), limitToLast(100));
 
-  const unsubscribe = onValue(listRef, (snapshot) => {
-    const raw = snapshot.val();
-    if (!raw) {
-      callback([]);
-      return;
-    }
+  let unsubscribe: (() => void) | undefined;
+  let disposed = false;
 
-    const items = Object.entries(raw as Record<string, StoredNews>)
-      .map((entry) => mapNews(entry as [string, StoredNews]))
-      .sort((a, b) => {
-        return getNewsTime(b) - getNewsTime(a);
-      });
+  void ensureFirebaseAuth().then(() => {
+    if (disposed) return;
+    unsubscribe = onValue(listRef, (snapshot) => {
+      if (disposed) return;
+      const raw = snapshot.val();
+      if (!raw) {
+        callback([]);
+        return;
+      }
+      const items = Object.entries(raw as Record<string, StoredNews>)
+        .map((entry) => mapNews(entry as [string, StoredNews]))
+        .sort((a, b) => getNewsTime(b) - getNewsTime(a));
+      callback(items);
+    }, options.onError ? (error) => { if (!disposed) options.onError!(error); } : () => { if (!disposed) callback([]); });
+  }).catch(() => { if (!disposed) callback([]); });
 
-    callback(items);
-  }, options.onError ? (error) => { options.onError!(error); } : undefined);
-
-  return unsubscribe;
+  return () => {
+    disposed = true;
+    unsubscribe?.();
+  };
 };
 
 export const loadOsbbNews = async (buildingId: string | null | undefined): Promise<OsbbNewsItem[]> => {

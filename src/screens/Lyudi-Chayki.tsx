@@ -20,7 +20,7 @@ import { communityUsersAPI } from '../firebase-config';
 import { selectUser } from '../redux/slices/authSlice';
 import type { RootState } from '../redux/store';
 import { HelpRequest, Request, User } from '../types/app';
-import { getChaikaActivity, getLevelName } from '../utils/chaikaLevels';
+import { getChaikaActivity } from '../utils/chaikaLevels';
 import { profilePermissionService } from '../services/profilePermissionService';
 import { ProfileViewRequestModal, PermissionModalState } from '../components/ProfileViewRequestModal';
 import { useContactRequest } from '../hooks/useContactRequest';
@@ -40,27 +40,21 @@ const UI_TEXT = {
   ua: {
     title: 'Люди Чайки',
     summaryTitle: 'Реальні користувачі застосунку',
-    members: 'учасників у списку',
+    members: 'зареєстровано у додатку',
     loading: 'Завантажуємо людей...',
     emptyTitle: 'Поки немає користувачів',
     emptyBody: 'Список зʼявиться після реєстрації мешканців.',
     you: 'Ви',
-    level: 'рів.',
     points: 'балів',
     days: 'днів',
     noAddress: 'Адресу не вказано',
     noProfession: 'Вид діяльності не вказано',
     residentFallback: 'Житель Чайки',
     statusLabel: 'Статус',
-    levelFilterLabel: 'Рівень',
     statusAll: 'Усі',
     statusNew: 'Новачки',
     statusActive: 'Активні',
     statusPro: 'Досвідчені',
-    levelAll: 'Усі',
-    levelLow: '1-2',
-    levelMid: '3-4',
-    levelHigh: '5+',
     viewProfile: 'Переглянути профіль',
     contactUser: "Зв'язатися",
     cancel: 'Скасувати',
@@ -69,27 +63,21 @@ const UI_TEXT = {
   ru: {
     title: 'Люди Чайки',
     summaryTitle: 'Реальные пользователи приложения',
-    members: 'участников в списке',
+    members: 'зарегистрировано в приложении',
     loading: 'Загружаем людей...',
     emptyTitle: 'Пока нет пользователей',
     emptyBody: 'Список появится после регистрации жителей.',
     you: 'Вы',
-    level: 'ур.',
     points: 'баллов',
     days: 'дней',
     noAddress: 'Адрес не указан',
     noProfession: 'Вид деятельности не указан',
     residentFallback: 'Житель Чайки',
     statusLabel: 'Статус',
-    levelFilterLabel: 'Уровень',
     statusAll: 'Все',
     statusNew: 'Новички',
     statusActive: 'Активные',
     statusPro: 'Опытные',
-    levelAll: 'Все',
-    levelLow: '1-2',
-    levelMid: '3-4',
-    levelHigh: '5+',
     viewProfile: 'Просмотреть профиль',
     contactUser: 'Связаться',
     cancel: 'Отмена',
@@ -98,27 +86,21 @@ const UI_TEXT = {
   en: {
     title: 'Chaika Life People',
     summaryTitle: 'Real app users',
-    members: 'members in the list',
+    members: 'registered in the app',
     loading: 'Loading people...',
     emptyTitle: 'No users yet',
     emptyBody: 'The list will appear after residents register.',
     you: 'You',
-    level: 'lvl',
     points: 'points',
     days: 'days',
     noAddress: 'Address not specified',
     noProfession: 'Activity type not specified',
     residentFallback: 'Chaika Life Resident',
     statusLabel: 'Status',
-    levelFilterLabel: 'Level',
     statusAll: 'All',
     statusNew: 'New',
     statusActive: 'Active',
     statusPro: 'Pro',
-    levelAll: 'All',
-    levelLow: '1-2',
-    levelMid: '3-4',
-    levelHigh: '5+',
     viewProfile: 'View full profile',
     contactUser: 'Contact',
     cancel: 'Cancel',
@@ -149,13 +131,11 @@ type CommunityUser = {
 
 type Person = CommunityUser & {
   level: number;
-  levelName: string;
   points: number;
   days: number;
 };
 
 type PersonStatusFilter = 'all' | 'new' | 'active' | 'pro';
-type PersonLevelFilter = 'all' | 'low' | 'mid' | 'high';
 
 const getAddress = (person: CommunityUser, text: UiText) => {
   const parts = [person.building, person.houseNumber].filter(Boolean);
@@ -221,7 +201,6 @@ export default function TopGirlsBoysScreen() {
   const [loading, setLoading] = useState(true);
   const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
   const [statusFilter, setStatusFilter] = useState<PersonStatusFilter>('all');
-  const [levelFilter, setLevelFilter] = useState<PersonLevelFilter>('all');
   const [bonusByUserId, setBonusByUserId] = useState<Record<string, number>>({});
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const [permModal, setPermModal] = useState<{
@@ -347,9 +326,8 @@ export default function TopGirlsBoysScreen() {
       title: person.name || text.residentFallback,
       description: person.profession?.trim() || text.noProfession,
       phone: person.phone || '',
-      category: person.levelName,
+      category: text.userProfile,
       address: getAddress(person, text),
-      status: `${text.level} ${person.level}`,
       votesCount: person.points,
       photoUri: person.photoURL,
       userId: person.id,
@@ -401,13 +379,12 @@ export default function TopGirlsBoysScreen() {
         return {
           ...person,
           level: activity.currentLevel.level,
-          levelName: getLevelName(activity.currentLevel, language),
           points: activity.points,
           days: activity.daysInApp,
         };
       })
       .sort((a, b) => b.level - a.level || b.points - a.points || b.days - a.days || a.name.localeCompare(b.name));
-  }, [activityByUserId, language, people]);
+  }, [activityByUserId, people]);
 
   const filteredRanked = useMemo(() => {
     const resolvedByStatus = ranked.filter((person) => {
@@ -417,13 +394,8 @@ export default function TopGirlsBoysScreen() {
       return person.level >= 5;
     });
 
-    return resolvedByStatus.filter((person) => {
-      if (levelFilter === 'all') return true;
-      if (levelFilter === 'low') return person.level >= 1 && person.level <= 2;
-      if (levelFilter === 'mid') return person.level >= 3 && person.level <= 4;
-      return person.level >= 5;
-    });
-  }, [levelFilter, ranked, statusFilter]);
+    return resolvedByStatus;
+  }, [ranked, statusFilter]);
 
   const handleSendViewRequest = useCallback(async () => {
     if (!user?.id || !permModal.targetId) return;
@@ -491,31 +463,13 @@ export default function TopGirlsBoysScreen() {
               </TouchableOpacity>
             </View>
           </View>
-
-          <View style={styles.filterBlock}>
-            <Text style={styles.filterTitle}>{text.levelFilterLabel}</Text>
-            <View style={styles.filterRow}>
-              <TouchableOpacity style={[styles.filterChip, levelFilter === 'all' && styles.filterChipActive]} onPress={() => setLevelFilter('all')} activeOpacity={0.82}>
-                <Text style={[styles.filterChipText, levelFilter === 'all' && styles.filterChipTextActive]}>{text.levelAll}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.filterChip, levelFilter === 'low' && styles.filterChipActive]} onPress={() => setLevelFilter('low')} activeOpacity={0.82}>
-                <Text style={[styles.filterChipText, levelFilter === 'low' && styles.filterChipTextActive]}>{text.levelLow}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.filterChip, levelFilter === 'mid' && styles.filterChipActive]} onPress={() => setLevelFilter('mid')} activeOpacity={0.82}>
-                <Text style={[styles.filterChipText, levelFilter === 'mid' && styles.filterChipTextActive]}>{text.levelMid}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.filterChip, levelFilter === 'high' && styles.filterChipActive]} onPress={() => setLevelFilter('high')} activeOpacity={0.82}>
-                <Text style={[styles.filterChipText, levelFilter === 'high' && styles.filterChipTextActive]}>{text.levelHigh}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
         </View>
 
         <View style={styles.summaryCard}>
           <MaterialCommunityIcons name="account-group-outline" size={28} color={PRIMARY} />
           <View style={styles.summaryCopy}>
             <Text style={styles.summaryTitle}>{text.summaryTitle}</Text>
-            <Text style={styles.summaryText}>{filteredRanked.length} {text.members}</Text>
+            <Text style={styles.summaryText}>{ranked.length} {text.members}</Text>
           </View>
         </View>
 
@@ -562,19 +516,6 @@ export default function TopGirlsBoysScreen() {
                   </View>
                   <Text style={styles.addressText} numberOfLines={1}>{getAddress(person, text)}</Text>
                   <Text style={styles.professionText} numberOfLines={1}>{person.profession?.trim() || text.noProfession}</Text>
-
-                  <View style={styles.metrics}>
-                    <View style={styles.metric}>
-                      <MaterialCommunityIcons name="shield-star-outline" size={14} color={PRIMARY} />
-                      <Text style={styles.metricText}>{text.level} {person.level}</Text>
-                    </View>
-                  </View>
-                  </View>
-
-                  <View style={styles.actionsColumn}>
-                    <View style={styles.levelBadge}>
-                      <Text style={styles.levelName} numberOfLines={2}>{person.levelName}</Text>
-                    </View>
                   </View>
                 </View>
                 <UserCardActionBar
@@ -714,23 +655,6 @@ const styles = StyleSheet.create({
   youBadge: { color: '#fff', backgroundColor: PRIMARY, borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1, fontSize: 9, fontWeight: '900' },
   addressText: { color: '#7A6D64', marginTop: 2, fontSize: 11, fontWeight: '700' },
   professionText: { color: '#5B5048', marginTop: 2, fontSize: 11, fontWeight: '700' },
-  metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
-  metric: { flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: '#F7F3EE', borderRadius: 999, paddingHorizontal: 6, paddingVertical: 2 },
-  metricText: { color: '#4A4038', fontSize: 10, fontWeight: '900' },
-  actionsColumn: { width: 68, alignItems: 'center', gap: 6 },
-  levelBadge: {
-    width: '100%',
-    minHeight: 36,
-    borderRadius: 12,
-    backgroundColor: '#F3E5F5',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 5,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: '#E0C4EA',
-  },
-  levelName: { color: PRIMARY, fontSize: 10, fontWeight: '900', textAlign: 'center', lineHeight: 12 },
   contactBtn: { width: 32, height: 28, borderRadius: 10, backgroundColor: PRIMARY, alignItems: 'center', justifyContent: 'center' },
   bonusCoinRow: {
     flexDirection: 'row',

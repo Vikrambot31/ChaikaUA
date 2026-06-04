@@ -208,11 +208,15 @@ export const profilePermissionService = {
     }
 
     const path = `profileViewRequests/${targetUserId}/${requester.id}`;
-    const existing = await get(ref(database, path));
-    if (existing.exists()) {
-      const s = existing.val()?.status as ViewRequestStatus;
-      if (s === 'approved') return 'already_approved';
-      if (s === 'pending') return 'already_pending';
+    try {
+      const existing = await get(ref(database, path));
+      if (existing.exists()) {
+        const s = existing.val()?.status as ViewRequestStatus;
+        if (s === 'approved') return 'already_approved';
+        if (s === 'pending') return 'already_pending';
+      }
+    } catch {
+      // can't read existing status — proceed to write attempt
     }
     const now = new Date().toISOString();
     const payload: Record<string, unknown> = {

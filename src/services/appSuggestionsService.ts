@@ -2,7 +2,7 @@ import { get, onValue, push, ref, remove, set, update } from 'firebase/database'
 import { database } from '../firebase-core';
 import { createPendingModeration, ModerationStatus } from '../utils/moderation';
 import { sanitizeStoredText } from '../utils/textUtils';
-import { requireWriteSession } from '../firebase-auth-session';
+import { ensureFirebaseAuth, requireWriteSession } from '../firebase-auth-session';
 import { assertTextMatchesLanguage, normalizeAppLang, type AppLang } from '../utils/contentLanguageGuard';
 
 export interface AppSuggestion {
@@ -116,21 +116,32 @@ const migrateLegacySuggestions = async (): Promise<void> => {
 export const appSuggestionsService = {
   subscribe(callback: (items: AppSuggestion[]) => void): () => void {
     const listRef = ref(database, PATH);
-    const unsubscribe = onValue(listRef, (snapshot) => {
-      const raw = snapshot.val();
-      if (!raw) {
-        callback([]);
-        return;
-      }
-      const items = Object.entries(raw as Record<string, Record<string, unknown>>)
-        .map(([id, value]) => mapSuggestion(id, value))
-        .reverse();
-      callback(items);
-    }, (error) => {
-      console.error('[appSuggestionsService] subscribe failed:', error);
-      callback([]);
-    });
-    return unsubscribe;
+    let unsubscribe: (() => void) | undefined;
+    let disposed = false;
+
+    void ensureFirebaseAuth().then(() => {
+      if (disposed) return;
+      unsubscribe = onValue(listRef, (snapshot) => {
+        if (disposed) return;
+        const raw = snapshot.val();
+        if (!raw) {
+          callback([]);
+          return;
+        }
+        const items = Object.entries(raw as Record<string, Record<string, unknown>>)
+          .map(([id, value]) => mapSuggestion(id, value))
+          .reverse();
+        callback(items);
+      }, (error) => {
+        console.error('[appSuggestionsService] subscribe failed:', error);
+        if (!disposed) callback([]);
+      });
+    }).catch(() => { if (!disposed) callback([]); });
+
+    return () => {
+      disposed = true;
+      unsubscribe?.();
+    };
   },
 
   async getSuggestionsOnce(): Promise<AppSuggestion[]> {

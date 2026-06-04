@@ -639,8 +639,8 @@ const OnlineChatScreen = () => {
 
   const handleContact = useCallback((userId: string, name: string) => {
     setActionModal({ visible: false, userId: '', userName: '' });
-    openContactModal({ userId, name, sourceType: 'help' });
-  }, [openContactModal]);
+    openContactModal({ userId, name, photoURL: avatarByUserId[userId] || undefined, sourceType: 'help' });
+  }, [openContactModal, avatarByUserId]);
 
   const handleDelete = (requestId: string) => {
     Alert.alert(deleteText.title, deleteText.body, [
@@ -847,7 +847,7 @@ const OnlineChatScreen = () => {
                         onPress={(event) => {
                           event.stopPropagation();
                           if (item.userId && !own) {
-                            openContactModal({ userId: item.userId, name: item.name ?? 'Unknown', sourceType: 'help', sourceId: item.id, sourceTitle: title });
+                            openContactModal({ userId: item.userId, name: item.name ?? 'Unknown', photoURL: avatarUri || undefined, sourceType: 'help', sourceId: item.id, sourceTitle: title });
                             return;
                           }
                           if (item.phone) void safeCallPhone(item.phone, language);
@@ -918,7 +918,7 @@ const OnlineChatScreen = () => {
                         style={styles.lostFoundIconAction}
                         onPress={(event) => {
                           event.stopPropagation();
-                          openContactModal({ userId: item.userId as string, name: item.name || 'Chaika', sourceType: 'help', sourceId: item.sourceItemId || item.id, sourceTitle: itemLabel });
+                          openContactModal({ userId: item.userId as string, name: item.name || 'Chaika', photoURL: avatarUri || undefined, sourceType: 'help', sourceId: item.sourceItemId || item.id, sourceTitle: itemLabel });
                         }}
                         activeOpacity={0.75}
                       >

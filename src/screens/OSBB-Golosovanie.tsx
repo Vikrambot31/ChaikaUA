@@ -13,6 +13,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { onValue, ref } from 'firebase/database';
+import { ensureFirebaseAuth } from '../firebase-auth-session';
 import type { RootState } from '../redux/store';
 import { selectUser } from '../redux/slices/authSlice';
 import { selectIsOsbbManager } from '../redux/slices/osbbSlice';
@@ -283,15 +284,24 @@ const OsbbGolosuvannyaScreen: React.FC = () => {
   const [totalApartments, setTotalApartments] = useState<number>(0);
   useEffect(() => {
     if (!buildingId) return undefined;
-    const unsubscribe = onValue(
-      ref(database, `buildings/${buildingId}/totalApartments`),
-      (snap) => {
-        const val = snap.val();
-        setTotalApartments(typeof val === 'number' && val > 0 ? val : 0);
-      },
-      () => { setTotalApartments(0); },
-    );
-    return unsubscribe;
+    let unsubscribe: (() => void) | undefined;
+    let disposed = false;
+    void ensureFirebaseAuth().then(() => {
+      if (disposed) return;
+      unsubscribe = onValue(
+        ref(database, `buildings/${buildingId}/totalApartments`),
+        (snap) => {
+          if (disposed) return;
+          const val = snap.val();
+          setTotalApartments(typeof val === 'number' && val > 0 ? val : 0);
+        },
+        () => { if (!disposed) setTotalApartments(0); },
+      );
+    }).catch(() => { if (!disposed) setTotalApartments(0); });
+    return () => {
+      disposed = true;
+      unsubscribe?.();
+    };
   }, [buildingId]);
   const user = useSelector(selectUser);
   useOsbbMembership();

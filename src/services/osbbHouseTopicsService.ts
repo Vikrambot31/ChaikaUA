@@ -1,5 +1,6 @@
 import { ref, push, onValue, query, orderByChild, limitToLast, runTransaction } from 'firebase/database';
 import { database } from '../firebase-core';
+import { ensureFirebaseAuth } from '../firebase-auth-session';
 import { ModerationStatus, createPendingModeration } from '../utils/moderation';
 import { sanitizeStoredText } from '../utils/textUtils';
 
@@ -41,31 +42,39 @@ export const subscribeApprovedHouseTopics = (
 
   const listRef = query(ref(database, `${PATH}/${buildingId}`), orderByChild('createdAt'), limitToLast(100));
 
-  const unsubscribe = onValue(listRef, (snapshot) => {
-    const raw = snapshot.val();
-    if (!raw) {
-      callback([]);
-      return;
-    }
+  let unsubscribe: (() => void) | undefined;
+  let disposed = false;
 
-    const items: OsbbHouseTopic[] = Object.entries(raw as Record<string, StoredTopic>)
-      .map(([id, data]) => ({
-        id,
-        title: sanitizeStoredText(data.title || ''),
-        votes: typeof data.votes === 'number' ? data.votes : 0,
-        createdAt: data.createdAt || '',
-        createdBy: data.createdBy || '',
-        hasVoted: currentUserId ? Boolean(data.voterIds?.[currentUserId]) : false,
-        moderationStatus: data.moderationStatus,
-        submittedForModerationAt: data.submittedForModerationAt,
-      }))
-      .filter((item) => item.moderationStatus === 'approved')
-      .sort((a, b) => b.votes - a.votes || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  void ensureFirebaseAuth().then(() => {
+    if (disposed) return;
+    unsubscribe = onValue(listRef, (snapshot) => {
+      if (disposed) return;
+      const raw = snapshot.val();
+      if (!raw) {
+        callback([]);
+        return;
+      }
+      const items: OsbbHouseTopic[] = Object.entries(raw as Record<string, StoredTopic>)
+        .map(([id, data]) => ({
+          id,
+          title: sanitizeStoredText(data.title || ''),
+          votes: typeof data.votes === 'number' ? data.votes : 0,
+          createdAt: data.createdAt || '',
+          createdBy: data.createdBy || '',
+          hasVoted: currentUserId ? Boolean(data.voterIds?.[currentUserId]) : false,
+          moderationStatus: data.moderationStatus,
+          submittedForModerationAt: data.submittedForModerationAt,
+        }))
+        .filter((item) => item.moderationStatus === 'approved')
+        .sort((a, b) => b.votes - a.votes || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      callback(items);
+    }, () => { if (!disposed) callback([]); });
+  }).catch(() => { if (!disposed) callback([]); });
 
-    callback(items);
-  });
-
-  return unsubscribe;
+  return () => {
+    disposed = true;
+    unsubscribe?.();
+  };
 };
 
 export const addHouseTopicForModeration = async (

@@ -56,6 +56,11 @@ export async function safeOpenURL(
   }
 
   try {
+    if (/^https?:\/\//i.test(cleanUrl)) {
+      await Linking.openURL(cleanUrl);
+      return true;
+    }
+
     const supported = await Linking.canOpenURL(cleanUrl);
     if (!supported) {
       showCommunicationError(language, unavailableMessage);

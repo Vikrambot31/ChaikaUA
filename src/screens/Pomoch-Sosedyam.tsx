@@ -233,7 +233,7 @@ const HelpNeighborsScreen: React.FC = () => {
                 currentUserId={user?.id}
                 language={language}
                 onProfile={item.userId ? () => { if (navLock.current) return; navLock.current = true; navigation.navigate('ViewUserProfile', { userId: item.userId as string }); setTimeout(() => { navLock.current = false; }, 800); } : undefined}
-                onContact={item.userId && item.userId !== user?.id ? () => openContactModal({ userId: item.userId as string, name: item.name || 'Unknown', sourceType: 'help', sourceId: item.id, sourceTitle: item.description?.slice(0, 60) }) : item.phone ? () => void safeCallPhone(item.phone, language) : undefined}
+                onContact={item.userId && item.userId !== user?.id ? () => openContactModal({ userId: item.userId as string, name: item.name || 'Unknown', photoURL: (item.userId && avatarByUserId[item.userId]) || undefined, sourceType: 'help', sourceId: item.id, sourceTitle: item.description?.slice(0, 60) }) : item.phone ? () => void safeCallPhone(item.phone, language) : undefined}
                 contactDisabled={!item.phone && (!item.userId || item.userId === user?.id)}
                 likePath="feed_likes/help_neighbors"
                 likeId={item.id}

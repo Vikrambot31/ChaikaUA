@@ -798,7 +798,6 @@ function AuthNavigation() {
       'JobSearchScreen',
       'BuySellScreen',
       'SportDetailScreen',
-      'ProfileRequestsScreen',
       'MyPhotosScreen',
       'MyApprovedPhotosScreen',
     ]);
@@ -944,7 +943,7 @@ function AuthNavigation() {
         <Stack.Screen name="SportDetailScreen" component={withGuard(SportDetailScreen, 'trusted')} />
         <Stack.Screen name="EdaNaChaykeScreen" component={EdaNaChaykeScreen} />
         <Stack.Screen name="SpisokPokupokScreen" component={SpisokPokupokScreen} />
-        <Stack.Screen name="ProfileRequestsScreen" component={withGuard(ProfileRequestsScreen, 'trusted')} />
+        <Stack.Screen name="ProfileRequestsScreen" component={ProfileRequestsScreen} />
         <Stack.Screen name="MyPhotosScreen" component={MyPhotosScreen} options={{ headerShown: false }} />
         <Stack.Screen name="MyApprovedPhotosScreen" component={MyApprovedPhotosScreen} options={{ headerShown: false }} />
         <Stack.Screen name="AppVersionInfoScreen" component={AppVersionInfoScreen} />
