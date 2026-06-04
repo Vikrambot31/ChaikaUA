@@ -283,10 +283,14 @@ const OsbbGolosuvannyaScreen: React.FC = () => {
   const [totalApartments, setTotalApartments] = useState<number>(0);
   useEffect(() => {
     if (!buildingId) return undefined;
-    const unsubscribe = onValue(ref(database, `buildings/${buildingId}/totalApartments`), (snap) => {
-      const val = snap.val();
-      setTotalApartments(typeof val === 'number' && val > 0 ? val : 0);
-    });
+    const unsubscribe = onValue(
+      ref(database, `buildings/${buildingId}/totalApartments`),
+      (snap) => {
+        const val = snap.val();
+        setTotalApartments(typeof val === 'number' && val > 0 ? val : 0);
+      },
+      () => { setTotalApartments(0); },
+    );
     return unsubscribe;
   }, [buildingId]);
   const user = useSelector(selectUser);

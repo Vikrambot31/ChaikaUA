@@ -356,9 +356,13 @@ export default function ProfileRequestsScreen() {
           setRequests([]);
         }
         setTabInitialized(true);
-      } catch {
+      } catch (err) {
         if (!cancelled) {
-          Alert.alert(t.errTitle, t.errBody);
+          if ((err as { code?: string })?.code === 'PERMISSION_DENIED') {
+            navigation.navigate('Login');
+          } else {
+            Alert.alert(t.errTitle, t.errBody);
+          }
           setTabInitialized(true);
         }
       } finally {
@@ -368,7 +372,7 @@ export default function ProfileRequestsScreen() {
       }
     })();
     return () => { cancelled = true; };
-  }, [loadIncomingPhones, t.errBody, t.errTitle, user?.id]);
+  }, [loadIncomingPhones, navigation, t.errBody, t.errTitle, user?.id]);
 
   useEffect(() => {
     if (!tabInitialized || !user?.id) return undefined;
@@ -391,18 +395,22 @@ export default function ProfileRequestsScreen() {
         if (activeTab === 'incoming') {
           await loadIncomingPhones(nextRequests);
         }
-      } catch {
-        Alert.alert(t.errTitle, t.errBody);
+      } catch (err) {
+        if ((err as { code?: string })?.code === 'PERMISSION_DENIED') {
+          navigation.navigate('Login');
+        } else {
+          Alert.alert(t.errTitle, t.errBody);
+        }
       } finally {
         setLoading(false);
       }
     }, () => {
-      Alert.alert(t.errTitle, t.errBody);
+      navigation.navigate('Login');
       setLoading(false);
     });
 
     return unsubscribe;
-  }, [activeTab, loadIncomingPhones, t.errBody, t.errTitle, tabInitialized, user?.id]);
+  }, [activeTab, loadIncomingPhones, navigation, t.errBody, t.errTitle, tabInitialized, user?.id]);
 
   useEffect(() => {
     void (async () => {

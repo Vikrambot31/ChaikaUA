@@ -56,6 +56,7 @@ const TEXT = {
     missingAge: 'Вкажіть вік від 14 до 100',
     avatarError: 'Не вдалося обрати або зберегти фото. Спробуйте ще раз.',
     loginRequiredForPhoto: 'Щоб зберегти власне фото, спочатку потрібно увійти в акаунт.',
+    saveError: 'Не вдалося зберегти дані. Спробуйте ще раз.',
   },
   ru: {
     title: 'Расскажите о себе',
@@ -81,6 +82,7 @@ const TEXT = {
     missingAge: 'Укажите возраст от 14 до 100',
     avatarError: 'Не удалось выбрать или сохранить фото. Попробуйте еще раз.',
     loginRequiredForPhoto: 'Чтобы сохранить свое фото, сначала нужно войти в аккаунт.',
+    saveError: 'Не удалось сохранить данные. Попробуйте еще раз.',
   },
   en: {
     title: 'Tell us about yourself',
@@ -106,6 +108,7 @@ const TEXT = {
     missingAge: 'Enter age from 14 to 100',
     avatarError: 'Could not choose or save the photo. Please try again.',
     loginRequiredForPhoto: 'To save your own photo, please sign in first.',
+    saveError: 'Could not save data. Please try again.',
   },
 } as const;
 
@@ -212,6 +215,8 @@ export default function ProfileSetupScreen() {
         startAvatarKey: selectedKey,
       });
       navigation.navigate('LoginScreen');
+    } catch {
+      Toast.show({ type: 'error', text1: text.missingTitle, text2: text.saveError });
     } finally {
       setSaving(false);
     }

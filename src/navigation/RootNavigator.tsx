@@ -865,7 +865,7 @@ function AuthNavigation() {
         <Stack.Screen name="ElectricityStatusScreen" component={ElectricityStatusScreen} />
         <Stack.Screen name="HelpScreen" component={HelpScreen} />
         <Stack.Screen name="AnnouncementsScreen" component={AnnouncementsScreen} />
-        <Stack.Screen name="JobSearchScreen" component={JobSearchScreen} />
+        <Stack.Screen name="JobSearchScreen" component={withGuard(JobSearchScreen, 'auth')} />
         <Stack.Screen name="BuySellScreen" component={withGuard(BuySellScreen, 'auth')} />
         <Stack.Screen name="KontaktiChaikyScreen" component={withGuard(KontaktiChaikyScreen, 'auth')} />
         <Stack.Screen name="BizznesChaikaScreen" component={withGuard(BizznesChaikaScreen, 'auth')} />
@@ -890,7 +890,7 @@ function AuthNavigation() {
         <Stack.Screen name="SectionScreen" component={SectionScreen} />
         <Stack.Screen name="TopCafeScreen" component={TopCafeScreen} />
         <Stack.Screen name="TopStoresScreen" component={TopStoresScreen} />
-        <Stack.Screen name="PlacesScreen" component={PlacesScreen} />
+        <Stack.Screen name="PlacesScreen" component={withGuard(PlacesScreen, 'auth')} />
         <Stack.Screen name="RequestsScreen" component={withGuard(RequestsScreen, 'moderator')} />
         <Stack.Screen name="RequestTopicScreen" component={RequestTopicScreen} />
         <Stack.Screen name="SubscriptionScreen" component={SubscriptionScreen} />
