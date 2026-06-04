@@ -153,57 +153,80 @@ export default function MyApprovedPhotosScreen() {
   }, []);
 
   useEffect(() => {
+    let active = true;
+    let unsub: (() => void) | undefined;
+
     if (!user?.id) {
       setLoading(false);
-      return;
+      return () => { active = false; };
     }
-    const dbRef = ref(database, 'community_photos');
-    const unsub = onValue(
-      dbRef,
-      (snap) => {
-        const raw = snap.val() as Record<string, unknown> | null;
-        if (!raw) { setPhotos([]); setLoading(false); return; }
-        const list: PhotoRecord[] = Object.entries(raw)
-          .reduce<PhotoRecord[]>((acc, [key, val]) => {
-            if (!val || typeof val !== 'object') return acc;
-            const v = val as Record<string, unknown>;
-            // community_photos uses uid OR userId
-            const recordUid = String(v.uid ?? v.userId ?? '');
-            if (recordUid !== user.id) return acc;
-            const imageUri = String(v.imageUri ?? v.downloadUrl ?? '');
-            const httpsUrl = typeof v.downloadUrl === 'string' && v.downloadUrl.startsWith('https://')
-              ? v.downloadUrl
-              : imageUri.startsWith('https://')
-                ? imageUri
-                : '';
-            acc.push({
-              firebaseKey: key,
-              uid: recordUid,
-              userName: String(v.uploadedBy ?? v.userName ?? ''),
-              uploadedAt: Number(v.uploadedAt ?? v.createdAt ?? 0),
-              downloadUrl: httpsUrl,
-              thumbUrl: typeof v.thumbnailUrl === 'string' && v.thumbnailUrl.startsWith('https://')
-                ? v.thumbnailUrl
-                : typeof v.thumbUrl === 'string' && v.thumbUrl.startsWith('https://')
-                  ? v.thumbUrl
-                  : httpsUrl,
-              storagePath: typeof v.storagePath === 'string' ? v.storagePath : undefined,
-              status: (['pending','approved','rejected'].includes(String(v.status))
-                ? v.status : 'pending') as ApprovalStatus,
-              note: typeof v.note === 'string' ? v.note : undefined,
-              // admin panel writes moderatedAt on approve/reject
-              reviewedAt: typeof v.moderatedAt === 'number' ? v.moderatedAt
-                : typeof v.reviewedAt === 'number' ? v.reviewedAt : undefined,
-            });
-            return acc;
-          }, [])
-          .sort((a, b) => b.uploadedAt - a.uploadedAt);
-        setPhotos(list);
-        setLoading(false);
-      },
-      () => setLoading(false),
-    );
-    return () => { unsub(); };
+
+    void ensureFirebaseAuth()
+      .then(() => {
+        if (!active) return;
+        const dbRef = ref(database, 'community_photos');
+        unsub = onValue(
+          dbRef,
+          (snap) => {
+            if (!active) return;
+            const raw = snap.val() as Record<string, unknown> | null;
+            if (!raw) { setPhotos([]); setLoading(false); return; }
+            const list: PhotoRecord[] = Object.entries(raw)
+              .reduce<PhotoRecord[]>((acc, [key, val]) => {
+                if (!val || typeof val !== 'object') return acc;
+                const v = val as Record<string, unknown>;
+                // community_photos uses uid OR userId
+                const recordUid = String(v.uid ?? v.userId ?? '');
+                if (recordUid !== user.id) return acc;
+                const imageUri = String(v.imageUri ?? v.downloadUrl ?? '');
+                const httpsUrl = typeof v.downloadUrl === 'string' && v.downloadUrl.startsWith('https://')
+                  ? v.downloadUrl
+                  : imageUri.startsWith('https://')
+                    ? imageUri
+                    : '';
+                acc.push({
+                  firebaseKey: key,
+                  uid: recordUid,
+                  userName: String(v.uploadedBy ?? v.userName ?? ''),
+                  uploadedAt: Number(v.uploadedAt ?? v.createdAt ?? 0),
+                  downloadUrl: httpsUrl,
+                  thumbUrl: typeof v.thumbnailUrl === 'string' && v.thumbnailUrl.startsWith('https://')
+                    ? v.thumbnailUrl
+                    : typeof v.thumbUrl === 'string' && v.thumbUrl.startsWith('https://')
+                      ? v.thumbUrl
+                      : httpsUrl,
+                  storagePath: typeof v.storagePath === 'string' ? v.storagePath : undefined,
+                  status: (['pending','approved','rejected'].includes(String(v.status))
+                    ? v.status : 'pending') as ApprovalStatus,
+                  note: typeof v.note === 'string' ? v.note : undefined,
+                  // admin panel writes moderatedAt on approve/reject
+                  reviewedAt: typeof v.moderatedAt === 'number' ? v.moderatedAt
+                    : typeof v.reviewedAt === 'number' ? v.reviewedAt : undefined,
+                });
+                return acc;
+              }, [])
+              .sort((a, b) => b.uploadedAt - a.uploadedAt);
+            setPhotos(list);
+            setLoading(false);
+          },
+          (err) => {
+            safeLogError('MyApprovedPhotosScreen.realtimeListener', err, { uid: user.id });
+            if (active) setLoading(false);
+          },
+        );
+      })
+      .catch((err) => {
+        safeLogError('MyApprovedPhotosScreen.auth', err, { uid: user.id });
+        if (active) {
+          setPhotos([]);
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+      unsub?.();
+    };
   }, [user?.id]);
 
   // Photos currently uploading (not yet in RTDB) — show immediately with local preview

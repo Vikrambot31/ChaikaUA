@@ -3,7 +3,7 @@ import { database } from '../firebase-core';
 import { createPendingModeration, ModerationStatus } from '../utils/moderation';
 import { sanitizeStoredText } from '../utils/textUtils';
 import { publishApprovedActivity } from './activityMirror';
-import { requireWriteSession } from '../firebase-auth-session';
+import { ensureFirebaseAuth, requireWriteSession } from '../firebase-auth-session';
 import { assertTextMatchesLanguage, normalizeAppLang, type AppLang } from '../utils/contentLanguageGuard';
 
 export interface JobListing {
@@ -55,8 +55,11 @@ const mapJobItem = (id: string, data: any, isArchived?: boolean): JobListing => 
 
 export const jobService = {
   subscribe(callback: (items: JobListing[]) => void, currentUserId?: string): () => void {
+    let disposed = false;
     let approvedItems: JobListing[] = [];
     let ownPendingItems: JobListing[] = [];
+    let unsubscribeApproved: (() => void) | undefined;
+    let unsubscribeOwn: (() => void) | undefined;
 
     const emit = (active: JobListing[]) => {
       const ids = new Set(active.map((i) => i.id));
@@ -64,61 +67,70 @@ export const jobService = {
       callback([...extras, ...active]);
     };
 
-    const listRef = query(ref(database, PATH), orderByChild('moderationStatus'), equalTo('approved'), limitToLast(ACTIVE_LIMIT + ACTIVE_LIMIT_BUFFER));
+    void ensureFirebaseAuth().then(() => {
+      if (disposed) return;
 
-    const unsubscribeApproved = onValue(listRef, (snapshot) => {
-      const raw = snapshot.val();
-      const now = Date.now();
-      const active: JobListing[] = raw
-        ? Object.entries(raw as Record<string, any>)
-            .map(([id, data]) => mapJobItem(id, data))
-            .filter((item) => {
-              const expired = item.expiresAt && new Date(item.expiresAt).getTime() < now;
-              return item.moderationStatus === 'approved' && !expired;
-            })
-            .reverse()
-            .slice(0, ACTIVE_LIMIT)
-        : [];
-      approvedItems = active;
+      const listRef = query(ref(database, PATH), orderByChild('moderationStatus'), equalTo('approved'), limitToLast(ACTIVE_LIMIT + ACTIVE_LIMIT_BUFFER));
 
-      if (active.length >= FEED_MINIMUM) {
-        emit(active);
-        return;
-      }
-
-      void get(query(ref(database, PATH), orderByChild('moderationStatus'), equalTo('expired'), limitToLast(ARCHIVED_FALLBACK_LIMIT))).then((expiredSnapshot) => {
-        const expiredRaw = expiredSnapshot.val();
-        const archived: JobListing[] = expiredRaw
-          ? Object.entries(expiredRaw as Record<string, any>)
-              .map(([id, data]) => mapJobItem(id, data, true))
-              .reverse()
-          : [];
-        emit([...active, ...archived]);
-      }).catch(() => {
-        emit(active);
-      });
-    }, () => {
-      callback([]);
-    });
-
-    let unsubscribeOwn: (() => void) | undefined;
-    if (currentUserId) {
-      const ownRef = query(ref(database, PATH), orderByChild('userId'), equalTo(currentUserId));
-      unsubscribeOwn = onValue(ownRef, (snapshot) => {
+      unsubscribeApproved = onValue(listRef, (snapshot) => {
+        if (disposed) return;
         const raw = snapshot.val();
-        ownPendingItems = raw
+        const now = Date.now();
+        const active: JobListing[] = raw
           ? Object.entries(raw as Record<string, any>)
               .map(([id, data]) => mapJobItem(id, data))
-              .filter((item) => item.moderationStatus !== 'approved')
+              .filter((item) => {
+                const expired = item.expiresAt && new Date(item.expiresAt).getTime() < now;
+                return item.moderationStatus === 'approved' && !expired;
+              })
+              .reverse()
+              .slice(0, ACTIVE_LIMIT)
           : [];
-        const ids = new Set(approvedItems.map((i) => i.id));
-        const extras = ownPendingItems.filter((i) => !ids.has(i.id));
-        callback([...extras, ...approvedItems]);
-      }, () => { ownPendingItems = []; });
-    }
+        approvedItems = active;
+
+        if (active.length >= FEED_MINIMUM) {
+          emit(active);
+          return;
+        }
+
+        void get(query(ref(database, PATH), orderByChild('moderationStatus'), equalTo('expired'), limitToLast(ARCHIVED_FALLBACK_LIMIT))).then((expiredSnapshot) => {
+          if (disposed) return;
+          const expiredRaw = expiredSnapshot.val();
+          const archived: JobListing[] = expiredRaw
+            ? Object.entries(expiredRaw as Record<string, any>)
+                .map(([id, data]) => mapJobItem(id, data, true))
+                .reverse()
+            : [];
+          emit([...active, ...archived]);
+        }).catch(() => {
+          if (!disposed) emit(active);
+        });
+      }, () => {
+        if (!disposed) callback([]);
+      });
+
+      if (currentUserId) {
+        const ownRef = query(ref(database, PATH), orderByChild('userId'), equalTo(currentUserId));
+        unsubscribeOwn = onValue(ownRef, (snapshot) => {
+          if (disposed) return;
+          const raw = snapshot.val();
+          ownPendingItems = raw
+            ? Object.entries(raw as Record<string, any>)
+                .map(([id, data]) => mapJobItem(id, data))
+                .filter((item) => item.moderationStatus !== 'approved')
+            : [];
+          const ids = new Set(approvedItems.map((i) => i.id));
+          const extras = ownPendingItems.filter((i) => !ids.has(i.id));
+          callback([...extras, ...approvedItems]);
+        }, () => { ownPendingItems = []; });
+      }
+    }).catch(() => {
+      if (!disposed) callback([]);
+    });
 
     return () => {
-      unsubscribeApproved();
+      disposed = true;
+      unsubscribeApproved?.();
       unsubscribeOwn?.();
     };
   },

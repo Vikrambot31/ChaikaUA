@@ -394,6 +394,7 @@ const KontaktiChaikyScreen: React.FC = () => {
   const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
   const [showPhoneOnCard, setShowPhoneOnCard] = useState(true);
   const [listings, setListings] = useState<ContactListing[]>([]);
+  const [listingsReady, setListingsReady] = useState(false);
   const [profileByUserId, setProfileByUserId] = useState<Record<string, ContactProfile>>({});
   const [selectedFilterCategory, setSelectedFilterCategory] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -432,7 +433,11 @@ const KontaktiChaikyScreen: React.FC = () => {
 
   useEffect(() => {
     let isMounted = true;
-    const unsubscribe = contactsService.subscribe(setListings, user?.id);
+    setListingsReady(false);
+    const unsubscribe = contactsService.subscribe((items) => {
+      setListingsReady(true);
+      setListings(items);
+    }, user?.id);
     // Restore draft if Android restarted the activity while picker was open
     (async () => {
       try {
@@ -953,6 +958,12 @@ const KontaktiChaikyScreen: React.FC = () => {
                 );
               })}
             </ScrollView>
+          </View>
+        )}
+
+        {!listingsReady && listings.length === 0 && (
+          <View style={{ paddingVertical: 24, alignItems: 'center' }}>
+            <ActivityIndicator size="large" color="#6A8BA5" />
           </View>
         )}
 

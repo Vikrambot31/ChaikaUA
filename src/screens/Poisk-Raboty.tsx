@@ -428,6 +428,7 @@ const JobSearchScreen: React.FC = () => {
   const [about, setAbout] = useState('');
   const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
   const [listings, setListings] = useState<JobListing[]>([]);
+  const [listingsReady, setListingsReady] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [touched, setTouched] = useState<Record<FieldKey, boolean>>({
@@ -446,7 +447,11 @@ const JobSearchScreen: React.FC = () => {
   const avatarByUserId = useUserAvatarMap(listings.map((item) => item.userId));
 
   useEffect(() => {
-    const unsubscribe = jobService.subscribe(setListings, user?.id);
+    setListingsReady(false);
+    const unsubscribe = jobService.subscribe((items) => {
+      setListingsReady(true);
+      setListings(items);
+    }, user?.id);
     return unsubscribe;
   }, [user?.id]);
 
@@ -1062,7 +1067,11 @@ const JobSearchScreen: React.FC = () => {
           </TouchableOpacity>
         )}
         ListEmptyComponent={
-          listings.length === 0 ? (
+          !listingsReady ? (
+            <View style={styles.emptyState}>
+              <ActivityIndicator size="large" color="#6A8BA5" />
+            </View>
+          ) : listings.length === 0 ? (
             <View style={styles.emptyState}>
               <TactileIcon icon="account-search-outline" size={54} iconSize={26} backgroundColor="#403933" />
               <Text style={styles.emptyTitle}>{text.emptyTitle}</Text>

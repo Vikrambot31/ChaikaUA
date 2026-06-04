@@ -12,7 +12,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
 import { NavigationProp, useNavigation, useRoute } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInAnonymously, updateProfile } from 'firebase/auth';
 import { ref as dbRef, set as dbSet, get, orderByChild, query, equalTo } from 'firebase/database';
 import Toast from 'react-native-toast-message';
 import { auth, database } from '../firebase-config';
@@ -240,7 +240,12 @@ const RegisterScreenFull: React.FC = () => {
         referrerVerified = referrerSnap.exists() || referrerSnapAlt.exists();
         if (!referrerVerified) {
           if (!isCompletingExistingAccount) {
-            await authUser.delete();
+            try {
+              await authUser.delete();
+            } catch {
+              // delete failed (e.g. auth/requires-recent-login) — reset to anonymous session
+              await signInAnonymously(auth).catch(() => null);
+            }
           }
           Toast.show({ type: 'error', text1: text.error, text2: text.referrerNotFound });
           return;

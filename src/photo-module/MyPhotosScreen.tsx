@@ -331,37 +331,55 @@ const MyPhotosScreen: React.FC = () => {
 
   // Real-time listener for RTDB photos — syncs when moderator approves/rejects
   useEffect(() => {
+    let active = true;
+    let unsubscribe: (() => void) | undefined;
+
     if (!uid) {
       setRtdbPhotos([]);
       setRtdbLoading(false);
-      return;
+      return () => { active = false; };
     }
     setRtdbLoading(true);
 
-    const photosRef = query(
-      ref(database, `user_photos/${uid}`),
-      orderByChild('uploadedAt')
-    );
+    void ensureFirebaseAuth()
+      .then(() => {
+        if (!active) return;
+        const photosRef = query(
+          ref(database, `user_photos/${uid}`),
+          orderByChild('uploadedAt')
+        );
 
-    const unsubscribe = onValue(
-      photosRef,
-      async (_snapshot) => {
-        try {
-          const photos = await fetchUserPhotosFromRtdb(uid);
-          setRtdbPhotos(photos);
-          setRtdbLoading(false);
-        } catch (err) {
-          safeLogError('MyPhotosScreen.onValue', err, { uid });
+        unsubscribe = onValue(
+          photosRef,
+          async (_snapshot) => {
+            try {
+              const photos = await fetchUserPhotosFromRtdb(uid);
+              if (!active) return;
+              setRtdbPhotos(photos);
+              setRtdbLoading(false);
+            } catch (err) {
+              safeLogError('MyPhotosScreen.onValue', err, { uid });
+              if (active) setRtdbLoading(false);
+            }
+          },
+          (err) => {
+            safeLogError('MyPhotosScreen.realtimeListener', err, { uid });
+            if (active) setRtdbLoading(false);
+          }
+        );
+      })
+      .catch((err) => {
+        safeLogError('MyPhotosScreen.auth', err, { uid });
+        if (active) {
+          setRtdbPhotos([]);
           setRtdbLoading(false);
         }
-      },
-      (err) => {
-        safeLogError('MyPhotosScreen.realtimeListener', err, { uid });
-        setRtdbLoading(false);
-      }
-    );
+      });
 
-    return () => unsubscribe();
+    return () => {
+      active = false;
+      unsubscribe?.();
+    };
   }, [uid]);
 
   useFocusEffect(

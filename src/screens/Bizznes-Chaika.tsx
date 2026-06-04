@@ -31,7 +31,7 @@ import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 import { useOperationTrace } from '../hooks/useOperationTrace';
 import { createPendingModeration, type ModerationStatus } from '../utils/moderation';
 import { resolveMediaAccessUrls } from '../services/mediaAccess';
-import { requireWriteSession } from '../firebase-auth-session';
+import { ensureFirebaseAuth, requireWriteSession } from '../firebase-auth-session';
 import { getBuildingsByStreet, getStreets } from '../data/buildings';
 
 const BIZ_LISTING_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -210,16 +210,12 @@ const mapBizItem = (id: string, data: any, isArchived?: boolean): BizListing => 
 
 const biznesChaikaService = {
   subscribe(callback: (items: BizListing[]) => void, currentUserId?: string): () => void {
-    const listRef = query(
-      ref(database, BIZ_LISTINGS_PATH),
-      orderByChild('moderationStatus'),
-      equalTo('approved'),
-      limitToLast(BIZ_ACTIVE_LIMIT + BIZ_ACTIVE_LIMIT_BUFFER),
-    );
     let requestId = 0;
     let disposed = false;
     let latestApprovedArchived: BizListing[] = [];
     let ownPendingItems: BizListing[] = [];
+    let unsubscribeApprovedRef: (() => void) | undefined;
+    let unsubscribeOwnRef: (() => void) | undefined;
 
     const buildMerged = (approvedArchived: BizListing[]): BizListing[] => {
       const ids = new Set(approvedArchived.map((item) => item.id));
@@ -264,74 +260,88 @@ const biznesChaikaService = {
       });
     };
 
-    const unsubscribeApproved = onValue(listRef, (snapshot) => {
-      requestId += 1;
-      const currentRequestId = requestId;
-      const raw = snapshot.val();
-      const now = Date.now();
-      const active: BizListing[] = raw
-        ? Object.entries(raw as Record<string, any>)
-            .map(([id, data]) => mapBizItem(id, data))
-            .filter((item) => {
-              const expired = item.expiresAt && new Date(item.expiresAt).getTime() < now;
-              return item.moderationStatus === 'approved' && !expired;
-            })
-            .reverse()
-            .slice(0, BIZ_ACTIVE_LIMIT)
-        : [];
+    void ensureFirebaseAuth().then(() => {
+      if (disposed) return;
 
-      if (active.length >= BIZ_FEED_MINIMUM) {
-        latestApprovedArchived = active;
-        const merged = buildMerged(active);
-        callback(merged);
-        resolvePhotosInBackground(merged, currentRequestId);
-        return;
-      }
+      const listRef = query(
+        ref(database, BIZ_LISTINGS_PATH),
+        orderByChild('moderationStatus'),
+        equalTo('approved'),
+        limitToLast(BIZ_ACTIVE_LIMIT + BIZ_ACTIVE_LIMIT_BUFFER),
+      );
 
-      callback(buildMerged(active));
-
-      void get(query(ref(database, BIZ_LISTINGS_PATH), orderByChild('moderationStatus'), equalTo('expired'), limitToLast(BIZ_ARCHIVED_FALLBACK_LIMIT))).then((expiredSnapshot) => {
-        if (disposed || currentRequestId !== requestId) return;
-        const expiredRaw = expiredSnapshot.val();
-        const archived: BizListing[] = expiredRaw
-          ? Object.entries(expiredRaw as Record<string, any>)
-              .map(([id, data]) => mapBizItem(id, data, true))
-              .reverse()
-          : [];
-        const combined = [...active, ...archived];
-        latestApprovedArchived = combined;
-        const merged = buildMerged(combined);
-        callback(merged);
-        resolvePhotosInBackground(merged, currentRequestId);
-      }).catch((error) => {
-        console.warn('[biznesChaikaService] expired fallback load failed:', error);
-        if (disposed || currentRequestId !== requestId) return;
-        latestApprovedArchived = active;
-        resolvePhotosInBackground(buildMerged(active), currentRequestId);
-      });
-    }, () => {
-      callback([]);
-    });
-
-    let unsubscribeOwn: (() => void) | undefined;
-    if (currentUserId) {
-      const ownRef = query(ref(database, BIZ_LISTINGS_PATH), orderByChild('userId'), equalTo(currentUserId));
-      unsubscribeOwn = onValue(ownRef, (snapshot) => {
+      unsubscribeApprovedRef = onValue(listRef, (snapshot) => {
+        if (disposed) return;
+        requestId += 1;
+        const currentRequestId = requestId;
         const raw = snapshot.val();
-        ownPendingItems = raw
+        const now = Date.now();
+        const active: BizListing[] = raw
           ? Object.entries(raw as Record<string, any>)
               .map(([id, data]) => mapBizItem(id, data))
-              .filter((item) => item.moderationStatus !== 'approved')
+              .filter((item) => {
+                const expired = item.expiresAt && new Date(item.expiresAt).getTime() < now;
+                return item.moderationStatus === 'approved' && !expired;
+              })
+              .reverse()
+              .slice(0, BIZ_ACTIVE_LIMIT)
           : [];
-        callback(buildMerged(latestApprovedArchived));
-      }, () => { ownPendingItems = []; });
-    }
+
+        if (active.length >= BIZ_FEED_MINIMUM) {
+          latestApprovedArchived = active;
+          const merged = buildMerged(active);
+          callback(merged);
+          resolvePhotosInBackground(merged, currentRequestId);
+          return;
+        }
+
+        callback(buildMerged(active));
+
+        void get(query(ref(database, BIZ_LISTINGS_PATH), orderByChild('moderationStatus'), equalTo('expired'), limitToLast(BIZ_ARCHIVED_FALLBACK_LIMIT))).then((expiredSnapshot) => {
+          if (disposed || currentRequestId !== requestId) return;
+          const expiredRaw = expiredSnapshot.val();
+          const archived: BizListing[] = expiredRaw
+            ? Object.entries(expiredRaw as Record<string, any>)
+                .map(([id, data]) => mapBizItem(id, data, true))
+                .reverse()
+            : [];
+          const combined = [...active, ...archived];
+          latestApprovedArchived = combined;
+          const merged = buildMerged(combined);
+          callback(merged);
+          resolvePhotosInBackground(merged, currentRequestId);
+        }).catch((error) => {
+          console.warn('[biznesChaikaService] expired fallback load failed:', error);
+          if (disposed || currentRequestId !== requestId) return;
+          latestApprovedArchived = active;
+          resolvePhotosInBackground(buildMerged(active), currentRequestId);
+        });
+      }, () => {
+        if (!disposed) callback([]);
+      });
+
+      if (currentUserId) {
+        const ownRef = query(ref(database, BIZ_LISTINGS_PATH), orderByChild('userId'), equalTo(currentUserId));
+        unsubscribeOwnRef = onValue(ownRef, (snapshot) => {
+          if (disposed) return;
+          const raw = snapshot.val();
+          ownPendingItems = raw
+            ? Object.entries(raw as Record<string, any>)
+                .map(([id, data]) => mapBizItem(id, data))
+                .filter((item) => item.moderationStatus !== 'approved')
+            : [];
+          callback(buildMerged(latestApprovedArchived));
+        }, () => { ownPendingItems = []; });
+      }
+    }).catch(() => {
+      if (!disposed) callback([]);
+    });
 
     return () => {
       disposed = true;
       requestId += 1;
-      unsubscribeApproved();
-      unsubscribeOwn?.();
+      unsubscribeApprovedRef?.();
+      unsubscribeOwnRef?.();
     };
   },
 
@@ -774,6 +784,7 @@ const KontaktiChaikyScreen: React.FC = () => {
   const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
   const [showPhoneOnCard, setShowPhoneOnCard] = useState(true);
   const [listings, setListings] = useState<BizListing[]>([]);
+  const [listingsReady, setListingsReady] = useState(false);
   const [profileByUserId, setProfileByUserId] = useState<Record<string, ContactProfile>>({});
   const [selectedFilterCategory, setSelectedFilterCategory] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -824,7 +835,11 @@ const KontaktiChaikyScreen: React.FC = () => {
 
   useEffect(() => {
     let isMounted = true;
-    const unsubscribe = biznesChaikaService.subscribe(setListings, user?.id);
+    setListingsReady(false);
+    const unsubscribe = biznesChaikaService.subscribe((items) => {
+      setListingsReady(true);
+      setListings(items);
+    }, user?.id);
     (async () => {
       try {
         const raw = await AsyncStorage.getItem(BIZ_DRAFT_KEY);
@@ -1362,6 +1377,12 @@ const KontaktiChaikyScreen: React.FC = () => {
                 );
               })}
             </ScrollView>
+          </View>
+        )}
+
+        {!listingsReady && listings.length === 0 && (
+          <View style={{ paddingVertical: 24, alignItems: 'center' }}>
+            <ActivityIndicator size="large" color="#6A8BA5" />
           </View>
         )}
 
