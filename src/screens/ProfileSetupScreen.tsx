@@ -191,18 +191,19 @@ export default function ProfileSetupScreen() {
     if (saving) return;
 
     // Only proceed if all fields are filled to preserve data
-    if (!isNameDone || !isGenderDone || !isAgeDone || !selectedKey) {
+    if (!isNameDone || !isGenderDone || !isAgeDone || !isAvatarDone) {
+      const missing = getMissingMessages();
       Toast.show({
         type: 'error',
-        text1: text.error,
-        text2: 'Заповніть усі поля для збереження даних',
+        text1: text.missingTitle,
+        text2: missing.join('\n'),
       });
       return;
     }
 
     setSaving(true);
     try {
-      await saveSelectedStartAvatar(selectedKey);
+      if (selectedKey) await saveSelectedStartAvatar(selectedKey);
       await saveTempProfileData({
         name: trimmedName,
         gender: gender!,
