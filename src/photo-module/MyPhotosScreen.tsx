@@ -35,6 +35,7 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../redux/store';
 import AppPhotoImage from '../components/AppPhotoImage';
 import { database } from '../firebase-core';
+import { ensureFirebaseAuth } from '../firebase-auth-session';
 import { photoService } from '../services/photoService';
 import { safeLogError } from '../utils/errorLogger';
 import { SCREEN_THEME } from '../utils/screenTheme';

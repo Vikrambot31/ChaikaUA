@@ -18,10 +18,12 @@ import { useSelector } from 'react-redux';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { onValue, ref } from 'firebase/database';
 import { database } from '../firebase-core';
+import { ensureFirebaseAuth } from '../firebase-auth-session';
 import { selectUser } from '../redux/slices/authSlice';
 import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField';
 import AppPhotoImage from '../components/AppPhotoImage';
 import type { RootState } from '../redux/store';
+import { safeLogError } from '../utils/errorLogger';
 
 type Lang = 'ua' | 'ru' | 'en';
 type AppNav = NavigationProp<Record<string, object | undefined>>;
