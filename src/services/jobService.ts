@@ -97,6 +97,8 @@ export const jobService = {
       }).catch(() => {
         emit(active);
       });
+    }, () => {
+      callback([]);
     });
 
     let unsubscribeOwn: (() => void) | undefined;

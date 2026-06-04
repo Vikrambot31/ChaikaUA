@@ -94,6 +94,12 @@ const helpRequestsSlice = createSlice({
       state.todayItems = merged.filter((item) => item.createdAt >= today);
     },
   },
+  extraReducers: (builder) => {
+    builder.addCase('auth/logout', (state) => {
+      state.items = [];
+      state.todayItems = [];
+    });
+  },
 });
 
 export const {

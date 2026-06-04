@@ -115,9 +115,9 @@ const SLIDES_EN: Slide[] = [
 ];
 
 const BUTTON_LABELS = {
-  ua: { next: 'Далі', done: 'Почати' },
-  ru: { next: 'Далее', done: 'Начать' },
-  en: { next: 'Next', done: 'Get started' },
+  ua: { next: 'Далі', done: 'Почати', skip: 'Пропустити' },
+  ru: { next: 'Далее', done: 'Начать', skip: 'Пропустить' },
+  en: { next: 'Next', done: 'Get started', skip: 'Skip' },
 };
 
 type Props = {
@@ -197,7 +197,7 @@ const OnboardingSlides: React.FC<Props> = ({ language = 'ua', onDone }) => {
 
         {!isLast && (
           <TouchableOpacity style={styles.skipBtn} onPress={onDone} activeOpacity={0.7}>
-            <Text style={styles.skipText}>Skip</Text>
+            <Text style={styles.skipText}>{labels.skip}</Text>
           </TouchableOpacity>
         )}
       </View>

@@ -183,6 +183,10 @@ const requestsSlice = createSlice({
       .addCase(deleteRequest.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload ?? action.error.message ?? 'Failed to delete request';
+      })
+      .addCase('auth/logout', (state) => {
+        state.items = [];
+        state.approved = [];
       });
   },
 });
