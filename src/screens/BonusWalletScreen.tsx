@@ -23,6 +23,7 @@ import {
   type UserBonuses,
 } from '../services/bonusService';
 import { SCREEN_THEME } from '../utils/screenTheme';
+import { useTranslation } from '../i18n/useTranslation';
 
 type AppNav = NavigationProp<Record<string, object | undefined>>;
 
@@ -32,21 +33,6 @@ const EMPTY_PROMO_CREDITS: PromoCredits = {
   lifetime: 0,
   spent: { total: 0 },
   updatedAt: 0,
-};
-
-const BADGE_LABELS: Record<string, string> = {
-  newcomer: 'Newcomer',
-  good_neighbor: 'Good neighbor',
-  active_resident: 'Active resident',
-  guardian: 'Chaika Guardian',
-  ambassador: 'Trust Ambassador',
-};
-
-const PROMO_LABELS: Record<string, string> = {
-  contacts: 'Contacts',
-  business: 'Business',
-  beauty: 'Beauty',
-  kids: 'Kids',
 };
 
 const formatDate = (timestamp: number) => {
@@ -65,19 +51,35 @@ const getTransactionTitle = (item: BonusTransaction) => {
   return `${type}${category}`;
 };
 
-const getPromotionTitle = (item: BonusPromotion) => {
-  const screen = PROMO_LABELS[item.screen] || item.screen || 'Promotion';
-  const target = item.targetType ? ` · ${item.targetType}` : '';
-  return `${screen}${target}`;
-};
-
 const BonusWalletScreen: React.FC = () => {
   const navigation = useNavigation<AppNav>();
+  const { t } = useTranslation();
   const [bonuses, setBonuses] = useState<UserBonuses | null>(null);
   const [promoCredits, setPromoCredits] = useState<PromoCredits>(EMPTY_PROMO_CREDITS);
   const [transactions, setTransactions] = useState<BonusTransaction[]>([]);
   const [promotions, setPromotions] = useState<BonusPromotion[]>([]);
   const [ready, setReady] = useState(false);
+
+  const BADGE_LABELS: Record<string, string> = {
+    newcomer: t.bonus.newcomer,
+    good_neighbor: t.bonus.good_neighbor,
+    active_resident: t.bonus.active_resident,
+    guardian: t.bonus.guardian,
+    ambassador: t.bonus.ambassador,
+  };
+
+  const PROMO_LABELS: Record<string, string> = {
+    contacts: t.promoCredits.topupTitle,
+    business: t.promoCredits.topupTitle,
+    beauty: t.promoCredits.topupTitle,
+    kids: t.promoCredits.topupTitle,
+  };
+
+  const getPromotionTitle = (item: BonusPromotion) => {
+    const screen = PROMO_LABELS[item.screen] || item.screen || t.promoCredits.topupTitle;
+    const target = item.targetType ? ` · ${item.targetType}` : '';
+    return `${screen}${target}`;
+  };
 
   useEffect(() => {
     let loaded = 0;
@@ -156,8 +158,8 @@ const BonusWalletScreen: React.FC = () => {
             <MaterialCommunityIcons name="arrow-left" size={24} color={SCREEN_THEME.textPrimary} />
           </TouchableOpacity>
           <View style={styles.headerCopy}>
-            <Text style={styles.headerTitle}>Bonus wallet</Text>
-            <Text style={styles.headerSubtitle}>Trust bonuses and promo credits</Text>
+            <Text style={styles.headerTitle}>{t.bonus.walletTitle}</Text>
+            <Text style={styles.headerSubtitle}>{t.bonus.walletSubtitle}</Text>
           </View>
           <TouchableOpacity onPress={openSupport} style={styles.iconButton} activeOpacity={0.82}>
             <MaterialCommunityIcons name="headset" size={23} color={SCREEN_THEME.textPrimary} />
@@ -172,19 +174,19 @@ const BonusWalletScreen: React.FC = () => {
               <View style={[styles.balancePanel, styles.trustPanel]}>
                 <View style={styles.panelIconRow}>
                   <MaterialCommunityIcons name="hand-heart" size={22} color="#FFF9EE" />
-                  <Text style={styles.panelLabelLight}>Trust bonuses</Text>
+                  <Text style={styles.panelLabelLight}>{t.bonus.trustBonuses}</Text>
                 </View>
                 <Text style={styles.panelValueLight}>{trustAvailable}</Text>
-                <Text style={styles.panelHintLight}>Available for profile and contacts boosts</Text>
+                <Text style={styles.panelHintLight}>{t.bonus.trustDesc}</Text>
               </View>
 
               <View style={styles.balancePanel}>
                 <View style={styles.panelIconRow}>
                   <MaterialCommunityIcons name="storefront" size={22} color={SCREEN_THEME.woodGreenDark} />
-                  <Text style={styles.panelLabel}>Promo credits</Text>
+                  <Text style={styles.panelLabel}>{t.promoCredits.title}</Text>
                 </View>
                 <Text style={styles.panelValue}>{promoCredits.balance}</Text>
-                <Text style={styles.panelHint}>For business, beauty and kids placements</Text>
+                <Text style={styles.panelHint}>{t.promoCredits.topupDesc}</Text>
               </View>
             </View>
 
@@ -198,47 +200,47 @@ const BonusWalletScreen: React.FC = () => {
               </View>
               <View style={styles.progressMeta}>
                 <Text style={styles.metaText}>{bonuses?.total ?? 0} / {BONUS_CAPS.total}</Text>
-                <Text style={styles.metaText}>Spent: {bonuses?.spent.total ?? 0}</Text>
+                <Text style={styles.metaText}>{t.bonus.spentLabel} {bonuses?.spent.total ?? 0}</Text>
               </View>
             </View>
 
             <View style={styles.card}>
               <View style={styles.cardHeader}>
                 <MaterialCommunityIcons name="calendar-week" size={22} color={SCREEN_THEME.enamelBlue} />
-                <Text style={styles.cardTitle}>Free weekly limit</Text>
+                <Text style={styles.cardTitle}>{t.bonus.weeklyLimit}</Text>
               </View>
               <View style={styles.progressTrack}>
                 <View style={[styles.progressFillBlue, { width: `${weeklyProgress}%` }]} />
               </View>
               <View style={styles.progressMeta}>
                 <Text style={styles.metaText}>{weeklyEarned} / {WEEKLY_FREE_LIMIT}</Text>
-                <Text style={styles.metaText}>{bonuses?.earned.weekKey || 'current week'}</Text>
+                <Text style={styles.metaText}>{bonuses?.earned.weekKey || t.bonus.currentWeek}</Text>
               </View>
               <View style={styles.breakdownGrid}>
-                <Breakdown label="Help" value={bonuses?.help.points ?? 0} />
-                <Breakdown label="Thanks" value={bonuses?.gratitude.points ?? 0} />
-                <Breakdown label="Invites" value={bonuses?.invites.points ?? 0} />
-                <Breakdown label="Likes" value={bonuses?.likes.points ?? 0} />
+                <Breakdown label={t.bonus.help} value={bonuses?.help.points ?? 0} />
+                <Breakdown label={t.bonus.thanks} value={bonuses?.gratitude.points ?? 0} />
+                <Breakdown label={t.bonus.invites} value={bonuses?.invites.points ?? 0} />
+                <Breakdown label={t.bonus.likes} value={bonuses?.likes.points ?? 0} />
               </View>
             </View>
 
             <View style={styles.actionGrid}>
-              <ActionButton icon="account-star" label="Boost profile" hint="Contacts top" onPress={openContacts} />
-              <ActionButton icon="store-plus" label="Boost business" hint="Business top" onPress={openBusiness} />
-              <ActionButton icon="content-cut" label="Boost beauty" hint="Salon or offer" onPress={openBeauty} />
-              <ActionButton icon="baby-face-outline" label="Boost kids" hint="Place or event" onPress={openKids} />
+              <ActionButton icon="account-star" label={t.bonus.boostProfile} hint={t.bonus.contactsTop} onPress={openContacts} />
+              <ActionButton icon="store-plus" label={t.bonus.boostBusiness} hint={t.bonus.businessTop} onPress={openBusiness} />
+              <ActionButton icon="content-cut" label={t.bonus.boostBeauty} hint={t.bonus.beautyTop} onPress={openBeauty} />
+              <ActionButton icon="baby-face-outline" label={t.bonus.boostKids} hint={t.bonus.kidsTop} onPress={openKids} />
             </View>
 
             <TouchableOpacity style={styles.topupButton} onPress={openTopup} activeOpacity={0.86}>
               <MaterialCommunityIcons name="credit-card-plus-outline" size={22} color="#FFF9EE" />
               <View style={styles.topupCopy}>
-                <Text style={styles.topupTitle}>Top up through admin</Text>
-                <Text style={styles.topupHint}>Create a top-up request, agree payment, then admin grants promo credits.</Text>
+                <Text style={styles.topupTitle}>{t.promoCredits.topupTitle}</Text>
+                <Text style={styles.topupHint}>{t.promoCredits.topupDesc}</Text>
               </View>
               <MaterialCommunityIcons name="chevron-right" size={22} color="#FFF9EE" />
             </TouchableOpacity>
 
-            <Section title="Active placements" icon="pin">
+            <Section title={t.bonus.activePromotions} icon="pin">
               {activePromotions.length === 0 ? (
                 <EmptyLine text="No active bonus placements yet." />
               ) : activePromotions.map((item) => (
@@ -254,7 +256,7 @@ const BonusWalletScreen: React.FC = () => {
               ))}
             </Section>
 
-            <Section title="Recent history" icon="history">
+            <Section title={t.bonus.recentHistory} icon="history">
               {transactions.length === 0 ? (
                 <EmptyLine text="Bonus history will appear after accruals, top-ups or spending." />
               ) : transactions.slice(0, 12).map((item) => (
