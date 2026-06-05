@@ -2,6 +2,22 @@ import { createFinding } from '../utils/severity.mjs';
 
 const SCANNER = 'upload-photo';
 
+/**
+ * Returns true when a line merely declares, imports, or aliases a symbol
+ * rather than actually calling it. This prevents false positives on:
+ *   import { uploadBytes, getDownloadURL } from '...'
+ *   const alias = uploadBytes as (...)
+ *   // comment mentioning getDownloadURL
+ *   ['get', 'DownloadURL'].join('')   (obfuscated reference)
+ */
+const isNonCallLine = (line) => {
+  if (/^\s*import\s/.test(line)) return true;
+  if (/^\s*(\/\/|\/\*|\*)/.test(line)) return true;
+  if (/=\s*\w+\s+as\s+[\s(]/.test(line)) return true;
+  if (/\[.*\]\.join\s*\(/.test(line)) return true;
+  return false;
+};
+
 export function analyze(files) {
   const findings = [];
 
@@ -10,7 +26,7 @@ export function analyze(files) {
 
     // 1. missing-upload-catch (HIGH)
     lines.forEach((line, i) => {
-      if (/upload(Bytes|BytesResumable|String)|putFile/.test(line)) {
+      if (/upload(Bytes|BytesResumable|String)|putFile/.test(line) && !isNonCallLine(line)) {
         // Wider context window (±8) to catch wrapping try/catch blocks
         const contextWindow = lines.slice(Math.max(0, i - 8), Math.min(i + 8, lines.length)).join('\n');
         if (!/\.catch|catch\s*\(|try\s*\{/.test(contextWindow)) {
@@ -75,7 +91,7 @@ export function analyze(files) {
 
     // 5. storage-url-no-error (HIGH)
     lines.forEach((line, i) => {
-      if (/getDownloadURL/.test(line)) {
+      if (/getDownloadURL/.test(line) && !isNonCallLine(line)) {
         // Wider context window (±8) to catch wrapping try/catch blocks
         const contextWindow = lines.slice(Math.max(0, i - 8), Math.min(i + 8, lines.length)).join('\n');
         if (!/\.catch|catch\s*\(|try\s*\{/.test(contextWindow)) {
@@ -92,7 +108,7 @@ export function analyze(files) {
 
     // 6. upload-no-timeout (MEDIUM)
     lines.forEach((line, i) => {
-      if (/upload(Bytes|BytesResumable|String)|putFile/.test(line)) {
+      if (/upload(Bytes|BytesResumable|String)|putFile/.test(line) && !isNonCallLine(line)) {
         // Look at the entire function context (30 lines around)
         const funcContext = lines.slice(Math.max(0, i - 15), Math.min(i + 15, lines.length)).join('\n');
         if (!/AbortController|timeout|setTimeout|signal/.test(funcContext)) {
