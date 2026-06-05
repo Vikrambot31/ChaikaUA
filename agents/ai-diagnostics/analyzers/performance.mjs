@@ -48,7 +48,8 @@ export function analyze(files) {
       }
     });
 
-    // 3. flatlist-no-optimization (MEDIUM)
+    // 3. flatlist-no-optimization (LOW)
+    // Downgraded: a suggestion, not a bug — FlatList works correctly without these.
     lines.forEach((line, i) => {
       if (/<FlatList\b/.test(line)) {
         const context = lines.slice(i, Math.min(i + 15, lines.length)).join('\n');
@@ -58,7 +59,7 @@ export function analyze(files) {
         const hasInitialRender = /initialNumToRender/.test(context);
         if (!hasGetItemLayout && !hasMaxRender && !hasWindowSize && !hasInitialRender) {
           findings.push(createFinding({
-            severity: 'MEDIUM', file: relativePath, line: i + 1, rule: 'flatlist-no-optimization', scanner: SCANNER,
+            severity: 'LOW', file: relativePath, line: i + 1, rule: 'flatlist-no-optimization', scanner: SCANNER,
             why: 'FlatList without any performance optimization props',
             risk: 'Large lists render all items at once, causing jank and high memory usage',
             uxImpact: 'medium', perfImpact: 'high', memoryImpact: 'high',
@@ -84,19 +85,17 @@ export function analyze(files) {
       }
     });
 
-    // 5. expensive-rerender (MEDIUM)
+    // 5. expensive-rerender (LOW)
+    // Downgraded: .map()/.filter() in JSX is extremely common React pattern, rarely a real perf issue.
     lines.forEach((line, i) => {
-      // Look for .map/.filter/.reduce in render body (JSX return area)
       if (/\.\b(map|filter|reduce|sort)\s*\(/.test(line)) {
-        // Check if we're likely in the render body (between return and JSX)
         const contextBefore = lines.slice(Math.max(0, i - 15), i).join('\n');
         const isInRender = /return\s*\(/.test(contextBefore) && /</.test(contextBefore);
         const isInUseMemo = /useMemo/.test(lines.slice(Math.max(0, i - 5), i).join('\n'));
         if (isInRender && !isInUseMemo) {
-          // Check if operating on a state/prop array (not a small literal)
           if (!/\[\s*['"`\d]/.test(line)) {
             findings.push(createFinding({
-              severity: 'MEDIUM', file: relativePath, line: i + 1, rule: 'expensive-rerender', scanner: SCANNER,
+              severity: 'LOW', file: relativePath, line: i + 1, rule: 'expensive-rerender', scanner: SCANNER,
               why: 'Array transformation in render body without useMemo',
               risk: 'Expensive computation runs on every render, causing UI jank',
               uxImpact: 'low', perfImpact: 'medium', memoryImpact: 'low',
@@ -137,8 +136,11 @@ export function analyze(files) {
     // 7. blocking-operation (HIGH)
     lines.forEach((line, i) => {
       if (/readFileSync|writeFileSync|existsSync|mkdirSync|readdirSync/.test(line)) {
-        // Only flag in React component files, not scripts/config
-        if (/src\//.test(relativePath) && !/scripts|config|\.config/.test(relativePath)) {
+        // Skip __DEV__ guarded code — only runs in dev, not production
+        const nearbyContext = lines.slice(Math.max(0, i - 10), i + 1).join('\n');
+        if (/__DEV__|process\.env\.NODE_ENV/.test(nearbyContext)) return;
+        // Only flag in React component files, not scripts/config/tests/utils
+        if (/src\//.test(relativePath) && !/scripts|config|\.config|__tests__|\.test\.|\.spec\.|utils\/env/.test(relativePath)) {
           findings.push(createFinding({
             severity: 'HIGH', file: relativePath, line: i + 1, rule: 'blocking-operation', scanner: SCANNER,
             why: 'Synchronous file operation blocks the JavaScript thread',

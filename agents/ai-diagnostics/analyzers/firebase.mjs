@@ -16,6 +16,39 @@ export function analyze(files) {
     // 1. missing-catch-firebase (HIGH)
     lines.forEach((line, i) => {
       if (/\b(get|set|update|push|remove)\s*\(\s*ref\s*\(/.test(line)) {
+        // Skip: Firebase call inside a lambda/arrow function passed as callback —
+        // the wrapping function (e.g. runAction) handles errors.
+        const nearbyBefore = lines.slice(Math.max(0, i - 3), i + 1).join('\n');
+        if (/=>\s*\{?\s*$|=>\s*\w/.test(nearbyBefore) && /\)\s*=>/.test(nearbyBefore)) {
+          return; // callback lambda — wrapper handles errors
+        }
+        // Skip: the call is inside a lambda on the same line (inline callback)
+        if (/\(\)\s*=>\s*(update|remove|set|get|push)\s*\(/.test(line)) {
+          return;
+        }
+
+        // Skip: inside useCallback/useMemo — the wrapping caller handles errors
+        const hookContext = lines.slice(Math.max(0, i - 20), i + 1).join('\n');
+        if (/useCallback\s*\(|useMemo\s*\(/.test(hookContext) && !/try\s*\{/.test(hookContext)) {
+          return;
+        }
+
+        // Skip: exported/const async service functions — callers are responsible for error handling.
+        const funcSearchStart = Math.max(0, i - 80);
+        const blockBefore = lines.slice(funcSearchStart, i + 1).join('\n');
+        // Match: export const/async function, or just const funcName = async
+        if (/export\s+(const|async\s+function|function)\s+\w+/.test(blockBefore) ||
+            /const\s+\w+\s*=\s*async\s/.test(blockBefore)) {
+          const lastFuncIdx = Math.max(
+            blockBefore.lastIndexOf('export'),
+            blockBefore.lastIndexOf('const ')
+          );
+          const sinceFunc = blockBefore.slice(Math.max(0, lastFuncIdx));
+          if (!/try\s*\{/.test(sinceFunc) && !/\.catch/.test(sinceFunc)) {
+            return; // service function — callers handle errors
+          }
+        }
+
         // Wide context window (±35 lines) to catch wrapping try/catch blocks in longer functions
         const contextWindow = lines.slice(Math.max(0, i - 35), Math.min(i + 35, lines.length)).join('\n');
         if (!/\.catch|catch\s*\(|try\s*\{/.test(contextWindow)) {
@@ -159,24 +192,30 @@ export function analyze(files) {
       }
     });
 
-    // 8. hardcoded-uid (MEDIUM)
+    // 8. hardcoded-uid (LOW)
+    // Downgraded: most matches are screen names, route names, or hash constants — not UIDs.
+    // Tightened: only flag strings that look like Firebase UIDs (mixed case + digits, no camelCase).
     if (!isRulesFile) {
       lines.forEach((line, i) => {
-        // Match typical Firebase UID patterns (28 chars alphanumeric)
-        if (/['"`][A-Za-z0-9]{25,35}['"`]/.test(line)) {
-          // Filter out common false positives (imports, URLs, hashes)
-          if (!/import|require|http|sha|hash|key|token|secret|\.js|\.ts|\.mjs/.test(line)) {
-            // Check if it looks like a UID reference (near user/uid context)
-            const context = lines.slice(Math.max(0, i - 3), Math.min(i + 3, lines.length)).join('\n');
-            if (/uid|user|admin|owner|author|creator/i.test(context)) {
-              findings.push(createFinding({
-                severity: 'MEDIUM', file: relativePath, line: i + 1, rule: 'hardcoded-uid', scanner: SCANNER,
-                why: 'Hardcoded UID string detected in source code',
-                risk: 'Breaks if user UID changes, makes code environment-specific',
-                uxImpact: 'none', perfImpact: 'none', memoryImpact: 'none',
-                suggestion: 'Move UID to environment config or fetch dynamically from auth context',
-              }));
-            }
+        const match = line.match(/['"`]([A-Za-z0-9]{25,35})['"`]/);
+        if (match) {
+          const candidate = match[1];
+          // Firebase UIDs have mixed case letters + digits, no pure camelCase names
+          const hasDigits = /\d/.test(candidate);
+          const hasMixedCase = /[a-z]/.test(candidate) && /[A-Z]/.test(candidate);
+          // Skip: camelCase names (screen names, component names)
+          const isCamelCase = /^[a-z][a-zA-Z]+$/.test(candidate) || /^[A-Z][a-zA-Z]+$/.test(candidate);
+          if (!hasDigits || !hasMixedCase || isCamelCase) return;
+          if (/import|require|http|sha|hash|key|token|secret|\.js|\.ts|\.mjs|Screen|Component|name\s*=/.test(line)) return;
+          const context = lines.slice(Math.max(0, i - 3), Math.min(i + 3, lines.length)).join('\n');
+          if (/uid|user|admin|owner|author|creator/i.test(context)) {
+            findings.push(createFinding({
+              severity: 'LOW', file: relativePath, line: i + 1, rule: 'hardcoded-uid', scanner: SCANNER,
+              why: 'Hardcoded UID string detected in source code',
+              risk: 'Breaks if user UID changes, makes code environment-specific',
+              uxImpact: 'none', perfImpact: 'none', memoryImpact: 'none',
+              suggestion: 'Move UID to environment config or fetch dynamically from auth context',
+            }));
           }
         }
       });

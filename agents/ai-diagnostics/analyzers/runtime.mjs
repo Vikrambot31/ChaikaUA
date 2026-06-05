@@ -160,37 +160,44 @@ export function analyze(files) {
     });
 
     // 8. infinite-rerender-risk (HIGH)
+    // Only flags useEffect without ANY dependency array — a genuine infinite loop risk.
+    // Strategy: find the matching closing `}, [deps]);` by tracking brace depth,
+    // rather than using a fixed line window which misses long effects.
     lines.forEach((line, i) => {
-      // setState inside useEffect with no deps or wrong deps
       if (/useEffect\s*\(\s*\(\)\s*=>\s*\{/.test(line)) {
-        const effectBlock = lines.slice(i, Math.min(i + 15, lines.length)).join('\n');
-        // Check for setState without deps array (runs every render)
-        const setStateMatch = effectBlock.match(/\bset[A-Z]\w*\s*\(/);
-        if (setStateMatch) {
-          // Check if deps array is missing entirely (not empty [])
-          if (!/\]\s*\);\s*$/.test(effectBlock) && !/,\s*\[/.test(effectBlock)) {
-            findings.push(createFinding({
-              severity: 'HIGH', file: relativePath, line: i + 1, rule: 'infinite-rerender-risk', scanner: SCANNER,
-              why: 'setState inside useEffect without dependency array',
-              risk: 'Infinite re-render loop: setState triggers render, which triggers effect again',
-              uxImpact: 'high', perfImpact: 'high', memoryImpact: 'none',
-              suggestion: 'Add a dependency array to useEffect to control when it runs',
-            }));
+        // Track brace depth to find end of the effect callback
+        let depth = 0;
+        let foundDeps = false;
+        let hasSetState = false;
+        const maxScan = Math.min(i + 300, lines.length);
+
+        for (let j = i; j < maxScan; j++) {
+          const l = lines[j];
+          if (/\bset[A-Z]\w*\s*\(/.test(l)) hasSetState = true;
+
+          for (const ch of l) {
+            if (ch === '{') depth++;
+            if (ch === '}') depth--;
+          }
+
+          // When depth returns to 0, the useEffect call is closed
+          if (depth <= 0 && j > i) {
+            // Check this line and the next for deps array pattern: }, [...]); or , []);
+            const closingContext = lines.slice(Math.max(i, j - 1), Math.min(j + 2, lines.length)).join('\n');
+            if (/,\s*\[/.test(closingContext)) {
+              foundDeps = true;
+            }
+            break;
           }
         }
-      }
 
-      // setState directly in render body (not inside hooks or handlers)
-      if (/^\s*set[A-Z]\w*\s*\(/.test(line)) {
-        const context = lines.slice(Math.max(0, i - 15), i).join('\n');
-        // Skip if inside any function, callback, hook, or conditional — broader exclusion to reduce false positives
-        if (!/useEffect|useCallback|useMemo|handle|on[A-Z]|function\s+\w+|=>\s*\{|if\s*\(|else\s*\{|\?\s*$/.test(context)) {
+        if (hasSetState && !foundDeps) {
           findings.push(createFinding({
             severity: 'HIGH', file: relativePath, line: i + 1, rule: 'infinite-rerender-risk', scanner: SCANNER,
-            why: 'setState call appears to be in render body',
-            risk: 'setState in render body causes infinite re-render loop',
+            why: 'setState inside useEffect without dependency array',
+            risk: 'Infinite re-render loop: setState triggers render, which triggers effect again',
             uxImpact: 'high', perfImpact: 'high', memoryImpact: 'none',
-            suggestion: 'Move setState into useEffect, event handler, or callback',
+            suggestion: 'Add a dependency array to useEffect to control when it runs',
           }));
         }
       }

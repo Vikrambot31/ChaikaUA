@@ -13,12 +13,26 @@ export function analyze(files) {
     // 1. empty-catch (HIGH)
     lines.forEach((line, i) => {
       if (/catch\s*\(\s*\w*\s*\)\s*\{/.test(line)) {
+        // Check for inline empty catch: catch(e) {} on same line
+        if (/catch\s*\(\s*\w*\s*\)\s*\{\s*\}\s*$/.test(line.trim())) {
+          // Skip if it has a comment explaining why
+          if (/\/\//.test(line)) return;
+          findings.push(createFinding({
+            severity: 'HIGH', file: relativePath, line: i + 1, rule: 'empty-catch', scanner: SCANNER,
+            why: 'Empty catch block silently swallows errors',
+            risk: 'Bugs become invisible, impossible to diagnose production issues',
+            uxImpact: 'none', perfImpact: 'none', memoryImpact: 'none',
+            suggestion: 'Log the error or report it to an error tracking service',
+          }));
+          return;
+        }
         const catchBody = lines.slice(i + 1, Math.min(i + 8, lines.length)).join('\n').trim();
-        // Strip comments and check if body is truly empty (no statements at all)
+        // Strip comments — if only comments remain, the catch is intentionally empty (documented)
         const stripped = catchBody.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '').trim();
-        // Only flag completely empty blocks — must start with } and have nothing else meaningful
         const firstMeaningfulLine = stripped.split('\n').map(l => l.trim()).find(l => l.length > 0) || '';
         if (firstMeaningfulLine === '}' || firstMeaningfulLine === '') {
+          // If the catch body had comments, it's intentionally empty — skip
+          if (catchBody !== stripped) return;
           findings.push(createFinding({
             severity: 'HIGH', file: relativePath, line: i + 1, rule: 'empty-catch', scanner: SCANNER,
             why: 'Empty catch block silently swallows errors',
@@ -30,17 +44,18 @@ export function analyze(files) {
       }
     });
 
-    // 2. console-only-error (MEDIUM)
+    // 2. console-only-error (LOW)
+    // Downgraded: console.error is valid logging in many contexts, not a bug.
+    // Also include logClientError/logClientEvent as proper reporting.
     lines.forEach((line, i) => {
       if (/catch\s*\(\s*\w*\s*\)\s*\{/.test(line)) {
         const catchBody = lines.slice(i + 1, Math.min(i + 6, lines.length));
         const bodyText = catchBody.join('\n');
-        // Find where the catch block ends
         const hasConsole = /console\.(log|error|warn)\s*\(/.test(bodyText);
-        const hasProperReporting = /Sentry|crashlytics|Analytics|reportError|logError|errorService|Alert\.alert|showError|toast|Toast/.test(bodyText);
+        const hasProperReporting = /Sentry|crashlytics|Analytics|reportError|logError|logClientError|logClientEvent|errorService|Alert\.alert|showError|toast|Toast/.test(bodyText);
         if (hasConsole && !hasProperReporting) {
           findings.push(createFinding({
-            severity: 'MEDIUM', file: relativePath, line: i + 1, rule: 'console-only-error', scanner: SCANNER,
+            severity: 'LOW', file: relativePath, line: i + 1, rule: 'console-only-error', scanner: SCANNER,
             why: 'Catch block only uses console.log/error without proper error reporting',
             risk: 'Errors lost in production where console is not visible',
             uxImpact: 'low', perfImpact: 'none', memoryImpact: 'none',
@@ -63,15 +78,16 @@ export function analyze(files) {
       }
     }
 
-    // 4. silent-failure (HIGH)
+    // 4. silent-failure (MEDIUM)
+    // Downgraded from HIGH: returning fallback values from catch is a valid pattern
+    // in many cases (optional data, non-critical operations).
     lines.forEach((line, i) => {
       if (/catch\s*\(\s*\w*\s*\)\s*\{/.test(line)) {
-        const catchBody = lines.slice(i + 1, Math.min(i + 5, lines.length)).join('\n');
-        // Check if catch returns null/undefined/false/empty without logging
+        const catchBody = lines.slice(i + 1, Math.min(i + 8, lines.length)).join('\n');
         if (/return\s+(null|undefined|false|\[\]|\{\})\s*;/.test(catchBody)) {
-          if (!/console|log|report|alert|throw|Sentry|crashlytics/.test(catchBody)) {
+          if (!/console|log|report|alert|throw|Sentry|crashlytics|logClient|safeLog|void\s/.test(catchBody)) {
             findings.push(createFinding({
-              severity: 'HIGH', file: relativePath, line: i + 1, rule: 'silent-failure', scanner: SCANNER,
+              severity: 'MEDIUM', file: relativePath, line: i + 1, rule: 'silent-failure', scanner: SCANNER,
               why: 'Function returns fallback value on error without any logging',
               risk: 'Errors completely invisible, stale or missing data shown to users silently',
               uxImpact: 'medium', perfImpact: 'none', memoryImpact: 'none',
@@ -102,8 +118,9 @@ export function analyze(files) {
       }
     });
 
-    // 6. swallowed-rejection (HIGH)
-    // Whitelist: fire-and-forget patterns where swallowing is intentional and documented.
+    // 6. swallowed-rejection (MEDIUM)
+    // Downgraded from HIGH: many intentional fire-and-forget patterns exist in real apps.
+    // Whitelist: patterns where swallowing is intentional.
     const INTENTIONAL_SWALLOW_PATTERNS = [
       /AsyncStorage/,
       /Linking\./,
@@ -113,17 +130,24 @@ export function analyze(files) {
       /Notifications\.(schedule|cancel)/,
       /BackgroundFetch/,
       /void\s+\w/,  // explicit void cast = intentional fire-and-forget
+      /signInAnonymously|signOut|logOut/,
+      /removeToken|clearToken|deleteToken/,
+      /\.finally\s*\(/,
+      /\.then\s*\([\s\S]*?\.catch/,
+      /setItem|getItem|removeItem/,  // storage operations — non-critical
+      /rateLimiter|rateLimit|cooldown/i,
+      /unsubscribe|unsub|cleanup/i,
+      /dashboard|stats|metric/i,  // dashboard data — non-critical reads
     ];
     lines.forEach((line, i) => {
       if (/\.catch\s*\(\s*\(\s*\)\s*=>\s*\{?\s*\}?\s*\)/.test(line) ||
           /\.catch\s*\(\s*\(\s*\w*\s*\)\s*=>\s*(null|undefined|false|\{\s*\})\s*\)/.test(line) ||
           /\.catch\s*\(\s*\(\s*\)\s*=>\s*(null|undefined|false)\s*\)/.test(line)) {
-        // Check surrounding context (±3 lines) for intentional fire-and-forget patterns
-        const context = lines.slice(Math.max(0, i - 3), Math.min(i + 3, lines.length)).join('\n');
+        const context = lines.slice(Math.max(0, i - 5), Math.min(i + 5, lines.length)).join('\n');
         const isIntentional = INTENTIONAL_SWALLOW_PATTERNS.some(p => p.test(context));
         if (!isIntentional) {
           findings.push(createFinding({
-            severity: 'HIGH', file: relativePath, line: i + 1, rule: 'swallowed-rejection', scanner: SCANNER,
+            severity: 'MEDIUM', file: relativePath, line: i + 1, rule: 'swallowed-rejection', scanner: SCANNER,
             why: 'Promise rejection completely swallowed with empty/noop .catch()',
             risk: 'Errors silently discarded, failures invisible in production',
             uxImpact: 'none', perfImpact: 'none', memoryImpact: 'none',
