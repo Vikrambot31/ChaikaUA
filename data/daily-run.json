@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-06-05",
+      "publishedAt": "2026-06-05T08:01:52.981Z",
+      "key": "https://bigkyiv.com.ua/ekonomichni-perevagy-vstanovlennya-kogeneraczijnoyi-ustanovky-chomu-vlasna-generacziya-vygidnisha-za-merezhu/"
+    },
+    {
       "type": "places",
       "date": "2026-06-04",
       "publishedAt": "2026-06-04T10:53:02.420Z",
