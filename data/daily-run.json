@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-06-05",
+      "publishedAt": "2026-06-05T11:17:01.254Z",
+      "key": "places-White Rabbit Coffee and Friends-Chaykava-2026-06-05"
+    },
+    {
       "type": "news",
       "date": "2026-06-05",
       "publishedAt": "2026-06-05T08:01:52.981Z",
