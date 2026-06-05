@@ -267,7 +267,6 @@ const normalizeOutgoingRequests = (
 export default function ProfileRequestsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const navLock = useRef(false);
-  const authAlertShownRef = useRef(false);
   const user = useSelector(selectUser);
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
   const t = UI[language];
@@ -339,38 +338,16 @@ export default function ProfileRequestsScreen() {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
     if (user?.id) {
       setSessionUserId('');
       setSessionResolved(true);
-      return () => { cancelled = true; };
+      return;
     }
 
     setSessionResolved(false);
     setSessionUserId('');
-    void ensureFirebaseAuth()
-      .then((firebaseUser) => {
-        if (!cancelled) {
-          setSessionUserId(firebaseUser?.uid ?? '');
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setSessionUserId('');
-          if (!authAlertShownRef.current) {
-            Alert.alert(t.errTitle, t.authErrBody);
-            authAlertShownRef.current = true;
-          }
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setSessionResolved(true);
-        }
-      });
-
-    return () => { cancelled = true; };
-  }, [t.authErrBody, t.errTitle, user?.id]);
+    setSessionResolved(true);
+  }, [user?.id]);
 
   useEffect(() => {
     if (!sessionResolved) {
@@ -393,16 +370,14 @@ export default function ProfileRequestsScreen() {
         ]);
         if (cancelled) return;
         setHiddenKeys(hidden);
-        if (incomingRequests.length > 0) {
+        // Входящие показывают все статусы (pending + approved + denied)
+        if (historyRequests.length > 0 || incomingRequests.length > 0) {
           setActiveTab('incoming');
-          setRequests(incomingRequests);
-          await loadIncomingPhones(incomingRequests);
+          setRequests(historyRequests);
+          await loadIncomingPhones(historyRequests);
         } else if (outgoingRequests.length > 0) {
           setActiveTab('outgoing');
           setRequests(outgoingRequests);
-        } else if (historyRequests.length > 0) {
-          setActiveTab('history');
-          setRequests(historyRequests);
         } else {
           setActiveTab('incoming');
           setRequests([]);
@@ -442,7 +417,7 @@ export default function ProfileRequestsScreen() {
           const raw = snap.exists() ? (snap.val() as Record<string, Partial<ProfileViewRequest>>) : null;
           const nextRequests = activeTab === 'outgoing'
             ? normalizeOutgoingRequests(raw, currentUserId)
-            : normalizeIncomingRequests(raw, activeTab === 'history');
+            : normalizeIncomingRequests(raw, activeTab !== 'outgoing');
 
           setHiddenKeys(hidden);
           if (activeTab === 'incoming') {
@@ -568,7 +543,12 @@ export default function ProfileRequestsScreen() {
     setRespondingRequestId(requesterId);
     try {
       await profilePermissionService.respondToRequest(currentUserId, requesterId, approved);
-      setRequests((prev) => prev.filter((item) => item.requesterId !== requesterId));
+      // Оставаться на текущей вкладке — обновить статус карточки на месте
+      setRequests((prev) => prev.map((item) =>
+        item.requesterId === requesterId
+          ? { ...item, status: approved ? 'approved' : 'denied' }
+          : item,
+      ));
     } catch {
       Alert.alert(t.errTitle, t.errBody);
     } finally {
@@ -583,6 +563,49 @@ export default function ProfileRequestsScreen() {
   const handleViber = async (phoneRaw?: string) => {
     await safeOpenViber(phoneRaw, language);
   };
+
+  if (!currentUserId) {
+    const authTitle = language === 'en'
+      ? 'Registration required'
+      : language === 'ru'
+        ? '\u041d\u0443\u0436\u043d\u0430 \u0440\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u044f'
+        : '\u041f\u043e\u0442\u0440\u0456\u0431\u043d\u0430 \u0440\u0435\u0454\u0441\u0442\u0440\u0430\u0446\u0456\u044f';
+    const authBody = language === 'en'
+      ? 'Sign in to view and respond to contact requests.'
+      : language === 'ru'
+        ? '\u0412\u043e\u0439\u0434\u0438\u0442\u0435, \u0447\u0442\u043e\u0431\u044b \u0432\u0438\u0434\u0435\u0442\u044c \u0438 \u043e\u0431\u0440\u0430\u0431\u0430\u0442\u044b\u0432\u0430\u0442\u044c \u0437\u0430\u043f\u0440\u043e\u0441\u044b \u043d\u0430 \u043a\u043e\u043d\u0442\u0430\u043a\u0442.'
+        : '\u0423\u0432\u0456\u0439\u0434\u0456\u0442\u044c, \u0449\u043e\u0431 \u0431\u0430\u0447\u0438\u0442\u0438 \u0442\u0430 \u043e\u0431\u0440\u043e\u0431\u043b\u044f\u0442\u0438 \u0437\u0430\u043f\u0438\u0442\u0438 \u043d\u0430 \u043a\u043e\u043d\u0442\u0430\u043a\u0442.';
+    const authButton = language === 'en'
+      ? 'Sign in / Register'
+      : language === 'ru'
+        ? '\u0412\u043e\u0439\u0442\u0438 / \u0417\u0430\u0440\u0435\u0433\u0438\u0441\u0442\u0440\u0438\u0440\u043e\u0432\u0430\u0442\u044c\u0441\u044f'
+        : '\u0423\u0432\u0456\u0439\u0442\u0438 / \u0417\u0430\u0440\u0435\u0454\u0441\u0442\u0440\u0443\u0432\u0430\u0442\u0438\u0441\u044c';
+
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back}>
+            <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>{t.title}</Text>
+          <View style={{ width: 40 }} />
+        </View>
+        <View style={styles.authGate}>
+          <MaterialCommunityIcons name="lock-outline" size={42} color={ACCENT} />
+          <Text style={styles.authGateTitle}>{authTitle}</Text>
+          <Text style={styles.authGateText}>{authBody}</Text>
+          <TouchableOpacity
+            style={styles.authGateButton}
+            onPress={() => navigation.navigate('LoginScreen')}
+            activeOpacity={0.86}
+          >
+            <Text style={styles.authGateButtonText}>{authButton}</Text>
+          </TouchableOpacity>
+        </View>
+        <MiniTabBar />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -969,6 +992,40 @@ const styles = StyleSheet.create({
   filterChipActive: { backgroundColor: ACCENT, borderColor: ACCENT },
   filterChipText: { fontSize: 11, fontWeight: '700', color: '#6A5C54' },
   filterChipTextActive: { color: '#fff' },
+  authGate: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    gap: 12,
+  },
+  authGateTitle: {
+    color: '#2D2520',
+    fontSize: 21,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  authGateText: {
+    color: '#7A6D64',
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  authGateButton: {
+    marginTop: 8,
+    minHeight: 46,
+    borderRadius: 8,
+    paddingHorizontal: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: ACCENT,
+  },
+  authGateButtonText: {
+    color: '#FFF9EE',
+    fontSize: 15,
+    fontWeight: '900',
+  },
   emptyText: { color: '#4A3D37', fontSize: 16, fontWeight: '800', textAlign: 'center' },
   emptyHint: { color: '#7A6D64', fontSize: 13, fontWeight: '600', textAlign: 'center', lineHeight: 19 },
   list: { padding: 14, paddingBottom: 100 },
