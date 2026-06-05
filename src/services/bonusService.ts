@@ -410,18 +410,6 @@ export const subscribeHelpConfirmations = (
   });
 };
 
-export const subscribeBonusesForUser = (
-  uid: string,
-  onChanged: (bonuses: UserBonuses) => void,
-): (() => void) => {
-  if (!uid) {
-    onChanged(EMPTY_BONUSES);
-    return () => {};
-  }
-  return onValue(ref(database, `user_bonuses/${uid}`), (snapshot) => {
-    onChanged(normalizeBonuses(snapshot.val()));
-  });
-};
 
 export const BONUS_BADGE_CONFIG: Record<BonusBadge, { minPoints: number }> = {
   newcomer: { minPoints: 0 },
