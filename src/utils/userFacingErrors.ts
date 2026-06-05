@@ -149,13 +149,6 @@ const isExplicitAccessBlock = (raw: string): boolean =>
   raw.includes('profile blocked') ||
   raw.includes('access blocked');
 
-const isRetryableActionContext = (context: UserErrorContext): boolean =>
-  context === 'load' ||
-  context === 'save' ||
-  context === 'send' ||
-  context === 'delete' ||
-  context === 'moderation';
-
 export const getUserErrorMessage = (
   language: AppLanguage = 'ua',
   context: UserErrorContext = 'unknown',
