@@ -91,6 +91,15 @@ const SportDetailScreen: React.FC = () => {
   const isMyPlayerAdded = players.some((player) => player.id === user?.id);
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
 
+  const showAuthRequired = () => {
+    const message = language === 'en'
+      ? 'Sign in to add yourself as a player.'
+      : language === 'ru'
+        ? 'Войдите в аккаунт, чтобы добавить себя как игрока.'
+        : 'Увійдіть в акаунт, щоб додати себе як гравця.';
+    Alert.alert(title, message);
+  };
+
   useEffect(() => {
     setLoading(true);
     const unsubscribePlayers = sportsService.subscribePlayers(sportKey, (playerList) => {
@@ -113,7 +122,10 @@ const SportDetailScreen: React.FC = () => {
   }, [sportKey, user?.id]);
 
   const addActivePlayer = async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      showAuthRequired();
+      return;
+    }
     setSaving(true);
     try {
       await sportsService.savePlayer(sportKey, { id: user.id, name: currentPlayerName, phone: user.phone });
@@ -126,7 +138,10 @@ const SportDetailScreen: React.FC = () => {
   };
 
   const setTodayTime = async (time: string) => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      showAuthRequired();
+      return;
+    }
     const prevTime = selectedTime;
     setSelectedTime(time);
     setShowTimeSlots(false);

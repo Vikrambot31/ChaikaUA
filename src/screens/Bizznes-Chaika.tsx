@@ -825,6 +825,29 @@ const KontaktiChaikyScreen: React.FC = () => {
   }, []);
 
   const handleRequestCloseModal = useCallback(() => {
+    const defaultPhone = user?.phone ? normalizePhoneText(user.phone) : '+380';
+    const isDirty =
+      itemName.trim() !== '' ||
+      category !== '' ||
+      condition !== '' ||
+      priceFrom.trim() !== '' ||
+      priceTo.trim() !== '' ||
+      description.trim() !== '' ||
+      phone.trim() !== defaultPhone ||
+      contactName.trim() !== '' ||
+      workFormat !== '' ||
+      workHours !== '' ||
+      locationArea !== '' ||
+      locationStreet !== '' ||
+      locationHouseNumber !== '' ||
+      formPhotos.length > 0 ||
+      !showPhoneOnCard;
+    if (!isDirty) {
+      skipNextDraftFlushRef.current = true;
+      void AsyncStorage.removeItem(BIZ_DRAFT_KEY).catch(() => {});
+      setAddFormVisible(false);
+      return;
+    }
     const closeTitle = language === 'ua' ? 'Закрити форму?' : language === 'ru' ? 'Закрыть форму?' : 'Close form?';
     const closeMsg = language === 'ua' ? 'Ви ще не зберегли. Закрити?' : language === 'ru' ? 'Вы еще не сохранили. Закрыть?' : 'You have not saved. Close?';
     Alert.alert(
@@ -835,7 +858,7 @@ const KontaktiChaikyScreen: React.FC = () => {
         { text: language === 'ua' ? 'Так' : language === 'ru' ? 'Да' : 'Yes', onPress: () => setAddFormVisible(false) },
       ],
     );
-  }, [language]);
+  }, [category, condition, contactName, description, formPhotos.length, itemName, language, locationArea, locationHouseNumber, locationStreet, phone, priceFrom, priceTo, showPhoneOnCard, user?.phone, workFormat, workHours]);
 
   useEffect(() => {
     let isMounted = true;

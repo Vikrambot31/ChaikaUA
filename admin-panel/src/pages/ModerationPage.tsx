@@ -85,6 +85,20 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
     return unsub;
   }, []);
 
+  // Тестовые боты — не помечать как подозрительных (ложные срабатывания от истории тестов)
+  const TEST_BOT_UIDS = new Set([
+    '24h7Iz6ayzgeD73VkCKrIcGnXJ73', // Luca Moretti
+    '9rKrBVsQKAPflSblhpeWkM5wIDv1',  // Giulia Romano
+    'YFqlL7WuosMgJrAdXcVvefGDrdz2',  // Matteo Bianchi
+    'NzvDAlsLqPde8ueOvtZvY2zwy1Q2',  // Sofia Conti
+    'GEaVFokn5Bdl5kf41ahbBa91jld2',  // Alessandro Ricci
+    'hSscTmJTKtTsI6pXeWePtWazDe83',  // Francesca Gallo
+    'cwwaHrtU2lNz5niY7NC3lMUM1hA3',  // Davide Esposito
+    'jvFZoz7a1JdpA8WSL3w8GySrh762',  // Chiara Lombardi
+    'gybAiGnrKfZUDqBdTtR3egbfRUH3',  // Marco Santoro
+    'zhCLiQnSAlbkuHKLKKMCsfhZ4iX2',  // Elena Ferrara
+  ]);
+
   // Множество userId у которых есть хотя бы одна отклонённая заявка
   const rejectedUserIds = useMemo(() => {
     const set = new Set<string>();
@@ -96,6 +110,7 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
 
   const isUserFlagged = (item: ModerationItem): boolean => {
     if (!item.userId) return false;
+    if (TEST_BOT_UIDS.has(item.userId)) return false;
     // Пользователь помечен если: у него есть отклонённая заявка ИЛИ AI пометил ИЛИ он в жёлтом списке
     if (rejectedUserIds.has(item.userId)) return true;
     if (isUserInYellowList(item.userId)) return true;

@@ -425,6 +425,24 @@ const KontaktiChaikyScreen: React.FC = () => {
   );
 
   const handleRequestCloseModal = useCallback(() => {
+    const defaultPhone = user?.phone ? normalizePhoneText(user.phone) : '+380';
+    const isDirty =
+      category !== '' ||
+      condition !== '' ||
+      price.trim() !== '' ||
+      description.trim() !== '' ||
+      phone.trim() !== defaultPhone ||
+      zodiacSign !== '' ||
+      humanDesignType !== '' ||
+      humanDesignProfile !== '' ||
+      formPhotos.length > 0 ||
+      !showPhoneOnCard;
+    if (!isDirty) {
+      skipNextDraftFlushRef.current = true;
+      void AsyncStorage.removeItem(CONTACTS_DRAFT_KEY).catch(() => {});
+      setAddFormVisible(false);
+      return;
+    }
     Alert.alert(
       'Закрити форму?',
       'Ви ще не надіслали заявку. Закрити?',
@@ -433,7 +451,7 @@ const KontaktiChaikyScreen: React.FC = () => {
         { text: 'Так', onPress: () => setAddFormVisible(false) },
       ],
     );
-  }, []);
+  }, [category, condition, description, formPhotos.length, humanDesignProfile, humanDesignType, phone, price, showPhoneOnCard, user?.phone, zodiacSign]);
 
   useEffect(() => {
     let isMounted = true;

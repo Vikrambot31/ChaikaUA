@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Animated, FlatList, Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { useSelector } from 'react-redux';
@@ -458,6 +458,15 @@ const JobSearchScreen: React.FC = () => {
     return unsubscribe;
   }, [user?.id]);
 
+  const handleListingKindChange = useCallback((kind: JobListingKind) => {
+    if (kind === listingKind) return;
+    setListingKind(kind);
+    setWorkType('');
+    setAbout('');
+    setTouched({ name: false, phone: false, age: false, workType: false, about: false });
+    setSubmittedOnce(false);
+  }, [listingKind]);
+
   useEffect(() => {
     if (!name.trim() && user?.name) {
       setName(normalizePersonName(user.name));
@@ -880,14 +889,14 @@ const JobSearchScreen: React.FC = () => {
                 <View style={styles.kindSwitcher}>
                   <TouchableOpacity
                     style={[styles.kindOption, listingKind === 'resume' && styles.kindOptionActive]}
-                    onPress={() => { setListingKind('resume'); setWorkType(''); setTouched({ name: false, phone: false, age: false, workType: false, about: false }); setSubmittedOnce(false); }}
+                    onPress={() => handleListingKindChange('resume')}
                     activeOpacity={0.82}
                   >
                     <Text style={[styles.kindOptionText, listingKind === 'resume' && styles.kindOptionTextActive]}>{text.resumeOption}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.kindOption, listingKind === 'vacancy' && styles.kindOptionActive]}
-                    onPress={() => { setListingKind('vacancy'); setWorkType(''); setTouched({ name: false, phone: false, age: false, workType: false, about: false }); setSubmittedOnce(false); }}
+                    onPress={() => handleListingKindChange('vacancy')}
                     activeOpacity={0.82}
                   >
                     <Text style={[styles.kindOptionText, listingKind === 'vacancy' && styles.kindOptionTextActive]}>{text.vacancyOption}</Text>
