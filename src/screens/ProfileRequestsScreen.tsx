@@ -765,30 +765,45 @@ export default function ProfileRequestsScreen() {
                     </View>
                   </View>
 
-                  <View style={styles.responseActionsRow}>
-                    <TouchableOpacity
-                      style={[styles.responseBtn, styles.responseBtnApprove, isResponding && styles.responseBtnDisabled]}
-                      onPress={() => { void handleRespondToIncoming(item.requesterId, true); }}
-                      disabled={isResponding || Boolean(respondingRequestId)}
-                      activeOpacity={0.85}
-                    >
-                      {isResponding ? (
-                        <ActivityIndicator size="small" color="#fff" />
-                      ) : (
-                        <MaterialCommunityIcons name="check" size={18} color="#fff" />
-                      )}
-                      <Text style={styles.responseBtnText}>{t.approve}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.responseBtn, styles.responseBtnDeny, isResponding && styles.responseBtnDisabled]}
-                      onPress={() => { void handleRespondToIncoming(item.requesterId, false); }}
-                      disabled={isResponding || Boolean(respondingRequestId)}
-                      activeOpacity={0.85}
-                    >
-                      <MaterialCommunityIcons name="close" size={18} color="#A73737" />
-                      <Text style={styles.responseBtnDenyText}>{t.deny}</Text>
-                    </TouchableOpacity>
-                  </View>
+                  {item.status === 'pending' ? (
+                    <View style={styles.responseActionsRow}>
+                      <TouchableOpacity
+                        style={[styles.responseBtn, styles.responseBtnApprove, isResponding && styles.responseBtnDisabled]}
+                        onPress={() => { void handleRespondToIncoming(item.requesterId, true); }}
+                        disabled={isResponding || Boolean(respondingRequestId)}
+                        activeOpacity={0.85}
+                      >
+                        {isResponding ? (
+                          <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                          <MaterialCommunityIcons name="check" size={18} color="#fff" />
+                        )}
+                        <Text style={styles.responseBtnText}>{t.approve}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.responseBtn, styles.responseBtnDeny, isResponding && styles.responseBtnDisabled]}
+                        onPress={() => { void handleRespondToIncoming(item.requesterId, false); }}
+                        disabled={isResponding || Boolean(respondingRequestId)}
+                        activeOpacity={0.85}
+                      >
+                        <MaterialCommunityIcons name="close" size={18} color="#A73737" />
+                        <Text style={styles.responseBtnDenyText}>{t.deny}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={styles.responseActionsRow}>
+                      <View style={[styles.responseBtn, item.status === 'approved' ? styles.responseBtnApprove : styles.responseBtnDeny, { opacity: 0.7 }]}>
+                        <MaterialCommunityIcons
+                          name={item.status === 'approved' ? 'check' : 'close'}
+                          size={18}
+                          color={item.status === 'approved' ? '#fff' : '#A73737'}
+                        />
+                        <Text style={item.status === 'approved' ? styles.responseBtnText : styles.responseBtnDenyText}>
+                          {item.status === 'approved' ? t.approve : t.deny}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
 
                   <UserCardActionBar
                     avatarUri={item.requesterPhotoURL || ''}
