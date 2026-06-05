@@ -37,25 +37,72 @@ const EMPTY_PROMO_CREDITS: PromoCredits = {
   updatedAt: 0,
 };
 
-const formatDate = (timestamp: number) => {
+const DATE_LOCALES = {
+  ua: 'uk-UA',
+  ru: 'ru-RU',
+  en: 'en-US',
+} as const;
+
+const STATUS_LABEL_KEYS = {
+  pending: 'statusPending',
+  approved: 'statusApproved',
+  rejected: 'statusRejected',
+} as const;
+
+const TRANSACTION_TYPE_LABEL_KEYS = {
+  earn: 'earnOperation',
+  spend: 'spendOperation',
+  topup: 'topupOperation',
+} as const;
+
+const TARGET_TYPE_LABEL_KEYS = {
+  contacts: 'promotionTargetContacts',
+  contact: 'promotionTargetContacts',
+  profile: 'promotionTargetContacts',
+  business: 'promotionTargetBusiness',
+  business_listing: 'promotionTargetBusiness',
+  beauty_salon: 'promotionTargetBeautySalon',
+  beauty_promo: 'promotionTargetBeautyPromo',
+  kids_place: 'promotionTargetKidsPlace',
+  kids_event: 'promotionTargetKidsEvent',
+} as const;
+
+type AppLanguage = keyof typeof DATE_LOCALES;
+type BonusText = ReturnType<typeof useTranslation>['t']['bonus'];
+type BonusStatus = keyof typeof STATUS_LABEL_KEYS;
+type TransactionType = keyof typeof TRANSACTION_TYPE_LABEL_KEYS;
+type TargetType = keyof typeof TARGET_TYPE_LABEL_KEYS;
+
+const formatDate = (timestamp: number, language: AppLanguage) => {
   if (!timestamp) return '-';
-  return new Date(timestamp).toLocaleDateString();
+  return new Date(timestamp).toLocaleDateString(DATE_LOCALES[language]);
 };
 
-const formatDateTime = (timestamp: number) => {
+const formatDateTime = (timestamp: number, language: AppLanguage) => {
   if (!timestamp) return '-';
-  return new Date(timestamp).toLocaleString();
+  return new Date(timestamp).toLocaleString(DATE_LOCALES[language]);
 };
 
-const getTransactionTitle = (item: BonusTransaction) => {
-  const type = item.type || 'operation';
+const getStatusLabel = (status: string, bonusText: BonusText) => {
+  const key = STATUS_LABEL_KEYS[status as BonusStatus];
+  return key ? bonusText[key] : status;
+};
+
+const getTargetTypeLabel = (targetType: string, bonusText: BonusText) => {
+  const key = TARGET_TYPE_LABEL_KEYS[targetType as TargetType];
+  return key ? bonusText[key] : targetType;
+};
+
+const getTransactionTitle = (item: BonusTransaction, bonusText: BonusText) => {
+  const key = TRANSACTION_TYPE_LABEL_KEYS[item.type as TransactionType];
+  const type = key ? bonusText[key] : bonusText.operation;
   const category = item.category ? ` / ${item.category}` : '';
   return `${type}${category}`;
 };
 
 const BonusWalletScreen: React.FC = () => {
   const navigation = useNavigation<AppNav>();
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const [bonuses, setBonuses] = useState<UserBonuses | null>(null);
   const [promoCredits, setPromoCredits] = useState<PromoCredits>(EMPTY_PROMO_CREDITS);
   const [transactions, setTransactions] = useState<BonusTransaction[]>([]);
@@ -71,15 +118,15 @@ const BonusWalletScreen: React.FC = () => {
   };
 
   const PROMO_LABELS: Record<string, string> = {
-    contacts: t.promoCredits.topupTitle,
-    business: t.promoCredits.topupTitle,
-    beauty: t.promoCredits.topupTitle,
-    kids: t.promoCredits.topupTitle,
+    contacts: t.bonus.contactsTop,
+    business: t.bonus.businessTop,
+    beauty: t.bonus.beautyTop,
+    kids: t.bonus.kidsTop,
   };
 
   const getPromotionTitle = (item: BonusPromotion) => {
     const screen = PROMO_LABELS[item.screen] || item.screen || t.promoCredits.topupTitle;
-    const target = item.targetType ? ` · ${item.targetType}` : '';
+    const target = item.targetType ? ` · ${getTargetTypeLabel(item.targetType, t.bonus)}` : '';
     return `${screen}${target}`;
   };
 
@@ -201,7 +248,7 @@ const BonusWalletScreen: React.FC = () => {
             <View style={styles.card}>
               <View style={styles.cardHeader}>
                 <MaterialCommunityIcons name="medal-outline" size={22} color={SCREEN_THEME.accentGold} />
-                <Text style={styles.cardTitle}>{BADGE_LABELS[bonuses?.badge || 'newcomer'] || 'Newcomer'}</Text>
+                <Text style={styles.cardTitle}>{BADGE_LABELS[bonuses?.badge || 'newcomer'] || t.bonus.newcomer}</Text>
               </View>
               <View style={styles.progressTrack}>
                 <View style={[styles.progressFill, { width: `${totalProgress}%` }]} />
@@ -250,14 +297,14 @@ const BonusWalletScreen: React.FC = () => {
 
             <Section title={t.bonus.activePromotions} icon="pin">
               {activePromotions.length === 0 ? (
-                <EmptyLine text="No active bonus placements yet." />
+                <EmptyLine text={t.bonus.noActivePromotions} />
               ) : activePromotions.map((item) => (
                 <View key={item.id} style={styles.listItem}>
                   <MaterialCommunityIcons name="bullhorn-outline" size={21} color={SCREEN_THEME.terracotta} />
                   <View style={styles.listCopy}>
                     <Text style={styles.listTitle}>{getPromotionTitle(item)}</Text>
                     <Text style={styles.listMeta}>
-                      {item.pointsSpent} {item.currency} · until {formatDate(item.expiresAt)} · {item.moderationStatus}
+                      {item.pointsSpent} {item.currency} · {t.bonus.until} {formatDate(item.expiresAt, language)} · {getStatusLabel(item.moderationStatus, t.bonus)}
                     </Text>
                   </View>
                 </View>
@@ -266,7 +313,7 @@ const BonusWalletScreen: React.FC = () => {
 
             <Section title={t.bonus.recentHistory} icon="history">
               {transactions.length === 0 ? (
-                <EmptyLine text="Bonus history will appear after accruals, top-ups or spending." />
+                <EmptyLine text={t.bonus.emptyHistory} />
               ) : transactions.slice(0, 12).map((item) => (
                 <View key={item.id} style={styles.listItem}>
                   <MaterialCommunityIcons
@@ -275,8 +322,8 @@ const BonusWalletScreen: React.FC = () => {
                     color={item.type === 'spend' ? SCREEN_THEME.terracotta : SCREEN_THEME.woodGreen}
                   />
                   <View style={styles.listCopy}>
-                    <Text style={styles.listTitle}>{getTransactionTitle(item)}</Text>
-                    <Text style={styles.listMeta}>{formatDateTime(item.createdAt)} · balance {item.balanceAfter}</Text>
+                    <Text style={styles.listTitle}>{getTransactionTitle(item, t.bonus)}</Text>
+                    <Text style={styles.listMeta}>{formatDateTime(item.createdAt, language)} · {t.bonus.balanceAfter} {item.balanceAfter}</Text>
                     {item.note ? <Text style={styles.listNote}>{item.note}</Text> : null}
                   </View>
                   <Text style={[styles.pointsDelta, item.type === 'spend' && styles.pointsDeltaSpend]}>

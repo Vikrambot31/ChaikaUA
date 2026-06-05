@@ -69,6 +69,7 @@ const UI_TEXT = {
     addRequest: '+ Додати заявку',
     listTitle: 'Заявки',
     empty: 'Поки немає заявок.',
+    loadError: 'Не вдалося завантажити заявки. Спробуйте оновити екран.',
     closeItem: 'Знайдено - закрити',
     closeConfirmTitle: 'Закрити оголошення?',
     closeConfirmBody: 'Оголошення буде позначено як закрите і зникне з активного списку.',
@@ -107,6 +108,7 @@ const UI_TEXT = {
     addRequest: '+ Добавить заявку',
     listTitle: 'Заявки',
     empty: 'Пока нет заявок.',
+    loadError: 'Не удалось загрузить заявки. Попробуйте обновить экран.',
     closeItem: 'Найдено - закрыть',
     closeConfirmTitle: 'Закрыть объявление?',
     closeConfirmBody: 'Объявление будет помечено как закрытое и исчезнет из активного списка.',
@@ -145,6 +147,7 @@ const UI_TEXT = {
     addRequest: '+ Add request',
     listTitle: 'Requests',
     empty: 'No requests yet.',
+    loadError: 'Could not load requests. Try refreshing the screen.',
     closeItem: 'Found - close',
     closeConfirmTitle: 'Close listing?',
     closeConfirmBody: 'The listing will be marked as closed and removed from the active list.',
@@ -185,6 +188,8 @@ const LostAndFoundScreen: React.FC = () => {
   const { startOperation, trace } = useOperationTrace('Kto-Poteryal');
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const [items, setItems] = useState<LostFoundItem[]>([]);
+  const [loadingItems, setLoadingItems] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [type, setType] = useState<RequestType>('lost');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState(() => normalizePhoneText(user?.phone ?? ''));
@@ -222,7 +227,20 @@ const LostAndFoundScreen: React.FC = () => {
   );
 
   useEffect(() => {
-    const unsubscribe = lostFoundService.subscribe(setItems, user?.id);
+    setLoadingItems(true);
+    setLoadError(false);
+    const unsubscribe = lostFoundService.subscribe(
+      (nextItems) => {
+        setItems(nextItems);
+        setLoadingItems(false);
+        setLoadError(false);
+      },
+      user?.id,
+      () => {
+        setLoadingItems(false);
+        setLoadError(true);
+      },
+    );
     return unsubscribe;
   }, [user?.id]);
 
@@ -537,8 +555,14 @@ const LostAndFoundScreen: React.FC = () => {
         }}
         ListEmptyComponent={
           <View style={styles.emptyCard}>
-            <MaterialCommunityIcons name="magnify" size={28} color={SCREEN_THEME.textMuted} />
-            <Text style={styles.emptyText}>{text.empty}</Text>
+            {loadingItems ? (
+              <ActivityIndicator color={SCREEN_THEME.terracotta} />
+            ) : (
+              <>
+                <MaterialCommunityIcons name={loadError ? 'alert-circle-outline' : 'magnify'} size={28} color={SCREEN_THEME.textMuted} />
+                <Text style={styles.emptyText}>{loadError ? text.loadError : text.empty}</Text>
+              </>
+            )}
           </View>
         }
       />
@@ -549,7 +573,10 @@ const LostAndFoundScreen: React.FC = () => {
           style={styles.addBarBtn}
           onPress={() => {
             if (!user) {
-              Alert.alert(text.formTitle, text.authRequired);
+              Alert.alert(text.formTitle, text.authRequired, [
+                { text: text.cancel, style: 'cancel' },
+                { text: text.addRequest, onPress: () => navigation.navigate('LoginScreen') },
+              ]);
               return;
             }
             setAddFormVisible(true);

@@ -212,7 +212,7 @@ const mapBizItem = (id: string, data: any, isArchived?: boolean): BizListing => 
 });
 
 const biznesChaikaService = {
-  subscribe(callback: (items: BizListing[]) => void, currentUserId?: string): () => void {
+  subscribe(callback: (items: BizListing[]) => void, currentUserId?: string, onError?: (error: unknown) => void): () => void {
     let requestId = 0;
     let disposed = false;
     let latestApprovedArchived: BizListing[] = [];
@@ -319,8 +319,12 @@ const biznesChaikaService = {
           latestApprovedArchived = active;
           resolvePhotosInBackground(buildMerged(active), currentRequestId);
         });
-      }, () => {
-        if (!disposed) callback([]);
+      }, (error) => {
+        console.warn('[biznesChaikaService] approved subscription failed:', error);
+        if (!disposed) {
+          callback([]);
+          onError?.(error);
+        }
       });
 
       if (currentUserId) {
@@ -334,10 +338,18 @@ const biznesChaikaService = {
                 .filter((item) => item.moderationStatus !== 'approved')
             : [];
           callback(buildMerged(latestApprovedArchived));
-        }, () => { ownPendingItems = []; });
+        }, (error) => {
+          console.warn('[biznesChaikaService] own subscription failed:', error);
+          ownPendingItems = [];
+          if (!disposed) onError?.(error);
+        });
       }
-    }).catch(() => {
-      if (!disposed) callback([]);
+    }).catch((error) => {
+      console.warn('[biznesChaikaService] auth bootstrap failed:', error);
+      if (!disposed) {
+        callback([]);
+        onError?.(error);
+      }
     });
 
     return () => {
@@ -788,6 +800,7 @@ const KontaktiChaikyScreen: React.FC = () => {
   const [showPhoneOnCard, setShowPhoneOnCard] = useState(true);
   const [listings, setListings] = useState<BizListing[]>([]);
   const [listingsReady, setListingsReady] = useState(false);
+  const [listingsLoadError, setListingsLoadError] = useState(false);
   const [profileByUserId, setProfileByUserId] = useState<Record<string, ContactProfile>>({});
   const [selectedFilterCategory, setSelectedFilterCategory] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -863,10 +876,15 @@ const KontaktiChaikyScreen: React.FC = () => {
   useEffect(() => {
     let isMounted = true;
     setListingsReady(false);
+    setListingsLoadError(false);
     const unsubscribe = biznesChaikaService.subscribe((items) => {
       setListingsReady(true);
+      setListingsLoadError(false);
       setListings(items);
-    }, user?.id);
+    }, user?.id, () => {
+      setListingsReady(true);
+      setListingsLoadError(true);
+    });
     (async () => {
       try {
         const raw = await AsyncStorage.getItem(BIZ_DRAFT_KEY);
@@ -1436,7 +1454,14 @@ const KontaktiChaikyScreen: React.FC = () => {
           </View>
         )}
 
-        {listings.length > 0 && (
+        {listingsReady && listingsLoadError && listings.length === 0 && (
+          <View style={styles.emptyFiltered}>
+            <Text style={styles.emptyFilteredTitle}>{language === 'en' ? 'Could not load businesses' : language === 'ru' ? 'Не удалось загрузить бизнесы' : 'Не вдалося завантажити бізнеси'}</Text>
+            <Text style={styles.emptyFilteredSub}>{language === 'en' ? 'Check the internet connection or try refreshing the screen.' : language === 'ru' ? 'Проверьте интернет или попробуйте обновить экран.' : 'Перевірте інтернет або спробуйте оновити екран.'}</Text>
+          </View>
+        )}
+
+        {!listingsLoadError && listings.length > 0 && (
           <View style={styles.listingsSection}>
             <Text style={styles.formLabel}>{text.filterLabel}</Text>
             <View style={styles.pickerWrapper}>

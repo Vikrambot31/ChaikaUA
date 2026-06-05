@@ -75,7 +75,7 @@ const mapContactItem = (id: string, data: any, isArchived?: boolean): ContactLis
 });
 
 export const contactsService = {
-  subscribe(callback: (items: ContactListing[]) => void, currentUserId?: string): () => void {
+  subscribe(callback: (items: ContactListing[]) => void, currentUserId?: string, onError?: (error: unknown) => void): () => void {
     let requestId = 0;
     let disposed = false;
     let latestApprovedArchived: ContactListing[] = [];
@@ -177,8 +177,12 @@ export const contactsService = {
           latestApprovedArchived = active;
           resolvePhotosInBackground(buildMerged(active), currentRequestId);
         });
-      }, () => {
-        if (!disposed) callback([]);
+      }, (error) => {
+        console.warn('[contactsService] approved subscription failed:', error);
+        if (!disposed) {
+          callback([]);
+          onError?.(error);
+        }
       });
 
       if (currentUserId) {
@@ -192,10 +196,18 @@ export const contactsService = {
                 .filter((item) => item.moderationStatus !== 'approved')
             : [];
           callback(buildMerged(latestApprovedArchived));
-        }, () => { ownPendingItems = []; });
+        }, (error) => {
+          console.warn('[contactsService] own subscription failed:', error);
+          ownPendingItems = [];
+          if (!disposed) onError?.(error);
+        });
       }
-    }).catch(() => {
-      if (!disposed) callback([]);
+    }).catch((error) => {
+      console.warn('[contactsService] auth bootstrap failed:', error);
+      if (!disposed) {
+        callback([]);
+        onError?.(error);
+      }
     });
 
     return () => {

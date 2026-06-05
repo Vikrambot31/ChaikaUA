@@ -1,14 +1,14 @@
 {
-  "latestVersion": "1.1.398",
-  "minSupportedVersion": "1.1.398",
+  "latestVersion": "1.1.401",
+  "minSupportedVersion": "1.1.401",
   "forceUpdate": true,
   "updateTitle": "РћРЅРѕРІС–С‚СЊ РґРѕРґР°С‚РѕРє",
   "updateText": "Р’РёР№С€Р»Р° РЅРѕРІР° РІРµСЂСЃС–СЏ Р§Р°Р№РєРё. РЎС‚Р°СЂР° РІРµСЂСЃС–СЏ Р±С–Р»СЊС€Рµ РЅРµ РїС–РґС‚СЂРёРјСѓС”С‚СЊСЃСЏ.",
-  "androidUrl": "https://chaika-life.netlify.app/release/ChaikaLife-v1.1.398-2026-06-04_23-10.apk",
+  "androidUrl": "https://chaika-life.netlify.app/release/ChaikaLife-v1.1.401-2026-06-05_19-38.apk",
   "iosUrl": "https://chaika-life.netlify.app/",
   "webUrl": "https://chaika-life.netlify.app/",
   "landingUrl": "https://chaika-life.netlify.app/",
-  "lastVersionDate": "2026-06-04",
-  "lastBuildStamp": "2026-06-04_23-10",
-  "apkFileName": "ChaikaLife-v1.1.398-2026-06-04_23-10.apk"
+  "lastVersionDate": "2026-06-05",
+  "lastBuildStamp": "2026-06-05_19-38",
+  "apkFileName": "ChaikaLife-v1.1.401-2026-06-05_19-38.apk"
 }

@@ -60,6 +60,8 @@ const UI_TEXT = {
     contactUser: "Зв'язатися",
     cancel: 'Скасувати',
     userProfile: 'Профіль користувача',
+    errorTitle: 'Помилка',
+    requestFailed: 'Не вдалося надіслати запит',
   },
   ru: {
     title: 'Люди Чайки',
@@ -83,6 +85,8 @@ const UI_TEXT = {
     contactUser: 'Связаться',
     cancel: 'Отмена',
     userProfile: 'Профиль пользователя',
+    errorTitle: 'Ошибка',
+    requestFailed: 'Не удалось отправить запрос',
   },
   en: {
     title: 'Chaika Life People',
@@ -106,6 +110,8 @@ const UI_TEXT = {
     contactUser: 'Contact',
     cancel: 'Cancel',
     userProfile: 'User profile',
+    errorTitle: 'Error',
+    requestFailed: 'Failed to send request',
   },
 } as const;
 
@@ -427,9 +433,9 @@ export default function TopGirlsBoysScreen() {
       }
     } catch (error) {
       setPermModal({ visible: false, state: 'confirm', targetId: '', targetName: '', contactInfo: '' });
-      Alert.alert('Помилка', error instanceof Error ? error.message : 'Не вдалося надіслати запит');
+      Alert.alert(text.errorTitle, error instanceof Error ? error.message : text.requestFailed);
     }
-  }, [user?.id, user?.name, user?.photoURL, permModal.targetId, filteredRanked]);
+  }, [user?.id, user?.name, user?.photoURL, permModal.targetId, filteredRanked, text.errorTitle, text.requestFailed]);
 
   return (
     <SafeAreaView style={styles.container}>

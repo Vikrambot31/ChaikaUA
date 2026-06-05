@@ -2,6 +2,8 @@ import { sanitizeStoredText } from '../utils/textUtils';
 import { filterChaykaNews, summarizeChaykaNews, type ChaykaNewsCandidate } from './chaykaNewsIntelligence';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState } from 'react-native';
+import { get, limitToLast, orderByChild, query, ref } from 'firebase/database';
+import { database } from '../firebase-core';
 
 export type ChaykaNewsPriority = 'urgent' | 'important' | 'info';
 
@@ -37,10 +39,13 @@ type RawChaykaNewsItem = Partial<Omit<ChaykaNewsItem, 'priority' | 'aiGenerated'
   aiGenerated?: boolean;
   body?: string;
   date?: string;
+  createdAt?: number;
 };
 
 const CHAYKA_NEWS_CACHE_KEY = 'chayka_news_cache_v1';
 const DEFAULT_CHAYKA_NEWS_URL = 'https://raw.githubusercontent.com/Vikrambot31/ChaikaUA/main/data/feed.json';
+const DEFAULT_CHAYKA_NEWS_CDN_URL = 'https://cdn.jsdelivr.net/gh/Vikrambot31/ChaikaUA@main/data/feed.json';
+const CHAYKA_NEWS_DB_PATH = 'chayka_news/publications';
 const CHAYKA_NEWS_TIMEOUT_MS = 6500;
 const CHAYKA_NEWS_ACTIVE_LIMIT = 200;
 const CHAYKA_NEWS_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -53,6 +58,7 @@ const CHAYKA_NEWS_SOURCE_URLS = [
   process.env.EXPO_PUBLIC_CHAYKA_NEWS_RSS_URL,
   process.env.EXPO_PUBLIC_CHAYKA_NEWS_JSON_URL,
   DEFAULT_CHAYKA_NEWS_URL,
+  DEFAULT_CHAYKA_NEWS_CDN_URL,
 ]
   .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
   .map((value) => value.trim())
@@ -151,6 +157,12 @@ export const loadChaykaNewsDetailed = async (): Promise<{ status: ChaykaNewsLoad
 
     // Remote feed exists but is empty. Do not fall back to fake draft news.
     return { status: 'empty', fromCache: false, items: [] };
+  }
+
+  const databaseFeed = await loadChaykaNewsFromDatabase();
+  if (databaseFeed.length > 0) {
+    await persistChaykaNewsCache(databaseFeed);
+    return { status: 'remote', fromCache: false, items: databaseFeed };
   }
 
   const cached = await loadChaykaNewsFromCache();
@@ -254,6 +266,34 @@ const normalizeRemotePayload = (payload: unknown): RawChaykaNewsItem[] => {
   }
 
   return [];
+};
+
+const mapDatabasePublication = ([id, item]: [string, RawChaykaNewsItem]): RawChaykaNewsItem => {
+  const publishedAt = typeof item.publishedAt === 'string'
+    ? item.publishedAt
+    : typeof item.createdAt === 'number'
+      ? new Date(item.createdAt).toISOString()
+      : typeof item.date === 'string'
+        ? item.date
+        : new Date().toISOString();
+
+  return {
+    ...item,
+    id: item.id || id,
+    publishedAt,
+  };
+};
+
+const loadChaykaNewsFromDatabase = async (): Promise<ChaykaNewsItem[]> => {
+  try {
+    const snapshot = await get(query(ref(database, CHAYKA_NEWS_DB_PATH), orderByChild('createdAt'), limitToLast(CHAYKA_NEWS_ACTIVE_LIMIT)));
+    const raw = snapshot.val() as Record<string, RawChaykaNewsItem> | null;
+    if (!raw) return [];
+
+    return normalizeChaykaNews(Object.entries(raw).map((entry) => mapDatabasePublication(entry)));
+  } catch {
+    return [];
+  }
 };
 
 const loadChaykaNewsFromRemote = async (): Promise<{ status: 'success' | 'unavailable'; items: ChaykaNewsItem[] }> => {

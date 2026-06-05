@@ -117,6 +117,8 @@ const CLEAN_PROBLEMS_TEXT = {
     votes: 'голосів',
     emptyTitle: 'Проблем немає',
     emptySubtitle: 'У Чайці все спокійно',
+    loadErrorTitle: 'Не вдалося завантажити',
+    loadErrorSubtitle: 'Перевірте інтернет або спробуйте оновити екран.',
     street: 'Вулиця',
     building: 'Будинок',
     today: 'Сьогодні',
@@ -158,6 +160,8 @@ const CLEAN_PROBLEMS_TEXT = {
     votes: 'голосов',
     emptyTitle: 'Проблем нет',
     emptySubtitle: 'В Чайке все спокойно',
+    loadErrorTitle: 'Не удалось загрузить',
+    loadErrorSubtitle: 'Проверьте интернет или попробуйте обновить экран.',
     street: 'Улица',
     building: 'Дом',
     today: 'Сегодня',
@@ -199,6 +203,8 @@ const CLEAN_PROBLEMS_TEXT = {
     votes: 'votes',
     emptyTitle: 'No problems',
     emptySubtitle: 'Everything is calm in Chaika Life',
+    loadErrorTitle: 'Could not load',
+    loadErrorSubtitle: 'Check the internet connection or try refreshing the screen.',
     street: 'Street',
     building: 'Building',
     today: 'Today',
@@ -319,6 +325,7 @@ const text = CLEAN_PROBLEMS_TEXT[language];
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const [voterMap, setVoterMap] = useState<Record<string, Record<string, true>>>({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [filter, setFilter] = useState<string>(text.all);
   const [category, setCategory] = useState<string>(text.yard);
   const [street, setStreet] = useState<string>(streets[0] || '');
@@ -379,6 +386,8 @@ const text = CLEAN_PROBLEMS_TEXT[language];
     const requestsRef = query(ref(db, 'requests'), orderByChild('category'), equalTo('problem'), limitToLast(360));
     let cancelled = false;
     let unsub: (() => void) = () => {};
+    setLoading(true);
+    setLoadError(false);
     void ensureFirebaseAuth().then(() => {
       if (cancelled) return;
       unsub = onValue(
@@ -386,6 +395,7 @@ const text = CLEAN_PROBLEMS_TEXT[language];
       (snapshot) => {
         if (cancelled) return;
         setLoading(false);
+        setLoadError(false);
         const raw = snapshot.val() as Record<string, any> | null;
         if (!raw) { setRawItems([]); return; }
         const problems = Object.entries(raw)
@@ -419,9 +429,21 @@ const text = CLEAN_PROBLEMS_TEXT[language];
           .sort((a, b) => b.id.localeCompare(a.id));
         setRawItems(problems);
       },
-      () => { if (!cancelled) setLoading(false); }
+      (error) => {
+        console.warn('[Problemy-Chayki] requests subscription failed:', error);
+        if (!cancelled) {
+          setLoading(false);
+          setLoadError(true);
+        }
+      }
       );
-    }).catch(() => setLoading(false));
+    }).catch((error) => {
+      console.warn('[Problemy-Chayki] auth bootstrap failed:', error);
+      if (!cancelled) {
+        setLoading(false);
+        setLoadError(true);
+      }
+    });
     return () => { cancelled = true; unsub(); };
   }, []);
 
@@ -469,11 +491,28 @@ const text = CLEAN_PROBLEMS_TEXT[language];
   useEffect(() => {
     const db = database;
     const votesRef = ref(db, 'problem_votes');
-    const unsub = onValue(votesRef, (snapshot) => {
-      const raw = snapshot.val() as Record<string, Record<string, true>> | null;
-      setVoterMap(raw ?? {});
-    });
-    return unsub;
+    let cancelled = false;
+    let unsub: (() => void) = () => {};
+    void ensureFirebaseAuth()
+      .then(() => {
+        if (cancelled) return;
+        unsub = onValue(votesRef, (snapshot) => {
+          if (cancelled) return;
+          const raw = snapshot.val() as Record<string, Record<string, true>> | null;
+          setVoterMap(raw ?? {});
+        }, (error) => {
+          console.warn('[Problemy-Chayki] votes subscription failed:', error);
+          if (!cancelled) setVoterMap({});
+        });
+      })
+      .catch((error) => {
+        console.warn('[Problemy-Chayki] votes auth bootstrap failed:', error);
+        if (!cancelled) setVoterMap({});
+      });
+    return () => {
+      cancelled = true;
+      unsub();
+    };
   }, []);
 
   const items = useMemo<Problem[]>(
@@ -874,9 +913,9 @@ const text = CLEAN_PROBLEMS_TEXT[language];
             </View>
           ) : (
             <View style={styles.emptyState}>
-              <TactileIcon icon="checkbox-marked-circle-outline" size={54} iconSize={26} backgroundColor="#403933" />
-              <Text style={styles.emptyTitle}>{text.emptyTitle}</Text>
-              <Text style={styles.emptySub}>{text.emptySubtitle}</Text>
+              <TactileIcon icon={loadError ? 'alert-circle-outline' : 'checkbox-marked-circle-outline'} size={54} iconSize={26} backgroundColor="#403933" />
+              <Text style={styles.emptyTitle}>{loadError ? text.loadErrorTitle : text.emptyTitle}</Text>
+              <Text style={styles.emptySub}>{loadError ? text.loadErrorSubtitle : text.emptySubtitle}</Text>
             </View>
           )
         }

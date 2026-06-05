@@ -4,7 +4,7 @@ import { createPendingModeration, ModerationStatus } from '../utils/moderation';
 import { sanitizeStoredText } from '../utils/textUtils';
 import { resolveMediaAccessUrls } from './mediaAccess';
 import { publishApprovedActivity } from './activityMirror';
-import { requireWriteSession } from '../firebase-auth-session';
+import { ensureFirebaseAuth, requireWriteSession } from '../firebase-auth-session';
 import { LOCAL_MODE, LOCAL_API } from '../local/LOCAL_MODE';
 import { assertTextMatchesLanguage, normalizeAppLang, type AppLang } from '../utils/contentLanguageGuard';
 
@@ -85,7 +85,7 @@ const mapBuySellItem = (id: string, data: any, isArchived?: boolean): BuySellLis
 });
 
 export const buySellService = {
-  subscribe(callback: (items: BuySellListing[]) => void, currentUserId?: string): () => void {
+  subscribe(callback: (items: BuySellListing[]) => void, currentUserId?: string, onError?: (error: unknown) => void): () => void {
     // ─── LOCAL_MODE ───────────────
     if (LOCAL_MODE) {
       let cancelled = false;
@@ -104,70 +104,107 @@ export const buySellService = {
     // ─────────────────────────────
     let approvedItems: BuySellListing[] = [];
     let ownPendingItems: BuySellListing[] = [];
+    let unsubscribeApproved: (() => void) | undefined;
+    let unsubscribeOwn: (() => void) | undefined;
+    let cancelled = false;
+
+    const resolveAndEmit = (items: BuySellListing[]) => {
+      void resolveMediaAccessUrls(items, 'buy_sell_listings', (item) => item.photoUri || item.photoStoragePath || '', (item, url) => ({ ...item, photoUri: url }))
+        .then((resolved) => {
+          if (!cancelled) callback(resolved);
+        })
+        .catch((error) => {
+          console.warn('[buySellService] media resolve failed:', error);
+          if (!cancelled) callback(items);
+        });
+    };
 
     const emit = (active: BuySellListing[]) => {
       const visibleActive = active.filter(isPublicListingContentVisible);
       const ids = new Set(visibleActive.map((i) => i.id));
       const extras = ownPendingItems.filter((i) => !ids.has(i.id) && isPublicListingContentVisible(i));
-      const merged = [...extras, ...visibleActive];
-      void resolveMediaAccessUrls(merged, 'buy_sell_listings', (item) => item.photoUri || item.photoStoragePath || '', (item, url) => ({ ...item, photoUri: url })).then(callback);
+      resolveAndEmit([...extras, ...visibleActive]);
     };
 
-    const listRef = query(ref(database, PATH), orderByChild('moderationStatus'), equalTo('approved'), limitToLast(ACTIVE_LIMIT + ACTIVE_LIMIT_BUFFER));
+    void ensureFirebaseAuth()
+      .then(() => {
+        if (cancelled) return;
+        const listRef = query(ref(database, PATH), orderByChild('moderationStatus'), equalTo('approved'), limitToLast(ACTIVE_LIMIT + ACTIVE_LIMIT_BUFFER));
 
-    const unsubscribeApproved = onValue(listRef, (snapshot) => {
-      const raw = snapshot.val();
-      const now = Date.now();
-      const active: BuySellListing[] = raw
-          ? Object.entries(raw as Record<string, any>)
-            .map(([id, data]) => mapBuySellItem(id, data))
-            .filter((item) => {
-              const expired = item.expiresAt && new Date(item.expiresAt).getTime() < now;
-              return item.moderationStatus === 'approved' && !expired && isPublicListingContentVisible(item);
-            })
-            .reverse()
-            .slice(0, ACTIVE_LIMIT)
-        : [];
-      approvedItems = active;
+        unsubscribeApproved = onValue(listRef, (snapshot) => {
+          if (cancelled) return;
+          const raw = snapshot.val();
+          const now = Date.now();
+          const active: BuySellListing[] = raw
+              ? Object.entries(raw as Record<string, any>)
+                .map(([id, data]) => mapBuySellItem(id, data))
+                .filter((item) => {
+                  const expired = item.expiresAt && new Date(item.expiresAt).getTime() < now;
+                  return item.moderationStatus === 'approved' && !expired && isPublicListingContentVisible(item);
+                })
+                .reverse()
+                .slice(0, ACTIVE_LIMIT)
+            : [];
+          approvedItems = active;
 
-      if (active.length >= FEED_MINIMUM) {
-        emit(active);
-        return;
-      }
+          if (active.length >= FEED_MINIMUM) {
+            emit(active);
+            return;
+          }
 
-      void get(query(ref(database, PATH), orderByChild('moderationStatus'), equalTo('expired'), limitToLast(ARCHIVED_FALLBACK_LIMIT))).then((expiredSnapshot) => {
-        const expiredRaw = expiredSnapshot.val();
-        const archived: BuySellListing[] = expiredRaw
-          ? Object.entries(expiredRaw as Record<string, any>)
-              .map(([id, data]) => mapBuySellItem(id, data, true))
-              .filter(isPublicListingContentVisible)
-              .reverse()
-          : [];
-        emit([...active, ...archived]);
-      }).catch((error) => {
-        console.warn('[buySellService] expired fallback load failed:', error);
-        emit(active);
+          void get(query(ref(database, PATH), orderByChild('moderationStatus'), equalTo('expired'), limitToLast(ARCHIVED_FALLBACK_LIMIT))).then((expiredSnapshot) => {
+            if (cancelled) return;
+            const expiredRaw = expiredSnapshot.val();
+            const archived: BuySellListing[] = expiredRaw
+              ? Object.entries(expiredRaw as Record<string, any>)
+                  .map(([id, data]) => mapBuySellItem(id, data, true))
+                  .filter(isPublicListingContentVisible)
+                  .reverse()
+              : [];
+            emit([...active, ...archived]);
+          }).catch((error) => {
+            console.warn('[buySellService] expired fallback load failed:', error);
+            if (!cancelled) emit(active);
+          });
+        }, (error) => {
+          console.warn('[buySellService] approved subscription failed:', error);
+          if (!cancelled) {
+            callback([]);
+            onError?.(error);
+          }
+        });
+
+        if (currentUserId) {
+          const ownRef = query(ref(database, PATH), orderByChild('userId'), equalTo(currentUserId));
+          unsubscribeOwn = onValue(ownRef, (snapshot) => {
+            if (cancelled) return;
+            const raw = snapshot.val();
+            ownPendingItems = raw
+              ? Object.entries(raw as Record<string, any>)
+                  .map(([id, data]) => mapBuySellItem(id, data))
+                  .filter((item) => item.moderationStatus !== 'approved' && isPublicListingContentVisible(item))
+              : [];
+            const ids = new Set(approvedItems.map((i) => i.id));
+            const extras = ownPendingItems.filter((i) => !ids.has(i.id));
+            resolveAndEmit([...extras, ...approvedItems]);
+          }, (error) => {
+            console.warn('[buySellService] own subscription failed:', error);
+            ownPendingItems = [];
+            if (!cancelled) onError?.(error);
+          });
+        }
+      })
+      .catch((error) => {
+        console.warn('[buySellService] auth bootstrap failed:', error);
+        if (!cancelled) {
+          callback([]);
+          onError?.(error);
+        }
       });
-    });
-
-    let unsubscribeOwn: (() => void) | undefined;
-    if (currentUserId) {
-      const ownRef = query(ref(database, PATH), orderByChild('userId'), equalTo(currentUserId));
-      unsubscribeOwn = onValue(ownRef, (snapshot) => {
-        const raw = snapshot.val();
-        ownPendingItems = raw
-          ? Object.entries(raw as Record<string, any>)
-              .map(([id, data]) => mapBuySellItem(id, data))
-              .filter((item) => item.moderationStatus !== 'approved' && isPublicListingContentVisible(item))
-          : [];
-        const ids = new Set(approvedItems.map((i) => i.id));
-        const extras = ownPendingItems.filter((i) => !ids.has(i.id));
-        void resolveMediaAccessUrls([...extras, ...approvedItems], 'buy_sell_listings', (item) => item.photoUri || item.photoStoragePath || '', (item, url) => ({ ...item, photoUri: url })).then(callback);
-      }, () => { ownPendingItems = []; });
-    }
 
     return () => {
-      unsubscribeApproved();
+      cancelled = true;
+      unsubscribeApproved?.();
       unsubscribeOwn?.();
     };
   },

@@ -432,6 +432,7 @@ const JobSearchScreen: React.FC = () => {
   const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
   const [listings, setListings] = useState<JobListing[]>([]);
   const [listingsReady, setListingsReady] = useState(false);
+  const [listingsLoadError, setListingsLoadError] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [touched, setTouched] = useState<Record<FieldKey, boolean>>({
@@ -451,10 +452,15 @@ const JobSearchScreen: React.FC = () => {
 
   useEffect(() => {
     setListingsReady(false);
+    setListingsLoadError(false);
     const unsubscribe = jobService.subscribe((items) => {
       setListingsReady(true);
+      setListingsLoadError(false);
       setListings(items);
-    }, user?.id);
+    }, user?.id, () => {
+      setListingsReady(true);
+      setListingsLoadError(true);
+    });
     return unsubscribe;
   }, [user?.id]);
 
@@ -1078,6 +1084,12 @@ const JobSearchScreen: React.FC = () => {
           !listingsReady ? (
             <View style={styles.emptyState}>
               <ActivityIndicator size="large" color="#6A8BA5" />
+            </View>
+          ) : listingsLoadError ? (
+            <View style={styles.emptyState}>
+              <TactileIcon icon="alert-circle-outline" size={54} iconSize={26} backgroundColor="#403933" />
+              <Text style={styles.emptyTitle}>{language === 'en' ? 'Could not load listings' : language === 'ru' ? 'Не удалось загрузить объявления' : 'Не вдалося завантажити оголошення'}</Text>
+              <Text style={styles.emptySub}>{language === 'en' ? 'Check the internet connection or try refreshing the screen.' : language === 'ru' ? 'Проверьте интернет или попробуйте обновить экран.' : 'Перевірте інтернет або спробуйте оновити екран.'}</Text>
             </View>
           ) : listings.length === 0 ? (
             <View style={styles.emptyState}>

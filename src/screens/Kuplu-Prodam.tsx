@@ -308,6 +308,8 @@ const BuySellScreen: React.FC = () => {
   const draftHadPhotos = useRef(false);
   const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
   const [listings, setListings] = useState<BuySellListing[]>([]);
+  const [listingsReady, setListingsReady] = useState(false);
+  const [listingsLoadError, setListingsLoadError] = useState(false);
   const [selectedFilterCategory, setSelectedFilterCategory] = useState('');
   const [selectedFilterListingType, setSelectedFilterListingType] = useState<'' | 'buy' | 'sell'>('');
   const [submitting, setSubmitting] = useState(false);
@@ -325,6 +327,21 @@ const BuySellScreen: React.FC = () => {
   const avatarByUserId = useUserAvatarMap(listings.map((item) => item.userId));
 
   const handleRequestCloseModal = useCallback(() => {
+    const defaultPhone = user?.phone ? normalizePhoneText(user.phone) : '';
+    const isDirty =
+      itemName.trim() !== '' ||
+      listingType !== 'sell' ||
+      category !== '' ||
+      condition !== '' ||
+      price.trim() !== '' ||
+      description.trim() !== '' ||
+      phone.trim() !== defaultPhone ||
+      formPhotos.length > 0;
+    if (!isDirty) {
+      void AsyncStorage.removeItem('@chaika:buy_sell_draft').catch(() => {});
+      setAddFormVisible(false);
+      return;
+    }
     const closeTitle = language === 'ru' ? 'Закрыть форму?' : language === 'en' ? 'Close form?' : 'Закрити форму?';
     const closeMsg = language === 'ru' ? 'Вы ещё не отправили объявление. Закрыть?' : language === 'en' ? 'You haven\'t submitted the listing yet. Close?' : 'Ви ще не надіслали оголошення. Закрити?';
     const closeNo = language === 'ru' ? 'Нет' : language === 'en' ? 'No' : 'Ні';
@@ -333,11 +350,20 @@ const BuySellScreen: React.FC = () => {
       { text: closeNo, style: 'cancel' },
       { text: closeYes, onPress: () => { void AsyncStorage.removeItem('@chaika:buy_sell_draft').catch(() => {}); setAddFormVisible(false); } },
     ]);
-  }, [language]);
+  }, [category, condition, description, formPhotos.length, itemName, language, listingType, phone, price, user?.phone]);
 
   useEffect(() => {
     let isMounted = true;
-    const unsubscribe = buySellService.subscribe(setListings, user?.id);
+    setListingsReady(false);
+    setListingsLoadError(false);
+    const unsubscribe = buySellService.subscribe((items) => {
+      setListingsReady(true);
+      setListingsLoadError(false);
+      setListings(items);
+    }, user?.id, () => {
+      setListingsReady(true);
+      setListingsLoadError(true);
+    });
     // Restore draft if Android restarted the activity while picker was open
     (async () => {
       try {
@@ -866,6 +892,23 @@ const BuySellScreen: React.FC = () => {
             </TouchableOpacity>
           );
         }}
+        ListEmptyComponent={
+          !listingsReady ? (
+            <View style={styles.emptyFiltered}>
+              <ActivityIndicator size="large" color="#6A8BA5" />
+            </View>
+          ) : listingsLoadError ? (
+            <View style={styles.emptyFiltered}>
+              <Text style={styles.emptyFilteredTitle}>{language === 'en' ? 'Could not load listings' : language === 'ru' ? 'Не удалось загрузить объявления' : 'Не вдалося завантажити оголошення'}</Text>
+              <Text style={styles.emptyFilteredSub}>{language === 'en' ? 'Check the internet connection or try refreshing the screen.' : language === 'ru' ? 'Проверьте интернет или попробуйте обновить экран.' : 'Перевірте інтернет або спробуйте оновити екран.'}</Text>
+            </View>
+          ) : listings.length === 0 ? (
+            <View style={styles.emptyFiltered}>
+              <Text style={styles.emptyFilteredTitle}>{text.noSearchResults}</Text>
+              <Text style={styles.emptyFilteredSub}>{text.noSearchResultsSub}</Text>
+            </View>
+          ) : null
+        }
       />
       <View style={styles.addBar}>
         <TouchableOpacity style={styles.addBarBtn} onPress={guestGuard(() => {

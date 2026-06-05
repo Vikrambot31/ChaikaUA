@@ -398,6 +398,7 @@ const KontaktiChaikyScreen: React.FC = () => {
   const [showPhoneOnCard, setShowPhoneOnCard] = useState(true);
   const [listings, setListings] = useState<ContactListing[]>([]);
   const [listingsReady, setListingsReady] = useState(false);
+  const [listingsLoadError, setListingsLoadError] = useState(false);
   const [profileByUserId, setProfileByUserId] = useState<Record<string, ContactProfile>>({});
   const [selectedFilterCategory, setSelectedFilterCategory] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -456,10 +457,15 @@ const KontaktiChaikyScreen: React.FC = () => {
   useEffect(() => {
     let isMounted = true;
     setListingsReady(false);
+    setListingsLoadError(false);
     const unsubscribe = contactsService.subscribe((items) => {
       setListingsReady(true);
+      setListingsLoadError(false);
       setListings(items);
-    }, user?.id);
+    }, user?.id, () => {
+      setListingsReady(true);
+      setListingsLoadError(true);
+    });
     // Restore draft if Android restarted the activity while picker was open
     (async () => {
       try {
@@ -1012,7 +1018,14 @@ const KontaktiChaikyScreen: React.FC = () => {
           </View>
         )}
 
-        {listings.length > 0 && (
+        {listingsReady && listingsLoadError && listings.length === 0 && (
+          <View style={styles.emptyFiltered}>
+            <Text style={styles.emptyFilteredTitle}>{language === 'en' ? 'Could not load contacts' : language === 'ru' ? 'Не удалось загрузить контакты' : 'Не вдалося завантажити контакти'}</Text>
+            <Text style={styles.emptyFilteredSub}>{language === 'en' ? 'Check the internet connection or try refreshing the screen.' : language === 'ru' ? 'Проверьте интернет или попробуйте обновить экран.' : 'Перевірте інтернет або спробуйте оновити екран.'}</Text>
+          </View>
+        )}
+
+        {!listingsLoadError && listings.length > 0 && (
           <View style={styles.listingsSection}>
             <Text style={styles.formLabel}>{text.filterLabel}</Text>
             <View style={styles.pickerWrapper}>

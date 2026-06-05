@@ -54,7 +54,7 @@ const mapJobItem = (id: string, data: any, isArchived?: boolean): JobListing => 
 });
 
 export const jobService = {
-  subscribe(callback: (items: JobListing[]) => void, currentUserId?: string): () => void {
+  subscribe(callback: (items: JobListing[]) => void, currentUserId?: string, onError?: (error: unknown) => void): () => void {
     let disposed = false;
     let approvedItems: JobListing[] = [];
     let ownPendingItems: JobListing[] = [];
@@ -105,8 +105,12 @@ export const jobService = {
         }).catch(() => {
           if (!disposed) emit(active);
         });
-      }, () => {
-        if (!disposed) callback([]);
+      }, (error) => {
+        console.warn('[jobService] approved subscription failed:', error);
+        if (!disposed) {
+          callback([]);
+          onError?.(error);
+        }
       });
 
       if (currentUserId) {
@@ -122,10 +126,18 @@ export const jobService = {
           const ids = new Set(approvedItems.map((i) => i.id));
           const extras = ownPendingItems.filter((i) => !ids.has(i.id));
           callback([...extras, ...approvedItems]);
-        }, () => { ownPendingItems = []; });
+        }, (error) => {
+          console.warn('[jobService] own subscription failed:', error);
+          ownPendingItems = [];
+          if (!disposed) onError?.(error);
+        });
       }
-    }).catch(() => {
-      if (!disposed) callback([]);
+    }).catch((error) => {
+      console.warn('[jobService] auth bootstrap failed:', error);
+      if (!disposed) {
+        callback([]);
+        onError?.(error);
+      }
     });
 
     return () => {
