@@ -19,8 +19,11 @@ import { safeCallPhone } from '../utils/communicationActions';
 import type { DetailItemData } from '../utils/detailViewTypes';
 import UserCardActionBar from '../components/UserCardActionBar';
 import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
+import ScreenTooltip from '../components/ScreenTooltip';
+import { HELP_HISTORY_TOOLTIP } from '../utils/screenTooltips';
+import { requireAuthForDetails } from '../utils/authGuard';
 
-type FilterType = 'all' | 'active' | 'completed' | 'today' | 'expired' | 'mine';
+type FilterType = 'active' | 'completed' | 'today' | 'expired' | 'mine';
 type Lang = 'ua' | 'ru' | 'en';
 
 const UI_TEXT = {
@@ -210,7 +213,6 @@ const HelpHistoryScreen: React.FC = () => {
 
   const allRequests = useSelector((state: RootState) => selectAllHelpRequests(state)) as HelpRequest[];
   const completedRequests = useSelector((state: RootState) => selectCompletedRequests(state)) as HelpRequest[];
-  const avatarByUserId = useUserAvatarMap(allRequests.map((item) => item.userId));
 
   useEffect(() => {
     if (sourceRequests.length === 0) return;
@@ -229,10 +231,14 @@ const HelpHistoryScreen: React.FC = () => {
     return sameName;
   }, [user]);
 
+  const ownRequests = useMemo(() => allRequests.filter((r) => isOwnRequest(r)), [allRequests, isOwnRequest]);
+  const ownCompletedRequests = useMemo(() => completedRequests.filter((r) => isOwnRequest(r)), [completedRequests, isOwnRequest]);
+  const avatarByUserId = useUserAvatarMap([...ownRequests, ...ownCompletedRequests].map((item) => item.userId));
+
   const helpTypes = useMemo(() => {
-    const values = Array.from(new Set(allRequests.map((r) => extractHelpType(r.description)).filter(Boolean)));
+    const values = Array.from(new Set(ownRequests.map((r) => extractHelpType(r.description)).filter(Boolean)));
     return values;
-  }, [allRequests]);
+  }, [ownRequests]);
 
   const filteredRequests = useMemo(() => {
     const now = new Date(nowTs);
@@ -240,21 +246,20 @@ const HelpHistoryScreen: React.FC = () => {
     const baseList = (() => {
       switch (filter) {
         case 'active':
-          return allRequests.filter((r) => r.isBurning && toDateSafe(r.expiresAt) > now);
+          return ownRequests.filter((r) => r.isBurning && toDateSafe(r.expiresAt) > now);
         case 'completed':
-          return completedRequests;
+          return ownCompletedRequests;
         case 'today': {
           const today = new Date(nowTs);
           today.setHours(0, 0, 0, 0);
-          return allRequests.filter((r) => toDateSafe(r.createdAt) >= today);
+          return ownRequests.filter((r) => toDateSafe(r.createdAt) >= today);
         }
         case 'expired':
-          return allRequests.filter((r) => toDateSafe(r.expiresAt) <= now);
+          return ownRequests.filter((r) => toDateSafe(r.expiresAt) <= now);
         case 'mine':
-          return allRequests.filter((r) => isOwnRequest(r));
-        case 'all':
+          return ownRequests;
         default:
-          return allRequests;
+          return ownRequests;
       }
     })();
 
@@ -266,7 +271,7 @@ const HelpHistoryScreen: React.FC = () => {
         return haystack.includes(query);
       })
       .sort((a, b) => toDateSafe(b.createdAt).getTime() - toDateSafe(a.createdAt).getTime());
-  }, [allRequests, completedRequests, filter, isOwnRequest, nowTs, searchQuery, typeFilter]);
+  }, [filter, nowTs, ownCompletedRequests, ownRequests, searchQuery, typeFilter]);
 
   const filterOptions: { label: string; value: FilterType; count: number }[] = useMemo(() => {
     const now = new Date(nowTs);
@@ -274,14 +279,13 @@ const HelpHistoryScreen: React.FC = () => {
     today.setHours(0, 0, 0, 0);
 
     return [
-      { label: text.all, value: 'all', count: allRequests.length },
-      { label: text.active, value: 'active', count: allRequests.filter((r) => r.isBurning && toDateSafe(r.expiresAt) > now).length },
-      { label: text.completed, value: 'completed', count: completedRequests.length },
-      { label: text.today, value: 'today', count: allRequests.filter((r) => toDateSafe(r.createdAt) >= today).length },
-      { label: text.expired, value: 'expired', count: allRequests.filter((r) => toDateSafe(r.expiresAt) <= now).length },
-      { label: text.mine, value: 'mine', count: allRequests.filter((r) => isOwnRequest(r)).length },
+      { label: text.active, value: 'active', count: ownRequests.filter((r) => r.isBurning && toDateSafe(r.expiresAt) > now).length },
+      { label: text.completed, value: 'completed', count: ownCompletedRequests.length },
+      { label: text.today, value: 'today', count: ownRequests.filter((r) => toDateSafe(r.createdAt) >= today).length },
+      { label: text.expired, value: 'expired', count: ownRequests.filter((r) => toDateSafe(r.expiresAt) <= now).length },
+      { label: text.mine, value: 'mine', count: ownRequests.length },
     ];
-  }, [allRequests, completedRequests.length, isOwnRequest, nowTs, text]);
+  }, [nowTs, ownCompletedRequests.length, ownRequests, text]);
 
   const handleRepeat = (item: HelpRequest) => {
     const now = new Date();
@@ -338,6 +342,7 @@ const HelpHistoryScreen: React.FC = () => {
       sourceId: item.id,
     };
 
+    if (!requireAuthForDetails({ userId: user?.id, navigation, language })) return;
     navigation.navigate('ItemDetailScreen', { item: detailItem });
   };
 
@@ -442,6 +447,12 @@ const HelpHistoryScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <ScreenTooltip
+        storageKey={HELP_HISTORY_TOOLTIP.storageKey}
+        title={HELP_HISTORY_TOOLTIP.title}
+        items={HELP_HISTORY_TOOLTIP.items}
+        accentColor={COLORS.primary}
+      />
       <FlatList
         keyboardShouldPersistTaps="handled"
         data={filteredRequests}

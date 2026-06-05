@@ -30,6 +30,8 @@ import {
 } from '../services/adService';
 import { subscribeMyPromoCredits, type PromoCredits } from '../services/bonusService';
 import type { AdMessage, AdTicket } from '../types/ad';
+import ScreenTooltip from '../components/ScreenTooltip';
+import { PROMO_CREDITS_TOPUP_TOOLTIP } from '../utils/screenTooltips';
 
 type AppNav = NavigationProp<Record<string, object | undefined>>;
 
@@ -196,6 +198,12 @@ const PromoCreditsTopupScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <ScreenTooltip
+        storageKey={PROMO_CREDITS_TOPUP_TOOLTIP.storageKey}
+        title={PROMO_CREDITS_TOPUP_TOOLTIP.title}
+        items={PROMO_CREDITS_TOPUP_TOOLTIP.items}
+        accentColor={SCREEN_THEME.terracotta}
+      />
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.8}>
           <MaterialCommunityIcons name="arrow-left" size={22} color={SCREEN_THEME.textPrimary} />

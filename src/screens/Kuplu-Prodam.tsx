@@ -24,6 +24,7 @@ import { getLanguageValidationError } from '../utils/contentLanguageGuard';
 import UserCardActionBar from '../components/UserCardActionBar';
 import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 import { useOperationTrace } from '../hooks/useOperationTrace';
+import { requireAuthForDetails } from '../utils/authGuard';
 
 const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000;
 
@@ -500,8 +501,9 @@ const BuySellScreen: React.FC = () => {
   }, [text.approved, text.categories, text.pending, text.rejected]);
 
   const openDetail = useCallback((item: BuySellListing) => {
+    if (!requireAuthForDetails({ userId: user?.id, navigation, language })) return;
     navigation.navigate('ItemDetailScreen', { item: mapToDetailData(item) });
-  }, [mapToDetailData, navigation]);
+  }, [language, mapToDetailData, navigation, user?.id]);
 
   const handleSubmit = async () => {
     startOperation();

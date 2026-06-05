@@ -173,6 +173,9 @@ export const getUserErrorMessage = (
   if (raw.includes('write_session_auth_mismatch') || raw.includes('write_session_token_refresh_failed')) {
     return MESSAGES[language].permissionDenied;
   }
+  if (raw.includes('daily request limit') || raw.includes('daily help_neighbors limit') || raw.includes('daily_limit') || raw.includes('limit reached')) {
+    return MESSAGES[language].rateLimit;
+  }
   if (raw.includes('owner_required')) {
     return MESSAGES[language].notFound;
   }
@@ -207,10 +210,7 @@ export const getUserErrorMessage = (
     if (context === 'auth') {
       return MESSAGES[language].loginRequired;
     }
-    if (isRetryableActionContext(context)) {
-      return MESSAGES[language][context];
-    }
-    return MESSAGES[language].noPermission;
+    return MESSAGES[language].permissionDenied;
   }
   if (context === 'upload' && (raw.includes('upload') || raw.includes('storage') || raw.includes('blob'))) {
     return MESSAGES[language].uploadFailed;

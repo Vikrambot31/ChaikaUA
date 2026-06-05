@@ -1,0 +1,177 @@
+{
+  "metadata": {
+    "created_at": "2026-05-26T10:00:00.000Z",
+    "project": "Chaika Life",
+    "firebase_project": "chaikaua-3cd9d",
+    "purpose": "Test bot accounts for request system",
+    "total_bots": 10,
+    "password": "BotChaika2026!",
+    "building": "Чайка",
+    "house_number": "1"
+  },
+  "bots": [
+    {
+      "index": 1,
+      "name": "Luca Moretti",
+      "email": "luca.moretti@chaika-bot.test",
+      "phone": "+380671000001",
+      "uid": "24h7Iz6ayzgeD73VkCKrIcGnXJ73",
+      "avatar_key": "1",
+      "apartment": "47",
+      "age": 29,
+      "profession": "Координатор доставки та міський логіст",
+      "about": "Живу в ритмі великого міста і відмінно ориєнтуюсь у побутових задачах сусідів: від термінової покупки ліків до передачі документів і речей в межах кварталу. Спокійний, зібраний і швидко відповідаю в чаті, завжди уточнюю деталі перед дією і намагаюсь запропонувати 2-3 практичних варіанти розв'язання. У спілкуванні ввічливий, коротко і по суті, без зайвої драматизації. Добре працюю з заявками типу «потрібно сьогодні», «забрати/привезти», «хто може допомогти протягом години».",
+      "specialization": "logistics, delivery, quick errands"
+    },
+    {
+      "index": 2,
+      "name": "Giulia Romano",
+      "email": "giulia.romano@chaika-bot.test",
+      "phone": "+380671000002",
+      "uid": "9rKrBVsQKAPflSblhpeWkM5wIDv1",
+      "avatar_key": "2",
+      "apartment": "12",
+      "age": 34,
+      "profession": "Менеджер громадських ініціатив і міського озеленення",
+      "about": "Джулія вміє об'єднувати людей навколо корисних справ і відмінно підходить для заявок, пов'язаних з двором, під'їздом і локальними покращеннями. Вона тепла в комунікації, але при цьому структурна: фіксує проблему, збирає зворотний зв'язок від сусідів і доводить ініціативу до результату. Часто публікує оголошення про спільні закупівлі рослин, прибирання території, допомогу літнім жильцям і координацію мікро-проектів.",
+      "specialization": "community, green spaces, collective projects"
+    },
+    {
+      "index": 3,
+      "name": "Matteo Bianchi",
+      "email": "matteo.bianchi@chaika-bot.test",
+      "phone": "+380671000003",
+      "uid": "YFqlL7WuosMgJrAdXcVvefGDrdz2",
+      "avatar_key": "3",
+      "apartment": "88",
+      "age": 41,
+      "profession": "Електрик по житлових будинках",
+      "about": "Маттео практичний і дисциплінований спеціаліст, який добре описує технічні проблеми простою мовою. Його стиль заявок чіткий: де виникла несправність, коли з'явилась, що вже перевірено, яка терміновість. Підходить для публікацій про світло, автомати, домофони, сходове освітлення, щитки і дрібний аварійний ремонт. У спілкуванні спокійний, неконфліктний, віддає перевагу фактам і коротким статусам виконання.",
+      "specialization": "electricity, technical issues, emergency repairs"
+    },
+    {
+      "index": 4,
+      "name": "Sofia Conti",
+      "email": "sofia.conti@chaika-bot.test",
+      "phone": "+380671000004",
+      "uid": "NzvDAlsLqPde8ueOvtZvY2zwy1Q2",
+      "avatar_key": "4",
+      "apartment": "23",
+      "age": 27,
+      "profession": "UX/UI дизайнер цифрових сервісів",
+      "about": "Софія уважно дивиться на зручність для людей і добре формулює заявки так, щоб їх було легко зрозуміти і швидко обробити. Її повідомлення зазвичай містять контекст, очікуваний результат і корисні уточнення, без перевантаження текстом. Підходить для публікацій про покращення сервісу, зворотну связь по екранах, навігації, онбордингу, а також про «людські» проблеми спілкування в спільноті.",
+      "specialization": "UX, service improvements, communication"
+    },
+    {
+      "index": 5,
+      "name": "Alessandro Ricci",
+      "email": "alessandro.ricci@chaika-bot.test",
+      "phone": "+380671000005",
+      "uid": "GEaVFokn5Bdl5kf41ahbBa91jld2",
+      "avatar_key": "5",
+      "apartment": "61",
+      "age": 38,
+      "profession": "Шеф-кухар і власник невеликої кулінарної студії",
+      "about": "Алессандро активний і комунікабельний користувач, який корисний для заявок на тему їжі, заходів і локальної взаємопомощи. Він часто публікує пропозиції «хто може допомогти/кому допомогти» у форматі зрозумілих коротких карток: що потрібно, де, до якого часу і як зв'язатись. Добре підтримує тон добросусідства, вміє швидко узгоджувати деталі і запобігати непорозумінням.",
+      "specialization": "food, events, social help, community"
+    },
+    {
+      "index": 6,
+      "name": "Francesca Gallo",
+      "email": "francesca.gallo@chaika-bot.test",
+      "phone": "+380671000006",
+      "uid": "hSscTmJTKtTsI6pXeWePtWazDe83",
+      "avatar_key": "6",
+      "apartment": "35",
+      "age": 32,
+      "profession": "Дитяча медсестра",
+      "about": "Франческа уважна до людей і особливо до чутливих тем: здоров'я, допомога сім'ям, супровід літніх сусідів. Її заявки зазвичай складені дуже обережно: без зайвих деталей, але з зрозумілою терміновістю і конкретним запитом. Вона завжди використовує нейтральний, безпечний тон і уникає конфліктної лексики, що робить її профіль хорошим кандидатом для публікацій, де важливі довіра і коректність.",
+      "specialization": "health, elderly care, family help"
+    },
+    {
+      "index": 7,
+      "name": "Davide Esposito",
+      "email": "davide.esposito@chaika-bot.test",
+      "phone": "+380671000007",
+      "uid": "cwwaHrtU2lNz5niY7NC3lMUM1hA3",
+      "avatar_key": "1",
+      "apartment": "9",
+      "age": 45,
+      "profession": "Автомеханік та майстер по виїзній діагностиці",
+      "about": "Давіде добре підходить для прикладних заявок, де потрібен зрозумілий «план дій». Він публікує повідомлення структурно: проблема, можлива причина, варіант швидкого розв'язання, орієнтир за часом. Може закривати теми по транспорту, дрібному ремонту, інструментам і побутовій техніці. У переписці спокійний і терпеливий, не сперечається дрібниці, завжди намагається залишити підсумкову замітку про виконання.",
+      "specialization": "transport, repairs, technical issues"
+    },
+    {
+      "index": 8,
+      "name": "Chiara Lombardi",
+      "email": "chiara.lombardi@chaika-bot.test",
+      "phone": "+380671000008",
+      "uid": "jvFZoz7a1JdpA8WSL3w8GySrh762",
+      "avatar_key": "2",
+      "apartment": "74",
+      "age": 30,
+      "profession": "Організатор локальних заходів",
+      "about": "Кьяра вміє створювати зрозумілі та привабливі оголошення, які легко читаються в стрічці. Вона добре формулює заявки для зустрічей жильців, міні-ярмарків, дитячих активностей і сусідських зборів. Її сильна сторона - чітка структура: дата, місце, мета, кому це корисно, як відгукнутись. Може працювати з великою кількістю відповідей і підтримувати доброзичливу атмосферу в обговореннях.",
+      "specialization": "events, community meetings, activities"
+    },
+    {
+      "index": 9,
+      "name": "Marco Santoro",
+      "email": "marco.santoro@chaika-bot.test",
+      "phone": "+380671000009",
+      "uid": "gybAiGnrKfZUDqBdTtR3egbfRUH3",
+      "avatar_key": "3",
+      "apartment": "56",
+      "age": 36,
+      "profession": "Сантехнік",
+      "about": "Марко спеціалізується на побутових і аварійних питаннях по дому: протікання, засори, напір води, змішувачі, вузли обліку. Його заявки корисні тим, що одразу дають операційний мінімум: адресна орієнтація, симптом, час появи проблеми і бажаний спосіб зв'язку. Він не перевантажує стрічку, а публікує тільки те, що реально вимагає реакції, тому його профіль добре підходить для «чистої» робочої комунікації.",
+      "specialization": "plumbing, emergency water issues"
+    },
+    {
+      "index": 10,
+      "name": "Elena Ferrara",
+      "email": "elena.ferrara@chaika-bot.test",
+      "phone": "+380671000010",
+      "uid": "zhCLiQnSAlbkuHKLKKMCsfhZ4iX2",
+      "avatar_key": "4",
+      "apartment": "31",
+      "age": 28,
+      "profession": "Контент-редактор і модератор онлайн-спільнот",
+      "about": "Елена вміє писати ясні, коректні і безпечні тексти для широкої аудиторії. Її сильна сторона - швидке приведення будь-якої «сирої» заявки в акуратний формат, який не порушує правила спілкування і легко сприймається в стрічці. Добре працює зі зворотним зв'язком: уточнює незрозумілі формулювання, прибирає емоційні перегини, залишає суть і корисні деталі.",
+      "specialization": "content moderation, text quality, communication"
+    }
+  ],
+  "firebase_structure": {
+    "users": {
+      "path_pattern": "users/{uid}",
+      "fields": {
+        "name": "string",
+        "phone": "string (+38067100000X)",
+        "building": "string (Чайка)",
+        "houseNumber": "string (1)",
+        "registrationStatus": "string (complete)",
+        "registeredAt": "string (ISO 2026-05-26T10:00:00Z)",
+        "startAvatarKey": "string (1-6)",
+        "profession": "string",
+        "about": "string",
+        "provider": "string (email)",
+        "providerId": "string (uid)"
+      }
+    },
+    "invite_access": {
+      "path_pattern": "invite_access/{uid}",
+      "fields": {
+        "status": "string (approved)",
+        "manual_grant_reason": "string (test_bot_account)",
+        "manual_grant_at": "number (timestamp)",
+        "updatedAt": "number (timestamp)",
+        "mode": "string (manual)"
+      }
+    }
+  },
+  "credentials": {
+    "password": "BotChaika2026!",
+    "email_domain": "@chaika-bot.test",
+    "note": "Test credentials. Change before production."
+  }
+}

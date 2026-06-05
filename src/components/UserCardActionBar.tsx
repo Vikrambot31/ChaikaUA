@@ -41,6 +41,18 @@ const labels = {
   en: { profile: 'Profile', contact: 'Contact', saveFailed: 'Could not save', retry: 'Tap like again to retry' },
 } as const;
 
+const authRequiredTitle = {
+  ua: '\u041f\u043e\u0442\u0440\u0456\u0431\u043d\u0430 \u0440\u0435\u0454\u0441\u0442\u0440\u0430\u0446\u0456\u044f',
+  ru: '\u041d\u0443\u0436\u043d\u0430 \u0440\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u044f',
+  en: 'Registration required',
+} as const;
+
+const authRequiredBody = {
+  ua: '\u0423\u0432\u0456\u0439\u0434\u0456\u0442\u044c, \u0449\u043e\u0431 \u0432\u0456\u0434\u043a\u0440\u0438\u0442\u0438 \u043f\u0440\u043e\u0444\u0456\u043b\u044c \u0430\u0431\u043e \u043a\u043e\u043d\u0442\u0430\u043a\u0442\u0438.',
+  ru: '\u0412\u043e\u0439\u0434\u0438\u0442\u0435, \u0447\u0442\u043e\u0431\u044b \u043e\u0442\u043a\u0440\u044b\u0442\u044c \u043f\u0440\u043e\u0444\u0438\u043b\u044c \u0438\u043b\u0438 \u043a\u043e\u043d\u0442\u0430\u043a\u0442\u044b.',
+  en: 'Sign in to open profiles or contacts.',
+} as const;
+
 export default function UserCardActionBar({
   avatarUri,
   name,
@@ -90,6 +102,11 @@ export default function UserCardActionBar({
   const t = labels[language] ?? labels.ua;
   const profileDisabled = !onProfile || !userId;
   const resolvedContactDisabled = contactDisabled || !onContact;
+  const requireRegisteredUser = () => {
+    if (currentUserId) return true;
+    showInfo(authRequiredTitle, authRequiredBody);
+    return false;
+  };
 
   useEffect(() => {
     if (!showLikeAvatars || likeAvatarUserIds.length === 0) {
@@ -159,14 +176,14 @@ export default function UserCardActionBar({
       ) : null}
 
       {showProfile ? (
-        <TouchableOpacity style={[styles.outlined, profileDisabled && styles.disabled]} onPress={(event) => { event.stopPropagation(); onProfile?.(); }} disabled={profileDisabled} activeOpacity={0.8}>
+        <TouchableOpacity style={[styles.outlined, profileDisabled && styles.disabled]} onPress={(event) => { event.stopPropagation(); if (requireRegisteredUser()) onProfile?.(); }} disabled={profileDisabled} activeOpacity={0.8}>
           <MaterialCommunityIcons name="badge-account-horizontal-outline" size={13} color={profileDisabled ? '#B0A090' : '#7A1E5C'} />
           <Text style={[styles.outlinedText, profileDisabled && styles.disabledText]}>{t.profile}</Text>
         </TouchableOpacity>
       ) : null}
 
       {showContact ? (
-        <TouchableOpacity style={[styles.outlined, resolvedContactDisabled && styles.disabled]} onPress={(event) => { event.stopPropagation(); onContact?.(); }} disabled={resolvedContactDisabled} activeOpacity={0.8}>
+        <TouchableOpacity style={[styles.outlined, resolvedContactDisabled && styles.disabled]} onPress={(event) => { event.stopPropagation(); if (requireRegisteredUser()) onContact?.(); }} disabled={resolvedContactDisabled} activeOpacity={0.8}>
           <MaterialCommunityIcons name="message-text-outline" size={13} color={resolvedContactDisabled ? '#B0A090' : '#7A1E5C'} />
           <Text style={[styles.outlinedText, resolvedContactDisabled && styles.disabledText]}>{t.contact}</Text>
         </TouchableOpacity>

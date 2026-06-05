@@ -37,6 +37,7 @@ import { getDonePhotos, validateSubmissionRequirements } from '../utils/submissi
 import { checkYellowList } from '../utils/yellowListCheck';
 import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 import { useOperationTrace } from '../hooks/useOperationTrace';
+import { requireAuthForDetails } from '../utils/authGuard';
 
 type AppLanguage = 'ua' | 'ru' | 'en';
 
@@ -404,6 +405,7 @@ const LostAndFoundScreen: React.FC = () => {
   });
 
   const openDetail = (item: LostFoundItem) => {
+    if (!requireAuthForDetails({ userId: user?.id, navigation, language })) return;
     navigation.navigate('ItemDetailScreen', { item: mapToDetailData(item) });
   };
 
@@ -471,7 +473,7 @@ const LostAndFoundScreen: React.FC = () => {
                     likeId={item.id}
                     style={styles.likeAction}
                   />
-                  <TouchableOpacity style={styles.phoneAction} onPress={(event) => { event.stopPropagation(); void safeCallPhone(item.phone, language); }} activeOpacity={0.75}>
+                  <TouchableOpacity style={styles.phoneAction} onPress={(event) => { event.stopPropagation(); if (requireAuthForDetails({ userId: user?.id, navigation, language })) void safeCallPhone(item.phone, language); }} activeOpacity={0.75}>
                     <TactileIcon icon="phone-outline" size={34} iconSize={14} backgroundColor="#403933" />
                   </TouchableOpacity>
                   {item.userId && item.userId !== user?.id ? (

@@ -253,14 +253,142 @@ const countActiveUsersToday = (raw: unknown): number => {
   }).length;
 };
 
+const isPermissionDeniedError = (error: RawOpsError): boolean => {
+  const text = `${String(error.type ?? '')} ${String(error.code ?? '')} ${String(error.message ?? '')}`.toLowerCase();
+  return text.includes('permission_denied') || text.includes('permission-denied');
+};
+
 const countPermissionDenied24h = (raw: unknown): number => {
   if (!raw || typeof raw !== 'object') return 0;
   const since = Date.now() - 24 * 60 * 60 * 1000;
   return Object.values(raw as Record<string, RawOpsError>).filter((error) => {
-    const text = `${String(error.type ?? '')} ${String(error.code ?? '')} ${String(error.message ?? '')}`.toLowerCase();
     const timestamp = getTime(error as Record<string, unknown>);
-    return timestamp >= since && (text.includes('permission_denied') || text.includes('permission-denied'));
+    return timestamp >= since && isPermissionDeniedError(error);
   }).length;
+};
+
+export type PermissionDeniedEntry = {
+  id: string;
+  at: number;
+  screen: string;
+  action: string;
+  firebasePath: string;
+  feature: string;
+  stage: string;
+  code: string;
+  firebaseCode: string;
+  uid: string;
+  sessionId: string;
+  appVersion: string;
+  networkState: string;
+  deviceInfo: string;
+  androidVersion: string;
+  appMode: string;
+  severity: 'info' | 'warning' | 'critical';
+  humanMessage: string;
+  rawMessage: string;
+  source: string;
+  repeatCount: number;
+  slowOp: boolean;
+  durationMs: number | undefined;
+  breadcrumbs: Array<{ at: number; category: string; message: string; screen?: string }>;
+};
+
+const getString = (v: unknown): string => (typeof v === 'string' ? v : '');
+const getNum = (v: unknown): number => (Number.isFinite(v) ? Number(v) : 0);
+
+const isPermissionDeniedText = (text: string): boolean =>
+  text.includes('permission_denied') || text.includes('permission-denied') || text.includes('permission denied');
+
+const normalizeRichEntry = (id: string, raw: Record<string, unknown>): PermissionDeniedEntry | null => {
+  // diagnostics/runtime_moderation wrapper: { fingerprint, uid, submittedAt, entry: {...}, reporter: {...} }
+  const entryRaw = raw.entry && typeof raw.entry === 'object'
+    ? (raw.entry as Record<string, unknown>)
+    : raw; // flat structure from diagnostics/runtime or ops/errors
+
+  const at = getNum(raw.submittedAt) || getNum(entryRaw.at) || getNum(raw.at);
+  const since = Date.now() - 24 * 60 * 60 * 1000;
+  if (at < since) return null;
+
+  const allText = [
+    getString(entryRaw.rawMessage), getString(entryRaw.humanMessage),
+    getString(entryRaw.code), getString(entryRaw.firebaseCode),
+    getString(entryRaw.message), getString(entryRaw.type),
+  ].join(' ').toLowerCase();
+
+  if (!isPermissionDeniedText(allText)) return null;
+
+  const reporter = raw.reporter && typeof raw.reporter === 'object'
+    ? (raw.reporter as Record<string, unknown>) : {};
+
+  const breadcrumbsRaw = Array.isArray(entryRaw.breadcrumbs) ? entryRaw.breadcrumbs : [];
+  const breadcrumbs = breadcrumbsRaw
+    .filter((b): b is Record<string, unknown> => Boolean(b && typeof b === 'object'))
+    .map((b) => ({
+      at: getNum(b.at),
+      category: getString(b.category) || 'runtime',
+      message: getString(b.message),
+      screen: typeof b.screen === 'string' ? b.screen : undefined,
+    }));
+
+  return {
+    id,
+    at,
+    screen: getString(entryRaw.screen) || getString(entryRaw.functionName) || '-',
+    action: getString(entryRaw.action) || '-',
+    firebasePath: getString(entryRaw.firebasePath) || '-',
+    feature: getString(entryRaw.feature) || '-',
+    stage: getString(entryRaw.stage) || '-',
+    code: getString(entryRaw.code) || getString(entryRaw.type) || '-',
+    firebaseCode: getString(entryRaw.firebaseCode) || '-',
+    uid: getString(raw.uid) || getString(reporter.userId) || getString(entryRaw.uid) || '-',
+    sessionId: getString(entryRaw.sessionId) || getString(raw.sessionId) || '-',
+    appVersion: getString(entryRaw.appVersion) || getString(raw.appVersion) || '-',
+    networkState: getString(entryRaw.networkState) || '-',
+    deviceInfo: getString(entryRaw.deviceInfo) || '-',
+    androidVersion: getString(entryRaw.androidVersion) || '-',
+    appMode: getString(entryRaw.appMode) || '-',
+    severity: (entryRaw.severity === 'critical' || entryRaw.severity === 'warning' ? entryRaw.severity : 'info') as 'info' | 'warning' | 'critical',
+    humanMessage: getString(entryRaw.humanMessage) || getString(entryRaw.message) || '-',
+    rawMessage: getString(entryRaw.rawMessage) || getString(entryRaw.message) || '-',
+    source: getString(entryRaw.source) || getString(raw.source) || 'client',
+    repeatCount: getNum(entryRaw.repeatCount) || 1,
+    slowOp: entryRaw.slowOp === true,
+    durationMs: typeof entryRaw.durationMs === 'number' ? entryRaw.durationMs : undefined,
+    breadcrumbs,
+  };
+};
+
+export const fetchPermissionDeniedDetails = async (): Promise<PermissionDeniedEntry[]> => {
+  const [richSnapshot, opsSnapshot] = await Promise.all([
+    get(query(ref(database, 'diagnostics/runtime_moderation'), limitToLast(300))).catch(() => null),
+    get(query(ref(database, 'ops/errors'), limitToLast(300))).catch(() => null),
+  ]);
+
+  const seen = new Set<string>();
+  const results: PermissionDeniedEntry[] = [];
+
+  // Primary: diagnostics/runtime_moderation (rich data with uid, breadcrumbs, etc.)
+  const richRaw = richSnapshot?.val();
+  if (richRaw && typeof richRaw === 'object') {
+    for (const [id, value] of Object.entries(richRaw as Record<string, unknown>)) {
+      if (!value || typeof value !== 'object') continue;
+      const entry = normalizeRichEntry(id, value as Record<string, unknown>);
+      if (entry) { results.push(entry); seen.add(id); }
+    }
+  }
+
+  // Fallback: ops/errors (basic data, catches anything not in runtime_moderation)
+  const opsRaw = opsSnapshot?.val();
+  if (opsRaw && typeof opsRaw === 'object') {
+    for (const [id, value] of Object.entries(opsRaw as Record<string, unknown>)) {
+      if (seen.has(id) || !value || typeof value !== 'object') continue;
+      const entry = normalizeRichEntry(id, value as Record<string, unknown>);
+      if (entry) results.push(entry);
+    }
+  }
+
+  return results.sort((a, b) => b.at - a.at);
 };
 
 const getQueueNumber = (raw: unknown, keys: string[]): number => {

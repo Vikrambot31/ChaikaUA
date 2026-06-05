@@ -22,6 +22,8 @@ import { chaykaPlaces } from '../services/chaykaPlacesData';
 import { getBeautyPlaces, getActiveBeautyOffers } from '../services/beautySeed';
 import { getChildrenPlaces, getActiveOffers } from '../services/childrenSeed';
 import { useTranslation } from '../i18n/useTranslation';
+import ScreenTooltip from '../components/ScreenTooltip';
+import { BONUS_PROMOTION_PURCHASE_TOOLTIP } from '../utils/screenTooltips';
 
 type AppNav = NavigationProp<Record<string, object | undefined>>;
 type RouteParams = {
@@ -207,6 +209,12 @@ const BonusPromotionPurchaseScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <ScreenTooltip
+        storageKey={BONUS_PROMOTION_PURCHASE_TOOLTIP.storageKey}
+        title={BONUS_PROMOTION_PURCHASE_TOOLTIP.title}
+        items={BONUS_PROMOTION_PURCHASE_TOOLTIP.items}
+        accentColor={SCREEN_THEME.woodGreen}
+      />
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.8}>
           <MaterialCommunityIcons name="arrow-left" size={22} color={SCREEN_THEME.textPrimary} />

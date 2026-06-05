@@ -360,7 +360,7 @@ const buildShortTypeAndMessage = (
   const isNetwork = /network|offline|fetch|internet|connection lost/.test(haystack);
   const isUnknownModule = /requiring unknown module "undefined"|requiring unknown module/.test(haystack);
   const isAtobMissing = /property 'atob' doesn't exist|atob doesn't exist|atob is not defined/.test(haystack);
-  const isConnectionLost = /firebase_connection|connection lost|onrealtimedisconnect_|onconnectionlost_/.test(haystack);
+  const isConnectionLost = /firebase_connection|firebase_reconnecting|connection lost|onrealtimedisconnect_|onconnectionlost_/.test(haystack);
 
   if (isUnknownModule) {
     return {
@@ -380,9 +380,9 @@ const buildShortTypeAndMessage = (
 
   if (isConnectionLost) {
     return {
-      shortType: 'Потеря соединения Firebase',
-      humanMessage: 'Соединение с Firebase временно прервалось. Обычно это сеть/переподключение, а не ошибка прав доступа.',
-      severity: 'warning',
+      shortType: 'Firebase: переподключение',
+      humanMessage: 'Временная пауза соединения с Firebase. Это нормальное поведение сети, приложение переподключится автоматически.',
+      severity: 'info',
     };
   }
 

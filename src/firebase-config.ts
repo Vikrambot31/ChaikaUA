@@ -35,7 +35,9 @@ const resolveStorageUrl = getDownloadURL as (
 
 let lastConnectedState: boolean | null = null;
 let disconnectDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-const DISCONNECT_DEBOUNCE_MS = 4000;
+let disconnectStartedAt: number | null = null;
+const DISCONNECT_SHORT_MS = 5000;   // < 5s — don't log at all
+const DISCONNECT_WARN_MS = 30000;   // > 30s — log as warning
 
 try {
   onValue(
@@ -55,16 +57,23 @@ try {
           if (disconnectDebounceTimer !== null) {
             clearTimeout(disconnectDebounceTimer);
             disconnectDebounceTimer = null;
-          } else {
-            void logClientEvent('connection_restored');
+            // Recovered within debounce window — no logging needed
+          } else if (disconnectStartedAt !== null) {
+            const pauseDuration = Date.now() - disconnectStartedAt;
+            if (pauseDuration >= DISCONNECT_WARN_MS) {
+              void logClientEvent('connection_restored', { pauseMs: pauseDuration });
+            }
           }
+          disconnectStartedAt = null;
         } else if (!connected && lastConnectedState) {
-          // Debounce: only log if still disconnected after DISCONNECT_DEBOUNCE_MS
+          disconnectStartedAt = Date.now();
+          // Debounce: only log if still disconnected after DISCONNECT_SHORT_MS
           if (disconnectDebounceTimer === null) {
             disconnectDebounceTimer = setTimeout(() => {
               disconnectDebounceTimer = null;
-              void logClientError('firebase_connection', new Error('Connection lost'));
-            }, DISCONNECT_DEBOUNCE_MS);
+              // Log as a DEBUG-level event, not an error
+              void logClientEvent('firebase_reconnecting', { pauseMs: DISCONNECT_SHORT_MS });
+            }, DISCONNECT_SHORT_MS);
           }
         }
         lastConnectedState = connected;

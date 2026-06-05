@@ -9,6 +9,7 @@ import { loadInviteAccessState, type InviteAccessMode } from '../services/invite
 import { computeAccessStats, getModeDescription } from '../services/accessControlService';
 import { useViewMode } from '../contexts/ViewModeContext';
 import { probeRulesLevel, type RulesProbeResult } from '../services/rulesProbeService';
+import { fetchPermissionDeniedDetails, type PermissionDeniedEntry } from '../services/dashboardService';
 
 type AccessSummary = {
   enabled: boolean;
@@ -39,6 +40,8 @@ export const DashboardPage = ({ user, onNavigate }: DashboardPageProps) => {
   const [accessSummary, setAccessSummary] = useState<AccessSummary | null>(null);
   const [probeResult, setProbeResult] = useState<RulesProbeResult | null>(null);
   const [probing, setProbing] = useState(false);
+  const [permDetails, setPermDetails] = useState<PermissionDeniedEntry[] | null>(null);
+  const [permDetailsLoading, setPermDetailsLoading] = useState(false);
 
   const runProbe = useCallback(async () => {
     setProbing(true);
@@ -102,6 +105,18 @@ export const DashboardPage = ({ user, onNavigate }: DashboardPageProps) => {
   };
 
   const isSimpleMode = viewMode === 'simple';
+
+  const handleShowPermDetails = async () => {
+    setPermDetailsLoading(true);
+    try {
+      const entries = await fetchPermissionDeniedDetails();
+      setPermDetails(entries);
+    } catch {
+      setPermDetails([]);
+    } finally {
+      setPermDetailsLoading(false);
+    }
+  };
 
   return (
     <section className="dashboard">
@@ -229,7 +244,20 @@ export const DashboardPage = ({ user, onNavigate }: DashboardPageProps) => {
 
       <div className="statsGrid">
         <article className="metric metric-success"><span>Активные сегодня</span><strong>{stats.activeUsersToday}</strong></article>
-        <article className={stats.permissionDenied24h < 5 ? 'metric metric-info' : 'metric metric-danger'}><span>permission_denied 24ч</span><strong>{stats.permissionDenied24h}</strong></article>
+        <article className={stats.permissionDenied24h < 5 ? 'metric metric-info' : 'metric metric-danger'} style={{ cursor: 'pointer' }}>
+          <span>permission_denied 24ч</span>
+          <strong>{stats.permissionDenied24h}</strong>
+          {stats.permissionDenied24h > 0 && (
+            <button
+              type="button"
+              onClick={() => { void handleShowPermDetails(); }}
+              disabled={permDetailsLoading}
+              style={{ marginTop: 6, fontSize: 11, padding: '2px 8px', borderRadius: 4, border: '1px solid currentColor', background: 'transparent', color: 'inherit', cursor: 'pointer', opacity: 0.85 }}
+            >
+              {permDetailsLoading ? 'Загрузка...' : 'Показать подробности'}
+            </button>
+          )}
+        </article>
         <article className={stats.activeSubscriptions <= 4 ? 'metric metric-success' : 'metric metric-warning'}><span>onValue подписки</span><strong>{stats.activeSubscriptions}</strong></article>
         <article className="metric metric-warning"><span>Pending фото</span><strong>{stats.pendingPhotos}</strong></article>
         <article className="metric metric-warning"><span>Pending invite</span><strong>{stats.pendingInviteRequests}</strong></article>
@@ -260,7 +288,22 @@ export const DashboardPage = ({ user, onNavigate }: DashboardPageProps) => {
             <div><dt>Новые устройства</dt><dd className={healthClass(Boolean(config?.allow_new_devices))}>{config?.allow_new_devices ? 'РАЗРЕШЕНЫ' : 'ЗАПРЕЩЕНЫ'}</dd></div>
             <div><dt>Связь с Firebase</dt><dd className={healthClass(Boolean(connected))}>{statusLabel(connected)}</dd></div>
             <div><dt>Активные пользователи сегодня</dt><dd>{stats.activeUsersToday}</dd></div>
-            <div><dt>permission_denied за 24ч</dt><dd className={healthClass(stats.permissionDenied24h < 5)}>{stats.permissionDenied24h}</dd></div>
+            <div>
+              <dt>permission_denied за 24ч</dt>
+              <dd className={healthClass(stats.permissionDenied24h < 5)} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {stats.permissionDenied24h}
+                {stats.permissionDenied24h > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => { void handleShowPermDetails(); }}
+                    disabled={permDetailsLoading}
+                    style={{ fontSize: 11, padding: '1px 8px', borderRadius: 4, border: '1px solid #888', background: 'transparent', color: 'inherit', cursor: 'pointer' }}
+                  >
+                    {permDetailsLoading ? '...' : 'подробности'}
+                  </button>
+                )}
+              </dd>
+            </div>
             <div><dt>onValue подписок активных</dt><dd className={healthClass(stats.activeSubscriptions <= 4)}>{stats.activeSubscriptions} / цель ≤4</dd></div>
             <div><dt>Pending фото</dt><dd>{stats.pendingPhotos}</dd></div>
             <div><dt>Pending invite заявок</dt><dd>{stats.pendingInviteRequests}</dd></div>
@@ -394,6 +437,140 @@ export const DashboardPage = ({ user, onNavigate }: DashboardPageProps) => {
           </div>
         </article>
       </div>
+      {permDetails !== null && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Подробности permission_denied"
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', overflowY: 'auto', padding: '24px 8px' }}
+          onClick={(e) => { if (e.target === e.currentTarget) setPermDetails(null); }}
+        >
+          <div style={{ background: '#111827', borderRadius: 12, padding: '24px 24px', width: '100%', maxWidth: 1400, boxShadow: '0 8px 60px rgba(0,0,0,0.7)', border: '1px solid #1e3a5f' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+              <div>
+                <h3 style={{ margin: 0, color: '#e2e8f0', fontSize: 18 }}>permission_denied — подробный лог за 24ч</h3>
+                <p style={{ margin: '4px 0 0', color: '#607594', fontSize: 13 }}>
+                  {permDetails.length === 0 ? 'Записей нет' : `${permDetails.length} случаев · источники: diagnostics/runtime_moderation + ops/errors`}
+                </p>
+              </div>
+              <button type="button" onClick={() => setPermDetails(null)}
+                style={{ background: 'none', border: 'none', color: '#607594', fontSize: 22, cursor: 'pointer', lineHeight: 1, padding: '0 4px' }}>✕</button>
+            </div>
+
+            {permDetails.length === 0 ? (
+              <p style={{ color: '#607594', textAlign: 'center', padding: '40px 0' }}>Записей не найдено за последние 24ч</p>
+            ) : (
+              <div style={{ overflowX: 'auto', borderRadius: 8, border: '1px solid #1e3a5f' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, color: '#cdd8f0', tableLayout: 'auto' }}>
+                  <thead>
+                    <tr style={{ background: '#0f1829', color: '#7a90b0', textAlign: 'left', position: 'sticky', top: 0 }}>
+                      {['Когда', 'Сев.', 'Экран', 'Действие', 'Firebase путь', 'Фича / Этап', 'Код / FB код', 'UID', 'Сеть', 'Устройство', 'Версия', 'Повт.', 'Сообщение'].map((h) => (
+                        <th key={h} style={{ padding: '10px 12px', fontWeight: 600, whiteSpace: 'nowrap', borderBottom: '1px solid #1e3a5f', fontSize: 11 }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {permDetails.map((entry, i) => {
+                      const sevColor = entry.severity === 'critical' ? '#ff5555' : entry.severity === 'warning' ? '#ffaa00' : '#4499ff';
+                      const rowBg = i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)';
+                      return (
+                        <>
+                          <tr key={entry.id} style={{ borderBottom: entry.breadcrumbs.length ? 'none' : '1px solid #162030', background: rowBg }}>
+                            <td style={{ padding: '8px 12px', whiteSpace: 'nowrap', color: '#7a90b0', fontSize: 11 }}>
+                              {entry.at ? new Date(entry.at).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '-'}
+                            </td>
+                            <td style={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>
+                              <span style={{ color: sevColor, fontWeight: 700, fontSize: 10, textTransform: 'uppercase' }}>{entry.severity}</span>
+                              {entry.slowOp && <span style={{ marginLeft: 4, color: '#ff9900', fontSize: 10 }}>⚡slow</span>}
+                            </td>
+                            <td style={{ padding: '8px 12px', fontFamily: 'monospace', color: '#7fb3ff', whiteSpace: 'nowrap', maxWidth: 180 }}>
+                              {entry.screen}
+                            </td>
+                            <td style={{ padding: '8px 12px', fontFamily: 'monospace', color: '#aaccff', whiteSpace: 'nowrap', maxWidth: 160 }}>
+                              {entry.action !== '-' ? entry.action : <span style={{ color: '#3d5070' }}>—</span>}
+                            </td>
+                            <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 11, color: '#ff8888', maxWidth: 220, wordBreak: 'break-all' }}>
+                              {entry.firebasePath !== '-' ? entry.firebasePath : <span style={{ color: '#3d5070' }}>—</span>}
+                            </td>
+                            <td style={{ padding: '8px 12px', fontSize: 11, whiteSpace: 'nowrap' }}>
+                              {entry.feature !== '-' && <span style={{ color: '#66ddaa' }}>{entry.feature}</span>}
+                              {entry.feature !== '-' && entry.stage !== '-' && <span style={{ color: '#3d5070' }}> / </span>}
+                              {entry.stage !== '-' && <span style={{ color: '#88bbdd' }}>{entry.stage}</span>}
+                              {entry.feature === '-' && entry.stage === '-' && <span style={{ color: '#3d5070' }}>—</span>}
+                            </td>
+                            <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 11, whiteSpace: 'nowrap', color: '#ff9999' }}>
+                              {entry.code !== '-' && <span>{entry.code}</span>}
+                              {entry.firebaseCode !== '-' && <span style={{ color: '#cc7777', marginLeft: 4 }}>({entry.firebaseCode})</span>}
+                              {entry.code === '-' && entry.firebaseCode === '-' && <span style={{ color: '#3d5070' }}>—</span>}
+                            </td>
+                            <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 11, color: '#99aacc', maxWidth: 140, wordBreak: 'break-all' }}>
+                              {entry.uid !== '-' ? entry.uid : <span style={{ color: '#3d5070' }}>анон</span>}
+                            </td>
+                            <td style={{ padding: '8px 12px', whiteSpace: 'nowrap', fontSize: 11 }}>
+                              <span style={{ color: entry.networkState === 'offline' || entry.networkState === 'none' ? '#ff5555' : '#88bbdd' }}>
+                                {entry.networkState !== '-' ? entry.networkState : <span style={{ color: '#3d5070' }}>—</span>}
+                              </span>
+                            </td>
+                            <td style={{ padding: '8px 12px', fontSize: 11, whiteSpace: 'nowrap', color: '#7a90b0' }}>
+                              {entry.deviceInfo !== '-' ? entry.deviceInfo : <span style={{ color: '#3d5070' }}>—</span>}
+                              {entry.androidVersion !== '-' && entry.androidVersion && (
+                                <span style={{ color: '#556677', marginLeft: 4 }}>({entry.androidVersion})</span>
+                              )}
+                              {entry.appMode === 'debug' && <span style={{ color: '#ffaa00', marginLeft: 4, fontSize: 10 }}>DEV</span>}
+                            </td>
+                            <td style={{ padding: '8px 12px', fontSize: 11, whiteSpace: 'nowrap', color: '#5d7a9a' }}>
+                              {entry.appVersion !== '-' ? entry.appVersion : <span style={{ color: '#3d5070' }}>—</span>}
+                            </td>
+                            <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 700, color: entry.repeatCount > 1 ? '#ffaa00' : '#3d5070' }}>
+                              {entry.repeatCount > 1 ? `×${entry.repeatCount}` : '1'}
+                              {entry.durationMs !== undefined && (
+                                <div style={{ fontSize: 10, color: '#5d7a9a', fontWeight: 400 }}>{entry.durationMs}ms</div>
+                              )}
+                            </td>
+                            <td style={{ padding: '8px 12px', fontSize: 11, color: '#c0cce0', maxWidth: 280, wordBreak: 'break-word' }}>
+                              {entry.humanMessage !== '-' && entry.humanMessage !== entry.rawMessage
+                                ? <><span style={{ color: '#99ccff' }}>{entry.humanMessage.slice(0, 80)}{entry.humanMessage.length > 80 ? '…' : ''}</span><br /></>
+                                : null}
+                              <span style={{ color: '#7a8fa8' }}>{entry.rawMessage.slice(0, 100)}{entry.rawMessage.length > 100 ? '…' : ''}</span>
+                            </td>
+                          </tr>
+                          {entry.breadcrumbs.length > 0 && (
+                            <tr key={`${entry.id}-bc`} style={{ borderBottom: '1px solid #162030', background: rowBg }}>
+                              <td colSpan={13} style={{ padding: '2px 12px 10px 28px' }}>
+                                <div style={{ fontSize: 10, color: '#3d5580', marginBottom: 3 }}>↳ breadcrumbs ({entry.breadcrumbs.length}):</div>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px' }}>
+                                  {entry.breadcrumbs.slice(-8).map((bc, bi) => (
+                                    <span key={bi} style={{ fontSize: 10, color: '#4a6280', fontFamily: 'monospace' }}>
+                                      <span style={{ color: '#3d5070' }}>{new Date(bc.at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                                      {' '}<span style={{ color: '#5577aa' }}>[{bc.category}]</span>
+                                      {' '}<span style={{ color: '#6688aa' }}>{bc.message.slice(0, 60)}</span>
+                                      {bc.screen && <span style={{ color: '#334455' }}> @{bc.screen}</span>}
+                                    </span>
+                                  ))}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div style={{ marginTop: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <p style={{ margin: 0, fontSize: 11, color: '#3d5070' }}>
+                Источники: diagnostics/runtime_moderation (UID, breadcrumbs, firebasePath, networkState) + ops/errors (fallback)
+              </p>
+              <button type="button" onClick={() => setPermDetails(null)}
+                style={{ padding: '7px 20px', borderRadius: 6, border: '1px solid #2d4060', background: 'transparent', color: '#607594', cursor: 'pointer', fontSize: 13 }}>
+                Закрыть
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 };

@@ -24,6 +24,7 @@ import type { DetailItemData } from '../utils/detailViewTypes';
 import UserCardActionBar from '../components/UserCardActionBar';
 import { openRequestFormWithLimitCheck } from '../utils/requestFormLimitGuard';
 import AppPhotoImage from '../components/AppPhotoImage';
+import { requireAuthForDetails } from '../utils/authGuard';
 
 const HELP_NEIGHBORS_SPLASH_KEY = '@help_neighbors_first_visit_splash_seen';
 
@@ -144,6 +145,7 @@ const HelpNeighborsScreen: React.FC = () => {
   });
 
   const openDetail = (item: HelpRequest) => {
+    if (!requireAuthForDetails({ userId: user?.id, navigation, language })) return;
     navigation.navigate('ItemDetailScreen', { item: mapToDetailData(item) });
   };
 

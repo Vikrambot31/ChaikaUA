@@ -57,15 +57,23 @@ type PendingSummarySubscription = {
 
 const pendingSummarySubscriptions = new Map<string, PendingSummarySubscription>();
 
-const summarizePendingRequests = (data: Record<string, ProfileViewRequest> | null | undefined): PendingRequestsSummary => {
+const summarizePendingRequests = (
+  targetUserId: string,
+  data: Record<string, ProfileViewRequest> | null | undefined,
+  hiddenKeys: Record<string, boolean> = {},
+): PendingRequestsSummary => {
   if (!data) {
     return { count: 0, latestRequestedAtMs: 0 };
   }
 
   let count = 0;
   let latestRequestedAtMs = 0;
-  Object.values(data).forEach((request) => {
+  Object.entries(data).forEach(([requesterKey, request]) => {
     if (request.status !== 'pending') return;
+    const requesterId = typeof request.requesterId === 'string' && request.requesterId.trim()
+      ? request.requesterId
+      : requesterKey;
+    if (hiddenKeys[`${targetUserId}__${requesterId}`]) return;
     count += 1;
     const requestedAtMs = typeof request.requestedAt === 'string' ? new Date(request.requestedAt).getTime() : 0;
     if (Number.isFinite(requestedAtMs) && requestedAtMs > latestRequestedAtMs) {
@@ -80,16 +88,43 @@ const subscribeToSharedPendingSummary = (userId: string, callback: PendingSummar
   let subscription = pendingSummarySubscriptions.get(userId);
   if (!subscription) {
     const callbacks = new Set<PendingSummarySubscriber>();
-    const unsubscribe = onValue(ref(database, `profileViewRequests/${userId}`), (snap) => {
-      const data = snap.exists() ? (snap.val() as Record<string, ProfileViewRequest>) : null;
-      const summary = summarizePendingRequests(data);
+    let currentData: Record<string, ProfileViewRequest> | null = null;
+    let currentHiddenKeys: Record<string, boolean> = {};
+    const emit = () => {
+      const summary = summarizePendingRequests(userId, currentData, currentHiddenKeys);
       callbacks.forEach((subscriber) => subscriber(summary));
+    };
+
+    const unsubscribe = onValue(ref(database, `profileViewRequests/${userId}`), (snap) => {
+      currentData = snap.exists() ? (snap.val() as Record<string, ProfileViewRequest>) : null;
+      emit();
     }, (error) => {
       console.error('[profilePermissionService] subscribeToPendingSummary failed:', error);
       callbacks.forEach((subscriber) => subscriber({ count: 0, latestRequestedAtMs: 0 }));
     });
 
-    subscription = { callbacks, unsubscribe };
+    const unsubscribeHidden = onValue(ref(database, `users/${userId}/profileRequestsArchive`), (snap) => {
+      const raw = snap.exists() ? ((snap.val() as Record<string, boolean | ArchivedRequestEntry>) ?? {}) : {};
+      currentHiddenKeys = Object.entries(raw).reduce<Record<string, boolean>>((acc, [key, value]) => {
+        if (typeof value === 'boolean') {
+          if (value) acc[key] = true;
+          return acc;
+        }
+        if (value && typeof value === 'object' && value.archived) acc[key] = true;
+        return acc;
+      }, {});
+      emit();
+    }, () => {
+      currentHiddenKeys = {};
+      emit();
+    });
+
+    const unsubscribeAll = () => {
+      unsubscribe();
+      unsubscribeHidden();
+    };
+
+    subscription = { callbacks, unsubscribe: unsubscribeAll };
     pendingSummarySubscriptions.set(userId, subscription);
   }
 

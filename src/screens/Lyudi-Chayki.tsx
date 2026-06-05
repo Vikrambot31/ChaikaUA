@@ -30,6 +30,7 @@ import UserCardActionBar from '../components/UserCardActionBar';
 import { START_AVATAR_URI_PREFIX } from '../utils/startAvatars';
 import { get, ref } from 'firebase/database';
 import { database } from '../firebase-config';
+import { requireAuthForDetails } from '../utils/authGuard';
 
 const CACHE_KEY = '@chaika:community_users_cache_v1';
 const PRIMARY = '#7A1E5C';
@@ -321,6 +322,7 @@ export default function TopGirlsBoysScreen() {
   }, [mergeWithCurrentUser]);
 
   const openPersonDetails = useCallback((person: Person) => {
+    if (!requireAuthForDetails({ userId: user?.id, navigation, language })) return;
     const item: DetailItemData = {
       id: person.id,
       title: person.name || text.residentFallback,
@@ -335,7 +337,7 @@ export default function TopGirlsBoysScreen() {
       sourceId: person.id,
     };
     navigation.navigate('ItemDetailScreen', { item });
-  }, [navigation, text]);
+  }, [language, navigation, text, user?.id]);
 
   useEffect(() => {
     void loadPeople();

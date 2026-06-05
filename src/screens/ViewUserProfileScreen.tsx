@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useRoute } from '@react-navigation/native';
+import { NavigationProp, useNavigation, useRoute } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import ContactReasonModal from '../components/ContactReasonModal';
 import { useContactRequest } from '../hooks/useContactRequest';
@@ -26,6 +26,7 @@ import { database } from '../firebase-config';
 import type { JobListing } from '../services/jobService';
 import { getDaysInApp } from '../utils/chaikaLevels';
 import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
+import { requireAuthForDetails } from '../utils/authGuard';
 
 const UI_TEXT = {
   ua: {
@@ -127,6 +128,7 @@ const getGenderShortLabel = (gender?: string) => {
 
 const ViewUserProfileScreen: React.FC = () => {
   const route = useRoute();
+  const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const { userId } = (route.params as RouteParams) || {};
   const { language } = useTranslation();
   const text = UI_TEXT[language];
@@ -143,9 +145,20 @@ const ViewUserProfileScreen: React.FC = () => {
   const [profileLikes, setProfileLikes] = useState(0);
   const [loading, setLoading] = useState(true);
   const [jobListing, setJobListing] = useState<JobListing | null>(null);
+  const isAuthenticated = Boolean(currentUser?.id);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      requireAuthForDetails({ userId: currentUser?.id, navigation, language });
+    }
+  }, [currentUser?.id, isAuthenticated, language, navigation]);
 
   useEffect(() => {
     const loadUserProfile = async () => {
+      if (!isAuthenticated) {
+        setLoading(false);
+        return;
+      }
       if (!userId) {
         Alert.alert(text.error, text.errorLoadProfile);
         setLoading(false);
@@ -199,7 +212,7 @@ const ViewUserProfileScreen: React.FC = () => {
     };
 
     void loadUserProfile();
-  }, [userId, text]);
+  }, [isAuthenticated, userId, text]);
 
   const genderLabel = getGenderShortLabel(gender);
   const ageGenderLabel = [
@@ -242,6 +255,19 @@ const ViewUserProfileScreen: React.FC = () => {
       { text: contactText.cancel, style: 'cancel' },
     ]);
   };
+
+  if (!isAuthenticated) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.centerContent}>
+          <MaterialCommunityIcons name="lock-outline" size={42} color={SCREEN_THEME.terracotta} />
+          <Text style={styles.loadingText}>
+            {language === 'en' ? 'Registration required' : language === 'ru' ? '\u041d\u0443\u0436\u043d\u0430 \u0440\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u044f' : '\u041f\u043e\u0442\u0440\u0456\u0431\u043d\u0430 \u0440\u0435\u0454\u0441\u0442\u0440\u0430\u0446\u0456\u044f'}
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (loading) {
     return (

@@ -40,6 +40,8 @@ import { photoService } from '../services/photoService';
 import { safeLogError } from '../utils/errorLogger';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { showUserError } from '../utils/userFacingErrors';
+import ScreenTooltip from '../components/ScreenTooltip';
+import { MY_PHOTOS_TOOLTIP } from '../utils/screenTooltips';
 import { getBestPhotoUri, getPhotoThumbnailUri, ImageStorage } from './ImageStorage';
 import { deleteEngineUpload } from './PhotoUploadEngine';
 import { UploadQueue } from './UploadQueue';
@@ -90,6 +92,8 @@ const UI_TEXT = {
     saved: 'Збережено',
     error: 'Помилка',
     limitReached: 'Можна зберегти до 10 фото. Видаліть одне фото, щоб додати нове.',
+    limitCounterPrefix: 'Завантажено',
+    limitCounterOf: 'з',
     sectionAll: 'Мої фото',
     sectionSaved: 'Збережено',
     sectionPending: 'На модерації',
@@ -129,6 +133,8 @@ const UI_TEXT = {
     saved: 'Сохранено',
     error: 'Ошибка',
     limitReached: 'Можно сохранить до 10 фото. Удалите одно фото, чтобы добавить новое.',
+    limitCounterPrefix: 'Загружено',
+    limitCounterOf: 'из',
     sectionAll: 'Мои фото',
     sectionSaved: 'Сохранено',
     sectionPending: 'На модерации',
@@ -168,6 +174,8 @@ const UI_TEXT = {
     saved: 'Saved',
     error: 'Error',
     limitReached: 'You can save up to 10 photos. Delete one photo to add another.',
+    limitCounterPrefix: 'Uploaded',
+    limitCounterOf: 'of',
     sectionAll: 'My photos',
     sectionSaved: 'Saved',
     sectionPending: 'Under review',
@@ -198,9 +206,31 @@ const REQUEST_PHOTO_PREFIXES = [
   'job_listings/',
 ];
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+const REQUEST_PHOTO_TTL_BY_PREFIX: { prefix: string; ttlMs: number }[] = [
+  { prefix: 'buy_sell/', ttlMs: 90 * DAY_MS },
+  { prefix: 'contacts/', ttlMs: 30 * DAY_MS },
+  { prefix: 'local_business/', ttlMs: 30 * DAY_MS },
+  { prefix: 'job_listings/', ttlMs: 30 * DAY_MS },
+  { prefix: 'requests/', ttlMs: 15 * DAY_MS },
+  { prefix: 'lost_found/', ttlMs: 15 * DAY_MS },
+];
+
 const isRequestPhoto = (photo: UserPhoto): boolean => {
   const storagePath = String(photo.storagePath || photo.filePath || '').trim();
   return REQUEST_PHOTO_PREFIXES.some((prefix) => storagePath.startsWith(prefix));
+};
+
+const getRequestPhotoTtlMs = (photo: UserPhoto): number => {
+  const storagePath = String(photo.storagePath || photo.filePath || '').trim();
+  return REQUEST_PHOTO_TTL_BY_PREFIX.find((rule) => storagePath.startsWith(rule.prefix))?.ttlMs ?? 15 * DAY_MS;
+};
+
+const isExpiredRequestPhoto = (photo: UserPhoto, now = Date.now()): boolean => {
+  if (!isRequestPhoto(photo)) return false;
+  const createdAt = Number(photo.createdAt || photo.updatedAt || 0);
+  if (!Number.isFinite(createdAt) || createdAt <= 0) return false;
+  return createdAt + getRequestPhotoTtlMs(photo) <= now;
 };
 
 const statusColor: Record<UserPhoto['status'], string> = {
@@ -298,7 +328,7 @@ const MyPhotosScreen: React.FC = () => {
     !((photo.storagePath && rtdbPhotoKeys.has(photo.storagePath)) || (photo.imageUrl && rtdbPhotoKeys.has(photo.imageUrl)))
   )), [localPhotos, rtdbPhotoKeys]);
   const requestLocalPhotos = useMemo(
-    () => displayedLocalPhotos.filter(isRequestPhoto),
+    () => displayedLocalPhotos.filter((photo) => isRequestPhoto(photo) && !isExpiredRequestPhoto(photo)),
     [displayedLocalPhotos],
   );
   const personalLocalPhotos = useMemo(
@@ -308,7 +338,6 @@ const MyPhotosScreen: React.FC = () => {
   const totalPhotoCount = rtdbPhotos.length + personalLocalPhotos.length;
 
   const limitReached = totalPhotoCount >= MAX_USER_PHOTOS;
-  const addButtonDisabled = limitReached || adding;
   const selectedCount = selectedForReview.length;
   const selectedReviewableCount = useMemo(() => (
     rtdbPhotos.filter((photo) => selectedForReview.includes(photo.id) && (photo.status === 'not_submitted' || photo.status === 'rejected')).length
@@ -328,6 +357,16 @@ const MyPhotosScreen: React.FC = () => {
     );
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    const expiredRequestPhotos = localPhotos.filter(isExpiredRequestPhoto);
+    if (expiredRequestPhotos.length === 0) return;
+    void Promise.all(
+      expiredRequestPhotos.map((photo) => ImageStorage.updatePhoto(photo.id, { deleted: true })),
+    ).catch((error) => {
+      safeLogError('MyPhotosScreen.expiredRequestPhotosCleanup', error, { count: expiredRequestPhotos.length });
+    });
+  }, [localPhotos]);
 
   // Real-time listener for RTDB photos — syncs when moderator approves/rejects
   useEffect(() => {
@@ -407,6 +446,10 @@ const MyPhotosScreen: React.FC = () => {
   const runAdd = useCallback(
     async (source: 'camera' | 'library') => {
       if (adding) return;
+      if (limitReached) {
+        Alert.alert(text.add, text.limitReached);
+        return;
+      }
       setAdding(true);
       try {
         // Photo is saved locally with status='local' — no Firebase upload yet.
@@ -421,10 +464,14 @@ const MyPhotosScreen: React.FC = () => {
         setAdding(false);
       }
     },
-    [adding, language, userId],
+    [adding, language, limitReached, text.add, text.limitReached, userId],
   );
 
   const addPhoto = useCallback(async () => {
+    if (limitReached) {
+      Alert.alert(text.add, text.limitReached);
+      return;
+    }
     if (Platform.OS === 'web') {
       await runAdd('library');
       return;
@@ -434,7 +481,7 @@ const MyPhotosScreen: React.FC = () => {
       { text: text.library, onPress: () => { void runAdd('library'); } },
       { text: text.cancel, style: 'cancel' },
     ]);
-  }, [runAdd, text]);
+  }, [limitReached, runAdd, text]);
 
   const togglePhotoForReview = useCallback((photo: RtdbPhoto) => {
     setSelectedForReview((prev) => (
@@ -695,6 +742,12 @@ const MyPhotosScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <ScreenTooltip
+        storageKey={MY_PHOTOS_TOOLTIP.storageKey}
+        title={MY_PHOTOS_TOOLTIP.title}
+        items={MY_PHOTOS_TOOLTIP.items}
+        accentColor={SCREEN_THEME.accentPurple}
+      />
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={handleBack} activeOpacity={0.82}>
@@ -704,6 +757,17 @@ const MyPhotosScreen: React.FC = () => {
           <Text style={styles.title}>{text.title}</Text>
           <Text style={styles.subtitle}>{text.subtitle}</Text>
         </View>
+      </View>
+
+      <View style={[styles.photoLimitCounter, limitReached && styles.photoLimitCounterFull]}>
+        <MaterialCommunityIcons
+          name="image-multiple-outline"
+          size={16}
+          color={limitReached ? '#8E2E24' : SCREEN_THEME.textSecondary}
+        />
+        <Text style={[styles.photoLimitCounterText, limitReached && styles.photoLimitCounterTextFull]}>
+          {text.limitCounterPrefix}: {totalPhotoCount} {text.limitCounterOf} {MAX_USER_PHOTOS}
+        </Text>
       </View>
 
       {limitReached ? (
@@ -812,10 +876,10 @@ const MyPhotosScreen: React.FC = () => {
 
       {/* FAB — disabled when the personal gallery limit is reached */}
       <TouchableOpacity
-        style={[styles.addButton, selectedCount > 0 && styles.addButtonRaised, addButtonDisabled && styles.addButtonDisabled]}
+        style={[styles.addButton, selectedCount > 0 && styles.addButtonRaised, (adding || limitReached) && styles.addButtonDisabled]}
         onPress={() => void addPhoto()}
         activeOpacity={0.88}
-        disabled={addButtonDisabled}
+        disabled={adding}
       >
         {adding ? (
           <ActivityIndicator color="#fff" />
@@ -882,6 +946,31 @@ const styles = StyleSheet.create({
   headerCopy: { flex: 1 },
   title: { fontSize: 24, fontWeight: '900', color: SCREEN_THEME.textPrimary },
   subtitle: { marginTop: 4, color: SCREEN_THEME.textSecondary, lineHeight: 19, fontWeight: '600' },
+  photoLimitCounter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    marginHorizontal: 16,
+    marginBottom: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderWidth: 1,
+    borderColor: SCREEN_THEME.borderSoft,
+  },
+  photoLimitCounterFull: {
+    backgroundColor: '#FFF1ED',
+    borderColor: 'rgba(142, 46, 36, 0.34)',
+  },
+  photoLimitCounterText: {
+    color: SCREEN_THEME.textSecondary,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  photoLimitCounterTextFull: {
+    color: '#8E2E24',
+  },
   pendingBanner: {
     flexDirection: 'row',
     alignItems: 'center',

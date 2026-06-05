@@ -27,6 +27,8 @@ import { SCREEN_THEME } from '../utils/screenTheme';
 import { useOsbbMembership } from '../hooks/useOsbbMembership';
 import InlineFieldHint from '../components/InlineFieldHint';
 import { useSoftToast } from '../hooks/useSoftToast';
+import ScreenTooltip from '../components/ScreenTooltip';
+import { OSBB_FINANCE_TOOLTIP } from '../utils/screenTooltips';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -476,6 +478,12 @@ const OsbbFinansyScreen: React.FC = () => {
   // ---------------------------------------------------------------------------
   return (
     <SafeAreaView style={styles.container}>
+      <ScreenTooltip
+        storageKey={OSBB_FINANCE_TOOLTIP.storageKey}
+        title={OSBB_FINANCE_TOOLTIP.title}
+        items={OSBB_FINANCE_TOOLTIP.items}
+        accentColor={SCREEN_THEME.enamelBlue}
+      />
       <ScrollView
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
@@ -1111,4 +1119,3 @@ const styles = StyleSheet.create({
 });
 
 export default OsbbFinansyScreen;
-

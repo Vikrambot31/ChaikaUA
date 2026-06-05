@@ -166,7 +166,7 @@ export const classifyStartupTransientIssue = ({
     screen.includes('deviceAuth') &&
     /permission_denied|permission denied|device_auth_not_ready/.test(haystack);
   const isReconnect =
-    /firebase_connection|connection lost|offline|listener|subscribe|reconnect|onvalue|sync/.test(haystack);
+    /firebase_connection|firebase_reconnecting|connection lost|offline|listener|subscribe|reconnect|onvalue|sync/.test(haystack);
   const isAuthRefreshDelay =
     /auth refresh|authstate|auth state|token refresh|session restore/.test(haystack);
   const isTransientTimeout =

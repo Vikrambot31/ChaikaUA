@@ -21,6 +21,16 @@ import {
   getTierLabel,
 } from '../services/accessControlService';
 import {
+  auditPublishRules,
+  computeDenialAggregates,
+  detectRisks,
+  fetchSubmissionDenials,
+  type DenialCategory,
+  type DenialEntry,
+  type DenialAggregates,
+  type RulesAuditResult,
+} from '../services/submissionDenialService';
+import {
   subscribeManagedAuthorizedDevices,
   updateSecurityAppControl,
   setPersonalForceUpdate,
@@ -130,6 +140,16 @@ export const AccessControlPage = ({ role, onNavigateToInvites }: AccessControlPa
   const [devicesPage, setDevicesPage] = useState(0);
   const DEVICES_PAGE_SIZE = 20;
 
+  // ── Denial Monitor state ──
+  const [denials, setDenials] = useState<DenialEntry[]>([]);
+  const [denialAggregates, setDenialAggregates] = useState<DenialAggregates | null>(null);
+  const [denialRisks, setDenialRisks] = useState<string[]>([]);
+  const [rulesAudit, setRulesAudit] = useState<RulesAuditResult[]>([]);
+  const [denialLoading, setDenialLoading] = useState(false);
+  const [denialFilter, setDenialFilter] = useState<DenialCategory | 'all'>('all');
+  const [denialScreenFilter, setDenialScreenFilter] = useState('');
+  const [denialPeriod, setDenialPeriod] = useState<'1h' | '24h' | '7d'>('24h');
+
   const autoRefreshRef = useRef({ loading, busyAction, refresh: async () => {} });
   autoRefreshRef.current.loading = loading;
   autoRefreshRef.current.busyAction = busyAction;
@@ -184,6 +204,52 @@ export const AccessControlPage = ({ role, onNavigateToInvites }: AccessControlPa
     const unsub = subscribeManagedAuthorizedDevices(setDevices);
     return () => { mounted = false; unsub(); };
   }, []);
+
+  // ── Denial monitor data ──
+  useEffect(() => {
+    let mounted = true;
+    setDenialLoading(true);
+    fetchSubmissionDenials()
+      .then((entries) => {
+        if (!mounted) return;
+        setDenials(entries);
+        setDenialAggregates(computeDenialAggregates(entries));
+        setDenialRisks(detectRisks(entries));
+      })
+      .catch((err: unknown) => console.warn('[AccessControl] Failed to load denials:', err))
+      .finally(() => { if (mounted) setDenialLoading(false); });
+    setRulesAudit(auditPublishRules());
+    return () => { mounted = false; };
+  }, []);
+
+  const refreshDenials = async () => {
+    setDenialLoading(true);
+    try {
+      const entries = await fetchSubmissionDenials();
+      setDenials(entries);
+      setDenialAggregates(computeDenialAggregates(entries));
+      setDenialRisks(detectRisks(entries));
+    } catch (err) {
+      console.warn('[AccessControl] Failed to refresh denials:', err);
+    } finally {
+      setDenialLoading(false);
+    }
+  };
+
+  const periodMs = denialPeriod === '1h' ? 60 * 60 * 1000 : denialPeriod === '24h' ? 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000;
+  const filteredDenials = useMemo(() => {
+    const since = Date.now() - periodMs;
+    return denials.filter((d) => {
+      if (d.at < since) return false;
+      if (denialFilter !== 'all' && d.category !== denialFilter) return false;
+      if (denialScreenFilter && !d.screen.toLowerCase().includes(denialScreenFilter.toLowerCase())) return false;
+      return true;
+    });
+  }, [denials, denialFilter, denialScreenFilter, denialPeriod, periodMs]);
+
+  const uniqueScreens = useMemo(() => [...new Set(denials.map((d) => d.screen).filter(Boolean))], [denials]);
+
+  const rulesWarnings = useMemo(() => rulesAudit.filter((r) => r.warnings.length > 0), [rulesAudit]);
 
   const runAction = async (
     actionId: string,
@@ -1106,6 +1172,177 @@ export const AccessControlPage = ({ role, onNavigateToInvites }: AccessControlPa
               >
                 {busyAction === 'loadmore' ? 'Загрузка...' : 'Загрузить ещё'}
               </button>
+            </div>
+          )}
+        </article>
+
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        {/* ── Монитор блокировок заявок ─────────────────────────────────── */}
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        <article className="panel" style={{ marginTop: 32 }}>
+          <div className="headingWithHint" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <h3>Монитор блокировок заявок</h3>
+            <button type="button" className="smallButton" disabled={denialLoading} onClick={() => void refreshDenials()}>
+              {denialLoading ? 'Загрузка...' : 'Обновить'}
+            </button>
+          </div>
+
+          {/* ── Aggregates ── */}
+          {denialAggregates && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 12 }}>
+              <span className="pill" style={{ background: '#1a1a2e', border: '1px solid #444' }}>
+                Всего 24ч: <strong>{denialAggregates.total24h}</strong>
+              </span>
+              {denialAggregates.byCategory.permission_denied > 0 && (
+                <span className="pill danger">permission_denied: {denialAggregates.byCategory.permission_denied}</span>
+              )}
+              {denialAggregates.byCategory.write_session_anonymous > 0 && (
+                <span className="pill warning">anonymous: {denialAggregates.byCategory.write_session_anonymous}</span>
+              )}
+              {denialAggregates.byCategory.write_session_auth_mismatch > 0 && (
+                <span className="pill warning">auth_mismatch: {denialAggregates.byCategory.write_session_auth_mismatch}</span>
+              )}
+              {denialAggregates.byCategory.yellow_list > 0 && (
+                <span className="pill" style={{ background: '#4a3a00', border: '1px solid #8a7a00' }}>yellow_list: {denialAggregates.byCategory.yellow_list}</span>
+              )}
+              {denialAggregates.byCategory.daily_limit > 0 && (
+                <span className="pill">daily_limit: {denialAggregates.byCategory.daily_limit}</span>
+              )}
+              {denialAggregates.byCategory.schema_mismatch > 0 && (
+                <span className="pill danger">schema_mismatch: {denialAggregates.byCategory.schema_mismatch}</span>
+              )}
+            </div>
+          )}
+
+          {/* ── Risk Cards ── */}
+          {denialRisks.length > 0 && (
+            <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 8, background: '#2a1a1a', border: '1px solid #7a2a2a' }}>
+              <strong style={{ fontSize: 13, color: '#ff6b6b' }}>Карточки рисков:</strong>
+              <ul style={{ margin: '6px 0 0', paddingLeft: 18, fontSize: 12, color: '#ffa0a0', lineHeight: 1.7 }}>
+                {denialRisks.map((risk, i) => (
+                  <li key={i}>{risk}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* ── Filters ── */}
+          <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+            <select value={denialFilter} onChange={(e) => setDenialFilter(e.target.value as DenialCategory | 'all')} style={{ fontSize: 12 }}>
+              <option value="all">Все категории</option>
+              <option value="permission_denied">permission_denied</option>
+              <option value="write_session_anonymous">write_session_anonymous</option>
+              <option value="write_session_auth_mismatch">write_session_auth_mismatch</option>
+              <option value="yellow_list">yellow_list</option>
+              <option value="daily_limit">daily_limit</option>
+              <option value="schema_mismatch">schema_mismatch</option>
+              <option value="unknown">unknown</option>
+            </select>
+            <select value={denialScreenFilter} onChange={(e) => setDenialScreenFilter(e.target.value)} style={{ fontSize: 12 }}>
+              <option value="">Все экраны</option>
+              {uniqueScreens.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <select value={denialPeriod} onChange={(e) => setDenialPeriod(e.target.value as '1h' | '24h' | '7d')} style={{ fontSize: 12 }}>
+              <option value="1h">1 час</option>
+              <option value="24h">24 часа</option>
+              <option value="7d">7 дней</option>
+            </select>
+            <span style={{ fontSize: 11, color: '#888' }}>Показано: {filteredDenials.length}</span>
+          </div>
+
+          {/* ── Denials Table ── */}
+          {filteredDenials.length > 0 ? (
+            <div style={{ maxHeight: 460, overflowY: 'auto', marginTop: 10 }}>
+              <table className="adminTable" style={{ fontSize: 11 }}>
+                <thead>
+                  <tr>
+                    <th>Время</th>
+                    <th>UID</th>
+                    <th>Экран</th>
+                    <th>Path</th>
+                    <th>Категория</th>
+                    <th>Рекомендация</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredDenials.slice(0, 100).map((d) => (
+                    <tr key={d.id}>
+                      <td style={{ whiteSpace: 'nowrap' }}>{new Date(d.at).toLocaleString()}</td>
+                      <td title={d.authUid ? `auth: ${d.authUid}` : ''} style={{ maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {d.uid || '—'}{d.isAnonymous ? ' (anon)' : ''}
+                      </td>
+                      <td>{d.screen || '—'}</td>
+                      <td style={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.firebasePath || '—'}</td>
+                      <td>
+                        <span className={
+                          d.category === 'permission_denied' || d.category === 'schema_mismatch' ? 'pill danger' :
+                          d.category === 'write_session_anonymous' || d.category === 'write_session_auth_mismatch' ? 'pill warning' :
+                          d.category === 'yellow_list' ? 'pill' :
+                          'pill'
+                        }>
+                          {d.category}
+                        </span>
+                      </td>
+                      <td style={{ fontSize: 10, color: '#aaa' }}>{d.recommendation}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p style={{ color: '#666', fontSize: 12, marginTop: 10 }}>
+              {denialLoading ? 'Загрузка...' : 'Нет отказов за выбранный период.'}
+            </p>
+          )}
+        </article>
+
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        {/* ── Rules Consistency Audit ───────────────────────────────────── */}
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        <article className="panel" style={{ marginTop: 24 }}>
+          <h3>Аудит Rules — publish-коллекции</h3>
+          {rulesAudit.length > 0 ? (
+            <div style={{ maxHeight: 400, overflowY: 'auto', marginTop: 10 }}>
+              <table className="adminTable" style={{ fontSize: 11 }}>
+                <thead>
+                  <tr>
+                    <th>Коллекция</th>
+                    <th>auth</th>
+                    <th>!anon</th>
+                    <th>userId</th>
+                    <th>yellow</th>
+                    <th>admin</th>
+                    <th>status</th>
+                    <th>Warnings</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rulesAudit.map((r) => {
+                    const allOk = Object.values(r.checks).every(Boolean);
+                    return (
+                      <tr key={r.collection} style={allOk ? {} : { background: '#2a1a1a' }}>
+                        <td><strong>{r.collection}</strong></td>
+                        <td>{r.checks.authRequired ? '\u2705' : '\u274C'}</td>
+                        <td>{r.checks.anonymousBlocked ? '\u2705' : '\u274C'}</td>
+                        <td>{r.checks.userIdMatch ? '\u2705' : '\u274C'}</td>
+                        <td>{r.checks.yellowListGuard ? '\u2705' : '\u274C'}</td>
+                        <td>{r.checks.adminBypass ? '\u2705' : '\u274C'}</td>
+                        <td>{r.checks.statusProtection ? '\u2705' : '\u274C'}</td>
+                        <td style={{ fontSize: 10, color: '#ffa0a0', maxWidth: 200 }}>
+                          {r.warnings.length > 0 ? r.warnings.join('; ') : <span style={{ color: '#5a5' }}>OK</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p style={{ color: '#666', fontSize: 12 }}>Загрузка...</p>
+          )}
+          {rulesWarnings.length > 0 && (
+            <div style={{ marginTop: 10, padding: '8px 12px', borderRadius: 8, background: '#2a2a1a', border: '1px solid #8a7a2a', fontSize: 12, color: '#ffd700' }}>
+              {rulesWarnings.length} коллекций с предупреждениями — проверьте firebase.rules.json
             </div>
           )}
         </article>

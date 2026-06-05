@@ -307,7 +307,12 @@ const ProfileScreen: React.FC = () => {
   }, [user?.id]);
 
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      setPendingRequestsCount(0);
+      setLatestPendingRequestedAtMs(0);
+      setLastSeenPendingAtMs(0);
+      return;
+    }
     const unsub = profilePermissionService.subscribeToPendingSummary(user.id, (summary) => {
       setPendingRequestsCount(summary.count);
       setLatestPendingRequestedAtMs(summary.latestRequestedAtMs);

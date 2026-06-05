@@ -34,6 +34,8 @@ import { resolveMediaAccessUrls } from '../services/mediaAccess';
 import { ensureFirebaseAuth, requireWriteSession } from '../firebase-auth-session';
 import { getBuildingsByStreet, getStreets } from '../data/buildings';
 import { subscribeActiveBonusPromotions, type BonusPromotion } from '../services/bonusService';
+import ScreenTooltip from '../components/ScreenTooltip';
+import { BUSINESS_CHAIKA_TOOLTIP } from '../utils/screenTooltips';
 
 const BIZ_LISTING_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const BIZ_LISTINGS_PATH = 'biznes_chaika_listings';
@@ -1210,8 +1212,7 @@ const KontaktiChaikyScreen: React.FC = () => {
       setAddFormVisible(false);
     } catch (error) {
       trace('api_call', 'fail', {}, error);
-      toast.showError(text.errorTitle, text.errorSave);
-      void error;
+      showUserError(language, 'send', error);
     } finally {
       setSubmitting(false);
     }
@@ -1259,6 +1260,12 @@ const KontaktiChaikyScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <ScreenTooltip
+        storageKey={BUSINESS_CHAIKA_TOOLTIP.storageKey}
+        title={BUSINESS_CHAIKA_TOOLTIP.title}
+        items={BUSINESS_CHAIKA_TOOLTIP.items}
+        accentColor={SCREEN_THEME.woodGreen}
+      />
       <Modal visible={searchModalVisible} animationType="slide" transparent onRequestClose={() => setSearchModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalSheet}>

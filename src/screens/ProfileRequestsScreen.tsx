@@ -31,6 +31,8 @@ import MiniUserAvatar from '../components/MiniUserAvatar';
 import { database } from '../firebase-config';
 import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
 import UserCardActionBar from '../components/UserCardActionBar';
+import ScreenTooltip from '../components/ScreenTooltip';
+import { PROFILE_REQUESTS_TOOLTIP } from '../utils/screenTooltips';
 
 type Lang = 'ua' | 'ru' | 'en';
 type RequestsTab = 'incoming' | 'outgoing' | 'history';
@@ -584,6 +586,12 @@ export default function ProfileRequestsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <ScreenTooltip
+        storageKey={PROFILE_REQUESTS_TOOLTIP.storageKey}
+        title={PROFILE_REQUESTS_TOOLTIP.title}
+        items={PROFILE_REQUESTS_TOOLTIP.items}
+        accentColor={ACCENT}
+      />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back}>
           <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />

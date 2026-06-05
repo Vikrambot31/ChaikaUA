@@ -41,6 +41,7 @@ import AppPhotoImage from '../components/AppPhotoImage';
 import FeedLikeButton from '../components/FeedLikeButton';
 import { normalizeLanguage } from '../redux/slices/languageSlice';
 import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
+import { requireAuthForDetails } from '../utils/authGuard';
 
 type ChatRequest = ChatRequestLike;
 
@@ -633,14 +634,16 @@ const OnlineChatScreen = () => {
   }, [deleteText.error, language]);
 
   const handleViewProfile = useCallback((userId: string) => {
+    if (!requireAuthForDetails({ userId: currentUser?.id, navigation, language })) return;
     setActionModal({ visible: false, userId: '', userName: '' });
     navigation.navigate('ViewUserProfile', { userId });
-  }, [navigation]);
+  }, [currentUser?.id, language, navigation]);
 
   const handleContact = useCallback((userId: string, name: string) => {
+    if (!requireAuthForDetails({ userId: currentUser?.id, navigation, language })) return;
     setActionModal({ visible: false, userId: '', userName: '' });
     openContactModal({ userId, name, photoURL: avatarByUserId[userId] || undefined, sourceType: 'help' });
-  }, [openContactModal, avatarByUserId]);
+  }, [avatarByUserId, currentUser?.id, language, navigation, openContactModal]);
 
   const handleDelete = (requestId: string) => {
     Alert.alert(deleteText.title, deleteText.body, [
@@ -835,7 +838,7 @@ const OnlineChatScreen = () => {
                       <MiniUserAvatar uri={avatarUri} name={item.name || ''} size={42} borderRadius={14} backgroundColor="#6A8BA5" />
                       <TouchableOpacity
                         style={[styles.problemChatActionPill, styles.problemChatProfilePill, !item.userId && styles.problemChatActionPillDisabled]}
-                        onPress={(event) => { event.stopPropagation(); if (!item.userId || navLock.current) return; navLock.current = true; navigation.navigate('ViewUserProfile', { userId: item.userId }); setTimeout(() => { navLock.current = false; }, 800); }}
+                        onPress={(event) => { event.stopPropagation(); if (!item.userId || navLock.current || !requireAuthForDetails({ userId: currentUser?.id, navigation, language })) return; navLock.current = true; navigation.navigate('ViewUserProfile', { userId: item.userId }); setTimeout(() => { navLock.current = false; }, 800); }}
                         disabled={!item.userId}
                         activeOpacity={item.userId ? 0.78 : 1}
                       >
@@ -846,6 +849,7 @@ const OnlineChatScreen = () => {
                         style={[styles.problemChatActionPill, styles.problemChatContactPill, (!item.userId && !item.phone) && styles.problemChatActionPillDisabled]}
                         onPress={(event) => {
                           event.stopPropagation();
+                          if (!requireAuthForDetails({ userId: currentUser?.id, navigation, language })) return;
                           if (item.userId && !own) {
                             openContactModal({ userId: item.userId, name: item.name ?? 'Unknown', photoURL: avatarUri || undefined, sourceType: 'help', sourceId: item.id, sourceTitle: title });
                             return;
@@ -909,7 +913,7 @@ const OnlineChatScreen = () => {
                       style={styles.lostFoundLikeAction}
                     />
                     {item.phone ? (
-                      <TouchableOpacity style={styles.lostFoundIconAction} onPress={(event) => { event.stopPropagation(); void safeCallPhone(item.phone as string, language); }} activeOpacity={0.75}>
+                      <TouchableOpacity style={styles.lostFoundIconAction} onPress={(event) => { event.stopPropagation(); if (requireAuthForDetails({ userId: currentUser?.id, navigation, language })) void safeCallPhone(item.phone as string, language); }} activeOpacity={0.75}>
                         <TactileIcon icon="phone-outline" size={34} iconSize={14} backgroundColor="#403933" />
                       </TouchableOpacity>
                     ) : null}
@@ -1021,7 +1025,7 @@ const OnlineChatScreen = () => {
                   {item.phone ? (
                     <TouchableOpacity
                       style={styles.chatActionBtn}
-                      onPress={(event) => { event.stopPropagation(); void safeCallPhone(item.phone as string, language); }}
+                      onPress={(event) => { event.stopPropagation(); if (requireAuthForDetails({ userId: currentUser?.id, navigation, language })) void safeCallPhone(item.phone as string, language); }}
                       activeOpacity={0.8}
                     >
                       <MaterialCommunityIcons name="phone-outline" size={13} color={SCREEN_THEME.woodGreenDark} />

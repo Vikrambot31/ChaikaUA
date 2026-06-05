@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -16,6 +16,7 @@ import type { ViewRequestContext } from '../services/profilePermissionService';
 import { getRequestTopicLabel } from '../data/categories';
 import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
 import type { DetailItemData } from '../utils/detailViewTypes';
+import { requireAuthForDetails } from '../utils/authGuard';
 import { SCREEN_THEME } from '../utils/screenTheme';
 
 type Lang = 'ua' | 'ru' | 'en';
@@ -102,6 +103,14 @@ export default function ItemDetailScreen({
   const categoryLabel = item.category ? getRequestTopicLabel({ category: item.category }, language) : '';
   const profileLabel = language === 'ua' ? 'Профіль' : language === 'ru' ? 'Профиль' : 'Profile';
 
+  const isAuthenticated = Boolean(currentUser?.id);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      requireAuthForDetails({ userId: currentUser?.id, navigation, language });
+    }
+  }, [currentUser?.id, isAuthenticated, language, navigation]);
+
   const fields = [
     { label: text.description, value: item.description },
     { label: item.priceLabel ?? text.price, value: item.price },
@@ -141,6 +150,49 @@ export default function ItemDetailScreen({
     if (!canOpenProfile || !item.userId) return;
     navigation.navigate('ViewUserProfile', { userId: item.userId });
   };
+
+  if (!isAuthenticated) {
+    const gateTitle = language === 'en'
+      ? 'Registration required'
+      : language === 'ru'
+        ? '\u041d\u0443\u0436\u043d\u0430 \u0440\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u044f'
+        : '\u041f\u043e\u0442\u0440\u0456\u0431\u043d\u0430 \u0440\u0435\u0454\u0441\u0442\u0440\u0430\u0446\u0456\u044f';
+    const gateText = language === 'en'
+      ? 'Sign in to open details, contacts, and profiles.'
+      : language === 'ru'
+        ? '\u0412\u043e\u0439\u0434\u0438\u0442\u0435, \u0447\u0442\u043e\u0431\u044b \u043e\u0442\u043a\u0440\u044b\u0442\u044c \u0434\u0435\u0442\u0430\u043b\u0438, \u043a\u043e\u043d\u0442\u0430\u043a\u0442\u044b \u0438 \u043f\u0440\u043e\u0444\u0438\u043b\u044c.'
+        : '\u0423\u0432\u0456\u0439\u0434\u0456\u0442\u044c, \u0449\u043e\u0431 \u0432\u0456\u0434\u043a\u0440\u0438\u0442\u0438 \u0434\u0435\u0442\u0430\u043b\u0456, \u043a\u043e\u043d\u0442\u0430\u043a\u0442\u0438 \u0442\u0430 \u043f\u0440\u043e\u0444\u0456\u043b\u044c.';
+    const gateButton = language === 'en'
+      ? 'Sign in / Register'
+      : language === 'ru'
+        ? '\u0412\u043e\u0439\u0442\u0438 / \u0417\u0430\u0440\u0435\u0433\u0438\u0441\u0442\u0440\u0438\u0440\u043e\u0432\u0430\u0442\u044c\u0441\u044f'
+        : '\u0423\u0432\u0456\u0439\u0442\u0438 / \u0417\u0430\u0440\u0435\u0454\u0441\u0442\u0440\u0443\u0432\u0430\u0442\u0438\u0441\u044c';
+
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.8}>
+            <MaterialCommunityIcons name="chevron-left" size={22} color="#403933" />
+            <Text style={styles.backText}>{text.back}</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>{text.headerTitle}</Text>
+          <View style={styles.headerSpacer} />
+        </View>
+        <View style={styles.authGate}>
+          <MaterialCommunityIcons name="lock-outline" size={42} color={SCREEN_THEME.terracotta} />
+          <Text style={styles.authGateTitle}>{gateTitle}</Text>
+          <Text style={styles.authGateText}>{gateText}</Text>
+          <TouchableOpacity
+            style={styles.authGateButton}
+            onPress={() => navigation.navigate('LoginScreen', {})}
+            activeOpacity={0.86}
+          >
+            <Text style={styles.authGateButtonText}>{gateButton}</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -278,6 +330,40 @@ const styles = StyleSheet.create({
   headerAvatar: { width: 78, alignItems: 'flex-end' },
   headerSpacer: { width: 78 },
   content: { padding: 16, paddingBottom: 112, gap: 12 },
+  authGate: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    gap: 12,
+  },
+  authGateTitle: {
+    color: SCREEN_THEME.textPrimary,
+    fontSize: 21,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  authGateText: {
+    color: SCREEN_THEME.textSecondary,
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  authGateButton: {
+    marginTop: 8,
+    minHeight: 46,
+    borderRadius: 8,
+    paddingHorizontal: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: SCREEN_THEME.terracotta,
+  },
+  authGateButtonText: {
+    color: '#FFF9EE',
+    fontSize: 15,
+    fontWeight: '900',
+  },
   photo: { width: '100%', height: 300, borderRadius: 22, backgroundColor: '#F0EDE8' },
   titleCard: {
     backgroundColor: SCREEN_THEME.paperStrong,

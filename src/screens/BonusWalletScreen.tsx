@@ -24,6 +24,8 @@ import {
 } from '../services/bonusService';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { useTranslation } from '../i18n/useTranslation';
+import ScreenTooltip from '../components/ScreenTooltip';
+import { BONUS_WALLET_TOOLTIP } from '../utils/screenTooltips';
 
 type AppNav = NavigationProp<Record<string, object | undefined>>;
 
@@ -152,6 +154,12 @@ const BonusWalletScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <ScreenTooltip
+        storageKey={BONUS_WALLET_TOOLTIP.storageKey}
+        title={BONUS_WALLET_TOOLTIP.title}
+        items={BONUS_WALLET_TOOLTIP.items}
+        accentColor={SCREEN_THEME.woodGreen}
+      />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.headerRow}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconButton} activeOpacity={0.82}>

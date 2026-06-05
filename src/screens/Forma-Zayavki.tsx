@@ -376,7 +376,7 @@ const getSubmitFailureMessage = (rawError: unknown, t: (typeof TEXT_BY_LANG)[Lan
     raw.includes('unauthorized') ||
     raw.includes('forbidden')
   ) {
-    return t.serverUnavailable;
+    return t.permissionDenied;
   }
 
   if (

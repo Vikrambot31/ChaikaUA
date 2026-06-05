@@ -31,6 +31,8 @@ import UserCardActionBar from '../components/UserCardActionBar';
 import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 import { useOperationTrace } from '../hooks/useOperationTrace';
 import { subscribeActiveBonusPromotions, type BonusPromotion } from '../services/bonusService';
+import ScreenTooltip from '../components/ScreenTooltip';
+import { CONTACTS_CHAIKA_TOOLTIP } from '../utils/screenTooltips';
 
 const CONTACT_LISTING_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const PROFILE_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -781,8 +783,7 @@ const KontaktiChaikyScreen: React.FC = () => {
       setAddFormVisible(false);
     } catch (error) {
       trace('api_call', 'fail', {}, error);
-      toast.showError(text.errorTitle, text.errorSave);
-      void error;
+      showUserError(language, 'send', error);
     } finally {
       setSubmitting(false);
     }
@@ -843,6 +844,12 @@ const KontaktiChaikyScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <ScreenTooltip
+        storageKey={CONTACTS_CHAIKA_TOOLTIP.storageKey}
+        title={CONTACTS_CHAIKA_TOOLTIP.title}
+        items={CONTACTS_CHAIKA_TOOLTIP.items}
+        accentColor={SCREEN_THEME.woodGreen}
+      />
       <Modal visible={searchModalVisible} animationType="slide" transparent onRequestClose={() => setSearchModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalSheet}>
