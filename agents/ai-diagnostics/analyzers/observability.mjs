@@ -13,9 +13,14 @@ export function analyze(files) {
     // 1. empty-catch (HIGH)
     lines.forEach((line, i) => {
       if (/catch\s*\(\s*\w*\s*\)\s*\{/.test(line)) {
+        // Skip: catch body is on the SAME line (one-liner with code)
+        // e.g. `} catch (err) { console.error(...); }`
+        const afterCatch = line.replace(/^.*catch\s*\(\s*\w*\s*\)\s*\{/, '').trim();
+        if (afterCatch && afterCatch !== '}' && !/^\s*\}\s*$/.test(afterCatch)) {
+          return; // has inline body — not empty
+        }
         // Check for inline empty catch: catch(e) {} on same line
         if (/catch\s*\(\s*\w*\s*\)\s*\{\s*\}\s*$/.test(line.trim())) {
-          // Skip if it has a comment explaining why
           if (/\/\//.test(line)) return;
           findings.push(createFinding({
             severity: 'HIGH', file: relativePath, line: i + 1, rule: 'empty-catch', scanner: SCANNER,
