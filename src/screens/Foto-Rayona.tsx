@@ -1,4 +1,6 @@
 import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import GuestRegisterBanner from '../components/GuestRegisterBanner';
+import { useGuestGuard } from '../hooks/useGuestGuard';
 import {
   ActivityIndicator,
   FlatList,
@@ -135,6 +137,7 @@ export default function FotoRayonaScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const user = useSelector((state: RootState) => state.auth.user);
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
+  const { guard: guestGuard, bannerVisible: guestBannerVisible, hideBanner: hideGuestBanner } = useGuestGuard();
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
 
   const [remotePhotos, setRemotePhotos] = useState<SoulPhoto[]>([]);
@@ -235,25 +238,14 @@ export default function FotoRayonaScreen() {
 
   const uploadPanel = (
     <View style={styles.uploadPanel}>
-      {user ? (
-        <TouchableOpacity
-          style={styles.submitButton}
-          onPress={() => navigation.navigate('PhotoUploadScreen')}
-          activeOpacity={0.86}
-        >
-          <MaterialCommunityIcons name="camera-plus-outline" size={19} color="#fff" />
-          <Text style={styles.submitText}>{text.addPhoto}</Text>
-        </TouchableOpacity>
-      ) : (
-        <TouchableOpacity
-          style={styles.loginButton}
-          onPress={() => navigation.navigate('LoginScreen', {})}
-          activeOpacity={0.82}
-        >
-          <MaterialCommunityIcons name="login" size={19} color="#fff" />
-          <Text style={styles.actionText}>{text.login}</Text>
-        </TouchableOpacity>
-      )}
+      <TouchableOpacity
+        style={styles.submitButton}
+        onPress={guestGuard(() => navigation.navigate('PhotoUploadScreen'))}
+        activeOpacity={0.86}
+      >
+        <MaterialCommunityIcons name="camera-plus-outline" size={19} color="#fff" />
+        <Text style={styles.submitText}>{text.addPhoto}</Text>
+      </TouchableOpacity>
     </View>
   );
 
@@ -290,6 +282,7 @@ export default function FotoRayonaScreen() {
       />
       {uploadPanel}
       <MiniTabBar />
+      <GuestRegisterBanner visible={guestBannerVisible} onClose={hideGuestBanner} />
     </SafeAreaView>
   );
 }

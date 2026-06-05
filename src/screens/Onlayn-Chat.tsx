@@ -42,6 +42,8 @@ import FeedLikeButton from '../components/FeedLikeButton';
 import { normalizeLanguage } from '../redux/slices/languageSlice';
 import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 import { requireAuthForDetails } from '../utils/authGuard';
+import GuestRegisterBanner from '../components/GuestRegisterBanner';
+import { useGuestGuard } from '../hooks/useGuestGuard';
 
 type ChatRequest = ChatRequestLike;
 
@@ -410,6 +412,7 @@ const OnlineChatScreen = () => {
   const navLock = useRef(false);
   const language = useSelector((state: RootState) => normalizeLanguage(state.language?.current)) as 'ua' | 'ru' | 'en';
   const currentUser = useSelector((state: RootState) => state.auth.user);
+  const { guard: guestGuard, bannerVisible: guestBannerVisible, hideBanner: hideGuestBanner } = useGuestGuard();
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const text = UI_TEXT[language];
   const currentUserAvatarUri = pickUserAvatarUri(currentUser);
@@ -1146,11 +1149,11 @@ const OnlineChatScreen = () => {
 
       <TactileButton
         title={text.add}
-        onPress={() => {
+        onPress={guestGuard(() => {
           if (addRequestNavLock.current) return;
           if (!hasCurrentUserAvatar) {
             Alert.alert(avatarRequiredText.title, avatarRequiredText.body, [
-              { text: avatarRequiredText.action, onPress: () => navigation.navigate(currentUser?.id ? 'EditProfileScreen' : 'LoginScreen') },
+              { text: avatarRequiredText.action, onPress: () => navigation.navigate('EditProfileScreen') },
               { text: language === 'en' ? 'Cancel' : language === 'ru' ? 'Отмена' : 'Скасувати', style: 'cancel' },
             ]);
             return;
@@ -1158,7 +1161,7 @@ const OnlineChatScreen = () => {
           addRequestNavLock.current = true;
           void openRequestFormWithLimitCheck(navigation, language)
             .finally(() => { setTimeout(() => { addRequestNavLock.current = false; }, 800); });
-        }}
+        })}
         variant="primary"
         style={{ marginHorizontal: 16, marginTop: 10, marginBottom: 14 }}
         icon={<MaterialCommunityIcons name="plus-circle-outline" size={20} color="#FFFFFF" />}
@@ -1192,6 +1195,7 @@ const OnlineChatScreen = () => {
         onSelect={(reason) => void sendContactRequest(reason)}
         onClose={closeContactModal}
       />
+      <GuestRegisterBanner visible={guestBannerVisible} onClose={hideGuestBanner} />
     </SafeAreaView>
   );
 };

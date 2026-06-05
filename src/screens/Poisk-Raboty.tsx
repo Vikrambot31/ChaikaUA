@@ -23,6 +23,8 @@ import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField'
 import { getDonePhotos, getRequiredPhotoLabel, validateSubmissionRequirements } from '../utils/submissionRequirements';
 import { checkYellowList } from '../utils/yellowListCheck';
 import UserCardActionBar from '../components/UserCardActionBar';
+import GuestRegisterBanner from '../components/GuestRegisterBanner';
+import { useGuestGuard } from '../hooks/useGuestGuard';
 
 const TWO_MONTHS_MS = 60 * 24 * 60 * 60 * 1000;
 type AppLanguage = 'ua' | 'ru' | 'en';
@@ -417,6 +419,7 @@ const JobSearchScreen: React.FC = () => {
   const navLock = useRef(false);
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as AppLanguage;
   const user = useSelector((state: RootState) => state.auth.user);
+  const { guard: guestGuard, bannerVisible: guestBannerVisible, hideBanner: hideGuestBanner } = useGuestGuard();
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const text = UI_TEXT[language];
   const requiredPhotoLabel = getRequiredPhotoLabel(language);
@@ -863,13 +866,9 @@ const JobSearchScreen: React.FC = () => {
 
             <TouchableOpacity
               style={styles.publishToggleBtn}
-              onPress={() => {
-                if (!user) {
-                  Alert.alert(text.addPost, text.authRequired);
-                  return;
-                }
+              onPress={guestGuard(() => {
                 setIsPublishFormVisible(true);
-              }}
+              })}
               activeOpacity={0.86}
             >
               <Text style={styles.publishToggleBtnText}>{text.addPost}</Text>
@@ -1108,6 +1107,7 @@ const JobSearchScreen: React.FC = () => {
         onSelect={(reason) => void sendContactRequest(reason)}
         onClose={closeContactModal}
       />
+      <GuestRegisterBanner visible={guestBannerVisible} onClose={hideGuestBanner} />
     </SafeAreaView>
   );
 };

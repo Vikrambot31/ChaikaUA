@@ -1,4 +1,6 @@
 import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import GuestRegisterBanner from '../components/GuestRegisterBanner';
+import { useGuestGuard } from '../hooks/useGuestGuard';
 import {
   ActivityIndicator,
   FlatList,
@@ -181,6 +183,7 @@ export default function SoulPhotosScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const user = useSelector((state: RootState) => state.auth.user);
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
+  const { bannerVisible: guestBannerVisible, hideBanner: hideGuestBanner, guard: guestGuard } = useGuestGuard();
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
 
   const [remotePhotos, setRemotePhotos] = useState<SoulPhoto[]>([]);
@@ -361,7 +364,7 @@ export default function SoulPhotosScreen() {
       ) : (
         <TouchableOpacity
           style={styles.loginButton}
-          onPress={() => navigation.navigate('LoginScreen', {})}
+          onPress={guestGuard(() => {})}
           activeOpacity={0.82}
         >
           <MaterialCommunityIcons name="login" size={19} color="#fff" />
@@ -412,6 +415,7 @@ export default function SoulPhotosScreen() {
       />
       {uploadPanel}
       <MiniTabBar />
+      <GuestRegisterBanner visible={guestBannerVisible} onClose={hideGuestBanner} />
     </SafeAreaView>
   );
 }

@@ -23,6 +23,8 @@ import { checkYellowList } from '../utils/yellowListCheck';
 import { getLanguageValidationError } from '../utils/contentLanguageGuard';
 import UserCardActionBar from '../components/UserCardActionBar';
 import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
+import GuestRegisterBanner from '../components/GuestRegisterBanner';
+import { useGuestGuard } from '../hooks/useGuestGuard';
 import { useOperationTrace } from '../hooks/useOperationTrace';
 import { requireAuthForDetails } from '../utils/authGuard';
 
@@ -292,6 +294,7 @@ const BuySellScreen: React.FC = () => {
   const navLock = useRef(false);
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const user = useSelector((state: RootState) => state.auth.user);
+  const { guard: guestGuard, bannerVisible: guestBannerVisible, hideBanner: hideGuestBanner } = useGuestGuard();
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const text = UI_TEXT[language];
   const { startOperation, trace } = useOperationTrace('Kuplu-Prodam');
@@ -865,16 +868,9 @@ const BuySellScreen: React.FC = () => {
         }}
       />
       <View style={styles.addBar}>
-        <TouchableOpacity style={styles.addBarBtn} onPress={() => {
-          if (!user) {
-            Alert.alert(text.formTitle, text.authRequired, [
-              { text: text.loginBtn, onPress: () => navigation.navigate('LoginScreen', {}) },
-              { text: text.ok },
-            ]);
-            return;
-          }
+        <TouchableOpacity style={styles.addBarBtn} onPress={guestGuard(() => {
           setAddFormVisible(true);
-        }} activeOpacity={0.85}>
+        })} activeOpacity={0.85}>
           <Text style={styles.addBarBtnText}>{text.addRequest}</Text>
         </TouchableOpacity>
       </View>
@@ -1003,6 +999,7 @@ const BuySellScreen: React.FC = () => {
         onSelect={(reason) => void sendContactRequest(reason)}
         onClose={closeContactModal}
       />
+      <GuestRegisterBanner visible={guestBannerVisible} onClose={hideGuestBanner} />
     </SafeAreaView>
   );
 };

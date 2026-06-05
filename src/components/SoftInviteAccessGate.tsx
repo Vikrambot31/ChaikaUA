@@ -1,6 +1,4 @@
 import React from 'react';
-import { useSelector } from 'react-redux';
-import { selectUser } from '../redux/slices/authSlice';
 import { TrustedAccessContext } from '../contexts/TrustedAccessContext';
 
 type SoftInviteAccessGateProps = {
@@ -8,16 +6,15 @@ type SoftInviteAccessGateProps = {
 };
 
 /**
- * Access gate — any authenticated user gets full trusted access.
- * No invite system, no banners, no blocking screens.
+ * Access gate — all users (including guests) get full trusted access.
+ * Trust tree is preserved in admin panel for analytics only and does
+ * not affect screen visibility or feature access.
  */
 export default function SoftInviteAccessGate({ children }: SoftInviteAccessGateProps) {
-  const user = useSelector(selectUser);
-
   return (
     <TrustedAccessContext.Provider
       value={{
-        isTrusted: Boolean(user?.id),
+        isTrusted: true,          // All users — including guests — can view all screens
         isLoading: false,
         hasPendingInvite: false,
         openInviteAccess: undefined,
