@@ -82,7 +82,8 @@ export default function InviteAccessScreen({
     void AsyncStorage.getItem(DRAFT_KEY)
       .then((raw) => {
         if (!raw) return;
-        const draft = JSON.parse(raw) as InviteDraft;
+        let draft: InviteDraft;
+        try { draft = JSON.parse(raw) as InviteDraft; } catch { return; }
         setStep(Math.min(3, Math.max(1, Number(draft.step || 1))));
         setName(String(draft.name || ''));
         setApartment(String(draft.apartment || ''));

@@ -88,7 +88,7 @@ async function fbPushLog(entry: { message: string; severity: string; scanner: st
 }
 
 async function fbClearLogs() {
-  try { await set(logsRef(), null); } catch { /* ok if empty */ }
+  try { await set(logsRef(), null); } catch (err) { console.warn('[audit] RTDB clear logs error', err); }
 }
 
 async function fbAddHistory(entry: Record<string, unknown>) {

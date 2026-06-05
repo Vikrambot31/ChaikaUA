@@ -155,7 +155,8 @@ const AppInfoScreen: React.FC = () => {
       });
 
       const raw = await AsyncStorage.getItem(SUGGESTIONS_ARCHIVE_KEY);
-      const archive = raw ? JSON.parse(raw) : [];
+      let archive: unknown[];
+      try { archive = raw ? JSON.parse(raw) : []; } catch { archive = []; }
       const nextItem = {
         id: `suggestion-${Date.now()}`,
         text: cleanText.slice(0, SUGGESTION_MAX_LENGTH),
