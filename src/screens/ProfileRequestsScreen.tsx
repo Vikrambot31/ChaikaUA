@@ -52,6 +52,30 @@ const PENDING_HINT: Record<Lang, string> = {
   en: 'When a phone icon appears — the user is ready to contact you',
 };
 
+const ELAPSED_LABELS: Record<Lang, { min: string; hour: string; day: string; waiting: string }> = {
+  ua: { min: 'хв', hour: 'год', day: 'дн', waiting: 'в очікуванні' },
+  ru: { min: 'мин', hour: 'ч', day: 'дн', waiting: 'в ожидании' },
+  en: { min: 'min', hour: 'h', day: 'd', waiting: 'waiting' },
+};
+
+const VIEWED_LABELS: Record<Lang, { seen: string; notSeen: string }> = {
+  ua: { seen: 'Переглянуто', notSeen: 'Ще не бачив' },
+  ru: { seen: 'Просмотрено', notSeen: 'Ещё не видел' },
+  en: { seen: 'Viewed', notSeen: 'Not seen yet' },
+};
+
+const formatElapsed = (isoDate: string, lang: Lang): string => {
+  const diff = Date.now() - new Date(isoDate).getTime();
+  const l = ELAPSED_LABELS[lang];
+  if (diff < 0) return `0 ${l.min} ${l.waiting}`;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins} ${l.min} ${l.waiting}`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} ${l.hour} ${l.waiting}`;
+  const days = Math.floor(hours / 24);
+  return `${days} ${l.day} ${l.waiting}`;
+};
+
 type StatusFilter = 'all' | ViewRequestStatus;
 type ContextFilter = 'all' | 'lyudi' | 'help' | 'sport' | 'buysell' | 'job';
 
@@ -229,6 +253,7 @@ const normalizeIncomingRequests = (
       sourceTitle: typeof value.sourceTitle === 'string' ? value.sourceTitle : undefined,
       requesterPhone: typeof value.requesterPhone === 'string' ? value.requesterPhone : undefined,
       targetPhone: typeof value.targetPhone === 'string' ? value.targetPhone : undefined,
+      viewedAt: typeof value.viewedAt === 'string' ? value.viewedAt : undefined,
     }))
     .filter((r) => Boolean(r.requesterId) && (includeHistory || r.status === 'pending'))
     .sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime());
@@ -259,6 +284,7 @@ const normalizeOutgoingRequests = (
       sourceTitle: typeof value.sourceTitle === 'string' ? value.sourceTitle : undefined,
       requesterPhone: typeof value.requesterPhone === 'string' ? value.requesterPhone : undefined,
       targetPhone: typeof value.targetPhone === 'string' ? value.targetPhone : undefined,
+      viewedAt: typeof value.viewedAt === 'string' ? value.viewedAt : undefined,
     }))
     .filter((r) => Boolean(r.targetUserId))
     .sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime());
@@ -375,6 +401,11 @@ export default function ProfileRequestsScreen() {
           setActiveTab('incoming');
           setRequests(historyRequests);
           await loadIncomingPhones(historyRequests);
+          // Mark pending incoming requests as viewed by this user
+          const pendingWithoutView = incomingRequests.filter((r) => r.status === 'pending' && !r.viewedAt);
+          if (pendingWithoutView.length > 0) {
+            void profilePermissionService.markIncomingAsViewed(currentUserId, pendingWithoutView.map((r) => r.requesterId));
+          }
         } else if (outgoingRequests.length > 0) {
           setActiveTab('outgoing');
           setRequests(outgoingRequests);
@@ -843,6 +874,11 @@ export default function ProfileRequestsScreen() {
                   ? styles.outgoingStatusDenied
                   : styles.outgoingStatusPending;
 
+            // Elapsed time and viewed status (for outgoing pending cards)
+            const elapsedText = item.status === 'pending' ? formatElapsed(item.requestedAt, language) : null;
+            const viewedLabel = VIEWED_LABELS[language];
+            const isViewedByTarget = Boolean(item.viewedAt);
+
             const descText: string | null = item.status === 'pending'
               ? PENDING_HINT[language]
               : (item.reason ? t.reasons[item.reason as ContactReason] : item.sourceTitle ?? null);
@@ -879,6 +915,28 @@ export default function ProfileRequestsScreen() {
                         <Text style={styles.incomingDateText}>{formatTimeShort(item.requestedAt)}</Text>
                       </View>
                     </View>
+
+                    {/* Elapsed time + viewed indicator (outgoing pending only) */}
+                    {isOutgoing && item.status === 'pending' ? (
+                      <View style={styles.outgoingMetaRow}>
+                        {elapsedText ? (
+                          <View style={styles.elapsedBadge}>
+                            <MaterialCommunityIcons name="clock-outline" size={12} color="#8A7A6E" />
+                            <Text style={styles.elapsedText}>{elapsedText}</Text>
+                          </View>
+                        ) : null}
+                        <View style={[styles.viewedBadge, isViewedByTarget ? styles.viewedBadgeSeen : styles.viewedBadgeUnseen]}>
+                          <MaterialCommunityIcons
+                            name={isViewedByTarget ? 'eye-check' : 'eye-off-outline'}
+                            size={12}
+                            color={isViewedByTarget ? '#2D7A46' : '#A09080'}
+                          />
+                          <Text style={[styles.viewedText, isViewedByTarget && styles.viewedTextSeen]}>
+                            {isViewedByTarget ? viewedLabel.seen : viewedLabel.notSeen}
+                          </Text>
+                        </View>
+                      </View>
+                    ) : null}
 
                     {/* Description / hint */}
                     {descText ? (
@@ -1309,6 +1367,48 @@ const styles = StyleSheet.create({
   descriptionHint: {
     color: '#9A8A7E',
     fontStyle: 'italic',
+  },
+  outgoingMetaRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  elapsedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F5F0E8',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  elapsedText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#8A7A6E',
+  },
+  viewedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  viewedBadgeSeen: {
+    backgroundColor: '#E8F5E9',
+  },
+  viewedBadgeUnseen: {
+    backgroundColor: '#F5F0E8',
+  },
+  viewedText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#A09080',
+  },
+  viewedTextSeen: {
+    color: '#2D7A46',
   },
   // Blinking phone button
   blinkPhoneBtn: {

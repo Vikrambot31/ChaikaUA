@@ -28,6 +28,7 @@ export interface ProfileViewRequest {
   targetPhone?: string;
   requesterUserId?: string;
   createdAt?: string;
+  viewedAt?: string;
 }
 
 export interface ContactRequestOptions {
@@ -368,6 +369,7 @@ export const profilePermissionService = {
         sourceTitle: typeof value.sourceTitle === 'string' ? value.sourceTitle : undefined,
         requesterPhone: typeof value.requesterPhone === 'string' ? value.requesterPhone : undefined,
         targetPhone: typeof value.targetPhone === 'string' ? value.targetPhone : undefined,
+        viewedAt: typeof value.viewedAt === 'string' ? value.viewedAt : undefined,
       }))
       .filter((r) => Boolean(r.requesterId))
       .sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime());
@@ -403,6 +405,7 @@ export const profilePermissionService = {
           sourceTitle: typeof value.sourceTitle === 'string' ? value.sourceTitle : undefined,
           requesterPhone: typeof value.requesterPhone === 'string' ? value.requesterPhone : undefined,
           targetPhone: typeof value.targetPhone === 'string' ? value.targetPhone : undefined,
+          viewedAt: typeof value.viewedAt === 'string' ? value.viewedAt : undefined,
         }))
         .filter((r) => Boolean(r.targetUserId));
       return out.sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime());
@@ -433,6 +436,21 @@ export const profilePermissionService = {
     } catch (err) {
       console.error('[profilePermissionService] respondToRequest failed:', err);
       throw err;
+    }
+  },
+
+  async markIncomingAsViewed(targetUserId: string, requesterIds: string[]): Promise<void> {
+    if (!requesterIds.length) return;
+    const now = new Date().toISOString();
+    const updates: Record<string, string> = {};
+    for (const rid of requesterIds) {
+      updates[`profileViewRequests/${targetUserId}/${rid}/viewedAt`] = now;
+      updates[`outgoingProfileRequestsByUser/${rid}/${targetUserId}/viewedAt`] = now;
+    }
+    try {
+      await update(ref(database), updates);
+    } catch (err) {
+      console.error('[profilePermissionService] markIncomingAsViewed failed:', err);
     }
   },
 
