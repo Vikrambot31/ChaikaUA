@@ -21,6 +21,7 @@ import { LIGHT_ORBS, SCREEN_THEME } from '../utils/screenTheme';
 import {
   loadProfileRecord,
 } from '../services/authProfileService';
+import { profilePermissionService } from '../services/profilePermissionService';
 import { query, ref, get, orderByChild, equalTo } from 'firebase/database';
 import { database } from '../firebase-config';
 import type { JobListing } from '../services/jobService';
@@ -145,13 +146,29 @@ const ViewUserProfileScreen: React.FC = () => {
   const [profileLikes, setProfileLikes] = useState(0);
   const [loading, setLoading] = useState(true);
   const [jobListing, setJobListing] = useState<JobListing | null>(null);
+  const [contactApproved, setContactApproved] = useState(false);
   const isAuthenticated = Boolean(currentUser?.id);
+  const isOwnProfile = Boolean(userId && currentUser?.id && userId === currentUser.id);
 
   useEffect(() => {
     if (!isAuthenticated) {
       requireAuthForDetails({ userId: currentUser?.id, navigation, language });
     }
   }, [currentUser?.id, isAuthenticated, language, navigation]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !userId || !currentUser?.id || isOwnProfile) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const status = await profilePermissionService.checkAccess(userId, currentUser.id);
+        if (!cancelled) setContactApproved(status === 'approved');
+      } catch {
+        if (!cancelled) setContactApproved(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isAuthenticated, userId, currentUser?.id, isOwnProfile]);
 
   useEffect(() => {
     const loadUserProfile = async () => {
@@ -226,7 +243,8 @@ const ViewUserProfileScreen: React.FC = () => {
     `${profileLikes} likes`,
   ].filter(Boolean).join(' · ');
 
-  const hasPhone = Boolean(phone.trim());
+  const phoneVisible = isOwnProfile || contactApproved;
+  const hasPhone = phoneVisible && Boolean(phone.trim());
   const canRequestContact = Boolean(userId && userId !== currentUser?.id);
   const canContact = canRequestContact || hasPhone;
 
@@ -305,35 +323,37 @@ const ViewUserProfileScreen: React.FC = () => {
 
           <Text style={styles.inputLabel}>{text.phone}</Text>
           <View style={styles.valueBox}>
-            <Text style={styles.valueText}>{phone || '—'}</Text>
+            <Text style={styles.valueText}>{phoneVisible ? (phone || '—') : '***'}</Text>
           </View>
 
-          <View style={styles.contactActions}>
-            <TouchableOpacity
-              style={[styles.smallAction, !hasPhone && styles.disabledAction]}
-              onPress={() => void safeCallPhone(phone, language)}
-              disabled={!hasPhone}
-              activeOpacity={0.82}
-            >
-              <MaterialCommunityIcons name="phone-outline" size={16} color={hasPhone ? '#fff' : '#9F958E'} />
-              <Text style={[styles.smallActionText, !hasPhone && styles.disabledText]}>{contactText.call}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.smallAction, !hasPhone && styles.disabledAction]}
-              onPress={() => void safeOpenViber(phone, language)}
-              disabled={!hasPhone}
-              activeOpacity={0.82}
-            >
-              <MaterialCommunityIcons name="message-text-outline" size={16} color={hasPhone ? '#fff' : '#9F958E'} />
-              <Text style={[styles.smallActionText, !hasPhone && styles.disabledText]}>{contactText.viber}</Text>
-            </TouchableOpacity>
-            {hasPhone ? (
-              <TouchableOpacity style={styles.smallActionAlt} onPress={() => void handleCopyPhone()} activeOpacity={0.82}>
-                <MaterialCommunityIcons name="content-copy" size={16} color="#403933" />
-                <Text style={styles.smallActionAltText}>{contactText.copy}</Text>
+          {phoneVisible ? (
+            <View style={styles.contactActions}>
+              <TouchableOpacity
+                style={[styles.smallAction, !hasPhone && styles.disabledAction]}
+                onPress={() => void safeCallPhone(phone, language)}
+                disabled={!hasPhone}
+                activeOpacity={0.82}
+              >
+                <MaterialCommunityIcons name="phone-outline" size={16} color={hasPhone ? '#fff' : '#9F958E'} />
+                <Text style={[styles.smallActionText, !hasPhone && styles.disabledText]}>{contactText.call}</Text>
               </TouchableOpacity>
-            ) : null}
-          </View>
+              <TouchableOpacity
+                style={[styles.smallAction, !hasPhone && styles.disabledAction]}
+                onPress={() => void safeOpenViber(phone, language)}
+                disabled={!hasPhone}
+                activeOpacity={0.82}
+              >
+                <MaterialCommunityIcons name="message-text-outline" size={16} color={hasPhone ? '#fff' : '#9F958E'} />
+                <Text style={[styles.smallActionText, !hasPhone && styles.disabledText]}>{contactText.viber}</Text>
+              </TouchableOpacity>
+              {hasPhone ? (
+                <TouchableOpacity style={styles.smallActionAlt} onPress={() => void handleCopyPhone()} activeOpacity={0.82}>
+                  <MaterialCommunityIcons name="content-copy" size={16} color="#403933" />
+                  <Text style={styles.smallActionAltText}>{contactText.copy}</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          ) : null}
           <TouchableOpacity
             style={[styles.contactBtn, !canContact && styles.disabledAction]}
             onPress={handleContact}

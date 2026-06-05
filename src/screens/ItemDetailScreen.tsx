@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -12,7 +12,7 @@ import MiniUserAvatar from '../components/MiniUserAvatar';
 import { useContactRequest } from '../hooks/useContactRequest';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import type { RootState } from '../redux/store';
-import type { ViewRequestContext } from '../services/profilePermissionService';
+import { profilePermissionService, type ViewRequestContext } from '../services/profilePermissionService';
 import { getRequestTopicLabel } from '../data/categories';
 import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
 import type { DetailItemData } from '../utils/detailViewTypes';
@@ -94,7 +94,10 @@ export default function ItemDetailScreen({
   const { modalVisible, pending, currentTarget, openModal, closeModal, sendRequest } = useContactRequest();
   const item = route.params.item;
   const text = UI_TEXT[language];
-  const hasPhone = Boolean(item.phone?.trim());
+  const [contactApproved, setContactApproved] = useState(false);
+  const isOwnItem = Boolean(item.userId && currentUser?.id && item.userId === currentUser.id);
+  const phoneVisible = isOwnItem || contactApproved;
+  const hasPhone = phoneVisible && Boolean(item.phone?.trim());
   const canRequestContact = Boolean(item.userId && item.userId !== currentUser?.id);
   const canOpenProfile = Boolean(item.userId && item.userId !== currentUser?.id);
   const canContact = canRequestContact || hasPhone;
@@ -110,6 +113,20 @@ export default function ItemDetailScreen({
       requireAuthForDetails({ userId: currentUser?.id, navigation, language });
     }
   }, [currentUser?.id, isAuthenticated, language, navigation]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !item.userId || !currentUser?.id || isOwnItem) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const status = await profilePermissionService.checkAccess(item.userId!, currentUser.id);
+        if (!cancelled) setContactApproved(status === 'approved');
+      } catch {
+        if (!cancelled) setContactApproved(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isAuthenticated, item.userId, currentUser?.id, isOwnItem]);
 
   const fields = [
     { label: text.description, value: item.description },
@@ -251,7 +268,7 @@ export default function ItemDetailScreen({
 
         <View style={styles.infoCard}>
           <Text style={styles.infoLabel}>{text.phone}</Text>
-          {hasPhone ? <Text style={styles.phoneValue}>{item.phone}</Text> : null}
+          <Text style={styles.phoneValue}>{phoneVisible ? (item.phone || '—') : '***'}</Text>
           <View style={styles.contactActions}>
             <TouchableOpacity
               style={[styles.smallAction, !canOpenProfile && styles.disabledAction]}
@@ -262,29 +279,33 @@ export default function ItemDetailScreen({
               <MaterialCommunityIcons name="account-circle-outline" size={16} color={canOpenProfile ? '#fff' : '#9F958E'} />
               <Text style={[styles.smallActionText, !canOpenProfile && styles.disabledText]}>{profileLabel}</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.smallAction, !hasPhone && styles.disabledAction]}
-              onPress={() => void safeCallPhone(item.phone, language)}
-              disabled={!hasPhone}
-              activeOpacity={0.82}
-            >
-              <MaterialCommunityIcons name="phone-outline" size={16} color={hasPhone ? '#fff' : '#9F958E'} />
-              <Text style={[styles.smallActionText, !hasPhone && styles.disabledText]}>{text.call}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.smallAction, !hasPhone && styles.disabledAction]}
-              onPress={() => void safeOpenViber(item.phone, language)}
-              disabled={!hasPhone}
-              activeOpacity={0.82}
-            >
-              <MaterialCommunityIcons name="message-text-outline" size={16} color={hasPhone ? '#fff' : '#9F958E'} />
-              <Text style={[styles.smallActionText, !hasPhone && styles.disabledText]}>{text.viber}</Text>
-            </TouchableOpacity>
-            {hasPhone ? (
-              <TouchableOpacity style={styles.smallActionAlt} onPress={() => void handleCopyPhone()} activeOpacity={0.82}>
-                <MaterialCommunityIcons name="content-copy" size={16} color="#403933" />
-                <Text style={styles.smallActionAltText}>{text.copy}</Text>
-              </TouchableOpacity>
+            {phoneVisible ? (
+              <>
+                <TouchableOpacity
+                  style={[styles.smallAction, !hasPhone && styles.disabledAction]}
+                  onPress={() => void safeCallPhone(item.phone, language)}
+                  disabled={!hasPhone}
+                  activeOpacity={0.82}
+                >
+                  <MaterialCommunityIcons name="phone-outline" size={16} color={hasPhone ? '#fff' : '#9F958E'} />
+                  <Text style={[styles.smallActionText, !hasPhone && styles.disabledText]}>{text.call}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.smallAction, !hasPhone && styles.disabledAction]}
+                  onPress={() => void safeOpenViber(item.phone, language)}
+                  disabled={!hasPhone}
+                  activeOpacity={0.82}
+                >
+                  <MaterialCommunityIcons name="message-text-outline" size={16} color={hasPhone ? '#fff' : '#9F958E'} />
+                  <Text style={[styles.smallActionText, !hasPhone && styles.disabledText]}>{text.viber}</Text>
+                </TouchableOpacity>
+                {hasPhone ? (
+                  <TouchableOpacity style={styles.smallActionAlt} onPress={() => void handleCopyPhone()} activeOpacity={0.82}>
+                    <MaterialCommunityIcons name="content-copy" size={16} color="#403933" />
+                    <Text style={styles.smallActionAltText}>{text.copy}</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </>
             ) : null}
           </View>
         </View>

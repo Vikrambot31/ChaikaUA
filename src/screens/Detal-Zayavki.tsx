@@ -386,9 +386,22 @@ const RequestDetailScreen = ({
     };
   }, [helperIds]);
 
-  const hasPhone = Boolean(request.phone?.trim());
   const canRequestContact = Boolean(request.userId && request.userId !== currentUser?.id);
   const canOpenProfile = Boolean(request.userId && request.userId !== currentUser?.id);
+
+  const isOwnRequest = useMemo(() => {
+    if (!currentUser) return false;
+    // Primary: compare Firebase user ID (reliable, works with masked phone)
+    if (request.userId && currentUser.id) {
+      return request.userId === currentUser.id;
+    }
+    // Fallback: name match (phone is masked in Firebase so digits comparison is unreliable)
+    const sameName = Boolean(currentUser.name?.trim()) && currentUser.name.trim().toLowerCase() === (request.name || '').trim().toLowerCase();
+    return sameName;
+  }, [currentUser, request.userId, request.name]);
+
+  const phoneVisible = isOwnRequest || accessStatus === 'approved';
+  const hasPhone = phoneVisible && Boolean(request.phone?.trim());
   const canContact = canRequestContact || hasPhone;
 
   const handleCopyPhone = async () => {
@@ -435,17 +448,6 @@ const RequestDetailScreen = ({
       { text: text.cancel, style: 'cancel' },
     ]);
   };
-
-  const isOwnRequest = useMemo(() => {
-    if (!currentUser) return false;
-    // Primary: compare Firebase user ID (reliable, works with masked phone)
-    if (request.userId && currentUser.id) {
-      return request.userId === currentUser.id;
-    }
-    // Fallback: name match (phone is masked in Firebase so digits comparison is unreliable)
-    const sameName = Boolean(currentUser.name?.trim()) && currentUser.name.trim().toLowerCase() === (request.name || '').trim().toLowerCase();
-    return sameName;
-  }, [currentUser, request.userId, request.name]);
 
   useEffect(() => {
     if (!currentUser?.id || !request.id || isOwnRequest) return;
@@ -615,7 +617,7 @@ const RequestDetailScreen = ({
 
         <View style={styles.card}>
           <Text style={styles.cardLabel}>{text.contact}</Text>
-          <Text style={styles.phoneText}>{request.phone || '—'}</Text>
+          <Text style={styles.phoneText}>{phoneVisible ? (request.phone || '—') : '***'}</Text>
           <View style={styles.contactActions}>
             <TouchableOpacity
               style={[styles.smallAction, !canOpenProfile && styles.disabledContactAction]}
@@ -626,29 +628,33 @@ const RequestDetailScreen = ({
               <MaterialCommunityIcons name="account-circle-outline" size={16} color={canOpenProfile ? '#fff' : '#9F958E'} />
               <Text style={[styles.smallActionText, !canOpenProfile && styles.disabledContactText]}>{contactActionText.profile}</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.smallAction, !hasPhone && styles.disabledContactAction]}
-              onPress={() => void safeCallPhone(request.phone, language)}
-              disabled={!hasPhone}
-              activeOpacity={0.82}
-            >
-              <MaterialCommunityIcons name="phone-outline" size={16} color={hasPhone ? '#fff' : '#9F958E'} />
-              <Text style={[styles.smallActionText, !hasPhone && styles.disabledContactText]}>{contactActionText.call}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.smallAction, !hasPhone && styles.disabledContactAction]}
-              onPress={() => void safeOpenViber(request.phone, language)}
-              disabled={!hasPhone}
-              activeOpacity={0.82}
-            >
-              <MaterialCommunityIcons name="message-text-outline" size={16} color={hasPhone ? '#fff' : '#9F958E'} />
-              <Text style={[styles.smallActionText, !hasPhone && styles.disabledContactText]}>{contactActionText.viber}</Text>
-            </TouchableOpacity>
-            {hasPhone ? (
-              <TouchableOpacity style={styles.smallActionAlt} onPress={() => void handleCopyPhone()} activeOpacity={0.82}>
-                <MaterialCommunityIcons name="content-copy" size={16} color="#403933" />
-                <Text style={styles.smallActionAltText}>{contactActionText.copy}</Text>
-              </TouchableOpacity>
+            {phoneVisible ? (
+              <>
+                <TouchableOpacity
+                  style={[styles.smallAction, !hasPhone && styles.disabledContactAction]}
+                  onPress={() => void safeCallPhone(request.phone, language)}
+                  disabled={!hasPhone}
+                  activeOpacity={0.82}
+                >
+                  <MaterialCommunityIcons name="phone-outline" size={16} color={hasPhone ? '#fff' : '#9F958E'} />
+                  <Text style={[styles.smallActionText, !hasPhone && styles.disabledContactText]}>{contactActionText.call}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.smallAction, !hasPhone && styles.disabledContactAction]}
+                  onPress={() => void safeOpenViber(request.phone, language)}
+                  disabled={!hasPhone}
+                  activeOpacity={0.82}
+                >
+                  <MaterialCommunityIcons name="message-text-outline" size={16} color={hasPhone ? '#fff' : '#9F958E'} />
+                  <Text style={[styles.smallActionText, !hasPhone && styles.disabledContactText]}>{contactActionText.viber}</Text>
+                </TouchableOpacity>
+                {hasPhone ? (
+                  <TouchableOpacity style={styles.smallActionAlt} onPress={() => void handleCopyPhone()} activeOpacity={0.82}>
+                    <MaterialCommunityIcons name="content-copy" size={16} color="#403933" />
+                    <Text style={styles.smallActionAltText}>{contactActionText.copy}</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </>
             ) : null}
           </View>
         </View>

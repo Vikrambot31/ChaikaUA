@@ -634,7 +634,7 @@
         ".read": "auth != null && (auth.uid === $requesterId || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
         "$targetUserId": {
           ".read": "auth != null && (auth.uid === $requesterId || root.child('user_roles').child(auth.uid).child('role').val() === 'admin')",
-          ".write": "auth != null && auth.uid === $requesterId"
+          ".write": "auth != null && (auth.uid === $requesterId || (auth.uid === $targetUserId && data.exists()))"
         }
       }
     },

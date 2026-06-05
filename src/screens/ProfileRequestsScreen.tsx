@@ -695,7 +695,7 @@ export default function ProfileRequestsScreen() {
           contentContainerStyle={styles.list}
           renderItem={({ item }) => {
             if (activeTab === 'incoming') {
-              const phone = item.requesterPhone?.trim() || incomingPhones[item.requesterId];
+              const phone = item.status === 'approved' ? (item.requesterPhone?.trim() || incomingPhones[item.requesterId]) : undefined;
               const age = incomingAges[item.requesterId];
               const votes = incomingVotes[item.requesterId] ?? 0;
               const reasonText = item.reason ? t.reasons[item.reason as ContactReason] : null;
