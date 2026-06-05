@@ -417,7 +417,7 @@ export default function ProfileRequestsScreen() {
           const raw = snap.exists() ? (snap.val() as Record<string, Partial<ProfileViewRequest>>) : null;
           const nextRequests = activeTab === 'outgoing'
             ? normalizeOutgoingRequests(raw, currentUserId)
-            : normalizeIncomingRequests(raw, activeTab !== 'outgoing');
+            : normalizeIncomingRequests(raw, true);
 
           setHiddenKeys(hidden);
           if (activeTab === 'incoming') {
