@@ -1,10 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
   RefreshControl,
   SafeAreaView,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -40,8 +40,8 @@ type Lang = 'ua' | 'ru' | 'en';
 const UI_TEXT = {
   ua: {
     title: 'Люди Чайки',
-    summaryTitle: 'Реальні користувачі застосунку',
-    members: 'зареєстровано у додатку',
+    summaryTitle: 'Люди, яким можна довіряти',
+    members: 'сусідів уже з нами',
     loading: 'Завантажуємо людей...',
     emptyTitle: 'Поки немає користувачів',
     emptyBody: 'Список зʼявиться після реєстрації мешканців.',
@@ -62,11 +62,13 @@ const UI_TEXT = {
     userProfile: 'Профіль користувача',
     errorTitle: 'Помилка',
     requestFailed: 'Не вдалося надіслати запит',
+    fillProfileTitle: 'Додайте фото — сусіди побачать вас!',
+    fillProfileBody: 'Заповніть профіль, щоб інші мешканці могли вас знайти.',
   },
   ru: {
     title: 'Люди Чайки',
-    summaryTitle: 'Реальные пользователи приложения',
-    members: 'зарегистрировано в приложении',
+    summaryTitle: 'Люди, которым можно доверять',
+    members: 'соседей уже с нами',
     loading: 'Загружаем людей...',
     emptyTitle: 'Пока нет пользователей',
     emptyBody: 'Список появится после регистрации жителей.',
@@ -87,11 +89,13 @@ const UI_TEXT = {
     userProfile: 'Профиль пользователя',
     errorTitle: 'Ошибка',
     requestFailed: 'Не удалось отправить запрос',
+    fillProfileTitle: 'Добавьте фото — соседи увидят вас!',
+    fillProfileBody: 'Заполните профиль, чтобы другие жители могли вас найти.',
   },
   en: {
     title: 'Chaika Life People',
-    summaryTitle: 'Real app users',
-    members: 'registered in the app',
+    summaryTitle: 'People you can trust',
+    members: 'neighbors already with us',
     loading: 'Loading people...',
     emptyTitle: 'No users yet',
     emptyBody: 'The list will appear after residents register.',
@@ -112,6 +116,8 @@ const UI_TEXT = {
     userProfile: 'User profile',
     errorTitle: 'Error',
     requestFailed: 'Failed to send request',
+    fillProfileTitle: 'Add a photo — neighbors will see you!',
+    fillProfileBody: 'Complete your profile so other residents can find you.',
   },
 } as const;
 
@@ -196,7 +202,7 @@ const mergeCommunityUser = (existing: CommunityUser, next: CommunityUser): Commu
 
 export default function TopGirlsBoysScreen() {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
-  const navLock = useRef(false);
+  const [navigatingId, setNavigatingId] = useState<string | null>(null);
   const user = useSelector(selectUser);
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
   const text = UI_TEXT[language];
@@ -328,7 +334,9 @@ export default function TopGirlsBoysScreen() {
   }, [mergeWithCurrentUser]);
 
   const openPersonDetails = useCallback((person: Person) => {
+    if (navigatingId) return;
     if (!requireAuthForDetails({ userId: user?.id, navigation, language })) return;
+    setNavigatingId(person.id);
     const item: DetailItemData = {
       id: person.id,
       title: person.name || text.residentFallback,
@@ -343,7 +351,8 @@ export default function TopGirlsBoysScreen() {
       sourceId: person.id,
     };
     navigation.navigate('ItemDetailScreen', { item });
-  }, [language, navigation, text, user?.id]);
+    setTimeout(() => setNavigatingId(null), 800);
+  }, [language, navigation, navigatingId, text, user?.id]);
 
   useEffect(() => {
     void loadPeople();
@@ -447,108 +456,129 @@ export default function TopGirlsBoysScreen() {
         <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView
+      <FlatList<Person>
+        data={loading ? [] : filteredRanked}
+        keyExtractor={(item) => item.id}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.scroll}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void loadPeople()} />}
         showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.filtersCard}>
-          <View style={styles.filterBlock}>
-            <Text style={styles.filterTitle}>{text.statusLabel}</Text>
-            <View style={styles.filterRow}>
-              <TouchableOpacity style={[styles.filterChip, statusFilter === 'all' && styles.filterChipActive]} onPress={() => setStatusFilter('all')} activeOpacity={0.82}>
-                <Text style={[styles.filterChipText, statusFilter === 'all' && styles.filterChipTextActive]}>{text.statusAll}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.filterChip, statusFilter === 'new' && styles.filterChipActive]} onPress={() => setStatusFilter('new')} activeOpacity={0.82}>
-                <Text style={[styles.filterChipText, statusFilter === 'new' && styles.filterChipTextActive]}>{text.statusNew}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.filterChip, statusFilter === 'active' && styles.filterChipActive]} onPress={() => setStatusFilter('active')} activeOpacity={0.82}>
-                <Text style={[styles.filterChipText, statusFilter === 'active' && styles.filterChipTextActive]}>{text.statusActive}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.filterChip, statusFilter === 'pro' && styles.filterChipActive]} onPress={() => setStatusFilter('pro')} activeOpacity={0.82}>
-                <Text style={[styles.filterChipText, statusFilter === 'pro' && styles.filterChipTextActive]}>{text.statusPro}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.summaryCard}>
-          <MaterialCommunityIcons name="account-group-outline" size={28} color={PRIMARY} />
-          <View style={styles.summaryCopy}>
-            <Text style={styles.summaryTitle}>{text.summaryTitle}</Text>
-            <Text style={styles.summaryText}>{ranked.length} {text.members}</Text>
-          </View>
-        </View>
-
-        {loading ? (
-          <View style={styles.emptyCard}>
-            <ActivityIndicator color={PRIMARY} />
-            <Text style={styles.emptyText}>{text.loading}</Text>
-          </View>
-        ) : filteredRanked.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <MaterialCommunityIcons name="account-search-outline" size={34} color="#9A8F86" />
-            <Text style={styles.emptyTitle}>{text.emptyTitle}</Text>
-            <Text style={styles.emptyText}>{text.emptyBody}</Text>
-          </View>
-        ) : (
-          filteredRanked.map((person, index) => {
-            const avatarColor = AVATAR_COLORS[index % AVATAR_COLORS.length];
-            const isCurrentUser = person.id === user?.id;
-            return (
-              <TouchableOpacity key={person.id} style={[styles.personCard, isCurrentUser && styles.personCardCurrent]} onPress={() => { if (isCurrentUser || navLock.current) return; navLock.current = true; openPersonDetails(person); setTimeout(() => { navLock.current = false; }, 800); }} activeOpacity={0.88} disabled={isCurrentUser}>
-                <View style={styles.personCardMain}>
-                  <View style={styles.rankBox}>
-                    <Text style={styles.rankText}>#{index + 1}</Text>
-                  </View>
-
-                  <View style={[styles.avatar, { backgroundColor: avatarColor }]}> 
-                  {person.photoURL && !failedImages[person.id] ? (
-                    <AppPhotoImage
-                      uri={person.photoURL}
-                      style={styles.avatarImage}
-                      resizeMode="cover"
-                      debugLabel={`People:${person.id}`}
-                      onError={() => setFailedImages((prev) => ({ ...prev, [person.id]: true }))}
-                    />
-                  ) : (
-                    <MaterialCommunityIcons name="account" size={28} color="#fff" />
-                  )}
-                  </View>
-
-                  <View style={styles.personInfo}>
-                  <View style={styles.nameRow}>
-                    <Text style={styles.personName} numberOfLines={1}>{person.name}</Text>
-                    {isCurrentUser ? <Text style={styles.youBadge}>{text.you}</Text> : null}
-                  </View>
-                  <Text style={styles.addressText} numberOfLines={1}>{getAddress(person, text)}</Text>
-                  <Text style={styles.professionText} numberOfLines={1}>{person.profession?.trim() || text.noProfession}</Text>
-                  </View>
+        ListHeaderComponent={
+          <>
+            <View style={styles.filtersCard}>
+              <View style={styles.filterBlock}>
+                <Text style={styles.filterTitle}>{text.statusLabel}</Text>
+                <View style={styles.filterRow}>
+                  <TouchableOpacity style={[styles.filterChip, statusFilter === 'all' && styles.filterChipActive]} onPress={() => setStatusFilter('all')} activeOpacity={0.82}>
+                    <Text style={[styles.filterChipText, statusFilter === 'all' && styles.filterChipTextActive]}>{text.statusAll}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.filterChip, statusFilter === 'new' && styles.filterChipActive]} onPress={() => setStatusFilter('new')} activeOpacity={0.82}>
+                    <Text style={[styles.filterChipText, statusFilter === 'new' && styles.filterChipTextActive]}>{text.statusNew}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.filterChip, statusFilter === 'active' && styles.filterChipActive]} onPress={() => setStatusFilter('active')} activeOpacity={0.82}>
+                    <Text style={[styles.filterChipText, statusFilter === 'active' && styles.filterChipTextActive]}>{text.statusActive}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.filterChip, statusFilter === 'pro' && styles.filterChipActive]} onPress={() => setStatusFilter('pro')} activeOpacity={0.82}>
+                    <Text style={[styles.filterChipText, statusFilter === 'pro' && styles.filterChipTextActive]}>{text.statusPro}</Text>
+                  </TouchableOpacity>
                 </View>
-                <UserCardActionBar
-                  avatarUri={person.photoURL || ''}
-                  name={person.name}
-                  userId={person.id}
-                  currentUserId={user?.id}
-                  language={language}
-                  onProfile={!isCurrentUser ? () => navigation.navigate('ViewUserProfile', { userId: person.id }) : undefined}
-                  onContact={!isCurrentUser ? () => openContactModal({ userId: person.id, name: person.name, photoURL: person.photoURL, sourceType: 'lyudi', sourceId: person.id, sourceTitle: person.name }) : undefined}
-                  contactDisabled={isCurrentUser}
-                  likePath="feed_likes/people"
-                  likeId={person.id}
-                />
-                {(bonusByUserId[person.id] ?? 0) > 0 ? (
-                  <View style={styles.bonusCoinRow}>
-                    <MaterialCommunityIcons name="circle-multiple" size={14} color="#C79C47" />
-                    <Text style={styles.bonusCoinText}>{bonusByUserId[person.id]}</Text>
-                  </View>
-                ) : null}
+              </View>
+            </View>
+
+            <View style={styles.summaryCard}>
+              <MaterialCommunityIcons name="account-group-outline" size={28} color={PRIMARY} />
+              <View style={styles.summaryCopy}>
+                <Text style={styles.summaryTitle}>{text.summaryTitle}</Text>
+                <Text style={styles.summaryText}>{ranked.length} {text.members}</Text>
+              </View>
+            </View>
+
+            {user?.id && !user.photoURL ? (
+              <TouchableOpacity style={styles.fillProfileBanner} onPress={() => navigation.navigate('EditProfileScreen' as never)} activeOpacity={0.85}>
+                <MaterialCommunityIcons name="camera-plus-outline" size={22} color="#7A6D64" />
+                <View style={styles.fillProfileCopy}>
+                  <Text style={styles.fillProfileTitle}>{text.fillProfileTitle}</Text>
+                  <Text style={styles.fillProfileBody}>{text.fillProfileBody}</Text>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={20} color="#B0A090" />
               </TouchableOpacity>
-            );
-          })
-        )}
-      </ScrollView>
+            ) : null}
+          </>
+        }
+        ListEmptyComponent={
+          loading ? (
+            <View style={styles.emptyCard}>
+              <ActivityIndicator color={PRIMARY} />
+              <Text style={styles.emptyText}>{text.loading}</Text>
+            </View>
+          ) : (
+            <View style={styles.emptyCard}>
+              <MaterialCommunityIcons name="account-search-outline" size={34} color="#9A8F86" />
+              <Text style={styles.emptyTitle}>{text.emptyTitle}</Text>
+              <Text style={styles.emptyText}>{text.emptyBody}</Text>
+            </View>
+          )
+        }
+        renderItem={({ item: person, index }) => {
+          const avatarColor = AVATAR_COLORS[index % AVATAR_COLORS.length];
+          const isCurrentUser = person.id === user?.id;
+          const isNavigating = navigatingId === person.id;
+          return (
+            <TouchableOpacity style={[styles.personCard, isCurrentUser && styles.personCardCurrent]} onPress={() => openPersonDetails(person)} activeOpacity={0.88} disabled={isCurrentUser || isNavigating}>
+              <View style={styles.personCardMain}>
+                <View style={styles.rankBox}>
+                  {isNavigating ? (
+                    <ActivityIndicator size="small" color={PRIMARY} />
+                  ) : (
+                    <Text style={styles.rankText}>#{index + 1}</Text>
+                  )}
+                </View>
+
+                <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
+                {person.photoURL && !failedImages[person.id] ? (
+                  <AppPhotoImage
+                    uri={person.photoURL}
+                    style={styles.avatarImage}
+                    resizeMode="cover"
+                    debugLabel={`People:${person.id}`}
+                    onError={() => setFailedImages((prev) => ({ ...prev, [person.id]: true }))}
+                  />
+                ) : (
+                  <MaterialCommunityIcons name="account" size={28} color="#fff" />
+                )}
+                </View>
+
+                <View style={styles.personInfo}>
+                <View style={styles.nameRow}>
+                  <Text style={styles.personName} numberOfLines={1}>{person.name}</Text>
+                  {isCurrentUser ? <Text style={styles.youBadge}>{text.you}</Text> : null}
+                </View>
+                <Text style={styles.addressText} numberOfLines={1}>{getAddress(person, text)}</Text>
+                <Text style={styles.professionText} numberOfLines={1}>{person.profession?.trim() || text.noProfession}</Text>
+                </View>
+              </View>
+              <UserCardActionBar
+                avatarUri={person.photoURL || ''}
+                name={person.name}
+                userId={person.id}
+                currentUserId={user?.id}
+                language={language}
+                onProfile={!isCurrentUser ? () => navigation.navigate('ViewUserProfile', { userId: person.id }) : undefined}
+                onContact={!isCurrentUser ? () => openContactModal({ userId: person.id, name: person.name, photoURL: person.photoURL, sourceType: 'lyudi', sourceId: person.id, sourceTitle: person.name }) : undefined}
+                contactDisabled={isCurrentUser}
+                likePath="feed_likes/people"
+                likeId={person.id}
+              />
+              {(bonusByUserId[person.id] ?? 0) > 0 ? (
+                <View style={styles.bonusCoinRow}>
+                  <MaterialCommunityIcons name="circle-multiple" size={14} color="#C79C47" />
+                  <Text style={styles.bonusCoinText}>{bonusByUserId[person.id]}</Text>
+                </View>
+              ) : null}
+            </TouchableOpacity>
+          );
+        }}
+      />
       <MiniTabBar />
       <ProfileViewRequestModal
         visible={permModal.visible}
@@ -677,4 +707,18 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#C79C47',
   },
+  fillProfileBanner: {
+    backgroundColor: '#FFF8E1',
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: '#E4D0AB',
+  },
+  fillProfileCopy: { flex: 1 },
+  fillProfileTitle: { color: '#5B5048', fontSize: 13, fontWeight: '900' },
+  fillProfileBody: { color: '#7A6D64', fontSize: 11, fontWeight: '700', marginTop: 2 },
 });
