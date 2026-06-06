@@ -33,6 +33,7 @@ import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
 import UserCardActionBar from '../components/UserCardActionBar';
 import ScreenTooltip from '../components/ScreenTooltip';
 import { PROFILE_REQUESTS_TOOLTIP } from '../utils/screenTooltips';
+import useSoftToast from '../hooks/useSoftToast';
 
 type Lang = 'ua' | 'ru' | 'en';
 type RequestsTab = 'incoming' | 'outgoing' | 'history';
@@ -112,6 +113,18 @@ const UI = {
     copyHintBody: 'Затримайте номер, щоб скопіювати його в буфер обміну.',
     approve: 'Дозволити',
     deny: 'Відхилити',
+    topicLabel: 'Тема:',
+    foundContactLabel: 'Знайшов ваш контакт:',
+    transitionScreenLabel: 'Перейшов з екрана:',
+    notSpecified: 'не вказано',
+    contactOpened: 'Контакт відкрито',
+    contactOpenedByTopic: 'Контакт відкрито по темі:',
+    requestDenied: 'Запит відхилено',
+    approveAgainTitle: 'Схвалити контакт?',
+    approveAgainBody: 'Цей запит було відхилено. Хочете відкрити контакт для цього користувача?',
+    approveAgainYes: 'Так, схвалити',
+    approveSuccess: 'Контакт відкрито',
+    denySuccess: 'Запит відхилено',
     errTitle: 'Помилка',
     errBody: 'Не вдалося відповісти. Спробуйте ще раз.',
     loadErrBody: 'Не вдалося завантажити запити. Перевірте інтернет і спробуйте ще раз.',
@@ -161,6 +174,18 @@ const UI = {
     copyHintBody: 'Зажмите номер, чтобы скопировать его в буфер обмена.',
     approve: 'Разрешить',
     deny: 'Отклонить',
+    topicLabel: 'Тема:',
+    foundContactLabel: 'Нашел ваш контакт:',
+    transitionScreenLabel: 'Перешел с экрана:',
+    notSpecified: 'не указано',
+    contactOpened: 'Контакт открыт',
+    contactOpenedByTopic: 'Контакт открыт по теме:',
+    requestDenied: 'Запит відхилено',
+    approveAgainTitle: 'Одобрить контакт?',
+    approveAgainBody: 'Этот запрос был отклонен. Хотите открыть контакт для этого пользователя?',
+    approveAgainYes: 'Да, одобрить',
+    approveSuccess: 'Контакт открыт',
+    denySuccess: 'Запит відхилено',
     errTitle: 'Ошибка',
     errBody: 'Не удалось ответить. Попробуйте снова.',
     loadErrBody: 'Не удалось загрузить запросы. Проверьте интернет и попробуйте снова.',
@@ -210,6 +235,18 @@ const UI = {
     copyHintBody: 'Press and hold the number to copy it.',
     approve: 'Allow',
     deny: 'Deny',
+    topicLabel: 'Topic:',
+    foundContactLabel: 'Found your contact:',
+    transitionScreenLabel: 'Opened from screen:',
+    notSpecified: 'not specified',
+    contactOpened: 'Contact open',
+    contactOpenedByTopic: 'Contact opened for topic:',
+    requestDenied: 'Запит відхилено',
+    approveAgainTitle: 'Approve contact?',
+    approveAgainBody: 'This request was denied. Do you want to open contact for this user?',
+    approveAgainYes: 'Yes, approve',
+    approveSuccess: 'Contact open',
+    denySuccess: 'Запит відхилено',
     errTitle: 'Error',
     errBody: 'Failed to respond. Please try again.',
     loadErrBody: 'Failed to load requests. Check your internet connection and try again.',
@@ -295,6 +332,7 @@ export default function ProfileRequestsScreen() {
   const navLock = useRef(false);
   const user = useSelector(selectUser);
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
+  const toast = useSoftToast();
   const t = UI[language];
   const [sessionUserId, setSessionUserId] = useState(user?.id ?? '');
   const [sessionResolved, setSessionResolved] = useState(Boolean(user?.id));
@@ -510,8 +548,9 @@ export default function ProfileRequestsScreen() {
     const targetUserId = activeTab === 'outgoing' ? (item.targetUserId ?? '') : currentUserId;
     const hiddenKey = profilePermissionService.requestKey(targetUserId, item.requesterId);
     const isHidden = Boolean(hiddenKeys[hiddenKey]);
-    if (!showHidden && isHidden) return false;
-    if (activeTab === 'incoming') return true;
+    if (activeTab === 'incoming') return !isHidden;
+    if (activeTab === 'history' && !isHidden) return false;
+    if (activeTab === 'outgoing' && !showHidden && isHidden) return false;
     if (statusFilter !== 'all' && item.status !== statusFilter) return false;
     if (contextFilter !== 'all' && item.context !== contextFilter) return false;
     return true;
@@ -551,10 +590,6 @@ export default function ProfileRequestsScreen() {
         archiveTargets.forEach((_, key) => { next[key] = true; });
         return next;
       });
-      setRequests((prev) => prev.filter((item) => {
-        const targetUserId = activeTab === 'outgoing' ? (item.targetUserId ?? '') : currentUserId;
-        return !archiveTargets.has(profilePermissionService.requestKey(targetUserId, item.requesterId));
-      }));
     } catch {
       Alert.alert(t.errTitle, t.errBody);
     } finally {
@@ -580,12 +615,21 @@ export default function ProfileRequestsScreen() {
           ? { ...item, status: approved ? 'approved' : 'denied' }
           : item,
       ));
+      toast.showSuccess(approved ? t.approveSuccess : t.denySuccess);
     } catch {
       Alert.alert(t.errTitle, t.errBody);
     } finally {
       setRespondingRequestId(null);
     }
-  }, [currentUserId, respondingRequestId, t.errBody, t.errTitle]);
+  }, [currentUserId, respondingRequestId, t.approveSuccess, t.denySuccess, t.errBody, t.errTitle, toast]);
+
+  const confirmApproveDeniedRequest = useCallback((requesterId: string) => {
+    if (!requesterId || respondingRequestId) return;
+    Alert.alert(t.approveAgainTitle, t.approveAgainBody, [
+      { text: t.clearConfirmNo, style: 'cancel' },
+      { text: t.approveAgainYes, onPress: () => { void handleRespondToIncoming(requesterId, true); } },
+    ]);
+  }, [handleRespondToIncoming, respondingRequestId, t.approveAgainBody, t.approveAgainTitle, t.approveAgainYes, t.clearConfirmNo]);
 
   const handleCall = async (phoneRaw?: string) => {
     await safeCallPhone(phoneRaw, language);
@@ -755,9 +799,17 @@ export default function ProfileRequestsScreen() {
               const reasonText = item.reason ? t.reasons[item.reason as ContactReason] : null;
               const descriptionText = reasonText || item.sourceTitle || (age ? age : null);
               const isResponding = respondingRequestId === item.requesterId;
+              const topicText = reasonText || item.sourceTitle?.trim() || t.notSpecified;
+              const foundContactText = item.sourceTitle?.trim() || getProfileRequestContextLabel(item.context, language) || t.notSpecified;
+              const transitionScreenText = item.sourceType?.trim() || getProfileRequestContextLabel(item.context, language) || t.notSpecified;
               const votesLabel = language === 'en' ? 'votes' : language === 'ru' ? 'голосов' : 'голосів';
               return (
-                <View style={styles.card}>
+                <TouchableOpacity
+                  style={styles.card}
+                  onPress={() => confirmApproveDeniedRequest(item.requesterId)}
+                  disabled={item.status !== 'denied' || Boolean(respondingRequestId)}
+                  activeOpacity={0.86}
+                >
                   {/* Top: avatar + info */}
                   <View style={styles.cardIncoming}>
                     {item.requesterPhotoURL ? (
@@ -796,6 +848,21 @@ export default function ProfileRequestsScreen() {
                     </View>
                   </View>
 
+                  <View style={styles.requestMetaBox}>
+                    <View style={styles.requestMetaRow}>
+                      <Text style={styles.requestMetaLabel}>{t.topicLabel}</Text>
+                      <Text style={styles.requestMetaValue}>{topicText}</Text>
+                    </View>
+                    <View style={styles.requestMetaRow}>
+                      <Text style={styles.requestMetaLabel}>{t.foundContactLabel}</Text>
+                      <Text style={styles.requestMetaValue}>{foundContactText}</Text>
+                    </View>
+                    <View style={styles.requestMetaRow}>
+                      <Text style={styles.requestMetaLabel}>{t.transitionScreenLabel}</Text>
+                      <Text style={styles.requestMetaValue}>{transitionScreenText}</Text>
+                    </View>
+                  </View>
+
                   {item.status === 'pending' ? (
                     <View style={styles.responseActionsRow}>
                       <TouchableOpacity
@@ -822,17 +889,29 @@ export default function ProfileRequestsScreen() {
                       </TouchableOpacity>
                     </View>
                   ) : (
-                    <View style={styles.responseActionsRow}>
-                      <View style={[styles.responseBtn, item.status === 'approved' ? styles.responseBtnApprove : styles.responseBtnDeny, { opacity: 0.7 }]}>
+                    <View style={[
+                      styles.responseStatusBox,
+                      item.status === 'approved' ? styles.responseStatusApproved : styles.responseStatusDenied,
+                    ]}>
+                      <View style={styles.responseStatusTitleRow}>
                         <MaterialCommunityIcons
-                          name={item.status === 'approved' ? 'check' : 'close'}
+                          name={item.status === 'approved' ? 'check-circle' : 'close-circle-outline'}
                           size={18}
-                          color={item.status === 'approved' ? '#fff' : '#A73737'}
+                          color={item.status === 'approved' ? '#2D7A46' : '#A73737'}
                         />
-                        <Text style={item.status === 'approved' ? styles.responseBtnText : styles.responseBtnDenyText}>
-                          {item.status === 'approved' ? t.approve : t.deny}
+                        <Text style={[
+                          styles.responseStatusTitle,
+                          item.status === 'denied' && styles.responseStatusDeniedTitle,
+                        ]}>
+                          {item.status === 'approved' ? t.contactOpened : t.requestDenied}
                         </Text>
                       </View>
+                      <Text style={styles.responseStatusTopic}>
+                        {item.status === 'approved' ? t.contactOpenedByTopic : t.topicLabel} {topicText}
+                      </Text>
+                      {item.status === 'denied' ? (
+                        <Text style={styles.responseStatusHint}>{t.approveAgainBody}</Text>
+                      ) : null}
                     </View>
                   )}
 
@@ -848,7 +927,7 @@ export default function ProfileRequestsScreen() {
                     likePath="feed_likes/profile_requests"
                     likeId={`${item.requesterId}_${sanitizeFirebaseKey(item.requestedAt)}`}
                   />
-                </View>
+                </TouchableOpacity>
               );
             }
 
@@ -882,10 +961,24 @@ export default function ProfileRequestsScreen() {
             const descText: string | null = item.status === 'pending'
               ? PENDING_HINT[language]
               : (item.reason ? t.reasons[item.reason as ContactReason] : item.sourceTitle ?? null);
+            const reasonText = item.reason ? t.reasons[item.reason as ContactReason] : null;
+            const topicText = reasonText || item.sourceTitle?.trim() || t.notSpecified;
+            const foundContactText = item.sourceTitle?.trim() || getProfileRequestContextLabel(item.context, language) || t.notSpecified;
+            const transitionScreenText = item.sourceType?.trim() || getProfileRequestContextLabel(item.context, language) || t.notSpecified;
+            const statusIcon = item.status === 'approved'
+              ? 'check-circle'
+              : item.status === 'denied'
+                ? 'close-circle-outline'
+                : 'clock-outline';
+            const statusIconColor = item.status === 'approved'
+              ? '#2D7A46'
+              : item.status === 'denied'
+                ? '#A73737'
+                : '#8A6D2A';
 
             const callLabel = language === 'en' ? 'Call' : language === 'ru' ? 'Позвонить' : 'Подзвонити';
             return (
-              <View style={[styles.card, item.status === 'denied' && styles.cardDimmed]}>
+              <View style={[styles.card, !isOutgoing && item.status === 'denied' && styles.cardDimmed]}>
                 {/* Top: avatar + info */}
                 <View style={styles.cardIncoming}>
                   {photo ? (
@@ -947,6 +1040,49 @@ export default function ProfileRequestsScreen() {
                       </View>
                     ) : null}
                   </View>
+                </View>
+
+                <View style={styles.requestMetaBox}>
+                  <View style={styles.requestMetaRow}>
+                    <Text style={styles.requestMetaLabel}>{t.topicLabel}</Text>
+                    <Text style={styles.requestMetaValue}>{topicText}</Text>
+                  </View>
+                  <View style={styles.requestMetaRow}>
+                    <Text style={styles.requestMetaLabel}>{t.foundContactLabel}</Text>
+                    <Text style={styles.requestMetaValue}>{foundContactText}</Text>
+                  </View>
+                  <View style={styles.requestMetaRow}>
+                    <Text style={styles.requestMetaLabel}>{t.transitionScreenLabel}</Text>
+                    <Text style={styles.requestMetaValue}>{transitionScreenText}</Text>
+                  </View>
+                </View>
+
+                <View style={[
+                  styles.responseStatusBox,
+                  item.status === 'approved'
+                    ? styles.responseStatusApproved
+                    : item.status === 'denied'
+                      ? styles.responseStatusDenied
+                      : styles.responseStatusPending,
+                ]}>
+                  <View style={styles.responseStatusTitleRow}>
+                    <MaterialCommunityIcons name={statusIcon} size={18} color={statusIconColor} />
+                    <Text style={[
+                      styles.responseStatusTitle,
+                      item.status === 'denied' && styles.responseStatusDeniedTitle,
+                      item.status === 'pending' && styles.responseStatusPendingTitle,
+                    ]}>
+                      {outgoingStatusLabel}
+                    </Text>
+                  </View>
+                  <Text style={styles.responseStatusTopic}>
+                    {item.status === 'approved' ? t.contactOpenedByTopic : t.topicLabel} {topicText}
+                  </Text>
+                  {item.status === 'pending' ? (
+                    <Text style={styles.responseStatusHint}>
+                      {isViewedByTarget ? viewedLabel.seen : viewedLabel.notSeen}
+                    </Text>
+                  ) : null}
                 </View>
 
                 <UserCardActionBar
@@ -1242,6 +1378,34 @@ const styles = StyleSheet.create({
     color: '#7A6D64',
     lineHeight: 17,
   },
+  requestMetaBox: {
+    borderWidth: 1,
+    borderColor: '#E4D0AB',
+    borderRadius: 8,
+    backgroundColor: '#FFF9F1',
+    paddingHorizontal: 9,
+    paddingVertical: 7,
+    gap: 4,
+    marginBottom: 7,
+  },
+  requestMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+  },
+  requestMetaLabel: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#4A3D37',
+    minWidth: 104,
+  },
+  requestMetaValue: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#7A6D64',
+    lineHeight: 15,
+  },
   responseActionsRow: {
     flexDirection: 'row',
     gap: 8,
@@ -1278,6 +1442,54 @@ const styles = StyleSheet.create({
     color: '#A73737',
     fontSize: 13,
     fontWeight: '900',
+  },
+  responseStatusBox: {
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    gap: 4,
+    marginBottom: 7,
+  },
+  responseStatusApproved: {
+    backgroundColor: '#E8F5E9',
+    borderColor: '#A8D5B5',
+  },
+  responseStatusDenied: {
+    backgroundColor: '#FFF1EF',
+    borderColor: '#E7B6AE',
+  },
+  responseStatusPending: {
+    backgroundColor: '#FFF7E3',
+    borderColor: '#E6C982',
+  },
+  responseStatusTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  responseStatusTitle: {
+    color: '#2D7A46',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  responseStatusDeniedTitle: {
+    color: '#A73737',
+  },
+  responseStatusPendingTitle: {
+    color: '#8A6D2A',
+  },
+  responseStatusTopic: {
+    color: '#4A3D37',
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 17,
+  },
+  responseStatusHint: {
+    color: '#7A6D64',
+    fontSize: 11,
+    fontWeight: '700',
+    lineHeight: 15,
   },
   incomingActionsRow: {
     flexDirection: 'row',
