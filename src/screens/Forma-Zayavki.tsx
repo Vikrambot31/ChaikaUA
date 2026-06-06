@@ -13,7 +13,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationProp, ParamListBase, useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
@@ -29,6 +28,7 @@ import { normalizeUkrainianPhoneStrict, validateName, validatePhone } from '../u
 import { useOperationTrace } from '../hooks/useOperationTrace';
 
 type Lang = 'ua' | 'ru' | 'en';
+type RequestMode = 'need_help' | 'offer_help' | 'business';
 type FieldKey = 'name' | 'phone' | 'helpType' | 'description';
 type FieldTone = 'idle' | 'valid' | 'error' | 'warning';
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
@@ -38,17 +38,28 @@ type FieldState = {
   message: string;
 };
 
+const REQUEST_MODES = [
+  { value: 'need_help', icon: 'hand-heart-outline', label: { ua: 'Прошу допомоги', ru: 'Прошу помощи', en: 'Need help' } },
+  { value: 'offer_help', icon: 'account-heart-outline', label: { ua: 'Пропоную допомогу', ru: 'Предлагаю помощь', en: 'Offer help' } },
+  { value: 'business', icon: 'storefront-outline', label: { ua: 'Мій бізнес', ru: 'Мой бизнес', en: 'My business' } },
+] as const satisfies ReadonlyArray<{
+  value: RequestMode;
+  icon: IconName;
+  label: Record<Lang, string>;
+}>;
+
 const HELP_TYPES = [
-  { value: 'medicine', label: { ua: 'Медицина', ru: 'Медицина', en: 'Medicine' } },
-  { value: 'repair', label: { ua: 'Ремонт', ru: 'Ремонт', en: 'Repair' } },
-  { value: 'psychology', label: { ua: 'Психологія', ru: 'Психология', en: 'Psychology' } },
-  { value: 'transport', label: { ua: 'Транспорт', ru: 'Транспорт', en: 'Transport' } },
-  { value: 'shopping', label: { ua: 'Покупки', ru: 'Покупки', en: 'Shopping' } },
-  { value: 'documents', label: { ua: 'Документи', ru: 'Документы', en: 'Documents' } },
-  { value: 'other', label: { ua: 'Інше', ru: 'Другое', en: 'Other' } },
+  { value: 'medicine', icon: 'medical-bag', label: { ua: 'Медицина', ru: 'Медицина', en: 'Medicine' } },
+  { value: 'repair', icon: 'tools', label: { ua: 'Ремонт', ru: 'Ремонт', en: 'Repair' } },
+  { value: 'psychology', icon: 'head-heart-outline', label: { ua: 'Психологія', ru: 'Психология', en: 'Psychology' } },
+  { value: 'transport', icon: 'car-outline', label: { ua: 'Транспорт', ru: 'Транспорт', en: 'Transport' } },
+  { value: 'shopping', icon: 'cart-outline', label: { ua: 'Покупки', ru: 'Покупки', en: 'Shopping' } },
+  { value: 'documents', icon: 'file-document-outline', label: { ua: 'Документи', ru: 'Документы', en: 'Documents' } },
+  { value: 'other', icon: 'dots-horizontal-circle-outline', label: { ua: 'Інше', ru: 'Другое', en: 'Other' } },
 ] as const;
 
 const MAX_DESCRIPTION_LENGTH = 280;
+const MIN_DESCRIPTION_LENGTH = 5;
 const REQUEST_FORM_DRAFT_KEY = '@chaika:request-form-draft:v1';
 
 const PHOTO_UI_TEXT = {
@@ -64,6 +75,7 @@ const PHOTO_UI_TEXT = {
     sending: 'Фото вже на модерації',
     waitUpload: 'Зачекайте, поки фото завантажиться.',
     empty: 'Поки немає фото до заявок',
+    hint: 'Фото необовʼязкове. Додайте його, якщо воно допоможе сусідам краще зрозуміти ситуацію.',
   },
   ru: {
     sectionTitle: 'Фото к заявке',
@@ -77,6 +89,7 @@ const PHOTO_UI_TEXT = {
     sending: 'Фото уже на модерации',
     waitUpload: 'Подождите, пока фото загрузится.',
     empty: 'Пока нет фото к заявкам',
+    hint: 'Фото необязательно. Добавьте его, если оно поможет соседям лучше понять ситуацию.',
   },
   en: {
     sectionTitle: 'Photos for the request',
@@ -90,30 +103,34 @@ const PHOTO_UI_TEXT = {
     sending: 'Photo is in moderation',
     waitUpload: 'Wait until the photo finishes uploading.',
     empty: 'No photos for requests yet',
+    hint: 'A photo is optional. Add one only if it helps neighbors understand the situation.',
   },
 } as const;
 
 const TEXT_BY_LANG = {
   ua: {
     back: 'Назад',
-    title: 'Додати прохання',
-    subtitle: 'Заповніть коротку форму. Якщо щось пропущено, ми покажемо одну підказку.',
+    title: 'Розкажіть, чим допомогти',
+    subtitle: 'Оберіть, що саме хочете зробити: попросити допомоги, запропонувати її або розповісти про послугу для сусідів.',
+    modeLabel: 'Що ви хочете зробити?',
     name: "Ім'я",
     phone: 'Телефон',
-    helpType: 'Тип допомоги',
+    helpType: 'Тема',
     description: 'Опис',
     namePlaceholder: "Ваше ім'я",
     phonePlaceholder: '+380...',
-    descriptionPlaceholder: 'Напишіть, що саме потрібно...',
-    chooseType: 'Оберіть тип допомоги',
-    submit: 'Надіслати прохання',
+    descriptionPlaceholder: 'Напишіть коротко, що саме потрібно...',
+    offerPlaceholder: 'Напишіть, чим можете допомогти сусідам...',
+    businessPlaceholder: 'Напишіть назву, послуги та як з вами звʼязатися...',
+    chooseType: 'Оберіть тему',
+    submit: 'Надіслати',
     submitReview: 'Перевірити та надіслати',
     successTitle: 'Готово',
-    successBody: 'Ваше прохання додано у стрічку допомоги сусідам.',
+    successBody: 'Вашу заявку додано у стрічку. Сусіди побачать її після перевірки або одразу, якщо цей розділ відкритий для автопублікації.',
     errorTitle: 'Помилка',
     required: "Заповніть ім'я, телефон, тип допомоги та опис.",
     invalidContact: "Перевірте ім'я та телефон.",
-    shortDescription: 'Опис має бути не менше 10 символів.',
+    shortDescription: 'Опис має бути не менше 5 символів.',
     sendFailed: 'Не вдалося надіслати прохання.',
     authRequiredTitle: 'Потрібен вхід',
     authRequiredBody: 'Щоб додати заявку, спочатку увійдіть або пройдіть реєстрацію.',
@@ -123,16 +140,16 @@ const TEXT_BY_LANG = {
     nameHint: "Вкажіть ім'я, щоб сусіди знали, до кого звертатися.",
     nameEmpty: "Напишіть ім'я.",
     nameInvalid: "Ім'я має містити мінімум 2 символи.",
-    phoneHint: 'Формат: +380 XX XXX XX XX.',
+    phoneHint: 'Формат: +380 XX XXX XX XX. Номер потрібен тільки для звʼязку з вами.',
     phoneEmpty: 'Напишіть номер телефону.',
     phoneInvalid: 'Перевірте український номер у форматі +380 XX XXX XX XX.',
     helpTypeHint: 'Оберіть один варіант, щоб сусіди швидше зрозуміли тему.',
-    helpTypeEmpty: 'Оберіть тип допомоги.',
-    descriptionHint: 'Напишіть: що сталося, де це знаходиться, коли потрібна допомога.',
+    helpTypeEmpty: 'Оберіть тему.',
+    descriptionHint: 'Напишіть кілька слів: що сталося, де це знаходиться або як з вами звʼязатися.',
     descriptionExample: 'Приклад: Потрібна допомога купити ліки сьогодні після 18:00, будинок 12.',
     descriptionEmpty: 'Опишіть, яка допомога потрібна.',
-    descriptionShort: 'Додайте ще трохи деталей. Мінімум 10 символів.',
-    descriptionCount: '{count}/{max}, мін. 10 символів',
+    descriptionShort: 'Додайте ще трохи деталей. Мінімум 5 символів.',
+    descriptionCount: '{count}/{max}, мін. 5 символів',
     descriptionLeft: 'Ще {left} символів до мінімуму.',
     dailyHelpLimit: 'Сьогодні ви вже надіслали 5 прохань про допомогу. Нове прохання можна буде надіслати завтра.',
     dailyRequestLimit: 'Сьогодні ви вже надіслали багато заявок. Спробуйте завтра.',
@@ -147,24 +164,27 @@ const TEXT_BY_LANG = {
   },
   ru: {
     back: 'Назад',
-    title: 'Добавить просьбу',
-    subtitle: 'Заполните короткую форму. Если что-то пропущено, покажем одну подсказку.',
+    title: 'Расскажите, чем помочь',
+    subtitle: 'Выберите, что хотите сделать: попросить помощи, предложить ее или рассказать о своей услуге для соседей.',
+    modeLabel: 'Что вы хотите сделать?',
     name: 'Имя',
     phone: 'Телефон',
-    helpType: 'Тип помощи',
+    helpType: 'Тема',
     description: 'Описание',
     namePlaceholder: 'Ваше имя',
     phonePlaceholder: '+380...',
-    descriptionPlaceholder: 'Напишите, что именно нужно...',
-    chooseType: 'Выберите тип помощи',
-    submit: 'Отправить просьбу',
+    descriptionPlaceholder: 'Коротко напишите, что именно нужно...',
+    offerPlaceholder: 'Напишите, чем можете помочь соседям...',
+    businessPlaceholder: 'Напишите название, услуги и как с вами связаться...',
+    chooseType: 'Выберите тему',
+    submit: 'Отправить',
     submitReview: 'Проверить и отправить',
     successTitle: 'Готово',
-    successBody: 'Ваша просьба добавлена в ленту помощи соседям.',
+    successBody: 'Ваша заявка добавлена в ленту. Соседи увидят ее после проверки или сразу, если этот раздел открыт для автопубликации.',
     errorTitle: 'Ошибка',
     required: 'Заполните имя, телефон, тип помощи и описание.',
     invalidContact: 'Проверьте имя и телефон.',
-    shortDescription: 'Описание должно быть не меньше 10 символов.',
+    shortDescription: 'Описание должно быть не меньше 5 символов.',
     sendFailed: 'Не удалось отправить просьбу.',
     authRequiredTitle: 'Нужен вход',
     authRequiredBody: 'Чтобы добавить заявку, сначала войдите или пройдите регистрацию.',
@@ -174,16 +194,16 @@ const TEXT_BY_LANG = {
     nameHint: 'Укажите имя, чтобы соседи знали, к кому обращаться.',
     nameEmpty: 'Напишите имя.',
     nameInvalid: 'Имя должно содержать минимум 2 символа.',
-    phoneHint: 'Формат: +380 XX XXX XX XX.',
+    phoneHint: 'Формат: +380 XX XXX XX XX. Номер нужен только для связи с вами.',
     phoneEmpty: 'Напишите номер телефона.',
     phoneInvalid: 'Проверьте украинский номер в формате +380 XX XXX XX XX.',
     helpTypeHint: 'Выберите один вариант, чтобы соседи быстрее поняли тему.',
-    helpTypeEmpty: 'Выберите тип помощи.',
-    descriptionHint: 'Напишите: что случилось, где это находится, когда нужна помощь.',
+    helpTypeEmpty: 'Выберите тему.',
+    descriptionHint: 'Напишите несколько слов: что случилось, где это находится или как с вами связаться.',
     descriptionExample: 'Пример: Нужна помощь купить лекарства сегодня после 18:00, дом 12.',
     descriptionEmpty: 'Опишите, какая помощь нужна.',
-    descriptionShort: 'Добавьте ещё немного деталей. Минимум 10 символов.',
-    descriptionCount: '{count}/{max}, мин. 10 символов',
+    descriptionShort: 'Добавьте еще немного деталей. Минимум 5 символов.',
+    descriptionCount: '{count}/{max}, мин. 5 символов',
     descriptionLeft: 'Ещё {left} символов до минимума.',
     dailyHelpLimit: 'Сегодня вы уже отправили 5 просьб о помощи. Новую просьбу можно будет отправить завтра.',
     dailyRequestLimit: 'Сегодня вы уже отправили много заявок. Попробуйте завтра.',
@@ -198,24 +218,27 @@ const TEXT_BY_LANG = {
   },
   en: {
     back: 'Back',
-    title: 'Add a request',
-    subtitle: 'Fill out the short form. If anything is missing, we will show one tip.',
+    title: 'Tell neighbors how to help',
+    subtitle: 'Choose whether you need help, want to offer help, or want to share a local service.',
+    modeLabel: 'What do you want to do?',
     name: 'Name',
     phone: 'Phone',
-    helpType: 'Help type',
+    helpType: 'Topic',
     description: 'Description',
     namePlaceholder: 'Your name',
     phonePlaceholder: '+380...',
-    descriptionPlaceholder: 'Write what you need...',
-    chooseType: 'Choose help type',
-    submit: 'Send request',
+    descriptionPlaceholder: 'Briefly write what you need...',
+    offerPlaceholder: 'Write how you can help neighbors...',
+    businessPlaceholder: 'Write the name, service, and how to contact you...',
+    chooseType: 'Choose a topic',
+    submit: 'Send',
     submitReview: 'Check and send',
     successTitle: 'Done',
-    successBody: 'Your request has been added to the neighbor help feed.',
+    successBody: 'Your post has been added to the feed. Neighbors will see it after review, or immediately if this section allows auto-publishing.',
     errorTitle: 'Error',
     required: 'Fill in name, phone, help type and description.',
     invalidContact: 'Check name and phone.',
-    shortDescription: 'Description must be at least 10 characters.',
+    shortDescription: 'Description must be at least 5 characters.',
     sendFailed: 'Could not send the request.',
     authRequiredTitle: 'Sign in required',
     authRequiredBody: 'To add a request, sign in or register first.',
@@ -225,16 +248,16 @@ const TEXT_BY_LANG = {
     nameHint: 'Enter your name so neighbors know who to contact.',
     nameEmpty: 'Enter your name.',
     nameInvalid: 'Name must contain at least 2 characters.',
-    phoneHint: 'Format: +380 XX XXX XX XX.',
+    phoneHint: 'Format: +380 XX XXX XX XX. The number is used only to contact you.',
     phoneEmpty: 'Enter your phone number.',
     phoneInvalid: 'Check the Ukrainian number format: +380 XX XXX XX XX.',
     helpTypeHint: 'Choose one option so neighbors understand the topic faster.',
-    helpTypeEmpty: 'Choose a help type.',
-    descriptionHint: 'Write what happened, where it is, and when help is needed.',
+    helpTypeEmpty: 'Choose a topic.',
+    descriptionHint: 'Write a few words: what happened, where it is, or how to contact you.',
     descriptionExample: 'Example: Need help buying medicine today after 18:00, building 12.',
     descriptionEmpty: 'Describe what help is needed.',
-    descriptionShort: 'Add a little more detail. Minimum 10 characters.',
-    descriptionCount: '{count}/{max}, min. 10 characters',
+    descriptionShort: 'Add a little more detail. Minimum 5 characters.',
+    descriptionCount: '{count}/{max}, min. 5 characters',
     descriptionLeft: '{left} more characters to reach the minimum.',
     dailyHelpLimit: 'You have already sent 5 help requests today. You can send a new one tomorrow.',
     dailyRequestLimit: 'You have already sent many requests today. Try again tomorrow.',
@@ -409,6 +432,7 @@ const RequestFormScreen: React.FC = () => {
   const language = useSelector((state: RootState) => normalizeLanguage(state.language?.current)) as Lang;
   const user = useSelector((state: RootState) => state.auth.user);
   const { startOperation, trace } = useOperationTrace('Forma-Zayavki');
+  const [requestMode, setRequestMode] = useState<RequestMode>('need_help');
   const [name, setName] = useState(user?.name ?? '');
   const [phone, setPhone] = useState(() => formatPhoneInput(user?.phone || '+38'));
   const [helpType, setHelpType] = useState('');
@@ -436,11 +460,13 @@ const RequestFormScreen: React.FC = () => {
       if (!raw || cancelled) return;
       try {
         const draft = JSON.parse(raw) as Partial<{
+          requestMode: RequestMode;
           name: string;
           phone: string;
           helpType: string;
           description: string;
         }>;
+        if (draft.requestMode && REQUEST_MODES.some((mode) => mode.value === draft.requestMode)) setRequestMode(draft.requestMode);
         if (typeof draft.name === 'string') setName(draft.name);
         if (typeof draft.phone === 'string') setPhone(formatPhoneInput(draft.phone));
         if (typeof draft.helpType === 'string') setHelpType(draft.helpType);
@@ -465,6 +491,7 @@ const RequestFormScreen: React.FC = () => {
   useEffect(() => {
     const timer = setTimeout(() => {
       void AsyncStorage.setItem(REQUEST_FORM_DRAFT_KEY, JSON.stringify({
+        requestMode,
         name,
         phone,
         helpType,
@@ -472,7 +499,7 @@ const RequestFormScreen: React.FC = () => {
       })).catch(() => undefined);
     }, 600);
     return () => clearTimeout(timer);
-  }, [description, helpType, name, phone]);
+  }, [description, helpType, name, phone, requestMode]);
 
   const photoUploadsInProgress = hasPhotoUploadInProgress(formPhotos);
 
@@ -487,8 +514,20 @@ const RequestFormScreen: React.FC = () => {
   const nameReady = Boolean(normalizedName && validateName(normalizedName));
   const phoneReady = Boolean(normalizedPhone && validatePhone(normalizedPhone));
   const helpTypeReady = Boolean(helpType);
-  const descriptionReady = Boolean(cleanDescription && cleanDescription.length >= 10);
+  const descriptionReady = Boolean(cleanDescription && cleanDescription.length >= MIN_DESCRIPTION_LENGTH);
   const formReady = nameReady && phoneReady && helpTypeReady && descriptionReady;
+  const descriptionPlaceholder = requestMode === 'business'
+    ? t.businessPlaceholder
+    : requestMode === 'offer_help'
+      ? t.offerPlaceholder
+      : t.descriptionPlaceholder;
+  const submitCategory = requestMode === 'need_help' ? helpType : requestMode;
+  const submitSubcategory = requestMode === 'need_help' ? helpType : `${requestMode}:${helpType}`;
+  const modeLabel = REQUEST_MODES.find((mode) => mode.value === requestMode)?.label[language] ?? '';
+  const selectedHelpLabel = HELP_TYPES.find((item) => item.value === helpType)?.label[language] ?? '';
+  const finalDescription = requestMode === 'need_help'
+    ? cleanDescription
+    : sanitizeStoredText(`${modeLabel}${selectedHelpLabel ? ` / ${selectedHelpLabel}` : ''}: ${cleanDescription}`.slice(0, MAX_DESCRIPTION_LENGTH));
 
   const fieldStates = useMemo<Record<FieldKey, FieldState>>(() => {
     const phoneDigits = phone.replace(/\D/g, '');
@@ -600,7 +639,7 @@ const RequestFormScreen: React.FC = () => {
       return;
     }
 
-    if (cleanDescription.length < 10) {
+    if (cleanDescription.length < MIN_DESCRIPTION_LENGTH) {
       trace('validate', 'fail', { missing: 'descriptionLength' });
       Alert.alert(t.errorTitle, t.shortDescription);
       return;
@@ -630,12 +669,12 @@ const RequestFormScreen: React.FC = () => {
         name: normalizedName,
         phone: normalizedPhone,
         language,
-        category: helpType,
+        category: submitCategory,
         group: requestGroup,
-        subcategory: helpType,
+        subcategory: submitSubcategory,
         building: 'Чайка',
-        text: cleanDescription,
-        description: cleanDescription,
+        text: finalDescription,
+        description: finalDescription,
         ...(requestPhoto ?? {}),
       });
 
@@ -654,6 +693,7 @@ const RequestFormScreen: React.FC = () => {
       ]);
       setName(user?.name ?? '');
       setPhone(formatPhoneInput(user?.phone || '+38'));
+      setRequestMode('need_help');
       setHelpType('');
       setDescription('');
       setSubmitError(null);
@@ -676,8 +716,8 @@ const RequestFormScreen: React.FC = () => {
     }
   };
 
-  const descriptionExtra = cleanDescription.length > 0 && cleanDescription.length < 10
-    ? fillTemplate(t.descriptionLeft, { left: 10 - cleanDescription.length })
+  const descriptionExtra = cleanDescription.length > 0 && cleanDescription.length < MIN_DESCRIPTION_LENGTH
+    ? fillTemplate(t.descriptionLeft, { left: MIN_DESCRIPTION_LENGTH - cleanDescription.length })
     : undefined;
 
   return (
@@ -709,6 +749,31 @@ const RequestFormScreen: React.FC = () => {
           ) : null}
 
           <View style={styles.formCard}>
+            <Text style={styles.label}>{t.modeLabel}</Text>
+            <View style={styles.modeGrid}>
+              {REQUEST_MODES.map((mode) => {
+                const active = requestMode === mode.value;
+                return (
+                  <TouchableOpacity
+                    key={mode.value}
+                    style={[styles.modeChip, active && styles.modeChipActive]}
+                    activeOpacity={0.86}
+                    disabled={submitting}
+                    onPress={() => setRequestMode(mode.value)}
+                  >
+                    <MaterialCommunityIcons
+                      name={mode.icon}
+                      size={18}
+                      color={active ? '#FFFFFF' : SCREEN_THEME.textSecondary}
+                    />
+                    <Text style={[styles.modeChipText, active && styles.modeChipTextActive]} numberOfLines={2}>
+                      {mode.label[language]}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
             <FieldHeader label={t.name} state={fieldStates.name} />
             <TextInput
               value={name}
@@ -735,21 +800,35 @@ const RequestFormScreen: React.FC = () => {
             <FieldMessage state={fieldStates.phone} visible={activeIssueKey === 'phone'} />
 
             <FieldHeader label={t.helpType} state={fieldStates.helpType} />
-            <View style={[styles.pickerWrap, fieldStates.helpType.tone === 'error' && styles.inputError, fieldStates.helpType.tone === 'valid' && styles.inputValid]}>
-              <Picker
-                selectedValue={helpType}
-                onValueChange={(value) => {
-                  setHelpType(String(value));
-                  markTouched('helpType');
-                }}
-                enabled={!submitting}
-                style={styles.picker}
-              >
-                <Picker.Item label={t.chooseType} value="" />
-                {HELP_TYPES.map((item) => (
-                  <Picker.Item key={item.value} label={item.label[language]} value={item.value} />
-                ))}
-              </Picker>
+            <View style={styles.helpTypeGrid}>
+              {HELP_TYPES.map((item) => {
+                const active = helpType === item.value;
+                return (
+                  <TouchableOpacity
+                    key={item.value}
+                    style={[
+                      styles.helpTypeChip,
+                      fieldStates.helpType.tone === 'error' && !helpType && styles.inputError,
+                      active && styles.helpTypeChipActive,
+                    ]}
+                    activeOpacity={0.86}
+                    disabled={submitting}
+                    onPress={() => {
+                      setHelpType(item.value);
+                      markTouched('helpType');
+                    }}
+                  >
+                    <MaterialCommunityIcons
+                      name={item.icon}
+                      size={17}
+                      color={active ? '#FFFFFF' : SCREEN_THEME.terracotta}
+                    />
+                    <Text style={[styles.helpTypeChipText, active && styles.helpTypeChipTextActive]} numberOfLines={1}>
+                      {item.label[language]}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
             <FieldMessage state={fieldStates.helpType} visible={activeIssueKey === 'helpType'} />
 
@@ -758,7 +837,7 @@ const RequestFormScreen: React.FC = () => {
               value={description}
               onChangeText={(value) => setDescription(value.slice(0, MAX_DESCRIPTION_LENGTH))}
               onBlur={() => markTouched('description')}
-              placeholder={t.descriptionPlaceholder}
+              placeholder={descriptionPlaceholder}
               placeholderTextColor={SCREEN_THEME.textSecondary}
               style={[styles.input, styles.textArea, fieldStates.description.tone === 'error' && styles.inputError, fieldStates.description.tone === 'valid' && styles.inputValid]}
               multiline
@@ -772,6 +851,7 @@ const RequestFormScreen: React.FC = () => {
             <FieldMessage state={fieldStates.description} extra={descriptionExtra} visible={activeIssueKey === 'description'} />
 
             <Text style={styles.label}>{pt.sectionTitle}</Text>
+            <Text style={styles.hint}>{pt.hint}</Text>
             {user?.id ? (
               <RequestPhotoUploadField
                 uid={user.id}
@@ -864,6 +944,37 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   label: { color: SCREEN_THEME.textPrimary, fontSize: 14, fontWeight: '900' },
+  modeGrid: {
+    marginTop: 9,
+    marginBottom: 8,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  modeChip: {
+    flex: 1,
+    minHeight: 58,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#D9BF91',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 8,
+    paddingVertical: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  modeChipActive: {
+    backgroundColor: SCREEN_THEME.terracotta,
+    borderColor: SCREEN_THEME.terracotta,
+  },
+  modeChipText: {
+    color: SCREEN_THEME.textSecondary,
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  modeChipTextActive: { color: '#FFFFFF' },
   input: {
     minHeight: 48,
     borderRadius: 14,
@@ -878,14 +989,35 @@ const styles = StyleSheet.create({
   inputError: { borderColor: '#B84A3A', backgroundColor: '#FFF7F5' },
   inputValid: { borderColor: '#2F7D50', backgroundColor: '#FBFFFC' },
   textArea: { minHeight: 118, paddingTop: 12, lineHeight: 21 },
-  pickerWrap: {
+  helpTypeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  helpTypeChip: {
+    minHeight: 42,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: '#D9BF91',
     backgroundColor: '#FFFFFF',
-    overflow: 'hidden',
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    maxWidth: '48%',
   },
-  picker: { color: SCREEN_THEME.textPrimary },
+  helpTypeChipActive: {
+    backgroundColor: SCREEN_THEME.terracotta,
+    borderColor: SCREEN_THEME.terracotta,
+  },
+  helpTypeChipText: {
+    color: SCREEN_THEME.textPrimary,
+    fontSize: 13,
+    lineHeight: 16,
+    fontWeight: '900',
+  },
+  helpTypeChipTextActive: { color: '#FFFFFF' },
   counterRow: {
     marginTop: 6,
     flexDirection: 'row',
