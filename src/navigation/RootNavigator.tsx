@@ -78,6 +78,7 @@ import BonusWalletScreen from '../screens/BonusWalletScreen';
 import PromoCreditsTopupScreen from '../screens/PromoCreditsTopupScreen';
 import PromoCreditsAdminScreen from '../screens/PromoCreditsAdminScreen';
 import BonusPromotionPurchaseScreen from '../screens/BonusPromotionPurchaseScreen';
+import FavoritesScreen from '../screens/FavoritesScreen';
 import CrashDiagnosticsScreen from '../screens/CrashDiagnosticsScreen';
 import AppMonitorScreen from '../screens/AppMonitorScreen';
 import type { Request, Place } from '../types/app';
@@ -104,6 +105,16 @@ type RedirectRouteParams = {
   redirectMode?: 'auth' | 'complete';
 };
 
+type HelpRequestScreenParams = {
+  prefill?: {
+    name?: string;
+    phone?: string;
+    description?: string;
+    helpType?: string;
+    subType?: string;
+  };
+};
+
 export type RootStackParamList = {
   MainTabs: undefined;
   OnlineChatTab: undefined;
@@ -115,7 +126,7 @@ export type RootStackParamList = {
   PlaceDetailsPanel: { place: Place };
   RequestFormScreen: { group?: string } | undefined;
   HelpNeighborsScreen: undefined;
-  HelpRequestScreen: undefined;
+  HelpRequestScreen: HelpRequestScreenParams | undefined;
   TopPlacesScreen: undefined;
   TopGirlsBoysScreen: undefined;
   ChaikaProblemsScreen: undefined;
@@ -204,6 +215,7 @@ export type RootStackParamList = {
   PromoCreditsTopupScreen: undefined;
   PromoCreditsAdminScreen: undefined;
   BonusPromotionPurchaseScreen: { initialPromoType?: string } | undefined;
+  FavoritesScreen: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -864,6 +876,7 @@ function AuthNavigation() {
         <Stack.Screen name="PromoCreditsTopupScreen" component={withGuard(PromoCreditsTopupScreen, 'auth')} />
         <Stack.Screen name="PromoCreditsAdminScreen" component={withGuard(PromoCreditsAdminScreen, 'admin')} />
         <Stack.Screen name="BonusPromotionPurchaseScreen" component={withGuard(BonusPromotionPurchaseScreen, 'auth')} />
+        <Stack.Screen name="FavoritesScreen" component={FavoritesScreen} />
       </Stack.Navigator>
       <ScreenFileInfoOverlay />
     </NavigationContainer>

@@ -39,6 +39,7 @@ const UI_TEXT = {
     userStatus: 'Статус користувача',
     editProfile: 'Редагувати профіль',
     myPhotos: 'Мої фотографії',
+    favorites: 'Обране',
     uploadPhoto: 'Завантажити фото',
     myRequests: 'Мої заявки',
     helpHistory: 'Історія допомоги',
@@ -108,6 +109,7 @@ const UI_TEXT = {
     userStatus: 'Статус пользователя',
     editProfile: 'Редактировать профиль',
     myPhotos: 'Мои фотографии',
+    favorites: 'Избранное',
     uploadPhoto: 'Загрузить фото',
     myRequests: 'Мои заявки',
     helpHistory: 'История помощи',
@@ -177,6 +179,7 @@ const UI_TEXT = {
     userStatus: 'User status',
     editProfile: 'Edit profile',
     myPhotos: 'My photos',
+    favorites: 'Favorites',
     uploadPhoto: 'Upload photo',
     myRequests: 'My requests',
     helpHistory: 'Help history',
@@ -663,6 +666,12 @@ const ProfileScreen: React.FC = () => {
           <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('MyPhotosScreen')} activeOpacity={0.84}>
             <TactileIcon icon="image-multiple-outline" size={40} iconSize={18} backgroundColor="#6A8BA5" />
             <Text style={styles.menuLabel}>{text.myPhotos}</Text>
+            <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('FavoritesScreen')} activeOpacity={0.84}>
+            <TactileIcon icon="bookmark-outline" size={40} iconSize={18} backgroundColor="#C77A5D" />
+            <Text style={styles.menuLabel}>{text.favorites}</Text>
             <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
           </TouchableOpacity>
 

@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Platform,
   SafeAreaView,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -17,6 +19,11 @@ import { ChildCategory, ChildFeature, ChildOffer, Place, PlaceType } from '../ty
 import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { subscribeActiveBonusPromotions, type BonusPromotion } from '../services/bonusService';
+import { safeCallPhone, safeOpenExternalUrl } from '../utils/communicationActions';
+import { selectUserId } from '../redux/selectors';
+import FeedLikeButton from '../components/FeedLikeButton';
+import { toggleFavorite, getFavorites, type FavoriteSource } from '../services/favoritesService';
+import { useSoftToast } from '../hooks/useSoftToast';
 
 type Lang = 'ua' | 'ru' | 'en';
 type AppNavigation = NavigationProp<Record<string, object | undefined>>;
@@ -26,6 +33,8 @@ type CategoryKey = 'all' | ChildCategory;
 type ScreenText = (typeof UI_TEXT)[Lang];
 
 const FEATURE_PRIORITY: ChildFeature[] = ['shelter', 'food', 'english', 'speech_therapist', 'nurse', 'full_day', 'half_day', 'trial_day', 'sport'];
+
+const FAVORITE_SOURCE: FavoriteSource = 'kids';
 
 const UI_TEXT = {
   ua: {
@@ -50,6 +59,14 @@ const UI_TEXT = {
     priceUnknown: 'ціну уточнюйте',
     ageUnknown: 'вік уточнюйте',
     available: 'є місця',
+    share: 'Поділитися',
+    openMap: 'Відкрити на карті',
+    favoriteAdded: 'Додано в обране',
+    favoriteRemoved: 'Видалено з обраного',
+    filtersTitle: 'Фільтри',
+    filterShelter: 'Укриття',
+    filterEnglish: 'Англійська',
+    filterAge: 'Вік',
     categories: {
       all: 'Всі',
       kindergarten: 'Садочки',
@@ -91,6 +108,12 @@ const UI_TEXT = {
       trial_lesson: 'Пробне заняття',
       available_places: 'Є місця',
     },
+    ageRanges: {
+      '0-3': '0-3 р.',
+      '3-6': '3-6 р.',
+      '6-10': '6-10 р.',
+      '10+': '10+ р.',
+    },
   },
   ru: {
     title: 'Все для детей',
@@ -114,6 +137,14 @@ const UI_TEXT = {
     priceUnknown: 'цену уточняйте',
     ageUnknown: 'возраст уточняйте',
     available: 'есть места',
+    share: 'Поделиться',
+    openMap: 'Открыть на карте',
+    favoriteAdded: 'Добавлено в избранное',
+    favoriteRemoved: 'Удалено из избранного',
+    filtersTitle: 'Фильтры',
+    filterShelter: 'Укрытие',
+    filterEnglish: 'Английский',
+    filterAge: 'Возраст',
     categories: {
       all: 'Все',
       kindergarten: 'Садики',
@@ -155,6 +186,12 @@ const UI_TEXT = {
       trial_lesson: 'Пробное занятие',
       available_places: 'Есть места',
     },
+    ageRanges: {
+      '0-3': '0-3 г.',
+      '3-6': '3-6 л.',
+      '6-10': '6-10 л.',
+      '10+': '10+ л.',
+    },
   },
   en: {
     title: 'Everything for Kids',
@@ -178,6 +215,14 @@ const UI_TEXT = {
     priceUnknown: 'ask for price',
     ageUnknown: 'ask for age',
     available: 'spots available',
+    share: 'Share',
+    openMap: 'Open on map',
+    favoriteAdded: 'Added to favorites',
+    favoriteRemoved: 'Removed from favorites',
+    filtersTitle: 'Filters',
+    filterShelter: 'Shelter',
+    filterEnglish: 'English',
+    filterAge: 'Age',
     categories: {
       all: 'All',
       kindergarten: 'Kindergartens',
@@ -219,6 +264,12 @@ const UI_TEXT = {
       trial_lesson: 'Trial lesson',
       available_places: 'Spots available',
     },
+    ageRanges: {
+      '0-3': '0-3 y.',
+      '3-6': '3-6 y.',
+      '6-10': '6-10 y.',
+      '10+': '10+ y.',
+    },
   },
 } as const;
 
@@ -230,6 +281,15 @@ const CATEGORIES: { key: CategoryKey; icon: React.ComponentProps<typeof Material
   { key: 'sport', icon: 'basketball', bg: '#E8A44A', iconColor: '#FFF8EC' },
   { key: 'medical', icon: 'medical-bag', bg: '#D87B8C', iconColor: '#FFF0F3' },
   { key: 'event', icon: 'calendar-star', bg: '#8D7AB8', iconColor: '#F3EEFF' },
+];
+
+type AgeRangeKey = '0-3' | '3-6' | '6-10' | '10+';
+
+const AGE_RANGES: { key: AgeRangeKey; from: number; to: number }[] = [
+  { key: '0-3', from: 0, to: 3 },
+  { key: '3-6', from: 3, to: 6 },
+  { key: '6-10', from: 6, to: 10 },
+  { key: '10+', from: 10, to: 99 },
 ];
 
 const mergeChildInfo = (place: Place): Place => {
@@ -293,18 +353,54 @@ const getFeatureBadges = (place: Place, text: ScreenText) => {
   return badges.slice(0, 4);
 };
 
+const hasFeature = (place: Place, feature: ChildFeature): boolean => {
+  const features = new Set(place.childInfo?.features ?? []);
+  if (feature === 'shelter' && place.childInfo?.safety?.hasShelter) return true;
+  return features.has(feature);
+};
+
+const matchesAgeRange = (place: Place, range: { from: number; to: number }): boolean => {
+  const ageFrom = place.childInfo?.ageFrom;
+  const ageTo = place.childInfo?.ageTo;
+  if (typeof ageFrom !== 'number') return false;
+  const placeAgeTo = typeof ageTo === 'number' ? ageTo : ageFrom;
+  return placeAgeTo >= range.from && ageFrom <= range.to;
+};
+
+const buildMapUrl = (place: Place): string => {
+  if (place.latitude && place.longitude) {
+    if (Platform.OS === 'ios') {
+      return `https://maps.apple.com/?ll=${place.latitude},${place.longitude}&q=${encodeURIComponent(place.name)}`;
+    }
+    return `https://www.google.com/maps/search/?api=1&query=${place.latitude},${place.longitude}`;
+  }
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.address)}`;
+};
+
 export default function VseDlyaDeteyScreen() {
   const navigation = useNavigation<AppNavigation>();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as Lang;
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
+  const currentUserId = useSelector(selectUserId);
   const [activeCategory, setActiveCategory] = useState<CategoryKey>('all');
   const [query, setQuery] = useState('');
   const [activePromotions, setActivePromotions] = useState<BonusPromotion[]>([]);
+  const [filterShelter, setFilterShelter] = useState(false);
+  const [filterEnglish, setFilterEnglish] = useState(false);
+  const [filterAge, setFilterAge] = useState<AgeRangeKey | null>(null);
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const scrollRef = useRef<ScrollView>(null);
   const resultsAnchorY = useRef(0);
+  const { showSuccess } = useSoftToast();
 
   useEffect(() => {
     return subscribeActiveBonusPromotions('kids', setActivePromotions);
+  }, []);
+
+  useEffect(() => {
+    getFavorites(FAVORITE_SOURCE).then((items) => {
+      setFavoriteIds(new Set(items.map((item) => item.id)));
+    });
   }, []);
 
   const childPlaces = useMemo(() => (
@@ -337,11 +433,16 @@ export default function VseDlyaDeteyScreen() {
         .filter((promotion) => promotion.targetType === 'kids_place')
         .map((promotion, index) => [promotion.targetId, index]),
     );
+    const selectedAgeRange = filterAge ? AGE_RANGES.find((r) => r.key === filterAge) : null;
+
     return childPlaces
       .filter(({ place, category }) => {
         if (activeCategory !== 'all' && category !== activeCategory) return false;
-        if (!normalizedQuery) return true;
-        return `${place.name} ${place.address}`.toLowerCase().includes(normalizedQuery);
+        if (normalizedQuery && !`${place.name} ${place.address}`.toLowerCase().includes(normalizedQuery)) return false;
+        if (filterShelter && !hasFeature(place, 'shelter')) return false;
+        if (filterEnglish && !hasFeature(place, 'english')) return false;
+        if (selectedAgeRange && !matchesAgeRange(place, selectedAgeRange)) return false;
+        return true;
       })
       .sort((a, b) => {
         const aPromoted = promotedPlaceIds.get(a.place.id);
@@ -353,7 +454,7 @@ export default function VseDlyaDeteyScreen() {
         }
         return 0;
       });
-  }, [activeCategory, activePromotions, childPlaces, query]);
+  }, [activeCategory, activePromotions, childPlaces, query, filterShelter, filterEnglish, filterAge]);
 
   const activeOffers = useMemo(() => {
     const promotedEventIds = new Map(
@@ -373,6 +474,7 @@ export default function VseDlyaDeteyScreen() {
     });
   }, [activePromotions]);
   const isEventsCategory = activeCategory === 'event';
+  const hasActiveFilters = filterShelter || filterEnglish || filterAge !== null;
 
   const openPlace = (place: Place) => {
     navigation.navigate('DetalDetskogoMestaScreen', { place });
@@ -392,6 +494,43 @@ export default function VseDlyaDeteyScreen() {
     }, 80);
   };
 
+  const handleSharePlace = async (place: Place, category: ChildCategory) => {
+    try {
+      await Share.share({
+        message: `${place.name} (${text.categoryLabel[category]})\n${place.address}`,
+      });
+    } catch {
+      // user cancelled — silent
+    }
+  };
+
+  const handleShareOffer = async (offer: ChildOffer) => {
+    const offerPlace = chaykaPlaces.find((p) => p.id === offer.placeId);
+    const meta = getOfferMeta(offer, text);
+    try {
+      await Share.share({
+        message: `${offer.title}${offerPlace ? `\n${offerPlace.name}` : ''}${meta ? `\n${meta}` : ''}`,
+      });
+    } catch {
+      // user cancelled — silent
+    }
+  };
+
+  const handleOpenMap = (place: Place) => {
+    void safeOpenExternalUrl(buildMapUrl(place), language);
+  };
+
+  const handleToggleFavorite = async (placeId: string) => {
+    const added = await toggleFavorite(placeId, FAVORITE_SOURCE);
+    setFavoriteIds((prev) => {
+      const next = new Set(prev);
+      if (added) next.add(placeId);
+      else next.delete(placeId);
+      return next;
+    });
+    showSuccess(added ? text.favoriteAdded : text.favoriteRemoved);
+  };
+
   const renderOfferCard = (offer: ChildOffer, wide = false) => {
     const offerPlace = chaykaPlaces.find((p) => p.id === offer.placeId);
     const offerMeta = getOfferMeta(offer, text);
@@ -402,8 +541,17 @@ export default function VseDlyaDeteyScreen() {
         activeOpacity={0.88}
         onPress={() => openOffer(offer)}
       >
-        <View style={styles.offerBadge}>
-          <Text style={styles.offerBadgeText}>{text.offerTypes[offer.type]}</Text>
+        <View style={styles.offerTopRow}>
+          <View style={styles.offerBadge}>
+            <Text style={styles.offerBadgeText}>{text.offerTypes[offer.type]}</Text>
+          </View>
+          <TouchableOpacity
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            onPress={(e) => { e.stopPropagation(); void handleShareOffer(offer); }}
+            activeOpacity={0.7}
+          >
+            <MaterialCommunityIcons name="share-variant-outline" size={18} color={SCREEN_THEME.textSecondary} />
+          </TouchableOpacity>
         </View>
         <Text style={styles.offerTitle} numberOfLines={2}>{offer.title}</Text>
         <Text style={styles.offerShortText} numberOfLines={wide ? 3 : 2}>{offer.shortText}</Text>
@@ -413,8 +561,12 @@ export default function VseDlyaDeteyScreen() {
     );
   };
 
-  const renderPlaceCard = ({ place, category }: { place: Place; category: ChildCategory }, compact = false) => {
+  const renderPlaceCard = ({ place, category }: { place: Place; category: ChildCategory }) => {
     const featureBadges = getFeatureBadges(place, text);
+    const hasPhone = Boolean(place.phone);
+    const hasTelegram = Boolean(place.childInfo?.telegram);
+    const isFav = favoriteIds.has(place.id);
+
     return (
       <TouchableOpacity key={place.id} style={styles.placeCard} activeOpacity={0.88} onPress={() => openPlace(place)}>
         <View style={styles.placeHeader}>
@@ -431,10 +583,17 @@ export default function VseDlyaDeteyScreen() {
           </View>
         </View>
 
-        <View style={styles.addressRow}>
-          <MaterialCommunityIcons name="map-marker-outline" size={16} color={SCREEN_THEME.textMuted} />
-          <Text style={styles.addressText} numberOfLines={1}>{place.address}</Text>
-        </View>
+        {/* Address — tappable to open map */}
+        <TouchableOpacity
+          style={styles.addressRow}
+          activeOpacity={0.7}
+          onPress={(e) => { e.stopPropagation(); handleOpenMap(place); }}
+          accessibilityLabel={text.openMap}
+        >
+          <MaterialCommunityIcons name="map-marker-outline" size={16} color={SCREEN_THEME.terracotta} />
+          <Text style={[styles.addressText, styles.addressLink]} numberOfLines={1}>{place.address}</Text>
+          <MaterialCommunityIcons name="open-in-new" size={12} color={SCREEN_THEME.textMuted} />
+        </TouchableOpacity>
 
         {featureBadges.length > 0 ? (
           <View style={styles.badgeRow}>
@@ -446,13 +605,65 @@ export default function VseDlyaDeteyScreen() {
           </View>
         ) : null}
 
-        {!compact ? (
-          <View style={styles.cardActions}>
-            <TouchableOpacity style={styles.primaryAction} onPress={() => openPlace(place)} activeOpacity={0.85}>
-              <Text style={styles.primaryActionText}>{text.details}</Text>
+        {/* Action row: details, contacts, share, like, favorite */}
+        <View style={styles.cardActions}>
+          <TouchableOpacity style={styles.primaryAction} onPress={() => openPlace(place)} activeOpacity={0.85}>
+            <Text style={styles.primaryActionText}>{text.details}</Text>
+          </TouchableOpacity>
+
+          {hasPhone ? (
+            <TouchableOpacity
+              style={styles.contactAction}
+              onPress={(e) => { e.stopPropagation(); void safeCallPhone(place.phone, language); }}
+              activeOpacity={0.82}
+              accessibilityLabel={text.call}
+            >
+              <MaterialCommunityIcons name="phone-outline" size={16} color="#fff" />
+              <Text style={styles.contactActionText}>{text.call}</Text>
+            </TouchableOpacity>
+          ) : null}
+
+          {hasTelegram ? (
+            <TouchableOpacity
+              style={[styles.contactAction, styles.telegramAction]}
+              onPress={(e) => { e.stopPropagation(); void safeOpenExternalUrl(`https://t.me/${place.childInfo!.telegram}`, language); }}
+              activeOpacity={0.82}
+              accessibilityLabel={text.telegram}
+            >
+              <MaterialCommunityIcons name="send" size={14} color="#fff" />
+            </TouchableOpacity>
+          ) : null}
+
+          <View style={styles.cardActionsRight}>
+            <TouchableOpacity
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              onPress={(e) => { e.stopPropagation(); void handleSharePlace(place, category); }}
+              activeOpacity={0.7}
+              accessibilityLabel={text.share}
+            >
+              <MaterialCommunityIcons name="share-variant-outline" size={18} color={SCREEN_THEME.textSecondary} />
+            </TouchableOpacity>
+
+            <FeedLikeButton
+              currentUserId={currentUserId}
+              likePath="feed_likes/kids"
+              likeId={place.id}
+            />
+
+            <TouchableOpacity
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              onPress={(e) => { e.stopPropagation(); void handleToggleFavorite(place.id); }}
+              activeOpacity={0.7}
+              accessibilityLabel={isFav ? text.favoriteRemoved : text.favoriteAdded}
+            >
+              <MaterialCommunityIcons
+                name={isFav ? 'bookmark' : 'bookmark-outline'}
+                size={20}
+                color={isFav ? SCREEN_THEME.terracotta : SCREEN_THEME.textSecondary}
+              />
             </TouchableOpacity>
           </View>
-        ) : null}
+        </View>
       </TouchableOpacity>
     );
   };
@@ -479,6 +690,50 @@ export default function VseDlyaDeteyScreen() {
             placeholderTextColor={SCREEN_THEME.textMuted}
             style={styles.searchInput}
           />
+        </View>
+
+        {/* Filter chips */}
+        <View style={styles.chipRow}>
+          <TouchableOpacity
+            style={[styles.chip, filterShelter && styles.chipActive]}
+            onPress={() => setFilterShelter((v) => !v)}
+            activeOpacity={0.82}
+          >
+            <MaterialCommunityIcons name="shield-check-outline" size={14} color={filterShelter ? '#fff' : SCREEN_THEME.textSecondary} />
+            <Text style={[styles.chipText, filterShelter && styles.chipTextActive]}>{text.filterShelter}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.chip, filterEnglish && styles.chipActive]}
+            onPress={() => setFilterEnglish((v) => !v)}
+            activeOpacity={0.82}
+          >
+            <MaterialCommunityIcons name="translate" size={14} color={filterEnglish ? '#fff' : SCREEN_THEME.textSecondary} />
+            <Text style={[styles.chipText, filterEnglish && styles.chipTextActive]}>{text.filterEnglish}</Text>
+          </TouchableOpacity>
+
+          {AGE_RANGES.map((range) => (
+            <TouchableOpacity
+              key={range.key}
+              style={[styles.chip, filterAge === range.key && styles.chipActive]}
+              onPress={() => setFilterAge((v) => v === range.key ? null : range.key)}
+              activeOpacity={0.82}
+            >
+              <Text style={[styles.chipText, filterAge === range.key && styles.chipTextActive]}>
+                {text.ageRanges[range.key]}
+              </Text>
+            </TouchableOpacity>
+          ))}
+
+          {hasActiveFilters ? (
+            <TouchableOpacity
+              style={styles.chipClear}
+              onPress={() => { setFilterShelter(false); setFilterEnglish(false); setFilterAge(null); }}
+              activeOpacity={0.7}
+            >
+              <MaterialCommunityIcons name="close-circle" size={18} color={SCREEN_THEME.textMuted} />
+            </TouchableOpacity>
+          ) : null}
         </View>
 
         <View style={styles.sectionHeaderRow}>
@@ -627,7 +882,7 @@ const styles = StyleSheet.create({
     minHeight: 50,
     borderWidth: 1,
     borderColor: SCREEN_THEME.borderSoft,
-    marginBottom: 18,
+    marginBottom: 10,
   },
   searchInput: {
     flex: 1,
@@ -635,6 +890,40 @@ const styles = StyleSheet.create({
     color: SCREEN_THEME.textPrimary,
     fontSize: 15,
     fontWeight: '600',
+  },
+  // Filter chips
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 18,
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderWidth: 1,
+    borderColor: SCREEN_THEME.borderSoft,
+  },
+  chipActive: {
+    backgroundColor: SCREEN_THEME.enamelBlueDark,
+    borderColor: SCREEN_THEME.enamelBlueDark,
+  },
+  chipText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: SCREEN_THEME.textSecondary,
+  },
+  chipTextActive: {
+    color: '#fff',
+  },
+  chipClear: {
+    justifyContent: 'center',
+    paddingHorizontal: 4,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
@@ -806,6 +1095,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  addressLink: {
+    color: SCREEN_THEME.enamelBlueDark,
+    textDecorationLine: 'underline',
+  },
   badgeRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -825,7 +1118,15 @@ const styles = StyleSheet.create({
   },
   cardActions: {
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     marginTop: 12,
+  },
+  cardActionsRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginLeft: 'auto',
   },
   primaryAction: {
     borderRadius: 15,
@@ -837,6 +1138,24 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '900',
     fontSize: 13,
+  },
+  contactAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 15,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: '#5C7A5C',
+  },
+  contactActionText: {
+    color: '#fff',
+    fontWeight: '800',
+    fontSize: 12,
+  },
+  telegramAction: {
+    backgroundColor: '#3390EC',
+    paddingHorizontal: 10,
   },
   emptyState: {
     alignItems: 'center',
@@ -869,13 +1188,18 @@ const styles = StyleSheet.create({
   offerCardWide: {
     width: '100%',
   },
+  offerTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
   offerBadge: {
     alignSelf: 'flex-start',
     borderRadius: 10,
     paddingHorizontal: 8,
     paddingVertical: 3,
     backgroundColor: SCREEN_THEME.terracotta,
-    marginBottom: 6,
   },
   offerBadgeText: {
     fontSize: 11,
