@@ -672,7 +672,7 @@ const HomeScreen: React.FC = () => {
     { id: 'kids', icon: 'baby-face-outline', titleKey: 'kidsHub', subtitleKey: 'kidsHubSub', screen: 'VseDlyaDeteyScreen' },
     { id: 'coffee-dating', icon: 'coffee-outline', titleKey: 'coffeeDating', subtitleKey: 'coffeeDatingSub', screen: 'KontaktiChaikyScreen' },
     { id: 'news', icon: 'newspaper-variant-outline', titleKey: 'importantNews', subtitleKey: 'importantNewsSub', screen: 'ImportantNewsScreen' },
-    { id: 'telegram', icon: 'send-circle-outline', titleKey: 'viberGroup', subtitleKey: 'viberGroupSub', url: 'https://t.me/Chaika_ua_APP' },
+    { id: 'telegram', icon: 'send-circle-outline', titleKey: 'telegramGroup', subtitleKey: 'telegramGroupSub', url: 'https://t.me/Chaika_ua_APP' },
     { id: 'problem', icon: 'home-alert-outline', titleKey: 'tellProblem', subtitleKey: 'tellProblemSub', screen: 'ChaikaProblemsScreen' },
     { id: 'lost', icon: 'magnify', titleKey: 'whoLost', subtitleKey: 'whoLostSub', screen: 'LostAndFoundScreen' },
   ];

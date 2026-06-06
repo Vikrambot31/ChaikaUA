@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useMemo } from 'react';
+import React, { useRef, useEffect, useMemo, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,9 +12,14 @@ import { Video, ResizeMode } from 'expo-av';
 interface VideoLoadingOverlayProps {
   visible: boolean;
   text?: string;
+  /** Delay before showing (ms). If loading ends before this, overlay never appears. Default: 300 */
+  showDelay?: number;
+  /** Minimum time to stay visible once shown (ms). Prevents flash. Default: 1500 */
+  minDuration?: number;
 }
 
 const CIRCLE_SIZE = Dimensions.get('window').width * 0.55;
+const FADE_DURATION = 250;
 
 const CHAIKA_PHRASES = [
   'Цікаво, з ким тут можна познайомитися за кавою? ☕🕊️',
@@ -36,14 +41,83 @@ function getRandomPhrase(): string {
 export const VideoLoadingOverlay: React.FC<VideoLoadingOverlayProps> = ({
   visible,
   text = 'Завантаження екрану...',
+  showDelay = 300,
+  minDuration = 1500,
 }) => {
+  // shouldRender: actual DOM presence (controls video playback)
+  const [shouldRender, setShouldRender] = useState(false);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
   const spinAnim = useRef(new Animated.Value(0)).current;
 
-  // Pick a random phrase each time overlay becomes visible
-  const phrase = useMemo(() => getRandomPhrase(), [visible]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Timestamps for min-duration logic
+  const shownAtRef = useRef<number | null>(null);
+  const showTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const phrase = useMemo(() => getRandomPhrase(), []); // one phrase per mount
+
+  const fadeIn = useCallback(() => {
+    setShouldRender(true);
+    shownAtRef.current = Date.now();
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: FADE_DURATION,
+      useNativeDriver: true,
+    }).start();
+  }, [fadeAnim]);
+
+  const fadeOut = useCallback(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: FADE_DURATION,
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) setShouldRender(false);
+    });
+  }, [fadeAnim]);
 
   useEffect(() => {
-    if (!visible) return;
+    if (visible) {
+      // Cancel any pending hide
+      if (hideTimerRef.current) {
+        clearTimeout(hideTimerRef.current);
+        hideTimerRef.current = null;
+      }
+      // Delay before showing — prevents flash on fast loads
+      showTimerRef.current = setTimeout(() => {
+        fadeIn();
+      }, showDelay);
+    } else {
+      // Cancel pending show
+      if (showTimerRef.current) {
+        clearTimeout(showTimerRef.current);
+        showTimerRef.current = null;
+      }
+      // If already visible, respect min duration
+      if (shownAtRef.current !== null) {
+        const elapsed = Date.now() - shownAtRef.current;
+        const remaining = minDuration - elapsed;
+        if (remaining > 0) {
+          hideTimerRef.current = setTimeout(() => {
+            shownAtRef.current = null;
+            fadeOut();
+          }, remaining);
+        } else {
+          shownAtRef.current = null;
+          fadeOut();
+        }
+      }
+    }
+
+    return () => {
+      if (showTimerRef.current) clearTimeout(showTimerRef.current);
+      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    };
+  }, [visible, showDelay, minDuration, fadeIn, fadeOut]);
+
+  // Spinner animation — runs while rendered
+  useEffect(() => {
+    if (!shouldRender) return;
     const spin = Animated.loop(
       Animated.timing(spinAnim, {
         toValue: 1,
@@ -54,9 +128,9 @@ export const VideoLoadingOverlay: React.FC<VideoLoadingOverlayProps> = ({
     );
     spin.start();
     return () => spin.stop();
-  }, [visible, spinAnim]);
+  }, [shouldRender, spinAnim]);
 
-  if (!visible) return null;
+  if (!shouldRender) return null;
 
   const spinInterpolation = spinAnim.interpolate({
     inputRange: [0, 1],
@@ -64,9 +138,9 @@ export const VideoLoadingOverlay: React.FC<VideoLoadingOverlayProps> = ({
   });
 
   return (
-    <View style={styles.overlay}>
+    <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
       <View style={styles.content}>
-        {/* Speech bubble above the video */}
+        {/* Speech bubble */}
         <View style={styles.bubble}>
           <Text style={styles.bubbleText}>{phrase}</Text>
           <View style={styles.bubbleTail} />
@@ -78,7 +152,7 @@ export const VideoLoadingOverlay: React.FC<VideoLoadingOverlayProps> = ({
             source={require('../../assets/Download.mp4')}
             style={styles.video}
             resizeMode={ResizeMode.COVER}
-            shouldPlay={visible}
+            shouldPlay
             isLooping
             isMuted
           />
@@ -88,16 +162,11 @@ export const VideoLoadingOverlay: React.FC<VideoLoadingOverlayProps> = ({
         <Text style={styles.text}>{text}</Text>
 
         {/* Spinner */}
-        <Animated.View
-          style={[
-            styles.spinner,
-            { transform: [{ rotate: spinInterpolation }] },
-          ]}
-        >
+        <Animated.View style={[styles.spinner, { transform: [{ rotate: spinInterpolation }] }]}>
           <View style={styles.spinnerArc} />
         </Animated.View>
       </View>
-    </View>
+    </Animated.View>
   );
 };
 

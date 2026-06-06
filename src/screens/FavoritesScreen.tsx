@@ -28,6 +28,8 @@ const UI_TEXT = {
     emptyText: 'Зберігайте цікаві місця, натискаючи на закладку на картці.',
     remove: 'Видалити',
     removed: 'Видалено з обраного',
+    removeFailed: 'Не вдалося видалити. Спробуйте ще раз.',
+    openMissing: 'Місце не знайдено. Його можна видалити з обраного.',
     sources: {
       kids: 'Для дітей',
       food: 'Їжа',
@@ -44,6 +46,8 @@ const UI_TEXT = {
     emptyText: 'Сохраняйте интересные места, нажимая на закладку на карточке.',
     remove: 'Удалить',
     removed: 'Удалено из избранного',
+    removeFailed: 'Не удалось удалить. Попробуйте еще раз.',
+    openMissing: 'Место не найдено. Его можно удалить из избранного.',
     sources: {
       kids: 'Для детей',
       food: 'Еда',
@@ -60,6 +64,8 @@ const UI_TEXT = {
     emptyText: 'Save interesting places by tapping the bookmark icon on a card.',
     remove: 'Remove',
     removed: 'Removed from favorites',
+    removeFailed: 'Could not remove it. Try again.',
+    openMissing: 'This place was not found. You can remove it from favorites.',
     sources: {
       kids: 'For kids',
       food: 'Food',
@@ -96,7 +102,7 @@ export default function FavoritesScreen() {
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as Lang;
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
   const [items, setItems] = useState<ResolvedFavorite[]>([]);
-  const { showSuccess } = useSoftToast();
+  const { showError, showSuccess } = useSoftToast();
 
   useFocusEffect(
     useCallback(() => {
@@ -113,13 +119,20 @@ export default function FavoritesScreen() {
   );
 
   const handleRemove = async (id: string, source: FavoriteSource) => {
-    await removeFavorite(id, source);
-    setItems((prev) => prev.filter((item) => !(item.id === id && item.source === source)));
-    showSuccess(text.removed);
+    try {
+      await removeFavorite(id, source);
+      setItems((prev) => prev.filter((item) => !(item.id === id && item.source === source)));
+      showSuccess(text.removed);
+    } catch {
+      showError(text.removeFailed);
+    }
   };
 
   const handleOpen = (item: ResolvedFavorite) => {
-    if (!item.place) return;
+    if (!item.place) {
+      showError(text.openMissing);
+      return;
+    }
     switch (item.source) {
       case 'kids':
         navigation.navigate('DetalDetskogoMestaScreen', { place: item.place });

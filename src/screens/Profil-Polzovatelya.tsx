@@ -797,6 +797,14 @@ const ProfileScreen: React.FC = () => {
             ) : null}
           </View>
 
+          <TactileButton
+            title={text.manageSubscription}
+            onPress={() => navigation.navigate('SubscriptionScreen')}
+            variant="secondary"
+            style={styles.subscriptionButton}
+            icon={<MaterialCommunityIcons name="cog-outline" size={20} color="#4E5F43" />}
+          />
+
         </TactileCard>
 
         <TactileButton
@@ -1185,6 +1193,7 @@ const styles = StyleSheet.create({
   },
   subscriptionPlan: { fontSize: 16, fontWeight: '900', color: '#7B69A8' },
   subscriptionExpiry: { marginTop: 4, fontSize: 12, fontWeight: '700', color: SCREEN_THEME.textSecondary },
+  subscriptionButton: { marginHorizontal: 16, marginBottom: 14 },
   sectionLabel: {
     fontSize: 11,
     fontWeight: '800',

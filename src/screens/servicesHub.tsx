@@ -43,6 +43,7 @@ const UI_TEXT: Record<'ua' | 'ru' | 'en', SectionedItems> = {
       { label: 'Спорт на Чайці', desc: 'Баскетбол, футбол і теніс з сусідами', screen: 'SportNaChaykeScreen', icon: 'run-fast', accent: '#4F8D5F' },
     ] as ServiceHubItem[],
     market: [
+      { label: 'Оголошення', desc: 'Новини та повідомлення мешканців', screen: 'AnnouncementsScreen', icon: 'bullhorn-outline', accent: '#B85042' },
       { label: 'Їжа на Чайці', desc: 'Поїсти, продукти, акції поруч', screen: 'EdaNaChaykeScreen', icon: 'food-fork-drink', accent: '#FFD400' },
       { label: 'Все для дітей', desc: 'Садочки, школи, гуртки та події', screen: 'VseDlyaDeteyScreen', icon: 'baby-face-outline', accent: '#C77A5D' },
       { label: 'Бізнес на Чайці', desc: 'Розмістіть свій бізнес для мешканців', screen: 'BizznesChaikaScreen', icon: 'store-plus-outline', accent: '#6E7F47' },
@@ -67,6 +68,7 @@ const UI_TEXT: Record<'ua' | 'ru' | 'en', SectionedItems> = {
       { label: 'Спорт на Чайке', desc: 'Баскетбол, футбол и теннис с соседями', screen: 'SportNaChaykeScreen', icon: 'run-fast', accent: '#4F8D5F' },
     ] as ServiceHubItem[],
     market: [
+      { label: 'Объявления', desc: 'Новости и сообщения жителей', screen: 'AnnouncementsScreen', icon: 'bullhorn-outline', accent: '#B85042' },
       { label: 'Еда на Чайке', desc: 'Поесть, продукты, акции рядом', screen: 'EdaNaChaykeScreen', icon: 'food-fork-drink', accent: '#FFD400' },
       { label: 'Все для детей', desc: 'Садики, школы, кружки и события', screen: 'VseDlyaDeteyScreen', icon: 'baby-face-outline', accent: '#C77A5D' },
       { label: 'Бизнес на Чайке', desc: 'Разместить свой бизнес для жителей', screen: 'BizznesChaikaScreen', icon: 'store-plus-outline', accent: '#6E7F47' },
@@ -91,6 +93,7 @@ const UI_TEXT: Record<'ua' | 'ru' | 'en', SectionedItems> = {
       { label: 'Sports in Chaika', desc: 'Basketball, football, and tennis with neighbors', screen: 'SportNaChaykeScreen', icon: 'run-fast', accent: '#4F8D5F' },
     ] as ServiceHubItem[],
     market: [
+      { label: 'Announcements', desc: 'Community news and resident posts', screen: 'AnnouncementsScreen', icon: 'bullhorn-outline', accent: '#B85042' },
       { label: 'Food at Chaika', desc: 'Eat, groceries, deals nearby', screen: 'EdaNaChaykeScreen', icon: 'food-fork-drink', accent: '#FFD400' },
       { label: 'Everything for Kids', desc: 'Kindergartens, schools, clubs and events', screen: 'VseDlyaDeteyScreen', icon: 'baby-face-outline', accent: '#C77A5D' },
       { label: 'Business at Chaika', desc: 'Place your business for residents', screen: 'BizznesChaikaScreen', icon: 'store-plus-outline', accent: '#6E7F47' },

@@ -48,6 +48,7 @@ const UI_TEXT = {
     createRequest: 'Створити нову заявку',
     loadingError: 'Помилка завантаження',
     retry: 'Повторити',
+    loadMore: 'Завантажити ще',
     approveBtn: 'Схвалити',
     rejectBtn: 'Відхилити',
     deleteBtn: 'Видалити',
@@ -69,6 +70,7 @@ const UI_TEXT = {
     createRequest: 'Создать новую заявку',
     loadingError: 'Ошибка загрузки',
     retry: 'Повторить',
+    loadMore: 'Загрузить ещё',
     approveBtn: 'Одобрить',
     rejectBtn: 'Отклонить',
     deleteBtn: 'Удалить',
@@ -90,6 +92,7 @@ const UI_TEXT = {
     createRequest: 'Create new request',
     loadingError: 'Loading error',
     retry: 'Retry',
+    loadMore: 'Load more',
     approveBtn: 'Approve',
     rejectBtn: 'Reject',
     deleteBtn: 'Delete',
@@ -1290,7 +1293,7 @@ const RequestsScreen: React.FC = () => {
         <View style={[styles.loadMoreWrap, { paddingBottom: Math.max(insets.bottom, 10) + 8 }]}>
           <TouchableOpacity style={styles.retryBtn} onPress={() => void handleLoadMore()} activeOpacity={0.85} disabled={loadingMore}>
             <MaterialCommunityIcons name={loadingMore ? 'timer-sand' : 'chevron-down'} size={18} color="#FFFFFF" />
-            <Text style={styles.retryBtnText}>{loadingMore ? '...' : text.retry}</Text>
+            <Text style={styles.retryBtnText}>{loadingMore ? '...' : text.loadMore}</Text>
           </TouchableOpacity>
         </View>
       ) : null}

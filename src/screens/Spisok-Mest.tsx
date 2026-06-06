@@ -142,6 +142,7 @@ const ListScreen: React.FC = () => {
 
   const handleClearFilters = useCallback(() => {
     setSearch('');
+    setTypeSearch('');
     setSelectedTypes(FILTER_TYPES);
     dispatch(clearFilters());
   }, [dispatch]);
@@ -162,20 +163,25 @@ const ListScreen: React.FC = () => {
     const query = typeSearch.trim().toLowerCase();
     if (!query) return places;
     const typeAliases: Record<string, string> = {
-      shop: 'магазин товары',
-      school: 'школы школа',
-      kindergarten: 'детские сады детский сад дети',
+      shop: 'магазин магазины товары shop shops store stores',
+      school: 'школы школа school schools',
+      kindergarten: 'детские сады детский сад дети kindergarten kindergartens',
       cafe: 'кафе',
-      restaurant: 'рестораны ресторан',
-      salon: 'салоны салон',
-      service: 'частные услуги услуги сервис',
-      pharmacy: 'аптеки аптека',
+      restaurant: 'рестораны ресторан restaurant restaurants',
+      salon: 'салоны салон salon salons',
+      service: 'частные услуги услуги сервис service services',
+      pharmacy: 'аптеки аптека pharmacy pharmacies',
     };
     return places.filter((place) => {
-      const bucket = typeAliases[place.type] ?? '';
-      return bucket.includes(query) || place.type.includes(query);
+      const typeLabel = text.filterLabels[place.type] ?? '';
+      const bucket = [
+        place.type,
+        typeLabel,
+        typeAliases[place.type] ?? '',
+      ].join(' ').toLowerCase();
+      return bucket.includes(query);
     });
-  }, [places, typeSearch]);
+  }, [places, text.filterLabels, typeSearch]);
 
   const showSkeleton = loading && visiblePlaces.length === 0;
   const renderPlace = useCallback(
