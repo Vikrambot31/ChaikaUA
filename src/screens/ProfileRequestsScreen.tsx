@@ -48,12 +48,6 @@ const OUTGOING_STATUS: Record<string, Record<Lang, string>> = {
   denied:           { ua: 'Поки без відповіді', ru: 'Пока без ответа',  en: 'No response yet'   },
 };
 
-const PENDING_HINT: Record<Lang, string> = {
-  ua: "Коли з'явиться значок телефону — користувач готовий з вами зв'язатися",
-  ru: 'Когда появится значок телефона — пользователь готов с вами связаться',
-  en: 'When a phone icon appears — the user is ready to contact you',
-};
-
 const ELAPSED_LABELS: Record<Lang, { min: string; hour: string; day: string; waiting: string }> = {
   ua: { min: 'хв', hour: 'год', day: 'дн', waiting: 'в очікуванні' },
   ru: { min: 'мин', hour: 'ч', day: 'дн', waiting: 'в ожидании' },
@@ -363,7 +357,6 @@ export default function ProfileRequestsScreen() {
   const [showHidden, setShowHidden] = useState(false);
   const [hiddenKeys, setHiddenKeys] = useState<Record<string, boolean>>({});
   const [incomingPhones, setIncomingPhones] = useState<Record<string, string>>({});
-  const [incomingAges, setIncomingAges] = useState<Record<string, string>>({});
   const [incomingVotes, setIncomingVotes] = useState<Record<string, number>>({});
   const [seenContacts, setSeenContacts] = useState<Record<string, boolean>>({});
   const [clearingHistory, setClearingHistory] = useState(false);
@@ -373,7 +366,6 @@ export default function ProfileRequestsScreen() {
     const uniqueRequesterIds = Array.from(new Set(incoming.map((item) => item.requesterId).filter(Boolean)));
     if (uniqueRequesterIds.length === 0) {
       setIncomingPhones({});
-      setIncomingAges({});
       setIncomingVotes({});
       return;
     }
@@ -381,20 +373,17 @@ export default function ProfileRequestsScreen() {
     const pairs = await Promise.all(
       uniqueRequesterIds.map(async (requesterId) => {
         try {
-          const [phoneSnap, ageSnap, votesSnap] = await Promise.all([
+          const [phoneSnap, votesSnap] = await Promise.all([
             get(ref(database, `users/${requesterId}/phone`)),
-            get(ref(database, `users/${requesterId}/age`)),
             get(ref(database, `users/${requesterId}/ratingVotes`)),
           ]);
           const rawPhone = phoneSnap.val();
-          const rawAge = ageSnap.val();
           const rawVotes = votesSnap.val();
           const phone = typeof rawPhone === 'string' ? rawPhone.trim() : '';
-          const age = rawAge !== null && rawAge !== undefined ? String(rawAge).trim() : '';
           const votes = typeof rawVotes === 'number' ? rawVotes : 0;
-          return [requesterId, phone, age, votes] as const;
+          return [requesterId, phone, votes] as const;
         } catch {
-          return [requesterId, '', '', 0] as const;
+          return [requesterId, '', 0] as const;
         }
       })
     );
@@ -404,14 +393,8 @@ export default function ProfileRequestsScreen() {
         return acc;
       }, {})
     );
-    setIncomingAges(
-      pairs.reduce<Record<string, string>>((acc, [requesterId, , age]) => {
-        if (age) acc[requesterId] = age;
-        return acc;
-      }, {})
-    );
     setIncomingVotes(
-      pairs.reduce<Record<string, number>>((acc, [requesterId, , , votes]) => {
+      pairs.reduce<Record<string, number>>((acc, [requesterId, , votes]) => {
         acc[requesterId] = votes;
         return acc;
       }, {})
@@ -811,14 +794,14 @@ export default function ProfileRequestsScreen() {
           renderItem={({ item }) => {
             if (activeTab === 'incoming') {
               const phone = item.status === 'approved' ? (item.requesterPhone?.trim() || incomingPhones[item.requesterId]) : undefined;
-              const age = incomingAges[item.requesterId];
               const votes = incomingVotes[item.requesterId] ?? 0;
               const reasonText = item.reason ? t.reasons[item.reason as ContactReason] : null;
-              const descriptionText = reasonText || item.sourceTitle || (age ? age : null);
               const isResponding = respondingRequestId === item.requesterId;
-              const topicText = reasonText || item.sourceTitle?.trim() || t.notSpecified;
-              const foundContactText = item.sourceTitle?.trim() || getProfileRequestContextLabel(item.context, language) || t.notSpecified;
               const transitionScreenText = getProfileRequestSourceLabel(item.sourceType, item.context, language, t.notSpecified);
+              const sourceTitleText = item.sourceTitle?.trim();
+              const descriptionText = reasonText || sourceTitleText || transitionScreenText;
+              const topicText = reasonText || sourceTitleText || transitionScreenText;
+              const foundContactText = sourceTitleText || getProfileRequestContextLabel(item.context, language) || t.notSpecified;
               const votesLabel = language === 'en' ? 'votes' : language === 'ru' ? 'голосов' : 'голосів';
               return (
                 <TouchableOpacity
@@ -977,13 +960,12 @@ export default function ProfileRequestsScreen() {
             const viewedLabel = VIEWED_LABELS[language];
             const isViewedByTarget = Boolean(item.viewedAt);
 
-            const descText: string | null = item.status === 'pending'
-              ? PENDING_HINT[language]
-              : (item.reason ? t.reasons[item.reason as ContactReason] : item.sourceTitle ?? null);
             const reasonText = item.reason ? t.reasons[item.reason as ContactReason] : null;
-            const topicText = reasonText || item.sourceTitle?.trim() || t.notSpecified;
-            const foundContactText = item.sourceTitle?.trim() || getProfileRequestContextLabel(item.context, language) || t.notSpecified;
             const transitionScreenText = getProfileRequestSourceLabel(item.sourceType, item.context, language, t.notSpecified);
+            const sourceTitleText = item.sourceTitle?.trim();
+            const descText: string | null = reasonText || sourceTitleText || transitionScreenText;
+            const topicText = reasonText || sourceTitleText || transitionScreenText;
+            const foundContactText = sourceTitleText || getProfileRequestContextLabel(item.context, language) || t.notSpecified;
             const statusIcon = item.status === 'approved'
               ? 'check-circle'
               : item.status === 'denied'

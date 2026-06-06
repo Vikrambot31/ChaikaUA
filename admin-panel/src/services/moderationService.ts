@@ -1,4 +1,4 @@
-import { get, limitToFirst, query, ref } from 'firebase/database';
+import { get, ref } from 'firebase/database';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { database, firebaseApp } from '../firebase/firebase';
 import { resolveMediaUrl } from './mediaService';
@@ -283,7 +283,7 @@ export const loadModerationItems = async (): Promise<ModerationItem[]> => {
   const results = await Promise.allSettled(
     MODERATION_SECTIONS.map(async (config) => ({
       config,
-      snapshot: await get(query(ref(database, config.path), limitToFirst(500))),
+      snapshot: await get(ref(database, config.path)),
     })),
   );
 
@@ -304,10 +304,6 @@ export const loadModerationItems = async (): Promise<ModerationItem[]> => {
       if (!value || typeof value !== 'object') return [];
       return [normalizeItem(config, id, `${config.path}/${id}`, value as Record<string, unknown>)];
     });
-
-    if (entries.length >= 500) {
-      console.warn(`[moderationService] Раздел "${config.label}" вернул 500 записей — возможна трункация. Часть данных может быть не загружена.`);
-    }
 
     return entries;
   });

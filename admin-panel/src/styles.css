@@ -4339,6 +4339,82 @@ td {
   50% { opacity: 0.6; }
 }
 
+/* ── Уровень 1: жёлтый флаг (2 нарушения) ── */
+
+.ylYellowCell {
+  background: #2a1e00 !important;
+  border-left: 4px solid #e8a800 !important;
+}
+
+.ylYellowIcon {
+  font-size: 18px;
+  color: #e8a800;
+  text-shadow: 0 0 6px #cc880066;
+  line-height: 1;
+}
+
+.ylYellowName {
+  color: #e8a800 !important;
+  font-weight: 700 !important;
+  font-size: 14px !important;
+}
+
+.ylYellowBadge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #5a3d00;
+  border: 1px solid #e8a800;
+  color: #e8a800;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+/* Счётчик нарушений рядом с бейджем ПОДОЗРЕНИЕ */
+.ylViolationCount {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #330000;
+  color: #ff8888;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* Кнопка "Снять грехи" — зелёная */
+.ylPardonBtn {
+  border-color: #22aa44 !important;
+  background: #0a2a12 !important;
+  color: #44dd66 !important;
+  font-weight: 700 !important;
+}
+.ylPardonBtn:hover {
+  background: #0d3a18 !important;
+}
+.ylPardonBtn:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+/* ── Таблица нарушителей ── */
+
+.vlSection {
+  border-color: #e8a800 !important;
+  background: #1a1400 !important;
+}
+
+.vlSectionTitle {
+  font-size: 18px;
+  font-weight: 900;
+  color: #e8a800;
+}
+
+.vlYellowRow {
+  background: #1a1400 !important;
+}
+
 /* ===== Full Tree View ===== */
 .full-tree-container {
   display: grid;

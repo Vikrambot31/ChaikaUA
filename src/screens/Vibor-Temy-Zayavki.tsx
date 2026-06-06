@@ -239,7 +239,11 @@ const RequestTopicScreen: React.FC = () => {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Image source={require('../../assets/WEBP-version/Operator.webp')} style={styles.headerImage} resizeMode="cover" />
 
-        <View style={styles.activityPanel}>
+        <TouchableOpacity
+          style={styles.activityPanel}
+          onPress={() => safeNavigate(navigation, 'OnlineChatTab')}
+          activeOpacity={0.88}
+        >
           <Text style={styles.activityTitle}>сегодня активность</Text>
           <View style={styles.activityRow}>
             <View style={styles.activityAvatars}>
@@ -282,7 +286,7 @@ const RequestTopicScreen: React.FC = () => {
               <Text style={styles.offerCaption}>работа и бизнес сегодня</Text>
             </View>
           </View>
-        </View>
+        </TouchableOpacity>
 
         <View style={styles.quickGrid}>
           <TouchableOpacity
