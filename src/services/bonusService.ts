@@ -122,12 +122,17 @@ const EMPTY_PROMO_CREDITS: PromoCredits = {
   updatedAt: 0,
 };
 
+const toSafeNumber = (value: unknown, fallback = 0): number => {
+  const next = Number(value ?? fallback);
+  return Number.isFinite(next) ? next : fallback;
+};
+
 const normalizeCategory = (value: unknown): BonusCategory => {
   if (value && typeof value === 'object') {
     const v = value as Record<string, unknown>;
     return {
-      count: Number(v.count || 0),
-      points: Number(v.points || 0),
+      count: toSafeNumber(v.count),
+      points: toSafeNumber(v.points),
     };
   }
   return { count: 0, points: 0 };
@@ -138,11 +143,11 @@ const normalizeBonuses = (raw: unknown): UserBonuses => {
   const data = raw as Record<string, unknown>;
   const earnedRaw = data.earned && typeof data.earned === 'object' ? data.earned as Record<string, unknown> : {};
   const spentRaw = data.spent && typeof data.spent === 'object' ? data.spent as Record<string, unknown> : {};
-  const earnedTotal = Number(earnedRaw.total || data.total || 0);
-  const spentTotal = Number(spentRaw.total || 0);
+  const earnedTotal = toSafeNumber(earnedRaw.total || data.total);
+  const spentTotal = toSafeNumber(spentRaw.total);
   return {
-    total: Number(data.total || earnedTotal || 0),
-    available: Number(data.available ?? Math.max(0, earnedTotal - spentTotal)),
+    total: toSafeNumber(data.total || earnedTotal),
+    available: toSafeNumber(data.available, Math.max(0, earnedTotal - spentTotal)),
     invites: normalizeCategory(data.invites),
     likes: normalizeCategory(data.likes),
     help: normalizeCategory(data.help),
@@ -150,24 +155,24 @@ const normalizeBonuses = (raw: unknown): UserBonuses => {
     activity: normalizeCategory(data.activity),
     earned: {
       total: earnedTotal,
-      weeklyTotal: Number(earnedRaw.weeklyTotal || 0),
+      weeklyTotal: toSafeNumber(earnedRaw.weeklyTotal),
       weekKey: typeof earnedRaw.weekKey === 'string' ? earnedRaw.weekKey : '',
       weeklyByCategory: earnedRaw.weeklyByCategory && typeof earnedRaw.weeklyByCategory === 'object'
         ? Object.fromEntries(
           Object.entries(earnedRaw.weeklyByCategory as Record<string, unknown>)
-            .map(([key, value]) => [key, Number(value || 0)])
+            .map(([key, value]) => [key, toSafeNumber(value)])
         )
         : {},
     },
     spent: {
       total: spentTotal,
-      contactsTop: Number(spentRaw.contactsTop || spentRaw.contacts_top || 0),
-      businessTop: Number(spentRaw.businessTop || spentRaw.business_top || 0),
-      beautyTop: Number(spentRaw.beautyTop || spentRaw.beauty_top || 0),
-      kidsTop: Number(spentRaw.kidsTop || spentRaw.kids_top || 0),
+      contactsTop: toSafeNumber(spentRaw.contactsTop || spentRaw.contacts_top),
+      businessTop: toSafeNumber(spentRaw.businessTop || spentRaw.business_top),
+      beautyTop: toSafeNumber(spentRaw.beautyTop || spentRaw.beauty_top),
+      kidsTop: toSafeNumber(spentRaw.kidsTop || spentRaw.kids_top),
     },
     badge: typeof data.badge === 'string' ? data.badge : 'newcomer',
-    updatedAt: Number(data.updatedAt || 0),
+    updatedAt: toSafeNumber(data.updatedAt),
   };
 };
 
@@ -176,12 +181,12 @@ const normalizePromoCredits = (raw: unknown): PromoCredits => {
   const data = raw as Record<string, unknown>;
   const spentRaw = data.spent && typeof data.spent === 'object' ? data.spent as Record<string, unknown> : {};
   return {
-    balance: Number(data.balance || 0),
-    lifetime: Number(data.lifetime || 0),
+    balance: toSafeNumber(data.balance),
+    lifetime: toSafeNumber(data.lifetime),
     spent: {
-      total: Number(spentRaw.total || 0),
+      total: toSafeNumber(spentRaw.total),
     },
-    updatedAt: Number(data.updatedAt || 0),
+    updatedAt: toSafeNumber(data.updatedAt),
   };
 };
 
@@ -192,12 +197,12 @@ const normalizeTransaction = (id: string, raw: unknown): BonusTransaction => {
     type: String(data.type || ''),
     currency: String(data.currency || ''),
     category: String(data.category || ''),
-    points: Number(data.points || 0),
-    balanceAfter: Number(data.balanceAfter || 0),
+    points: toSafeNumber(data.points),
+    balanceAfter: toSafeNumber(data.balanceAfter),
     sourceId: String(data.sourceId || ''),
     sourceType: String(data.sourceType || ''),
     status: String(data.status || ''),
-    createdAt: Number(data.createdAt || 0),
+    createdAt: toSafeNumber(data.createdAt),
     createdBy: String(data.createdBy || ''),
     note: String(data.note || ''),
   };
@@ -212,11 +217,11 @@ const normalizePromotion = (id: string, raw: unknown): BonusPromotion => {
     targetType: String(data.targetType || ''),
     targetId: String(data.targetId || ''),
     screen: String(data.screen || ''),
-    pointsSpent: Number(data.pointsSpent || 0),
+    pointsSpent: toSafeNumber(data.pointsSpent),
     status: String(data.status || ''),
-    startsAt: Number(data.startsAt || 0),
-    expiresAt: Number(data.expiresAt || 0),
-    createdAt: Number(data.createdAt || 0),
+    startsAt: toSafeNumber(data.startsAt),
+    expiresAt: toSafeNumber(data.expiresAt),
+    createdAt: toSafeNumber(data.createdAt),
     moderationStatus: String(data.moderationStatus || ''),
     badge: String(data.badge || ''),
   };

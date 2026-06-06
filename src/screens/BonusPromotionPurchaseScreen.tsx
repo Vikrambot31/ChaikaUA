@@ -18,9 +18,6 @@ import { selectUser } from '../redux/selectors';
 import { database } from '../firebase-core';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { purchaseBonusPromotion, subscribeMyBonuses, subscribeMyPromoCredits, type PromoCredits, type UserBonuses } from '../services/bonusService';
-import { chaykaPlaces } from '../services/chaykaPlacesData';
-import { getBeautyPlaces, getActiveBeautyOffers } from '../services/beautySeed';
-import { getChildrenPlaces, getActiveOffers } from '../services/childrenSeed';
 import { useTranslation } from '../i18n/useTranslation';
 import ScreenTooltip from '../components/ScreenTooltip';
 import { BONUS_PROMOTION_PURCHASE_TOOLTIP } from '../utils/screenTooltips';
@@ -97,6 +94,49 @@ const EMPTY_CREDITS: PromoCredits = { balance: 0, lifetime: 0, spent: { total: 0
 const normalizeBizTitle = (raw: Record<string, unknown>, id: string) =>
   String(raw.itemName || raw.businessName || raw.contactName || raw.category || id);
 
+const normalizeListingTitle = (raw: Record<string, unknown>, id: string) =>
+  String(raw.itemName || raw.title || raw.name || raw.category || id);
+
+const normalizeListingSubtitle = (raw: Record<string, unknown>, fallback: string) =>
+  String(raw.category || raw.condition || raw.moderationStatus || raw.status || fallback);
+
+const fetchOwnedTargets = async (
+  collection: string,
+  uid: string,
+  fallbackSubtitle: string,
+): Promise<PromotionTarget[]> => {
+  const snap = await get(query(ref(database, collection), orderByChild('userId'), equalTo(uid)));
+  const next: PromotionTarget[] = [];
+  snap.forEach((child) => {
+    const raw = child.val() && typeof child.val() === 'object' ? child.val() as Record<string, unknown> : {};
+    const id = child.key || '';
+    if (!id) return;
+    next.push({
+      id,
+      title: normalizeListingTitle(raw, id),
+      subtitle: normalizeListingSubtitle(raw, fallbackSubtitle),
+    });
+  });
+  return next;
+};
+
+const getPromotionErrorMessage = (error: any, fallback: string) => {
+  const raw = String(error?.message || error?.code || '').toLowerCase();
+  if (raw.includes('permission-denied') || raw.includes('can_only_promote_own')) {
+    return 'Можно продвигать только свою карточку. Выберите свою запись из списка.';
+  }
+  if (raw.includes('insufficient') || raw.includes('not_enough')) {
+    return 'Недостаточно бонусов или промо-кредитов для этого продвижения.';
+  }
+  if (raw.includes('already_has_active_promotion')) {
+    return 'У этой карточки уже есть активное продвижение.';
+  }
+  if (raw.includes('max_top_slots_reached')) {
+    return 'Сейчас все места продвижения заняты. Попробуйте позже.';
+  }
+  return error?.message || fallback;
+};
+
 const BonusPromotionPurchaseScreen: React.FC = () => {
   const navigation = useNavigation<AppNav>();
   const route = useRoute<RouteProp<RouteParams, 'BonusPromotionPurchaseScreen'>>();
@@ -106,7 +146,7 @@ const BonusPromotionPurchaseScreen: React.FC = () => {
   const [selectedPromoType, setSelectedPromoType] = useState(initialPromoType);
   const [selectedTargetId, setSelectedTargetId] = useState('');
   const [selectedDuration, setSelectedDuration] = useState('24h');
-  const [businessTargets, setBusinessTargets] = useState<PromotionTarget[]>([]);
+  const [promotionTargets, setPromotionTargets] = useState<PromotionTarget[]>([]);
   const [targetsLoading, setTargetsLoading] = useState(false);
   const [bonuses, setBonuses] = useState<UserBonuses | null>(EMPTY_BONUSES);
   const [credits, setCredits] = useState<PromoCredits>(EMPTY_CREDITS);
@@ -139,17 +179,18 @@ const BonusPromotionPurchaseScreen: React.FC = () => {
       return;
     }
 
-    if (selectedPromoType === 'business_top') {
-      if (!user?.id) {
-        setBusinessTargets([]);
-        setSelectedTargetId('');
-        return;
-      }
-      setTargetsLoading(true);
-      void (async () => {
-        try {
+    if (!user?.id) {
+      setPromotionTargets([]);
+      setSelectedTargetId('');
+      return;
+    }
+
+    setTargetsLoading(true);
+    void (async () => {
+      try {
+        let next: PromotionTarget[] = [];
+        if (selectedPromoType === 'business_top') {
           const snap = await get(query(ref(database, 'biznes_chaika_listings'), orderByChild('userId'), equalTo(user.id)));
-          const next: PromotionTarget[] = [];
           snap.forEach((child) => {
             const raw = child.val() && typeof child.val() === 'object' ? child.val() as Record<string, unknown> : {};
             next.push({
@@ -158,29 +199,29 @@ const BonusPromotionPurchaseScreen: React.FC = () => {
               subtitle: String(raw.moderationStatus || raw.status || 'business'),
             });
           });
-          setBusinessTargets(next);
-          setSelectedTargetId((current) => current && next.some((item) => item.id === current) ? current : next[0]?.id || '');
-        } catch {
-          setBusinessTargets([]);
-          setSelectedTargetId('');
-        } finally {
-          setTargetsLoading(false);
+          const localBusiness = await fetchOwnedTargets('local_business', user.id, 'business');
+          const knownIds = new Set(next.map((item) => item.id));
+          next = [...next, ...localBusiness.filter((item) => !knownIds.has(item.id))];
+        } else {
+          next = await fetchOwnedTargets('contacts_listings', user.id, 'listing');
         }
-      })();
-      return;
-    }
-
-    const nextTargets = buildStaticTargets(selectedPromoType);
-    setSelectedTargetId((current) => current && nextTargets.some((item) => item.id === current) ? current : nextTargets[0]?.id || '');
+        setPromotionTargets(next);
+        setSelectedTargetId((current) => current && next.some((item) => item.id === current) ? current : next[0]?.id || '');
+      } catch {
+        setPromotionTargets([]);
+        setSelectedTargetId('');
+      } finally {
+        setTargetsLoading(false);
+      }
+    })();
   }, [selectedPromoType, user?.id]);
 
   const targets = useMemo(() => {
     if (selectedPromoType === 'contacts_top') {
       return [{ id: user?.id || '', title: user?.name || t.bonus.activePromotions, subtitle: t.bonus.trustBonuses }];
     }
-    if (selectedPromoType === 'business_top') return businessTargets;
-    return buildStaticTargets(selectedPromoType);
-  }, [businessTargets, selectedPromoType, user?.id, user?.name, t.bonus.activePromotions, t.bonus.trustBonuses]);
+    return promotionTargets;
+  }, [promotionTargets, selectedPromoType, user?.id, user?.name, t.bonus.activePromotions, t.bonus.trustBonuses]);
 
   const canBuy = Boolean(selectedTargetId) && balance >= selectedPrice && !buying;
 
@@ -201,7 +242,7 @@ const BonusPromotionPurchaseScreen: React.FC = () => {
       );
       navigation.goBack();
     } catch (error: any) {
-      Alert.alert(t.common.error, error?.message || '');
+      Alert.alert(t.common.error, getPromotionErrorMessage(error, t.common.error));
     } finally {
       setBuying(false);
     }
@@ -329,38 +370,6 @@ const BonusPromotionPurchaseScreen: React.FC = () => {
       </ScrollView>
     </SafeAreaView>
   );
-};
-
-const buildStaticTargets = (promoType: string): PromotionTarget[] => {
-  if (promoType === 'beauty_salon_top') {
-    return getBeautyPlaces(chaykaPlaces).map((place) => ({
-      id: place.id,
-      title: place.name,
-      subtitle: place.address,
-    }));
-  }
-  if (promoType === 'beauty_promo_top') {
-    return getActiveBeautyOffers().map((offer) => ({
-      id: offer.id,
-      title: offer.title,
-      subtitle: offer.shortText,
-    }));
-  }
-  if (promoType === 'kids_place_top') {
-    return getChildrenPlaces(chaykaPlaces).map((place) => ({
-      id: place.id,
-      title: place.name,
-      subtitle: place.address,
-    }));
-  }
-  if (promoType === 'kids_event_top') {
-    return getActiveOffers().map((offer) => ({
-      id: offer.id,
-      title: offer.title,
-      subtitle: offer.shortText,
-    }));
-  }
-  return [];
 };
 
 const BalanceCard = ({

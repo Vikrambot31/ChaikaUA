@@ -580,7 +580,10 @@ const createBonusFunctions = ({ functions, admin, writeOpsEvent, writeOpsError, 
 
     // Check max confirmed helpers per request (1 main + 2 additional = 3 max)
     const confirmedSnap = await db.ref(`help_confirmations/${requestId}`).once('value');
-    const confirmedVal = confirmedSnap.val();
+    const confirmedVal = confirmedSnap.val() || {};
+    if (confirmedVal[helperUid]) {
+      return { ok: true, status: 'already_confirmed', points: 0 };
+    }
     const confirmedCount = confirmedVal ? Object.keys(confirmedVal).length : 0;
     if (confirmedCount >= 3) throw new functions.https.HttpsError('failed-precondition', 'max_helpers_confirmed');
 
@@ -606,7 +609,7 @@ const createBonusFunctions = ({ functions, admin, writeOpsEvent, writeOpsError, 
     // Award to helper
     const result = await awardTrustBonus(
       db, helperUid, 'help', BONUS_HELP_CONFIRMED,
-      `help_confirmed_${requestId}`,
+      `help_confirmed_${requestId}_${helperUid}`,
       { sourceId: requestId, sourceType: 'request', note: `Confirmed by ${authorUid}` },
       now, isNewcomer,
     );
@@ -670,6 +673,11 @@ const createBonusFunctions = ({ functions, admin, writeOpsEvent, writeOpsError, 
     if (authorUid === helperUid) throw new functions.https.HttpsError('failed-precondition', 'cannot_thank_self');
 
     const now = Date.now();
+
+    const reqSnap = await db.ref(`requests/${requestId}`).once('value');
+    const reqVal = reqSnap.val();
+    if (!reqVal) throw new functions.https.HttpsError('not-found', 'request_not_found');
+    if (reqVal.userId !== authorUid) throw new functions.https.HttpsError('permission-denied', 'only_author_can_thank');
 
     // Verify confirmation exists (must confirm before thanking)
     const confirmSnap = await db.ref(`help_confirmations/${requestId}/${helperUid}`).once('value');

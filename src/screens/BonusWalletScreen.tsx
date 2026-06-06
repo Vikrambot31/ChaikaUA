@@ -131,30 +131,33 @@ const BonusWalletScreen: React.FC = () => {
   };
 
   useEffect(() => {
-    let loaded = 0;
-    const markLoaded = () => {
-      loaded += 1;
-      if (loaded >= 4) setReady(true);
+    let active = true;
+    const loadedSources = new Set<string>();
+    const markLoaded = (source: string) => {
+      if (!active) return;
+      loadedSources.add(source);
+      if (loadedSources.size >= 4) setReady(true);
     };
 
     const unsubBonuses = subscribeMyBonuses((next) => {
       setBonuses(next);
-      markLoaded();
+      markLoaded('bonuses');
     });
     const unsubCredits = subscribeMyPromoCredits((next) => {
       setPromoCredits(next);
-      markLoaded();
+      markLoaded('credits');
     });
     const unsubTransactions = subscribeMyBonusTransactions((next) => {
       setTransactions(next);
-      markLoaded();
+      markLoaded('transactions');
     });
     const unsubPromotions = subscribeMyBonusPromotions((next) => {
       setPromotions(next);
-      markLoaded();
+      markLoaded('promotions');
     });
 
     return () => {
+      active = false;
       unsubBonuses();
       unsubCredits();
       unsubTransactions();
