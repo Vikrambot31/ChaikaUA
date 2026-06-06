@@ -1,22 +1,24 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { Alert, FlatList, Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { NavigationProp, RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import MiniTabBar from '../components/MiniTabBar';
 import AlertHelper from '../utils/alertHelper';
 import ErrorHandler from '../utils/errorHandler';
 import { LIGHT_ORBS, SCREEN_THEME } from '../utils/screenTheme';
 import { RootState } from '../redux/store';
+import { selectIsAuthenticated, selectUser } from '../redux/selectors';
 import { BUILDINGS, getFullAddress } from '../data/buildings';
-import { LastRatingMap, canRateNow, getRatingDaysLeft } from '../utils/monthlyRating';
 import { useTranslation } from '../i18n/useTranslation';
-import StarRatingModal from '../components/StarRatingModal';
 import { useOperationTrace } from '../hooks/useOperationTrace';
-
-const STORAGE_KEY = '@chaika:building_ratings_v1';
-const LAST_VOTE_KEY = '@chaika:building_rating_votes_v1';
+import {
+  BuildingRatingValue,
+  canSubmitBuildingRatingToday,
+  getUserBuildingRating,
+  submitBuildingRating,
+} from '../services/buildingRatingService';
+import { useBuildingRatings } from '../hooks/useBuildingRatings';
 
 type Building = {
   id: string;
@@ -29,16 +31,7 @@ type Building = {
   votes: number;
 };
 
-type RatingValue = {
-  cleaning: number;
-  elevator: number;
-  electricity: number;
-  services: number;
-  votes: number;
-  complaints: number;
-};
-
-type RatingsByBuilding = Record<string, RatingValue>;
+type RatingValue = BuildingRatingValue;
 type RatingCategoryKey = keyof Pick<RatingValue, 'cleaning' | 'elevator' | 'electricity' | 'services'>;
 type RatingCategory = {
   key: RatingCategoryKey;
@@ -61,10 +54,61 @@ const RATING_EXPLANATION = {
   },
 } as const;
 
-const RATING_MODAL_HINT = {
-  ua: 'Оберіть кількість зірок для цієї категорії.',
-  ru: 'Выберите количество звезд для этой категории.',
-  en: 'Choose the number of stars for this category.',
+const RATING_AUTH_NOTICE = {
+  ua: {
+    title: 'Потрібна реєстрація',
+    body: 'Оцінки будинків можуть ставити тільки зареєстровані користувачі. Увійдіть або зареєструйтесь, щоб залишити оцінку.',
+    action: 'Увійти / Реєстрація',
+    cancel: 'Пізніше',
+  },
+  ru: {
+    title: 'Нужна регистрация',
+    body: 'Оценки домов могут ставить только зарегистрированные пользователи. Войдите или зарегистрируйтесь, чтобы оставить оценку.',
+    action: 'Войти / Регистрация',
+    cancel: 'Позже',
+  },
+  en: {
+    title: 'Registration required',
+    body: 'Only registered users can rate buildings. Sign in or register to leave a rating.',
+    action: 'Sign in / Register',
+    cancel: 'Later',
+  },
+} as const;
+
+const RATING_SYNC_NOTICE = {
+  ua: 'Не вдалося оновити спільний рейтинг. Спробуйте ще раз трохи пізніше.',
+  ru: 'Не удалось обновить общий рейтинг. Попробуйте ещё раз чуть позже.',
+  en: 'Could not update the shared rating. Please try again a little later.',
+} as const;
+
+const RATING_UI_TEXT = {
+  ua: {
+    loading: 'Завантажуємо спільний рейтинг...',
+    sharedInfo: 'Рейтинг спільний для всіх користувачів. Один користувач може оновити свою оцінку одного будинку один раз на день.',
+    authInline: 'Оцінювати можуть тільки зареєстровані користувачі.',
+    changeTomorrow: 'Ваш голос уже враховано. Змінити оцінку можна завтра.',
+    changeAvailable: 'Ви вже оцінювали цей будинок. Сьогодні можна оновити свою оцінку.',
+    saveFailed: 'Не вдалося зберегти оцінку. Спробуйте ще раз трохи пізніше.',
+    updated: 'Оцінку оновлено. Дякуємо!',
+  },
+  ru: {
+    loading: 'Загружаем общий рейтинг...',
+    sharedInfo: 'Рейтинг общий для всех пользователей. Один пользователь может обновить свою оценку одного дома один раз в день.',
+    authInline: 'Оценивать могут только зарегистрированные пользователи.',
+    changeTomorrow: 'Ваш голос уже учтён. Изменить оценку можно завтра.',
+    changeAvailable: 'Вы уже оценивали этот дом. Сегодня можно обновить свою оценку.',
+    saveFailed: 'Не удалось сохранить оценку. Попробуйте ещё раз чуть позже.',
+    updated: 'Оценка обновлена. Спасибо!',
+  },
+  en: {
+    loading: 'Loading shared rating...',
+    sharedInfo: 'The rating is shared for all users. One user can update their building rating once per day.',
+    authInline: 'Only registered users can rate buildings.',
+    changeTomorrow: 'Your vote has already been counted. You can change it tomorrow.',
+    changeAvailable: 'You have rated this building before. You can update your rating today.',
+    saveFailed: 'Could not save the rating. Please try again a little later.',
+    updated: 'Rating updated. Thank you!',
+  },
 } as const;
 
 const getEmptyRating = (): RatingValue => ({
@@ -74,7 +118,10 @@ const getEmptyRating = (): RatingValue => ({
   services: 0,
   votes: 0,
   complaints: 0,
+  voterIds: {},
 });
+
+const getEmptyRatingInput = () => ({ cleaning: 0, elevator: 0, electricity: 0, services: 0 });
 
 const getBuildingScoreValue = (b: Pick<RatingValue, 'cleaning' | 'elevator' | 'electricity' | 'services'>): number => {
   return (b.cleaning + b.elevator + b.electricity + b.services) / 4;
@@ -101,17 +148,18 @@ function StarRow({ value }: { value: number | null }) {
 export default function RatingScreen() {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  const currentUser = useSelector(selectUser);
   const { t } = useTranslation();
   const { startOperation, trace } = useOperationTrace('Reyting-Domov', 'rating');
   const explanation = RATING_EXPLANATION[language];
+  const uiText = RATING_UI_TEXT[language];
   const [tab, setTab] = useState<'top20' | 'vote'>('top20');
-  const [ratings, setRatings] = useState<Record<string, number>>({ cleaning: 0, elevator: 0, electricity: 0, services: 0 });
+  const [ratings, setRatings] = useState<Record<string, number>>(getEmptyRatingInput);
   const [selectedBuildingId, setSelectedBuildingId] = useState(BUILDINGS[0]?.id ?? '');
   const [buildingPickerOpen, setBuildingPickerOpen] = useState(false);
-  const [storedRatings, setStoredRatings] = useState<RatingsByBuilding>({});
-  const [lastVotes, setLastVotes] = useState<LastRatingMap>({});
-  const [voted, setVoted] = useState(false);
-  const [ratingModalCategory, setRatingModalCategory] = useState<RatingCategoryKey | null>(null);
+  const { ratings: storedRatings, loading: ratingsLoading, error: ratingsError } = useBuildingRatings();
+  const [sharedRatingErrorShown, setSharedRatingErrorShown] = useState(false);
 
   const CATEGORIES: RatingCategory[] = [
     { key: 'cleaning', label: t.ratingScreen.categories.cleaning, icon: 'broom' as const },
@@ -126,26 +174,11 @@ export default function RatingScreen() {
   }, [language]);
 
   useEffect(() => {
-    const loadRatings = async () => {
-      try {
-        const [raw, rawVotes] = await Promise.all([
-          AsyncStorage.getItem(STORAGE_KEY),
-          AsyncStorage.getItem(LAST_VOTE_KEY),
-        ]);
-        setStoredRatings(raw ? (JSON.parse(raw) as RatingsByBuilding) : {});
-        setLastVotes(rawVotes ? (JSON.parse(rawVotes) as LastRatingMap) : {});
-      } catch {
-        setStoredRatings({});
-        setLastVotes({});
-      }
-    };
-
-    void loadRatings();
-  }, []);
-
-  useEffect(() => {
-    setVoted(!canRateNow(lastVotes[selectedBuildingId]));
-  }, [lastVotes, selectedBuildingId]);
+    if (ratingsError && !sharedRatingErrorShown) {
+      setSharedRatingErrorShown(true);
+      Alert.alert(t.ratingScreen.title, RATING_SYNC_NOTICE[language]);
+    }
+  }, [language, ratingsError, sharedRatingErrorShown, t.ratingScreen.title]);
 
   const buildingList: Building[] = useMemo(() => {
     return BUILDINGS.map((b) => {
@@ -165,18 +198,56 @@ export default function RatingScreen() {
   }, [storedRatings]);
 
   const selectedBuilding = BUILDINGS.find((building) => building.id === selectedBuildingId) ?? BUILDINGS[0];
+  const currentUserId = currentUser?.id ?? '';
+  const selectedStoredRating = storedRatings[selectedBuildingId] ?? getEmptyRating();
+  const userRating = getUserBuildingRating(selectedStoredRating, currentUserId);
+  const hasUserRating = Boolean(userRating?.ratedAt);
+  const canRateToday = canSubmitBuildingRatingToday(selectedStoredRating, currentUserId);
 
-  const handleVote = (category: string, value: number) => {
+  useEffect(() => {
+    if (canRateToday && userRating && userRating.cleaning > 0) {
+      setRatings({
+        cleaning: userRating.cleaning,
+        elevator: userRating.elevator,
+        electricity: userRating.electricity,
+        services: userRating.services,
+      });
+      return;
+    }
+    setRatings(getEmptyRatingInput());
+  }, [canRateToday, currentUserId, selectedBuildingId, userRating?.ratedAt]);
+
+  const handleVote = (category: RatingCategoryKey, value: number) => {
+    if (!isAuthenticated) {
+      showRatingAuthNotice();
+      return;
+    }
+    if (!canRateToday) {
+      Alert.alert(t.ratingScreen.ratingAlreadySubmitted, uiText.changeTomorrow);
+      return;
+    }
     setRatings((prev) => ({ ...prev, [category]: value }));
-    setRatingModalCategory(null);
   };
+
+  const showRatingAuthNotice = () => {
+    const notice = RATING_AUTH_NOTICE[language];
+    Alert.alert(notice.title, notice.body, [
+      { text: notice.cancel, style: 'cancel' },
+      { text: notice.action, onPress: () => navigation.navigate('LoginScreen') },
+    ]);
+  };
+
   const handleSubmitVote = async () => {
     startOperation();
     trace('validate', 'start');
-    const daysLeft = getRatingDaysLeft(lastVotes[selectedBuildingId]);
-    if (daysLeft > 0) {
-      trace('validate', 'fail', { reason: 'cooldown', daysLeft });
-      Alert.alert(t.ratingScreen.ratingAlreadySubmitted, `${t.ratingScreen.canRateAgainIn} ${daysLeft} ${t.ratingScreen.days}`);
+    if (!isAuthenticated) {
+      trace('validate', 'fail', { reason: 'auth_required' });
+      showRatingAuthNotice();
+      return;
+    }
+    if (!canRateToday) {
+      trace('validate', 'fail', { reason: 'already_voted' });
+      Alert.alert(t.ratingScreen.ratingAlreadySubmitted, uiText.changeTomorrow);
       return;
     }
     const allFilled = CATEGORIES.every((c) => ratings[c.key] > 0);
@@ -186,29 +257,22 @@ export default function RatingScreen() {
       return;
     }
     trace('validate', 'success');
-    const previous = storedRatings[selectedBuildingId] ?? getEmptyRating();
-    const nextVotes = previous.votes + 1;
-    const nextRating: RatingValue = {
-      cleaning: (previous.cleaning * previous.votes + ratings.cleaning) / nextVotes,
-      elevator: (previous.elevator * previous.votes + ratings.elevator) / nextVotes,
-      electricity: (previous.electricity * previous.votes + ratings.electricity) / nextVotes,
-      services: (previous.services * previous.votes + ratings.services) / nextVotes,
-      votes: nextVotes,
-      complaints: previous.complaints,
-    };
-    const next = { ...storedRatings, [selectedBuildingId]: nextRating };
-    const nextLastVotes = { ...lastVotes, [selectedBuildingId]: new Date().toISOString() };
-    setStoredRatings(next);
-    setLastVotes(nextLastVotes);
-    trace('api_call', 'start', { path: 'AsyncStorage' });
-    await Promise.all([
-      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)),
-      AsyncStorage.setItem(LAST_VOTE_KEY, JSON.stringify(nextLastVotes)),
-    ]);
-    trace('api_call', 'success');
-    setVoted(true);
-    trace('user_alert', 'success', { type: 'success' });
-    AlertHelper.success(t.ratingScreen.thankYou);
+    try {
+      trace('api_call', 'start', { path: 'stats/building_ratings' });
+      await submitBuildingRating(selectedBuildingId, ratings as Record<RatingCategoryKey, number>, currentUserId);
+      trace('api_call', 'success');
+      setRatings(getEmptyRatingInput());
+      trace('user_alert', 'success', { type: 'success' });
+      AlertHelper.success(hasUserRating ? uiText.updated : t.ratingScreen.thankYou);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      trace('api_call', 'fail', { error: message });
+      if (message.includes('already-voted')) {
+        Alert.alert(t.ratingScreen.ratingAlreadySubmitted, uiText.changeTomorrow);
+        return;
+      }
+      Alert.alert(t.ratingScreen.title, uiText.saveFailed);
+    }
   };
 
   const getBuildingScore = (b: Building): string => {
@@ -256,6 +320,16 @@ export default function RatingScreen() {
                       <Text style={styles.explanationText}>{explanation.body}</Text>
                     </View>
                   </View>
+                  <View style={styles.infoStrip}>
+                    <MaterialCommunityIcons name="account-check-outline" size={17} color={SCREEN_THEME.woodGreenDark} />
+                    <Text style={styles.infoStripText}>{uiText.sharedInfo}</Text>
+                  </View>
+                  {ratingsLoading ? (
+                    <View style={styles.loadingRow}>
+                      <ActivityIndicator size="small" color={SCREEN_THEME.terracotta} />
+                      <Text style={styles.loadingText}>{uiText.loading}</Text>
+                    </View>
+                  ) : null}
                 </>
               )}
               renderItem={({ item, index }) => (
@@ -264,7 +338,9 @@ export default function RatingScreen() {
                   activeOpacity={0.84}
                   onPress={() => navigation.navigate('BuildingRatingDetailScreen', { buildingId: item.id })}
                 >
-                  <Image source={require('../../assets/WEBP-version/Dom1.webp')} style={styles.buildingCardDom} resizeMode="cover" />
+                  <View style={styles.buildingCardIcon}>
+                    <MaterialCommunityIcons name="home-city-outline" size={52} color="rgba(79,131,186,0.38)" />
+                  </View>
                   <View style={styles.buildingCardInner}>
                     <View style={styles.buildingRank}>
                       <Text style={styles.rankNum}>#{index + 1}</Text>
@@ -329,14 +405,26 @@ export default function RatingScreen() {
                     ))}
                   </View>
                 ) : null}
-                {voted ? (
+                {!isAuthenticated ? (
+                  <View style={styles.authNoticeInline}>
+                    <MaterialCommunityIcons name="lock-outline" size={18} color={SCREEN_THEME.terracottaDark} />
+                    <Text style={styles.authNoticeInlineText}>{uiText.authInline}</Text>
+                  </View>
+                ) : null}
+                {hasUserRating && !canRateToday ? (
                   <View style={styles.votedBanner}>
                     <MaterialCommunityIcons name="check-circle" size={28} color="#4F7A3D" />
                     <Text style={styles.votedText}>{t.ratingScreen.votedTitle}</Text>
-                    <Text style={styles.votedSub}>{t.ratingScreen.votedSubtitle}</Text>
+                    <Text style={styles.votedSub}>{uiText.changeTomorrow}</Text>
                   </View>
                 ) : (
                   <>
+                    {hasUserRating ? (
+                      <View style={styles.updateNotice}>
+                        <MaterialCommunityIcons name="calendar-refresh" size={18} color={SCREEN_THEME.enamelBlue} />
+                        <Text style={styles.updateNoticeText}>{uiText.changeAvailable}</Text>
+                      </View>
+                    ) : null}
                     {CATEGORIES.map((cat) => (
                       <View key={cat.key} style={styles.ratingRow}>
                         <View style={styles.ratingLabel}>
@@ -345,7 +433,7 @@ export default function RatingScreen() {
                         </View>
                         <View style={styles.starsInput}>
                           {[1, 2, 3, 4, 5].map((star) => (
-                            <TouchableOpacity key={star} onPress={() => setRatingModalCategory(cat.key as RatingCategoryKey)} activeOpacity={0.7}>
+                            <TouchableOpacity key={star} onPress={() => handleVote(cat.key, star)} activeOpacity={0.7}>
                               <MaterialCommunityIcons name={star <= (ratings[cat.key] || 0) ? 'star' : 'star-outline'} size={30} color={star <= (ratings[cat.key] || 0) ? '#FFA000' : '#D6C4A3'} />
                             </TouchableOpacity>
                           ))}
@@ -361,14 +449,6 @@ export default function RatingScreen() {
             </ScrollView>
           )}
         </>
-      <StarRatingModal
-        visible={Boolean(ratingModalCategory)}
-        title={CATEGORIES.find((cat) => cat.key === ratingModalCategory)?.label ?? t.ratingScreen.submitRating}
-        subtitle={RATING_MODAL_HINT[language]}
-        value={ratingModalCategory ? ratings[ratingModalCategory] || 0 : 0}
-        onSelect={(value) => { if (ratingModalCategory) handleVote(ratingModalCategory, value); }}
-        onClose={() => setRatingModalCategory(null)}
-      />
       <MiniTabBar />
     </SafeAreaView>
   );
@@ -378,12 +458,14 @@ export function BuildingRatingDetailScreen() {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const route = useRoute<RouteProp<{ BuildingRatingDetailScreen: { buildingId: string } }, 'BuildingRatingDetailScreen'>>();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  const currentUser = useSelector(selectUser);
   const { t } = useTranslation();
+  const uiText = RATING_UI_TEXT[language];
   const building = BUILDINGS.find((item) => item.id === route.params?.buildingId) ?? BUILDINGS[0];
-  const [storedRatings, setStoredRatings] = useState<RatingsByBuilding>({});
-  const [lastVotes, setLastVotes] = useState<LastRatingMap>({});
-  const [ratings, setRatings] = useState<Record<string, number>>({ cleaning: 0, elevator: 0, electricity: 0, services: 0 });
-  const [ratingModalCategory, setRatingModalCategory] = useState<RatingCategoryKey | null>(null);
+  const { ratings: storedRatings, loading: ratingsLoading, error: ratingsError } = useBuildingRatings();
+  const [ratings, setRatings] = useState<Record<string, number>>(getEmptyRatingInput);
+  const [sharedRatingErrorShown, setSharedRatingErrorShown] = useState(false);
 
   const CATEGORIES: RatingCategory[] = [
     { key: 'cleaning', label: t.ratingScreen.categories.cleaning, icon: 'broom' as const },
@@ -398,36 +480,59 @@ export function BuildingRatingDetailScreen() {
   }, [language]);
 
   useEffect(() => {
-    const loadRatings = async () => {
-      try {
-        const [raw, rawVotes] = await Promise.all([
-          AsyncStorage.getItem(STORAGE_KEY),
-          AsyncStorage.getItem(LAST_VOTE_KEY),
-        ]);
-        setStoredRatings(raw ? (JSON.parse(raw) as RatingsByBuilding) : {});
-        setLastVotes(rawVotes ? (JSON.parse(rawVotes) as LastRatingMap) : {});
-      } catch {
-        setStoredRatings({});
-        setLastVotes({});
-      }
-    };
-
-    void loadRatings();
-  }, []);
+    if (ratingsError && !sharedRatingErrorShown) {
+      setSharedRatingErrorShown(true);
+      Alert.alert(t.ratingScreen.title, RATING_SYNC_NOTICE[language]);
+    }
+  }, [language, ratingsError, sharedRatingErrorShown, t.ratingScreen.title]);
 
   const currentRating = storedRatings[building.id] ?? getEmptyRating();
   const score = getBuildingScoreValue(currentRating);
-  const daysLeft = getRatingDaysLeft(lastVotes[building.id]);
-  const voted = daysLeft > 0;
+  const currentUserId = currentUser?.id ?? '';
+  const userRating = getUserBuildingRating(currentRating, currentUserId);
+  const hasUserRating = Boolean(userRating?.ratedAt);
+  const canRateToday = canSubmitBuildingRatingToday(currentRating, currentUserId);
 
-  const handleVote = (category: string, value: number) => {
+  useEffect(() => {
+    if (canRateToday && userRating && userRating.cleaning > 0) {
+      setRatings({
+        cleaning: userRating.cleaning,
+        elevator: userRating.elevator,
+        electricity: userRating.electricity,
+        services: userRating.services,
+      });
+      return;
+    }
+    setRatings(getEmptyRatingInput());
+  }, [building.id, canRateToday, currentUserId, userRating?.ratedAt]);
+
+  const handleVote = (category: RatingCategoryKey, value: number) => {
+    if (!isAuthenticated) {
+      showRatingAuthNotice();
+      return;
+    }
+    if (!canRateToday) {
+      Alert.alert(t.ratingScreen.ratingAlreadySubmitted, uiText.changeTomorrow);
+      return;
+    }
     setRatings((prev) => ({ ...prev, [category]: value }));
-    setRatingModalCategory(null);
+  };
+
+  const showRatingAuthNotice = () => {
+    const notice = RATING_AUTH_NOTICE[language];
+    Alert.alert(notice.title, notice.body, [
+      { text: notice.cancel, style: 'cancel' },
+      { text: notice.action, onPress: () => navigation.navigate('LoginScreen') },
+    ]);
   };
 
   const handleSubmitVote = async () => {
-    if (daysLeft > 0) {
-      Alert.alert(t.ratingScreen.ratingAlreadySubmitted, `${t.ratingScreen.canRateAgainIn} ${daysLeft} ${t.ratingScreen.days}`);
+    if (!isAuthenticated) {
+      showRatingAuthNotice();
+      return;
+    }
+    if (!canRateToday) {
+      Alert.alert(t.ratingScreen.ratingAlreadySubmitted, uiText.changeTomorrow);
       return;
     }
     const allFilled = CATEGORIES.every((c) => ratings[c.key] > 0);
@@ -435,25 +540,18 @@ export function BuildingRatingDetailScreen() {
       AlertHelper.rateAllCategories();
       return;
     }
-
-    const nextVotes = currentRating.votes + 1;
-    const nextRating: RatingValue = {
-      cleaning: (currentRating.cleaning * currentRating.votes + ratings.cleaning) / nextVotes,
-      elevator: (currentRating.elevator * currentRating.votes + ratings.elevator) / nextVotes,
-      electricity: (currentRating.electricity * currentRating.votes + ratings.electricity) / nextVotes,
-      services: (currentRating.services * currentRating.votes + ratings.services) / nextVotes,
-      votes: nextVotes,
-      complaints: currentRating.complaints,
-    };
-    const next = { ...storedRatings, [building.id]: nextRating };
-    const nextLastVotes = { ...lastVotes, [building.id]: new Date().toISOString() };
-    setStoredRatings(next);
-    setLastVotes(nextLastVotes);
-    await Promise.all([
-      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)),
-      AsyncStorage.setItem(LAST_VOTE_KEY, JSON.stringify(nextLastVotes)),
-    ]);
-    AlertHelper.success(t.ratingScreen.thankYou);
+    try {
+      await submitBuildingRating(building.id, ratings as Record<RatingCategoryKey, number>, currentUserId);
+      setRatings(getEmptyRatingInput());
+      AlertHelper.success(hasUserRating ? uiText.updated : t.ratingScreen.thankYou);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes('already-voted')) {
+        Alert.alert(t.ratingScreen.ratingAlreadySubmitted, uiText.changeTomorrow);
+        return;
+      }
+      Alert.alert(t.ratingScreen.title, uiText.saveFailed);
+    }
   };
 
   return (
@@ -477,7 +575,9 @@ export function BuildingRatingDetailScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.detailScroll}>
-        <Image source={require('../../assets/WEBP-version/Dom1.webp')} style={styles.detailHeroImage} resizeMode="cover" />
+        <View style={styles.detailHeroImage}>
+          <MaterialCommunityIcons name="home-city-outline" size={72} color="rgba(79,131,186,0.52)" />
+        </View>
         <View style={styles.detailHeroCard}>
           <Text style={styles.detailAddress}>{getFullAddress(building)}</Text>
           <View style={styles.detailScoreRow}>
@@ -491,6 +591,18 @@ export function BuildingRatingDetailScreen() {
             </View>
           </View>
         </View>
+
+        <View style={styles.infoStrip}>
+          <MaterialCommunityIcons name="account-check-outline" size={17} color={SCREEN_THEME.woodGreenDark} />
+          <Text style={styles.infoStripText}>{uiText.sharedInfo}</Text>
+        </View>
+
+        {ratingsLoading ? (
+          <View style={styles.loadingRow}>
+            <ActivityIndicator size="small" color={SCREEN_THEME.terracotta} />
+            <Text style={styles.loadingText}>{uiText.loading}</Text>
+          </View>
+        ) : null}
 
         <View style={styles.detailCard}>
           {CATEGORIES.map((cat) => (
@@ -507,14 +619,26 @@ export function BuildingRatingDetailScreen() {
         <View style={styles.voteCard}>
           <Text style={styles.voteTitle}>{t.ratingScreen.rateYourHome}</Text>
           <Text style={styles.voteSubtitle}>{t.ratingScreen.rateSubtitle}</Text>
-          {voted ? (
+          {!isAuthenticated ? (
+            <View style={styles.authNoticeInline}>
+              <MaterialCommunityIcons name="lock-outline" size={18} color={SCREEN_THEME.terracottaDark} />
+              <Text style={styles.authNoticeInlineText}>{uiText.authInline}</Text>
+            </View>
+          ) : null}
+          {hasUserRating && !canRateToday ? (
             <View style={styles.votedBanner}>
               <MaterialCommunityIcons name="check-circle" size={28} color="#4F7A3D" />
               <Text style={styles.votedText}>{t.ratingScreen.votedTitle}</Text>
-              <Text style={styles.votedSub}>{`${t.ratingScreen.canRateAgainIn} ${daysLeft} ${t.ratingScreen.days}`}</Text>
+              <Text style={styles.votedSub}>{uiText.changeTomorrow}</Text>
             </View>
           ) : (
             <>
+              {hasUserRating ? (
+                <View style={styles.updateNotice}>
+                  <MaterialCommunityIcons name="calendar-refresh" size={18} color={SCREEN_THEME.enamelBlue} />
+                  <Text style={styles.updateNoticeText}>{uiText.changeAvailable}</Text>
+                </View>
+              ) : null}
               {CATEGORIES.map((cat) => (
                 <View key={cat.key} style={styles.ratingRow}>
                   <View style={styles.ratingLabel}>
@@ -523,7 +647,7 @@ export function BuildingRatingDetailScreen() {
                   </View>
                   <View style={styles.starsInput}>
                     {[1, 2, 3, 4, 5].map((star) => (
-                      <TouchableOpacity key={star} onPress={() => setRatingModalCategory(cat.key as RatingCategoryKey)} activeOpacity={0.7}>
+                      <TouchableOpacity key={star} onPress={() => handleVote(cat.key, star)} activeOpacity={0.7}>
                         <MaterialCommunityIcons name={star <= (ratings[cat.key] || 0) ? 'star' : 'star-outline'} size={30} color={star <= (ratings[cat.key] || 0) ? '#FFA000' : '#D6C4A3'} />
                       </TouchableOpacity>
                     ))}
@@ -538,14 +662,6 @@ export function BuildingRatingDetailScreen() {
         </View>
       </ScrollView>
 
-      <StarRatingModal
-        visible={Boolean(ratingModalCategory)}
-        title={CATEGORIES.find((cat) => cat.key === ratingModalCategory)?.label ?? t.ratingScreen.submitRating}
-        subtitle={RATING_MODAL_HINT[language]}
-        value={ratingModalCategory ? ratings[ratingModalCategory] || 0 : 0}
-        onSelect={(value) => { if (ratingModalCategory) handleVote(ratingModalCategory, value); }}
-        onClose={() => setRatingModalCategory(null)}
-      />
       <MiniTabBar />
     </SafeAreaView>
   );
@@ -577,7 +693,12 @@ const styles = StyleSheet.create({
   explanationCopy: { flex: 1 },
   explanationTitle: { color: SCREEN_THEME.textPrimary, fontSize: 14, fontWeight: '900', marginBottom: 4 },
   explanationText: { color: SCREEN_THEME.textSecondary, fontSize: 12, lineHeight: 17, fontWeight: '600' },
+  infoStrip: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#F3F7E9', borderRadius: 14, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#DCE8C9' },
+  infoStripText: { flex: 1, color: SCREEN_THEME.woodGreenDark, fontSize: 12, lineHeight: 17, fontWeight: '800' },
+  loadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12 },
+  loadingText: { color: SCREEN_THEME.textSecondary, fontSize: 13, fontWeight: '800' },
   buildingCard: { backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 20, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#E4D0AB', overflow: 'hidden' },
+  buildingCardIcon: { position: 'absolute', right: 8, top: 8, bottom: 8, width: 84, borderRadius: 16, backgroundColor: 'rgba(237,247,250,0.72)', alignItems: 'center', justifyContent: 'center' },
   buildingCardDom: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 96, opacity: 0.48 },
   buildingCardInner: { flexDirection: 'row', alignItems: 'center' },
   showOnMapBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', marginTop: 8, marginLeft: 44, paddingVertical: 4, paddingHorizontal: 10, borderRadius: 20, backgroundColor: 'rgba(79,131,186,0.1)', borderWidth: 1, borderColor: 'rgba(79,131,186,0.25)' },
@@ -632,11 +753,15 @@ const styles = StyleSheet.create({
   starsInput: { flexDirection: 'row', gap: 2 },
   submitVoteBtn: { backgroundColor: SCREEN_THEME.woodGreen, borderRadius: 18, paddingVertical: 14, alignItems: 'center', marginTop: 20, borderWidth: 1, borderColor: SCREEN_THEME.woodGreenDark },
   submitVoteBtnText: { color: '#FFF9EE', fontWeight: '900', fontSize: 15 },
+  authNoticeInline: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FFF1E7', borderRadius: 14, borderWidth: 1, borderColor: '#E9C5AA', padding: 12, marginBottom: 10 },
+  authNoticeInlineText: { flex: 1, color: SCREEN_THEME.terracottaDark, fontSize: 13, lineHeight: 18, fontWeight: '800' },
+  updateNotice: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#EDF7FA', borderRadius: 14, borderWidth: 1, borderColor: '#D7E5EA', padding: 12, marginBottom: 8 },
+  updateNoticeText: { flex: 1, color: SCREEN_THEME.enamelBlueDark, fontSize: 13, lineHeight: 18, fontWeight: '800' },
   votedBanner: { alignItems: 'center', paddingVertical: 24, gap: 8 },
   votedText: { fontSize: 16, fontWeight: '900', color: '#4F7A3D' },
   votedSub: { fontSize: 13, color: SCREEN_THEME.textSecondary },
   detailScroll: { padding: 16, paddingBottom: 110 },
-  detailHeroImage: { width: '100%', height: 180, borderRadius: 22, borderWidth: 1, borderColor: '#E4D0AB' },
+  detailHeroImage: { width: '100%', height: 180, borderRadius: 22, borderWidth: 1, borderColor: '#E4D0AB', backgroundColor: '#EDF7FA', alignItems: 'center', justifyContent: 'center' },
   detailHeroCard: { backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 22, padding: 16, marginTop: -26, marginHorizontal: 10, borderWidth: 1, borderColor: '#E4D0AB' },
   detailAddress: { fontSize: 20, lineHeight: 25, fontWeight: '900', color: SCREEN_THEME.textPrimary, marginBottom: 14 },
   detailScoreRow: { flexDirection: 'row', alignItems: 'stretch', gap: 10 },
