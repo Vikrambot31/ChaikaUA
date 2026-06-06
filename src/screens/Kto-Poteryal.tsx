@@ -66,6 +66,10 @@ const UI_TEXT = {
     namePlaceholder: 'Ім\'я',
     phonePlaceholder: 'Телефон',
     itemLabel: 'Річ',
+    wherePlaceholder: 'Де загублено або знайдено?',
+    searchPlaceholder: 'Пошук: ключі, телефон, сумка...',
+    filterAll: 'Усі',
+    todayBadge: 'Сьогодні',
     addRequest: '+ Додати заявку',
     listTitle: 'Заявки',
     empty: 'Поки немає заявок.',
@@ -105,6 +109,10 @@ const UI_TEXT = {
     namePlaceholder: 'Имя',
     phonePlaceholder: 'Телефон',
     itemLabel: 'Вещь',
+    wherePlaceholder: 'Где потеряли или нашли?',
+    searchPlaceholder: 'Поиск: ключи, телефон, сумка...',
+    filterAll: 'Все',
+    todayBadge: 'Сегодня',
     addRequest: '+ Добавить заявку',
     listTitle: 'Заявки',
     empty: 'Пока нет заявок.',
@@ -144,6 +152,10 @@ const UI_TEXT = {
     namePlaceholder: 'Name',
     phonePlaceholder: 'Phone',
     itemLabel: 'Item',
+    wherePlaceholder: 'Where was it lost or found?',
+    searchPlaceholder: 'Search: keys, phone, bag...',
+    filterAll: 'All',
+    todayBadge: 'Today',
     addRequest: '+ Add request',
     listTitle: 'Requests',
     empty: 'No requests yet.',
@@ -180,6 +192,15 @@ const formatItemDate = (value: string, language: AppLanguage): string => {
   return date.toLocaleDateString(locale, { day: '2-digit', month: 'short' });
 };
 
+const isToday = (value: string): boolean => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+  const now = new Date();
+  return date.getFullYear() === now.getFullYear()
+    && date.getMonth() === now.getMonth()
+    && date.getDate() === now.getDate();
+};
+
 const LostAndFoundScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as AppLanguage;
@@ -195,13 +216,16 @@ const LostAndFoundScreen: React.FC = () => {
   const [phone, setPhone] = useState(() => normalizePhoneText(user?.phone ?? ''));
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
+  const [locationText, setLocationText] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState<RequestType | 'all'>('all');
   const [addFormVisible, setAddFormVisible] = useState(false);
   const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   const handleRequestCloseModal = useCallback(() => {
     // Bug #9 fix: skip confirmation if the form has not been touched
-    const isDirty = category !== '' || description.trim() !== '' || formPhotos.length > 0;
+    const isDirty = category !== '' || description.trim() !== '' || locationText.trim() !== '' || formPhotos.length > 0;
     if (!isDirty) {
       setAddFormVisible(false);
       return;
@@ -214,7 +238,7 @@ const LostAndFoundScreen: React.FC = () => {
         { text: 'Так', onPress: () => setAddFormVisible(false) },
       ],
     );
-  }, [category, description, formPhotos]);
+  }, [category, description, locationText, formPhotos]);
   const [closingId, setClosingId] = useState<string | null>(null);
   const [previewPhoto, setPreviewPhoto] = useState<{ uri: string; storagePath?: string } | null>(null);
   const hasUploadingPhotos = formPhotos.some((photo) => photo.status === 'uploading');
@@ -225,6 +249,28 @@ const LostAndFoundScreen: React.FC = () => {
     () => ({ found: text.typeFound, lost: text.typeLost }),
     [text.typeFound, text.typeLost]
   );
+
+  const filteredItems = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+
+    return items.filter((item) => {
+      if (typeFilter !== 'all' && item.type !== typeFilter) return false;
+      if (!query) return true;
+
+      const categoryLabel = getLostFoundCategoryLabel(item.category, language);
+      const haystack = [
+        item.name,
+        item.phone,
+        item.category,
+        categoryLabel,
+        item.description,
+        item.locationText,
+        typeLabels[item.type],
+      ].join(' ').toLowerCase();
+
+      return haystack.includes(query);
+    });
+  }, [items, language, searchQuery, typeFilter, typeLabels]);
 
   useEffect(() => {
     setLoadingItems(true);
@@ -262,6 +308,7 @@ const LostAndFoundScreen: React.FC = () => {
     setPhone(normalizePhoneText(user?.phone ?? ''));
     setCategory('');
     setDescription('');
+    setLocationText('');
     setFormPhotos([]);
   };
 
@@ -337,6 +384,7 @@ const LostAndFoundScreen: React.FC = () => {
         phone: normalizedPhone,
         category,
         description: description.trim(),
+        locationText: locationText.trim(),
         photoUri: firstPhoto?.downloadUrl ?? '',
         photoStoragePath: firstPhoto?.storagePath ?? '',
         userPhotoURL: user?.photoURL || '',
@@ -357,6 +405,7 @@ const LostAndFoundScreen: React.FC = () => {
         phone: normalizedPhone,
         category,
         description: description.trim(),
+        locationText: locationText.trim(),
         photoUri: firstPhoto?.downloadUrl ?? '',
         photoStoragePath: firstPhoto?.storagePath ?? '',
         userPhotoURL: user?.photoURL || '',
@@ -433,7 +482,7 @@ const LostAndFoundScreen: React.FC = () => {
       <FlatList
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
-        data={items}
+        data={filteredItems}
         keyExtractor={(item) => item.id}
         initialNumToRender={8}
         windowSize={5}
@@ -446,12 +495,47 @@ const LostAndFoundScreen: React.FC = () => {
 
             <View style={styles.listHeader}>
               <Text style={styles.listTitle}>{text.listTitle}</Text>
-              <Text style={styles.listCount}>{items.length}</Text>
+              <Text style={styles.listCount}>{filteredItems.length}</Text>
+            </View>
+
+            <View style={styles.searchBox}>
+              <MaterialCommunityIcons name="magnify" size={20} color={SCREEN_THEME.textMuted} />
+              <TextInput
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder={text.searchPlaceholder}
+                placeholderTextColor={SCREEN_THEME.textMuted}
+                style={styles.searchInput}
+                returnKeyType="search"
+              />
+              {searchQuery.trim() ? (
+                <TouchableOpacity onPress={() => setSearchQuery('')} activeOpacity={0.75}>
+                  <MaterialCommunityIcons name="close-circle" size={20} color={SCREEN_THEME.textMuted} />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
+            <View style={styles.filterRow}>
+              {(['all', 'lost', 'found'] as const).map((filter) => {
+                const isActive = typeFilter === filter;
+                const label = filter === 'all' ? text.filterAll : typeLabels[filter];
+                return (
+                  <TouchableOpacity
+                    key={filter}
+                    style={[styles.filterChip, isActive && styles.filterChipActive]}
+                    onPress={() => setTypeFilter(filter)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.filterChipText, isActive && styles.filterChipTextActive]} numberOfLines={1}>{label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </>
         }
         renderItem={({ item }) => {
           const itemDate = formatItemDate(item.createdAt, language);
+          const freshToday = isToday(item.createdAt);
           const hasItemPhoto = Boolean(item.photoUri || item.photoStoragePath);
           const authorAvatarUri = (item.userId && avatarByUserId[item.userId]) || undefined;
           const modIcon = item.moderationStatus === 'approved'
@@ -468,6 +552,7 @@ const LostAndFoundScreen: React.FC = () => {
                   </Text>
                   {item.isArchived ? <Text style={styles.archiveBadge}>Архів</Text> : null}
                   <View style={styles.dateModRow}>
+                    {freshToday ? <Text style={styles.todayBadge}>{text.todayBadge}</Text> : null}
                     {!!itemDate && <Text style={styles.itemDate}>{itemDate}</Text>}
                     <MaterialCommunityIcons name={modIcon.name} size={15} color={modIcon.color} />
                   </View>
@@ -477,6 +562,9 @@ const LostAndFoundScreen: React.FC = () => {
                   <Text style={styles.itemTitle} numberOfLines={2}>{getLostFoundCategoryLabel(item.category, language)}</Text>
                   {!!item.description && (
                     <Text style={styles.itemDescription} numberOfLines={2}>{item.description}</Text>
+                  )}
+                  {!!item.locationText && (
+                    <Text style={styles.itemLocation} numberOfLines={1}>{item.locationText}</Text>
                   )}
                 </View>
 
@@ -645,6 +733,7 @@ const LostAndFoundScreen: React.FC = () => {
 
               <TextInput value={name} onChangeText={setName} placeholder={text.namePlaceholder} placeholderTextColor={SCREEN_THEME.textMuted} style={styles.input} />
               <TextInput value={phone} onChangeText={setPhone} placeholder={text.phonePlaceholder} placeholderTextColor={SCREEN_THEME.textMuted} keyboardType="phone-pad" style={styles.input} />
+              <TextInput value={locationText} onChangeText={setLocationText} placeholder={text.wherePlaceholder} placeholderTextColor={SCREEN_THEME.textMuted} style={styles.input} />
               <TextInput value={description} onChangeText={setDescription} placeholder={type === 'lost' ? text.descriptionPlaceholder : text.descriptionPlaceholderFound} placeholderTextColor={SCREEN_THEME.textMuted} style={[styles.input, styles.inputMultiline]} multiline numberOfLines={3} />
 
               <Text style={styles.fieldLabel}>{text.itemLabel}</Text>
@@ -726,6 +815,53 @@ const styles = StyleSheet.create({
   listTitle: { color: SCREEN_THEME.textPrimary, fontSize: 18, fontWeight: '900' },
   listCount: { color: SCREEN_THEME.textSecondary, fontSize: 13, fontWeight: '900' },
   list: { gap: 10 },
+  searchBox: {
+    minHeight: 48,
+    borderRadius: 16,
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderWidth: 1,
+    borderColor: '#E4D0AB',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    marginBottom: 10,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    minWidth: 0,
+    color: SCREEN_THEME.textPrimary,
+    fontSize: 14,
+    fontWeight: '800',
+    paddingVertical: 8,
+  },
+  filterRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  filterChip: {
+    flex: 1,
+    minHeight: 40,
+    borderRadius: 14,
+    backgroundColor: SCREEN_THEME.cardCream,
+    borderWidth: 1,
+    borderColor: '#E4D0AB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  filterChipActive: {
+    backgroundColor: SCREEN_THEME.woodGreenDark,
+    borderColor: SCREEN_THEME.woodGreenDark,
+  },
+  filterChipText: {
+    color: SCREEN_THEME.textPrimary,
+    fontSize: 12,
+    lineHeight: 15,
+    fontWeight: '900',
+  },
+  filterChipTextActive: { color: '#fff' },
 
   emptyCard: {
     minHeight: 86,
@@ -805,6 +941,17 @@ const styles = StyleSheet.create({
     color: SCREEN_THEME.terracottaDark,
     backgroundColor: 'rgba(199, 122, 93, 0.16)',
   },
+  todayBadge: {
+    color: '#fff',
+    backgroundColor: SCREEN_THEME.terracottaDark,
+    borderRadius: 999,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    fontSize: 10,
+    lineHeight: 12,
+    fontWeight: '900',
+    overflow: 'hidden',
+  },
   itemDate: {
     color: SCREEN_THEME.textSecondary,
     fontSize: 12,
@@ -830,6 +977,7 @@ const styles = StyleSheet.create({
   },
   itemTitle: { fontSize: 20, lineHeight: 24, fontWeight: '900', color: SCREEN_THEME.textPrimary },
   itemDescription: { fontSize: 12, lineHeight: 16, color: '#fff', fontWeight: '800', marginTop: 4, backgroundColor: '#7A1E5C', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, overflow: 'hidden' },
+  itemLocation: { fontSize: 12, lineHeight: 16, color: SCREEN_THEME.woodGreenDark, fontWeight: '900', marginTop: 5 },
   bottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6, gap: 5 },
   personRow: { flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1, minWidth: 42 },
   itemMeta: { flex: 1, fontSize: 13, lineHeight: 16, color: SCREEN_THEME.textPrimary, fontWeight: '800' },
