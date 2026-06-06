@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-06-06",
+      "publishedAt": "2026-06-06T06:48:41.787Z",
+      "key": "https://bigkyiv.com.ua/u-dtp-u-solomyanskomu-rajoni-kyyeva-zagynuly-dvoye-policzejskyh/"
+    },
+    {
       "type": "places",
       "date": "2026-06-05",
       "publishedAt": "2026-06-05T11:17:01.254Z",
