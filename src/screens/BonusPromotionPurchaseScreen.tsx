@@ -123,18 +123,30 @@ const fetchOwnedTargets = async (
 const getPromotionErrorMessage = (error: any, fallback: string) => {
   const raw = String(error?.message || error?.code || '').toLowerCase();
   if (raw.includes('permission-denied') || raw.includes('can_only_promote_own')) {
-    return 'Можно продвигать только свою карточку. Выберите свою запись из списка.';
+    return 'Можна просувати тільки свою картку. Виберіть свій запис зі списку.';
   }
-  if (raw.includes('insufficient') || raw.includes('not_enough')) {
-    return 'Недостаточно бонусов или промо-кредитов для этого продвижения.';
+  if (raw.includes('insufficient') || raw.includes('not_enough') || raw.includes('insufficient_credits') || raw.includes('insufficient_bonuses')) {
+    return 'Недостатньо бонусів або промо-кредитів для цього просування.';
   }
   if (raw.includes('already_has_active_promotion')) {
-    return 'У этой карточки уже есть активное продвижение.';
+    return 'У цієї картки вже є активне просування.';
   }
   if (raw.includes('max_top_slots_reached')) {
-    return 'Сейчас все места продвижения заняты. Попробуйте позже.';
+    return 'Зараз всі місця просування зайняті. Спробуйте пізніше.';
   }
-  return error?.message || fallback;
+  if (raw.includes('access_not_confirmed')) {
+    return 'Ваш доступ ще не підтверджено. Просування стане доступним після підтвердження.';
+  }
+  if (raw.includes('min_badge')) {
+    return 'Недостатній рівень бонусів для цього типу просування.';
+  }
+  if (raw.includes('active_subscription_already_exists')) {
+    return 'У вас вже є активна підписка для цього місця.';
+  }
+  if (raw.includes('invalid_promo_type_or_duration') || raw.includes('invalid_duration')) {
+    return 'Невірний тип або тривалість просування.';
+  }
+  return fallback;
 };
 
 const BonusPromotionPurchaseScreen: React.FC = () => {
@@ -237,8 +249,8 @@ const BonusPromotionPurchaseScreen: React.FC = () => {
       Alert.alert(
         t.bonus.activePromotions,
         result.moderationStatus === 'pending'
-          ? t.common.loading
-          : `${t.bonus.active_resident} ${new Date(result.expiresAt).toLocaleString()}.`,
+          ? 'Запит на просування надіслано. Воно буде активоване після перевірки модератором.'
+          : `Просування активне до ${new Date(result.expiresAt).toLocaleString()}.`,
       );
       navigation.goBack();
     } catch (error: any) {

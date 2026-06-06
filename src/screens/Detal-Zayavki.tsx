@@ -71,9 +71,7 @@ const UI_TEXT = {
       delivery: 'Доставка',
       other: 'Інше',
     },
-    iHelped: 'Я допоміг',
     alreadyHelped: 'Ви вже відгукнулись',
-    helpedSuccess: '+20 бонусів за допомогу!',
     helpError: 'Не вдалося надіслати відгук',
   },
   ru: {
@@ -107,9 +105,7 @@ const UI_TEXT = {
       delivery: 'Доставка',
       other: 'Другое',
     },
-    iHelped: 'Я помог',
     alreadyHelped: 'Вы уже откликнулись',
-    helpedSuccess: '+20 бонусов за помощь!',
     helpError: 'Не удалось отправить отклик',
   },
   en: {
@@ -143,12 +139,60 @@ const UI_TEXT = {
       delivery: 'Delivery',
       other: 'Other',
     },
-    iHelped: 'I helped',
     alreadyHelped: 'You already responded',
-    helpedSuccess: '+20 bonuses for helping!',
     helpError: 'Could not send response',
   },
 } as const;
+
+const FUNCTION_ERROR_MESSAGES: Record<Lang, Record<string, string>> = {
+  ua: {
+    max_helpers_confirmed: 'Вже підтверджено 3 помічники для цієї заявки.',
+    flagged_for_review: 'Відмічено для перевірки модератором.',
+    help_not_confirmed: 'Спочатку підтвердіть допомогу цього користувача.',
+    helper_not_responded: 'Цей користувач не відгукнувся на заявку.',
+    request_not_found: 'Заявку не знайдено.',
+    only_author_can_confirm: 'Підтверджувати помічника може тільки автор.',
+    only_author_can_close: 'Закрити заявку може тільки автор.',
+    only_author_can_thank: 'Дякувати може тільки автор.',
+    auth_required: 'Необхідно авторизуватись.',
+    weekly_limit_help: 'Тижневий ліміт бонусів допомоги вичерпано.',
+    weekly_limit_total: 'Тижневий ліміт бонусів вичерпано.',
+    accrual_blocked: 'Нарахування бонусів тимчасово заблоковано для цього акаунту.',
+  },
+  ru: {
+    max_helpers_confirmed: 'Уже подтверждено 3 помощника для этой заявки.',
+    flagged_for_review: 'Помечено для проверки модератором.',
+    help_not_confirmed: 'Сначала подтвердите помощь этого пользователя.',
+    helper_not_responded: 'Этот пользователь не откликнулся на заявку.',
+    request_not_found: 'Заявка не найдена.',
+    only_author_can_confirm: 'Подтверждать помощника может только автор.',
+    only_author_can_close: 'Закрыть заявку может только автор.',
+    only_author_can_thank: 'Благодарить может только автор.',
+    auth_required: 'Необходимо авторизоваться.',
+    weekly_limit_help: 'Недельный лимит бонусов помощи исчерпан.',
+    weekly_limit_total: 'Недельный лимит бонусов исчерпан.',
+    accrual_blocked: 'Начисление бонусов временно заблокировано для этого аккаунта.',
+  },
+  en: {
+    max_helpers_confirmed: 'Already confirmed 3 helpers for this request.',
+    flagged_for_review: 'Flagged for moderator review.',
+    help_not_confirmed: 'Please confirm this helper first.',
+    helper_not_responded: 'This user has not responded to the request.',
+    request_not_found: 'Request not found.',
+    only_author_can_confirm: 'Only the author can confirm a helper.',
+    only_author_can_close: 'Only the author can close the request.',
+    only_author_can_thank: 'Only the author can send thanks.',
+    auth_required: 'Authentication required.',
+    weekly_limit_help: 'Weekly help bonus limit reached.',
+    weekly_limit_total: 'Weekly bonus limit reached.',
+    accrual_blocked: 'Bonus accrual is temporarily blocked for this account.',
+  },
+};
+
+const parseFunctionError = (error: unknown, fallback: string, language: Lang): string => {
+  const msg = String((error as any)?.message || '').toLowerCase().replace(/functions\//g, '');
+  return FUNCTION_ERROR_MESSAGES[language]?.[msg] || fallback;
+};
 
 const AVATAR_COLORS = ['#C77A5D', '#D8AF59', '#7E9D69', '#5F84B4', '#A56B55'];
 const RTDB_FORBIDDEN_KEY_CHARS = /[.#$[\]/]/g;
@@ -479,9 +523,9 @@ const RequestDetailScreen = ({
         setHelpStatus('helped');
         Alert.alert(text.ok, helpText.respondSuccess);
       }
-    } catch {
+    } catch (error) {
       setHelpStatus('idle');
-      Alert.alert(helpText.bonusError, text.helpError);
+      Alert.alert(text.ok, parseFunctionError(error, text.helpError, language));
     }
   };
 
@@ -498,10 +542,11 @@ const RequestDetailScreen = ({
       if (result.ok) {
         Alert.alert(text.ok, helpText.confirmSuccess);
       } else {
-        Alert.alert(helpText.bonusError, result.status || helpText.bonusError);
+        const knownMsg = FUNCTION_ERROR_MESSAGES[language]?.[result.status || ''];
+        Alert.alert(text.ok, knownMsg || helpText.bonusError);
       }
-    } catch {
-      Alert.alert(helpText.bonusError, helpText.bonusError);
+    } catch (error) {
+      Alert.alert(text.ok, parseFunctionError(error, helpText.bonusError, language));
     } finally {
       setBusyHelperUid(null);
     }
@@ -514,8 +559,8 @@ const RequestDetailScreen = ({
       const result = await awardGratitudeBonus(request.id, helperUid);
       setThankedHelpers((prev) => ({ ...prev, [helperUid]: true }));
       Alert.alert(text.ok, result.awarded ? helpText.thanksSuccess : helpText.thanked);
-    } catch {
-      Alert.alert(helpText.bonusError, helpText.bonusError);
+    } catch (error) {
+      Alert.alert(text.ok, parseFunctionError(error, helpText.bonusError, language));
     } finally {
       setBusyHelperUid(null);
     }
@@ -528,8 +573,8 @@ const RequestDetailScreen = ({
       const result = await closeRequestWithBonus(request.id);
       setRequestSolved(true);
       Alert.alert(text.ok, result.ok ? helpText.closeSuccess : helpText.closed);
-    } catch {
-      Alert.alert(helpText.bonusError, helpText.bonusError);
+    } catch (error) {
+      Alert.alert(text.ok, parseFunctionError(error, helpText.bonusError, language));
     } finally {
       setClosingRequest(false);
     }
