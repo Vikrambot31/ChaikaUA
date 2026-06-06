@@ -95,7 +95,14 @@ const BIZ_CATEGORY_VALUES = [
 
 type BizCategoryValue = typeof BIZ_CATEGORY_VALUES[number];
 
-const ITEM_CONDITION_VALUES = ['new', 'like_new', 'good', 'fair'] as const;
+const OFFER_TYPE_VALUES = ['products', 'services', 'promotions', 'partnership'] as const;
+/** Map legacy DB values (copied from Kuplu-Prodam condition) to business offer types */
+const LEGACY_OFFER_TYPE_MAP: Record<string, string> = {
+  new: 'products',
+  like_new: 'services',
+  good: 'promotions',
+  fair: 'partnership',
+};
 const WORK_FORMAT_VALUES = ['offline', 'online', 'mixed'] as const;
 const WORK_HOURS_VALUES = ['daily', 'weekdays', 'weekends', 'by_appointment'] as const;
 const LOCATION_AREA_VALUES = ['phase_1', 'phase_2', 'phase_3', 'phase_4', 'sofia', 'other'] as const;
@@ -187,7 +194,7 @@ const mapBizItem = (id: string, data: any, isArchived?: boolean): BizListing => 
   itemName: data.itemName || '',
   contactName: data.contactName || '',
   category: data.category || '',
-  condition: data.condition || '',
+  condition: LEGACY_OFFER_TYPE_MAP[data.condition] || data.condition || '',
   price: data.price || '',
   description: data.description || '',
   phone: data.phone || '',
@@ -485,7 +492,7 @@ const UI_TEXT = {
     errorSave: 'Не вдалося зберегти бізнес',
     errorTitle: 'Помилка',
     deleteText: 'Видалити',
-    conditionLabels: { new: 'Товари', like_new: 'Послуги', good: 'Акції', fair: 'Партнерство' },
+    conditionLabels: { products: 'Товари', services: 'Послуги', promotions: 'Акції', partnership: 'Партнерство' },
     categories: {
       furniture: 'Кафе / Ресторан',
       appliances: 'Магазин',
@@ -594,7 +601,7 @@ const UI_TEXT = {
     errorSave: 'Не удалось сохранить бизнес',
     errorTitle: 'Ошибка',
     deleteText: 'Удалить',
-    conditionLabels: { new: 'Товары', like_new: 'Услуги', good: 'Акции', fair: 'Партнерство' },
+    conditionLabels: { products: 'Товары', services: 'Услуги', promotions: 'Акции', partnership: 'Партнерство' },
     categories: {
       furniture: 'Кафе / Ресторан',
       appliances: 'Магазин',
@@ -703,7 +710,7 @@ const UI_TEXT = {
     errorSave: 'Failed to save business',
     errorTitle: 'Error',
     deleteText: 'Delete',
-    conditionLabels: { new: 'Products', like_new: 'Services', good: 'Promotions', fair: 'Partnership' },
+    conditionLabels: { products: 'Products', services: 'Services', promotions: 'Promotions', partnership: 'Partnership' },
     categories: {
       furniture: 'Cafe / Restaurant',
       appliances: 'Store',
@@ -773,7 +780,7 @@ const UI_TEXT = {
   },
 } as const;
 
-const KontaktiChaikyScreen: React.FC = () => {
+const BiznesChaikaScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const navLock = useRef(false);
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
@@ -1341,7 +1348,7 @@ const KontaktiChaikyScreen: React.FC = () => {
               <View style={styles.pickerWrapper}>
                 <Picker selectedValue={searchCondition} onValueChange={setSearchCondition} style={styles.picker}>
                   <Picker.Item label={text.searchAnyCondition} value="" />
-                  {ITEM_CONDITION_VALUES.map((value) => (
+                  {OFFER_TYPE_VALUES.map((value) => (
                     <Picker.Item key={`search-condition-${value}`} label={text.conditionLabels[value]} value={value} />
                   ))}
                 </Picker>
@@ -1644,7 +1651,7 @@ const KontaktiChaikyScreen: React.FC = () => {
               <View style={styles.pickerWrapper}>
                 <Picker selectedValue={condition} onValueChange={(itemValue) => setCondition(itemValue)} style={styles.picker}>
                   <Picker.Item label={text.selectCondition} value="" />
-                  {ITEM_CONDITION_VALUES.map((value) => (
+                  {OFFER_TYPE_VALUES.map((value) => (
                     <Picker.Item key={value} label={text.conditionLabels[value]} value={value} />
                   ))}
                 </Picker>
@@ -1702,16 +1709,6 @@ const KontaktiChaikyScreen: React.FC = () => {
               <InlineFieldHint message={text.phoneHint} type={phone.replace(/\D/g, '').length >= 7 ? 'success' : 'hint'} />
               <FormFieldError error={submitAttempted && phone.replace(/\D/g, '').length < 7 ? text.errorPhone : undefined} />
 
-              <Text style={styles.formLabel}>{text.contactNameLabel}</Text>
-              <TextInput
-                placeholder={text.contactNamePlaceholder}
-                value={contactName}
-                onChangeText={setContactName}
-                style={styles.input}
-                placeholderTextColor="#A0938D"
-                maxLength={60}
-              />
-              <InlineFieldHint message={text.contactNameHint} type={contactName.trim() ? 'success' : 'hint'} />
               </View>
 
               <TouchableOpacity
@@ -1721,10 +1718,45 @@ const KontaktiChaikyScreen: React.FC = () => {
               >
                 <MaterialCommunityIcons name="star-four-points-outline" size={18} color="#7A1E5C" />
                 <Text style={styles.interestingBtnText}>{text.makeInteresting}</Text>
+                <MaterialCommunityIcons name={isExtraExpanded ? 'chevron-up' : 'chevron-down'} size={20} color="#7A1E5C" />
               </TouchableOpacity>
 
               {isExtraExpanded ? (
                 <View style={styles.interestingSection}>
+                  <Text style={styles.formLabel}>{text.contactNameLabel}</Text>
+                  <TextInput
+                    placeholder={text.contactNamePlaceholder}
+                    value={contactName}
+                    onChangeText={setContactName}
+                    style={styles.input}
+                    placeholderTextColor="#A0938D"
+                    maxLength={60}
+                  />
+                  <InlineFieldHint message={text.contactNameHint} type={contactName.trim() ? 'success' : 'hint'} />
+
+                  <Text style={styles.formLabel}>{text.photoLabel}</Text>
+                  {user?.id ? (
+                    <PhotoUploadField
+                      uid={user.id}
+                      userName={user?.name ?? ''}
+                      maxPhotos={5}
+                      storagePath={BIZ_PHOTO_STORAGE_PATH}
+                      onPhotosChange={setFormPhotos}
+                    />
+                  ) : (
+                    <Text style={styles.signInNote}>{text.authRequired}</Text>
+                  )}
+
+                  <View style={styles.toggleRow}>
+                    <Text style={styles.formLabel}>{text.showPhoneToggle}</Text>
+                    <Switch
+                      value={showPhoneOnCard}
+                      onValueChange={setShowPhoneOnCard}
+                      trackColor={{ false: '#E8DDD3', true: '#6A8BA5' }}
+                      thumbColor={showPhoneOnCard ? '#403933' : '#A0938D'}
+                    />
+                  </View>
+
                   <Text style={styles.formLabel}>{text.workFormatLabel}</Text>
                   <View style={styles.pickerWrapper}>
                     <Picker selectedValue={workFormat} onValueChange={setWorkFormat} style={styles.picker}>
@@ -1781,29 +1813,6 @@ const KontaktiChaikyScreen: React.FC = () => {
                   </View>
                 </View>
               ) : null}
-
-              <Text style={styles.formLabel}>{text.photoLabel}</Text>
-              {user?.id ? (
-                <PhotoUploadField
-                  uid={user.id}
-                  userName={user?.name ?? ''}
-                  maxPhotos={5}
-                  storagePath={BIZ_PHOTO_STORAGE_PATH}
-                  onPhotosChange={setFormPhotos}
-                />
-              ) : (
-                <Text style={styles.signInNote}>{text.authRequired}</Text>
-              )}
-
-              <View style={styles.toggleRow}>
-                <Text style={styles.formLabel}>{text.showPhoneToggle}</Text>
-                <Switch
-                  value={showPhoneOnCard}
-                  onValueChange={setShowPhoneOnCard}
-                  trackColor={{ false: '#E8DDD3', true: '#6A8BA5' }}
-                  thumbColor={showPhoneOnCard ? '#403933' : '#A0938D'}
-                />
-              </View>
 
               <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} activeOpacity={0.85} disabled={submitting}>
                 {submitting ? (
@@ -2211,4 +2220,4 @@ const styles = StyleSheet.create({
   sheetContent: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 28 },
 });
 
-export default KontaktiChaikyScreen;
+export default BiznesChaikaScreen;
