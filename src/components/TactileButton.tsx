@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import { ActivityIndicator, Animated, Pressable, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { SCREEN_THEME } from '../utils/screenTheme';
 
 type TactileButtonProps = {
@@ -7,6 +7,7 @@ type TactileButtonProps = {
   onPress: () => void;
   variant?: 'primary' | 'secondary' | 'social';
   disabled?: boolean;
+  loading?: boolean;
   style?: ViewStyle;
   textStyle?: any;
   icon?: React.ReactNode;
@@ -38,6 +39,7 @@ export default function TactileButton({
   onPress,
   variant = 'primary',
   disabled = false,
+  loading = false,
   style,
   textStyle,
   icon,
@@ -57,14 +59,14 @@ export default function TactileButton({
   };
 
   const handlePressIn = () => {
-    if (disabled) return;
+    if (disabled || loading) return;
     setElevationNum(2);
     Animated.timing(scaleVal, { toValue: 0.96, duration: 80, useNativeDriver: true }).start();
     Animated.timing(translateYVal, { toValue: 2, duration: 80, useNativeDriver: true }).start();
   };
 
   const handlePressOut = () => {
-    if (disabled) return;
+    if (disabled || loading) return;
     setElevationNum(6);
     Animated.timing(scaleVal, { toValue: 1, duration: 150, useNativeDriver: true }).start();
     Animated.timing(translateYVal, { toValue: 0, duration: 150, useNativeDriver: true }).start();
@@ -88,7 +90,7 @@ export default function TactileButton({
         onPress={onPress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
-        disabled={disabled}
+        disabled={disabled || loading}
         style={styles.pressableContent}
       >
         <View style={styles.bevelTopLeft} />
@@ -96,8 +98,14 @@ export default function TactileButton({
         <View style={styles.gloss} />
         <View style={styles.insetShadow} />
         <View style={styles.innerContent}>
-          {icon}
-          <Text style={[styles.title, { color: disabled ? disabledTextColor : v.text }, textStyle]}>{title}</Text>
+          {loading ? (
+            <ActivityIndicator size="small" color={disabledTextColor} />
+          ) : (
+            <>
+              {icon}
+              <Text style={[styles.title, { color: disabled ? disabledTextColor : v.text }, textStyle]}>{title}</Text>
+            </>
+          )}
         </View>
       </Pressable>
     </Animated.View>

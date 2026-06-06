@@ -6,7 +6,7 @@ interface IconProps {
   color: string;
 }
 
-// РњРµРіР°С„РѕРЅ - РўР•Р РњР†РќРћР'Рђ Р"РћРџРћРњРћР"Рђ
+// Мегафон - термінова допомога
 export const MegaphoneIcon: React.FC<IconProps> = ({ size, color }) => (
   <Svg width={size} height={size} viewBox="0 0 100 100">
     <Defs>
@@ -15,14 +15,14 @@ export const MegaphoneIcon: React.FC<IconProps> = ({ size, color }) => (
         <Stop offset="100%" stopColor={color} stopOpacity="0.7" />
       </LinearGradient>
     </Defs>
-    {/* РћСЃРЅРѕРІРЅРѕР№ СЂРѕРі */}
+    {/* Основной рог */}
     <Path
       d="M 15 50 L 45 35 L 45 65 Z"
       fill="url(#megaGrad)"
       stroke={color}
       strokeWidth="2"
     />
-    {/* РР·РѕРіРЅСѓС‚Р°СЏ С‡Р°СЃС‚СЊ */}
+    {/* Изогнутая часть */}
     <Path
       d="M 45 35 Q 65 25 75 30 L 75 70 Q 65 75 45 65"
       fill="none"
@@ -30,7 +30,7 @@ export const MegaphoneIcon: React.FC<IconProps> = ({ size, color }) => (
       strokeWidth="3"
       strokeLinecap="round"
     />
-    {/* Р'РѕР»РЅС‹ Р·РІСѓРєР° */}
+    {/* Волны звука */}
     <Path
       d="M 80 50"
       stroke={color}
@@ -43,7 +43,7 @@ export const MegaphoneIcon: React.FC<IconProps> = ({ size, color }) => (
   </Svg>
 );
 
-// РљР°СЂС‚Р° - РљРђР РўРђ Р§РђР™РљР
+// Карта - карта Чайки
 export const MapIcon: React.FC<IconProps> = ({ size, color }) => (
   <Svg width={size} height={size} viewBox="0 0 100 100">
     <Defs>
@@ -52,14 +52,14 @@ export const MapIcon: React.FC<IconProps> = ({ size, color }) => (
         <Stop offset="100%" stopColor={color} stopOpacity="0.7" />
       </LinearGradient>
     </Defs>
-    {/* РљР°СЂС‚Р° - СЃР»РѕР¶РµРЅРЅР°СЏ */}
+    {/* Карта - сложенная */}
     <Path
       d="M 25 30 L 50 20 L 75 30 L 75 60 Q 50 70 25 60 Z"
       fill="url(#mapGrad)"
       stroke={color}
       strokeWidth="2"
     />
-    {/* Р›РёРЅРёРё РЅР° РєР°СЂС‚Рµ */}
+    {/* Линии на карте */}
     <Path
       d="M 35 40 Q 50 35 65 45"
       stroke={color}
@@ -76,9 +76,9 @@ export const MapIcon: React.FC<IconProps> = ({ size, color }) => (
       strokeLinecap="round"
       opacity="0.6"
     />
-    {/* РњР°СЂРєРµСЂ/Р±СѓР»Р°РІРєР° */}
+    {/* Маркер/булавка */}
     <Circle cx="50" cy="45" r="3" fill={color} />
-    {/* Р—Р°РіРёР±С‹ РєР°СЂС‚С‹ */}
+    {/* Загибы карты */}
     <Path
       d="M 50 20 L 50 35"
       stroke={color}
@@ -88,7 +88,7 @@ export const MapIcon: React.FC<IconProps> = ({ size, color }) => (
   </Svg>
 );
 
-// РўСЂРµСѓРіРѕР»СЊРЅРёРє РїСЂРµРґСѓРїСЂРµР¶РґРµРЅРёСЏ - РџР РћР'Р›Р•РњР Р–Рљ
+// Треугольник предупреждения - проблемы ЖК
 export const WarningIcon: React.FC<IconProps> = ({ size, color }) => (
   <Svg width={size} height={size} viewBox="0 0 100 100">
     <Defs>
@@ -97,7 +97,7 @@ export const WarningIcon: React.FC<IconProps> = ({ size, color }) => (
         <Stop offset="100%" stopColor={color} stopOpacity="0.7" />
       </LinearGradient>
     </Defs>
-    {/* Р'РЅРµС€РЅРёР№ С‚СЂРµСѓРіРѕР»СЊРЅРёРє */}
+    {/* Внешний треугольник */}
     <Path
       d="M 50 15 L 85 70 L 15 70 Z"
       fill="url(#warnGrad)"
@@ -105,9 +105,9 @@ export const WarningIcon: React.FC<IconProps> = ({ size, color }) => (
       strokeWidth="2.5"
       strokeLinejoin="round"
     />
-    {/* Р'РѕСЃРєР»РёС†Р°С‚РµР»СЊРЅС‹Р№ Р·РЅР°Рє - С‚РѕС‡РєР° */}
+    {/* Восклицательный знак - точка */}
     <Circle cx="50" cy="58" r="3.5" fill="white" />
-    {/* Р'РѕСЃРєР»РёС†Р°С‚РµР»СЊРЅС‹Р№ Р·РЅР°Рє - Р»РёРЅРёСЏ */}
+    {/* Восклицательный знак - линия */}
     <Path
       d="M 50 35 L 50 50"
       stroke="white"
@@ -117,7 +117,7 @@ export const WarningIcon: React.FC<IconProps> = ({ size, color }) => (
   </Svg>
 );
 
-// РЎСѓРјРєР°/РџРѕРєСѓРїРєРё - РљР РђР©Р† РњР†РЎР¦РЇ
+// Сумка/покупки - кращі місця
 export const ShoppingBagIcon: React.FC<IconProps> = ({ size, color }) => (
   <Svg width={size} height={size} viewBox="0 0 100 100">
     <Defs>
@@ -134,7 +134,7 @@ export const ShoppingBagIcon: React.FC<IconProps> = ({ size, color }) => (
       strokeWidth="2.5"
       strokeLinecap="round"
     />
-    {/* РћСЃРЅРѕРІРЅР°СЏ СЃСѓРјРєР° */}
+    {/* Основная сумка */}
     <Path
       d="M 35 25 L 32 40 Q 30 70 50 75 Q 70 70 68 40 L 65 25 Z"
       fill="url(#bagGrad)"
@@ -155,7 +155,7 @@ export const ShoppingBagIcon: React.FC<IconProps> = ({ size, color }) => (
       strokeWidth="1.5"
       opacity="0.5"
     />
-    {/* Р'РµСЂС…РЅСЏСЏ С‡Р°СЃС‚СЊ СЃСѓРјРєРё */}
+    {/* Верхняя часть сумки */}
     <Path
       d="M 35 25 L 65 25"
       stroke={color}
