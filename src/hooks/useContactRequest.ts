@@ -27,6 +27,7 @@ const TOAST_TEXT: Record<string, Record<Lang, string>> = {
   sent: { ua: 'Запит надіслано', ru: 'Запрос отправлен', en: 'Request sent' },
   already_pending: { ua: 'Запит вже надіслано', ru: 'Запрос уже отправлен', en: 'Already sent' },
   already_approved: { ua: 'Вже погоджено', ru: 'Уже одобрено', en: 'Already approved' },
+  open_profile: { ua: 'Контакт відкрито', ru: 'Контакт открыт', en: 'Contact available' },
   error: { ua: 'Помилка. Спробуйте ще раз', ru: 'Ошибка. Попробуйте снова', en: 'Error. Try again' },
   no_auth: { ua: 'Потрібна авторизація', ru: 'Требуется авторизация', en: 'Authorization required' },
   no_user: { ua: 'Користувача не знайдено', ru: 'Пользователь не найден', en: 'User not found' },
@@ -111,7 +112,9 @@ export function useContactRequest() {
           Toast.show({ type: 'success', text1: TOAST_TEXT.sent[language] });
         } else if (result === 'already_pending') {
           Toast.show({ type: 'info', text1: TOAST_TEXT.already_pending[language] });
-        } else if (result === 'already_approved' || result === 'open_profile') {
+        } else if (result === 'open_profile') {
+          Toast.show({ type: 'success', text1: TOAST_TEXT.open_profile[language] });
+        } else if (result === 'already_approved') {
           Toast.show({ type: 'success', text1: TOAST_TEXT.already_approved[language] });
         }
       } catch {

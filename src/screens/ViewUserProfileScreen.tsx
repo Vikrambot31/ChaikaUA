@@ -161,8 +161,11 @@ const ViewUserProfileScreen: React.FC = () => {
     let cancelled = false;
     void (async () => {
       try {
-        const status = await profilePermissionService.checkAccess(userId, currentUser.id);
-        if (!cancelled) setContactApproved(status === 'approved');
+        const [status, privacyMode] = await Promise.all([
+          profilePermissionService.checkAccess(userId, currentUser.id),
+          profilePermissionService.getPrivacyMode(userId),
+        ]);
+        if (!cancelled) setContactApproved(status === 'approved' || privacyMode === 'open');
       } catch {
         if (!cancelled) setContactApproved(false);
       }

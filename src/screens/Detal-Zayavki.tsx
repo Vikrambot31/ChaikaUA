@@ -285,8 +285,11 @@ const RequestDetailScreen = ({
         return;
       }
       try {
-        const access = await profilePermissionService.checkAccess(request.userId, currentUser.id);
-        setAccessStatus(access);
+        const [access, privacyMode] = await Promise.all([
+          profilePermissionService.checkAccess(request.userId, currentUser.id),
+          profilePermissionService.getPrivacyMode(request.userId),
+        ]);
+        setAccessStatus(privacyMode === 'open' ? 'approved' : access);
       } catch {
         setAccessStatus(null);
       }
@@ -419,8 +422,11 @@ const RequestDetailScreen = ({
     await sendRequest(reason);
     if (currentUser?.id && request.userId && currentUser.id !== request.userId) {
       try {
-        const access = await profilePermissionService.checkAccess(request.userId, currentUser.id);
-        setAccessStatus(access);
+        const [access, privacyMode] = await Promise.all([
+          profilePermissionService.checkAccess(request.userId, currentUser.id),
+          profilePermissionService.getPrivacyMode(request.userId),
+        ]);
+        setAccessStatus(privacyMode === 'open' ? 'approved' : access);
       } catch {
         // ignore — status label will stay as-is
       }
