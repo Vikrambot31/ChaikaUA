@@ -190,6 +190,13 @@ const UI_TEXT = {
     live: 'НАЖИВО',
     liveCount: (count: number) => `всього ${count} людей шукають знайомств`,
     topAnketyTitle: 'Топ анкети',
+    editBtn: 'Редагувати',
+    editTitle: 'Редагування анкети',
+    editSaveBtn: 'Зберегти зміни',
+    editSuccessTitle: 'Готово',
+    editSuccessMsg: 'Анкету оновлено. Зміни надіслано на модерацію.',
+    editCooldownMsg: 'Редагувати можна раз на 3 дні. Спробуйте пізніше.',
+    editWhilePendingMsg: 'Анкета зараз на модерації. Дочекайтесь результату.',
   },
   ru: {
     title: 'Знакомства на кофе',
@@ -286,6 +293,13 @@ const UI_TEXT = {
     live: 'В ЭФИРЕ',
     liveCount: (count: number) => `всего ${count} людей ищут знакомства`,
     topAnketyTitle: 'Топ анкеты',
+    editBtn: 'Редактировать',
+    editTitle: 'Редактирование анкеты',
+    editSaveBtn: 'Сохранить изменения',
+    editSuccessTitle: 'Готово',
+    editSuccessMsg: 'Анкета обновлена. Изменения отправлены на модерацию.',
+    editCooldownMsg: 'Редактировать можно раз в 3 дня. Попробуйте позже.',
+    editWhilePendingMsg: 'Анкета на модерации. Дождитесь результата.',
   },
   en: {
     title: 'Coffee Meetups',
@@ -382,6 +396,13 @@ const UI_TEXT = {
     live: 'LIVE',
     liveCount: (count: number) => `${count} people looking for contacts`,
     topAnketyTitle: 'Top profiles',
+    editBtn: 'Edit',
+    editTitle: 'Edit profile',
+    editSaveBtn: 'Save changes',
+    editSuccessTitle: 'Done',
+    editSuccessMsg: 'Profile updated. Changes sent for moderation.',
+    editCooldownMsg: 'You can edit once every 3 days. Try later.',
+    editWhilePendingMsg: 'Profile is under moderation. Wait for the result.',
   },
 } as const;
 
@@ -422,6 +443,19 @@ const KontaktiChaikyScreen: React.FC = () => {
   const [searchDescription, setSearchDescription] = useState('');
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [activePromotions, setActivePromotions] = useState<BonusPromotion[]>([]);
+  const [editingItem, setEditingItem] = useState<ContactListing | null>(null);
+  const [editFormVisible, setEditFormVisible] = useState(false);
+  const [editCategory, setEditCategory] = useState('');
+  const [editCondition, setEditCondition] = useState('');
+  const [editPrice, setEditPrice] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editShowPhone, setEditShowPhone] = useState(true);
+  const [editZodiac, setEditZodiac] = useState('');
+  const [editHdType, setEditHdType] = useState('');
+  const [editHdProfile, setEditHdProfile] = useState('');
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [editSubmitAttempted, setEditSubmitAttempted] = useState(false);
   const blinkAnim = useRef(new Animated.Value(1)).current;
   const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestDraftRef = useRef({ category, condition, price, description, phone, addFormVisible, isInterestingFormExpanded, zodiacSign, humanDesignType, humanDesignProfile });
@@ -863,6 +897,75 @@ const KontaktiChaikyScreen: React.FC = () => {
     ]);
   };
 
+  const openEditForm = (item: ContactListing) => {
+    setEditingItem(item);
+    setEditCategory(item.category);
+    setEditCondition(item.condition);
+    setEditPrice(item.price);
+    setEditDescription(item.description);
+    setEditPhone(item.phone);
+    setEditShowPhone(item.showPhone !== false);
+    setEditZodiac(item.zodiacSign || '');
+    setEditHdType(item.humanDesignType || '');
+    setEditHdProfile(item.humanDesignProfile || '');
+    setEditSubmitAttempted(false);
+    setEditFormVisible(true);
+  };
+
+  const handleEditSubmit = async () => {
+    if (!editingItem) return;
+    setEditSubmitAttempted(true);
+
+    if (!editCategory || !editCondition || !editDescription.trim() || !editPhone.trim() || !editPrice.trim()) {
+      toast.showWarning(text.errorTitle, text.errorFill);
+      return;
+    }
+    const normalizedPrice = editPrice.replace(',', '.').replace(/[^\d.]/g, '');
+    const numericPrice = Number(normalizedPrice);
+    if (!Number.isFinite(numericPrice) || numericPrice <= 0 || numericPrice > 120) {
+      toast.showWarning(text.errorTitle, text.priceError);
+      return;
+    }
+    if (editPhone.replace(/\D/g, '').length < 7) {
+      toast.showWarning(text.errorTitle, text.errorPhone);
+      return;
+    }
+    const langError = getLanguageValidationError(editDescription.trim(), language as 'ua' | 'ru' | 'en');
+    if (langError) {
+      toast.showWarning(text.errorTitle, langError);
+      return;
+    }
+
+    setEditSubmitting(true);
+    try {
+      await contactsService.edit(editingItem.id, {
+        category: editCategory,
+        condition: editCondition,
+        price: normalizedPrice,
+        description: editDescription.trim(),
+        phone: normalizePhoneText(editPhone),
+        showPhone: editShowPhone,
+        zodiacSign: editZodiac,
+        humanDesignType: editHdType,
+        humanDesignProfile: editHdProfile,
+        language,
+      });
+      toast.showSuccess(text.editSuccessTitle, text.editSuccessMsg);
+      setEditFormVisible(false);
+      setEditingItem(null);
+    } catch (error: any) {
+      if (error?.message === 'edit_cooldown') {
+        toast.showWarning(text.errorTitle, text.editCooldownMsg);
+      } else if (error?.message === 'edit_while_pending') {
+        toast.showWarning(text.errorTitle, text.editWhilePendingMsg);
+      } else {
+        showUserError(language, 'send', error);
+      }
+    } finally {
+      setEditSubmitting(false);
+    }
+  };
+
   const mapToDetailData = (item: ContactListing, ownerAvatarUri?: string): DetailItemData => {
     const categoryLabel = getCategoryLabel(item.category);
     const conditionLabel = text.conditionLabels[item.condition as keyof typeof text.conditionLabels] ?? item.condition;
@@ -1173,10 +1276,16 @@ const KontaktiChaikyScreen: React.FC = () => {
                       showLikeAvatars
                     />
                     {isOwn ? (
-                      <TouchableOpacity style={styles.kDeleteLink} onPress={() => handleDelete(item.id)} activeOpacity={0.8}>
-                        <MaterialCommunityIcons name="trash-can-outline" size={14} color="#C0392B" />
-                        <Text style={styles.kDeleteLinkText}>{text.deleteText}</Text>
-                      </TouchableOpacity>
+                      <View style={styles.kOwnActions}>
+                        <TouchableOpacity style={styles.kEditLink} onPress={() => openEditForm(item)} activeOpacity={0.8}>
+                          <MaterialCommunityIcons name="pencil-outline" size={14} color="#2D7E4D" />
+                          <Text style={styles.kEditLinkText}>{text.editBtn}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.kDeleteLink} onPress={() => handleDelete(item.id)} activeOpacity={0.8}>
+                          <MaterialCommunityIcons name="trash-can-outline" size={14} color="#C0392B" />
+                          <Text style={styles.kDeleteLinkText}>{text.deleteText}</Text>
+                        </TouchableOpacity>
+                      </View>
                     ) : null}
                   </View>
                 );
@@ -1358,6 +1467,97 @@ const KontaktiChaikyScreen: React.FC = () => {
                 )}
               </TouchableOpacity>
             </ScrollView>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+      {/* Edit modal */}
+      <Modal visible={editFormVisible} transparent animationType="slide" onRequestClose={() => setEditFormVisible(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.sheetOverlay}>
+          <TouchableOpacity style={styles.sheetBackdrop} activeOpacity={1} onPress={() => setEditFormVisible(false)} />
+          <View style={styles.sheetWrapper}>
+            <View style={styles.sheet}>
+              <View style={styles.sheetHandle} />
+              <View style={styles.sheetHeader}>
+                <Text style={styles.sheetTitle}>{text.editTitle}</Text>
+                <TouchableOpacity onPress={() => setEditFormVisible(false)} style={styles.sheetCloseBtn} activeOpacity={0.7}>
+                  <Text style={styles.sheetCloseTxt}>✕</Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheetContent} style={styles.sheetScroll}>
+                <Text style={styles.formLabel}>{text.categoryLabel}</Text>
+                <View style={styles.pickerWrapper}>
+                  <Picker selectedValue={editCategory} onValueChange={setEditCategory} style={styles.picker}>
+                    <Picker.Item label={text.selectCategory} value="" />
+                    {CONTACT_CATEGORY_VALUES.map((value) => (
+                      <Picker.Item key={`edit-cat-${value}`} label={getCategoryLabel(value)} value={value} />
+                    ))}
+                  </Picker>
+                </View>
+                <FormFieldError error={!editCategory && editSubmitAttempted ? text.errorFill : undefined} />
+
+                <Text style={styles.formLabel}>{text.conditionLabel}</Text>
+                <View style={styles.pickerWrapper}>
+                  <Picker selectedValue={editCondition} onValueChange={setEditCondition} style={styles.picker}>
+                    <Picker.Item label={text.selectCondition} value="" />
+                    {ITEM_CONDITION_VALUES.map((value) => (
+                      <Picker.Item key={`edit-cond-${value}`} label={text.conditionLabels[value]} value={value} />
+                    ))}
+                  </Picker>
+                </View>
+                <FormFieldError error={!editCondition && editSubmitAttempted ? text.errorFill : undefined} />
+
+                <Text style={styles.formLabel}>{text.priceLabel}</Text>
+                <TextInput placeholder="0" value={editPrice} onChangeText={(v) => setEditPrice(v.replace(',', '.').replace(/[^\d.]/g, ''))} keyboardType="decimal-pad" style={styles.input} placeholderTextColor="#A0938D" />
+                <FormFieldError error={editSubmitAttempted && (!editPrice.trim() || Number(editPrice) <= 0) ? text.priceError : undefined} />
+
+                <Text style={styles.formLabel}>{text.descriptionLabel}</Text>
+                <TextInput placeholder={text.descriptionLabel} value={editDescription} onChangeText={setEditDescription} style={[styles.input, styles.textarea]} placeholderTextColor="#A0938D" multiline maxLength={260} />
+                <FormFieldError error={editSubmitAttempted && !editDescription.trim() ? text.descriptionRequired : undefined} />
+
+                <Text style={styles.formLabel}>{text.phoneLabel}</Text>
+                <TextInput placeholder="+380..." value={editPhone} onChangeText={(v) => setEditPhone(normalizePhoneText(v))} keyboardType="phone-pad" style={styles.input} placeholderTextColor="#A0938D" />
+                <FormFieldError error={editSubmitAttempted && editPhone.replace(/\D/g, '').length < 7 ? text.errorPhone : undefined} />
+
+                <Text style={styles.formLabel}>{text.zodiacLabel}</Text>
+                <View style={styles.pickerWrapper}>
+                  <Picker selectedValue={editZodiac} onValueChange={setEditZodiac} style={styles.picker}>
+                    <Picker.Item label={text.selectZodiac} value="" />
+                    {ZODIAC_VALUES.map((value) => (
+                      <Picker.Item key={`edit-z-${value}`} label={text.zodiacLabels[value]} value={value} />
+                    ))}
+                  </Picker>
+                </View>
+
+                <Text style={styles.formLabel}>{text.humanDesignTypeLabel}</Text>
+                <View style={styles.pickerWrapper}>
+                  <Picker selectedValue={editHdType} onValueChange={setEditHdType} style={styles.picker}>
+                    <Picker.Item label={text.selectHumanDesignType} value="" />
+                    {HUMAN_DESIGN_TYPE_VALUES.map((value) => (
+                      <Picker.Item key={`edit-hd-${value}`} label={text.humanDesignTypeLabels[value]} value={value} />
+                    ))}
+                  </Picker>
+                </View>
+
+                <Text style={styles.formLabel}>{text.humanDesignProfileLabel}</Text>
+                <View style={styles.pickerWrapper}>
+                  <Picker selectedValue={editHdProfile} onValueChange={setEditHdProfile} style={styles.picker}>
+                    <Picker.Item label={text.selectHumanDesignProfile} value="" />
+                    {HUMAN_DESIGN_PROFILE_VALUES.map((value) => (
+                      <Picker.Item key={`edit-hdp-${value}`} label={value} value={value} />
+                    ))}
+                  </Picker>
+                </View>
+
+                <View style={styles.toggleRow}>
+                  <Text style={styles.formLabel}>{text.showPhoneToggle}</Text>
+                  <Switch value={editShowPhone} onValueChange={setEditShowPhone} trackColor={{ false: '#E8DDD3', true: '#6A8BA5' }} thumbColor={editShowPhone ? '#403933' : '#A0938D'} />
+                </View>
+
+                <TouchableOpacity style={styles.submitBtn} onPress={handleEditSubmit} activeOpacity={0.85} disabled={editSubmitting}>
+                  {editSubmitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>{text.editSaveBtn}</Text>}
+                </TouchableOpacity>
+              </ScrollView>
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -1604,12 +1804,25 @@ const styles = StyleSheet.create({
   },
   sectionDividerLine: { flex: 1, height: 1, backgroundColor: '#E8DDD3' },
   sectionDividerText: { fontSize: 10, fontWeight: '900' as const, color: '#A0938D', textTransform: 'uppercase' as const, letterSpacing: 1 },
+  kOwnActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 6,
+  },
+  kEditLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  kEditLinkText: { color: '#2D7E4D', fontSize: 11, fontWeight: '800' },
   kDeleteLink: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    alignSelf: 'flex-end',
-    marginTop: 6,
     paddingHorizontal: 8,
     paddingVertical: 4,
   },

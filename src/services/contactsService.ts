@@ -31,6 +31,7 @@ export interface ContactListing {
   humanDesignProfile?: string;
   isArchived?: boolean;
   language?: AppLang;
+  lastEditedAt?: string;
 }
 
 const PATH = 'contacts_listings';
@@ -286,6 +287,57 @@ export const contactsService = {
       });
     } catch (error) {
       console.error('[contactsService] attachPhotoStoragePath failed:', error);
+      throw error;
+    }
+  },
+
+  async edit(id: string, fields: Partial<Omit<ContactListing, 'id' | 'userId' | 'createdAt'>>): Promise<void> {
+    try {
+      const user = await requireWriteSession({
+        operation: 'edit',
+        screen: 'Kontakt-XXX',
+      });
+      const snapshot = await get(ref(database, `${PATH}/${id}`));
+      const existing = snapshot.exists() ? snapshot.val() as Partial<ContactListing> : null;
+      if (!existing || existing.userId !== user.uid) {
+        throw new Error('owner_required');
+      }
+      const EDIT_COOLDOWN_MS = 3 * 24 * 60 * 60 * 1000;
+      const lastEdited = existing.lastEditedAt ? new Date(existing.lastEditedAt as string).getTime() : 0;
+      if (lastEdited && Date.now() - lastEdited < EDIT_COOLDOWN_MS) {
+        throw new Error('edit_cooldown');
+      }
+      if (existing.moderationStatus === 'pending') {
+        throw new Error('edit_while_pending');
+      }
+      const pendingModeration = createPendingModeration();
+      const patch: Record<string, unknown> = {};
+      if (fields.itemName !== undefined) patch.itemName = sanitizeStoredText(fields.itemName);
+      if (fields.category !== undefined) patch.category = sanitizeStoredText(fields.category);
+      if (fields.condition !== undefined) patch.condition = sanitizeStoredText(fields.condition);
+      if (fields.price !== undefined) patch.price = normalizePrice(fields.price);
+      if (fields.description !== undefined) patch.description = sanitizeStoredText(fields.description);
+      if (fields.phone !== undefined) patch.phone = sanitizeStoredText(fields.phone);
+      if (fields.zodiacSign !== undefined) patch.zodiacSign = sanitizeStoredText(fields.zodiacSign);
+      if (fields.humanDesignType !== undefined) patch.humanDesignType = sanitizeStoredText(fields.humanDesignType);
+      if (fields.humanDesignProfile !== undefined) patch.humanDesignProfile = sanitizeStoredText(fields.humanDesignProfile);
+      if (fields.showPhone !== undefined) patch.showPhone = fields.showPhone;
+      if (fields.photoStoragePath !== undefined) {
+        patch.photoStoragePath = fields.photoStoragePath;
+        patch.photoUri = '';
+      }
+      if (fields.language !== undefined) patch.language = normalizeAppLang(fields.language, 'ua');
+      const descText = (patch.description as string) ?? existing.description ?? '';
+      const nameText = (patch.itemName as string) ?? existing.itemName ?? '';
+      const lang = (patch.language as AppLang) ?? existing.language ?? 'ua';
+      assertTextMatchesLanguage(`${nameText} ${descText}`.trim(), lang);
+      patch.moderationStatus = pendingModeration.moderationStatus;
+      patch.submittedForModerationAt = pendingModeration.submittedForModerationAt;
+      patch.lastEditedAt = new Date().toISOString();
+      patch.expiresAt = new Date(Date.now() + CONTACT_LISTING_TTL_MS).toISOString();
+      await update(ref(database, `${PATH}/${id}`), patch);
+    } catch (error) {
+      console.error('[contactsService] edit failed:', error);
       throw error;
     }
   },
