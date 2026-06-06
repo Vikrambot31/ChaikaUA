@@ -3,6 +3,7 @@ import GuestRegisterBanner from '../components/GuestRegisterBanner';
 import { useGuestGuard } from '../hooks/useGuestGuard';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   SafeAreaView,
   StyleSheet,
@@ -51,6 +52,7 @@ const UI_TEXT = {
     login: 'Увійдіть, щоб додати фото',
     empty: 'Поки немає фото для душі',
     loadError: 'Не вдалося завантажити фото',
+    uploadError: 'Не вдалося завантажити фото. Спробуйте ще раз.',
   },
   ru: {
     title: 'Фото для Души',
@@ -66,6 +68,7 @@ const UI_TEXT = {
     login: 'Войдите, чтобы добавить фото',
     empty: 'Пока нет фото для души',
     loadError: 'Не удалось загрузить фото',
+    uploadError: 'Не удалось загрузить фото. Попробуйте ещё раз.',
   },
   en: {
     title: 'Photos for the Soul',
@@ -81,6 +84,7 @@ const UI_TEXT = {
     login: 'Sign in to add a photo',
     empty: 'No soul photos yet',
     loadError: 'Could not load photos',
+    uploadError: 'Failed to upload photo. Please try again.',
   },
 } as const;
 
@@ -257,18 +261,23 @@ export default function SoulPhotosScreen() {
   }, [user?.id]);
 
   const handlePhotosChange = useCallback((photos: UploadedPhoto[]) => {
+    let hasError = false;
     setPickedPhotos((current) => {
       const next = { ...current };
       for (const photo of photos) {
         if (photo.status === 'error') {
           delete next[photo.photoId];
+          hasError = true;
         } else {
           next[photo.photoId] = photo;
         }
       }
       return next;
     });
-  }, []);
+    if (hasError) {
+      Alert.alert(text.loadError, text.uploadError);
+    }
+  }, [text.loadError, text.uploadError]);
 
   const data = useMemo<SoulPhoto[]>(() => {
     const remotePaths = new Set(remotePhotos.map((photo) => photo.storagePath).filter(Boolean));
@@ -372,13 +381,12 @@ export default function SoulPhotosScreen() {
         </TouchableOpacity>
       )}
 
-      <TouchableOpacity
-        style={[styles.submitButton, !hasUploadedLocal && styles.submitButtonDisabled]}
-        disabled
-        activeOpacity={0.86}
-      >
-        <Text style={styles.submitText}>{hasUploadedLocal || pendingCount > 0 ? text.sending : text.send}</Text>
-      </TouchableOpacity>
+      {(hasUploadedLocal || pendingCount > 0) && (
+        <View style={styles.statusBadge}>
+          <MaterialCommunityIcons name="clock-outline" size={16} color="#fff" />
+          <Text style={styles.submitText}>{text.sending}</Text>
+        </View>
+      )}
     </View>
   );
 
@@ -574,14 +582,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '900',
   },
-  submitButton: {
-    minHeight: 52,
+  statusBadge: {
+    minHeight: 44,
     borderRadius: 12,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 7,
     backgroundColor: '#8FA77A',
+    opacity: 0.88,
   },
-  submitButtonDisabled: { opacity: 0.66 },
   submitText: {
     color: '#fff',
     fontSize: 15,

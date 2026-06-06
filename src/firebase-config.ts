@@ -13,7 +13,7 @@ import { canPublishImage } from './utils/imageSafety';
 import { safePromiseTimeout } from './utils/safePromiseTimeout';
 import { auth, database, storage } from './firebase-core';
 import { ensureFirebaseAuth, isModeratorUser, requireWriteSession } from './firebase-auth-session';
-import { Request as AppRequest, CommunityPhoto as AppPhoto, AudioAttachment } from './types/app';
+import { Request as AppRequest, CommunityPhoto as AppPhoto, AudioAttachment, type ProblemResolutionStatus } from './types/app';
 import { resolveMediaAccessUrls } from './services/mediaAccess';
 import { assertTextMatchesLanguage, normalizeAppLang } from './utils/contentLanguageGuard';
 
@@ -140,6 +140,9 @@ interface DbRequestValue {
   photoStoragePath?: unknown;
   userPhotoURL?: unknown;
   startAvatarKey?: unknown;
+  resolutionStatus?: unknown;
+  resolutionStatusUpdatedAt?: unknown;
+  resolvedAt?: unknown;
   sourceItemId?: unknown;
   sourceType?: unknown;
   sourceCategory?: unknown;
@@ -233,6 +236,7 @@ interface AddRequestPayload {
   photoStoragePath?: string;
   userPhotoURL?: string;
   startAvatarKey?: string;
+  resolutionStatus?: ProblemResolutionStatus;
 }
 
 /** The payload accepted by photoAPI.addPhoto. */
@@ -405,6 +409,13 @@ const deleteStoragePathQuietly = async (storagePath: string): Promise<void> => {
   }
 };
 
+const normalizeProblemResolutionStatus = (value: unknown): ProblemResolutionStatus | undefined => {
+  if (value === 'new' || value === 'in_progress' || value === 'resolved' || value === 'rejected') {
+    return value;
+  }
+  return undefined;
+};
+
 /**
  * Maps a raw Firebase RTDB request node to a typed AppRequest.
  * All field reads are guarded against missing / wrongly-typed data.
@@ -504,6 +515,11 @@ const mapDbRequestToAppRequest = (id: string, value: unknown): AppRequest => {
         : typeof v?.reason === 'string'
           ? v.reason
           : undefined,
+    resolutionStatus: normalizeProblemResolutionStatus(v?.resolutionStatus),
+    resolutionStatusUpdatedAt:
+      typeof v?.resolutionStatusUpdatedAt === 'number' ? v.resolutionStatusUpdatedAt : undefined,
+    resolvedAt:
+      typeof v?.resolvedAt === 'number' ? v.resolvedAt : undefined,
     audio,
     photoUri: typeof v?.photoUri === 'string' ? v.photoUri : undefined,
     photoStoragePath: typeof v?.photoStoragePath === 'string' ? v.photoStoragePath : undefined,
@@ -768,6 +784,7 @@ export const firebaseChatAPI = {
 
       // Electricity status reports are factual community data — auto-approve immediately.
       const nowIso = new Date().toISOString();
+      const nowMs = Date.now();
 
       const newRequest = {
         userId: user.uid,
@@ -803,9 +820,9 @@ export const firebaseChatAPI = {
           ? { moderatedAt: nowIso, moderatedBy: 'auto' }
           : { submittedForModerationAt: nowIso }),
         ...moderationMeta,
-        timestamp: Date.now(),
-        createdAt: Date.now(),
-        expires_at: Date.now() + getRequestExpiryTtlMs(requestData),
+        timestamp: nowMs,
+        createdAt: nowMs,
+        expires_at: nowMs + getRequestExpiryTtlMs(requestData),
         ...(requestData.audio ? { audio: requestData.audio } : {}),
         ...(requestData.photoStoragePath || requestData.photoUri
           ? {
@@ -818,6 +835,12 @@ export const firebaseChatAPI = {
           : {}),
         ...(typeof requestData.startAvatarKey === 'string' && requestData.startAvatarKey.trim().length > 0
           ? { startAvatarKey: normalizeText(requestData.startAvatarKey, 120) }
+          : {}),
+        ...(category === 'problem'
+          ? {
+              resolutionStatus: requestData.resolutionStatus || 'new',
+              resolutionStatusUpdatedAt: nowMs,
+            }
           : {}),
       };
 

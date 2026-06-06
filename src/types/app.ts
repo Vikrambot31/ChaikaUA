@@ -212,6 +212,8 @@ export interface AudioAttachment {
   transcript?: string;
 }
 
+export type ProblemResolutionStatus = 'new' | 'in_progress' | 'resolved' | 'rejected';
+
 export interface Request {
   id: string;
   userId?: string;
@@ -236,6 +238,9 @@ export interface Request {
   moderatedBy?: string;
   moderationReason?: string;
   rejectionReason?: string;
+  resolutionStatus?: ProblemResolutionStatus;
+  resolutionStatusUpdatedAt?: number;
+  resolvedAt?: number;
   audio?: AudioAttachment;
   photoUri?: string;
   photoStoragePath?: string;

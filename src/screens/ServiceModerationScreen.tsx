@@ -19,7 +19,7 @@ import MiniTabBar from '../components/MiniTabBar';
 import AppPhotoImage from '../components/AppPhotoImage';
 import { auth, communityUsersAPI, database, firebaseChatAPI } from '../firebase-config';
 import type { RootState } from '../redux/store';
-import type { CommunityPhoto } from '../types/app';
+import type { CommunityPhoto, ProblemResolutionStatus } from '../types/app';
 import { buySellService, BuySellListing } from '../services/buySellService';
 import { contactsService, ContactListing } from '../services/contactsService';
 import { jobService, JobListing } from '../services/jobService';
@@ -59,6 +59,7 @@ type ModerationRequest = {
   phone?: string;
   category?: string;
   status?: string;
+  resolutionStatus?: ProblemResolutionStatus;
 };
 
 type LocalBusinessItem = {
@@ -585,6 +586,7 @@ const ServiceModerationScreen: React.FC = () => {
           phone: item.phone,
           category: item.category,
           status: item.status ?? (item.isApproved ? 'approved' : 'pending'),
+          resolutionStatus: item.resolutionStatus,
         }));
         if (mountedRef.current) {
           setRequests(nextRequests);
@@ -830,6 +832,22 @@ const ServiceModerationScreen: React.FC = () => {
     return text.pending;
   }, [text.approved, text.pending, text.rejected]);
 
+  const resolutionLabel = useCallback((status?: ProblemResolutionStatus) => {
+    if (status === 'in_progress') return language === 'en' ? 'In progress' : language === 'ru' ? 'В работе' : 'В роботі';
+    if (status === 'resolved') return language === 'en' ? 'Resolved' : language === 'ru' ? 'Решено' : 'Вирішено';
+    if (status === 'rejected') return language === 'en' ? 'Declined' : language === 'ru' ? 'Отклонено' : 'Відхилено';
+    return language === 'en' ? 'New' : language === 'ru' ? 'Новая' : 'Нова';
+  }, [language]);
+
+  const updateProblemResolution = useCallback(async (id: string, status: ProblemResolutionStatus) => {
+    const now = Date.now();
+    await update(ref(database, `requests/${id}`), {
+      resolutionStatus: status,
+      resolutionStatusUpdatedAt: now,
+      resolvedAt: status === 'resolved' ? now : null,
+    });
+  }, []);
+
   // Схвалити всі pending заявки разом
   const handleBulkApprovePending = useCallback(() => {
     const pending = requests.filter((r) => !r.status || r.status === 'pending');
@@ -1025,6 +1043,33 @@ const ServiceModerationScreen: React.FC = () => {
           {item.phone ? <Text style={styles.cardMeta}>{text.phone}: {item.phone}</Text> : null}
           {isSuspicious ? <Text style={styles.suspiciousBadge}>⚠ {text.suspicious}</Text> : null}
           <Text style={styles.cardMeta}>{text.status}: {statusLabel(item.status)}</Text>
+          {item.category === 'problem' && item.status === 'approved' ? (
+            <>
+              <Text style={styles.cardMeta}>
+                {language === 'en' ? 'Problem status' : language === 'ru' ? 'Статус решения' : 'Статус вирішення'}: {resolutionLabel(item.resolutionStatus)}
+              </Text>
+              <View style={styles.actions}>
+                <ActionButton
+                  id={item.id}
+                  label={language === 'en' ? 'In work' : language === 'ru' ? 'В работу' : 'В роботу'}
+                  tone="neutral"
+                  onPress={() => void runAction(item.id, () => updateProblemResolution(item.id, 'in_progress'))}
+                />
+                <ActionButton
+                  id={item.id}
+                  label={language === 'en' ? 'Resolved' : language === 'ru' ? 'Решено' : 'Вирішено'}
+                  tone="approve"
+                  onPress={() => void runAction(item.id, () => updateProblemResolution(item.id, 'resolved'))}
+                />
+                <ActionButton
+                  id={item.id}
+                  label={language === 'en' ? 'Declined' : language === 'ru' ? 'Отклонено' : 'Відхилено'}
+                  tone="reject"
+                  onPress={() => void runAction(item.id, () => updateProblemResolution(item.id, 'rejected'))}
+                />
+              </View>
+            </>
+          ) : null}
           <View style={styles.actions}>
             {item.status !== 'approved' ? (
               <ActionButton

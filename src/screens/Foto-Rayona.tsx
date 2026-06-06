@@ -365,20 +365,6 @@ const styles = StyleSheet.create({
     borderTopColor: '#D8BF8B',
     backgroundColor: '#F6E9C9',
   },
-  loginButton: {
-    minHeight: 52,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#C97959',
-  },
-  actionText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '900',
-  },
   submitButton: {
     minHeight: 52,
     borderRadius: 12,

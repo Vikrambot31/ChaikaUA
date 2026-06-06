@@ -17,7 +17,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { get, onValue, ref } from 'firebase/database';
 import { ensureFirebaseAuth } from '../firebase-auth-session';
-import { ContactReason, ProfileViewRequest, ViewRequestStatus, profilePermissionService } from '../services/profilePermissionService';
+import { ContactReason, ProfileViewRequest, ViewRequestContext, ViewRequestStatus, profilePermissionService } from '../services/profilePermissionService';
 import {
   PROFILE_REQUEST_CONTEXT_KEYS,
   getProfileRequestContextLabel,
@@ -82,6 +82,20 @@ type StatusFilter = 'all' | ViewRequestStatus;
 type ContextFilter = 'all' | 'lyudi' | 'help' | 'sport' | 'buysell' | 'job';
 
 const ACCENT = '#7A1E5C';
+
+const getProfileRequestSourceLabel = (
+  sourceType: string | undefined,
+  context: ViewRequestContext,
+  language: Lang,
+  fallback: string,
+): string => {
+  const rawSource = sourceType?.trim();
+  const sourceKey = rawSource && PROFILE_REQUEST_CONTEXT_KEYS.includes(rawSource as ViewRequestContext)
+    ? rawSource
+    : context;
+  const label = getProfileRequestContextLabel(sourceKey, language).trim();
+  return label || fallback;
+};
 
 const UI = {
   ua: {
@@ -804,7 +818,7 @@ export default function ProfileRequestsScreen() {
               const isResponding = respondingRequestId === item.requesterId;
               const topicText = reasonText || item.sourceTitle?.trim() || t.notSpecified;
               const foundContactText = item.sourceTitle?.trim() || getProfileRequestContextLabel(item.context, language) || t.notSpecified;
-              const transitionScreenText = item.sourceType?.trim() || getProfileRequestContextLabel(item.context, language) || t.notSpecified;
+              const transitionScreenText = getProfileRequestSourceLabel(item.sourceType, item.context, language, t.notSpecified);
               const votesLabel = language === 'en' ? 'votes' : language === 'ru' ? 'голосов' : 'голосів';
               return (
                 <TouchableOpacity
@@ -969,7 +983,7 @@ export default function ProfileRequestsScreen() {
             const reasonText = item.reason ? t.reasons[item.reason as ContactReason] : null;
             const topicText = reasonText || item.sourceTitle?.trim() || t.notSpecified;
             const foundContactText = item.sourceTitle?.trim() || getProfileRequestContextLabel(item.context, language) || t.notSpecified;
-            const transitionScreenText = item.sourceType?.trim() || getProfileRequestContextLabel(item.context, language) || t.notSpecified;
+            const transitionScreenText = getProfileRequestSourceLabel(item.sourceType, item.context, language, t.notSpecified);
             const statusIcon = item.status === 'approved'
               ? 'check-circle'
               : item.status === 'denied'
@@ -1371,17 +1385,19 @@ const styles = StyleSheet.create({
     color: '#3D5D87',
   },
   descriptionBox: {
-    borderWidth: 1,
-    borderColor: '#E0D5C8',
+    borderWidth: 0,
     borderRadius: 8,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    backgroundColor: '#FAF7F3',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    backgroundColor: ACCENT,
+    minHeight: 42,
+    justifyContent: 'center',
   },
   descriptionText: {
-    fontSize: 12,
-    color: '#7A6D64',
-    lineHeight: 17,
+    fontSize: 15,
+    color: '#fff',
+    lineHeight: 19,
+    fontWeight: '900',
   },
   requestMetaBox: {
     borderWidth: 1,
@@ -1582,8 +1598,8 @@ const styles = StyleSheet.create({
     borderColor: '#D4C5B8',
   },
   descriptionHint: {
-    color: '#9A8A7E',
-    fontStyle: 'italic',
+    color: '#F8EAF4',
+    fontStyle: 'normal',
   },
   outgoingMetaRow: {
     flexDirection: 'row',

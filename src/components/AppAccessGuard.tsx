@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import { useSelector } from 'react-redux';
 import SplashAnimation from './SplashAnimation';
+import MaintenanceScreen from './MaintenanceScreen';
+import ForceUpdateScreen from './ForceUpdateScreen';
 import {
   createDefaultRemoteConfigSnapshot,
   loadRemoteConfigSnapshot,
@@ -28,6 +30,7 @@ import {
   type EmergencyAccessCurrent,
 } from '../services/emergencyAccess';
 import { logClientError } from '../utils/errorLogger';
+import { getCurrentAppVersion, getVersionConfigUrl } from '../services/appVersion';
 
 type AppAccessGuardProps = {
   children: React.ReactNode;
@@ -373,9 +376,69 @@ const AppAccessGuard: React.FC<AppAccessGuardProps> = ({
     return () => subscription.remove();
   }, []);
 
+  const prevBetaModeRef = useRef(remoteSnapshot.config.beta_mode_enabled);
+  useEffect(() => {
+    const current = remoteSnapshot.config.beta_mode_enabled;
+    if (current !== prevBetaModeRef.current) {
+      prevBetaModeRef.current = current;
+      Toast.show({
+        type: current ? 'info' : 'success',
+        text1: current ? 'Бета-режим активовано' : 'Бета-режим вимкнено',
+        visibilityTime: 3000,
+      });
+    }
+  }, [remoteSnapshot.config.beta_mode_enabled]);
+
   if (!isRemoteReady) {
     console.log(`[AAG] render→SplashAnimation (remoteConfig not ready yet)`);
     return <SplashAnimation />;
+  }
+
+  const { config } = remoteSnapshot;
+
+  // Admin/moderator users bypass all blocking screens
+  if (!isBypassUser) {
+    // 1. App disabled by admin
+    if (!config.app_enabled) {
+      console.log('[AAG] render→MaintenanceScreen (app_enabled=false)');
+      return (
+        <MaintenanceScreen
+          message={config.maintenance_message || undefined}
+          onRetry={() => void refreshRemoteConfig()}
+        />
+      );
+    }
+
+    // 2. Maintenance mode
+    if (config.maintenance_mode) {
+      console.log('[AAG] render→MaintenanceScreen (maintenance_mode=true)');
+      return (
+        <MaintenanceScreen
+          message={config.maintenance_message || undefined}
+          onRetry={() => void refreshRemoteConfig()}
+        />
+      );
+    }
+
+    // 3. Admin-triggered force update
+    if (config.force_update_required) {
+      console.log('[AAG] render→ForceUpdateScreen (force_update_required=true)');
+      return (
+        <ForceUpdateScreen
+          result={{
+            currentVersion: getCurrentAppVersion(),
+            requiresUpdate: true,
+            hasNewVersion: true,
+            config: {
+              latestVersion: config.minimum_required_version,
+              minSupportedVersion: config.minimum_required_version,
+            },
+            configUrl: getVersionConfigUrl(),
+          }}
+          onRetry={() => void refreshRemoteConfig()}
+        />
+      );
+    }
   }
 
   return <>{children}</>;

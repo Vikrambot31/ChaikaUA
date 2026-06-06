@@ -77,6 +77,12 @@ const UI_TEXT = {
     topPhotoUploading: 'Дочекайтесь завершення завантаження фото.',
     topPhotoError: 'Фото не завантажилось. Видаліть його або спробуйте ще раз.',
     topPhotoRequired: 'Додайте фото для картки.',
+    businessTitle: 'Ваш бізнес на Чайці?',
+    businessDesc: 'Додайте заклад у топ без нових правил доступу.',
+    businessButton: 'Додати заклад',
+    offerBadge: 'Акція',
+    offerAlertTitle: 'Акція поруч',
+    offerAlertRoute: 'Маршрут',
     errorTitle: 'Помилка',
     ok: 'OK',
     filters: {
@@ -127,6 +133,12 @@ const UI_TEXT = {
     topPhotoUploading: 'Дождитесь завершения загрузки фото.',
     topPhotoError: 'Фото не загрузилось. Удалите его или попробуйте ещё раз.',
     topPhotoRequired: 'Добавьте фото для карточки.',
+    businessTitle: 'Ваш бизнес на Чайке?',
+    businessDesc: 'Добавьте заведение в топ без новых правил доступа.',
+    businessButton: 'Добавить заведение',
+    offerBadge: 'Акция',
+    offerAlertTitle: 'Акция рядом',
+    offerAlertRoute: 'Маршрут',
     errorTitle: 'Ошибка',
     ok: 'OK',
     filters: {
@@ -177,6 +189,12 @@ const UI_TEXT = {
     topPhotoUploading: 'Wait until the photo upload finishes.',
     topPhotoError: 'The photo did not upload. Remove it or try again.',
     topPhotoRequired: 'Add a photo for the card.',
+    businessTitle: 'Your business at Chaika?',
+    businessDesc: 'Add your place to the top without new access rules.',
+    businessButton: 'Add place',
+    offerBadge: 'Deal',
+    offerAlertTitle: 'Deal nearby',
+    offerAlertRoute: 'Route',
     errorTitle: 'Error',
     ok: 'OK',
     filters: {
@@ -289,6 +307,7 @@ export default function EdaNaChaykeScreen() {
   const allFoodPlaces = useMemo(() => getFoodPlaces(chaykaPlaces), []);
 
   const activeOffers = useMemo(() => getActiveFoodOffers(chaykaPlaces), []);
+  const offerPlaceIds = useMemo(() => new Set(activeOffers.map((offer) => offer.placeId)), [activeOffers]);
 
   // Eat mode: filtered by category + search
   const eatPlaces = useMemo(() => {
@@ -307,8 +326,9 @@ export default function EdaNaChaykeScreen() {
   const recommendedPlaces = useMemo(() => {
     return allFoodPlaces
       .filter((p) => getPlaceFoodCategory(p) !== 'grocery')
-      .slice(0, 4);
-  }, [allFoodPlaces]);
+      .filter((p) => !offerPlaceIds.has(p.id))
+      .slice(0, 3);
+  }, [allFoodPlaces, offerPlaceIds]);
 
   // Home mode: offers with places
   const offersWithPlaces = useMemo(() => {
@@ -691,19 +711,57 @@ export default function EdaNaChaykeScreen() {
     );
   };
 
-  const renderOfferCard = (offer: FoodOffer, placeName?: string) => {
+  const renderBusinessCard = () => (
+    <TouchableOpacity style={styles.businessCard} activeOpacity={0.88} onPress={handleOpenTopForm}>
+      <View style={styles.businessIcon}>
+        <MaterialCommunityIcons name="store-plus" size={26} color="#FFFFFF" />
+      </View>
+      <View style={styles.businessTextBlock}>
+        <Text style={styles.businessTitle}>{text.businessTitle}</Text>
+        <Text style={styles.businessDesc}>{text.businessDesc}</Text>
+      </View>
+      <View style={styles.businessAction}>
+        <Text style={styles.businessActionText}>{text.businessButton}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderOfferCard = (offer: FoodOffer, place?: Place) => {
     const dateStr = offer.validUntil ? `${text.validUntil} ${formatOfferDate(offer.validUntil)}` : '';
+    const placeName = place?.name;
     return (
       <TouchableOpacity
         key={offer.id}
         style={styles.offerCard}
         activeOpacity={0.86}
-        onPress={() => logFoodEvent('food_open_offer', { placeId: offer.placeId })}
+        onPress={() => {
+          logFoodEvent('food_open_offer', { placeId: offer.placeId });
+          Alert.alert(
+            text.offerAlertTitle,
+            `${offer.title}\n\n${offer.shortText}${placeName ? `\n\n${placeName}` : ''}`,
+            [
+              ...(place ? [{ text: text.offerAlertRoute, onPress: () => handleRoutePlace(place) }] : []),
+              { text: text.ok, style: 'cancel' as const },
+            ],
+          );
+        }}
       >
-        <Text style={styles.offerTitle} numberOfLines={2}>{offer.title}</Text>
-        <Text style={styles.offerShortText} numberOfLines={2}>{offer.shortText}</Text>
-        {dateStr ? <Text style={styles.offerMeta}>{dateStr}</Text> : null}
-        {placeName ? <Text style={styles.offerPlaceName} numberOfLines={1}>{placeName}</Text> : null}
+        <View style={styles.offerRow}>
+          <View style={styles.offerVisual}>
+            <MaterialCommunityIcons name="tag-heart" size={28} color="#FFFFFF" />
+          </View>
+          <View style={styles.offerTextBlock}>
+            <View style={styles.offerBadge}>
+              <Text style={styles.offerBadgeText}>{text.offerBadge}</Text>
+            </View>
+            <Text style={styles.offerTitle} numberOfLines={2}>{offer.title}</Text>
+            <Text style={styles.offerShortText} numberOfLines={2}>{offer.shortText}</Text>
+            <View style={styles.offerFooterRow}>
+              {dateStr ? <Text style={styles.offerMeta}>{dateStr}</Text> : null}
+              {placeName ? <Text style={styles.offerPlaceName} numberOfLines={1}>{placeName}</Text> : null}
+            </View>
+          </View>
+        </View>
       </TouchableOpacity>
     );
   };
@@ -870,6 +928,7 @@ export default function EdaNaChaykeScreen() {
             {renderCTA('pizza', text.eatNow, text.eatNowDesc, '#E07B39', handleEatNow)}
             {renderCTA('cart', text.shopping, text.shoppingDesc, SCREEN_THEME.enamelBlueDark, handleShopping)}
             {renderCTA('fire', text.offers, text.offersDesc, '#C0392B', handleOffersScroll)}
+            {renderBusinessCard()}
 
             {/* Recommended nearby */}
             {recommendedPlaces.length > 0 && (
@@ -891,7 +950,7 @@ export default function EdaNaChaykeScreen() {
               {offersWithPlaces.length > 0 ? (
                 <View style={styles.cardList}>
                   {offersWithPlaces.map(({ offer, place }) =>
-                    renderOfferCard(offer, place?.name),
+                    renderOfferCard(offer, place),
                   )}
                 </View>
               ) : (
@@ -1036,6 +1095,53 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: SCREEN_THEME.textSecondary,
     lineHeight: 17,
+  },
+  businessCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5FBF8',
+    borderRadius: 20,
+    padding: 14,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#B7D8C4',
+    ...SCREEN_THEME.raisedShadow,
+  },
+  businessIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#2E7D5B',
+    marginRight: 12,
+  },
+  businessTextBlock: {
+    flex: 1,
+    paddingRight: 8,
+  },
+  businessTitle: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: SCREEN_THEME.textPrimary,
+  },
+  businessDesc: {
+    marginTop: 3,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '700',
+    color: SCREEN_THEME.textSecondary,
+  },
+  businessAction: {
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: '#2E7D5B',
+  },
+  businessActionText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
   },
 
   // Category chips (eat mode)
@@ -1379,11 +1485,44 @@ const styles = StyleSheet.create({
 
   // Offers
   offerCard: {
-    backgroundColor: '#FFF7E3',
+    backgroundColor: '#FFF8EA',
     borderRadius: 18,
-    padding: 14,
+    padding: 12,
     borderWidth: 1,
-    borderColor: 'rgba(216, 175, 89, 0.35)',
+    borderColor: '#E8BE68',
+    shadowColor: '#5C3A1E',
+    shadowOpacity: 0.1,
+    shadowRadius: 7,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
+  },
+  offerRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+  },
+  offerVisual: {
+    width: 62,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#C0392B',
+    marginRight: 12,
+  },
+  offerTextBlock: {
+    flex: 1,
+  },
+  offerBadge: {
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    backgroundColor: '#C0392B',
+    marginBottom: 6,
+  },
+  offerBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '900',
   },
   offerTitle: {
     fontSize: 14,
@@ -1399,16 +1538,23 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   offerMeta: {
-    marginTop: 7,
+    marginTop: 0,
+    marginRight: 8,
     fontSize: 12,
     fontWeight: '900',
     color: SCREEN_THEME.terracotta,
   },
   offerPlaceName: {
-    marginTop: 6,
+    flex: 1,
+    marginTop: 0,
     fontSize: 11,
     fontWeight: '800',
     color: SCREEN_THEME.enamelBlueDark,
+  },
+  offerFooterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
   },
 
   // Empty state

@@ -32,12 +32,15 @@ describe('Firebase rules explicit child-read policy', () => {
     expect(rules).not.toContain("role').val() == 'moderator'");
   });
 
-  it('keeps public moderation collections readable without auth-gating writes', () => {
+  it('gates moderation collections behind auth (no public read)', () => {
     const parsed = tryParseJson(readProjectFile('firebase.rules.json')) as Record<string, any>;
 
-    expect(parsed.rules.requests['.read']).toBe(true);
-    expect(parsed.rules.community_photos['.read']).toBe(true);
+    expect(parsed.rules.requests['.read']).toBe('auth != null');
+    expect(parsed.rules.community_photos['.read']).toBe('auth != null');
     expect(parsed.rules.community_photos_public['.read']).toBe('auth != null');
+    expect(parsed.rules.buy_sell_listings['.read']).toBe('auth != null');
+    expect(parsed.rules.food_top_listings['.read']).toBe('auth != null');
+    expect(parsed.rules.job_listings['.read']).toBe('auth != null');
 
     expect(parsed.rules.requests.$requestId['.write']).toContain('auth != null');
     expect(parsed.rules.community_photos.$photoId['.write']).toContain('auth != null');
