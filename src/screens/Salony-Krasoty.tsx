@@ -7,6 +7,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Share,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
@@ -38,11 +39,14 @@ const UI_TEXT = {
     actualTitle: 'Актуальні пропозиції',
     actualEmptyTitle: 'Тут зʼявляться акції та знижки',
     actualEmptyText: 'Салони зможуть показувати свої акції, нових майстрів та вільні вікна для мешканців району.',
+    addOffer: 'Додати акцію',
+    businessOwner: 'Ви власник салону?',
     categoriesTitle: 'Категорії',
     allPlacesTitle: 'Всі салони',
     noResults: 'Нічого не знайдено. Спробуйте змінити пошук або категорію.',
     noOffers: 'Поки що немає активних пропозицій.',
-    details: 'Детальніше',
+    details: 'Обрати послугу',
+    share: 'Поділитись',
     validUntil: 'до',
     free: 'безкоштовно',
     priceFrom: 'від',
@@ -96,11 +100,14 @@ const UI_TEXT = {
     actualTitle: 'Актуальные предложения',
     actualEmptyTitle: 'Здесь появятся акции и скидки',
     actualEmptyText: 'Салоны смогут показывать свои акции, новых мастеров и свободные окна для жителей района.',
+    addOffer: 'Добавить акцию',
+    businessOwner: 'Вы владелец салона?',
     categoriesTitle: 'Категории',
     allPlacesTitle: 'Все салоны',
     noResults: 'Ничего не найдено. Попробуйте изменить поиск или категорию.',
     noOffers: 'Пока нет активных предложений.',
-    details: 'Подробнее',
+    details: 'Выбрать услугу',
+    share: 'Поделиться',
     validUntil: 'до',
     free: 'бесплатно',
     priceFrom: 'от',
@@ -154,11 +161,14 @@ const UI_TEXT = {
     actualTitle: 'Current offers',
     actualEmptyTitle: 'Deals and discounts will appear here',
     actualEmptyText: 'Salons will be able to show their promotions, new masters and available slots for local residents.',
+    addOffer: 'Add promotion',
+    businessOwner: 'Salon owner?',
     categoriesTitle: 'Categories',
     allPlacesTitle: 'All salons',
     noResults: 'Nothing found. Try changing search or category.',
     noOffers: 'No active offers yet.',
-    details: 'Details',
+    details: 'Choose service',
+    share: 'Share',
     validUntil: 'until',
     free: 'free',
     priceFrom: 'from',
@@ -352,6 +362,20 @@ export default function SalonyKrasotyScreen() {
     navigation.navigate('DetalPredlozheniyaSalonaScreen', { offer });
   };
 
+  const shareSalon = async (place: Place) => {
+    try {
+      await Share.share({
+        message: `${place.name}\n${place.address}\n\nЧайка — Салони краси`,
+      });
+    } catch {
+      // пользователь закрыл шторку — ничего не делаем
+    }
+  };
+
+  const openBusinessForm = () => {
+    navigation.navigate('BizznesChaikaScreen', {});
+  };
+
   const handleCategoryPress = (category: CategoryKey) => {
     setActiveCategory(category);
     setTimeout(() => {
@@ -420,6 +444,9 @@ export default function SalonyKrasotyScreen() {
           <TouchableOpacity style={styles.primaryAction} onPress={() => openPlace(place)} activeOpacity={0.85}>
             <Text style={styles.primaryActionText}>{text.details}</Text>
           </TouchableOpacity>
+          <TouchableOpacity style={styles.shareAction} onPress={() => shareSalon(place)} activeOpacity={0.85}>
+            <MaterialCommunityIcons name="share-variant-outline" size={18} color={SCREEN_THEME.enamelBlueDark} />
+          </TouchableOpacity>
         </View>
       </TouchableOpacity>
     );
@@ -457,15 +484,18 @@ export default function SalonyKrasotyScreen() {
             {activeOffers.map((offer) => renderOfferCard(offer))}
           </ScrollView>
         ) : (
-          <View style={styles.actualCard}>
+          <TouchableOpacity style={styles.actualCard} activeOpacity={0.88} onPress={openBusinessForm}>
             <View style={styles.actualIcon}>
-              <MaterialCommunityIcons name="content-cut" size={24} color="#FFFFFF" />
+              <MaterialCommunityIcons name="bell-plus-outline" size={24} color="#FFFFFF" />
             </View>
             <View style={styles.actualTextBlock}>
-              <Text style={styles.actualTitle}>{text.actualEmptyTitle}</Text>
+              <Text style={styles.actualTitle}>{text.businessOwner}</Text>
               <Text style={styles.actualText}>{text.actualEmptyText}</Text>
             </View>
-          </View>
+            <View style={styles.actualCta}>
+              <Text style={styles.actualCtaText}>{text.addOffer}</Text>
+            </View>
+          </TouchableOpacity>
         )}
 
         <View style={styles.sectionHeaderRow}>
@@ -649,6 +679,18 @@ const styles = StyleSheet.create({
     color: SCREEN_THEME.textSecondary,
     fontWeight: '600',
   },
+  actualCta: {
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#D4668E',
+    marginLeft: 8,
+  },
+  actualCtaText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
   categoryGrid: {
     gap: TILE_GAP,
     marginBottom: 6,
@@ -783,12 +825,26 @@ const styles = StyleSheet.create({
   cardActions: {
     flexDirection: 'row',
     marginTop: 12,
+    alignItems: 'center',
+    gap: 8,
   },
   primaryAction: {
     borderRadius: 15,
     paddingHorizontal: 14,
     paddingVertical: 9,
     backgroundColor: SCREEN_THEME.enamelBlueDark,
+    flex: 1,
+    alignItems: 'center',
+  },
+  shareAction: {
+    width: 38,
+    height: 38,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: SCREEN_THEME.accentCream,
+    borderWidth: 1,
+    borderColor: SCREEN_THEME.borderSoft,
   },
   primaryActionText: {
     color: '#FFFFFF',
