@@ -1,222 +1,177 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, FlatList, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { useDispatch, useSelector } from 'react-redux';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { addHelpRequest, removeHelpRequest, selectAllHelpRequests, selectCompletedRequests, syncFromRequests } from '../redux/slices/helpRequestsSlice';
-import { selectAllRequests } from '../redux/slices/requestsSlice';
-import { COLORS, SIZES } from '../utils/constants';
+import { useDispatch, useSelector } from 'react-redux';
 import MiniTabBar from '../components/MiniTabBar';
-import ContactReasonModal from '../components/ContactReasonModal';
-import { useContactRequest } from '../hooks/useContactRequest';
-import type { AppDispatch, RootState } from '../redux/store';
-import { selectUser } from '../redux/slices/authSlice';
-import { createPendingModeration } from '../utils/moderation';
-import { normalizePhoneText } from '../utils/textUtils';
-import type { HelpRequest } from '../types/app';
-import MiniUserAvatar from '../components/MiniUserAvatar';
-import { safeCallPhone } from '../utils/communicationActions';
-import type { DetailItemData } from '../utils/detailViewTypes';
-import UserCardActionBar from '../components/UserCardActionBar';
-import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 import ScreenTooltip from '../components/ScreenTooltip';
 import { HELP_HISTORY_TOOLTIP } from '../utils/screenTooltips';
+import { COLORS, SIZES } from '../utils/constants';
+import { removeHelpRequest, selectAllHelpRequests, syncFromRequests } from '../redux/slices/helpRequestsSlice';
+import { selectAllRequests } from '../redux/slices/requestsSlice';
+import { selectUser } from '../redux/slices/authSlice';
+import type { AppDispatch, RootState } from '../redux/store';
+import type { DetailItemData } from '../utils/detailViewTypes';
+import type { HelpRequest } from '../types/app';
+import { normalizePhoneText } from '../utils/textUtils';
 import { requireAuthForDetails } from '../utils/authGuard';
 
-type FilterType = 'active' | 'completed' | 'today' | 'expired' | 'mine';
 type Lang = 'ua' | 'ru' | 'en';
+type TabKey = 'active' | 'attention' | 'history';
 
 const UI_TEXT = {
   ua: {
-    expiredLabel: 'Згоріла',
-    justNow: 'Щойно',
+    title: 'Мої запити допомоги',
+    subtitle: 'Статус, повтор і архів ваших звернень без зайвих дій.',
+    active: 'Активні',
+    attention: 'Потрібна дія',
+    history: 'Історія',
+    searchPlaceholder: 'Пошук за текстом, типом або телефоном...',
+    total: 'Усього',
+    published: 'Опубліковано',
+    pending: 'На перевірці',
+    rejected: 'Відхилено',
+    expired: 'Прострочено',
+    closed: 'Закрито',
+    noReason: 'Причину не вказано. Перевірте текст і фото перед повторною відправкою.',
+    details: 'Деталі',
+    repeat: 'Повторити',
+    fixAndRepeat: 'Виправити',
+    hide: 'Сховати',
+    create: 'Створити запит',
+    hideTitle: 'Сховати з історії?',
+    hideBody: 'Запит буде прибрано тільки з цього списку на вашому пристрої.',
+    cancel: 'Скасувати',
+    hiddenTitle: 'Готово',
+    hiddenBody: 'Запит сховано з історії.',
+    emptyTitle: 'Тут поки немає запитів',
+    emptyBody: 'Коли ви створите запит допомоги, він зʼявиться тут зі статусом.',
+    repeatHint: 'Відкриємо форму з вашим попереднім текстом. Після перевірки запит знову зʼявиться у сусідів.',
+    confirm: 'Продовжити',
     minAgo: 'хв тому',
     hourAgo: 'год тому',
     dayAgo: 'д тому',
-    all: 'Усі',
-    active: 'Активні',
-    completed: 'Виконано',
-    today: 'Сьогодні',
-    expired: 'Минуло',
-    mine: 'Мої',
-    title: 'ІСТОРІЯ ДОПОМОГИ',
-    subtitle: 'Усі прохання сусідів — архів допомоги',
-    inFilter: 'В фільтрі',
-    activeStats: 'Активних',
-    searchPlaceholder: 'Пошук по імені, телефону, опису...',
-    typeFilterAll: 'Усі типи',
-    typeFilterLabel: 'Тип допомоги',
-    details: 'Деталі',
-    repeat: 'Повторити',
-    delete: 'Видалити',
-    createNew: 'Створити нове прохання',
-    myStats: 'Мої',
-    moderationPending: 'На модерації',
-    moderationApproved: 'Схвалено',
-    moderationRejected: 'Відхилено',
-    detailsTitle: 'Деталі заявки',
-    detailsType: 'Тип',
-    detailsStatus: 'Статус',
-    detailsCreated: 'Створено',
-    detailsExpires: 'Діє до',
-    detailsDescription: 'Опис',
-    repeatDone: 'Заявку повторено',
-    deleteConfirmTitle: 'Видалити заявку?',
-    deleteConfirmBody: 'Вона зникне з історії допомоги.',
-    deleteCancel: 'Скасувати',
-    minShort: 'хв',
-    hourShort: 'год',
-    dayShort: 'д',
-    emptyTitle: 'Немає прохань у цьому фільтрі',
-    emptySubtitle: 'Змініть фільтр або створіть нове прохання',
+    justNow: 'щойно',
   },
   ru: {
-    expiredLabel: 'Сгорела',
-    justNow: 'Только что',
+    title: 'Мои запросы помощи',
+    subtitle: 'Статус, повтор и архив ваших обращений без лишних действий.',
+    active: 'Активные',
+    attention: 'Нужны действия',
+    history: 'История',
+    searchPlaceholder: 'Поиск по тексту, типу или телефону...',
+    total: 'Всего',
+    published: 'Опубликовано',
+    pending: 'На проверке',
+    rejected: 'Отклонено',
+    expired: 'Просрочено',
+    closed: 'Закрыто',
+    noReason: 'Причина не указана. Проверьте текст и фото перед повторной отправкой.',
+    details: 'Детали',
+    repeat: 'Повторить',
+    fixAndRepeat: 'Исправить',
+    hide: 'Скрыть',
+    create: 'Создать запрос',
+    hideTitle: 'Скрыть из истории?',
+    hideBody: 'Запрос будет убран только из этого списка на вашем устройстве.',
+    cancel: 'Отмена',
+    hiddenTitle: 'Готово',
+    hiddenBody: 'Запрос скрыт из истории.',
+    emptyTitle: 'Здесь пока нет запросов',
+    emptyBody: 'Когда вы создадите запрос помощи, он появится здесь со статусом.',
+    repeatHint: 'Откроем форму с вашим прошлым текстом. После проверки запрос снова появится у соседей.',
+    confirm: 'Продолжить',
     minAgo: 'мин назад',
     hourAgo: 'ч назад',
     dayAgo: 'д назад',
-    all: 'Все',
-    active: 'Активные',
-    completed: 'Выполнено',
-    today: 'Сегодня',
-    expired: 'Прошло',
-    mine: 'Мои',
-    title: 'ИСТОРИЯ ПОМОЩИ',
-    subtitle: 'Все просьбы соседей — архив помощи',
-    inFilter: 'В фильтре',
-    activeStats: 'Активных',
-    searchPlaceholder: 'Поиск по имени, телефону, описанию...',
-    typeFilterAll: 'Все типы',
-    typeFilterLabel: 'Тип помощи',
-    details: 'Детали',
-    repeat: 'Повторить',
-    delete: 'Удалить',
-    createNew: 'Создать новую просьбу',
-    myStats: 'Моих',
-    moderationPending: 'На модерации',
-    moderationApproved: 'Одобрено',
-    moderationRejected: 'Отклонено',
-    detailsTitle: 'Детали заявки',
-    detailsType: 'Тип',
-    detailsStatus: 'Статус',
-    detailsCreated: 'Создано',
-    detailsExpires: 'Действует до',
-    detailsDescription: 'Описание',
-    repeatDone: 'Заявка повторена',
-    deleteConfirmTitle: 'Удалить заявку?',
-    deleteConfirmBody: 'Она исчезнет из истории помощи.',
-    deleteCancel: 'Отмена',
-    minShort: 'мин',
-    hourShort: 'ч',
-    dayShort: 'д',
-    emptyTitle: 'Нет просьб в этом фильтре',
-    emptySubtitle: 'Измените фильтр или создайте новую просьбу',
+    justNow: 'только что',
   },
   en: {
-    expiredLabel: 'Expired',
-    justNow: 'Just now',
+    title: 'My help requests',
+    subtitle: 'Status, repeat, and archive for your help requests.',
+    active: 'Active',
+    attention: 'Needs action',
+    history: 'History',
+    searchPlaceholder: 'Search by text, type, or phone...',
+    total: 'Total',
+    published: 'Published',
+    pending: 'Checking',
+    rejected: 'Rejected',
+    expired: 'Expired',
+    closed: 'Closed',
+    noReason: 'No reason was provided. Check text and photo before submitting again.',
+    details: 'Details',
+    repeat: 'Repeat',
+    fixAndRepeat: 'Fix',
+    hide: 'Hide',
+    create: 'Create request',
+    hideTitle: 'Hide from history?',
+    hideBody: 'This request will be removed only from this list on your device.',
+    cancel: 'Cancel',
+    hiddenTitle: 'Done',
+    hiddenBody: 'Request hidden from history.',
+    emptyTitle: 'No requests yet',
+    emptyBody: 'When you create a help request, it will appear here with its status.',
+    repeatHint: 'We will open the form with your previous text. After review, the request will appear for neighbors again.',
+    confirm: 'Continue',
     minAgo: 'min ago',
     hourAgo: 'h ago',
     dayAgo: 'd ago',
-    all: 'All',
-    active: 'Active',
-    completed: 'Completed',
-    today: 'Today',
-    expired: 'Expired',
-    mine: 'Mine',
-    title: 'HELP HISTORY',
-    subtitle: 'All neighbor requests — help archive',
-    inFilter: 'In filter',
-    activeStats: 'Active',
-    searchPlaceholder: 'Search by name, phone, description...',
-    typeFilterAll: 'All types',
-    typeFilterLabel: 'Help type',
-    details: 'Details',
-    repeat: 'Repeat',
-    delete: 'Delete',
-    createNew: 'Create new request',
-    myStats: 'Mine',
-    moderationPending: 'Pending',
-    moderationApproved: 'Approved',
-    moderationRejected: 'Rejected',
-    detailsTitle: 'Request details',
-    detailsType: 'Type',
-    detailsStatus: 'Status',
-    detailsCreated: 'Created',
-    detailsExpires: 'Expires',
-    detailsDescription: 'Description',
-    repeatDone: 'Request repeated',
-    deleteConfirmTitle: 'Delete request?',
-    deleteConfirmBody: 'It will be removed from help history.',
-    deleteCancel: 'Cancel',
-    minShort: 'm',
-    hourShort: 'h',
-    dayShort: 'd',
-    emptyTitle: 'No requests in this filter',
-    emptySubtitle: 'Change filter or create a new request',
+    justNow: 'just now',
   },
 } as const;
 
-type UiText = (typeof UI_TEXT)[Lang];
-
-const toDateSafe = (value?: Date | string | null) => {
+const toDateSafe = (value?: Date | string | number | null) => {
   if (!value) return new Date(0);
   return value instanceof Date ? value : new Date(value);
 };
 
-const extractHelpType = (description: string) => {
-  const match = description.match(/^\[(.*?)\]\s*/);
+const normalizeForSearch = (value: string) => value.trim().toLowerCase();
+
+const getAgeLabel = (date: Date, text: (typeof UI_TEXT)[Lang], nowTs: number) => {
+  const diffMs = Math.max(0, nowTs - date.getTime());
+  const mins = Math.floor(diffMs / 60000);
+  const hours = Math.floor(diffMs / 3600000);
+  const days = Math.floor(diffMs / 86400000);
+  if (mins < 1) return text.justNow;
+  if (mins < 60) return `${mins} ${text.minAgo}`;
+  if (hours < 24) return `${hours} ${text.hourAgo}`;
+  return `${days} ${text.dayAgo}`;
+};
+
+const getHelpType = (request: HelpRequest) => {
+  const fromCategory = request.subcategory || request.category || '';
+  if (fromCategory) return fromCategory;
+  const match = request.description.match(/^\[(.*?)\]\s*/);
   return match?.[1]?.trim() || '';
 };
 
-const normalizeForSearch = (value: string) => value.trim().toLowerCase();
+const isExpired = (request: HelpRequest, nowTs: number) => toDateSafe(request.expiresAt).getTime() <= nowTs;
 
-const formatTimeLeft = (expiresAt: Date, text: UiText, nowTs: number) => {
-  const diff = expiresAt.getTime() - nowTs;
-  if (diff <= 0) return text.expiredLabel;
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  const hours = Math.floor(diff / (1000 * 60 * 60));
-  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-  if (days > 0) {
-    const restHours = hours % 24;
-    return `${days}${text.dayShort} ${restHours}${text.hourShort}`;
-  }
-  return `${hours}${text.hourShort} ${minutes}${text.minShort}`;
-};
-
-const getTimeAgo = (date: Date, text: UiText, nowTs: number): string => {
-  const diffMs = nowTs - date.getTime();
-  const diffMins = Math.floor(diffMs / (1000 * 60));
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffMins < 1) return text.justNow;
-  if (diffMins < 60) return `${diffMins} ${text.minAgo}`;
-  if (diffHours < 24) return `${diffHours} ${text.hourAgo}`;
-  return `${diffDays} ${text.dayAgo}`;
+const getStatusKey = (request: HelpRequest, nowTs: number): 'pending' | 'published' | 'rejected' | 'expired' | 'closed' => {
+  if (request.moderationStatus === 'rejected') return 'rejected';
+  if (request.moderationStatus === 'pending') return 'pending';
+  if (isExpired(request, nowTs)) return 'expired';
+  if (!request.isBurning) return 'closed';
+  return 'published';
 };
 
 const HelpHistoryScreen: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
-  const navLock = useRef(false);
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
   const text = UI_TEXT[language];
-  const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
-  const [filter, setFilter] = useState<FilterType>('mine');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [typeFilter, setTypeFilter] = useState('');
-  const [nowTs, setNowTs] = useState(() => Date.now());
   const user = useSelector(selectUser);
   const sourceRequests = useSelector((state: RootState) => selectAllRequests(state));
-
   const allRequests = useSelector((state: RootState) => selectAllHelpRequests(state)) as HelpRequest[];
-  const completedRequests = useSelector((state: RootState) => selectCompletedRequests(state)) as HelpRequest[];
+  const [tab, setTab] = useState<TabKey>('active');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [nowTs, setNowTs] = useState(() => Date.now());
 
   useEffect(() => {
-    if (sourceRequests.length === 0) return;
-    dispatch(syncFromRequests(sourceRequests));
+    if (sourceRequests.length > 0) {
+      dispatch(syncFromRequests(sourceRequests));
+    }
   }, [dispatch, sourceRequests]);
 
   useEffect(() => {
@@ -227,162 +182,126 @@ const HelpHistoryScreen: React.FC = () => {
   const isOwnRequest = useCallback((request: HelpRequest) => {
     if (!user) return false;
     if (request.userId && user.id) return request.userId === user.id;
-    const sameName = Boolean(normalizeForSearch(user.name || '')) && normalizeForSearch(user.name || '') === normalizeForSearch(request.name || '');
-    return sameName;
+    return Boolean(user.name && request.name) && normalizeForSearch(user.name) === normalizeForSearch(request.name);
   }, [user]);
 
-  const ownRequests = useMemo(() => allRequests.filter((r) => isOwnRequest(r)), [allRequests, isOwnRequest]);
-  const ownCompletedRequests = useMemo(() => completedRequests.filter((r) => isOwnRequest(r)), [completedRequests, isOwnRequest]);
-  const avatarByUserId = useUserAvatarMap([...ownRequests, ...ownCompletedRequests].map((item) => item.userId));
+  const ownRequests = useMemo(
+    () => allRequests.filter((request) => isOwnRequest(request)),
+    [allRequests, isOwnRequest],
+  );
 
-  const helpTypes = useMemo(() => {
-    const values = Array.from(new Set(ownRequests.map((r) => extractHelpType(r.description)).filter(Boolean)));
-    return values;
-  }, [ownRequests]);
+  const stats = useMemo(() => {
+    const pending = ownRequests.filter((request) => getStatusKey(request, nowTs) === 'pending').length;
+    const rejected = ownRequests.filter((request) => getStatusKey(request, nowTs) === 'rejected').length;
+    const active = ownRequests.filter((request) => getStatusKey(request, nowTs) === 'published').length;
+    const expired = ownRequests.filter((request) => getStatusKey(request, nowTs) === 'expired').length;
+    return { total: ownRequests.length, active, pending, rejected, expired };
+  }, [nowTs, ownRequests]);
+
+  const tabOptions = useMemo(() => [
+    { key: 'active' as const, label: text.active, count: stats.active },
+    { key: 'attention' as const, label: text.attention, count: stats.pending + stats.rejected + stats.expired },
+    { key: 'history' as const, label: text.history, count: stats.total },
+  ], [stats, text]);
 
   const filteredRequests = useMemo(() => {
-    const now = new Date(nowTs);
     const query = normalizeForSearch(searchQuery);
-    const baseList = (() => {
-      switch (filter) {
-        case 'active':
-          return ownRequests.filter((r) => r.isBurning && toDateSafe(r.expiresAt) > now);
-        case 'completed':
-          return ownCompletedRequests;
-        case 'today': {
-          const today = new Date(nowTs);
-          today.setHours(0, 0, 0, 0);
-          return ownRequests.filter((r) => toDateSafe(r.createdAt) >= today);
-        }
-        case 'expired':
-          return ownRequests.filter((r) => toDateSafe(r.expiresAt) <= now);
-        case 'mine':
-          return ownRequests;
-        default:
-          return ownRequests;
-      }
-    })();
-
-    return baseList
-      .filter((r) => {
-        if (typeFilter && extractHelpType(r.description) !== typeFilter) return false;
+    return ownRequests
+      .filter((request) => {
+        const status = getStatusKey(request, nowTs);
+        if (tab === 'active') return status === 'published';
+        if (tab === 'attention') return status === 'pending' || status === 'rejected' || status === 'expired';
+        return true;
+      })
+      .filter((request) => {
         if (!query) return true;
-        const haystack = `${r.name} ${r.phone} ${r.description}`.toLowerCase();
+        const haystack = `${request.name} ${request.phone} ${request.description} ${getHelpType(request)}`.toLowerCase();
         return haystack.includes(query);
       })
       .sort((a, b) => toDateSafe(b.createdAt).getTime() - toDateSafe(a.createdAt).getTime());
-  }, [filter, nowTs, ownCompletedRequests, ownRequests, searchQuery, typeFilter]);
+  }, [nowTs, ownRequests, searchQuery, tab]);
 
-  const filterOptions: { label: string; value: FilterType; count: number }[] = useMemo(() => {
-    const now = new Date(nowTs);
-    const today = new Date(nowTs);
-    today.setHours(0, 0, 0, 0);
-
-    return [
-      { label: text.active, value: 'active', count: ownRequests.filter((r) => r.isBurning && toDateSafe(r.expiresAt) > now).length },
-      { label: text.completed, value: 'completed', count: ownCompletedRequests.length },
-      { label: text.today, value: 'today', count: ownRequests.filter((r) => toDateSafe(r.createdAt) >= today).length },
-      { label: text.expired, value: 'expired', count: ownRequests.filter((r) => toDateSafe(r.expiresAt) <= now).length },
-      { label: text.mine, value: 'mine', count: ownRequests.length },
-    ];
-  }, [nowTs, ownCompletedRequests.length, ownRequests, text]);
-
-  const handleRepeat = (item: HelpRequest) => {
-    const now = new Date();
-    const expires = new Date();
-    expires.setHours(23, 59, 59, 999);
-    dispatch(
-      addHelpRequest({
-        ...item,
-        id: `help-${Date.now()}`,
-        name: user?.name || item.name,
-        phone: normalizePhoneText(user?.phone || item.phone),
-        createdAt: now,
-        expiresAt: expires,
-        isBurning: true,
-        ...createPendingModeration(),
-      }),
-    );
-    Alert.alert(text.repeatDone);
+  const openRepeatForm = (item: HelpRequest) => {
+    Alert.alert(text.repeat, text.repeatHint, [
+      { text: text.cancel, style: 'cancel' },
+      {
+        text: text.confirm,
+        onPress: () => navigation.navigate('HelpRequestScreen', {
+          prefill: {
+            description: item.description,
+            phone: normalizePhoneText(user?.phone || item.phone || ''),
+            name: user?.name || item.name,
+            helpType: item.subcategory || '',
+          },
+        }),
+      },
+    ]);
   };
 
-  const handleDelete = (item: HelpRequest) => {
-    Alert.alert(text.deleteConfirmTitle, text.deleteConfirmBody, [
-      { text: text.deleteCancel, style: 'cancel' },
+  const hideFromHistory = (item: HelpRequest) => {
+    Alert.alert(text.hideTitle, text.hideBody, [
+      { text: text.cancel, style: 'cancel' },
       {
-        text: text.delete,
+        text: text.hide,
         style: 'destructive',
-        onPress: () => dispatch(removeHelpRequest(item.id)),
+        onPress: () => {
+          dispatch(removeHelpRequest(item.id));
+          Alert.alert(text.hiddenTitle, text.hiddenBody);
+        },
       },
     ]);
   };
 
   const openDetails = (item: HelpRequest) => {
-    const status = item.isBurning && toDateSafe(item.expiresAt) > new Date(nowTs)
-      ? text.active
-      : item.isBurning
-        ? text.expired
-        : text.completed;
-    const moderation =
-      item.moderationStatus === 'approved'
-        ? text.moderationApproved
-        : item.moderationStatus === 'rejected'
-          ? text.moderationRejected
-          : text.moderationPending;
+    if (!requireAuthForDetails({ userId: user?.id, navigation, language })) return;
     const detailItem: DetailItemData = {
       id: item.id,
       title: item.name,
       description: item.description,
       phone: item.phone,
-      category: extractHelpType(item.description) || undefined,
-      status: `${status} • ${moderation}`,
+      category: getHelpType(item) || undefined,
+      status: text[getStatusKey(item, nowTs)],
       userId: item.userId,
       createdAt: toDateSafe(item.createdAt).toISOString(),
       sourceType: 'help',
       sourceId: item.id,
+      photoUri: item.photoUri,
+      photoStoragePath: item.photoStoragePath,
     };
-
-    if (!requireAuthForDetails({ userId: user?.id, navigation, language })) return;
     navigation.navigate('ItemDetailScreen', { item: detailItem });
   };
 
-  const renderHeader = useCallback(() => (
+  const renderHeader = () => (
     <>
       <View style={styles.headerCard}>
         <Text style={styles.headerTitle}>{text.title}</Text>
         <Text style={styles.headerSubtitle}>{text.subtitle}</Text>
       </View>
 
-      <View style={styles.filterContainer}>
-        {filterOptions.map((option) => (
-          <TouchableOpacity
-            key={option.value}
-            style={[styles.filterButton, filter === option.value && styles.filterButtonActive]}
-            onPress={() => setFilter(option.value)}
-            activeOpacity={0.85}
-          >
-            <Text
-              style={[
-                styles.filterButtonText,
-                filter === option.value && styles.filterButtonTextActive,
-              ]}
+      <View style={styles.summaryCard}>
+        <SummaryItem label={text.total} value={stats.total} />
+        <SummaryItem label={text.published} value={stats.active} />
+        <SummaryItem label={text.pending} value={stats.pending} />
+        <SummaryItem label={text.rejected} value={stats.rejected} warning />
+      </View>
+
+      <View style={styles.tabsRow}>
+        {tabOptions.map((option) => {
+          const active = tab === option.key;
+          return (
+            <TouchableOpacity
+              key={option.key}
+              style={[styles.tabButton, active && styles.tabButtonActive]}
+              onPress={() => setTab(option.key)}
+              activeOpacity={0.84}
             >
-              {option.label}
-            </Text>
-            {option.count > 0 && (
-              <View style={[styles.badge, filter === option.value && styles.badgeActive]}>
-                <Text
-                  style={[
-                    styles.badgeText,
-                    filter === option.value && styles.badgeTextActive,
-                  ]}
-                >
-                  {option.count}
-                </Text>
+              <Text style={[styles.tabText, active && styles.tabTextActive]}>{option.label}</Text>
+              <View style={[styles.tabBadge, active && styles.tabBadgeActive]}>
+                <Text style={[styles.tabBadgeText, active && styles.tabBadgeTextActive]}>{option.count}</Text>
               </View>
-            )}
-          </TouchableOpacity>
-        ))}
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       <View style={styles.searchCard}>
@@ -395,55 +314,50 @@ const HelpHistoryScreen: React.FC = () => {
           style={styles.searchInput}
         />
       </View>
-
-      <View style={styles.typeFilterRow}>
-        <Text style={styles.typeFilterLabel}>{text.typeFilterLabel}</Text>
-        <ScrollToggle
-          text={text.typeFilterAll}
-          active={typeFilter === ''}
-          onPress={() => setTypeFilter('')}
-        />
-        {helpTypes.map((type) => (
-          <ScrollToggle
-            key={type}
-            text={type}
-            active={typeFilter === type}
-            onPress={() => setTypeFilter(type)}
-          />
-        ))}
-      </View>
-
-      {filteredRequests.length > 0 && (
-        <View style={styles.statsCard}>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{filteredRequests.length}</Text>
-            <Text style={styles.statLabel}>{text.inFilter}</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>
-              {filteredRequests.filter((r) => r.isBurning).length}
-            </Text>
-            <Text style={styles.statLabel}>{text.activeStats}</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{filteredRequests.filter((r) => isOwnRequest(r)).length}</Text>
-            <Text style={styles.statLabel}>{text.myStats}</Text>
-          </View>
-        </View>
-      )}
     </>
-  ), [
-    filter,
-    filterOptions,
-    filteredRequests,
-    helpTypes,
-    isOwnRequest,
-    searchQuery,
-    text,
-    typeFilter,
-  ]);
+  );
+
+  const renderRequest = ({ item }: { item: HelpRequest }) => {
+    const statusKey = getStatusKey(item, nowTs);
+    const type = getHelpType(item);
+    const reason = item.rejectionReason || item.moderationReason;
+    const isRejected = statusKey === 'rejected';
+
+    return (
+      <View style={styles.requestCard}>
+        <View style={styles.requestTop}>
+          <View style={styles.requestTitleWrap}>
+            <Text style={styles.requestTitle}>{type || text.title}</Text>
+            <Text style={styles.requestMeta}>{getAgeLabel(toDateSafe(item.createdAt), text, nowTs)}</Text>
+          </View>
+          <StatusPill label={text[statusKey]} status={statusKey} />
+        </View>
+
+        <Text style={styles.requestDescription}>{item.description}</Text>
+
+        {isRejected ? (
+          <View style={styles.reasonBox}>
+            <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#9A4B23" />
+            <Text style={styles.reasonText}>{reason?.trim() || text.noReason}</Text>
+          </View>
+        ) : null}
+
+        <View style={styles.actionsRow}>
+          <TouchableOpacity style={styles.secondaryAction} onPress={() => openDetails(item)} activeOpacity={0.82}>
+            <MaterialCommunityIcons name="text-box-search-outline" size={16} color="#5B4F47" />
+            <Text style={styles.secondaryActionText}>{text.details}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.primaryAction} onPress={() => openRepeatForm(item)} activeOpacity={0.86}>
+            <MaterialCommunityIcons name={isRejected ? 'pencil-outline' : 'repeat'} size={16} color="#FFFFFF" />
+            <Text style={styles.primaryActionText}>{isRejected ? text.fixAndRepeat : text.repeat}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconAction} onPress={() => hideFromHistory(item)} activeOpacity={0.82}>
+            <MaterialCommunityIcons name="archive-arrow-down-outline" size={18} color="#B13E2C" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -459,144 +373,39 @@ const HelpHistoryScreen: React.FC = () => {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={renderHeader}
-        renderItem={({ item }) => (
-          <View
-            style={[
-              styles.requestCard,
-              item.isBurning && toDateSafe(item.expiresAt) > new Date(nowTs)
-                ? styles.requestCardBurning
-                : styles.requestCardExpired,
-            ]}
-          >
-            <View style={styles.requestHeader}>
-              <View style={styles.userInfo}>
-                <MiniUserAvatar
-                  uri={(item.userId && avatarByUserId[item.userId]) || undefined}
-                  name={item.name}
-                  size={40}
-                  borderRadius={20}
-                  backgroundColor={item.isBurning && toDateSafe(item.expiresAt) > new Date(nowTs) ? '#FF6B4A' : '#A0938D'}
-                />
-                <View>
-                  <Text style={styles.userName}>{item.name}</Text>
-                </View>
-              </View>
-
-              {item.isBurning && toDateSafe(item.expiresAt) > new Date(nowTs) ? (
-                <View style={styles.burningBadge}>
-                  <MaterialCommunityIcons name="fire" size={16} color="#FFFFFF" />
-                  <Text style={styles.burningText}>{formatTimeLeft(toDateSafe(item.expiresAt), text, nowTs)}</Text>
-                </View>
-              ) : item.isBurning === false ? (
-                <View style={styles.completedBadge}>
-                  <MaterialCommunityIcons name="check-circle" size={18} color="#4CAF50" />
-                </View>
-              ) : (
-                <View style={styles.expiredBadge}>
-                  <MaterialCommunityIcons name="alert-circle" size={18} color="#FF9800" />
-                </View>
-              )}
-            </View>
-
-            {extractHelpType(item.description) ? (
-              <View style={styles.typeBadge}>
-                <Text style={styles.typeBadgeText}>{extractHelpType(item.description)}</Text>
-              </View>
-            ) : null}
-
-            <View style={styles.moderationBadge}>
-              <Text style={styles.moderationBadgeText}>
-                {item.moderationStatus === 'approved'
-                  ? text.moderationApproved
-                  : item.moderationStatus === 'rejected'
-                    ? text.moderationRejected
-                    : text.moderationPending}
-              </Text>
-            </View>
-
-            <Text style={styles.requestDescription}>{item.description}</Text>
-
-            <UserCardActionBar
-              avatarUri={(item.userId && avatarByUserId[item.userId]) || undefined}
-              name={item.name}
-              userId={item.userId}
-              currentUserId={user?.id}
-              language={language}
-              onProfile={item.userId ? () => { if (navLock.current) return; navLock.current = true; navigation.navigate('ViewUserProfile', { userId: item.userId as string }); setTimeout(() => { navLock.current = false; }, 800); } : undefined}
-              onContact={!isOwnRequest(item) && item.userId ? () => openContactModal({ userId: item.userId as string, name: item.name || 'Unknown', photoURL: avatarByUserId[item.userId as string] || undefined, sourceType: 'help', sourceId: item.id, sourceTitle: item.description?.slice(0, 60) }) : item.phone ? () => void safeCallPhone(item.phone, language) : undefined}
-              contactDisabled={!item.phone && (!item.userId || isOwnRequest(item))}
-              likePath="feed_likes/help_history"
-              likeId={item.id}
-            />
-
-            <View style={styles.requestFooter}>
-              <Text style={styles.requestTime}>
-                <MaterialCommunityIcons name="clock" size={12} color={COLORS.gray} />{' '}
-                {getTimeAgo(toDateSafe(item.createdAt), text, nowTs)}
-              </Text>
-              <View style={styles.actionsRow}>
-                <TouchableOpacity style={styles.actionBtn} onPress={() => openDetails(item)} activeOpacity={0.8}>
-                  <Text style={styles.actionBtnText}>{text.details}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.actionBtn} onPress={() => handleRepeat(item)} activeOpacity={0.8}>
-                  <Text style={styles.actionBtnText}>{text.repeat}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.actionBtn, styles.deleteActionBtn, !isOwnRequest(item) && styles.actionBtnDisabled]}
-                  onPress={() => handleDelete(item)}
-                  activeOpacity={0.8}
-                  disabled={!isOwnRequest(item)}
-                >
-                  <Text style={[styles.actionBtnText, styles.deleteActionBtnText]}>{text.delete}</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        )}
+        renderItem={renderRequest}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <MaterialCommunityIcons name="inbox-outline" size={48} color={COLORS.gray} />
-            <Text style={styles.emptyText}>{text.emptyTitle}</Text>
-            <Text style={styles.emptySubtext}>{text.emptySubtitle}</Text>
+            <MaterialCommunityIcons name="hand-heart-outline" size={48} color={COLORS.gray} />
+            <Text style={styles.emptyTitle}>{text.emptyTitle}</Text>
+            <Text style={styles.emptyBody}>{text.emptyBody}</Text>
             <TouchableOpacity
-              style={styles.createBtn}
-              onPress={() => navigation.navigate('HelpNeighborsScreen')}
-              activeOpacity={0.84}
+              style={styles.createButton}
+              onPress={() => navigation.navigate('HelpRequestScreen')}
+              activeOpacity={0.86}
             >
-              <Text style={styles.createBtnText}>{text.createNew}</Text>
+              <Text style={styles.createButtonText}>{text.create}</Text>
             </TouchableOpacity>
           </View>
         }
         showsVerticalScrollIndicator={false}
-      />
-      <ContactReasonModal
-        visible={contactModalVisible}
-        pending={contactPending}
-        target={contactTarget}
-        onSelect={(reason) => void sendContactRequest(reason)}
-        onClose={closeContactModal}
       />
       <MiniTabBar />
     </SafeAreaView>
   );
 };
 
-const ScrollToggle = ({
-  text,
-  active,
-  onPress,
-}: {
-  text: string;
-  active: boolean;
-  onPress: () => void;
-}) => (
-  <TouchableOpacity
-    style={[styles.typeToggle, active && styles.typeToggleActive]}
-    onPress={onPress}
-    activeOpacity={0.82}
-  >
-    <Text style={[styles.typeToggleText, active && styles.typeToggleTextActive]}>{text}</Text>
-  </TouchableOpacity>
+const SummaryItem = ({ label, value, warning = false }: { label: string; value: number; warning?: boolean }) => (
+  <View style={styles.summaryItem}>
+    <Text style={[styles.summaryValue, warning && styles.summaryValueWarning]}>{value}</Text>
+    <Text style={styles.summaryLabel}>{label}</Text>
+  </View>
+);
+
+const StatusPill = ({ label, status }: { label: string; status: ReturnType<typeof getStatusKey> }) => (
+  <View style={[styles.statusPill, styles[`status_${status}`]]}>
+    <Text style={[styles.statusText, status === 'published' && styles.statusTextLight]}>{label}</Text>
+  </View>
 );
 
 const styles = StyleSheet.create({
@@ -606,40 +415,108 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 16,
-    paddingVertical: 16,
-    paddingBottom: 32,
+    paddingTop: 16,
+    paddingBottom: 34,
   },
   headerCard: {
     backgroundColor: '#7A1E5C',
-    borderRadius: 20,
+    borderRadius: 18,
     padding: 18,
-    marginBottom: 14,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
+    marginBottom: 12,
   },
   headerTitle: {
-    fontSize: 28,
-    fontWeight: '900',
     color: '#FFFFFF',
-    marginTop: 8,
-    letterSpacing: 0.8,
-  },
-  headerSubtitle: {
-    marginTop: 6,
-    color: 'rgba(255,255,255,0.88)',
-    fontSize: SIZES.fontSmall,
-    lineHeight: 20,
+    fontSize: 24,
+    fontWeight: '900',
     textAlign: 'center',
   },
-  filterContainer: {
+  headerSubtitle: {
+    color: 'rgba(255,255,255,0.88)',
+    fontSize: SIZES.fontSmall,
+    lineHeight: 19,
+    marginTop: 6,
+    textAlign: 'center',
+  },
+  summaryCard: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E8DDD3',
+    marginBottom: 12,
+    paddingVertical: 12,
+  },
+  summaryItem: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  summaryValue: {
+    color: '#7A1E5C',
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  summaryValueWarning: {
+    color: '#B13E2C',
+  },
+  summaryLabel: {
+    color: COLORS.gray,
+    fontSize: 10,
+    fontWeight: '800',
+    marginTop: 3,
+    textAlign: 'center',
+  },
+  tabsRow: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 14,
-    flexWrap: 'wrap',
+    marginBottom: 12,
+  },
+  tabButton: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E8DDD3',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 6,
+    paddingHorizontal: 8,
+  },
+  tabButtonActive: {
+    backgroundColor: '#7A1E5C',
+    borderColor: '#7A1E5C',
+  },
+  tabText: {
+    color: COLORS.black,
+    fontSize: 11,
+    fontWeight: '900',
+    textAlign: 'center',
+    flexShrink: 1,
+  },
+  tabTextActive: {
+    color: '#FFFFFF',
+  },
+  tabBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F0E7DF',
+    paddingHorizontal: 5,
+  },
+  tabBadgeActive: {
+    backgroundColor: 'rgba(255,255,255,0.26)',
+  },
+  tabBadgeText: {
+    color: '#7A1E5C',
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  tabBadgeTextActive: {
+    color: '#FFFFFF',
   },
   searchCard: {
     backgroundColor: '#FFFFFF',
@@ -647,299 +524,181 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E8DDD3',
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    minHeight: 42,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 10,
+    marginBottom: 12,
   },
   searchInput: {
     flex: 1,
     color: COLORS.black,
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
     paddingVertical: 0,
-  },
-  typeFilterRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 12,
-    alignItems: 'center',
-  },
-  typeFilterLabel: {
-    fontSize: 12,
-    color: COLORS.gray,
-    fontWeight: '800',
-    marginRight: 2,
-  },
-  typeToggle: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#E8DDD3',
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-  },
-  typeToggleActive: {
-    backgroundColor: '#7A1E5C',
-    borderColor: '#7A1E5C',
-  },
-  typeToggleText: {
-    color: COLORS.black,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  typeToggleTextActive: {
-    color: '#FFFFFF',
-  },
-  filterButton: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: '#E8DDD3',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 2,
-  },
-  filterButtonActive: {
-    backgroundColor: '#7A1E5C',
-    borderColor: '#7A1E5C',
-  },
-  filterButtonText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.black,
-  },
-  filterButtonTextActive: {
-    color: '#FFFFFF',
-  },
-  badge: {
-    backgroundColor: '#F0E7DF',
-    borderRadius: 8,
-    paddingVertical: 2,
-    paddingHorizontal: 6,
-  },
-  badgeActive: {
-    backgroundColor: 'rgba(255,255,255,0.3)',
-  },
-  badgeText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: COLORS.primary,
-  },
-  badgeTextActive: {
-    color: '#FFFFFF',
-  },
-  statsCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 12,
-    marginBottom: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 2,
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statDivider: {
-    width: 1,
-    height: 30,
-    backgroundColor: '#E8DDD3',
-  },
-  statValue: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: COLORS.primary,
-  },
-  statLabel: {
-    fontSize: 11,
-    color: COLORS.gray,
-    marginTop: 2,
-    fontWeight: '700',
   },
   requestCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E8DDD3',
     padding: 14,
     marginBottom: 10,
-    borderLeftWidth: 4,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
   },
-  requestCardBurning: {
-    borderLeftColor: '#FF6B4A',
-  },
-  requestCardExpired: {
-    borderLeftColor: '#A0938D',
-    opacity: 0.8,
-  },
-  requestHeader: {
+  requestTop: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
+    gap: 10,
     marginBottom: 10,
   },
-  userInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  requestTitleWrap: {
     flex: 1,
-    gap: 10,
+    minWidth: 0,
   },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  userName: {
-    fontSize: SIZES.fontRegular,
-    fontWeight: '900',
+  requestTitle: {
     color: COLORS.black,
+    fontSize: 15,
+    fontWeight: '900',
   },
-  burningBadge: {
-    backgroundColor: '#FF6B4A',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+  requestMeta: {
+    color: COLORS.gray,
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 3,
   },
-  burningText: {
+  statusPill: {
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderWidth: 1,
+  },
+  status_published: {
+    backgroundColor: '#5F7B4D',
+    borderColor: '#5F7B4D',
+  },
+  status_pending: {
+    backgroundColor: '#FFF3CD',
+    borderColor: '#F0C96B',
+  },
+  status_rejected: {
+    backgroundColor: '#FFE8E4',
+    borderColor: '#F2B4A8',
+  },
+  status_expired: {
+    backgroundColor: '#F0E7DF',
+    borderColor: '#D7C5B5',
+  },
+  status_closed: {
+    backgroundColor: '#E8F0F3',
+    borderColor: '#BCD2DA',
+  },
+  statusText: {
+    color: '#5B4F47',
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  statusTextLight: {
     color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 12,
-  },
-  completedBadge: {
-    backgroundColor: '#F0F8F0',
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  expiredBadge: {
-    backgroundColor: '#FFF3E0',
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   requestDescription: {
-    fontSize: SIZES.fontRegular,
     color: COLORS.black,
+    fontSize: 14,
     lineHeight: 20,
+    fontWeight: '700',
     marginBottom: 10,
   },
-  typeBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#F3E5F5',
-    borderRadius: 999,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    marginBottom: 6,
-  },
-  typeBadgeText: {
-    color: '#7A1E5C',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  moderationBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#E8F0F3',
-    borderRadius: 999,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    marginBottom: 8,
-  },
-  moderationBadgeText: {
-    color: '#2F5969',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  requestFooter: {
+  reasonBox: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-    flexWrap: 'wrap',
+    gap: 7,
+    backgroundColor: '#FFF4E8',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#F2D0AE',
+    padding: 10,
+    marginBottom: 10,
   },
-  requestTime: {
+  reasonText: {
+    flex: 1,
+    color: '#7A4A2A',
     fontSize: 12,
-    color: COLORS.gray,
-    fontWeight: '600',
+    lineHeight: 17,
+    fontWeight: '700',
   },
   actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
+  },
+  secondaryAction: {
+    flex: 1,
+    minHeight: 40,
+    borderRadius: 10,
+    backgroundColor: '#F0E7DF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
     gap: 6,
   },
-  actionBtn: {
-    backgroundColor: '#F0E7DF',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-  },
-  actionBtnDisabled: {
-    opacity: 0.5,
-  },
-  deleteActionBtn: {
-    backgroundColor: '#FFE8E4',
-  },
-  actionBtnText: {
-    fontSize: 11,
-    fontWeight: '800',
+  secondaryActionText: {
     color: '#5B4F47',
+    fontSize: 12,
+    fontWeight: '900',
   },
-  deleteActionBtnText: {
-    color: '#B13E2C',
+  primaryAction: {
+    flex: 1,
+    minHeight: 40,
+    borderRadius: 10,
+    backgroundColor: '#7A1E5C',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 6,
+  },
+  primaryActionText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  iconAction: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: '#FFE8E4',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 40,
+    paddingVertical: 42,
+    paddingHorizontal: 16,
   },
-  emptyText: {
-    fontSize: SIZES.fontRegular,
-    fontWeight: '900',
+  emptyTitle: {
     color: COLORS.black,
+    fontSize: 16,
+    fontWeight: '900',
     marginTop: 12,
-  },
-  emptySubtext: {
-    fontSize: SIZES.fontSmall,
-    color: COLORS.gray,
-    marginTop: 4,
     textAlign: 'center',
   },
-  createBtn: {
+  emptyBody: {
+    color: COLORS.gray,
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: '700',
+    marginTop: 5,
+    textAlign: 'center',
+  },
+  createButton: {
     marginTop: 14,
     backgroundColor: '#7A1E5C',
     borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
   },
-  createBtnText: {
+  createButtonText: {
     color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '900',
   },
 });
 

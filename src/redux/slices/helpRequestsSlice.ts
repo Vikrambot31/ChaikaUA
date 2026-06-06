@@ -63,7 +63,7 @@ const helpRequestsSlice = createSlice({
     },
     syncFromRequests: (state, action: PayloadAction<Request[]>) => {
       const mapped = action.payload
-        .filter((item) => item.group === 'help_neighbors' || item.category === 'help')
+        .filter((item) => item.group === 'help_neighbors' || item.group === 'care' || item.category === 'help' || item.category === 'care')
         .map((item) => {
           const createdAt = new Date(item.createdAt);
           const expiresAt = typeof item.expires_at === 'number'
@@ -75,6 +75,9 @@ const helpRequestsSlice = createSlice({
             name: item.name,
             phone: item.phone,
             description: item.description || item.text || '',
+            category: item.category,
+            group: item.group,
+            subcategory: item.subcategory,
             photoUri: item.photoUri,
             photoStoragePath: item.photoStoragePath,
             createdAt,

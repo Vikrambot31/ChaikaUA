@@ -26,6 +26,7 @@ import ViewUserProfileScreen from '../screens/ViewUserProfileScreen';
 import HelpScreen from '../screens/Spravka';
 import JobSearchScreen from '../screens/Poisk-Raboty';
 import BuySellScreen from '../screens/Kuplu-Prodam';
+import CreateBuySellScreen from '../screens/CreateBuySellScreen';
 import KontaktiChaikyScreen from '../screens/Kontakt-XXX';
 import BizznesChaikaScreen from '../screens/Bizznes-Chaika';
 import AppInfoScreen from '../screens/Pro-Prilozhenie';
@@ -136,6 +137,7 @@ export type RootStackParamList = {
   AnnouncementsScreen: undefined;
   JobSearchScreen: undefined;
   BuySellScreen: undefined;
+  CreateBuySellScreen: undefined;
   KontaktiChaikyScreen: undefined;
   BizznesChaikaScreen: undefined;
   AppInfoScreen: undefined;
@@ -284,6 +286,7 @@ const linking: LinkingOptions<RootStackParamList> = {
       PromoCreditsTopupScreen: 'screen/promo-credits-topup',
       PromoCreditsAdminScreen: 'screen/admin/promo-credits',
       BonusPromotionPurchaseScreen: 'screen/bonus-promotion',
+      CreateBuySellScreen: 'screen/buy-sell/create',
     },
   },
 };
@@ -314,6 +317,7 @@ const ROUTE_FILE_MAP: Record<string, string> = {
   AnnouncementsScreen: 'Obyavleniya.tsx',
   JobSearchScreen: 'Poisk-Raboty.tsx',
   BuySellScreen: 'Kuplu-Prodam.tsx',
+  CreateBuySellScreen: 'CreateBuySellScreen.tsx',
   KontaktiChaikyScreen: 'Kontakt-XXX.tsx',
   BizznesChaikaScreen: 'Bizznes-Chaika.tsx',
   AppInfoScreen: 'Pro-Prilozhenie.tsx',
@@ -805,6 +809,7 @@ function AuthNavigation() {
         <Stack.Screen name="AnnouncementsScreen" component={AnnouncementsScreen} />
         <Stack.Screen name="JobSearchScreen" component={JobSearchScreen} />
         <Stack.Screen name="BuySellScreen" component={BuySellScreen} />
+        <Stack.Screen name="CreateBuySellScreen" component={withGuard(CreateBuySellScreen, 'complete')} />
         <Stack.Screen name="KontaktiChaikyScreen" component={KontaktiChaikyScreen} />
         <Stack.Screen name="BizznesChaikaScreen" component={BizznesChaikaScreen} />
         <Stack.Screen name="ItemDetailScreen" component={ItemDetailScreen} />

@@ -254,6 +254,9 @@ export interface HelpRequest {
   name: string;
   phone: string;
   description: string;
+  category?: string;
+  group?: string;
+  subcategory?: string;
   photoUri?: string;
   photoStoragePath?: string;
   createdAt: Date;

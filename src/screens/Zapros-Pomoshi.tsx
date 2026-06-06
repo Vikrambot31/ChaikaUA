@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
-import { NavigationProp, useNavigation } from '@react-navigation/native';
+import { NavigationProp, RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import MiniTabBar from '../components/MiniTabBar';
 import FormSectionLabel from '../components/FormSectionLabel';
@@ -18,6 +18,18 @@ import { checkYellowList } from '../utils/yellowListCheck';
 
 // RootState type for language selector
 interface LangState { language?: { current?: string } }
+
+type HelpRequestRouteParams = {
+  HelpRequestScreen: {
+    prefill?: {
+      name?: string;
+      phone?: string;
+      description?: string;
+      helpType?: string;
+      subType?: string;
+    };
+  } | undefined;
+};
 
 const UI_TEXT = {
   ua: {
@@ -296,15 +308,17 @@ const getSubtypeLabel = (language: 'ua' | 'ru' | 'en', helpType: string, subtype
 
 const HelpRequestScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
+  const route = useRoute<RouteProp<HelpRequestRouteParams, 'HelpRequestScreen'>>();
   const language = useSelector((state: LangState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const user = useSelector((state: { auth?: { user?: { id?: string; name?: string; phone?: string; photoURL?: string; startAvatarKey?: string } } }) => state.auth?.user);
   const text = UI_TEXT[language];
   const helpTypeLabels = HELP_TYPES_LABELS[language];
-  const [name, setName] = useState(() => (user?.name ? normalizePersonName(user.name) : ''));
-  const [phone, setPhone] = useState(() => (user?.phone ? normalizePhoneText(user.phone) : ''));
-  const [helpType, setHelpType] = useState('');
-  const [subType, setSubType] = useState('');
-  const [description, setDescription] = useState('');
+  const prefill = route.params?.prefill;
+  const [name, setName] = useState(() => normalizePersonName(prefill?.name || user?.name || ''));
+  const [phone, setPhone] = useState(() => normalizePhoneText(prefill?.phone || user?.phone || ''));
+  const [helpType, setHelpType] = useState(() => prefill?.helpType || '');
+  const [subType, setSubType] = useState(() => prefill?.subType || '');
+  const [description, setDescription] = useState(() => (prefill?.description || '').slice(0, 500));
   const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{
@@ -427,7 +441,7 @@ const HelpRequestScreen: React.FC = () => {
         phone: normalizedPhone,
         language,
         category,
-        group: 'care',
+        group: 'help_neighbors',
         subcategory: helpType,
         building: 'Чайка',
         text: finalText,
@@ -687,4 +701,3 @@ const styles = StyleSheet.create({
 });
 
 export default HelpRequestScreen;
-

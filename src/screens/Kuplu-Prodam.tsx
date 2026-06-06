@@ -1,36 +1,30 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, FlatList, KeyboardAvoidingView, Modal, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, FlatList, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { useSelector } from 'react-redux';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import MiniTabBar from '../components/MiniTabBar';
 import MiniUserAvatar from '../components/MiniUserAvatar';
 import AppPhotoImage from '../components/AppPhotoImage';
 import { SCREEN_THEME } from '../utils/screenTheme';
-import { normalizePhoneText } from '../utils/textUtils';
 import { RootState } from '../redux/store';
 import { getModerationLabel } from '../utils/moderation';
 import { buySellService, BuySellListing } from '../services/buySellService';
 import { getModerationUserMessage, showUserError } from '../utils/userFacingErrors';
-import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField';
 import { useContactRequest } from '../hooks/useContactRequest';
 import ContactReasonModal from '../components/ContactReasonModal';
 import { safeCallPhone } from '../utils/communicationActions';
 import type { DetailItemData } from '../utils/detailViewTypes';
-import { getDonePhotos, validateSubmissionRequirements } from '../utils/submissionRequirements';
-import { checkYellowList } from '../utils/yellowListCheck';
-import { getLanguageValidationError } from '../utils/contentLanguageGuard';
 import UserCardActionBar from '../components/UserCardActionBar';
 import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 import GuestRegisterBanner from '../components/GuestRegisterBanner';
 import { useGuestGuard } from '../hooks/useGuestGuard';
-import { useOperationTrace } from '../hooks/useOperationTrace';
 import { requireAuthForDetails } from '../utils/authGuard';
+import type { RootStackParamList } from '../navigation/RootNavigator';
 
-const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000;
+export const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000;
 
-const ITEM_CATEGORY_VALUES = [
+export const ITEM_CATEGORY_VALUES = [
   'furniture',
   'appliances',
   'electronics',
@@ -44,9 +38,9 @@ const ITEM_CATEGORY_VALUES = [
   'other',
 ] as const;
 
-const ITEM_CONDITION_VALUES = ['new', 'like_new', 'good', 'fair'] as const;
+export const ITEM_CONDITION_VALUES = ['new', 'like_new', 'good', 'fair'] as const;
 
-const UI_TEXT = {
+export const UI_TEXT = {
   ua: {
     title: 'Куплю / Продам',
     subtitle: 'Оголошення для сусідів ЖК Чайка',
@@ -290,30 +284,18 @@ const UI_TEXT = {
 } as const;
 
 const BuySellScreen: React.FC = () => {
-  const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const navLock = useRef(false);
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const user = useSelector((state: RootState) => state.auth.user);
   const { guard: guestGuard, bannerVisible: guestBannerVisible, hideBanner: hideGuestBanner } = useGuestGuard();
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const text = UI_TEXT[language];
-  const { startOperation, trace } = useOperationTrace('Kuplu-Prodam');
-  const [itemName, setItemName] = useState('');
-  const [listingType, setListingType] = useState<'buy' | 'sell'>('sell');
-  const [category, setCategory] = useState('');
-  const [condition, setCondition] = useState('');
-  const [price, setPrice] = useState('');
-  const [description, setDescription] = useState('');
-  const [phone, setPhone] = useState(() => (user?.phone ? normalizePhoneText(user.phone) : ''));
-  const draftHadPhotos = useRef(false);
-  const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
   const [listings, setListings] = useState<BuySellListing[]>([]);
   const [listingsReady, setListingsReady] = useState(false);
   const [listingsLoadError, setListingsLoadError] = useState(false);
   const [selectedFilterCategory, setSelectedFilterCategory] = useState('');
   const [selectedFilterListingType, setSelectedFilterListingType] = useState<'' | 'buy' | 'sell'>('');
-  const [submitting, setSubmitting] = useState(false);
-  const [addFormVisible, setAddFormVisible] = useState(false);
   const [searchModalVisible, setSearchModalVisible] = useState(false);
   const [searchItemName, setSearchItemName] = useState('');
   const [searchCategory, setSearchCategory] = useState('');
@@ -326,34 +308,7 @@ const BuySellScreen: React.FC = () => {
   const blinkAnim = useRef(new Animated.Value(1)).current;
   const avatarByUserId = useUserAvatarMap(listings.map((item) => item.userId));
 
-  const handleRequestCloseModal = useCallback(() => {
-    const defaultPhone = user?.phone ? normalizePhoneText(user.phone) : '';
-    const isDirty =
-      itemName.trim() !== '' ||
-      listingType !== 'sell' ||
-      category !== '' ||
-      condition !== '' ||
-      price.trim() !== '' ||
-      description.trim() !== '' ||
-      phone.trim() !== defaultPhone ||
-      formPhotos.length > 0;
-    if (!isDirty) {
-      void AsyncStorage.removeItem('@chaika:buy_sell_draft').catch(() => {});
-      setAddFormVisible(false);
-      return;
-    }
-    const closeTitle = language === 'ru' ? 'Закрыть форму?' : language === 'en' ? 'Close form?' : 'Закрити форму?';
-    const closeMsg = language === 'ru' ? 'Вы ещё не отправили объявление. Закрыть?' : language === 'en' ? 'You haven\'t submitted the listing yet. Close?' : 'Ви ще не надіслали оголошення. Закрити?';
-    const closeNo = language === 'ru' ? 'Нет' : language === 'en' ? 'No' : 'Ні';
-    const closeYes = language === 'ru' ? 'Да' : language === 'en' ? 'Yes' : 'Так';
-    Alert.alert(closeTitle, closeMsg, [
-      { text: closeNo, style: 'cancel' },
-      { text: closeYes, onPress: () => { void AsyncStorage.removeItem('@chaika:buy_sell_draft').catch(() => {}); setAddFormVisible(false); } },
-    ]);
-  }, [category, condition, description, formPhotos.length, itemName, language, listingType, phone, price, user?.phone]);
-
   useEffect(() => {
-    let isMounted = true;
     setListingsReady(false);
     setListingsLoadError(false);
     const unsubscribe = buySellService.subscribe((items) => {
@@ -364,48 +319,8 @@ const BuySellScreen: React.FC = () => {
       setListingsReady(true);
       setListingsLoadError(true);
     });
-    // Restore draft if Android restarted the activity while picker was open
-    (async () => {
-      try {
-        const raw = await AsyncStorage.getItem('@chaika:buy_sell_draft');
-        if (!isMounted || !raw) return;
-        const draft = JSON.parse(raw) as Partial<{ itemName: string; listingType: 'buy' | 'sell'; category: string; condition: string; price: string; description: string; phone: string; addFormVisible: boolean; hadPhotos: boolean }>;
-        if (draft.itemName) setItemName(draft.itemName);
-        if (draft.listingType === 'buy' || draft.listingType === 'sell') setListingType(draft.listingType);
-        if (draft.category) setCategory(draft.category);
-        if (draft.condition) setCondition(draft.condition);
-        if (draft.price) setPrice(draft.price);
-        if (draft.description) setDescription(draft.description);
-        if (draft.phone) setPhone(draft.phone);
-        if (draft.addFormVisible) {
-          setAddFormVisible(true);
-          if (draft.hadPhotos) {
-            draftHadPhotos.current = true;
-          }
-        }
-        await AsyncStorage.removeItem('@chaika:buy_sell_draft');
-      } catch { /* ignore */ }
-    })();
-    return () => {
-      isMounted = false;
-      unsubscribe();
-    };
+    return unsubscribe;
   }, [user?.id]);
-
-  useEffect(() => {
-    if (!addFormVisible) return;
-    void AsyncStorage.setItem(
-      '@chaika:buy_sell_draft',
-      JSON.stringify({ itemName, listingType, category, condition, price, description, phone, addFormVisible: true, hadPhotos: formPhotos.length > 0 }),
-    ).catch(() => {});
-  }, [addFormVisible, itemName, listingType, category, condition, price, description, phone, formPhotos]);
-
-  useEffect(() => {
-    if (!addFormVisible || !draftHadPhotos.current) return;
-    draftHadPhotos.current = false;
-    Alert.alert(text.draftRestoredTitle, text.draftRestoredMsg, [{ text: text.draftRestoredOk }]);
-  }, [addFormVisible, text.draftRestoredTitle, text.draftRestoredMsg, text.draftRestoredOk]);
-
   useEffect(() => {
     const anim = Animated.loop(
       Animated.sequence([
@@ -478,9 +393,6 @@ const BuySellScreen: React.FC = () => {
     ],
   );
 
-  const hasUploadingPhotos = formPhotos.some((photo) => photo.status === 'uploading');
-  const hasPhotoErrors = formPhotos.some((photo) => photo.status === 'error');
-
   const resetSearch = () => {
     setSearchItemName('');
     setSearchCategory('');
@@ -490,18 +402,6 @@ const BuySellScreen: React.FC = () => {
     setSearchPriceTo('');
     setSearchContact('');
     setSearchDescription('');
-  };
-
-  const resetForm = () => {
-    setItemName('');
-    setListingType('sell');
-    setCategory('');
-    setCondition('');
-    setPrice('');
-    setDescription('');
-    setPhone(user?.phone ? normalizePhoneText(user.phone) : '');
-    setFormPhotos([]);
-    void AsyncStorage.removeItem('@chaika:buy_sell_draft').catch(() => {});
   };
 
   const mapToDetailData = useCallback((item: BuySellListing): DetailItemData => {
@@ -533,116 +433,6 @@ const BuySellScreen: React.FC = () => {
     if (!requireAuthForDetails({ userId: user?.id, navigation, language })) return;
     navigation.navigate('ItemDetailScreen', { item: mapToDetailData(item) });
   }, [language, mapToDetailData, navigation, user?.id]);
-
-  const handleSubmit = async () => {
-    startOperation();
-
-    trace('validate', 'start');
-    if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, userStartAvatarKey: user?.startAvatarKey, navigation })) {
-      trace('validate', 'fail', { missing: 'submissionRequirements' });
-      return;
-    }
-    if (await checkYellowList(user?.id, language)) {
-      trace('validate', 'fail', { missing: 'yellowList' });
-      return;
-    }
-    const normalizedPrice = price.replace(',', '.').replace(/[^\d.]/g, '');
-    const numericPrice = Number(normalizedPrice);
-
-    if (!itemName.trim()) {
-      trace('validate', 'fail', { missing: 'itemName' });
-      Alert.alert(text.errorTitle, text.itemNameError);
-      return;
-    }
-    if (!normalizedPrice) {
-      trace('validate', 'fail', { missing: 'price' });
-      Alert.alert(text.errorTitle, text.priceError);
-      return;
-    }
-    if (!Number.isFinite(numericPrice) || numericPrice < 0) {
-      trace('validate', 'fail', { missing: 'priceValue' });
-      Alert.alert(text.errorTitle, text.priceError);
-      return;
-    }
-    if (!category || !condition || !description.trim() || !phone.trim()) {
-      trace('validate', 'fail', { missing: 'requiredFields' });
-      Alert.alert(text.errorTitle, text.errorFill);
-      return;
-    }
-    if (phone.replace(/\D/g, '').length < 7) {
-      trace('validate', 'fail', { missing: 'phone' });
-      Alert.alert(text.errorTitle, text.errorPhone);
-      return;
-    }
-    const langError = getLanguageValidationError(`${itemName.trim()} ${description.trim()}`, language as 'ua' | 'ru' | 'en');
-    if (langError) {
-      trace('validate', 'fail', { missing: 'language' });
-      Alert.alert(text.errorTitle, langError);
-      return;
-    }
-    trace('validate', 'success');
-
-    trace('photo_check', 'start');
-    if (hasUploadingPhotos) {
-      trace('photo_check', 'fail', { reason: 'uploadsInProgress' });
-      Alert.alert(text.errorTitle, text.photoUploading);
-      return;
-    }
-    if (hasPhotoErrors) {
-      trace('photo_check', 'fail', { reason: 'photoErrors' });
-      Alert.alert(text.errorTitle, text.photoUploadError);
-      return;
-    }
-    const donePhotos = getDonePhotos(formPhotos);
-    if (donePhotos.length === 0) {
-      trace('photo_check', 'fail', { reason: 'noPhotos' });
-      Alert.alert(text.errorTitle, text.photoRequired);
-      return;
-    }
-    trace('photo_check', 'success');
-
-    setSubmitting(true);
-    try {
-      const resolvedPhotoUri = donePhotos[0]?.downloadUrl ?? '';
-      const resolvedStoragePath = donePhotos[0]?.storagePath ?? '';
-
-      const createdAt = new Date();
-
-      trace('api_call', 'start', { path: 'buy_sell' });
-      await buySellService.add({
-        listingType,
-        itemName: itemName.trim(),
-        category,
-        condition,
-        price: Number.isFinite(numericPrice)
-          ? numericPrice.toFixed(Number.isInteger(numericPrice) ? 0 : 2)
-          : normalizedPrice,
-        description: description.trim(),
-        phone: normalizePhoneText(phone),
-        photoUri: resolvedPhotoUri,
-        photoStoragePath: resolvedStoragePath,
-        photoId: '',
-        moderationStatus: 'pending',
-        submittedForModerationAt: createdAt.toISOString(),
-        createdAt: createdAt.toISOString(),
-        expiresAt: new Date(createdAt.getTime() + THREE_MONTHS_MS).toISOString(),
-        userId: user?.id || '',
-        language,
-      });
-      trace('api_call', 'success');
-
-      trace('user_alert', 'success', { type: 'success' });
-      Alert.alert(text.successTitle, text.successMsg, [
-        { text: text.ok, onPress: () => { resetForm(); setAddFormVisible(false); } },
-      ]);
-    } catch (error) {
-      trace('api_call', 'fail', {}, error);
-      showUserError(language, 'send', error);
-      await AsyncStorage.removeItem('@chaika:buy_sell_draft').catch(() => {});
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   const handleDelete = (id: string) => {
     Alert.alert(text.deleteConfirmTitle, text.deleteConfirmMsg, [
@@ -912,128 +702,11 @@ const BuySellScreen: React.FC = () => {
       />
       <View style={styles.addBar}>
         <TouchableOpacity style={styles.addBarBtn} onPress={guestGuard(() => {
-          setAddFormVisible(true);
+          navigation.navigate('CreateBuySellScreen');
         })} activeOpacity={0.85}>
           <Text style={styles.addBarBtnText}>{text.addRequest}</Text>
         </TouchableOpacity>
       </View>
-      <Modal visible={addFormVisible} transparent animationType="slide" onRequestClose={handleRequestCloseModal}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.sheetOverlay}>
-          <TouchableOpacity style={styles.sheetBackdrop} activeOpacity={1} onPress={handleRequestCloseModal} />
-          <View style={styles.sheetWrapper}>
-            <View style={styles.sheet}>
-            <View style={styles.sheetHandle} />
-            <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>{text.formTitle}</Text>
-              <TouchableOpacity onPress={handleRequestCloseModal} style={styles.sheetCloseBtn} activeOpacity={0.7}>
-                <Text style={styles.sheetCloseTxt}>✕</Text>
-              </TouchableOpacity>
-            </View>
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              contentContainerStyle={styles.sheetContent}
-              style={styles.sheetScroll}
-            >
-              <View style={styles.typeToggleRow}>
-                <TouchableOpacity
-                  style={[styles.typeToggleBtn, listingType === 'buy' ? styles.typeToggleBuyActive : styles.typeToggleInactive]}
-                  onPress={() => setListingType('buy')}
-                  activeOpacity={0.82}
-                >
-                  <Text style={[styles.typeToggleText, listingType === 'buy' && styles.typeToggleTextActive]}>{text.buyToggle}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.typeToggleBtn, listingType === 'sell' ? styles.typeToggleSellActive : styles.typeToggleInactive]}
-                  onPress={() => setListingType('sell')}
-                  activeOpacity={0.82}
-                >
-                  <Text style={[styles.typeToggleText, listingType === 'sell' && styles.typeToggleTextActive]}>{text.sellToggle}</Text>
-                </TouchableOpacity>
-              </View>
-
-              <Text style={styles.formLabel}>{text.itemNameLabel}</Text>
-              <TextInput
-                placeholder={text.itemNamePlaceholder}
-                value={itemName}
-                onChangeText={setItemName}
-                style={styles.input}
-                placeholderTextColor="#A0938D"
-                maxLength={80}
-              />
-
-              <Text style={styles.formLabel}>{text.categoryLabel}</Text>
-              <View style={styles.pickerWrapper}>
-                <Picker selectedValue={category} onValueChange={setCategory} style={styles.picker}>
-                  <Picker.Item label={text.selectCategory} value="" />
-                  {ITEM_CATEGORY_VALUES.map((value, index) => (
-                    <Picker.Item key={value} label={text.categories[index]} value={value} />
-                  ))}
-                </Picker>
-              </View>
-
-              <Text style={styles.formLabel}>{text.conditionLabel}</Text>
-              <View style={styles.pickerWrapper}>
-                <Picker selectedValue={condition} onValueChange={(itemValue) => setCondition(itemValue)} style={styles.picker}>
-                  <Picker.Item label={text.selectCondition} value="" />
-                  {ITEM_CONDITION_VALUES.map((value) => (
-                    <Picker.Item key={value} label={text.conditionLabels[value]} value={value} />
-                  ))}
-                </Picker>
-              </View>
-
-              <Text style={styles.formLabel}>{text.priceLabel}</Text>
-              <TextInput
-                placeholder="0"
-                value={price}
-                onChangeText={(value) => setPrice(value.replace(',', '.').replace(/[^\d.]/g, ''))}
-                keyboardType="decimal-pad"
-                style={styles.input}
-                placeholderTextColor="#A0938D"
-              />
-
-              <Text style={styles.formLabel}>{text.descriptionLabel}</Text>
-              <TextInput
-                placeholder={text.descriptionLabel}
-                value={description}
-                onChangeText={setDescription}
-                style={[styles.input, styles.textarea]}
-                placeholderTextColor="#A0938D"
-                multiline
-                maxLength={260}
-              />
-
-              <Text style={styles.formLabel}>{text.phoneLabel}</Text>
-              <TextInput placeholder="+380..." value={phone} onChangeText={(value) => setPhone(normalizePhoneText(value))} keyboardType="phone-pad" style={styles.input} placeholderTextColor="#A0938D" />
-
-              <View style={styles.photoLabelRow}>
-                <Text style={styles.formLabel}>{text.photoLabel}</Text>
-                <Text style={styles.requiredMark}>{text.photoRequiredMark}</Text>
-              </View>
-              {user?.id ? (
-                <PhotoUploadField
-                  uid={user.id}
-                  userName={user?.name ?? ''}
-                  maxPhotos={5}
-                  storagePath="buy_sell_listings"
-                  onPhotosChange={setFormPhotos}
-                />
-              ) : (
-                <Text style={styles.signInNote}>{text.authRequired}</Text>
-              )}
-
-              <TouchableOpacity style={[styles.submitBtn, (submitting || hasUploadingPhotos) && styles.submitBtnDisabled]} onPress={handleSubmit} activeOpacity={0.85} disabled={submitting || hasUploadingPhotos}>
-                {submitting ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.submitBtnText}>{hasUploadingPhotos ? text.photoUploading : text.submitBtn}</Text>
-                )}
-              </TouchableOpacity>
-            </ScrollView>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
       <MiniTabBar />
       <ContactReasonModal
         visible={contactModalVisible}

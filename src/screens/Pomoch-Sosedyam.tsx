@@ -35,25 +35,34 @@ const UI_TEXT = {
     listTitle: 'Термінові запити',
     emptyTitle: 'Сьогодні все спокійно',
     emptySubtitle: 'Немає термінових прохань від сусідів',
+    emptyAction: '+ Додати прохання',
     expired: 'Час минув',
     splash: 'Зробимо Чайку місцем підтримки один для одного',
     yesterday: 'Вчора',
+    addRequest: '+ Додати прохання',
+    awaitingModeration: 'Очікує модерації',
   },
   ru: {
     listTitle: 'Срочные запросы',
     emptyTitle: 'Сегодня все спокойно',
     emptySubtitle: 'Нет срочных просьб от соседей',
+    emptyAction: '+ Добавить просьбу',
     expired: 'Срок вышел',
     splash: 'Сделаем Чайку местом поддержки друг для друга',
     yesterday: 'Вчера',
+    addRequest: '+ Добавить просьбу',
+    awaitingModeration: 'Ожидает модерации',
   },
   en: {
     listTitle: 'Urgent requests',
     emptyTitle: 'Everything is calm today',
     emptySubtitle: 'There are no urgent requests from neighbors',
+    emptyAction: '+ Add request',
     expired: 'Time expired',
     splash: "Let's make Chaika Life a place of support for one another",
     yesterday: 'Yesterday',
+    addRequest: '+ Add request',
+    awaitingModeration: 'Awaiting moderation',
   },
 } as const;
 
@@ -87,6 +96,14 @@ const HelpNeighborsScreen: React.FC = () => {
   ], [burningRequests, yesterdayRequests]);
   const avatarByUserId = useUserAvatarMap(listData.map((item) => item.userId));
 
+  const dismissSplash = async () => {
+    setShowHelpSplash(false);
+    setIsReady(true);
+    try {
+      await AsyncStorage.setItem(HELP_NEIGHBORS_SPLASH_KEY, 'true');
+    } catch {}
+  };
+
   useEffect(() => {
     let isMounted = true;
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -109,7 +126,7 @@ const HelpNeighborsScreen: React.FC = () => {
           try {
             await AsyncStorage.setItem(HELP_NEIGHBORS_SPLASH_KEY, 'true');
           } catch {}
-        }, 3000);
+        }, 5000);
       } catch {
         if (!isMounted) return;
         setShowHelpSplash(true);
@@ -117,7 +134,7 @@ const HelpNeighborsScreen: React.FC = () => {
           if (!isMounted) return;
           setShowHelpSplash(false);
           setIsReady(true);
-        }, 3000);
+        }, 5000);
       }
     };
 
@@ -152,13 +169,13 @@ const HelpNeighborsScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       {showHelpSplash ? (
-        <View style={styles.splashContainer}>
+        <TouchableOpacity style={styles.splashContainer} onPress={() => { void dismissSplash(); }} activeOpacity={1}>
           <Image source={require('../../assets/WEBP-version/dopomoga1.webp')} style={styles.splashImage} resizeMode="cover" />
           <View style={styles.splashOverlay} />
           <View style={styles.splashCaption}>
             <Text style={styles.splashText}>{text.splash}</Text>
           </View>
-        </View>
+        </TouchableOpacity>
       ) : null}
 
       {isReady ? (
@@ -181,7 +198,7 @@ const HelpNeighborsScreen: React.FC = () => {
                 onPress={() => { void openRequestFormWithLimitCheck(navigation, language); }}
                 activeOpacity={0.86}
               >
-                <Text style={styles.addRequestButtonText}>+ Додати прохання</Text>
+                <Text style={styles.addRequestButtonText}>{text.addRequest}</Text>
               </TouchableOpacity>
 
               <View style={styles.listHeader}>
@@ -220,12 +237,10 @@ const HelpNeighborsScreen: React.FC = () => {
                   showDebugInfo={false}
                 />
               ) : null}
-              <Text style={styles.requestDescription}>{item.description}</Text>
+              <Text style={[styles.requestDescription, item.isYesterday && styles.requestDescriptionYesterday]}>{item.description}</Text>
               {item.moderationStatus === 'pending' && item.userId === user?.id && (
                 <View style={styles.pendingBadge}>
-                  <Text style={styles.pendingBadgeText}>
-                    {language === 'ru' ? 'Ожидает модерации' : language === 'en' ? 'Awaiting moderation' : 'Очікує модерації'}
-                  </Text>
+                  <Text style={styles.pendingBadgeText}>{text.awaitingModeration}</Text>
                 </View>
               )}
               <UserCardActionBar
@@ -248,6 +263,13 @@ const HelpNeighborsScreen: React.FC = () => {
             <View style={styles.emptyState}>
               <Text style={styles.emptyText}>{text.emptyTitle}</Text>
               <Text style={styles.emptySubtext}>{text.emptySubtitle}</Text>
+              <TouchableOpacity
+                style={styles.emptyActionButton}
+                onPress={() => { void openRequestFormWithLimitCheck(navigation, language); }}
+                activeOpacity={0.86}
+              >
+                <Text style={styles.emptyActionButtonText}>{text.emptyAction}</Text>
+              </TouchableOpacity>
             </View>
           }
         />
@@ -343,19 +365,34 @@ const styles = StyleSheet.create({
   timeBadge: { backgroundColor: SCREEN_THEME.terracotta, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
   timeText: { color: '#FFFFFF', fontWeight: '800', fontSize: 12 },
   requestPhoto: { width: '100%', height: 170, borderRadius: 14, marginBottom: 8, backgroundColor: '#E7D6B6' },
-  requestDescription: { color: '#fff', backgroundColor: '#7A1E5C', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 7, lineHeight: 20, marginBottom: 8, fontWeight: '800', overflow: 'hidden' },
+  requestDescription: { color: SCREEN_THEME.textPrimary, backgroundColor: 'rgba(199, 122, 93, 0.10)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 7, lineHeight: 20, marginBottom: 8, fontWeight: '600', overflow: 'hidden' },
+  requestDescriptionYesterday: { color: SCREEN_THEME.textSecondary, backgroundColor: 'rgba(199, 122, 93, 0.06)' },
   pendingBadge: { backgroundColor: '#FFF3CD', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, marginBottom: 8, alignSelf: 'flex-start', borderWidth: 1, borderColor: '#F0C96B' },
   pendingBadgeText: { color: '#7A5C00', fontWeight: '800', fontSize: 12 },
   emptyState: { alignItems: 'center', paddingVertical: 40 },
   emptyText: { fontWeight: '900', color: SCREEN_THEME.textPrimary, marginTop: 12 },
   emptySubtext: { color: SCREEN_THEME.textSecondary, marginTop: 4 },
+  emptyActionButton: {
+    marginTop: 20,
+    borderRadius: 16,
+    paddingVertical: 13,
+    paddingHorizontal: 32,
+    backgroundColor: SCREEN_THEME.terracotta,
+    shadowColor: '#7A3A22',
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  emptyActionButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '900' },
   requestCardYesterday: {
-    backgroundColor: '#D6D6D6',
+    backgroundColor: SCREEN_THEME.paperStrong,
     borderRadius: 20,
     padding: 14,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#B0B0B0',
+    borderColor: '#E4D0AB',
+    opacity: 0.72,
   },
   yesterdaySeparator: {
     flexDirection: 'row',
@@ -363,8 +400,8 @@ const styles = StyleSheet.create({
     marginVertical: 14,
     gap: 8,
   },
-  yesterdayLine: { flex: 1, height: 1, backgroundColor: '#B0B0B0' },
-  yesterdayLabel: { color: '#888888', fontWeight: '800', fontSize: 13 },
+  yesterdayLine: { flex: 1, height: 1, backgroundColor: '#C8B89A' },
+  yesterdayLabel: { color: SCREEN_THEME.textMuted, fontWeight: '800', fontSize: 13 },
 });
 
 export default HelpNeighborsScreen;
