@@ -33,6 +33,7 @@ type Props = {
   showProfile?: boolean;
   showContact?: boolean;
   showLikeAvatars?: boolean;
+  contactLabel?: string;
 };
 
 const labels = {
@@ -74,6 +75,7 @@ export default function UserCardActionBar({
   showProfile = true,
   showContact = true,
   showLikeAvatars = false,
+  contactLabel,
 }: Props) {
   const [localLikes, setLocalLikes] = useState<Record<string, true>>({});
   const [likeAvatarByUserId, setLikeAvatarByUserId] = useState<Record<string, string>>({});
@@ -185,7 +187,7 @@ export default function UserCardActionBar({
       {showContact ? (
         <TouchableOpacity style={[styles.outlined, resolvedContactDisabled && styles.disabled]} onPress={(event) => { event.stopPropagation(); if (requireRegisteredUser()) onContact?.(); }} disabled={resolvedContactDisabled} activeOpacity={0.8}>
           <MaterialCommunityIcons name="message-text-outline" size={13} color={resolvedContactDisabled ? '#B0A090' : '#7A1E5C'} />
-          <Text style={[styles.outlinedText, resolvedContactDisabled && styles.disabledText]}>{t.contact}</Text>
+          <Text style={[styles.outlinedText, resolvedContactDisabled && styles.disabledText]}>{contactLabel ?? t.contact}</Text>
         </TouchableOpacity>
       ) : null}
 

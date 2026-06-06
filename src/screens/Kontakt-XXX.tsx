@@ -58,7 +58,7 @@ function upsertProfileCache(uid: string, entry: ContactProfileCacheEntry): void 
   contactProfileCache.set(uid, entry);
 }
 
-const CONTACT_LEGACY_CATEGORY_VALUES = [
+const CONTACT_CATEGORY_VALUES = [
   'furniture',
   'appliances',
   'electronics',
@@ -72,7 +72,7 @@ const CONTACT_LEGACY_CATEGORY_VALUES = [
   'other',
 ] as const;
 
-type ContactLegacyCategoryValue = typeof CONTACT_LEGACY_CATEGORY_VALUES[number];
+type ContactCategoryValue = typeof CONTACT_CATEGORY_VALUES[number];
 
 const ITEM_CONDITION_VALUES = ['new', 'like_new', 'good', 'fair'] as const;
 const ZODIAC_VALUES = ['aries', 'taurus', 'gemini', 'cancer', 'leo', 'virgo', 'libra', 'scorpio', 'sagittarius', 'capricorn', 'aquarius', 'pisces'] as const;
@@ -96,8 +96,8 @@ type ContactsDraft = Partial<{
 
 const UI_TEXT = {
   ua: {
-    title: 'Контакти Чайки',
-    subtitle: 'Люди ЖК Чайка: залиште контакт для зв\'язку',
+    title: 'Знайомства на каву',
+    subtitle: 'Люди ЖК Чайка — знайдіть цікаву компанію поруч',
     categoryLabel: 'Хто я',
     conditionLabel: 'Шукаю',
     priceLabel: 'Вік',
@@ -108,14 +108,15 @@ const UI_TEXT = {
     removePhoto: 'Прибрати фото',
     descriptionLabel: 'Про себе',
     submitBtn: 'Опублікувати',
-    addRequest: '+ Додати контакт',
-    formTitle: 'Контакт',
+    addRequest: '+ Моя анкета',
+    formTitle: 'Моя анкета',
     errorFill: 'Заповніть усі поля',
     errorPhone: 'Перевірте номер телефону',
     successTitle: 'Готово',
-    successMsg: 'Контакт опубліковано. Тепер інші можуть знайти вас.',
+    successMsg: 'Анкету опубліковано. Тепер інші можуть знайти вас.',
+    successMsgWithPhoto: 'Анкету опубліковано. Фото буде показане після перевірки модератором.',
     deleteConfirmTitle: 'Видалити?',
-    deleteConfirmMsg: 'Ви впевнені, що хочете видалити цей контакт?',
+    deleteConfirmMsg: 'Ви впевнені, що хочете видалити цю анкету?',
     deleteCancel: 'Скасувати',
     deleteBtn: 'Видалити',
     listingsTitle: 'Люди поруч',
@@ -183,14 +184,16 @@ const UI_TEXT = {
     },
     humanDesignTypeLabels: { generator: 'Генератор', projector: 'Проектор', manifestor: 'Маніфестор', reflector: 'Рефлектор' },
     descriptionRequired: 'Додайте кілька слів про себе.',
-    authRequired: 'Для публікації контакту потрібна реєстрація.',
+    authRequired: 'Для публікації анкети потрібна реєстрація.',
+    sectionMain: 'Основне',
+    sectionExtra: 'Додатково',
     live: 'НАЖИВО',
     liveCount: (count: number) => `всього ${count} людей шукають знайомств`,
     topAnketyTitle: 'Топ анкети',
   },
   ru: {
-    title: 'Контакты Чайки',
-    subtitle: 'Люди ЖК Чайка: оставьте контакт для связи',
+    title: 'Знакомства на кофе',
+    subtitle: 'Люди ЖК Чайка — найдите интересную компанию рядом',
     categoryLabel: 'Кто я',
     conditionLabel: 'Ищу',
     priceLabel: 'Возраст',
@@ -201,14 +204,15 @@ const UI_TEXT = {
     removePhoto: 'Убрать фото',
     descriptionLabel: 'О себе',
     submitBtn: 'Опубликовать',
-    addRequest: '+ Добавить контакт',
-    formTitle: 'Контакт',
+    addRequest: '+ Моя анкета',
+    formTitle: 'Моя анкета',
     errorFill: 'Заполните все поля',
     errorPhone: 'Проверьте номер телефона',
     successTitle: 'Готово',
-    successMsg: 'Контакт опубликован. Теперь другие могут найти вас.',
+    successMsg: 'Анкета опубликована. Теперь другие могут найти вас.',
+    successMsgWithPhoto: 'Анкета опубликована. Фото появится после проверки модератором.',
     deleteConfirmTitle: 'Удалить?',
-    deleteConfirmMsg: 'Вы уверены, что хотите удалить этот контакт?',
+    deleteConfirmMsg: 'Вы уверены, что хотите удалить эту анкету?',
     deleteCancel: 'Отмена',
     deleteBtn: 'Удалить',
     listingsTitle: 'Люди рядом',
@@ -276,14 +280,16 @@ const UI_TEXT = {
     },
     humanDesignTypeLabels: { generator: 'Генератор', projector: 'Проектор', manifestor: 'Манифестор', reflector: 'Рефлектор' },
     descriptionRequired: 'Добавьте несколько слов о себе.',
-    authRequired: 'Для публикации контакта требуется регистрация.',
+    authRequired: 'Для публикации анкеты требуется регистрация.',
+    sectionMain: 'Основное',
+    sectionExtra: 'Дополнительно',
     live: 'В ЭФИРЕ',
     liveCount: (count: number) => `всего ${count} людей ищут знакомства`,
     topAnketyTitle: 'Топ анкеты',
   },
   en: {
-    title: 'Chaika Contacts',
-    subtitle: 'Chaika Life people: leave your contact',
+    title: 'Coffee Meetups',
+    subtitle: 'Chaika Life people — find interesting company nearby',
     categoryLabel: 'I am',
     conditionLabel: 'Looking for',
     priceLabel: 'Age',
@@ -294,14 +300,15 @@ const UI_TEXT = {
     removePhoto: 'Remove photo',
     descriptionLabel: 'About me',
     submitBtn: 'Publish',
-    addRequest: '+ Add contact',
-    formTitle: 'Contact',
+    addRequest: '+ My profile',
+    formTitle: 'My profile',
     errorFill: 'Fill all fields',
     errorPhone: 'Check phone number',
     successTitle: 'Done',
-    successMsg: 'Contact published. Now others can find you.',
+    successMsg: 'Profile published. Now others can find you.',
+    successMsgWithPhoto: 'Profile published. Photo will appear after moderation review.',
     deleteConfirmTitle: 'Delete?',
-    deleteConfirmMsg: 'Are you sure you want to delete this contact?',
+    deleteConfirmMsg: 'Are you sure you want to delete this profile?',
     deleteCancel: 'Cancel',
     deleteBtn: 'Delete',
     listingsTitle: 'People nearby',
@@ -369,7 +376,9 @@ const UI_TEXT = {
     },
     humanDesignTypeLabels: { generator: 'Generator', projector: 'Projector', manifestor: 'Manifestor', reflector: 'Reflector' },
     descriptionRequired: 'Add a few words about yourself.',
-    authRequired: 'Registration is required to publish a contact.',
+    authRequired: 'Registration is required to publish a profile.',
+    sectionMain: 'Basic info',
+    sectionExtra: 'More about me',
     live: 'LIVE',
     liveCount: (count: number) => `${count} people looking for contacts`,
     topAnketyTitle: 'Top profiles',
@@ -421,7 +430,7 @@ const KontaktiChaikyScreen: React.FC = () => {
   const skipNextDraftFlushRef = useRef(false);
 
   const getCategoryLabel = useCallback(
-    (value: string) => text.categories[value as ContactLegacyCategoryValue] ?? value,
+    (value: string) => text.categories[value as ContactCategoryValue] ?? value,
     [text.categories],
   );
 
@@ -802,7 +811,7 @@ const KontaktiChaikyScreen: React.FC = () => {
       trace('api_call', 'success');
 
       trace('user_alert', 'success', { type: 'success' });
-      toast.showSuccess(text.successTitle, text.successMsg);
+      toast.showSuccess(text.successTitle, resolvedPhotoUri ? text.successMsgWithPhoto : text.successMsg);
       resetForm();
       setAddFormVisible(false);
     } catch (error) {
@@ -898,7 +907,7 @@ const KontaktiChaikyScreen: React.FC = () => {
               <View style={styles.pickerWrapper}>
                 <Picker selectedValue={searchCategory} onValueChange={setSearchCategory} style={styles.picker}>
                   <Picker.Item label={text.searchAnyCategory} value="" />
-                  {CONTACT_LEGACY_CATEGORY_VALUES.map((value) => (
+                  {CONTACT_CATEGORY_VALUES.map((value) => (
                     <Picker.Item key={`search-category-${value}`} label={getCategoryLabel(value)} value={value} />
                   ))}
                 </Picker>
@@ -1031,7 +1040,7 @@ const KontaktiChaikyScreen: React.FC = () => {
             <View style={styles.pickerWrapper}>
               <Picker selectedValue={selectedFilterCategory} onValueChange={setSelectedFilterCategory} style={styles.picker}>
                 <Picker.Item label={text.filterAll} value="" />
-                {CONTACT_LEGACY_CATEGORY_VALUES.map((value) => (
+                {CONTACT_CATEGORY_VALUES.map((value) => (
                   <Picker.Item key={`filter-${value}`} label={getCategoryLabel(value)} value={value} />
                 ))}
               </Picker>
@@ -1069,6 +1078,7 @@ const KontaktiChaikyScreen: React.FC = () => {
                 const displayName = profile?.name || item.itemName;
                 const modMsg = getModerationUserMessage(language, item.moderationStatus, item.rejectionReason || item.moderationReason);
                 const showModInfo = isOwn && item.moderationStatus !== 'approved';
+                const isViberContact = (!item.userId || item.userId === user?.id) && showPhone;
                 return (
                   <View
                     key={item.id}
@@ -1146,6 +1156,7 @@ const KontaktiChaikyScreen: React.FC = () => {
                       onProfile={item.userId ? () => { if (navLock.current) return; navLock.current = true; navigation.navigate('ViewUserProfile', { userId: item.userId as string }); setTimeout(() => { navLock.current = false; }, 800); } : undefined}
                       onContact={item.userId && item.userId !== user?.id ? () => openContactModal({ userId: item.userId as string, name: item.itemName ?? 'Unknown', photoURL: avatarUri || undefined, sourceType: 'lyudi', sourceId: item.id, sourceTitle: item.itemName }) : showPhone ? () => handleViber(item.phone) : undefined}
                       contactDisabled={!showPhone && (!item.userId || item.userId === user?.id)}
+                      contactLabel={isViberContact ? 'Viber' : undefined}
                       likePath="feed_likes/contacts"
                       likeId={item.id}
                       showLikeAvatars
@@ -1192,11 +1203,16 @@ const KontaktiChaikyScreen: React.FC = () => {
               contentContainerStyle={styles.sheetContent}
               style={styles.sheetScroll}
             >
+              <View style={styles.sectionDivider}>
+                <View style={styles.sectionDividerLine} />
+                <Text style={styles.sectionDividerText}>{text.sectionMain}</Text>
+                <View style={styles.sectionDividerLine} />
+              </View>
               <Text style={styles.formLabel}>{text.categoryLabel}</Text>
               <View style={styles.pickerWrapper}>
                 <Picker selectedValue={category} onValueChange={setCategory} style={styles.picker}>
                   <Picker.Item label={text.selectCategory} value="" />
-                  {CONTACT_LEGACY_CATEGORY_VALUES.map((value) => (
+                  {CONTACT_CATEGORY_VALUES.map((value) => (
                     <Picker.Item key={value} label={getCategoryLabel(value)} value={value} />
                   ))}
                 </Picker>
@@ -1245,6 +1261,12 @@ const KontaktiChaikyScreen: React.FC = () => {
               <TextInput placeholder="+380..." value={phone} onChangeText={(value) => setPhone(normalizePhoneText(value))} keyboardType="phone-pad" style={styles.input} placeholderTextColor="#A0938D" />
               <InlineFieldHint message={text.phoneHint} type={phone.replace(/\D/g, '').length >= 7 ? 'success' : 'hint'} />
               <FormFieldError error={submitAttempted && phone.replace(/\D/g, '').length < 7 ? text.errorPhone : undefined} />
+
+              <View style={styles.sectionDivider}>
+                <View style={styles.sectionDividerLine} />
+                <Text style={styles.sectionDividerText}>{text.sectionExtra}</Text>
+                <View style={styles.sectionDividerLine} />
+              </View>
 
               <TouchableOpacity
                 style={styles.interestingBtn}
@@ -1562,6 +1584,15 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: '#FFF3E0',
   },
+  sectionDivider: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+    marginTop: 18,
+    marginBottom: 6,
+  },
+  sectionDividerLine: { flex: 1, height: 1, backgroundColor: '#E8DDD3' },
+  sectionDividerText: { fontSize: 10, fontWeight: '900' as const, color: '#A0938D', textTransform: 'uppercase' as const, letterSpacing: 1 },
   kDeleteLink: {
     flexDirection: 'row',
     alignItems: 'center',
