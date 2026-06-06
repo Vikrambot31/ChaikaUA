@@ -644,6 +644,17 @@ const text = CLEAN_PROBLEMS_TEXT[language];
   };
 
   const openContactOptions = (problem: Problem) => {
+    if (!user?.id) {
+      Alert.alert(
+        language === 'en' ? 'Registration required' : language === 'ru' ? 'Нужна регистрация' : 'Потрібна реєстрація',
+        language === 'en' ? 'Sign in to contact users.' : language === 'ru' ? 'Для связи необходима регистрация.' : "Для зв'язку потрібна реєстрація.",
+        [
+          { text: language === 'en' ? 'Register' : language === 'ru' ? 'Зарегистрироваться' : 'Зареєструватись', onPress: () => navigation.navigate('LoginScreen') },
+          { text: language === 'en' ? 'Cancel' : language === 'ru' ? 'Отмена' : 'Скасувати', style: 'cancel' },
+        ]
+      );
+      return;
+    }
     if (problem.userId && problem.userId !== user?.id) {
       openContactModal({ userId: problem.userId, name: problem.name || problem.title, photoURL: (problem.userId && avatarByUserId[problem.userId]) || problem.avatarUri || undefined, sourceType: 'help', sourceId: problem.id, sourceTitle: problem.title });
       return;

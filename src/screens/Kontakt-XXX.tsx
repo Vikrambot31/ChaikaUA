@@ -625,6 +625,17 @@ const KontaktiChaikyScreen: React.FC = () => {
   }, [blinkAnim]);
 
   const handleViber = (phoneRaw: string) => {
+    if (!user?.id) {
+      Alert.alert(
+        language === 'en' ? 'Registration required' : language === 'ru' ? 'Нужна регистрация' : 'Потрібна реєстрація',
+        language === 'en' ? 'Sign in to contact users.' : language === 'ru' ? 'Для связи необходима регистрация.' : "Для зв'язку потрібна реєстрація.",
+        [
+          { text: language === 'en' ? 'Register' : language === 'ru' ? 'Зарегистрироваться' : 'Зареєструватись', onPress: () => navigation.navigate('LoginScreen') },
+          { text: language === 'en' ? 'Cancel' : language === 'ru' ? 'Отмена' : 'Скасувати', style: 'cancel' },
+        ]
+      );
+      return;
+    }
     void safeOpenViber(phoneRaw, language);
   };
 

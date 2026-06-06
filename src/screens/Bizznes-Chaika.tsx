@@ -189,6 +189,18 @@ const normalizeStoredBizPrice = (value: string): string => {
   return normalizeBizPrice(value);
 };
 
+const isRenderablePhotoUri = (value: unknown): boolean =>
+  typeof value === 'string' && /^(https?:|file:|content:)\/\//i.test(value.trim());
+
+const normalizeBizPhotoUri = (value: unknown): string =>
+  typeof value === 'string' && isRenderablePhotoUri(value) ? value.trim() : '';
+
+const normalizeBizPhotoStoragePath = (photoStoragePath: unknown, photoUri: unknown): string => {
+  if (typeof photoStoragePath === 'string' && photoStoragePath.trim()) return photoStoragePath.trim();
+  if (typeof photoUri === 'string' && photoUri.trim() && !isRenderablePhotoUri(photoUri)) return photoUri.trim();
+  return '';
+};
+
 const mapBizItem = (id: string, data: any, isArchived?: boolean): BizListing => ({
   id,
   itemName: data.itemName || '',
@@ -198,8 +210,8 @@ const mapBizItem = (id: string, data: any, isArchived?: boolean): BizListing => 
   price: data.price || '',
   description: data.description || '',
   phone: data.phone || '',
-  photoUri: data.photoUri || data.photoStoragePath || '',
-  photoStoragePath: data.photoStoragePath || data.photoUri || '',
+  photoUri: normalizeBizPhotoUri(data.photoUri),
+  photoStoragePath: normalizeBizPhotoStoragePath(data.photoStoragePath, data.photoUri),
   photoId: data.photoId || '',
   moderationStatus: isArchived ? 'approved' : (data.moderationStatus || 'pending'),
   submittedForModerationAt: data.submittedForModerationAt || '',
@@ -247,7 +259,7 @@ const biznesChaikaService = {
         const resolved = await resolveMediaAccessUrls(
           chunk,
           BIZ_PHOTO_STORAGE_PATH,
-          (item) => item.photoUri || item.photoStoragePath || '',
+          (item) => item.photoStoragePath || item.photoUri || '',
           (item, url) => ({ ...item, photoUri: url }),
           { profile: 'list' },
         );
@@ -1051,6 +1063,17 @@ const BiznesChaikaScreen: React.FC = () => {
   }, [blinkAnim]);
 
   const handleViber = (phoneRaw: string) => {
+    if (!user?.id) {
+      Alert.alert(
+        language === 'en' ? 'Registration required' : language === 'ru' ? 'Нужна регистрация' : 'Потрібна реєстрація',
+        language === 'en' ? 'Sign in to contact users.' : language === 'ru' ? 'Для связи необходима регистрация.' : "Для зв'язку потрібна реєстрація.",
+        [
+          { text: language === 'en' ? 'Register' : language === 'ru' ? 'Зарегистрироваться' : 'Зареєструватись', onPress: () => navigation.navigate('LoginScreen') },
+          { text: language === 'en' ? 'Cancel' : language === 'ru' ? 'Отмена' : 'Скасувати', style: 'cancel' },
+        ]
+      );
+      return;
+    }
     void safeOpenViber(phoneRaw, language);
   };
 
@@ -1096,7 +1119,7 @@ const BiznesChaikaScreen: React.FC = () => {
         .map((promotion, index) => [promotion.targetId, index]),
     );
     return [...listings]
-      .filter((item) => !item.isArchived && (item.photoUri || promotedByListingId.has(item.id)))
+      .filter((item) => !item.isArchived && (item.photoUri || item.photoStoragePath || promotedByListingId.has(item.id)))
       .sort((a, b) => {
         const aPromoted = promotedByListingId.get(a.id);
         const bPromoted = promotedByListingId.get(b.id);
