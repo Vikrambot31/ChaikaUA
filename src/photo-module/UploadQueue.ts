@@ -348,7 +348,11 @@ export const UploadQueue = {
           });
           await removeTask(task.photoId);
         } catch (error) {
-          const retryCount = task.retryCount + 1;
+          const errorCode = typeof error === 'object' && error !== null && 'code' in error
+            ? String((error as { code?: unknown }).code)
+            : '';
+          const shouldRetry = errorCode !== 'community-photo-monthly-limit';
+          const retryCount = shouldRetry ? task.retryCount + 1 : MAX_RETRY_COUNT;
           const message = (error instanceof Error ? error.message : String(error)).slice(0, MAX_ERROR_LENGTH);
 
           void recordRuntimeTrace({
@@ -362,7 +366,7 @@ export const UploadQueue = {
               photoId: task.photoId,
               retryCount,
               maxRetry: MAX_RETRY_COUNT,
-              willRetry: retryCount < MAX_RETRY_COUNT,
+              willRetry: shouldRetry && retryCount < MAX_RETRY_COUNT,
             },
           });
 

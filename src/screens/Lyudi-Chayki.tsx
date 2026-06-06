@@ -25,6 +25,7 @@ import { profilePermissionService } from '../services/profilePermissionService';
 import { ProfileViewRequestModal, PermissionModalState } from '../components/ProfileViewRequestModal';
 import { useContactRequest } from '../hooks/useContactRequest';
 import ContactReasonModal from '../components/ContactReasonModal';
+import { VideoLoadingOverlay } from '../components/VideoLoadingOverlay';
 import type { DetailItemData } from '../utils/detailViewTypes';
 import UserCardActionBar from '../components/UserCardActionBar';
 import { START_AVATAR_URI_PREFIX } from '../utils/startAvatars';
@@ -122,6 +123,24 @@ const UI_TEXT = {
 } as const;
 
 type UiText = (typeof UI_TEXT)[Lang];
+
+const CONTACT_REQUEST_LIMIT_TEXT: Record<Lang, Record<'cooldown' | 'daily_limit' | 'retry_later', string>> = {
+  ua: {
+    cooldown: 'Зачекайте кілька секунд перед наступним запитом.',
+    daily_limit: 'Ліміт контактних запитів на сьогодні вичерпано.',
+    retry_later: 'Після відмови повторний запит до цієї людини доступний завтра.',
+  },
+  ru: {
+    cooldown: 'Подождите несколько секунд перед следующим запросом.',
+    daily_limit: 'Лимит контактных запросов на сегодня исчерпан.',
+    retry_later: 'После отказа повторный запрос этому человеку доступен завтра.',
+  },
+  en: {
+    cooldown: 'Wait a few seconds before sending another request.',
+    daily_limit: 'Today contact request limit has been reached.',
+    retry_later: 'After a denial, you can request this contact again tomorrow.',
+  },
+};
 
 type CommunityUser = {
   id: string;
@@ -437,6 +456,9 @@ export default function TopGirlsBoysScreen() {
         setPermModal((prev) => ({ ...prev, state: 'open', contactInfo: phone }));
       } else if (result === 'already_pending') {
         setPermModal((prev) => ({ ...prev, state: 'pending' }));
+      } else if (result === 'cooldown' || result === 'daily_limit' || result === 'retry_later') {
+        setPermModal((prev) => ({ ...prev, state: 'confirm' }));
+        Alert.alert(text.errorTitle, CONTACT_REQUEST_LIMIT_TEXT[language][result]);
       } else {
         setPermModal((prev) => ({ ...prev, state: 'sent' }));
       }
@@ -444,7 +466,7 @@ export default function TopGirlsBoysScreen() {
       setPermModal({ visible: false, state: 'confirm', targetId: '', targetName: '', contactInfo: '' });
       Alert.alert(text.errorTitle, error instanceof Error ? error.message : text.requestFailed);
     }
-  }, [user?.id, user?.name, user?.photoURL, permModal.targetId, filteredRanked, text.errorTitle, text.requestFailed]);
+  }, [user?.id, user?.name, user?.photoURL, permModal.targetId, filteredRanked, language, text.errorTitle, text.requestFailed]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -596,6 +618,7 @@ export default function TopGirlsBoysScreen() {
         onSelect={(reason) => void sendContactRequest(reason)}
         onClose={closeContactModal}
       />
+      <VideoLoadingOverlay visible={loading} />
     </SafeAreaView>
   );
 }

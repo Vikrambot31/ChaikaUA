@@ -25,6 +25,7 @@ import { checkYellowList } from '../utils/yellowListCheck';
 import UserCardActionBar from '../components/UserCardActionBar';
 import GuestRegisterBanner from '../components/GuestRegisterBanner';
 import { useGuestGuard } from '../hooks/useGuestGuard';
+import { VideoLoadingOverlay } from '../components/VideoLoadingOverlay';
 
 const TWO_MONTHS_MS = 60 * 24 * 60 * 60 * 1000;
 type AppLanguage = 'ua' | 'ru' | 'en';
@@ -1129,6 +1130,7 @@ const JobSearchScreen: React.FC = () => {
         onClose={closeContactModal}
       />
       <GuestRegisterBanner visible={guestBannerVisible} onClose={hideGuestBanner} />
+      <VideoLoadingOverlay visible={!listingsReady} />
     </SafeAreaView>
   );
 };

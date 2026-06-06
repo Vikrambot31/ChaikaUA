@@ -19,6 +19,7 @@ import { COLORS } from '../utils/constants';
 import MiniTabBar from '../components/MiniTabBar';
 import { usePlaces } from '../hooks/usePlaces';
 import { selectPlacesLoading } from '../redux/slices/placesSlice';
+import { VideoLoadingOverlay } from '../components/VideoLoadingOverlay';
 
 type AppNavigation = import('@react-navigation/native').NavigationProp<Record<string, object | undefined>>;
 type TabType = 'cafe' | 'store' | 'people';
@@ -227,6 +228,7 @@ const TopPlacesScreen: React.FC = () => {
         }
       />
       <MiniTabBar />
+      <VideoLoadingOverlay visible={loading} />
     </SafeAreaView>
   );
 };

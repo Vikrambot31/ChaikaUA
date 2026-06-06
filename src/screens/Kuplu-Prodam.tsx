@@ -21,6 +21,7 @@ import GuestRegisterBanner from '../components/GuestRegisterBanner';
 import { useGuestGuard } from '../hooks/useGuestGuard';
 import { requireAuthForDetails } from '../utils/authGuard';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import { VideoLoadingOverlay } from '../components/VideoLoadingOverlay';
 
 export const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000;
 
@@ -716,6 +717,7 @@ const BuySellScreen: React.FC = () => {
         onClose={closeContactModal}
       />
       <GuestRegisterBanner visible={guestBannerVisible} onClose={hideGuestBanner} />
+      <VideoLoadingOverlay visible={!listingsReady} />
     </SafeAreaView>
   );
 };

@@ -44,6 +44,7 @@ import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 import { requireAuthForDetails } from '../utils/authGuard';
 import GuestRegisterBanner from '../components/GuestRegisterBanner';
 import { useGuestGuard } from '../hooks/useGuestGuard';
+import { VideoLoadingOverlay } from '../components/VideoLoadingOverlay';
 
 type ChatRequest = ChatRequestLike;
 
@@ -1196,6 +1197,7 @@ const OnlineChatScreen = () => {
         onClose={closeContactModal}
       />
       <GuestRegisterBanner visible={guestBannerVisible} onClose={hideGuestBanner} />
+      <VideoLoadingOverlay visible={loading} />
     </SafeAreaView>
   );
 };

@@ -11,6 +11,7 @@ import { uniqueId } from './utils/cryptoId';
 import { uploadPhotoToNamespace } from './services/photoUploadService';
 import { canPublishImage } from './utils/imageSafety';
 import { safePromiseTimeout } from './utils/safePromiseTimeout';
+import { assertCommunityPhotoMonthlyLimit, findCurrentMonthCommunityPhotoByStoragePath } from './utils/communityPhotoLimits';
 import { auth, database, storage } from './firebase-core';
 import { ensureFirebaseAuth, isModeratorUser, requireWriteSession } from './firebase-auth-session';
 import { Request as AppRequest, CommunityPhoto as AppPhoto, AudioAttachment, type ProblemResolutionStatus } from './types/app';
@@ -1296,6 +1297,33 @@ export const photoAPI = {
       }
 
       const now = Date.now();
+      const existingPhoto = await findCurrentMonthCommunityPhotoByStoragePath(user.uid, resolvedStoragePath);
+      if (existingPhoto) {
+        await update(ref(database, `community_photos/${existingPhoto.id}`), {
+          title: normalizedTitle,
+          description: normalizedDescription,
+          imageUri: effectiveImageUri,
+          ...(effectiveImageUri.startsWith('https://') ? { downloadUrl: effectiveImageUri } : {}),
+          uploadedBy: normalizedUploadedBy,
+          ...(normalizedUploadedByEmail ? { uploadedByEmail: normalizedUploadedByEmail } : {}),
+          target: photoData.target || 'gallery_public',
+          ...(normalizedSourceScreen ? { sourceScreen: normalizedSourceScreen } : {}),
+          ...(normalizedSourceScreenLabel ? { sourceScreenLabel: normalizedSourceScreenLabel } : {}),
+          ...(normalizedSourceFeature ? { sourceFeature: normalizedSourceFeature } : {}),
+          storagePath: resolvedStoragePath,
+          updatedAt: now,
+          ...(normalizedLocationLabel
+            ? {
+                locationLabel: normalizedLocationLabel,
+                ...(normalizedLocationType ? { locationType: normalizedLocationType } : {}),
+              }
+            : {}),
+        });
+        void logClientEvent('photo_metadata_updated', { title: normalizedTitle });
+        return { success: true };
+      }
+
+      await assertCommunityPhotoMonthlyLimit(user.uid, 1);
       try {
         await push(ref(database, 'community_photos'), {
           title: normalizedTitle,

@@ -31,6 +31,7 @@ import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 import { useOperationTrace } from '../hooks/useOperationTrace';
 import { createPendingModeration, type ModerationStatus } from '../utils/moderation';
 import { resolveMediaAccessUrls } from '../services/mediaAccess';
+import { VideoLoadingOverlay } from '../components/VideoLoadingOverlay';
 import { ensureFirebaseAuth, requireWriteSession } from '../firebase-auth-session';
 import { getBuildingsByStreet, getStreets } from '../data/buildings';
 import { subscribeActiveBonusPromotions, type BonusPromotion } from '../services/bonusService';
@@ -2161,6 +2162,7 @@ const BiznesChaikaScreen: React.FC = () => {
         onSelect={(reason) => void sendContactRequest(reason)}
         onClose={closeContactModal}
       />
+      <VideoLoadingOverlay visible={!listingsReady && listings.length === 0} />
     </SafeAreaView>
   );
 };

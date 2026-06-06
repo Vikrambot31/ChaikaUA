@@ -17,6 +17,7 @@ import { selectIsOsbbManager } from '../redux/slices/osbbSlice';
 import { useOsbbMembership } from '../hooks/useOsbbMembership';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { OsbbNewsItem, subscribeOsbbNews } from '../services/osbbNews';
+import { VideoLoadingOverlay } from '../components/VideoLoadingOverlay';
 
 type AppNav = NativeStackNavigationProp<Record<string, object | undefined>>;
 type Lang = 'ua' | 'ru' | 'en';
@@ -225,6 +226,7 @@ const OsbbNovostyScreen: React.FC = () => {
           <MaterialCommunityIcons name="plus" size={28} color="#FFFFFF" />
         </TouchableOpacity>
       ) : null}
+      <VideoLoadingOverlay visible={loading} />
     </SafeAreaView>
   );
 };

@@ -16,6 +16,7 @@ import { openInGoogleMaps } from '../utils/googleMapsLink';
 import { getMapFocusPlaceParams } from '../utils/mapFocusParams';
 import { buySellService, BuySellListing } from '../services/buySellService';
 import { database } from '../firebase-config';
+import { VideoLoadingOverlay } from '../components/VideoLoadingOverlay';
 
 const REAL_CHAIKA_STORES: Place[] = [
   { id: 'store-real-fora', name: 'Фора', address: 'вулиця Михайла Грушевського, 12', latitude: 50.43898, longitude: 30.28264, type: PlaceType.SHOP, rating: 0, reviews: 0, createdAt: new Date('2026-04-22T09:00:00Z').valueOf() },
@@ -640,6 +641,7 @@ const PlacesScreen: React.FC = () => {
         onSelect={(value) => { if (ratingTarget) void handleRate(ratingTarget, value); }}
         onClose={() => setRatingTarget(null)}
       />
+      <VideoLoadingOverlay visible={residentDataLoading} />
 
     </SafeAreaView>
   );

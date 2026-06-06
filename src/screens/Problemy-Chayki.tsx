@@ -28,6 +28,7 @@ import type { DetailItemData } from '../utils/detailViewTypes';
 import type { ProblemResolutionStatus } from '../types/app';
 import { getRequestTopicLabel } from '../data/categories';
 import { getFirstDoneRequestPhoto, getRequiredPhotoLabel, hasPhotoUploadInProgress, validateSubmissionRequirements } from '../utils/submissionRequirements';
+import { VideoLoadingOverlay } from '../components/VideoLoadingOverlay';
 import { checkYellowList } from '../utils/yellowListCheck';
 import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 
@@ -1024,6 +1025,7 @@ const text = CLEAN_PROBLEMS_TEXT[language];
         onClose={closeContactModal}
       />
       <MiniTabBar />
+      <VideoLoadingOverlay visible={loading} />
     </SafeAreaView>
   );
 }

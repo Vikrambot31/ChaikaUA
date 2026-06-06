@@ -30,6 +30,7 @@ import type { JobListing } from '../services/jobService';
 import { getDaysInApp } from '../utils/chaikaLevels';
 import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
 import { requireAuthForDetails } from '../utils/authGuard';
+import { VideoLoadingOverlay } from '../components/VideoLoadingOverlay';
 
 const UI_TEXT = {
   ua: {
@@ -398,6 +399,7 @@ const ViewUserProfileScreen: React.FC = () => {
         onSelect={(reason) => void sendRequest(reason)}
         onClose={closeModal}
       />
+      <VideoLoadingOverlay visible={loading} />
     </SafeAreaView>
   );
 };

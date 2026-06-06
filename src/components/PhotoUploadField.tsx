@@ -22,6 +22,7 @@ export type UploadedPhoto = {
   storagePath: string;
   status: 'uploading' | 'done' | 'error';
   progress: number;
+  error?: string;
 };
 
 type Props = {
@@ -107,6 +108,7 @@ const mapPhoto = (photo: UserPhoto): UploadedPhoto => ({
   storagePath: photo.storagePath || photo.filePath || '',
   status: mapStatus(photo.status),
   progress: photo.progress ?? (photo.status === 'uploaded' ? 100 : 0),
+  error: photo.error,
 });
 
 export default function PhotoUploadField({
@@ -125,6 +127,7 @@ export default function PhotoUploadField({
   const [selected, setSelected] = useState<UserPhoto[]>([]);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
   const [previewLoadFailed, setPreviewLoadFailed] = useState(false);
+  const alertedErrorIdsRef = useRef<Set<string>>(new Set());
   const limitReached = maxPhotos > 0 && selected.length >= maxPhotos;
 
   const onPhotosChangeRef = useRef(onPhotosChange);
@@ -141,6 +144,14 @@ export default function PhotoUploadField({
   useEffect(() => {
     onPhotosChangeRef.current?.(selected.map(mapPhoto));
   }, [selected]);
+
+  useEffect(() => {
+    const failed = selected.find((photo) => photo.status === 'error' && !alertedErrorIdsRef.current.has(photo.id));
+    if (!failed) return;
+    alertedErrorIdsRef.current.add(failed.id);
+    const e = PICK_ERROR_BY_LANG[language] ?? PICK_ERROR_BY_LANG.ua;
+    Alert.alert(e.title, failed.error || e.body);
+  }, [language, selected]);
 
   // Синхронизируем статусы уже выбранных фото из ImageStorage (обновляет статус загрузки)
   useEffect(() => {

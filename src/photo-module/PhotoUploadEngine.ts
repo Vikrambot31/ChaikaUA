@@ -22,6 +22,7 @@ import { ensureFirebaseAuth, isAnonymousFirebaseUser } from '../firebase-auth-se
 import { uploadPhotoToNamespace } from '../services/photoUploadService';
 import { recordRuntimeTrace } from '../services/runtimeMonitorService';
 import { safeLogError } from '../utils/errorLogger';
+import { assertCommunityPhotoMonthlyLimit } from '../utils/communityPhotoLimits';
 import type { EngineUploadState } from './types';
 
 // ─── Constraints ──────────────────────────────────────────────────────────────
@@ -196,6 +197,9 @@ export async function uploadPhotoWithEngine(
   const user = await ensureFirebaseAuth();
   // Guests are auto-signed-in anonymously for reads; block them from uploading.
   if (!user || isAnonymousFirebaseUser(user)) throw new Error('Sign in required to upload photos.');
+  if (collection === 'community_photos') {
+    await assertCommunityPhotoMonthlyLimit(user.uid, 1);
+  }
 
   let storagePath = '';
   let downloadUrl: string | undefined;

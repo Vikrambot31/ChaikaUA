@@ -33,6 +33,7 @@ import { useOperationTrace } from '../hooks/useOperationTrace';
 import { subscribeActiveBonusPromotions, type BonusPromotion } from '../services/bonusService';
 import ScreenTooltip from '../components/ScreenTooltip';
 import { CONTACTS_CHAIKA_TOOLTIP } from '../utils/screenTooltips';
+import { VideoLoadingOverlay } from '../components/VideoLoadingOverlay';
 
 const CONTACT_LISTING_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const PROFILE_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -1570,6 +1571,7 @@ const KontaktiChaikyScreen: React.FC = () => {
         onSelect={(reason) => void sendContactRequest(reason)}
         onClose={closeContactModal}
       />
+      <VideoLoadingOverlay visible={!listingsReady} />
     </SafeAreaView>
   );
 };

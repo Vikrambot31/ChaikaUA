@@ -23,6 +23,7 @@ import { safeCallPhone } from '../utils/communicationActions';
 import type { DetailItemData } from '../utils/detailViewTypes';
 import { openRequestFormWithLimitCheck } from '../utils/requestFormLimitGuard';
 import { getRequestTopicLabel } from '../data/categories';
+import { VideoLoadingOverlay } from '../components/VideoLoadingOverlay';
 
 const UI_TEXT = {
   ua: {
@@ -423,6 +424,7 @@ const MyRequestsScreen = () => {
         removeClippedSubviews
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />}
       />
+      <VideoLoadingOverlay visible={loading} />
     </SafeAreaView>
   );
 };

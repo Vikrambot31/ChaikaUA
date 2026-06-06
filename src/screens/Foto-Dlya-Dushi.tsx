@@ -3,7 +3,6 @@ import GuestRegisterBanner from '../components/GuestRegisterBanner';
 import { useGuestGuard } from '../hooks/useGuestGuard';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   SafeAreaView,
   StyleSheet,
@@ -28,6 +27,7 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
 import type { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { logClientError } from '../utils/errorLogger';
+import { VideoLoadingOverlay } from '../components/VideoLoadingOverlay';
 
 const SCREEN_ID = 'SoulPhotosScreen';
 const STORAGE_PATH = 'community_photos';
@@ -261,23 +261,18 @@ export default function SoulPhotosScreen() {
   }, [user?.id]);
 
   const handlePhotosChange = useCallback((photos: UploadedPhoto[]) => {
-    let hasError = false;
     setPickedPhotos((current) => {
       const next = { ...current };
       for (const photo of photos) {
         if (photo.status === 'error') {
           delete next[photo.photoId];
-          hasError = true;
         } else {
           next[photo.photoId] = photo;
         }
       }
       return next;
     });
-    if (hasError) {
-      Alert.alert(text.loadError, text.uploadError);
-    }
-  }, [text.loadError, text.uploadError]);
+  }, []);
 
   const data = useMemo<SoulPhoto[]>(() => {
     const remotePaths = new Set(remotePhotos.map((photo) => photo.storagePath).filter(Boolean));
@@ -424,6 +419,7 @@ export default function SoulPhotosScreen() {
       {uploadPanel}
       <MiniTabBar />
       <GuestRegisterBanner visible={guestBannerVisible} onClose={hideGuestBanner} />
+      <VideoLoadingOverlay visible={loading} />
     </SafeAreaView>
   );
 }

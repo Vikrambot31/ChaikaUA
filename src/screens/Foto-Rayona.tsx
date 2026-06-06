@@ -25,6 +25,7 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
 import type { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { logClientError } from '../utils/errorLogger';
+import { VideoLoadingOverlay } from '../components/VideoLoadingOverlay';
 
 const SCREEN_ID = 'FotoRayonaScreen';
 const PHOTO_UPLOAD_SCREEN_ID = 'PhotoUploadScreen';
@@ -283,6 +284,7 @@ export default function FotoRayonaScreen() {
       {uploadPanel}
       <MiniTabBar />
       <GuestRegisterBanner visible={guestBannerVisible} onClose={hideGuestBanner} />
+      <VideoLoadingOverlay visible={loading} />
     </SafeAreaView>
   );
 }
