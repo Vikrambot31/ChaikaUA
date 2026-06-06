@@ -34,6 +34,7 @@ import UserCardActionBar from '../components/UserCardActionBar';
 import ScreenTooltip from '../components/ScreenTooltip';
 import { PROFILE_REQUESTS_TOOLTIP } from '../utils/screenTooltips';
 import useSoftToast from '../hooks/useSoftToast';
+import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 
 type Lang = 'ua' | 'ru' | 'en';
 type RequestsTab = 'incoming' | 'outgoing' | 'history';
@@ -338,6 +339,8 @@ export default function ProfileRequestsScreen() {
   const [sessionResolved, setSessionResolved] = useState(Boolean(user?.id));
   const currentUserId = user?.id || sessionUserId || '';
   const [requests, setRequests] = useState<ProfileViewRequest[]>([]);
+  const requestUserIds = requests.flatMap((r) => [r.requesterId, r.targetUserId].filter(Boolean) as string[]);
+  const avatarByUserId = useUserAvatarMap(requestUserIds);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<RequestsTab>('incoming');
   const [tabInitialized, setTabInitialized] = useState(false);
@@ -812,9 +815,9 @@ export default function ProfileRequestsScreen() {
                 >
                   {/* Top: avatar + info */}
                   <View style={styles.cardIncoming}>
-                    {item.requesterPhotoURL ? (
+                    {(item.requesterPhotoURL || avatarByUserId[item.requesterId]) ? (
                       <AppPhotoImage
-                        uri={item.requesterPhotoURL}
+                        uri={item.requesterPhotoURL || avatarByUserId[item.requesterId]}
                         style={styles.avatarMedium}
                         resizeMode="cover"
                         debugLabel={`ProfileRequest:incoming:${item.requesterId}`}
@@ -916,7 +919,7 @@ export default function ProfileRequestsScreen() {
                   )}
 
                   <UserCardActionBar
-                    avatarUri={item.requesterPhotoURL || ''}
+                    avatarUri={item.requesterPhotoURL || avatarByUserId[item.requesterId] || ''}
                     name={item.requesterName}
                     userId={item.requesterId}
                     currentUserId={currentUserId}
@@ -932,7 +935,9 @@ export default function ProfileRequestsScreen() {
             }
 
             const isOutgoing = activeTab === 'outgoing';
-            const photo = isOutgoing ? item.targetPhotoURL : item.requesterPhotoURL;
+            const photo = isOutgoing
+              ? (item.targetPhotoURL || avatarByUserId[item.targetUserId ?? ''] || '')
+              : (item.requesterPhotoURL || avatarByUserId[item.requesterId] || '');
             const displayName = isOutgoing
               ? (item.targetName?.trim() || item.targetUserId || 'Unknown user')
               : item.requesterName;

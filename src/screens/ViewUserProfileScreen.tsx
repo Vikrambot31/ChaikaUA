@@ -14,7 +14,9 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationProp, useNavigation, useRoute } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import ContactReasonModal from '../components/ContactReasonModal';
+import MiniUserAvatar from '../components/MiniUserAvatar';
 import { useContactRequest } from '../hooks/useContactRequest';
+import { pickUserAvatarUri } from '../utils/userAvatar';
 import { useTranslation } from '../i18n/useTranslation';
 import type { RootState } from '../redux/store';
 import { LIGHT_ORBS, SCREEN_THEME } from '../utils/screenTheme';
@@ -143,6 +145,8 @@ const ViewUserProfileScreen: React.FC = () => {
   const [age, setAge] = useState<number | undefined>();
   const [gender, setGender] = useState('');
   const [registeredAt, setRegisteredAt] = useState('');
+  const [profilePhotoURL, setProfilePhotoURL] = useState('');
+  const [profileStartAvatarKey, setProfileStartAvatarKey] = useState('');
   const [profileLikes, setProfileLikes] = useState(0);
   const [loading, setLoading] = useState(true);
   const [jobListing, setJobListing] = useState<JobListing | null>(null);
@@ -195,6 +199,8 @@ const ViewUserProfileScreen: React.FC = () => {
           setAge(profile.age);
           setGender(profile.gender || '');
           setRegisteredAt(profile.registeredAt || '');
+          setProfilePhotoURL(profile.photoURL || '');
+          setProfileStartAvatarKey(profile.startAvatarKey || '');
         }
       } catch (error) {
         Alert.alert(text.error, text.errorLoadProfile);
@@ -246,6 +252,7 @@ const ViewUserProfileScreen: React.FC = () => {
     `${profileLikes} likes`,
   ].filter(Boolean).join(' · ');
 
+  const avatarUri = pickUserAvatarUri({ photoURL: profilePhotoURL, startAvatarKey: profileStartAvatarKey });
   const phoneVisible = isOwnProfile || contactApproved;
   const hasPhone = phoneVisible && Boolean(phone.trim());
   const canRequestContact = Boolean(userId && userId !== currentUser?.id);
@@ -311,6 +318,7 @@ const ViewUserProfileScreen: React.FC = () => {
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.heroCard}>
+          <MiniUserAvatar uri={avatarUri} name={name} size={72} borderRadius={20} />
           <Text style={styles.title}>{text.title}</Text>
         </View>
 
