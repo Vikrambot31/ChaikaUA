@@ -54,6 +54,18 @@ const persistMigrations = {
     if ('current' in next) {
       next.current = normalizeLanguage(next.current);
     }
+    // Add new subscription fields if missing (migration for subscription slice v4)
+    if (!('status' in next)) {
+      // Derive status from plan for legacy persisted data
+      const plan = next.plan;
+      next.status = (plan === 'premium' || plan === 'premium_plus') ? 'active' : 'free';
+    }
+    if (!('trialUsed' in next)) {
+      next.trialUsed = false;
+    }
+    if (!('paymentMethod' in next)) {
+      next.paymentMethod = null;
+    }
     return next;
   },
   2: (state: PersistedState) => {
@@ -150,9 +162,9 @@ const persistedSubscriptionReducer = persistReducer(
   {
     key: 'subscription',
     storage: AsyncStorage,
-    version: 3,
+    version: 4,
     migrate: createMigrate(persistMigrations, { debug: false }),
-    whitelist: ['plan', 'expiresAt', 'activatedAt'],
+    whitelist: ['plan', 'status', 'expiresAt', 'activatedAt', 'trialUsed', 'paymentMethod'],
   },
   subscriptionReducer
 );

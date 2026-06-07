@@ -196,7 +196,7 @@ export async function uploadPhotoWithEngine(
   // ── Step 2: upload to Firebase Storage ─────────────────────────────────────
   const user = await ensureFirebaseAuth();
   // Guests are auto-signed-in anonymously for reads; block them from uploading.
-  if (!user || isAnonymousFirebaseUser(user)) throw new Error('Sign in required to upload photos.');
+  if (!user || isAnonymousFirebaseUser(user)) throw new Error('auth: sign in required to upload photos');
   if (collection === 'community_photos') {
     await assertCommunityPhotoMonthlyLimit(user.uid, 1);
   }

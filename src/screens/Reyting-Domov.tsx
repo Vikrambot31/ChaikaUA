@@ -293,18 +293,7 @@ export default function RatingScreen() {
         <Text style={styles.title}>{t.ratingScreen.title}</Text>
         <View style={styles.headerSpacer} />
       </View>
-      <Image source={require('../../assets/WEBP-version/Reiting_Domov.webp')} style={styles.headerImage} resizeMode="contain" />
-
       <>
-          <View style={styles.tabBar}>
-            <TouchableOpacity style={[styles.tab, tab === 'top20' && styles.tabActive]} onPress={() => setTab('top20')}>
-              <Text style={[styles.tabText, tab === 'top20' && styles.tabTextActive]}>{t.ratingScreen.tabs.top20}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.tab, tab === 'vote' && styles.tabActive]} onPress={() => setTab('vote')}>
-              <Text style={[styles.tabText, tab === 'vote' && styles.tabTextActive]}>{t.ratingScreen.tabs.vote}</Text>
-            </TouchableOpacity>
-          </View>
-
           {tab === 'top20' ? (
             <FlatList
               data={buildingList}
@@ -312,6 +301,15 @@ export default function RatingScreen() {
               contentContainerStyle={styles.list}
               ListHeaderComponent={(
                 <>
+                  <Image source={require('../../assets/WEBP-version/Reiting_Domov.webp')} style={styles.headerImage} resizeMode="contain" />
+                  <View style={styles.tabBar}>
+                    <TouchableOpacity style={[styles.tab, tab === 'top20' && styles.tabActive]} onPress={() => setTab('top20')}>
+                      <Text style={[styles.tabText, tab === 'top20' && styles.tabTextActive]}>{t.ratingScreen.tabs.top20}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.tab, tab === 'vote' && styles.tabActive]} onPress={() => setTab('vote')}>
+                      <Text style={[styles.tabText, tab === 'vote' && styles.tabTextActive]}>{t.ratingScreen.tabs.vote}</Text>
+                    </TouchableOpacity>
+                  </View>
                   <View style={styles.listHeader}><Text style={styles.listHeaderText}>{t.ratingScreen.listHeader}</Text></View>
                   <View style={styles.explanationCard}>
                     <MaterialCommunityIcons name="information-outline" size={18} color={SCREEN_THEME.enamelBlue} />
@@ -378,6 +376,15 @@ export default function RatingScreen() {
             />
           ) : (
             <ScrollView contentContainerStyle={styles.voteScroll}>
+              <Image source={require('../../assets/WEBP-version/Reiting_Domov.webp')} style={styles.headerImage} resizeMode="contain" />
+              <View style={styles.tabBar}>
+                <TouchableOpacity style={[styles.tab, tab === 'top20' && styles.tabActive]} onPress={() => setTab('top20')}>
+                  <Text style={[styles.tabText, tab === 'top20' && styles.tabTextActive]}>{t.ratingScreen.tabs.top20}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.tab, tab === 'vote' && styles.tabActive]} onPress={() => setTab('vote')}>
+                  <Text style={[styles.tabText, tab === 'vote' && styles.tabTextActive]}>{t.ratingScreen.tabs.vote}</Text>
+                </TouchableOpacity>
+              </View>
               <View style={styles.voteCard}>
                 <Text style={styles.voteTitle}>{t.ratingScreen.rateYourHome}</Text>
                 <Text style={styles.voteSubtitle}>{t.ratingScreen.rateSubtitle}</Text>
@@ -675,7 +682,7 @@ const styles = StyleSheet.create({
   headerButton: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#F1E1BC', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E0C89A' },
   headerSpacer: { width: 42 },
   title: { fontSize: 18, fontWeight: '900', color: SCREEN_THEME.textPrimary },
-  headerImage: { width: '100%', height: 150, marginTop: 4, marginBottom: 8 },
+  headerImage: { width: '100%', height: 150, marginBottom: 8 },
   gateContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28 },
   gateTitle: { fontSize: 24, fontWeight: '900', color: SCREEN_THEME.textPrimary, marginTop: 16, marginBottom: 10 },
   gateDesc: { fontSize: 15, color: SCREEN_THEME.textSecondary, textAlign: 'center', lineHeight: 23, marginBottom: 24 },
@@ -686,7 +693,7 @@ const styles = StyleSheet.create({
   tabActive: { backgroundColor: '#F1E1BC' },
   tabText: { fontSize: 13, color: SCREEN_THEME.textMuted, fontWeight: '700' },
   tabTextActive: { color: SCREEN_THEME.textPrimary, fontWeight: '900' },
-  list: { padding: 16, paddingBottom: 110 },
+  list: { paddingHorizontal: 16, paddingBottom: 110 },
   listHeader: { backgroundColor: '#FFF7E8', borderRadius: 18, padding: 14, marginBottom: 14, borderWidth: 1, borderColor: '#E8D5AC' },
   listHeaderText: { fontSize: 13, color: SCREEN_THEME.textSecondary, textAlign: 'center', fontWeight: '700', lineHeight: 19 },
   explanationCard: { flexDirection: 'row', gap: 10, backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 18, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#D7E5EA' },
@@ -718,7 +725,7 @@ const styles = StyleSheet.create({
   detailsChevron: { marginTop: 4 },
   complaintsBadge: { backgroundColor: '#FFF1E7', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 4, marginTop: 4 },
   complaintsText: { fontSize: 10, color: SCREEN_THEME.terracottaDark, fontWeight: '700' },
-  voteScroll: { padding: 16, paddingBottom: 110 },
+  voteScroll: { paddingHorizontal: 16, paddingBottom: 110 },
   voteCard: { backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 22, padding: 16, borderWidth: 1, borderColor: '#E4D0AB' },
   voteTitle: { fontSize: 18, fontWeight: '900', color: SCREEN_THEME.textPrimary, marginBottom: 6 },
   voteSubtitle: { fontSize: 13, color: SCREEN_THEME.textSecondary, marginBottom: 20, lineHeight: 18 },

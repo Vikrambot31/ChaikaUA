@@ -679,6 +679,7 @@ const BuySellScreen: React.FC = () => {
               contactDisabled={!item.phone && (!item.userId || item.userId === user?.id)}
               likePath="feed_likes/buysell"
               likeId={item.id}
+              shareMessage={`${item.itemName}${item.price ? ` · ${item.price} грн` : ''}${item.description ? `\n${item.description}` : ''}`}
             />
             </TouchableOpacity>
           );

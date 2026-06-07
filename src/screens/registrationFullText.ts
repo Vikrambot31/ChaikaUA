@@ -10,6 +10,7 @@ export type RegistrationFullText = {
   personal: string;
   fullName: string;
   enterName: string;
+  email: string;
   phone: string;
   password: string;
   minPassword: string;
@@ -55,6 +56,7 @@ const TEXTS: Record<RegistrationLanguage, RegistrationFullText> = {
     personal: 'Особисті дані',
     fullName: "Повне ім'я",
     enterName: "Введіть ім'я",
+    email: 'Email',
     phone: 'Телефон',
     password: 'Пароль',
     minPassword: 'Мінімум 8 символів: літера, цифра і спецсимвол',
@@ -98,6 +100,7 @@ const TEXTS: Record<RegistrationLanguage, RegistrationFullText> = {
     personal: 'Личные данные',
     fullName: 'Полное имя',
     enterName: 'Введите имя',
+    email: 'Email',
     phone: 'Телефон',
     password: 'Пароль',
     minPassword: 'Минимум 8 символов: буква, цифра и спецсимвол',
@@ -141,6 +144,7 @@ const TEXTS: Record<RegistrationLanguage, RegistrationFullText> = {
     personal: 'Personal details',
     fullName: 'Full name',
     enterName: 'Enter your name',
+    email: 'Email',
     phone: 'Phone',
     password: 'Password',
     minPassword: 'At least 8 chars: letter, digit and special char',

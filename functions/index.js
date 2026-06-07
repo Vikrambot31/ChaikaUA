@@ -3548,3 +3548,256 @@ exports.getMyInvitedChildren = functionsV1.https.onCall(async (data, context) =>
   });
   return { children };
 });
+
+// ─────────────────────────────────────────────
+// PREMIUM SUBSCRIPTION — MANUAL ADMIN SYSTEM
+// ─────────────────────────────────────────────
+
+const PREMIUM_MONTHS_VALID = new Set([1, 3, 6, 12]);
+const PREMIUM_MONTH_MS = 30 * 24 * 60 * 60 * 1000;
+
+exports.activatePremiumManual = functionsV1.https.onCall(async (data, context) => {
+  try {
+    const actor = await assertAdminModerationAccess(context);
+    const uid = String(data?.uid || '').trim();
+    if (!uid) {
+      throw new functionsV1.https.HttpsError('invalid-argument', 'uid is required');
+    }
+    const months = Number(data?.months);
+    if (!PREMIUM_MONTHS_VALID.has(months)) {
+      throw new functionsV1.https.HttpsError('invalid-argument', 'months must be 1, 3, 6, or 12');
+    }
+    const notes = String(data?.notes || '').slice(0, 300);
+
+    const db = admin.database();
+    const subRef = db.ref(`user_subscription/${uid}`);
+    const snapshot = await subRef.once('value');
+    const existing = snapshot.val() || {};
+
+    const nowMs = Date.now();
+    const nowIso = new Date(nowMs).toISOString();
+    const durationMs = months * PREMIUM_MONTH_MS;
+
+    // Extend from current expiresAt if still active
+    let baseMs = nowMs;
+    if (existing.status === 'active' && existing.expiresAt) {
+      const currentExpiry = new Date(existing.expiresAt).getTime();
+      if (currentExpiry > nowMs) {
+        baseMs = currentExpiry;
+      }
+    }
+    const expiresAt = new Date(baseMs + durationMs).toISOString();
+    const startedAt = existing.startedAt || nowIso;
+
+    const record = {
+      plan: 'premium',
+      status: 'active',
+      startedAt,
+      expiresAt,
+      activatedBy: actor.uid,
+      activatedAt: nowIso,
+      paymentMethod: 'monobank_manual',
+      notes,
+    };
+
+    await subRef.set(record);
+    await db.ref(`users/${uid}/subscription`).set({ plan: 'premium', expiresAt });
+
+    await writeOpsEvent('premium_manual_activated', {
+      targetUid: uid,
+      months,
+      expiresAt,
+      actorUid: actor.uid,
+    });
+
+    return { ok: true, expiresAt, months };
+  } catch (error) {
+    if (error instanceof functionsV1.https.HttpsError) throw error;
+    console.error('[activatePremiumManual] error:', error?.message);
+    throw new functionsV1.https.HttpsError('internal', 'Failed to activate premium');
+  }
+});
+
+exports.activateTrialPremium = functionsV1.https.onCall(async (_data, context) => {
+  try {
+    if (!context.auth?.uid) {
+      throw new functionsV1.https.HttpsError('unauthenticated', 'Authentication required');
+    }
+    const uid = context.auth.uid;
+    const db = admin.database();
+    const subRef = db.ref(`user_subscription/${uid}`);
+    const snapshot = await subRef.once('value');
+    const existing = snapshot.val() || {};
+
+    if (existing.trialUsed === true) {
+      throw new functionsV1.https.HttpsError('already-exists', 'Trial has already been used');
+    }
+
+    const nowIso = new Date().toISOString();
+    const expiresAt = new Date(Date.now() + PREMIUM_MONTH_MS).toISOString();
+
+    const record = {
+      plan: 'premium',
+      status: 'trial',
+      startedAt: nowIso,
+      expiresAt,
+      activatedBy: uid,
+      activatedAt: nowIso,
+      paymentMethod: 'trial',
+      notes: 'Free trial - 30 days',
+      trialUsed: true,
+    };
+
+    await subRef.set(record);
+    await db.ref(`users/${uid}/subscription`).set({ plan: 'premium', expiresAt });
+
+    return { ok: true, expiresAt };
+  } catch (error) {
+    if (error instanceof functionsV1.https.HttpsError) throw error;
+    console.error('[activateTrialPremium] error:', error?.message);
+    throw new functionsV1.https.HttpsError('internal', 'Failed to activate trial');
+  }
+});
+
+exports.checkExpiredSubscriptions = functionsV1.pubsub
+  .schedule('0 9 * * *')
+  .timeZone('Europe/Kiev')
+  .onRun(async () => {
+    try {
+      const db = admin.database();
+      const nowIso = new Date().toISOString();
+      const snapshot = await db.ref('user_subscription').once('value');
+      const all = snapshot.val() || {};
+      const updates = {};
+
+      for (const [uid, sub] of Object.entries(all)) {
+        if (!sub || typeof sub !== 'object') continue;
+        const status = sub.status;
+        if (status !== 'active' && status !== 'trial') continue;
+        if (!sub.expiresAt) continue;
+        const expiresAt = new Date(sub.expiresAt).getTime();
+        if (expiresAt >= Date.now()) continue;
+
+        updates[`user_subscription/${uid}/status`] = 'expired';
+        updates[`user_subscription/${uid}/expiredAt`] = nowIso;
+        updates[`users/${uid}/subscription`] = { plan: 'free' };
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await db.ref().update(updates);
+        console.log(`[checkExpiredSubscriptions] expired ${Object.keys(updates).length / 3} subscriptions`);
+      }
+    } catch (error) {
+      console.error('[checkExpiredSubscriptions] error:', error?.message);
+    }
+  });
+
+exports.sendSubscriptionReminders = functionsV1.pubsub
+  .schedule('0 10 * * *')
+  .timeZone('Europe/Kiev')
+  .onRun(async () => {
+    try {
+      const db = admin.database();
+      const snapshot = await db.ref('user_subscription').once('value');
+      const all = snapshot.val() || {};
+      const MS_PER_DAY = 24 * 60 * 60 * 1000;
+      const now = Date.now();
+
+      for (const [uid, sub] of Object.entries(all)) {
+        if (!sub || typeof sub !== 'object') continue;
+        const status = sub.status;
+        if (status !== 'active' && status !== 'trial') continue;
+        if (!sub.expiresAt) continue;
+
+        const expiresMs = new Date(sub.expiresAt).getTime();
+        const daysLeft = Math.floor((expiresMs - now) / MS_PER_DAY);
+
+        let title = '';
+        let body = '';
+
+        if (daysLeft === 7) {
+          title = '\u2B50 Premium \u0427\u0430\u0439\u043A\u0430 Life';
+          body = '\u0412\u0430\u0448\u0430 \u043F\u0456\u0434\u043F\u0438\u0441\u043A\u0430 \u0437\u0430\u043A\u0456\u043D\u0447\u0443\u0454\u0442\u044C\u0441\u044F \u0447\u0435\u0440\u0435\u0437 7 \u0434\u043D\u0456\u0432. \u041F\u0440\u043E\u0434\u043E\u0432\u0436\u0442\u0435 \u0449\u043E\u0431 \u043D\u0435 \u0432\u0442\u0440\u0430\u0442\u0438\u0442\u0438 \u0434\u043E\u0441\u0442\u0443\u043F!';
+        } else if (daysLeft === 3) {
+          title = '\u2B50 Premium \u0427\u0430\u0439\u043A\u0430 Life';
+          body = '\u0417\u0430\u043B\u0438\u0448\u0438\u043B\u043E\u0441\u044C 3 \u0434\u043D\u0456 Premium. \u0417\u0432\u02BC\u044F\u0436\u0456\u0442\u044C\u0441\u044F \u0437 \u043F\u0456\u0434\u0442\u0440\u0438\u043C\u043A\u043E\u044E \u0434\u043B\u044F \u043F\u0440\u043E\u0434\u043E\u0432\u0436\u0435\u043D\u043D\u044F.';
+        } else if (daysLeft === 1) {
+          title = '\u26A0\uFE0F Premium \u0437\u0430\u043A\u0456\u043D\u0447\u0443\u0454\u0442\u044C\u0441\u044F \u0437\u0430\u0432\u0442\u0440\u0430';
+          body = '\u0417\u0430\u0432\u0442\u0440\u0430 \u0432\u0430\u0448 Premium \u0437\u0430\u043A\u0456\u043D\u0447\u0438\u0442\u044C\u0441\u044F. \u041D\u0430\u043F\u0438\u0448\u0456\u0442\u044C \u0432 \u043F\u0456\u0434\u0442\u0440\u0438\u043C\u043A\u0443 \u0449\u043E\u0431 \u043F\u0440\u043E\u0434\u043E\u0432\u0436\u0438\u0442\u0438.';
+        } else if (daysLeft <= 0) {
+          title = 'Premium \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u043E';
+          body = '\u0412\u0430\u0448 Premium \u0427\u0430\u0439\u043A\u0430 Life \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u043E. \u041F\u0435\u0440\u0448\u0438\u0439 \u043C\u0456\u0441\u044F\u0446\u044C \u0437\u0430\u0432\u0436\u0434\u0438 \u0431\u0435\u0437\u043A\u043E\u0448\u0442\u043E\u0432\u043D\u043E \u0434\u043B\u044F \u043D\u043E\u0432\u0438\u0445 \u0443\u0447\u0430\u0441\u043D\u0438\u043A\u0456\u0432!';
+        }
+
+        if (!title) continue;
+
+        try {
+          const userSnap = await db.ref(`users/${uid}/fcmToken`).once('value');
+          const fcmToken = userSnap.val();
+          if (!fcmToken || typeof fcmToken !== 'string') continue;
+
+          await admin.messaging().send({
+            token: fcmToken,
+            notification: { title, body },
+            android: { priority: 'high' },
+            apns: { payload: { aps: { badge: 1 } } },
+          });
+        } catch (sendErr) {
+          console.error(`[sendSubscriptionReminders] failed for uid ${uid}:`, sendErr?.message);
+        }
+      }
+    } catch (error) {
+      console.error('[sendSubscriptionReminders] error:', error?.message);
+    }
+  });
+
+exports.cancelPremiumSubscription = functionsV1.https.onCall(async (data, context) => {
+  try {
+    const actor = await assertAdminModerationAccess(context);
+    const uid = String(data?.uid || '').trim();
+    if (!uid) {
+      throw new functionsV1.https.HttpsError('invalid-argument', 'uid is required');
+    }
+
+    const db = admin.database();
+    const nowIso = new Date().toISOString();
+    await db.ref(`user_subscription/${uid}`).update({
+      status: 'expired',
+      expiredAt: nowIso,
+      cancelledBy: actor.uid,
+      cancelledAt: nowIso,
+    });
+    await db.ref(`users/${uid}/subscription`).set({ plan: 'free' });
+
+    await writeOpsEvent('premium_cancelled_by_admin', {
+      targetUid: uid,
+      actorUid: actor.uid,
+    });
+
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof functionsV1.https.HttpsError) throw error;
+    console.error('[cancelPremiumSubscription] error:', error?.message);
+    throw new functionsV1.https.HttpsError('internal', 'Failed to cancel subscription');
+  }
+});
+
+exports.getAllPremiumSubscriptions = functionsV1.https.onCall(async (_data, context) => {
+  try {
+    await assertAdminModerationAccess(context);
+    const db = admin.database();
+    const snapshot = await db.ref('user_subscription').once('value');
+    const all = snapshot.val() || {};
+    const result = [];
+    for (const [uid, sub] of Object.entries(all)) {
+      if (!sub || typeof sub !== 'object') continue;
+      if (!sub.plan || sub.plan === 'free') continue;
+      result.push({ uid, ...sub });
+    }
+    return { subscriptions: result };
+  } catch (error) {
+    if (error instanceof functionsV1.https.HttpsError) throw error;
+    console.error('[getAllPremiumSubscriptions] error:', error?.message);
+    throw new functionsV1.https.HttpsError('internal', 'Failed to load subscriptions');
+  }
+});

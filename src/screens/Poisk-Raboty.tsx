@@ -1078,6 +1078,7 @@ const JobSearchScreen: React.FC = () => {
               contactDisabled={!item.phone && (!item.userId || item.userId === user?.id)}
               likePath="feed_likes/jobs"
               likeId={item.id}
+              shareMessage={[item.name, item.workType, item.about].filter(Boolean).join('\n')}
             />
           </TouchableOpacity>
         )}

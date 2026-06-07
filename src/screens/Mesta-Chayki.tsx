@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, SafeAreaView, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationProp, useNavigation, useRoute } from '@react-navigation/native';
@@ -17,6 +17,10 @@ import { getMapFocusPlaceParams } from '../utils/mapFocusParams';
 import { buySellService, BuySellListing } from '../services/buySellService';
 import { database } from '../firebase-config';
 import { VideoLoadingOverlay } from '../components/VideoLoadingOverlay';
+import FeedLikeButton from '../components/FeedLikeButton';
+import { toggleFavorite, getFavorites, type FavoriteSource } from '../services/favoritesService';
+import { useSoftToast } from '../hooks/useSoftToast';
+import { selectUserId } from '../redux/selectors';
 
 const REAL_CHAIKA_STORES: Place[] = [
   { id: 'store-real-fora', name: 'Фора', address: 'вулиця Михайла Грушевського, 12', latitude: 50.43898, longitude: 30.28264, type: PlaceType.SHOP, rating: 0, reviews: 0, createdAt: new Date('2026-04-22T09:00:00Z').valueOf() },
@@ -107,6 +111,9 @@ const UI_TEXT = {
     ratingHint: 'Оберіть кількість зірок. Свою оцінку можна змінити.',
     ratingLimitTitle: 'Ліміт',
     ratingLimitText: 'Завтра зможете поставити ще.',
+    share: 'Поділитися',
+    favoriteAdded: 'Додано в обране',
+    favoriteRemoved: 'Видалено з обраного',
     typeLabels: {
       [PlaceType.SHOP]: 'Магазин',
       [PlaceType.SCHOOL]: 'Школа',
@@ -153,6 +160,9 @@ const UI_TEXT = {
     ratingHint: 'Выберите количество звезд. Свою оценку можно изменить.',
     ratingLimitTitle: 'Лимит',
     ratingLimitText: 'Завтра сможете поставить еще.',
+    share: 'Поделиться',
+    favoriteAdded: 'Добавлено в избранное',
+    favoriteRemoved: 'Удалено из избранного',
     typeLabels: {
       [PlaceType.SHOP]: 'Магазин',
       [PlaceType.SCHOOL]: 'Школа',
@@ -199,6 +209,9 @@ const UI_TEXT = {
     ratingHint: 'Choose the number of stars. You can change your rating.',
     ratingLimitTitle: 'Limit',
     ratingLimitText: 'You can add more ratings tomorrow.',
+    share: 'Share',
+    favoriteAdded: 'Added to favorites',
+    favoriteRemoved: 'Removed from favorites',
     typeLabels: {
       [PlaceType.SHOP]: 'Shop',
       [PlaceType.SCHOOL]: 'School',
@@ -212,6 +225,8 @@ const UI_TEXT = {
     },
   },
 } as const;
+
+const PLACES_FAVORITE_SOURCE: FavoriteSource = 'places';
 
 const SECTION_META: Record<SectionKey, { icon: React.ComponentProps<typeof MaterialCommunityIcons>['name']; accent: string; rating: boolean }> = {
   schools: { icon: 'school-outline', accent: SCREEN_THEME.enamelBlueDark, rating: false },
@@ -243,9 +258,14 @@ type PlaceRowProps = {
   navigation: ReturnType<typeof useNavigation<NavigationProp<Record<string, object | undefined>>>>;
   votesLabel: string;
   navLock: React.MutableRefObject<boolean>;
+  currentUserId?: string;
+  isFav: boolean;
+  onShare: (place: Place) => void;
+  onToggleFavorite: (placeId: string) => void;
+  shareLabel: string;
 };
 
-const PlaceRow: React.FC<PlaceRowProps> = ({ place, idx, section, ratings, onRatePress, typeLabel, navigation, votesLabel, navLock }) => {
+const PlaceRow: React.FC<PlaceRowProps> = ({ place, idx, section, ratings, onRatePress, typeLabel, navigation, votesLabel, navLock, currentUserId, isFav, onShare, onToggleFavorite, shareLabel }) => {
   const cfg = SECTION_META[section];
   const current = getRating(place, ratings);
   const rounded = Math.round(current.rating);
@@ -295,6 +315,32 @@ const PlaceRow: React.FC<PlaceRowProps> = ({ place, idx, section, ratings, onRat
             </Text>
           </View>
         )}
+        <View style={styles.cardActions}>
+          <TouchableOpacity
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            onPress={(e) => { e.stopPropagation?.(); onShare(place); }}
+            activeOpacity={0.7}
+            accessibilityLabel={shareLabel}
+          >
+            <MaterialCommunityIcons name="share-variant-outline" size={18} color={SCREEN_THEME.textSecondary} />
+          </TouchableOpacity>
+          <FeedLikeButton
+            currentUserId={currentUserId}
+            likePath="feed_likes/places"
+            likeId={place.id}
+          />
+          <TouchableOpacity
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            onPress={(e) => { e.stopPropagation?.(); onToggleFavorite(place.id); }}
+            activeOpacity={0.7}
+          >
+            <MaterialCommunityIcons
+              name={isFav ? 'bookmark' : 'bookmark-outline'}
+              size={20}
+              color={isFav ? SCREEN_THEME.terracotta : SCREEN_THEME.textSecondary}
+            />
+          </TouchableOpacity>
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -306,7 +352,10 @@ const PlacesScreen: React.FC = () => {
   const route = useRoute<import('@react-navigation/native').RouteProp<Record<string, PlacesScreenRouteParams>, string>>();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as Lang;
   const userId = useSelector((state: RootState) => state.auth?.user?.id);
+  const currentUserId = useSelector(selectUserId);
   const text = UI_TEXT[language];
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+  const { showSuccess } = useSoftToast();
 
   const defaultSection: SectionKey = route.params?.section ?? mapLegacyTabToSection(route.params?.tab) ?? 'restaurants';
   const [activeSection, setActiveSection] = useState<SectionKey>(defaultSection);
@@ -320,6 +369,28 @@ const PlacesScreen: React.FC = () => {
   const [residentGoods, setResidentGoods] = useState<BuySellListing[]>([]);
   const [residentServices, setResidentServices] = useState<BusinessItem[]>([]);
   const [residentDataLoading, setResidentDataLoading] = useState(true);
+
+  useEffect(() => {
+    getFavorites(PLACES_FAVORITE_SOURCE).then((items) => {
+      setFavoriteIds(new Set(items.map((item) => item.id)));
+    });
+  }, []);
+
+  const handleSharePlace = async (place: Place) => {
+    try {
+      await Share.share({ message: `${place.name}\n${text.typeLabels[place.type]} · ${place.address}` });
+    } catch { /* user cancelled */ }
+  };
+
+  const handleToggleFavorite = async (placeId: string) => {
+    const added = await toggleFavorite(placeId, PLACES_FAVORITE_SOURCE);
+    setFavoriteIds((prev) => {
+      const next = new Set(prev);
+      if (added) next.add(placeId); else next.delete(placeId);
+      return next;
+    });
+    showSuccess(added ? text.favoriteAdded : text.favoriteRemoved);
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -628,6 +699,11 @@ const PlacesScreen: React.FC = () => {
               navigation={navigation}
               votesLabel={text.votes}
               navLock={navLock}
+              currentUserId={currentUserId}
+              isFav={favoriteIds.has(place.id)}
+              onShare={handleSharePlace}
+              onToggleFavorite={handleToggleFavorite}
+              shareLabel={text.share}
             />
           ))
         )}
@@ -730,6 +806,7 @@ const styles = StyleSheet.create({
   ratingLine: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
   stars: { flexDirection: 'row', gap: 1 },
   ratingMeta: { fontSize: 12, color: SCREEN_THEME.textSecondary, fontWeight: '700' },
+  cardActions: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8, justifyContent: 'flex-end' },
 
   actionCard: {
     backgroundColor: SCREEN_THEME.paperStrong,

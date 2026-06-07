@@ -1778,6 +1778,7 @@ const BiznesChaikaScreen: React.FC = () => {
                       likePath="feed_likes/biznes"
                       likeId={item.id}
                       showLikeAvatars
+                      shareMessage={[item.itemName, item.description].filter(Boolean).join('\n')}
                     />
                     {isOwn ? (
                       <View style={styles.kOwnActions}>

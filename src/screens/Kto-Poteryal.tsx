@@ -8,6 +8,7 @@ import {
   Platform,
   SafeAreaView,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -536,7 +537,7 @@ const LostAndFoundScreen: React.FC = () => {
         renderItem={({ item }) => {
           const itemDate = formatItemDate(item.createdAt, language);
           const freshToday = isToday(item.createdAt);
-          const hasItemPhoto = Boolean(item.photoUri || item.photoStoragePath);
+          const hasItemPhoto = Boolean(item.photoUri?.trim() || item.photoStoragePath?.trim());
           const authorAvatarUri = (item.userId && avatarByUserId[item.userId]) || undefined;
           const modIcon = item.moderationStatus === 'approved'
             ? { name: 'check-circle' as const, color: SCREEN_THEME.woodGreenDark }
@@ -579,6 +580,13 @@ const LostAndFoundScreen: React.FC = () => {
                     likeId={item.id}
                     style={styles.likeAction}
                   />
+                  <TouchableOpacity
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    onPress={(event) => { event.stopPropagation(); void Share.share({ message: [getLostFoundCategoryLabel(item.category, language), item.description, item.locationText].filter(Boolean).join('\n') }); }}
+                    activeOpacity={0.7}
+                  >
+                    <MaterialCommunityIcons name="share-variant-outline" size={20} color={SCREEN_THEME.textSecondary} />
+                  </TouchableOpacity>
                   <TouchableOpacity style={styles.phoneAction} onPress={(event) => { event.stopPropagation(); if (requireAuthForDetails({ userId: user?.id, navigation, language })) void safeCallPhone(item.phone, language); }} activeOpacity={0.75}>
                     <TactileIcon icon="phone-outline" size={34} iconSize={14} backgroundColor="#403933" />
                   </TouchableOpacity>

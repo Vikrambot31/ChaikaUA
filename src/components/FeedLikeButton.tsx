@@ -48,7 +48,10 @@ export default function FeedLikeButton({
   const handlePress = async (event?: GestureResponderEvent) => {
     if (stopPropagation) event?.stopPropagation();
     if (!currentUserId) {
-      showInfo('Sign in required', 'Only registered users can like');
+      showInfo(
+        { ua: 'Потрібна реєстрація', ru: 'Требуется регистрация', en: 'Sign in required' },
+        { ua: 'Лайкати можуть лише зареєстровані користувачі', ru: 'Лайкать могут только зарегистрированные пользователи', en: 'Only registered users can like' },
+      );
       return;
     }
     if (busy || !likePath || !safeLikeId) return;
@@ -67,7 +70,10 @@ export default function FeedLikeButton({
       await runTransaction(ref(database, `${likePath}/${safeLikeId}/${currentUserId}`), (current) => (current ? null : true));
     } catch {
       setLikes(previousLikes);
-      showError('Could not save', 'Tap like again to retry');
+      showError(
+        { ua: 'Не вдалося зберегти', ru: 'Не удалось сохранить', en: 'Could not save' },
+        { ua: 'Натисніть лайк ще раз', ru: 'Нажмите лайк ещё раз', en: 'Tap like again to retry' },
+      );
     } finally {
       setBusy(false);
     }

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, SafeAreaView, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSelector } from 'react-redux';
 import { Picker } from '@react-native-picker/picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -997,6 +997,13 @@ const text = CLEAN_PROBLEMS_TEXT[language];
                         <Text style={styles.voteCount}>{problem.votes}</Text>
                       </>
                     )}
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    onPress={(e) => { e.stopPropagation(); void Share.share({ message: [problem.title, problem.street, problem.house].filter(Boolean).join(', ') }); }}
+                    activeOpacity={0.7}
+                  >
+                    <MaterialCommunityIcons name="share-variant-outline" size={20} color={SCREEN_THEME.textSecondary} />
                   </TouchableOpacity>
                 </View>
               </View>

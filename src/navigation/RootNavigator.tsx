@@ -393,7 +393,10 @@ function ScreenFileInfoOverlay() {
   const [visibleFile, setVisibleFile] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const isAuthenticated = useSelector(selectIsAuthenticated);
+  const language = useSelector((state: RootState) => state.language?.current ?? 'ua');
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const infoText = language === 'en' ? 'Info' : language === 'ru' ? 'Инфо' : 'Інфо';
 
   useEffect(() => () => {
     if (hideTimer.current) {
@@ -436,7 +439,7 @@ function ScreenFileInfoOverlay() {
         </View>
       ) : null}
       <TouchableOpacity onPress={handlePress} style={styles.infoButton} activeOpacity={0.85}>
-        <Text style={styles.infoButtonText}>Info</Text>
+        <Text style={styles.infoButtonText}>{infoText}</Text>
       </TouchableOpacity>
     </View>
   );

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { onValue, ref, runTransaction } from 'firebase/database';
 import { database } from '../firebase-config';
@@ -34,6 +34,9 @@ type Props = {
   showContact?: boolean;
   showLikeAvatars?: boolean;
   contactLabel?: string;
+  shareMessage?: string;
+  isFav?: boolean;
+  onToggleFavorite?: () => void;
 };
 
 const labels = {
@@ -76,6 +79,9 @@ export default function UserCardActionBar({
   showContact = true,
   showLikeAvatars = false,
   contactLabel,
+  shareMessage,
+  isFav,
+  onToggleFavorite,
 }: Props) {
   const [localLikes, setLocalLikes] = useState<Record<string, true>>({});
   const [likeAvatarByUserId, setLikeAvatarByUserId] = useState<Record<string, string>>({});
@@ -188,6 +194,30 @@ export default function UserCardActionBar({
         <TouchableOpacity style={[styles.outlined, resolvedContactDisabled && styles.disabled]} onPress={(event) => { event.stopPropagation(); if (requireRegisteredUser()) onContact?.(); }} disabled={resolvedContactDisabled} activeOpacity={0.8}>
           <MaterialCommunityIcons name="message-text-outline" size={13} color={resolvedContactDisabled ? '#B0A090' : '#7A1E5C'} />
           <Text style={[styles.outlinedText, resolvedContactDisabled && styles.disabledText]}>{contactLabel ?? t.contact}</Text>
+        </TouchableOpacity>
+      ) : null}
+
+      {shareMessage != null ? (
+        <TouchableOpacity
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          onPress={(event) => { event.stopPropagation(); void Share.share({ message: shareMessage }); }}
+          activeOpacity={0.7}
+        >
+          <MaterialCommunityIcons name="share-variant-outline" size={18} color="#9E8E80" />
+        </TouchableOpacity>
+      ) : null}
+
+      {onToggleFavorite != null ? (
+        <TouchableOpacity
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          onPress={(event) => { event.stopPropagation(); onToggleFavorite(); }}
+          activeOpacity={0.7}
+        >
+          <MaterialCommunityIcons
+            name={isFav ? 'bookmark' : 'bookmark-outline'}
+            size={20}
+            color={isFav ? '#C0533E' : '#9E8E80'}
+          />
         </TouchableOpacity>
       ) : null}
 

@@ -6,6 +6,7 @@ import {
   Modal,
   SafeAreaView,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -29,6 +30,10 @@ import PhotoUploadField, { type UploadedPhoto } from '../components/PhotoUploadF
 import { getDonePhotos, validateSubmissionRequirements } from '../utils/submissionRequirements';
 import { getLanguageValidationError } from '../utils/contentLanguageGuard';
 import { showUserError } from '../utils/userFacingErrors';
+import FeedLikeButton from '../components/FeedLikeButton';
+import { toggleFavorite, getFavorites, type FavoriteSource } from '../services/favoritesService';
+import { useSoftToast } from '../hooks/useSoftToast';
+import { selectUserId } from '../redux/selectors';
 
 type Lang = 'ua' | 'ru' | 'en';
 type AppNavigation = NavigationProp<Record<string, object | undefined>>;
@@ -83,6 +88,9 @@ const UI_TEXT = {
     offerBadge: 'Акція',
     offerAlertTitle: 'Акція поруч',
     offerAlertRoute: 'Маршрут',
+    share: 'Поділитися',
+    favoriteAdded: 'Додано в обране',
+    favoriteRemoved: 'Видалено з обраного',
     errorTitle: 'Помилка',
     ok: 'OK',
     filters: {
@@ -139,6 +147,9 @@ const UI_TEXT = {
     offerBadge: 'Акция',
     offerAlertTitle: 'Акция рядом',
     offerAlertRoute: 'Маршрут',
+    share: 'Поделиться',
+    favoriteAdded: 'Добавлено в избранное',
+    favoriteRemoved: 'Удалено из избранного',
     errorTitle: 'Ошибка',
     ok: 'OK',
     filters: {
@@ -195,6 +206,9 @@ const UI_TEXT = {
     offerBadge: 'Deal',
     offerAlertTitle: 'Deal nearby',
     offerAlertRoute: 'Route',
+    share: 'Share',
+    favoriteAdded: 'Added to favorites',
+    favoriteRemoved: 'Removed from favorites',
     errorTitle: 'Error',
     ok: 'OK',
     filters: {
@@ -205,6 +219,8 @@ const UI_TEXT = {
     },
   },
 } as const;
+
+const FOOD_FAVORITE_SOURCE: FavoriteSource = 'food';
 
 const EAT_FILTERS: { key: EatFilter; icon: React.ComponentProps<typeof MaterialCommunityIcons>['name'] }[] = [
   { key: 'all', icon: 'view-grid-outline' },
@@ -286,6 +302,7 @@ export default function EdaNaChaykeScreen() {
   const user = useSelector((state: RootState) => state.auth.user);
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
 
+  const currentUserId = useSelector(selectUserId);
   const [mode, setMode] = useState<ScreenMode>('home');
   const [eatFilter, setEatFilter] = useState<EatFilter>('all');
   const [query, setQuery] = useState('');
@@ -295,11 +312,19 @@ export default function EdaNaChaykeScreen() {
   const [topDescription, setTopDescription] = useState('');
   const [topPhotos, setTopPhotos] = useState<UploadedPhoto[]>([]);
   const [topSubmitting, setTopSubmitting] = useState(false);
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const scrollRef = useRef<ScrollView>(null);
   const offersSectionY = useRef(0);
+  const { showSuccess } = useSoftToast();
 
   useEffect(() => {
     logFoodEvent('food_open_screen');
+  }, []);
+
+  useEffect(() => {
+    getFavorites(FOOD_FAVORITE_SOURCE).then((items) => {
+      setFavoriteIds(new Set(items.map((item) => item.id)));
+    });
   }, []);
 
   useEffect(() => foodTopService.subscribe(setTopListings, user?.id), [user?.id]);
@@ -432,6 +457,22 @@ export default function EdaNaChaykeScreen() {
     topTitle,
     user?.id,
   ]);
+
+  const handleSharePlace = useCallback(async (place: Place) => {
+    try {
+      await Share.share({ message: `${place.name}\n${place.address}` });
+    } catch { /* user cancelled */ }
+  }, []);
+
+  const handleToggleFavorite = useCallback(async (placeId: string) => {
+    const added = await toggleFavorite(placeId, FOOD_FAVORITE_SOURCE);
+    setFavoriteIds((prev) => {
+      const next = new Set(prev);
+      if (added) next.add(placeId); else next.delete(placeId);
+      return next;
+    });
+    showSuccess(added ? text.favoriteAdded : text.favoriteRemoved);
+  }, [showSuccess, text.favoriteAdded, text.favoriteRemoved]);
 
   const handleBack = useCallback(() => {
     if (mode === 'eat') {
@@ -636,6 +677,7 @@ export default function EdaNaChaykeScreen() {
     const hasPhone = !!place.phone;
     const isPartner = false; // MVP: no paid places yet
     const hasDelivery = !!info?.deliveryAvailable;
+    const isFav = favoriteIds.has(place.id);
 
     return (
       <TouchableOpacity
@@ -706,6 +748,33 @@ export default function EdaNaChaykeScreen() {
               <Text style={styles.actionButtonText}>{text.telegram}</Text>
             </TouchableOpacity>
           )}
+          <View style={styles.cardActionsRight}>
+            <TouchableOpacity
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              onPress={(e) => { e.stopPropagation?.(); void handleSharePlace(place); }}
+              activeOpacity={0.7}
+              accessibilityLabel={text.share}
+            >
+              <MaterialCommunityIcons name="share-variant-outline" size={18} color={SCREEN_THEME.textSecondary} />
+            </TouchableOpacity>
+            <FeedLikeButton
+              currentUserId={currentUserId}
+              likePath="feed_likes/food"
+              likeId={place.id}
+            />
+            <TouchableOpacity
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              onPress={(e) => { e.stopPropagation?.(); void handleToggleFavorite(place.id); }}
+              activeOpacity={0.7}
+              accessibilityLabel={isFav ? text.favoriteRemoved : text.favoriteAdded}
+            >
+              <MaterialCommunityIcons
+                name={isFav ? 'bookmark' : 'bookmark-outline'}
+                size={20}
+                color={isFav ? SCREEN_THEME.terracotta : SCREEN_THEME.textSecondary}
+              />
+            </TouchableOpacity>
+          </View>
         </View>
       </TouchableOpacity>
     );
@@ -1451,9 +1520,15 @@ const styles = StyleSheet.create({
   // Card actions
   cardActions: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
     gap: 8,
     marginTop: 12,
+  },
+  cardActionsRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginLeft: 'auto',
   },
   actionButton: {
     flexDirection: 'row',

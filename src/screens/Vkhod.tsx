@@ -117,6 +117,7 @@ const UI_TEXT = {
     appleLoginFailed: 'Не вдалося увійти через Apple. Спробуйте ще раз.',
     loginLocked: 'Забагато невдалих спроб. Спробуйте знову через 15 хвилин.',
     forgotPassword: 'Забули пароль?',
+    resetPasswordTitle: 'Готово',
     resetPasswordSent: 'Інструкцію для скидання пароля надіслано на ваш email.',
     resetPasswordNeedEmail: 'Введіть коректний email, щоб скинути пароль.',
     resetPasswordFailed: 'Не вдалося надіслати лист для скидання пароля.',
@@ -149,6 +150,7 @@ const UI_TEXT = {
     appleLoginFailed: 'Не удалось войти через Apple. Попробуйте ещё раз.',
     loginLocked: 'Слишком много неудачных попыток. Попробуйте снова через 15 минут.',
     forgotPassword: 'Забыли пароль?',
+    resetPasswordTitle: 'Готово',
     resetPasswordSent: 'Инструкция по сбросу пароля отправлена на ваш email.',
     resetPasswordNeedEmail: 'Введите корректный email, чтобы сбросить пароль.',
     resetPasswordFailed: 'Не удалось отправить письмо для сброса пароля.',
@@ -181,6 +183,7 @@ const UI_TEXT = {
     appleLoginFailed: 'Could not sign in with Apple. Please try again.',
     loginLocked: 'Too many failed attempts. Try again in 15 minutes.',
     forgotPassword: 'Forgot password?',
+    resetPasswordTitle: 'Done',
     resetPasswordSent: 'Password reset instructions were sent to your email.',
     resetPasswordNeedEmail: 'Enter a valid email so we can send a password reset link.',
     resetPasswordFailed: 'Could not send the password reset email.',
@@ -405,7 +408,7 @@ const LoginScreen: React.FC = () => {
     dispatch(setLoading(true));
     try {
       await sendPasswordResetEmail(auth, normalizedEmail);
-      Alert.alert(text.loginBtn, text.resetPasswordSent);
+      Alert.alert(text.resetPasswordTitle, text.resetPasswordSent);
     } catch {
       Alert.alert(text.errorTitle, text.resetPasswordFailed);
     } finally {
@@ -547,4 +550,3 @@ const styles = StyleSheet.create({
 });
 
 export default LoginScreen;
-

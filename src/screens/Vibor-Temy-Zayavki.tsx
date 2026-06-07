@@ -36,6 +36,11 @@ const UI_TEXT = {
   ua: {
     quickLabel: 'ВСІ ЗАЯВКИ ЧАЙКИ',
     quickDesc: 'Відкрити живий список заявок',
+    activityTitle: 'сьогодні активність',
+    activeUsers: (count: number) => `активні за добу: ${count}`,
+    activityFallback: 'активність за добу',
+    sosCaption: 'допомога сусідів сьогодні',
+    offerCaption: 'робота і бізнес сьогодні',
     topics: [
       { label: 'Допомога сусідам', desc: 'Термінові запити від мешканців - тільки сьогодні', screen: 'HelpNeighborsScreen', icon: 'hand-heart-outline', accent: SCREEN_THEME.woodGreen },
       { label: 'Нова заявка', desc: 'Категорія, деталі або терміново - одна форма', screen: 'RequestFormScreen', icon: 'clipboard-edit-outline', accent: SCREEN_THEME.terracotta },
@@ -47,6 +52,11 @@ const UI_TEXT = {
   ru: {
     quickLabel: 'ВСЕ ЗАЯВКИ ЧАЙКИ',
     quickDesc: 'Открыть живой список заявок',
+    activityTitle: 'сегодня активность',
+    activeUsers: (count: number) => `активные за сутки: ${count}`,
+    activityFallback: 'активность за сутки',
+    sosCaption: 'помощь соседей сегодня',
+    offerCaption: 'работа и бизнес сегодня',
     topics: [
       { label: 'Помощь соседям', desc: 'Срочные запросы жителей - только сегодня', screen: 'HelpNeighborsScreen', icon: 'hand-heart-outline', accent: SCREEN_THEME.woodGreen },
       { label: 'Новая заявка', desc: 'Категория, детали или срочно - одна форма', screen: 'RequestFormScreen', icon: 'clipboard-edit-outline', accent: SCREEN_THEME.terracotta },
@@ -58,6 +68,11 @@ const UI_TEXT = {
   en: {
     quickLabel: 'ALL CHAIKA REQUESTS',
     quickDesc: 'Open live request list',
+    activityTitle: "today's activity",
+    activeUsers: (count: number) => `active in 24h: ${count}`,
+    activityFallback: 'activity in 24h',
+    sosCaption: 'neighbor help today',
+    offerCaption: 'jobs and business today',
     topics: [
       { label: 'Neighbor Help', desc: 'Urgent requests from residents - today only', screen: 'HelpNeighborsScreen', icon: 'hand-heart-outline', accent: SCREEN_THEME.woodGreen },
       { label: 'New Request', desc: 'Category, details, or urgent - one form', screen: 'RequestFormScreen', icon: 'clipboard-edit-outline', accent: SCREEN_THEME.terracotta },
@@ -198,8 +213,8 @@ const RequestTopicScreen: React.FC = () => {
   }, []);
 
   const activeUsersLabel = activeAvatarUsers.length > 0
-    ? `активные за сутки: ${activeAvatarUsers.length}`
-    : 'активность за сутки';
+    ? text.activeUsers(activeAvatarUsers.length)
+    : text.activityFallback;
 
   const shimmerTranslate = shimmerX.interpolate({
     inputRange: [0, 1],
@@ -244,7 +259,7 @@ const RequestTopicScreen: React.FC = () => {
           onPress={() => safeNavigate(navigation, 'OnlineChatTab')}
           activeOpacity={0.88}
         >
-          <Text style={styles.activityTitle}>сегодня активность</Text>
+          <Text style={styles.activityTitle}>{text.activityTitle}</Text>
           <View style={styles.activityRow}>
             <View style={styles.activityAvatars}>
               {[0, 1, 2].map((index) => {
@@ -271,7 +286,7 @@ const RequestTopicScreen: React.FC = () => {
                   <Text style={styles.sosText}>SOS {sosRequests.length}</Text>
                 </View>
               </View>
-              <Text style={styles.sosCaption}>помощь соседей сегодня</Text>
+              <Text style={styles.sosCaption}>{text.sosCaption}</Text>
             </View>
           </View>
           <View style={styles.offerRow}>
@@ -283,7 +298,7 @@ const RequestTopicScreen: React.FC = () => {
                   <Text style={styles.offerText}>😃 {todayOffersCount}</Text>
                 </View>
               </View>
-              <Text style={styles.offerCaption}>работа и бизнес сегодня</Text>
+              <Text style={styles.offerCaption}>{text.offerCaption}</Text>
             </View>
           </View>
         </TouchableOpacity>

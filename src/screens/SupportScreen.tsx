@@ -42,6 +42,7 @@ const UI_TEXT = {
     accountNotice: 'Щоб писати в службу підтримки, спочатку потрібно отримати статус користувача з акаунтом. Для цього пройдіть реєстрацію.',
     noConnection: "Немає з'єднання з Інтернетом",
     sendError: 'Не вдалося відправити повідомлення',
+    sendErrorBody: "Перевірте з'єднання з Інтернетом і спробуйте ще раз.",
     you: 'Ви',
     support: 'Підтримка',
   },
@@ -58,6 +59,7 @@ const UI_TEXT = {
     accountNotice: 'Чтобы писать в службу поддержки, сначала нужно получить статус пользователя с аккаунтом. Для этого пройдите регистрацию.',
     noConnection: 'Нет подключения к Интернету',
     sendError: 'Не удалось отправить сообщение',
+    sendErrorBody: 'Проверьте подключение к Интернету и попробуйте ещё раз.',
     you: 'Вы',
     support: 'Поддержка',
   },
@@ -74,6 +76,7 @@ const UI_TEXT = {
     accountNotice: 'To write to support, you first need user-with-account status. Please complete registration.',
     noConnection: 'No internet connection',
     sendError: 'Failed to send message',
+    sendErrorBody: 'Check your internet connection and try again.',
     you: 'You',
     support: 'Support',
   },
@@ -207,7 +210,7 @@ const SupportScreen: React.FC<Props> = ({ navigation }) => {
       }
       setMessageText('');
     } catch (e: any) {
-      Alert.alert(text.sendError, e?.message || '');
+      Alert.alert(text.sendError, e?.message || text.sendErrorBody);
     } finally {
       setSending(false);
     }

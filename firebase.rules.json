@@ -5,7 +5,7 @@
 
     "users": {
       ".read": "auth != null",
-      ".indexOn": ["phone"],
+      ".indexOn": ["phone", "name"],
       "$uid": {
         ".read": "auth != null",
         ".write": "auth != null && (auth.uid === $uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin')"

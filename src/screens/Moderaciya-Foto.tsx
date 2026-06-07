@@ -303,14 +303,17 @@ const PhotoModerationScreen: React.FC = () => {
     if (busyId) return;
     setBusyId(id);
     try {
-      await action();
+      const result = await action();
+      if (result && typeof result === 'object' && 'success' in result && !result.success) {
+        throw new Error((result as { error?: string }).error || text.actionFailed);
+      }
       await loadAll();
     } catch (e: unknown) {
       Alert.alert(text.errorTitle, e instanceof Error ? e.message : text.actionFailed);
     } finally {
       setBusyId(null);
     }
-  }, [busyId, loadAll]);
+  }, [busyId, loadAll, text.actionFailed]);
 
   const moderatePhoto = useCallback((id: string, status: 'approved' | 'rejected') =>
     modAction(id, () => photoAPI.moderatePhoto(id, status)),

@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Modal,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -13,7 +14,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { get, ref, remove, update } from 'firebase/database';
+import { get, limitToFirst, query, ref, remove, update } from 'firebase/database';
 import { useSelector } from 'react-redux';
 import MiniTabBar from '../components/MiniTabBar';
 import AppPhotoImage from '../components/AppPhotoImage';
@@ -453,19 +454,44 @@ const ServiceModerationScreen: React.FC = () => {
   const [failedSectionIssues, setFailedSectionIssues] = useState<FailedSectionIssue[]>([]);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [initialLoaded, setInitialLoaded] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
+  const [headerExpanded, setHeaderExpanded] = useState(false);
+  const [rejectModal, setRejectModal] = useState<{ item: LocalBusinessItem } | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
   const mountedRef = useRef(true);
 
-  // Скидати пошук при переключенні вкладки
-  useEffect(() => { setSearchQuery(''); }, [activeTab]);
+  // Скидати пошук і фільтр при переключенні вкладки
+  useEffect(() => {
+    setSearchQuery('');
+    setDebouncedQuery('');
+    setStatusFilter('pending');
+  }, [activeTab]);
 
-  // Фільтрує будь-який масив об'єктів за пошуковим запитом.
+  // Debounce пошуку 300ms
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(searchQuery), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Фільтрує будь-який масив об'єктів за пошуковим запитом і статусом.
   const filterItems = useCallback(<T extends object>(items: T[]): T[] => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter((item) =>
+    let result = items;
+    if (statusFilter !== 'all') {
+      result = result.filter((item) => {
+        const s = (item as Record<string, unknown>);
+        const st = (s.moderationStatus ?? s.status ?? 'pending') as string;
+        if (statusFilter === 'approved') return st === 'approved' || st === 'active';
+        return st === statusFilter;
+      });
+    }
+    const q = debouncedQuery.trim().toLowerCase();
+    if (!q) return result;
+    return result.filter((item) =>
       Object.values(item).some((v) => typeof v === 'string' && v.toLowerCase().includes(q)),
     );
-  }, [searchQuery]);
+  }, [debouncedQuery, statusFilter]);
 
   // Підраховує pending/approved/rejected для поточної вкладки
   const tabStats = useMemo(() => {
@@ -480,6 +506,7 @@ const ServiceModerationScreen: React.FC = () => {
       jobs, lostfound,
       osbbnews: osbbNews as Array<{ moderationStatus?: string }>,
       osbbvotes: osbbVotes, osbbtopics: osbbTopics, osbbcollections: osbbCollections,
+      users: users as Array<{ moderationStatus?: string; status?: string }>,
     };
     const items = dataMap[activeTab] ?? [];
     const getStatus = (i: { moderationStatus?: string; status?: string }) =>
@@ -491,14 +518,19 @@ const ServiceModerationScreen: React.FC = () => {
     };
   }, [activeTab, requests, suggestions, photos, buysell, contacts, business, biznesChaika, jobs, lostfound, osbbNews, osbbVotes, osbbTopics, osbbCollections]);
 
-  // Кількість підозрілих номерів (3+ заявок з одного телефону)
+  // Кількість підозрілих номерів (3+ записів з одного телефону по всіх розділах)
   const suspiciousPhones = useMemo(() => {
     const counts: Record<string, number> = {};
-    requests.forEach((r) => {
-      if (r.phone) counts[r.phone] = (counts[r.phone] ?? 0) + 1;
-    });
+    const addPhone = (phone?: string) => {
+      if (phone) counts[phone] = (counts[phone] ?? 0) + 1;
+    };
+    requests.forEach((r) => addPhone(r.phone));
+    buysell.forEach((r) => addPhone(r.phone));
+    contacts.forEach((r) => addPhone(r.phone));
+    jobs.forEach((r) => addPhone(r.phone));
+    lostfound.forEach((r) => addPhone(r.phone));
     return new Set(Object.entries(counts).filter(([, count]) => count >= 3).map(([phone]) => phone));
-  }, [requests]);
+  }, [requests, buysell, contacts, jobs, lostfound]);
 
   const suspiciousCount = useMemo(() => {
     return suspiciousPhones.size;
@@ -545,17 +577,17 @@ const ServiceModerationScreen: React.FC = () => {
         Promise.allSettled([
           createSectionTimeoutPromise('requests', firebaseChatAPI.getRequestsPaginated({ limit: 300 })),
           createSectionTimeoutPromise('suggestions', appSuggestionsService.getSuggestionsOnce()),
-          createSectionTimeoutPromise('photos', get(ref(database, 'community_photos'))),
-          createSectionTimeoutPromise('buysell', get(ref(database, 'buy_sell_listings'))),
-          createSectionTimeoutPromise('contacts', get(ref(database, 'contacts_listings'))),
-          createSectionTimeoutPromise('business', get(ref(database, 'local_business'))),
-          createSectionTimeoutPromise('biznesChaika', get(ref(database, 'biznes_chaika_listings'))),
-          createSectionTimeoutPromise('jobs', get(ref(database, 'job_listings'))),
-          createSectionTimeoutPromise('lostfound', get(ref(database, 'lost_found'))),
-          createSectionTimeoutPromise('osbbnews', get(ref(database, 'osbb_news'))),
-          createSectionTimeoutPromise('osbbvotes', get(ref(database, 'osbb_votes'))),
-          createSectionTimeoutPromise('osbbtopics', get(ref(database, 'osbb_house_topics'))),
-          createSectionTimeoutPromise('osbbcollections', get(ref(database, 'osbb_collections'))),
+          createSectionTimeoutPromise('photos', get(query(ref(database, 'community_photos'), limitToFirst(200)))),
+          createSectionTimeoutPromise('buysell', get(query(ref(database, 'buy_sell_listings'), limitToFirst(200)))),
+          createSectionTimeoutPromise('contacts', get(query(ref(database, 'contacts_listings'), limitToFirst(200)))),
+          createSectionTimeoutPromise('business', get(query(ref(database, 'local_business'), limitToFirst(200)))),
+          createSectionTimeoutPromise('biznesChaika', get(query(ref(database, 'biznes_chaika_listings'), limitToFirst(200)))),
+          createSectionTimeoutPromise('jobs', get(query(ref(database, 'job_listings'), limitToFirst(200)))),
+          createSectionTimeoutPromise('lostfound', get(query(ref(database, 'lost_found'), limitToFirst(200)))),
+          createSectionTimeoutPromise('osbbnews', get(query(ref(database, 'osbb_news'), limitToFirst(200)))),
+          createSectionTimeoutPromise('osbbvotes', get(query(ref(database, 'osbb_votes'), limitToFirst(200)))),
+          createSectionTimeoutPromise('osbbtopics', get(query(ref(database, 'osbb_house_topics'), limitToFirst(200)))),
+          createSectionTimeoutPromise('osbbcollections', get(query(ref(database, 'osbb_collections'), limitToFirst(200)))),
           createSectionTimeoutPromise('users', communityUsersAPI.getUsersOnce()),
         ]),
         LOAD_ALL_EMERGENCY_TIMEOUT_MS,
@@ -796,6 +828,7 @@ const ServiceModerationScreen: React.FC = () => {
       if (mountedRef.current) {
         setLastUpdatedAt(new Date().toLocaleString(language === 'en' ? 'en-US' : language === 'ua' ? 'uk-UA' : 'ru-RU'));
         setFailedSectionIssues(warnings);
+        setInitialLoaded(true);
       }
       void logClientEvent('service_moderation_load_complete', {
         duration_ms: Date.now() - startedAt,
@@ -879,10 +912,89 @@ const ServiceModerationScreen: React.FC = () => {
     );
   }, [loadAll, requests, text]);
 
+  // Bulk approve для будь-якої вкладки
+  const handleBulkApproveTab = useCallback(() => {
+    const getTabPendingIds = (): string[] => {
+      const isPending = (s?: string) => !s || s === 'pending';
+      switch (activeTab) {
+        case 'photos': return photos.filter((i) => isPending(i.status)).map((i) => i.id);
+        case 'buysell': return buysell.filter((i) => isPending(i.moderationStatus)).map((i) => i.id);
+        case 'contacts': return contacts.filter((i) => isPending(i.moderationStatus)).map((i) => i.id);
+        case 'jobs': return jobs.filter((i) => isPending(i.moderationStatus)).map((i) => i.id);
+        case 'lostfound': return lostfound.filter((i) => isPending(i.moderationStatus)).map((i) => i.id);
+        case 'suggestions': return suggestions.filter((i) => isPending(i.moderationStatus)).map((i) => i.id);
+        case 'biznesChaika': return biznesChaika.filter((i) => isPending(i.moderationStatus)).map((i) => i.id);
+        default: return [];
+      }
+    };
+    const pendingIds = getTabPendingIds();
+    if (!pendingIds.length) return;
+    Alert.alert(
+      text.approveAllPending,
+      `${pendingIds.length} ${text.pending}?`,
+      [
+        { text: text.cancel, style: 'cancel' },
+        {
+          text: text.confirm,
+          onPress: () => {
+            void (async () => {
+              for (const id of pendingIds) {
+                applyOptimisticStatus(activeTab, id, 'approved');
+              }
+              try {
+                const updates: Record<string, unknown> = {};
+                if (activeTab === 'photos') {
+                  pendingIds.forEach((id) => { updates[`community_photos/${id}/status`] = 'approved'; updates[`community_photos/${id}/moderatedAt`] = Date.now(); });
+                  await update(ref(database), updates);
+                } else if (activeTab === 'suggestions') {
+                  for (const id of pendingIds) await appSuggestionsService.moderateSuggestion(id, 'approved');
+                } else if (activeTab === 'buysell') {
+                  for (const id of pendingIds) await buySellService.moderate(id, 'approved');
+                } else if (activeTab === 'contacts') {
+                  for (const id of pendingIds) await contactsService.moderate(id, 'approved');
+                } else if (activeTab === 'jobs') {
+                  for (const id of pendingIds) await jobService.moderate(id, 'approved');
+                } else if (activeTab === 'lostfound') {
+                  for (const id of pendingIds) await lostFoundService.moderate(id, 'approved');
+                } else if (activeTab === 'biznesChaika') {
+                  for (const id of pendingIds) await moderateBiznesChaika(id, 'approved');
+                }
+              } catch {
+                void loadAll();
+              }
+            })();
+          },
+        },
+      ],
+    );
+  }, [activeTab, applyOptimisticStatus, biznesChaika, buysell, contacts, jobs, loadAll, lostfound, moderateBiznesChaika, photos, suggestions, text]);
+
+  // Оновлює статус одного елемента в потрібному масиві без перезавантаження всього
+  const applyOptimisticStatus = useCallback((tab: Tab, id: string, status: string) => {
+    const patch = <T extends { id: string }>(arr: T[], key: 'status' | 'moderationStatus') =>
+      arr.map((item) => item.id === id ? { ...item, [key]: status } : item);
+    switch (tab) {
+      case 'requests': setRequests((p) => patch(p, 'status')); break;
+      case 'suggestions': setSuggestions((p) => patch(p, 'moderationStatus') as typeof p); break;
+      case 'photos': setPhotos((p) => patch(p, 'status') as typeof p); break;
+      case 'buysell': setBuysell((p) => patch(p, 'moderationStatus') as typeof p); break;
+      case 'contacts': setContacts((p) => patch(p, 'moderationStatus') as typeof p); break;
+      case 'business': setBusiness((p) => patch(p, 'status')); break;
+      case 'biznesChaika': setBiznesChaika((p) => patch(p, 'moderationStatus') as typeof p); break;
+      case 'jobs': setJobs((p) => patch(p, 'moderationStatus') as typeof p); break;
+      case 'lostfound': setLostfound((p) => patch(p, 'moderationStatus') as typeof p); break;
+      case 'osbbnews': setOsbbNews((p) => patch(p, 'moderationStatus') as typeof p); break;
+      case 'osbbvotes': setOsbbVotes((p) => patch(p, 'moderationStatus')); break;
+      case 'osbbtopics': setOsbbTopics((p) => patch(p, 'moderationStatus')); break;
+      case 'osbbcollections': setOsbbCollections((p) => patch(p, 'moderationStatus')); break;
+      default: break;
+    }
+  }, []);
+
   const runAction = useCallback(async (
     id: string,
     action: () => Promise<void>,
-    options?: { confirmTitle?: string; confirmMessage?: string },
+    options?: { confirmTitle?: string; confirmMessage?: string; optimisticStatus?: string },
   ) => {
     if (busyId) return;
 
@@ -895,12 +1007,22 @@ const ServiceModerationScreen: React.FC = () => {
 
     if (mountedRef.current) {
       setBusyId(id);
+      if (options?.optimisticStatus) {
+        applyOptimisticStatus(activeTab, id, options.optimisticStatus);
+      }
     }
 
     try {
       await action();
-      await loadAll();
+      // Повна перезагрузка тільки при видаленні (не при зміні статусу)
+      if (!options?.optimisticStatus) {
+        await loadAll();
+      }
     } catch (error) {
+      // Відкат оптимістичного оновлення при помилці
+      if (options?.optimisticStatus) {
+        await loadAll();
+      }
       safeLogError('ServiceModerationScreen.runAction', error, {
         itemId: id,
       });
@@ -911,7 +1033,7 @@ const ServiceModerationScreen: React.FC = () => {
         setBusyId(null);
       }
     }
-  }, [busyId, confirmAction, loadAll, text.actionFailed]);
+  }, [activeTab, applyOptimisticStatus, busyId, confirmAction, loadAll, text.actionFailed]);
 
   const moderateNested = useCallback(async (path: string, item: NestedModerationItem, status: 'approved' | 'rejected') => {
     await update(ref(database, `${path}/${item.buildingId}/${item.id}`), {
@@ -934,22 +1056,16 @@ const ServiceModerationScreen: React.FC = () => {
   }, []);
 
   const rejectBusinessWithReason = useCallback((item: LocalBusinessItem) => {
-    const prompt = (Alert as unknown as {
-      prompt?: (title: string, message?: string, callbackOrButtons?: (text: string) => void) => void;
-    }).prompt;
+    setRejectReason('');
+    setRejectModal({ item });
+  }, []);
 
-    if (prompt) {
-      prompt(text.confirmRejectTitle, text.confirmRejectMessage, (reason) => {
-        void runAction(item.id, () => moderateBusiness(item.id, 'rejected', reason), {});
-      });
-      return;
-    }
-
-    void runAction(item.id, () => moderateBusiness(item.id, 'rejected', 'Rejected by moderator'), {
-      confirmTitle: text.confirmRejectTitle,
-      confirmMessage: text.confirmRejectMessage,
-    });
-  }, [moderateBusiness, runAction, text.confirmRejectMessage, text.confirmRejectTitle]);
+  const handleRejectModalConfirm = useCallback(() => {
+    if (!rejectModal) return;
+    const { item } = rejectModal;
+    setRejectModal(null);
+    void runAction(item.id, () => moderateBusiness(item.id, 'rejected', rejectReason.trim() || 'Rejected by moderator'), {});
+  }, [rejectModal, rejectReason, runAction, moderateBusiness]);
 
   const moderateBiznesChaika = useCallback(async (id: string, status: 'approved' | 'rejected') => {
     await update(ref(database, `biznes_chaika_listings/${id}`), {
@@ -1079,7 +1195,7 @@ const ServiceModerationScreen: React.FC = () => {
                 onPress={() => void runAction(item.id, async () => {
                   const result = await firebaseChatAPI.moderateRequest(item.id, 'approved');
                   if (!result.success) throw new Error(result.error);
-                }, { confirmTitle: text.confirmApproveTitle, confirmMessage: text.confirmApproveMessage })}
+                }, { confirmTitle: text.confirmApproveTitle, confirmMessage: text.confirmApproveMessage, optimisticStatus: 'approved' })}
               />
             ) : null}
             {item.status !== 'rejected' ? (
@@ -1090,7 +1206,7 @@ const ServiceModerationScreen: React.FC = () => {
                 onPress={() => void runAction(item.id, async () => {
                   const result = await firebaseChatAPI.moderateRequest(item.id, 'rejected');
                   if (!result.success) throw new Error(result.error);
-                }, { confirmTitle: text.confirmRejectTitle, confirmMessage: text.confirmRejectMessage })}
+                }, { confirmTitle: text.confirmRejectTitle, confirmMessage: text.confirmRejectMessage, optimisticStatus: 'rejected' })}
               />
             ) : null}
             <ActionButton
@@ -1191,7 +1307,7 @@ const ServiceModerationScreen: React.FC = () => {
                 tone="approve"
                 onPress={() => void runAction(item.id,
                   () => update(ref(database, `community_photos/${item.id}`), { status: 'approved', moderatedAt: Date.now() }),
-                  { confirmTitle: text.confirmApproveTitle, confirmMessage: text.confirmApproveMessage })}
+                  { confirmTitle: text.confirmApproveTitle, confirmMessage: text.confirmApproveMessage, optimisticStatus: 'approved' })}
               />
             ) : null}
             {item.status !== 'rejected' ? (
@@ -1201,7 +1317,7 @@ const ServiceModerationScreen: React.FC = () => {
                 tone="reject"
                 onPress={() => void runAction(item.id,
                   () => update(ref(database, `community_photos/${item.id}`), { status: 'rejected', moderatedAt: Date.now() }),
-                  { confirmTitle: text.confirmRejectTitle, confirmMessage: text.confirmRejectMessage })}
+                  { confirmTitle: text.confirmRejectTitle, confirmMessage: text.confirmRejectMessage, optimisticStatus: 'rejected' })}
               />
             ) : null}
             <ActionButton
@@ -1244,6 +1360,7 @@ const ServiceModerationScreen: React.FC = () => {
                 onPress={() => void runAction(item.id, () => approve(item.id), {
                   confirmTitle: text.confirmApproveTitle,
                   confirmMessage: text.confirmApproveMessage,
+                  optimisticStatus: 'approved',
                 })}
               />
             ) : null}
@@ -1255,6 +1372,7 @@ const ServiceModerationScreen: React.FC = () => {
                 onPress={() => void runAction(item.id, () => reject(item.id), {
                   confirmTitle: text.confirmRejectTitle,
                   confirmMessage: text.confirmRejectMessage,
+                  optimisticStatus: 'rejected',
                 })}
               />
             ) : null}
@@ -1563,84 +1681,93 @@ const ServiceModerationScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>{text.title}</Text>
-        {lastUpdatedAt ? <Text style={styles.summaryMeta}>{text.updatedAt}: {lastUpdatedAt}</Text> : null}
-
-        <View style={styles.securityRow}>
-          <View style={styles.securityWrap}>
-            <TouchableOpacity
-              style={styles.securityButton}
-              onPress={() => navigation.navigate('SecurityControlScreen')}
-              activeOpacity={0.82}
-            >
-              <Text style={styles.securityButtonText}>{text.security}</Text>
-            </TouchableOpacity>
-            {language === 'ru' ? <Text style={styles.actionHint}>{text.securityHint}</Text> : null}
-          </View>
-          <View style={styles.securityWrap}>
-            <TouchableOpacity
-              style={styles.securityButton}
-              onPress={() => navigation.navigate('ServerStatusScreen')}
-              activeOpacity={0.82}
-            >
-              <Text style={styles.securityButtonText}>{text.server}</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.securityWrap}>
-            <TouchableOpacity
-              style={styles.securityButton}
-              onPress={() => navigation.navigate('AuthDiagnosticScreen')}
-              activeOpacity={0.82}
-            >
-              <Text style={styles.securityButtonText}>{text.authDiagnostic}</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.securityWrap}>
-            <TouchableOpacity
-              style={styles.securityButton}
-              onPress={() => navigation.navigate('AdminRuntimeMonitorScreen')}
-              activeOpacity={0.82}
-            >
-              <Text style={styles.securityButtonText}>{text.runtimeMonitor}</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.securityWrap}>
-            <TouchableOpacity
-              style={[styles.securityButton, styles.securityButtonUserErrors]}
-              onPress={() => navigation.navigate('AdminUserErrorsScreen')}
-              activeOpacity={0.82}
-            >
-              <Text style={styles.securityButtonText}>{text.userErrors}</Text>
-            </TouchableOpacity>
-          </View>
+      <TouchableOpacity style={styles.header} onPress={() => setHeaderExpanded((v) => !v)} activeOpacity={0.95}>
+        <View style={styles.headerTopRow}>
+          <Text style={styles.headerTitle}>{text.title}</Text>
+          <Text style={styles.headerToggle}>{headerExpanded ? '▲' : '▼'}</Text>
         </View>
-        {failedSectionIssues.length > 0 ? (
-          <View style={styles.noticeBox}>
-            <Text style={styles.noticeText}>{text.partialLoad}</Text>
-            <Text style={styles.noticeSubtext}>{text.partialLoadHint}</Text>
-            <Text style={styles.noticeFailedList}>
-              {failedSectionIssues
-                .map((item) => item.sectionLabel)
-                .join(' В· ')}
-            </Text>
-            <View style={styles.noticeActions}>
-              <TouchableOpacity
-                onPress={() => navigation.navigate('ServiceModerationIssuesScreen', {
-                  issues: failedSectionIssues,
-                  updatedAt: lastUpdatedAt,
-                })}
-                activeOpacity={0.82}
-              >
-                <Text style={styles.noticeLink}>{text.viewIssues}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => void loadAll()} activeOpacity={0.82}>
-                <Text style={styles.noticeLink}>{text.retryLoad}</Text>
-              </TouchableOpacity>
+        {!headerExpanded ? (
+          <Text style={styles.headerCollapsedHint}>
+            {lastUpdatedAt ? `${text.updatedAt}: ${lastUpdatedAt}` : text.loading}
+            {failedSectionIssues.length > 0 ? '  ⚠' : ''}
+          </Text>
+        ) : (
+          <>
+            {lastUpdatedAt ? <Text style={styles.summaryMeta}>{text.updatedAt}: {lastUpdatedAt}</Text> : null}
+            <View style={styles.securityRow}>
+              <View style={styles.securityWrap}>
+                <TouchableOpacity
+                  style={styles.securityButton}
+                  onPress={() => navigation.navigate('SecurityControlScreen')}
+                  activeOpacity={0.82}
+                >
+                  <Text style={styles.securityButtonText}>{text.security}</Text>
+                </TouchableOpacity>
+                {language === 'ru' ? <Text style={styles.actionHint}>{text.securityHint}</Text> : null}
+              </View>
+              <View style={styles.securityWrap}>
+                <TouchableOpacity
+                  style={styles.securityButton}
+                  onPress={() => navigation.navigate('ServerStatusScreen')}
+                  activeOpacity={0.82}
+                >
+                  <Text style={styles.securityButtonText}>{text.server}</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.securityWrap}>
+                <TouchableOpacity
+                  style={styles.securityButton}
+                  onPress={() => navigation.navigate('AuthDiagnosticScreen')}
+                  activeOpacity={0.82}
+                >
+                  <Text style={styles.securityButtonText}>{text.authDiagnostic}</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.securityWrap}>
+                <TouchableOpacity
+                  style={styles.securityButton}
+                  onPress={() => navigation.navigate('AdminRuntimeMonitorScreen')}
+                  activeOpacity={0.82}
+                >
+                  <Text style={styles.securityButtonText}>{text.runtimeMonitor}</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.securityWrap}>
+                <TouchableOpacity
+                  style={[styles.securityButton, styles.securityButtonUserErrors]}
+                  onPress={() => navigation.navigate('AdminUserErrorsScreen')}
+                  activeOpacity={0.82}
+                >
+                  <Text style={styles.securityButtonText}>{text.userErrors}</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        ) : null}
-      </View>
+            {failedSectionIssues.length > 0 ? (
+              <View style={styles.noticeBox}>
+                <Text style={styles.noticeText}>{text.partialLoad}</Text>
+                <Text style={styles.noticeSubtext}>{text.partialLoadHint}</Text>
+                <Text style={styles.noticeFailedList}>
+                  {failedSectionIssues.map((item) => item.sectionLabel).join(' · ')}
+                </Text>
+                <View style={styles.noticeActions}>
+                  <TouchableOpacity
+                    onPress={() => navigation.navigate('ServiceModerationIssuesScreen', {
+                      issues: failedSectionIssues,
+                      updatedAt: lastUpdatedAt,
+                    })}
+                    activeOpacity={0.82}
+                  >
+                    <Text style={styles.noticeLink}>{text.viewIssues}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => void loadAll()} activeOpacity={0.82}>
+                    <Text style={styles.noticeLink}>{text.retryLoad}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : null}
+          </>
+        )}
+      </TouchableOpacity>
 
       <>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabScroll} contentContainerStyle={styles.tabRow}>
@@ -1672,14 +1799,39 @@ const ServiceModerationScreen: React.FC = () => {
               returnKeyType="search"
               clearButtonMode="while-editing"
             />
+            {searchQuery.length > 0 ? (
+              <TouchableOpacity style={styles.searchClearBtn} onPress={() => setSearchQuery('')} activeOpacity={0.7}>
+                <Text style={styles.searchClearText}>✕</Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
 
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll} contentContainerStyle={styles.filterRow}>
+            {(['all', 'pending', 'approved', 'rejected'] as const).map((f) => {
+              const label = f === 'all'
+                ? (language === 'en' ? 'All' : language === 'ru' ? 'Все' : 'Всі')
+                : f === 'pending' ? text.pending
+                : f === 'approved' ? text.approved
+                : text.rejected;
+              const count = f === 'all'
+                ? (tabStats.pending + tabStats.approved + tabStats.rejected)
+                : tabStats[f];
+              return (
+                <TouchableOpacity
+                  key={f}
+                  style={[styles.filterBtn, statusFilter === f && styles.filterBtnActive]}
+                  onPress={() => setStatusFilter(f)}
+                  activeOpacity={0.82}
+                >
+                  <Text style={[styles.filterBtnText, statusFilter === f && styles.filterBtnTextActive]}>
+                    {label}{count > 0 ? ` (${count})` : ''}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
           <View style={styles.statsRow}>
-            {tabStats.pending > 0 ? (
-              <View style={[styles.statChip, styles.statChipPending]}>
-                <Text style={styles.statChipText}>{tabStats.pending} {text.pending}</Text>
-              </View>
-            ) : null}
             {tabStats.approved > 0 ? (
               <View style={[styles.statChip, styles.statChipApproved]}>
                 <Text style={styles.statChipText}>{tabStats.approved} {text.approved}</Text>
@@ -1700,10 +1852,15 @@ const ServiceModerationScreen: React.FC = () => {
                 <Text style={styles.bulkBtnText}>{text.approveAllPending}</Text>
               </TouchableOpacity>
             ) : null}
+            {activeTab !== 'requests' && activeTab !== 'users' && activeTab !== 'osbbnews' && activeTab !== 'osbbvotes' && activeTab !== 'osbbtopics' && activeTab !== 'osbbcollections' && tabStats.pending > 0 ? (
+              <TouchableOpacity style={styles.bulkBtn} onPress={handleBulkApproveTab} activeOpacity={0.82}>
+                <Text style={styles.bulkBtnText}>{text.approveAllPending}</Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
 
           <View style={styles.content}>
-            {refreshing && !requests.length && !photos.length && !users.length ? (
+            {refreshing && !initialLoaded ? (
               <View style={styles.loadingWrap}>
                 <ActivityIndicator size="large" color="#7A1E5C" />
                 <Text style={styles.loadingText}>{text.loading}</Text>
@@ -1713,6 +1870,37 @@ const ServiceModerationScreen: React.FC = () => {
 
           <MiniTabBar />
       </>
+
+      <Modal
+        visible={rejectModal !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setRejectModal(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>{text.confirmRejectTitle}</Text>
+            <Text style={styles.modalMessage}>{text.confirmRejectMessage}</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder={language === 'en' ? 'Reason (optional)' : language === 'ru' ? 'Причина (необязательно)' : 'Причина (необов\'язково)'}
+              placeholderTextColor="#aaa"
+              value={rejectReason}
+              onChangeText={setRejectReason}
+              multiline
+              autoFocus
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setRejectModal(null)} activeOpacity={0.82}>
+                <Text style={styles.modalCancelText}>{text.cancel}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalConfirmBtn} onPress={handleRejectModalConfirm} activeOpacity={0.82}>
+                <Text style={styles.modalConfirmText}>{text.confirm}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -1720,7 +1908,10 @@ const ServiceModerationScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: SCREEN_THEME.appBg, paddingTop: 10 },
   header: { backgroundColor: '#7A1E5C', borderRadius: 16, padding: 12, marginHorizontal: 14, marginBottom: 8 },
-  headerTitle: { fontSize: 24, fontWeight: '900', color: '#fff' },
+  headerTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  headerTitle: { fontSize: 20, fontWeight: '900', color: '#fff', flex: 1 },
+  headerToggle: { color: 'rgba(255,255,255,0.7)', fontSize: 14, marginLeft: 8 },
+  headerCollapsedHint: { color: 'rgba(255,255,255,0.65)', fontSize: 11, marginTop: 4 },
   headerSub: { color: 'rgba(255,255,255,0.82)', marginTop: 4, fontSize: 13 },
   modeBadge: { alignSelf: 'flex-start', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4, marginTop: 8 },
   modeBadgeActive: { backgroundColor: 'rgba(255,255,255,0.25)' },
@@ -1806,8 +1997,9 @@ const styles = StyleSheet.create({
   empty: { textAlign: 'center', color: '#7D736B', fontWeight: '700', marginTop: 40 },
   loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { marginTop: 12, color: '#6E6157', fontWeight: '700' },
-  searchRow: { marginHorizontal: 16, marginBottom: 8 },
+  searchRow: { marginHorizontal: 16, marginBottom: 8, flexDirection: 'row', alignItems: 'center' },
   searchInput: {
+    flex: 1,
     backgroundColor: '#F5EDF9',
     borderRadius: 12,
     paddingHorizontal: 14,
@@ -1817,6 +2009,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(122,30,92,0.15)',
   },
+  searchClearBtn: {
+    marginLeft: 8,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(122,30,92,0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  searchClearText: { fontSize: 13, color: '#7A1E5C', fontWeight: '800' },
   statsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1850,6 +2052,45 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   bulkBtnText: { color: '#fff', fontWeight: '800', fontSize: 12 },
+  filterScroll: { flexGrow: 0, marginBottom: 4 },
+  filterRow: { paddingHorizontal: 16, gap: 6 },
+  filterBtn: { borderRadius: 10, paddingVertical: 6, paddingHorizontal: 12, backgroundColor: '#EFE6DC' },
+  filterBtnActive: { backgroundColor: '#7A1E5C' },
+  filterBtnText: { fontSize: 12, fontWeight: '800', color: '#5A2C2C' },
+  filterBtnTextActive: { color: '#fff' },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalBox: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 20,
+    width: '100%',
+    maxWidth: 400,
+  },
+  modalTitle: { fontSize: 17, fontWeight: '900', color: '#1A1A1A', marginBottom: 6 },
+  modalMessage: { fontSize: 13, color: '#7D736B', marginBottom: 14 },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: 'rgba(122,30,92,0.25)',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    fontSize: 14,
+    color: '#1A1A1A',
+    minHeight: 72,
+    textAlignVertical: 'top',
+    marginBottom: 16,
+  },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10 },
+  modalCancelBtn: { borderRadius: 10, paddingHorizontal: 16, paddingVertical: 9, backgroundColor: '#EFE6DC' },
+  modalCancelText: { fontWeight: '800', color: '#5A2C2C', fontSize: 14 },
+  modalConfirmBtn: { borderRadius: 10, paddingHorizontal: 16, paddingVertical: 9, backgroundColor: '#9C3F2B' },
+  modalConfirmText: { fontWeight: '800', color: '#fff', fontSize: 14 },
 });
 
 export default ServiceModerationScreen;

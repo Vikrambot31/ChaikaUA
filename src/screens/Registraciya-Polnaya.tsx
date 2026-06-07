@@ -204,9 +204,9 @@ const RegisterScreenFull: React.FC = () => {
             maxLength={MAX_NAME_LENGTH}
           />
 
-          <FormSectionLabel label="Email" completed={isEmailValid} labelStyle={styles.label} containerStyle={styles.labelRow} />
+          <FormSectionLabel label={text.email} completed={isEmailValid} labelStyle={styles.label} containerStyle={styles.labelRow} />
           <TactileInput
-            placeholder="Email"
+            placeholder={text.email}
             value={email}
             onChangeText={(text) => {
               setEmail(normalizeEmailText(text));

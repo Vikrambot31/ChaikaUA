@@ -94,7 +94,7 @@ async function uploadViaFileSystem(
   // Anonymous guests are signed in automatically for read access; uploads must
   // come from a real account. Reject anonymous sessions so guest files never
   // reach Storage/RTDB (client-side enforcement on top of Storage Rules).
-  if (!user || isAnonymousFirebaseUser(user)) throw new Error('Sign in required to upload photos.');
+  if (!user || isAnonymousFirebaseUser(user)) throw new Error('auth: sign in required to upload photos');
   const timeoutMs = options.timeoutMs ?? PHOTO_UPLOAD_TIMEOUT_MS;
   const maxAttempts = options.maxAttempts ?? PHOTO_UPLOAD_MAX_ATTEMPTS;
   const backoffMs = options.backoffMs ?? PHOTO_UPLOAD_BACKOFF_MS;
@@ -349,7 +349,7 @@ async function uploadViaBlobFetch(
   const storage = getStorageInstance();
   const user = await ensureFirebaseAuth();
   // See uploadViaFileSystem: anonymous guests may not upload.
-  if (!user || isAnonymousFirebaseUser(user)) throw new Error('Sign in required to upload photos.');
+  if (!user || isAnonymousFirebaseUser(user)) throw new Error('auth: sign in required to upload photos');
   const timeoutMs = options.timeoutMs ?? PHOTO_UPLOAD_TIMEOUT_MS;
   const maxAttempts = options.maxAttempts ?? PHOTO_UPLOAD_MAX_ATTEMPTS;
   const backoffMs = options.backoffMs ?? PHOTO_UPLOAD_BACKOFF_MS;

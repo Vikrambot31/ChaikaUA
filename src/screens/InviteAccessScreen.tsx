@@ -12,9 +12,11 @@ import {
   View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSelector } from 'react-redux';
 import { COLORS } from '../utils/constants';
+import { RootState } from '../redux/store';
 import { submitInviteRequest } from '../services/sponsorService';
-import { formatCountdown, mapInviteCFErrorToField } from '../utils/userFacingErrors';
+import { AppLanguage, formatCountdown, mapInviteCFErrorToField } from '../utils/userFacingErrors';
 import {
   containsBannedWords,
   formatPhoneForConfirmation,
@@ -45,6 +47,140 @@ type InviteDraft = {
 
 const PHONE_PLACEHOLDER = '+380XXXXXXXXX';
 const DRAFT_KEY = 'invite_access_wizard_draft';
+const MIN_REASON_LENGTH = 20;
+const MAX_REASON_LENGTH = 280;
+
+const UI_TEXT = {
+  ua: {
+    eyebrow: 'Доступ за запрошенням',
+    title: (step: number) => `Заявка, крок ${step} з 3`,
+    subtitle: 'Заповніть дані по кроках. Застосунок підкаже помилки, а фінальне рішення приймає сервер.',
+    aboutTitle: 'Розкажіть про себе',
+    namePlaceholder: "Ім'я (необов'язково)",
+    yourPhone: 'Ваш телефон',
+    profilePhoto: 'Фото профілю',
+    choosePhoto: 'Обрати фото',
+    optional: "Необов'язково",
+    apartment: "Квартира / як зв'язатися",
+    sponsorTitle: 'Хто вас знає в Чайці?',
+    sponsorHelp: 'Поручитель - сусід, який підтвердить, що ви живете в Чайці.',
+    confirmPhone: (phone: string) => `Ми розпізнали номер: ${phone} - правильно?`,
+    confirmYes: 'Так, правильно',
+    change: 'Змінити',
+    noSponsor: 'Нікого не знаю',
+    noSponsorHint: 'Можна подати заявку без поручителя, але перевірка може зайняти більше часу.',
+    reasonTitle: 'Чому ви хочете приєднатися?',
+    reasonPlaceholder: 'Напишіть 20-280 символів',
+    bannedWarning: 'Текст може містити заборонені слова і буде відхилений.',
+    hardLocked: 'Строгий режим більше не використовується. Можна подати заявку або продовжити з базовим доступом.',
+    submitIn: (time: string) => `Надіслати заявку (через ${time})`,
+    submit: 'Подати заявку',
+    next: 'Далі',
+    back: 'Назад',
+    continueWithoutRequest: 'Продовжити без заявки',
+    confirmSponsorPhone: 'Підтвердьте розпізнаний телефон поручителя.',
+    photoError: 'Не вдалося обрати фото. Перевірте доступ до фото або камери.',
+    photoAlertTitle: 'Фото профілю',
+    photoAlertBody: 'Фото необовʼязкове. Воно збережеться як чернетка і не впливає на рішення сервера.',
+    gallery: 'Галерея',
+    camera: 'Камера',
+    delete: 'Видалити',
+    cancel: 'Скасувати',
+    requesterPhoneInvalid: 'Ваш телефон має бути у форматі +380XXXXXXXXX.',
+    sponsorPhoneInvalid: 'Телефон поручителя має бути у форматі +380XXXXXXXXX.',
+    samePhone: 'Телефон поручителя має відрізнятися від вашого телефону.',
+    checkReason: 'Перевірте текст заявки.',
+    sent: 'Заявку надіслано. Статус зʼявиться після перевірки.',
+    minReason: (min: number) => `Мінімум ${min} символів`,
+    maxReason: (max: number) => `Максимум ${max} символів`,
+  },
+  ru: {
+    eyebrow: 'Доступ по приглашению',
+    title: (step: number) => `Заявка, шаг ${step} из 3`,
+    subtitle: 'Заполните данные по шагам. Приложение подскажет ошибки, а финальное решение принимает сервер.',
+    aboutTitle: 'Расскажите о себе',
+    namePlaceholder: 'Имя (необязательно)',
+    yourPhone: 'Ваш телефон',
+    profilePhoto: 'Фото профиля',
+    choosePhoto: 'Выбрать фото',
+    optional: 'Необязательно',
+    apartment: 'Квартира / как связаться',
+    sponsorTitle: 'Кто вас знает в Чайке?',
+    sponsorHelp: 'Поручитель - сосед, который подтвердит, что вы живёте в Чайке.',
+    confirmPhone: (phone: string) => `Мы распознали номер: ${phone} - верно?`,
+    confirmYes: 'Да, верно',
+    change: 'Изменить',
+    noSponsor: 'Никого не знаю',
+    noSponsorHint: 'Можно подать заявку без поручителя, но проверка может занять больше времени.',
+    reasonTitle: 'Почему вы хотите вступить?',
+    reasonPlaceholder: 'Напишите 20-280 символов',
+    bannedWarning: 'Текст может содержать запрещённые слова и будет отклонён.',
+    hardLocked: 'Строгий режим больше не используется. Можно подать заявку или продолжить с базовым доступом.',
+    submitIn: (time: string) => `Отправить заявку (через ${time})`,
+    submit: 'Подать заявку',
+    next: 'Далее',
+    back: 'Назад',
+    continueWithoutRequest: 'Продолжить без заявки',
+    confirmSponsorPhone: 'Подтвердите распознанный телефон поручителя.',
+    photoError: 'Не удалось выбрать фото. Проверьте доступ к фото или камере.',
+    photoAlertTitle: 'Фото профиля',
+    photoAlertBody: 'Фото необязательно. Оно сохранится как черновик и не влияет на решение сервера.',
+    gallery: 'Галерея',
+    camera: 'Камера',
+    delete: 'Удалить',
+    cancel: 'Отмена',
+    requesterPhoneInvalid: 'Ваш телефон должен быть в формате +380XXXXXXXXX.',
+    sponsorPhoneInvalid: 'Телефон поручителя должен быть в формате +380XXXXXXXXX.',
+    samePhone: 'Телефон поручителя должен отличаться от вашего телефона.',
+    checkReason: 'Проверьте текст заявки.',
+    sent: 'Заявку отправлено. Статус появится после проверки.',
+    minReason: (min: number) => `Минимум ${min} символов`,
+    maxReason: (max: number) => `Максимум ${max} символов`,
+  },
+  en: {
+    eyebrow: 'Invite access',
+    title: (step: number) => `Request, step ${step} of 3`,
+    subtitle: 'Fill in the details step by step. The app will show errors, and the server makes the final decision.',
+    aboutTitle: 'Tell us about yourself',
+    namePlaceholder: 'Name (optional)',
+    yourPhone: 'Your phone',
+    profilePhoto: 'Profile photo',
+    choosePhoto: 'Choose photo',
+    optional: 'Optional',
+    apartment: 'Apartment / how to contact you',
+    sponsorTitle: 'Who knows you in Chaika?',
+    sponsorHelp: 'A sponsor is a neighbor who can confirm that you live in Chaika.',
+    confirmPhone: (phone: string) => `We recognized this number: ${phone} - correct?`,
+    confirmYes: 'Yes, correct',
+    change: 'Change',
+    noSponsor: "I don't know anyone",
+    noSponsorHint: 'You can submit a request without a sponsor, but review may take longer.',
+    reasonTitle: 'Why do you want to join?',
+    reasonPlaceholder: 'Write 20-280 characters',
+    bannedWarning: 'The text may contain prohibited words and may be rejected.',
+    hardLocked: 'Strict mode is no longer used. You can submit a request or continue with basic access.',
+    submitIn: (time: string) => `Submit request (in ${time})`,
+    submit: 'Submit request',
+    next: 'Next',
+    back: 'Back',
+    continueWithoutRequest: 'Continue without request',
+    confirmSponsorPhone: 'Confirm the recognized sponsor phone number.',
+    photoError: 'Could not choose the photo. Check photo or camera access.',
+    photoAlertTitle: 'Profile photo',
+    photoAlertBody: 'The photo is optional. It will be saved as a draft and does not affect the server decision.',
+    gallery: 'Gallery',
+    camera: 'Camera',
+    delete: 'Delete',
+    cancel: 'Cancel',
+    requesterPhoneInvalid: 'Your phone must be in +380XXXXXXXXX format.',
+    sponsorPhoneInvalid: 'The sponsor phone must be in +380XXXXXXXXX format.',
+    samePhone: 'The sponsor phone must be different from your phone.',
+    checkReason: 'Check the request text.',
+    sent: 'Request sent. The status will appear after review.',
+    minReason: (min: number) => `Minimum ${min} characters`,
+    maxReason: (max: number) => `Maximum ${max} characters`,
+  },
+} as const;
 
 export default function InviteAccessScreen({
   requesterPhone,
@@ -53,6 +189,8 @@ export default function InviteAccessScreen({
   allowContinue = true,
   hardLocked = false,
 }: InviteAccessScreenProps) {
+  const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as AppLanguage;
+  const copy = UI_TEXT[language] ?? UI_TEXT.ua;
   const [step, setStep] = useState(1);
   const [name, setName] = useState('');
   const [apartment, setApartment] = useState('');
@@ -72,7 +210,12 @@ export default function InviteAccessScreen({
   const normalizedRequesterPhone = 'normalized' in requesterPhoneResult ? requesterPhoneResult.normalized : '';
   const normalizedSponsorPhone = 'normalized' in sponsorPhoneResult ? sponsorPhoneResult.normalized : '';
   const cleanText = text.trim();
-  const textValidation = validateTextLength(cleanText, 20, 280);
+  const textValidation = validateTextLength(cleanText, MIN_REASON_LENGTH, MAX_REASON_LENGTH);
+  const textValidationMessage = !textValidation.valid
+    ? cleanText.length < MIN_REASON_LENGTH
+      ? copy.minReason(MIN_REASON_LENGTH)
+      : copy.maxReason(MAX_REASON_LENGTH)
+    : undefined;
   const rateLimitSeconds = Math.max(0, Math.ceil((rateLimitUntil - now) / 1000));
   const sponsorStepReady = noSponsor || (Boolean(normalizedSponsorPhone) && sponsorConfirmed);
   const canSubmit = Boolean(normalizedRequesterPhone) && sponsorStepReady && textValidation.valid && !loading && rateLimitSeconds <= 0;
@@ -116,8 +259,8 @@ export default function InviteAccessScreen({
     if (!sponsorStepReady) {
       setFieldErrors({
         sponsorPhone: 'error' in sponsorPhoneResult
-          ? sponsorPhoneResult.error
-          : 'Подтвердите распознанный телефон поручителя.',
+          ? copy.sponsorPhoneInvalid
+          : copy.confirmSponsorPhone,
       });
       return;
     }
@@ -133,38 +276,38 @@ export default function InviteAccessScreen({
         setProfilePhotoUri(photo.uri);
       }
     } catch {
-      setMessage('Не удалось выбрать фото. Проверьте доступ к фото или камере.');
+      setMessage(copy.photoError);
     }
   };
 
   const openProfilePhotoPicker = () => {
-    Alert.alert('Фото профиля', 'Фото необязательно. Оно сохранится как черновик и не влияет на решение сервера.', [
-      { text: 'Галерея', onPress: () => { void pickProfilePhoto('library'); } },
-      { text: 'Камера', onPress: () => { void pickProfilePhoto('camera'); } },
-      ...(profilePhotoUri ? [{ text: 'Удалить', style: 'destructive' as const, onPress: () => setProfilePhotoUri('') }] : []),
-      { text: 'Отмена', style: 'cancel' },
+    Alert.alert(copy.photoAlertTitle, copy.photoAlertBody, [
+      { text: copy.gallery, onPress: () => { void pickProfilePhoto('library'); } },
+      { text: copy.camera, onPress: () => { void pickProfilePhoto('camera'); } },
+      ...(profilePhotoUri ? [{ text: copy.delete, style: 'destructive' as const, onPress: () => setProfilePhotoUri('') }] : []),
+      { text: copy.cancel, style: 'cancel' },
     ]);
   };
 
   const handleSubmit = async () => {
     if (!normalizedRequesterPhone) {
-      setMessage('Ваш телефон має бути у форматі +380XXXXXXXXX.');
+      setMessage(copy.requesterPhoneInvalid);
       return;
     }
     if (!noSponsor && !normalizedSponsorPhone) {
       setStep(2);
-      setMessage('Телефон поручителя має бути у форматі +380XXXXXXXXX.');
+      setMessage(copy.sponsorPhoneInvalid);
       return;
     }
     if (!noSponsor && normalizedRequesterPhone === normalizedSponsorPhone) {
       setStep(2);
-      setMessage('Телефон поручителя має відрізнятися від вашого телефону.');
+      setMessage(copy.samePhone);
       return;
     }
     if (!textValidation.valid) {
       setStep(3);
-      setFieldErrors({ text: textValidation.message });
-      setMessage('Проверьте текст заявки.');
+      setFieldErrors({ text: textValidationMessage });
+      setMessage(copy.checkReason);
       return;
     }
 
@@ -177,10 +320,10 @@ export default function InviteAccessScreen({
         apartment,
       });
       await AsyncStorage.removeItem(DRAFT_KEY).catch(() => undefined);
-      setMessage('Заявку надіслано. Статус зʼявиться після перевірки.');
+      setMessage(copy.sent);
       onSubmitted();
     } catch (error) {
-      const mapped = mapInviteCFErrorToField(error);
+      const mapped = mapInviteCFErrorToField(error, language);
       setMessage(mapped.message);
       if (mapped.field === 'sponsorPhone') {
         setStep(2);
@@ -200,44 +343,44 @@ export default function InviteAccessScreen({
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.root}>
       <View style={styles.panel}>
-        <Text style={styles.eyebrow}>Доступ за запрошенням</Text>
-        <Text style={styles.title}>Заявка, шаг {step} из 3</Text>
-        <Text style={styles.subtitle}>Заполните данные по шагам. Клиент только подсказывает ошибки, финальное решение принимает сервер.</Text>
+        <Text style={styles.eyebrow}>{copy.eyebrow}</Text>
+        <Text style={styles.title}>{copy.title(step)}</Text>
+        <Text style={styles.subtitle}>{copy.subtitle}</Text>
 
         {step === 1 ? (
           <>
             <View style={styles.field}>
-              <Text style={styles.label}>Расскажите о себе</Text>
-              <TextInput value={name} onChangeText={setName} style={styles.input} placeholder="Имя (необязательно)" maxLength={60} />
+              <Text style={styles.label}>{copy.aboutTitle}</Text>
+              <TextInput value={name} onChangeText={setName} style={styles.input} placeholder={copy.namePlaceholder} maxLength={60} />
             </View>
             <View style={styles.field}>
-              <Text style={styles.label}>Ваш телефон</Text>
+              <Text style={styles.label}>{copy.yourPhone}</Text>
               <TextInput value={normalizedRequesterPhone} editable={false} style={[styles.input, styles.inputDisabled]} placeholder={PHONE_PLACEHOLDER} keyboardType="phone-pad" />
             </View>
             <View style={styles.field}>
-              <Text style={styles.label}>Фото профиля</Text>
+              <Text style={styles.label}>{copy.profilePhoto}</Text>
               <TouchableOpacity activeOpacity={0.86} onPress={openProfilePhotoPicker} style={styles.photoDraftBox}>
                 {profilePhotoUri ? (
                   <Image source={{ uri: profilePhotoUri }} style={styles.profilePhoto} resizeMode="cover" />
                 ) : (
                   <View style={styles.photoPlaceholder}>
-                    <Text style={styles.photoPlaceholderText}>Выбрать фото</Text>
-                    <Text style={styles.photoHint}>Необязательно</Text>
+                    <Text style={styles.photoPlaceholderText}>{copy.choosePhoto}</Text>
+                    <Text style={styles.photoHint}>{copy.optional}</Text>
                   </View>
                 )}
               </TouchableOpacity>
             </View>
             <View style={styles.field}>
-              <Text style={styles.label}>Квартира / как связаться</Text>
-              <TextInput value={apartment} onChangeText={setApartment} style={styles.input} placeholder="Необязательно" maxLength={80} />
+              <Text style={styles.label}>{copy.apartment}</Text>
+              <TextInput value={apartment} onChangeText={setApartment} style={styles.input} placeholder={copy.optional} maxLength={80} />
             </View>
           </>
         ) : null}
 
         {step === 2 ? (
           <View style={styles.field}>
-            <Text style={styles.label}>Кто вас знает в Чайке?</Text>
-            <Text style={styles.helpText}>Поручитель — сосед, который подтвердит, что вы живёте в Чайке.</Text>
+            <Text style={styles.label}>{copy.sponsorTitle}</Text>
+            <Text style={styles.helpText}>{copy.sponsorHelp}</Text>
             <TextInput
               value={sponsorPhone}
               onChangeText={(value) => {
@@ -255,28 +398,28 @@ export default function InviteAccessScreen({
             />
             {normalizedSponsorPhone && !sponsorConfirmed ? (
               <View style={styles.confirmBox}>
-                <Text style={styles.confirmText}>Мы распознали номер: {formatPhoneForConfirmation(normalizedSponsorPhone)} — верно?</Text>
+                <Text style={styles.confirmText}>{copy.confirmPhone(formatPhoneForConfirmation(normalizedSponsorPhone))}</Text>
                 <View style={styles.confirmActions}>
                   <TouchableOpacity onPress={() => setSponsorConfirmed(true)} style={styles.smallButton}>
-                    <Text style={styles.smallButtonText}>Да, верно</Text>
+                    <Text style={styles.smallButtonText}>{copy.confirmYes}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => setSponsorPhone('')} style={styles.smallButtonGhost}>
-                    <Text style={styles.smallButtonGhostText}>Изменить</Text>
+                    <Text style={styles.smallButtonGhostText}>{copy.change}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
             ) : null}
             {fieldErrors.sponsorPhone ? <Text style={styles.fieldError}>{fieldErrors.sponsorPhone}</Text> : null}
             <TouchableOpacity onPress={() => { setNoSponsor(true); setSponsorConfirmed(false); setFieldErrors({}); }} style={styles.secondaryButton}>
-              <Text style={styles.secondaryButtonText}>Никого не знаю</Text>
+              <Text style={styles.secondaryButtonText}>{copy.noSponsor}</Text>
             </TouchableOpacity>
-            {noSponsor ? <Text style={styles.message}>Можно подать заявку без поручителя, но проверка может занять больше времени.</Text> : null}
+            {noSponsor ? <Text style={styles.message}>{copy.noSponsorHint}</Text> : null}
           </View>
         ) : null}
 
         {step === 3 ? (
           <View style={styles.field}>
-            <Text style={styles.label}>Почему вы хотите вступить?</Text>
+            <Text style={styles.label}>{copy.reasonTitle}</Text>
             <TextInput
               value={text}
               onChangeText={(value) => {
@@ -284,17 +427,17 @@ export default function InviteAccessScreen({
                 setFieldErrors((prev) => ({ ...prev, text: undefined }));
               }}
               style={[styles.input, styles.textArea, fieldErrors.text ? styles.inputError : undefined]}
-              placeholder="Напишите 20-280 символов"
+              placeholder={copy.reasonPlaceholder}
               multiline
               maxLength={280}
             />
             <Text style={[styles.counter, cleanText.length > 0 && !textValidation.valid && styles.counterWarning]}>{cleanText.length}/280</Text>
-            {containsBannedWords(cleanText) ? <Text style={styles.fieldWarning}>Текст может содержать запрещённые слова и будет отклонён.</Text> : null}
-            {fieldErrors.text ? <Text style={styles.fieldError}>{fieldErrors.text}</Text> : null}
+            {containsBannedWords(cleanText) ? <Text style={styles.fieldWarning}>{copy.bannedWarning}</Text> : null}
+            {fieldErrors.text || (cleanText.length > 0 && textValidationMessage) ? <Text style={styles.fieldError}>{fieldErrors.text ?? textValidationMessage}</Text> : null}
           </View>
         ) : null}
 
-        {hardLocked ? <Text style={styles.message}>Строгий режим больше не используется. Можно подать заявку или продолжить с базовым доступом.</Text> : null}
+        {hardLocked ? <Text style={styles.message}>{copy.hardLocked}</Text> : null}
         {message ? <Text style={styles.message}>{message}</Text> : null}
 
         <TouchableOpacity
@@ -303,18 +446,18 @@ export default function InviteAccessScreen({
           onPress={step === 3 ? handleSubmit : goNext}
           style={[styles.primaryButton, (loading || (step === 3 && !canSubmit)) && styles.buttonDisabled]}
         >
-          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>{step === 3 ? (rateLimitSeconds > 0 ? `Отправить заявку (через ${formatCountdown(rateLimitSeconds)})` : 'Подать заявку') : 'Далее'}</Text>}
+          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>{step === 3 ? (rateLimitSeconds > 0 ? copy.submitIn(formatCountdown(rateLimitSeconds)) : copy.submit) : copy.next}</Text>}
         </TouchableOpacity>
 
         {step > 1 ? (
           <TouchableOpacity activeOpacity={0.85} disabled={loading} onPress={() => setStep(step - 1)} style={styles.backButton}>
-            <Text style={styles.secondaryButtonText}>Назад</Text>
+            <Text style={styles.secondaryButtonText}>{copy.back}</Text>
           </TouchableOpacity>
         ) : null}
 
         {allowContinue ? (
           <TouchableOpacity activeOpacity={0.85} disabled={loading} onPress={onContinue} style={styles.secondaryButton}>
-            <Text style={styles.secondaryButtonText}>Продовжити без заявки</Text>
+            <Text style={styles.secondaryButtonText}>{copy.continueWithoutRequest}</Text>
           </TouchableOpacity>
         ) : null}
       </View>
