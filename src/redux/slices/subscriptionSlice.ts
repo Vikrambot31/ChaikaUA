@@ -102,14 +102,6 @@ const subscriptionSlice = createSlice({
   name: 'subscription',
   initialState,
   reducers: {
-    activatePlan(state, action: PayloadAction<SubscriptionPlan>) {
-      state.plan = action.payload;
-      state.status = 'active';
-      state.activatedAt = new Date().toISOString();
-      const exp = new Date();
-      exp.setDate(exp.getDate() + 30);
-      state.expiresAt = exp.toISOString();
-    },
     hydrateSubscription(state, action: PayloadAction<SubscriptionState>) {
       state.plan = action.payload.plan;
       state.status = action.payload.status ?? 'free';
@@ -137,7 +129,7 @@ const subscriptionSlice = createSlice({
   },
 });
 
-export const { activatePlan, hydrateSubscription, cancelPlan, checkExpiry, setTrialUsed } = subscriptionSlice.actions;
+export const { hydrateSubscription, cancelPlan, checkExpiry, setTrialUsed } = subscriptionSlice.actions;
 export default subscriptionSlice.reducer;
 
 // ── Selectors ──

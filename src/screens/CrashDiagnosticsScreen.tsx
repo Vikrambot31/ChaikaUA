@@ -130,9 +130,9 @@ export default function CrashDiagnosticsScreen() {
     }
   };
 
-  const handleCopyStack = async (text: string) => {
+  const handleCopyStack = async (stackContent: string) => {
     try {
-      await Clipboard.setString(text);
+      await Clipboard.setString(stackContent);
       Toast.show({
         type: 'success',
         text1: text.copied,

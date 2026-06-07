@@ -146,6 +146,9 @@ const getPromotionErrorMessage = (error: any, fallback: string) => {
   if (raw.includes('invalid_promo_type_or_duration') || raw.includes('invalid_duration')) {
     return 'Невірний тип або тривалість просування.';
   }
+  if (raw.includes('promotion_write_failed_funds_returned')) {
+    return 'Помилка збереження. Кошти повернено на баланс. Спробуйте ще раз.';
+  }
   return fallback;
 };
 

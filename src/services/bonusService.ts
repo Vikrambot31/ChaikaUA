@@ -438,7 +438,7 @@ type OfferHelpResponse = {
 };
 
 export const offerHelp = async (requestId: string): Promise<OfferHelpResponse> => {
-  const callable = httpsCallable<{ requestId: string }, OfferHelpResponse>(functions, 'offerHelp');
+  const callable = httpsCallable<{ requestId: string }, OfferHelpResponse>(functions, 'awardHelpRespondBonus');
   const result = await callable({ requestId });
   return result.data;
 };

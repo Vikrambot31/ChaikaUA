@@ -29,7 +29,7 @@ import { BONUS_WALLET_TOOLTIP } from '../utils/screenTooltips';
 
 type AppNav = NavigationProp<Record<string, object | undefined>>;
 
-const WEEKLY_FREE_LIMIT = 250;
+const WEEKLY_FREE_LIMIT_FALLBACK = 250;
 const EMPTY_PROMO_CREDITS: PromoCredits = {
   balance: 0,
   lifetime: 0,
@@ -166,8 +166,9 @@ const BonusWalletScreen: React.FC = () => {
   }, []);
 
   const trustAvailable = bonuses?.available ?? bonuses?.total ?? 0;
-  const weeklyEarned = bonuses?.earned.weeklyTotal ?? 0;
-  const weeklyProgress = Math.min(100, (weeklyEarned / WEEKLY_FREE_LIMIT) * 100);
+  const weeklyEarned = bonuses?.earned?.weeklyTotal ?? 0;
+  const weeklyLimit = WEEKLY_FREE_LIMIT_FALLBACK;
+  const weeklyProgress = Math.min(100, (weeklyEarned / weeklyLimit) * 100);
   const totalProgress = Math.min(100, ((bonuses?.total ?? 0) / BONUS_CAPS.total) * 100);
   const activePromotions = useMemo(() => {
     const now = Date.now();
@@ -271,7 +272,7 @@ const BonusWalletScreen: React.FC = () => {
                 <View style={[styles.progressFillBlue, { width: `${weeklyProgress}%` }]} />
               </View>
               <View style={styles.progressMeta}>
-                <Text style={styles.metaText}>{weeklyEarned} / {WEEKLY_FREE_LIMIT}</Text>
+                <Text style={styles.metaText}>{weeklyEarned} / {weeklyLimit}</Text>
                 <Text style={styles.metaText}>{bonuses?.earned.weekKey || t.bonus.currentWeek}</Text>
               </View>
               <View style={styles.breakdownGrid}>

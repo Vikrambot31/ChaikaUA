@@ -6,6 +6,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ExpoLinking from 'expo-linking';
 import { useSelector } from 'react-redux';
+import { type RootState } from '../redux/store';
 import Toast from 'react-native-toast-message';
 
 import { COLORS } from '../utils/constants';

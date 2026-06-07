@@ -24,9 +24,7 @@ import {
   selectTrialUsed,
   hydrateSubscription,
   callActivateTrialPremium,
-  loadSubscriptionFromFirebase,
 } from '../redux/slices/subscriptionSlice';
-import { selectUserId } from '../redux/selectors';
 
 const FEATURES_UA = [
   'Люди Чайки — повний доступ',
@@ -74,7 +72,6 @@ export default function SubscriptionScreen() {
   const expiresAt = useSelector(selectExpiresAt);
   const daysLeft = useSelector(selectDaysLeft);
   const trialUsed = useSelector(selectTrialUsed);
-  const userId = useSelector(selectUserId);
 
   const [loading, setLoading] = useState(false);
 
@@ -175,9 +172,15 @@ export default function SubscriptionScreen() {
             setLoading(true);
             try {
               const result = await callActivateTrialPremium();
-              if (result.ok && userId) {
-                const updated = await loadSubscriptionFromFirebase(userId);
-                dispatch(hydrateSubscription(updated));
+              if (result.ok) {
+                dispatch(hydrateSubscription({
+                  plan: 'premium',
+                  status: 'trial',
+                  expiresAt: result.expiresAt,
+                  activatedAt: new Date().toISOString(),
+                  trialUsed: true,
+                  paymentMethod: 'trial',
+                }));
               }
               Alert.alert(text.trialSuccessTitle, text.trialSuccessMsg, [{ text: text.ok }]);
             } catch (err: any) {
@@ -194,7 +197,7 @@ export default function SubscriptionScreen() {
         },
       ],
     );
-  }, [text, userId, dispatch]);
+  }, [text, dispatch]);
 
   const handlePayViaSupport = useCallback(() => {
     navigation.navigate('SupportScreen', {

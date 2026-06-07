@@ -912,6 +912,36 @@ const ServiceModerationScreen: React.FC = () => {
     );
   }, [loadAll, requests, text]);
 
+  // Оновлює статус одного елемента в потрібному масиві без перезавантаження всього
+  const applyOptimisticStatus = useCallback((tab: Tab, id: string, status: string) => {
+    const patch = <T extends { id: string }>(arr: T[], key: 'status' | 'moderationStatus') =>
+      arr.map((item) => item.id === id ? { ...item, [key]: status } : item);
+    switch (tab) {
+      case 'requests': setRequests((p) => patch(p, 'status')); break;
+      case 'suggestions': setSuggestions((p) => patch(p, 'moderationStatus') as typeof p); break;
+      case 'photos': setPhotos((p) => patch(p, 'status') as typeof p); break;
+      case 'buysell': setBuysell((p) => patch(p, 'moderationStatus') as typeof p); break;
+      case 'contacts': setContacts((p) => patch(p, 'moderationStatus') as typeof p); break;
+      case 'business': setBusiness((p) => patch(p, 'status')); break;
+      case 'biznesChaika': setBiznesChaika((p) => patch(p, 'moderationStatus') as typeof p); break;
+      case 'jobs': setJobs((p) => patch(p, 'moderationStatus') as typeof p); break;
+      case 'lostfound': setLostfound((p) => patch(p, 'moderationStatus') as typeof p); break;
+      case 'osbbnews': setOsbbNews((p) => patch(p, 'moderationStatus') as typeof p); break;
+      case 'osbbvotes': setOsbbVotes((p) => patch(p, 'moderationStatus')); break;
+      case 'osbbtopics': setOsbbTopics((p) => patch(p, 'moderationStatus')); break;
+      case 'osbbcollections': setOsbbCollections((p) => patch(p, 'moderationStatus')); break;
+      default: break;
+    }
+  }, []);
+
+  const moderateBiznesChaika = useCallback(async (id: string, status: 'approved' | 'rejected') => {
+    await update(ref(database, `biznes_chaika_listings/${id}`), {
+      moderationStatus: status,
+      moderatedAt: new Date().toISOString(),
+      moderatedBy: auth.currentUser?.uid ?? 'service_owner',
+    });
+  }, []);
+
   // Bulk approve для будь-якої вкладки
   const handleBulkApproveTab = useCallback(() => {
     const getTabPendingIds = (): string[] => {
@@ -968,28 +998,6 @@ const ServiceModerationScreen: React.FC = () => {
       ],
     );
   }, [activeTab, applyOptimisticStatus, biznesChaika, buysell, contacts, jobs, loadAll, lostfound, moderateBiznesChaika, photos, suggestions, text]);
-
-  // Оновлює статус одного елемента в потрібному масиві без перезавантаження всього
-  const applyOptimisticStatus = useCallback((tab: Tab, id: string, status: string) => {
-    const patch = <T extends { id: string }>(arr: T[], key: 'status' | 'moderationStatus') =>
-      arr.map((item) => item.id === id ? { ...item, [key]: status } : item);
-    switch (tab) {
-      case 'requests': setRequests((p) => patch(p, 'status')); break;
-      case 'suggestions': setSuggestions((p) => patch(p, 'moderationStatus') as typeof p); break;
-      case 'photos': setPhotos((p) => patch(p, 'status') as typeof p); break;
-      case 'buysell': setBuysell((p) => patch(p, 'moderationStatus') as typeof p); break;
-      case 'contacts': setContacts((p) => patch(p, 'moderationStatus') as typeof p); break;
-      case 'business': setBusiness((p) => patch(p, 'status')); break;
-      case 'biznesChaika': setBiznesChaika((p) => patch(p, 'moderationStatus') as typeof p); break;
-      case 'jobs': setJobs((p) => patch(p, 'moderationStatus') as typeof p); break;
-      case 'lostfound': setLostfound((p) => patch(p, 'moderationStatus') as typeof p); break;
-      case 'osbbnews': setOsbbNews((p) => patch(p, 'moderationStatus') as typeof p); break;
-      case 'osbbvotes': setOsbbVotes((p) => patch(p, 'moderationStatus')); break;
-      case 'osbbtopics': setOsbbTopics((p) => patch(p, 'moderationStatus')); break;
-      case 'osbbcollections': setOsbbCollections((p) => patch(p, 'moderationStatus')); break;
-      default: break;
-    }
-  }, []);
 
   const runAction = useCallback(async (
     id: string,
@@ -1066,14 +1074,6 @@ const ServiceModerationScreen: React.FC = () => {
     setRejectModal(null);
     void runAction(item.id, () => moderateBusiness(item.id, 'rejected', rejectReason.trim() || 'Rejected by moderator'), {});
   }, [rejectModal, rejectReason, runAction, moderateBusiness]);
-
-  const moderateBiznesChaika = useCallback(async (id: string, status: 'approved' | 'rejected') => {
-    await update(ref(database, `biznes_chaika_listings/${id}`), {
-      moderationStatus: status,
-      moderatedAt: new Date().toISOString(),
-      moderatedBy: auth.currentUser?.uid ?? 'service_owner',
-    });
-  }, []);
 
   const counts = useMemo<Record<Tab, number>>(() => ({
     requests: requests.length,

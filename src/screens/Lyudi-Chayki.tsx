@@ -32,6 +32,7 @@ import { START_AVATAR_URI_PREFIX } from '../utils/startAvatars';
 import { get, ref } from 'firebase/database';
 import { database } from '../firebase-config';
 import { requireAuthForDetails } from '../utils/authGuard';
+import { PremiumGate } from '../components/PremiumGate';
 
 const CACHE_KEY = '@chaika:community_users_cache_v1';
 const PRIMARY = '#7A1E5C';
@@ -579,18 +580,20 @@ export default function TopGirlsBoysScreen() {
                 <Text style={styles.professionText} numberOfLines={1}>{person.profession?.trim() || text.noProfession}</Text>
                 </View>
               </View>
-              <UserCardActionBar
-                avatarUri={person.photoURL || ''}
-                name={person.name}
-                userId={person.id}
-                currentUserId={user?.id}
-                language={language}
-                onProfile={!isCurrentUser ? () => navigation.navigate('ViewUserProfile', { userId: person.id }) : undefined}
-                onContact={!isCurrentUser ? () => openContactModal({ userId: person.id, name: person.name, photoURL: person.photoURL, sourceType: 'lyudi', sourceId: person.id, sourceTitle: person.name }) : undefined}
-                contactDisabled={isCurrentUser}
-                likePath="feed_likes/people"
-                likeId={person.id}
-              />
+              <PremiumGate required={!isCurrentUser}>
+                <UserCardActionBar
+                  avatarUri={person.photoURL || ''}
+                  name={person.name}
+                  userId={person.id}
+                  currentUserId={user?.id}
+                  language={language}
+                  onProfile={!isCurrentUser ? () => navigation.navigate('ViewUserProfile', { userId: person.id }) : undefined}
+                  onContact={!isCurrentUser ? () => openContactModal({ userId: person.id, name: person.name, photoURL: person.photoURL, sourceType: 'lyudi', sourceId: person.id, sourceTitle: person.name }) : undefined}
+                  contactDisabled={isCurrentUser}
+                  likePath="feed_likes/people"
+                  likeId={person.id}
+                />
+              </PremiumGate>
               {(bonusByUserId[person.id] ?? 0) > 0 ? (
                 <View style={styles.bonusCoinRow}>
                   <MaterialCommunityIcons name="circle-multiple" size={14} color="#C79C47" />

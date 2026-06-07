@@ -1910,7 +1910,7 @@ exports.getUserSubscription = functionsV1.https.onCall(async (_data, context) =>
     const normalized = normalizeSubscriptionRecord(snapshot.val());
 
     if (!normalized.isActive && snapshot.exists()) {
-      await snapshot.ref.set({
+      await snapshot.ref.update({
         plan: 'free',
         expiresAt: null,
         activatedAt: null,
@@ -2011,8 +2011,9 @@ exports.cancelUserSubscription = functionsV1.https.onCall(async (_data, context)
       throw new functionsV1.https.HttpsError('unauthenticated', 'Authentication required');
     }
 
-    await admin.database().ref(`user_subscription/${context.auth.uid}`).set({
+    await admin.database().ref(`user_subscription/${context.auth.uid}`).update({
       plan: 'free',
+      status: 'free',
       activatedAt: null,
       expiresAt: null,
       updatedAt: new Date().toISOString(),
@@ -3626,29 +3627,32 @@ exports.activateTrialPremium = functionsV1.https.onCall(async (_data, context) =
     const uid = context.auth.uid;
     const db = admin.database();
     const subRef = db.ref(`user_subscription/${uid}`);
-    const snapshot = await subRef.once('value');
-    const existing = snapshot.val() || {};
-
-    if (existing.trialUsed === true) {
-      throw new functionsV1.https.HttpsError('already-exists', 'Trial has already been used');
-    }
 
     const nowIso = new Date().toISOString();
     const expiresAt = new Date(Date.now() + PREMIUM_MONTH_MS).toISOString();
 
-    const record = {
-      plan: 'premium',
-      status: 'trial',
-      startedAt: nowIso,
-      expiresAt,
-      activatedBy: uid,
-      activatedAt: nowIso,
-      paymentMethod: 'trial',
-      notes: 'Free trial - 30 days',
-      trialUsed: true,
-    };
+    const result = await subRef.transaction((current) => {
+      if (current && current.trialUsed === true) {
+        return; // abort — trial already used
+      }
+      return {
+        ...(current || {}),
+        plan: 'premium',
+        status: 'trial',
+        startedAt: nowIso,
+        expiresAt,
+        activatedBy: uid,
+        activatedAt: nowIso,
+        paymentMethod: 'trial',
+        notes: 'Free trial - 30 days',
+        trialUsed: true,
+      };
+    });
 
-    await subRef.set(record);
+    if (!result.committed) {
+      throw new functionsV1.https.HttpsError('already-exists', 'Trial has already been used');
+    }
+
     await db.ref(`users/${uid}/subscription`).set({ plan: 'premium', expiresAt });
 
     return { ok: true, expiresAt };
@@ -3679,7 +3683,7 @@ exports.checkExpiredSubscriptions = functionsV1.pubsub
         if (expiresAt >= Date.now()) continue;
 
         updates[`user_subscription/${uid}/status`] = 'expired';
-        updates[`user_subscription/${uid}/expiredAt`] = nowIso;
+        updates[`user_subscription/${uid}/expiresAt`] = nowIso;
         updates[`users/${uid}/subscription`] = { plan: 'free' };
       }
 

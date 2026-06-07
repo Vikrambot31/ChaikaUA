@@ -156,7 +156,7 @@ const createPromotionFunctions = ({ functions, functionsV1, admin, writeOpsEvent
     } else if (promoType === 'business_top') {
       // Check biznes_chaika_listings or local_business ownership
       const bizSnap = await db.ref(`biznes_chaika_listings/${targetId}/userId`).once('value');
-      const localSnap = bizSnap.val() ? null : await db.ref(`local_business/${targetId}/userId`).once('value');
+      const localSnap = bizSnap.val() !== null ? null : await db.ref(`local_business/${targetId}/userId`).once('value');
       const ownerId = bizSnap.val() || (localSnap && localSnap.val());
       if (ownerId !== uid) {
         throw new functions.https.HttpsError('permission-denied', 'can_only_promote_own_business');
@@ -183,37 +183,33 @@ const createPromotionFunctions = ({ functions, functionsV1, admin, writeOpsEvent
     }
 
     // Check max top slots on the screen
+    // Query by expiresAt >= now — loads only non-expired records (bounded set),
+    // instead of querying by screen which accumulates all historical expired records.
     const screen = screenForPromoType(promoType);
     const maxSlots = MAX_TOP_SLOTS[screen] || 10;
     const activeSnap = await db.ref(PROMOTIONS_PATH)
-      .orderByChild('screen')
-      .equalTo(screen)
+      .orderByChild('expiresAt')
+      .startAt(now)
       .once('value');
     let activeCount = 0;
+    let conflict = false;
     if (activeSnap.exists()) {
       activeSnap.forEach((child) => {
         const v = child.val();
-        if (v.status === 'active' && v.moderationStatus === 'approved' && v.expiresAt > now) {
+        if (v.screen !== screen) return;
+        if (v.status === 'active' && v.moderationStatus === 'approved') {
           activeCount++;
+        }
+        if (v.uid === uid && v.targetId === targetId && v.status === 'active') {
+          conflict = true;
         }
       });
     }
     if (activeCount >= maxSlots) {
       throw new functions.https.HttpsError('failed-precondition', 'max_top_slots_reached');
     }
-
-    // Check no conflicting active promotion for this user+target
-    if (activeSnap.exists()) {
-      let conflict = false;
-      activeSnap.forEach((child) => {
-        const v = child.val();
-        if (v.uid === uid && v.targetId === targetId && v.status === 'active' && v.expiresAt > now) {
-          conflict = true;
-        }
-      });
-      if (conflict) {
-        throw new functions.https.HttpsError('failed-precondition', 'already_has_active_promotion');
-      }
+    if (conflict) {
+      throw new functions.https.HttpsError('failed-precondition', 'already_has_active_promotion');
     }
 
     // Spend currency
@@ -247,7 +243,32 @@ const createPromotionFunctions = ({ functions, functionsV1, admin, writeOpsEvent
       badge: useTrust ? 'bonus_promoted' : 'partner',
     };
 
-    await promoRef.set(promotion);
+    try {
+      await promoRef.set(promotion);
+    } catch (writeErr) {
+      // Refund: return spent currency back to user
+      try {
+        if (useTrust) {
+          const bonusRef = db.ref(`${USER_BONUSES_PATH}/${uid}`);
+          await bonusRef.transaction((current) => {
+            const d = current && typeof current === 'object' ? { ...current } : {};
+            const spent = d.spent && typeof d.spent === 'object' ? { ...d.spent } : { total: 0 };
+            spent.total = Math.max(Number(spent.total || 0) - price, 0);
+            const available = Number(d.total || 0) - spent.total;
+            return { ...d, spent, available: Math.max(available, 0), updatedAt: now };
+          });
+        } else {
+          const creditsRef = db.ref(`${PROMO_CREDITS_PATH}/${uid}`);
+          await creditsRef.transaction((current) => {
+            const d = current && typeof current === 'object' ? { ...current } : {};
+            return { ...d, balance: Number(d.balance || 0) + price, updatedAt: now };
+          });
+        }
+      } catch (refundErr) {
+        await writeOpsError('promotion_refund_failed', { uid, price, useTrust, error: refundErr.message });
+      }
+      throw new functions.https.HttpsError('internal', 'promotion_write_failed_funds_returned');
+    }
 
     await writeOpsEvent('promotion_purchased', {
       uid, promoType, duration, price, currency: promotion.currency, promotionId: promoRef.key,
@@ -302,10 +323,11 @@ const createPromotionFunctions = ({ functions, functionsV1, admin, writeOpsEvent
         moderationNote: reason,
       });
 
-      // Refund
+      // Refund — capture actual balance after transaction for correct history entry
+      let balanceAfterRefund = 0;
       if (promo.currency === 'promo') {
         const creditsRef = db.ref(`${PROMO_CREDITS_PATH}/${promo.uid}`);
-        await creditsRef.transaction((current) => {
+        const txResult = await creditsRef.transaction((current) => {
           const d = current && typeof current === 'object' ? { ...current } : {};
           return {
             ...d,
@@ -313,15 +335,21 @@ const createPromotionFunctions = ({ functions, functionsV1, admin, writeOpsEvent
             updatedAt: now,
           };
         });
+        if (txResult.committed && txResult.snapshot.exists()) {
+          balanceAfterRefund = Number(txResult.snapshot.val().balance || 0);
+        }
       } else {
         const bonusRef = db.ref(`${USER_BONUSES_PATH}/${promo.uid}`);
-        await bonusRef.transaction((current) => {
+        const txResult = await bonusRef.transaction((current) => {
           const d = current && typeof current === 'object' ? { ...current } : {};
           const spent = d.spent && typeof d.spent === 'object' ? { ...d.spent } : { total: 0 };
           spent.total = Math.max(Number(spent.total || 0) - promo.pointsSpent, 0);
           const available = Number(d.total || 0) - spent.total;
           return { ...d, spent, available: Math.max(available, 0), updatedAt: now };
         });
+        if (txResult.committed && txResult.snapshot.exists()) {
+          balanceAfterRefund = Number(txResult.snapshot.val().available || 0);
+        }
       }
 
       await writeBonusTransaction(db, promo.uid, {
@@ -329,7 +357,7 @@ const createPromotionFunctions = ({ functions, functionsV1, admin, writeOpsEvent
         currency: promo.currency,
         category: 'promotion_rejected',
         points: promo.pointsSpent,
-        balanceAfter: 0, // Will be updated in the read
+        balanceAfter: balanceAfterRefund,
         sourceId: promotionId,
         sourceType: 'promotion',
         status: 'completed',

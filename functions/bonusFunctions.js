@@ -286,6 +286,7 @@ const awardTrustBonus = async (db, uid, category, points, idempotencyKey, txMeta
     earned.weeklyTotal = earned.weekKey === weekKey ? Number(earned.weeklyTotal || 0) + points : points;
     earned.weekKey = weekKey;
     earned.weeklyByCategory = weeklyByCategory;
+    earned.weeklyLimit = WEEKLY_LIMITS.total;
 
     // Spent tracking
     const spent = d.spent && typeof d.spent === 'object' ? d.spent : { total: 0 };
@@ -503,6 +504,7 @@ const createBonusFunctions = ({ functions, admin, writeOpsEvent, writeOpsError, 
     const reqVal = reqSnap.val();
     if (!reqVal) throw new functions.https.HttpsError('not-found', 'request_not_found');
     if (reqVal.userId === helperUid) throw new functions.https.HttpsError('failed-precondition', 'cannot_help_own_request');
+    if (reqVal.status === 'closed') return { ok: true, status: 'request_closed', points: 0 };
 
     // Check if already responded
     const existSnap = await db.ref(`${HELP_RESPONSES_PATH}/${requestId}/${helperUid}`).once('value');
@@ -645,6 +647,10 @@ const createBonusFunctions = ({ functions, admin, writeOpsEvent, writeOpsError, 
     const reqVal = reqSnap.val();
     if (!reqVal) throw new functions.https.HttpsError('not-found', 'request_not_found');
     if (reqVal.userId !== authorUid) throw new functions.https.HttpsError('permission-denied', 'only_author_can_close');
+    if (reqVal.status === 'closed') return { ok: true, status: 'already_closed', points: 0 };
+
+    // Mark request as closed so helpers can no longer earn bonus on it
+    await db.ref(`requests/${requestId}/status`).set('closed');
 
     const accessSnap = await db.ref(`trust_tree/${authorUid}/status`).once('value');
     const isNewcomer = accessSnap.val() !== 'active';

@@ -303,11 +303,11 @@ export default function RatingScreen() {
                 <>
                   <Image source={require('../../assets/WEBP-version/Reiting_Domov.webp')} style={styles.headerImage} resizeMode="contain" />
                   <View style={styles.tabBar}>
-                    <TouchableOpacity style={[styles.tab, tab === 'top20' && styles.tabActive]} onPress={() => setTab('top20')}>
-                      <Text style={[styles.tabText, tab === 'top20' && styles.tabTextActive]}>{t.ratingScreen.tabs.top20}</Text>
+                    <TouchableOpacity style={[styles.tab, (tab as string) === 'top20' && styles.tabActive]} onPress={() => setTab('top20')}>
+                      <Text style={[styles.tabText, (tab as string) === 'top20' && styles.tabTextActive]}>{t.ratingScreen.tabs.top20}</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[styles.tab, tab === 'vote' && styles.tabActive]} onPress={() => setTab('vote')}>
-                      <Text style={[styles.tabText, tab === 'vote' && styles.tabTextActive]}>{t.ratingScreen.tabs.vote}</Text>
+                    <TouchableOpacity style={[styles.tab, (tab as string) === 'vote' && styles.tabActive]} onPress={() => setTab('vote')}>
+                      <Text style={[styles.tabText, (tab as string) === 'vote' && styles.tabTextActive]}>{t.ratingScreen.tabs.vote}</Text>
                     </TouchableOpacity>
                   </View>
                   <View style={styles.listHeader}><Text style={styles.listHeaderText}>{t.ratingScreen.listHeader}</Text></View>
@@ -378,11 +378,11 @@ export default function RatingScreen() {
             <ScrollView contentContainerStyle={styles.voteScroll}>
               <Image source={require('../../assets/WEBP-version/Reiting_Domov.webp')} style={styles.headerImage} resizeMode="contain" />
               <View style={styles.tabBar}>
-                <TouchableOpacity style={[styles.tab, tab === 'top20' && styles.tabActive]} onPress={() => setTab('top20')}>
-                  <Text style={[styles.tabText, tab === 'top20' && styles.tabTextActive]}>{t.ratingScreen.tabs.top20}</Text>
+                <TouchableOpacity style={[styles.tab, (tab as string) === 'top20' && styles.tabActive]} onPress={() => setTab('top20')}>
+                  <Text style={[styles.tabText, (tab as string) === 'top20' && styles.tabTextActive]}>{t.ratingScreen.tabs.top20}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.tab, tab === 'vote' && styles.tabActive]} onPress={() => setTab('vote')}>
-                  <Text style={[styles.tabText, tab === 'vote' && styles.tabTextActive]}>{t.ratingScreen.tabs.vote}</Text>
+                <TouchableOpacity style={[styles.tab, (tab as string) === 'vote' && styles.tabActive]} onPress={() => setTab('vote')}>
+                  <Text style={[styles.tabText, (tab as string) === 'vote' && styles.tabTextActive]}>{t.ratingScreen.tabs.vote}</Text>
                 </TouchableOpacity>
               </View>
               <View style={styles.voteCard}>
