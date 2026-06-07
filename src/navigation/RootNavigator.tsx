@@ -72,6 +72,10 @@ import DetalPredlozheniyaSalonaScreen from '../screens/Detal-Predlozheniya-Salon
 import SportNaChaykeScreen from '../screens/Sport-Na-Chayke';
 import SportDetailScreen from '../screens/Sport-Detal';
 import EdaNaChaykeScreen from '../screens/Eda-Na-Chayke';
+import BusinessClaimScreen from '../screens/BusinessClaimScreen';
+import BusinessPlusSubscriptionScreen from '../screens/BusinessPlusSubscriptionScreen';
+import BusinessMenuEditorScreen from '../screens/BusinessMenuEditorScreen';
+import BusinessPromoEditorScreen from '../screens/BusinessPromoEditorScreen';
 import SpisokPokupokScreen from '../screens/Spisok-Pokupok';
 import ProfileRequestsScreen from '../screens/ProfileRequestsScreen';
 import AppVersionInfoScreen from '../screens/AppVersionInfoScreen';
@@ -214,6 +218,10 @@ export type RootStackParamList = {
   AppMonitorScreen: undefined;
   ViewUserProfile: { userId: string };
   SupportScreen: undefined;
+  BusinessClaimScreen: { item: DetailItemData };
+  BusinessPlusSubscriptionScreen: undefined;
+  BusinessMenuEditorScreen: { placeId: string; placeName: string };
+  BusinessPromoEditorScreen: { placeId: string; placeName: string };
   BonusWalletScreen: undefined;
   PromoCreditsTopupScreen: undefined;
   PromoCreditsAdminScreen: undefined;
@@ -886,6 +894,10 @@ function AuthNavigation() {
         <Stack.Screen name="PromoCreditsAdminScreen" component={withGuard(PromoCreditsAdminScreen, 'admin')} />
         <Stack.Screen name="BonusPromotionPurchaseScreen" component={withGuard(BonusPromotionPurchaseScreen, 'auth')} />
         <Stack.Screen name="FavoritesScreen" component={FavoritesScreen} />
+        <Stack.Screen name="BusinessClaimScreen" component={withGuard(BusinessClaimScreen, 'auth')} />
+        <Stack.Screen name="BusinessPlusSubscriptionScreen" component={withGuard(BusinessPlusSubscriptionScreen, 'auth')} />
+        <Stack.Screen name="BusinessMenuEditorScreen" component={withGuard(BusinessMenuEditorScreen, 'auth')} />
+        <Stack.Screen name="BusinessPromoEditorScreen" component={withGuard(BusinessPromoEditorScreen, 'auth')} />
       </Stack.Navigator>
       <ScreenFileInfoOverlay />
     </NavigationContainer>

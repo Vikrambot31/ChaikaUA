@@ -651,6 +651,24 @@
     "buildings": {
       ".read": "auth != null",
       ".write": false
+    },
+
+    "business_plus_claims": {
+      ".read": "auth != null && (root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
+      ".indexOn": ["status", "ownerUid", "createdAt"],
+      "$placeId": {
+        ".read": "auth != null && (root.child('business_plus_claims').child($placeId).child('ownerUid').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
+        ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && (root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator' || (!data.exists() && newData.child('ownerUid').val() === auth.uid) || (data.exists() && data.child('ownerUid').val() === auth.uid && data.child('status').val() !== 'approved' && newData.child('status').val() !== 'approved' && newData.child('status').val() !== 'rejected'))"
+      }
+    },
+
+    "business_plus_cards": {
+      ".read": "auth != null",
+      ".indexOn": ["moderationStatus", "ownerId"],
+      "$placeId": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && (root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator' || (root.child('business_plus_claims').child($placeId).child('ownerUid').val() === auth.uid && root.child('business_plus_claims').child($placeId).child('status').val() === 'approved' && (!data.exists() || data.child('ownerId').val() === auth.uid) && newData.child('moderationStatus').val() !== 'approved' && newData.child('moderationStatus').val() !== 'rejected'))"
+      }
     }
   }
 }

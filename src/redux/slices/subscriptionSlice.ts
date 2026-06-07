@@ -2,7 +2,7 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { getDatabase, ref, get } from 'firebase/database';
 
-export type SubscriptionPlan = 'free' | 'premium' | 'premium_plus';
+export type SubscriptionPlan = 'free' | 'premium' | 'premium_plus' | 'business_plus';
 export type SubscriptionStatus = 'free' | 'trial' | 'active' | 'expired';
 
 export interface SubscriptionState {
@@ -34,7 +34,7 @@ const initialState: SubscriptionState = {
 };
 
 const normalizePlan = (value: unknown): SubscriptionPlan => {
-  if (value === 'premium' || value === 'premium_plus') {
+  if (value === 'premium' || value === 'premium_plus' || value === 'business_plus') {
     return value;
   }
   return 'free';
@@ -151,6 +151,15 @@ export const selectIsPremium = (state: { subscription: SubscriptionState }): boo
 
 export const selectIsPremiumPlus = (state: { subscription: SubscriptionState }) =>
   state.subscription.plan === 'premium_plus';
+
+/** True if user has active business_plus subscription */
+export const selectIsBusinessPlus = (state: { subscription: SubscriptionState }): boolean => {
+  const { plan, status, expiresAt } = state.subscription;
+  if (plan !== 'business_plus') return false;
+  if (status !== 'active' && status !== 'trial') return false;
+  if (!expiresAt) return false;
+  return new Date() < new Date(expiresAt);
+};
 
 export const selectExpiresAt = (state: { subscription: SubscriptionState }) =>
   state.subscription.expiresAt;

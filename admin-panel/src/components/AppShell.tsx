@@ -10,7 +10,7 @@ import { useViewMode, type ViewMode } from '../contexts/ViewModeContext';
 import { useDashboardContext } from '../contexts/DashboardContext';
 import type { DashboardStats } from '../services/dashboardService';
 
-export type AdminPageKey = 'dashboard' | 'moderation' | 'archive' | 'invite_access' | 'guarantor_tree' | 'access_control' | 'security' | 'errors' | 'photo_approval' | 'releases' | 'ai_diagnostics' | 'app_rules' | 'support' | 'bonus_credits' | 'ad_chat' | 'premium';
+export type AdminPageKey = 'dashboard' | 'moderation' | 'archive' | 'invite_access' | 'guarantor_tree' | 'access_control' | 'security' | 'errors' | 'photo_approval' | 'releases' | 'ai_diagnostics' | 'app_rules' | 'support' | 'bonus_credits' | 'ad_chat' | 'premium' | 'business_plus';
 
 type AppShellProps = {
   children: ReactNode;
@@ -102,6 +102,11 @@ const navItems: Array<{ key: AdminPageKey; label: string; hint: string }> = [
     label: 'Premium підписки',
     hint: 'Управління Premium-підписками: активація, продовження, скасування, статистика.',
   },
+  {
+    key: 'business_plus',
+    label: 'Бізнес+ картки',
+    hint: 'Заявки власників закладів та модерація контенту меню, акцій і фото для Бізнес+ карток.',
+  },
 ];
 
 const navItemIcons: Record<AdminPageKey, string> = {
@@ -121,6 +126,7 @@ const navItemIcons: Record<AdminPageKey, string> = {
   bonus_credits: '\u{1F4B0}',
   ad_chat: '\u{1F4E2}',
   premium: '\u2B50',
+  business_plus: '🏪',
 };
 
 type AttentionLevel = 'low' | 'medium' | 'high';

@@ -3,7 +3,10 @@ import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, Vi
 import * as Clipboard from 'expo-clipboard';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import type { NavigationProp, RouteProp } from '@react-navigation/native';
+import { ref, get } from 'firebase/database';
 import { useSelector } from 'react-redux';
+
+import { database } from '../firebase-core';
 
 import AppPhotoImage from '../components/AppPhotoImage';
 import ContactReasonModal from '../components/ContactReasonModal';
@@ -12,10 +15,11 @@ import MiniUserAvatar from '../components/MiniUserAvatar';
 import { useContactRequest } from '../hooks/useContactRequest';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import type { RootState } from '../redux/store';
+import { selectIsBusinessPlus } from '../redux/slices/subscriptionSlice';
 import { profilePermissionService, type ViewRequestContext } from '../services/profilePermissionService';
 import { getRequestTopicLabel } from '../data/categories';
 import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
-import type { DetailItemData } from '../utils/detailViewTypes';
+import type { DetailItemData, BusinessMenuItem, BusinessPromotion } from '../utils/detailViewTypes';
 import { requireAuthForDetails } from '../utils/authGuard';
 import { SCREEN_THEME } from '../utils/screenTheme';
 
@@ -78,6 +82,15 @@ const UI_TEXT = {
 
 const REQUEST_CONTEXTS = new Set<string>(['lyudi', 'help', 'sport', 'buysell', 'job']);
 
+const formatPromoDate = (iso: string): string => {
+  try {
+    const d = new Date(iso);
+    return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
+  } catch {
+    return iso;
+  }
+};
+
 const getContactContext = (sourceType: string): ViewRequestContext => (
   REQUEST_CONTEXTS.has(sourceType) ? sourceType as ViewRequestContext : 'lyudi'
 );
@@ -91,11 +104,22 @@ export default function ItemDetailScreen({
 }) {
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
   const currentUser = useSelector((state: RootState) => state.auth.user);
+  const isBusinessPlus = useSelector(selectIsBusinessPlus);
   const { modalVisible, pending, currentTarget, openModal, closeModal, sendRequest } = useContactRequest();
   const item = route.params.item;
   const text = UI_TEXT[language];
   const [contactApproved, setContactApproved] = useState(false);
+  const [claimStatus, setClaimStatus] = useState<'none' | 'pending' | 'approved' | 'rejected'>('none');
+  const [businessCard, setBusinessCard] = useState<{
+    ownerId?: string;
+    moderationStatus?: string;
+    menuItems?: BusinessMenuItem[];
+    promotions?: BusinessPromotion[];
+    photoUri?: string;
+    photoStoragePath?: string;
+  } | null>(null);
   const isOwnItem = Boolean(item.userId && currentUser?.id && item.userId === currentUser.id);
+  const isPlaceType = item.sourceType === 'place';
   const phoneVisible = isOwnItem || contactApproved;
   const hasPhone = phoneVisible && Boolean(item.phone?.trim());
   const canRequestContact = Boolean(item.userId && item.userId !== currentUser?.id);
@@ -105,6 +129,27 @@ export default function ItemDetailScreen({
   const hasOwnerAvatar = Boolean(item.ownerAvatarUri);
   const categoryLabel = item.category ? getRequestTopicLabel({ category: item.category }, language) : '';
   const profileLabel = language === 'ua' ? 'Профіль' : language === 'ru' ? 'Профиль' : 'Profile';
+
+  const claimLabel = language === 'ua' ? 'Я власник цього закладу' : language === 'ru' ? 'Я владелец этого заведения' : 'I am the owner';
+  const claimPendingLabel = language === 'ua' ? 'Заявку надіслано — на розгляді' : language === 'ru' ? 'Заявка отправлена — на рассмотрении' : 'Claim submitted — pending review';
+  const claimApprovedLabel = language === 'ua' ? 'Підтверджений власник' : language === 'ru' ? 'Подтверждённый владелец' : 'Verified owner';
+  const claimRejectedLabel = language === 'ua' ? 'Заявку відхилено — подати нову' : language === 'ru' ? 'Заявка отклонена — подать новую' : 'Claim rejected — resubmit';
+  const activateBusinessPlusLabel = language === 'ua' ? 'Активувати Бізнес+ (49 грн/міс)' : language === 'ru' ? 'Активировать Бизнес+ (49 грн/мес)' : 'Activate Business+ (49 UAH/mo)';
+  const menuSectionLabel = language === 'ua' ? 'Меню' : language === 'ru' ? 'Меню' : 'Menu';
+  const promoSectionLabel = language === 'ua' ? 'Акції та знижки' : language === 'ru' ? 'Акции и скидки' : 'Promotions';
+  const promoUntilLabel = language === 'ua' ? 'до' : language === 'ru' ? 'до' : 'until';
+  const editMenuLabel = language === 'ua' ? 'Редагувати меню та ціни' : language === 'ru' ? 'Редактировать меню и цены' : 'Edit menu & prices';
+  const editPromosLabel = language === 'ua' ? 'Редагувати акції' : language === 'ru' ? 'Редактировать акции' : 'Edit promotions';
+  const editPhotoLabel = language === 'ua' ? 'Змінити фото закладу' : language === 'ru' ? 'Изменить фото заведения' : 'Change business photo';
+  const pendingModerationLabel = language === 'ua' ? 'На модерації — зміни незабаром з\'являться' : language === 'ru' ? 'На модерации — изменения скоро появятся' : 'Pending review — changes will appear soon';
+
+  // Owner = approved claim OR already set as card owner
+  const isMyApprovedPlace = isPlaceType && claimStatus === 'approved'
+    && (businessCard?.ownerId === currentUser?.id || item.businessPlusOwnerId === currentUser?.id);
+  const isApprovedCard = businessCard?.moderationStatus === 'approved';
+  const hasMenu = isApprovedCard && Array.isArray(businessCard?.menuItems) && (businessCard!.menuItems!.length > 0);
+  const hasPromos = isApprovedCard && Array.isArray(businessCard?.promotions) && (businessCard!.promotions!.length > 0);
+  const hasBusinessPhoto = Boolean(businessCard?.photoUri || businessCard?.photoStoragePath);
 
   const isAuthenticated = Boolean(currentUser?.id);
 
@@ -127,6 +172,59 @@ export default function ItemDetailScreen({
     })();
     return () => { cancelled = true; };
   }, [isAuthenticated, item.userId, currentUser?.id, isOwnItem]);
+
+  // Load business claim status for place cards
+  useEffect(() => {
+    if (!isAuthenticated || !isPlaceType || !currentUser?.id) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const claimRef = ref(database, `business_plus_claims/${item.sourceId}`);
+        const snap = await get(claimRef);
+        if (cancelled) return;
+        if (!snap.exists()) {
+          setClaimStatus('none');
+          return;
+        }
+        const data = snap.val() as { ownerUid?: string; status?: string };
+        if (data.ownerUid === currentUser.id) {
+          setClaimStatus((data.status as 'pending' | 'approved' | 'rejected') ?? 'none');
+        } else {
+          // Place already claimed by someone else
+          setClaimStatus('approved');
+        }
+      } catch {
+        if (!cancelled) setClaimStatus('none');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isAuthenticated, isPlaceType, item.sourceId, currentUser?.id]);
+
+  // Load business+ card content for place cards
+  useEffect(() => {
+    if (!isAuthenticated || !isPlaceType) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const cardRef = ref(database, `business_plus_cards/${item.sourceId}`);
+        const snap = await get(cardRef);
+        if (cancelled) return;
+        if (snap.exists()) {
+          setBusinessCard(snap.val() as {
+            ownerId?: string;
+            moderationStatus?: string;
+            menuItems?: BusinessMenuItem[];
+            promotions?: BusinessPromotion[];
+            photoUri?: string;
+            photoStoragePath?: string;
+          });
+        }
+      } catch {
+        // silently ignore — business card is optional content
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isAuthenticated, isPlaceType, item.sourceId]);
 
   const fields = [
     { label: text.description, value: item.description },
@@ -266,6 +364,101 @@ export default function ItemDetailScreen({
           </View>
         ))}
 
+        {/* ── Business+ content (approved cards visible to all authenticated users) ── */}
+        {isPlaceType && (hasMenu || hasPromos || hasBusinessPhoto || (isMyApprovedPlace && isBusinessPlus)) ? (
+          <View style={styles.businessSection}>
+
+            {/* Business photo */}
+            {hasBusinessPhoto && isApprovedCard ? (
+              <AppPhotoImage
+                uri={businessCard!.photoUri}
+                storagePath={businessCard!.photoStoragePath}
+                style={styles.businessPhoto}
+                resizeMode="cover"
+                debugLabel={`BusinessCard:${item.sourceId}`}
+              />
+            ) : null}
+
+            {/* Menu */}
+            {hasMenu ? (
+              <View style={styles.bpCard}>
+                <View style={styles.bpSectionHeader}>
+                  <MaterialCommunityIcons name="silverware-fork-knife" size={16} color="#7A1E5C" />
+                  <Text style={styles.bpSectionTitle}>{menuSectionLabel}</Text>
+                </View>
+                {businessCard!.menuItems!.map((dish, i) => (
+                  <View key={i} style={[styles.menuRow, i < businessCard!.menuItems!.length - 1 && styles.menuRowDivider]}>
+                    <Text style={styles.menuDishName}>{dish.name}</Text>
+                    <Text style={styles.menuDishPrice}>{dish.price}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+
+            {/* Promotions */}
+            {hasPromos ? (
+              <View style={{ gap: 8 }}>
+                <View style={styles.bpSectionHeader}>
+                  <MaterialCommunityIcons name="tag-multiple-outline" size={16} color="#B8860B" />
+                  <Text style={[styles.bpSectionTitle, { color: '#B8860B' }]}>{promoSectionLabel}</Text>
+                </View>
+                {businessCard!.promotions!.map((promo, i) => (
+                  <View key={i} style={styles.promoCard}>
+                    <View style={styles.promoHeader}>
+                      <Text style={styles.promoTitle}>{promo.title}</Text>
+                      {promo.dateUntil ? (
+                        <View style={styles.promoDateBadge}>
+                          <Text style={styles.promoDateText}>{promoUntilLabel} {formatPromoDate(promo.dateUntil)}</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                    {promo.description ? (
+                      <Text style={styles.promoDesc}>{promo.description}</Text>
+                    ) : null}
+                  </View>
+                ))}
+              </View>
+            ) : null}
+
+            {/* Owner edit controls (business_plus only) */}
+            {isMyApprovedPlace && isBusinessPlus ? (
+              <View style={styles.ownerControls}>
+                {businessCard?.moderationStatus === 'pending' ? (
+                  <View style={styles.pendingBanner}>
+                    <MaterialCommunityIcons name="clock-outline" size={14} color="#8A7A5A" />
+                    <Text style={styles.pendingBannerText}>{pendingModerationLabel}</Text>
+                  </View>
+                ) : null}
+                <TouchableOpacity
+                  style={styles.editBtn}
+                  onPress={() => navigation.navigate('BusinessMenuEditorScreen', { placeId: item.sourceId, placeName: item.title })}
+                  activeOpacity={0.86}
+                >
+                  <MaterialCommunityIcons name="silverware-fork-knife" size={16} color="#7A1E5C" />
+                  <Text style={styles.editBtnText}>{editMenuLabel}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.editBtn}
+                  onPress={() => navigation.navigate('BusinessPromoEditorScreen', { placeId: item.sourceId, placeName: item.title })}
+                  activeOpacity={0.86}
+                >
+                  <MaterialCommunityIcons name="tag-multiple-outline" size={16} color="#7A1E5C" />
+                  <Text style={styles.editBtnText}>{editPromosLabel}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.editBtn}
+                  onPress={() => navigation.navigate('BusinessMenuEditorScreen', { placeId: item.sourceId, placeName: item.title })}
+                  activeOpacity={0.86}
+                >
+                  <MaterialCommunityIcons name="image-plus" size={16} color="#7A1E5C" />
+                  <Text style={styles.editBtnText}>{editPhotoLabel}</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+
+          </View>
+        ) : null}
+
         <View style={styles.infoCard}>
           <Text style={styles.infoLabel}>{text.phone}</Text>
           <Text style={styles.phoneValue}>{phoneVisible ? (item.phone || '—') : '***'}</Text>
@@ -309,6 +502,46 @@ export default function ItemDetailScreen({
             ) : null}
           </View>
         </View>
+
+        {/* Business ownership claim section — only for place cards */}
+        {isPlaceType ? (
+          <View>
+            {claimStatus === 'none' || claimStatus === 'rejected' ? (
+              <TouchableOpacity
+                style={styles.claimBtn}
+                onPress={() => navigation.navigate('BusinessClaimScreen', { item })}
+                activeOpacity={0.86}
+              >
+                <MaterialCommunityIcons name="store-plus-outline" size={18} color={SCREEN_THEME.terracotta} />
+                <Text style={styles.claimBtnText}>
+                  {claimStatus === 'rejected' ? claimRejectedLabel : claimLabel}
+                </Text>
+              </TouchableOpacity>
+            ) : claimStatus === 'pending' ? (
+              <View style={styles.claimStatusCard}>
+                <MaterialCommunityIcons name="clock-outline" size={16} color="#8A7A5A" />
+                <Text style={styles.claimStatusText}>{claimPendingLabel}</Text>
+              </View>
+            ) : isMyApprovedPlace ? (
+              <View style={{ gap: 8 }}>
+                <View style={[styles.claimStatusCard, styles.claimStatusApproved]}>
+                  <MaterialCommunityIcons name="check-circle-outline" size={16} color="#2E7D32" />
+                  <Text style={[styles.claimStatusText, styles.claimStatusApprovedText]}>{claimApprovedLabel}</Text>
+                </View>
+                {!isBusinessPlus && (
+                  <TouchableOpacity
+                    style={styles.activateBusinessBtn}
+                    onPress={() => navigation.navigate('BusinessPlusSubscriptionScreen')}
+                    activeOpacity={0.86}
+                  >
+                    <MaterialCommunityIcons name="storefront" size={16} color="#fff" />
+                    <Text style={styles.activateBusinessBtnText}>{activateBusinessPlusLabel}</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : null}
+          </View>
+        ) : null}
 
         <TouchableOpacity
           style={[styles.contactBtn, !canContact && styles.disabledAction]}
@@ -431,4 +664,175 @@ const styles = StyleSheet.create({
   contactBtnText: { color: '#fff', fontSize: 15, fontWeight: '900' },
   disabledAction: { backgroundColor: '#E1D7CF' },
   disabledText: { color: '#9F958E' },
+  claimBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FBF7F2',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1.5,
+    borderColor: SCREEN_THEME.terracotta,
+    borderStyle: 'dashed',
+  },
+  claimBtnText: { color: SCREEN_THEME.terracotta, fontSize: 14, fontWeight: '800', flex: 1 },
+  claimStatusCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFF8E1',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#F2D9A0',
+  },
+  claimStatusText: { color: '#8A7A5A', fontSize: 13, fontWeight: '700', flex: 1 },
+  claimStatusApproved: { backgroundColor: '#F1F8F1', borderColor: '#A5D6A7' },
+  claimStatusApprovedText: { color: '#2E7D32' },
+  activateBusinessBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#7A1E5C',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  activateBusinessBtnText: { color: '#fff', fontSize: 14, fontWeight: '900', flex: 1 },
+
+  // Business+ content section
+  businessSection: { gap: 12 },
+  businessPhoto: {
+    width: '100%',
+    height: 200,
+    borderRadius: 18,
+    backgroundColor: '#F0EDE8',
+  },
+  bpCard: {
+    backgroundColor: '#FBF7F2',
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E8DDD3',
+    gap: 2,
+  },
+  bpSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    marginBottom: 10,
+  },
+  bpSectionTitle: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#7A1E5C',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  menuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 9,
+    gap: 12,
+  },
+  menuRowDivider: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#EFE7DC',
+  },
+  menuDishName: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2D2520',
+    lineHeight: 20,
+  },
+  menuDishPrice: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#7A1E5C',
+    minWidth: 60,
+    textAlign: 'right',
+  },
+
+  // Promo cards (yellow)
+  promoCard: {
+    backgroundColor: '#FFFDE7',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#F9E076',
+    gap: 6,
+  },
+  promoHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  promoTitle: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#5C4A1E',
+  },
+  promoDateBadge: {
+    backgroundColor: '#F9C400',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  promoDateText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#3D2D00',
+  },
+  promoDesc: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B5A2A',
+    lineHeight: 19,
+  },
+
+  // Owner edit controls
+  ownerControls: {
+    gap: 8,
+    marginTop: 4,
+  },
+  pendingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    backgroundColor: '#FFF8E1',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#F2D9A0',
+  },
+  pendingBannerText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#8A7A5A',
+  },
+  editBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FDF5FA',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#E8C4DC',
+  },
+  editBtnText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#7A1E5C',
+  },
 });

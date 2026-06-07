@@ -1,3 +1,14 @@
+export type BusinessMenuItem = {
+  name: string;
+  price: string;
+};
+
+export type BusinessPromotion = {
+  title: string;
+  description: string;
+  dateUntil: string; // ISO date string
+};
+
 export type DetailItemData = {
   id: string;
   title: string;
@@ -17,4 +28,11 @@ export type DetailItemData = {
   createdAt?: string;
   sourceType: string;
   sourceId: string;
+  // Business+ fields (only for sourceType 'place' / 'food_top')
+  businessPlusOwnerId?: string;
+  businessPlusModerationStatus?: 'pending' | 'approved' | 'rejected';
+  businessPhotoUri?: string;
+  businessPhotoStoragePath?: string;
+  menuItems?: BusinessMenuItem[];   // up to 20
+  promotions?: BusinessPromotion[]; // up to 3
 };
