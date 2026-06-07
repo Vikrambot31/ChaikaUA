@@ -2,7 +2,8 @@ import {
   get, ref, update, onValue,
   type Unsubscribe,
 } from 'firebase/database';
-import { database } from '../firebase/firebase';
+import { httpsCallable } from 'firebase/functions';
+import { database, functions } from '../firebase/firebase';
 
 // ── Types ──
 
@@ -160,6 +161,27 @@ export const approveBusinessClaim = async (
         moderationStatus: 'approved',
         updatedAt: now,
       });
+      // 3. Write in-app notification for the owner
+      await update(ref(database, `user_business_notifications/${claim.ownerUid}`), {
+        type: 'claim_approved',
+        placeName: claim.placeName,
+        placeId,
+        timestamp: now,
+        read: false,
+      });
+    }
+  } else {
+    // Card already exists — still notify the owner
+    const claimSnap = await get(ref(database, `business_plus_claims/${placeId}`));
+    const claim = claimSnap.val() as BusinessPlusClaim | null;
+    if (claim?.ownerUid) {
+      await update(ref(database, `user_business_notifications/${claim.ownerUid}`), {
+        type: 'claim_approved',
+        placeName: claim.placeName,
+        placeId,
+        timestamp: now,
+        read: false,
+      });
     }
   }
 };
@@ -170,6 +192,7 @@ export const rejectBusinessClaim = async (
   reason: string,
 ): Promise<void> => {
   const now = new Date().toISOString();
+  // 1. Update claim status
   await update(ref(database, `business_plus_claims/${placeId}`), {
     status: 'rejected',
     rejectedBy: adminUid,
@@ -177,6 +200,19 @@ export const rejectBusinessClaim = async (
     rejectReason: reason,
     updatedAt: now,
   });
+  // 2. Write in-app notification for the owner
+  const claimSnap = await get(ref(database, `business_plus_claims/${placeId}`));
+  const claim = claimSnap.val() as BusinessPlusClaim | null;
+  if (claim?.ownerUid) {
+    await update(ref(database, `user_business_notifications/${claim.ownerUid}`), {
+      type: 'claim_rejected',
+      placeName: claim.placeName,
+      placeId,
+      rejectReason: reason,
+      timestamp: now,
+      read: false,
+    });
+  }
 };
 
 // ── Card actions ──
@@ -205,6 +241,65 @@ export const rejectBusinessCard = async (
     rejectedAt: now,
     rejectReason: reason,
   });
+};
+
+// ── Business+ subscription management ──
+
+export type BusinessPlusSubStatus = 'active' | 'expired' | 'free';
+
+export interface BusinessPlusSubscription {
+  uid: string;
+  plan: string;
+  status: BusinessPlusSubStatus;
+  expiresAt: string | null;
+  activatedAt: string | null;
+  activatedBy: string | null;
+  notes: string | null;
+}
+
+export const subscribeToBusinessPlusSubscriptions = (
+  callback: (subs: BusinessPlusSubscription[]) => void,
+): Unsubscribe =>
+  onValue(ref(database, 'user_subscription'), (snap) => {
+    const result: BusinessPlusSubscription[] = [];
+    if (snap.exists()) {
+      snap.forEach((child) => {
+        const d = child.val();
+        if (!d || d.plan !== 'business_plus') return;
+        result.push({
+          uid: child.key!,
+          plan: d.plan,
+          status: d.status ?? 'free',
+          expiresAt: d.expiresAt ?? null,
+          activatedAt: d.activatedAt ?? null,
+          activatedBy: d.activatedBy ?? null,
+          notes: d.notes ?? null,
+        });
+      });
+    }
+    callback(result);
+  });
+
+export const activateBusinessPlusManual = async (
+  uid: string,
+  months: 1 | 3 | 6 | 12,
+  notes: string,
+): Promise<{ ok: boolean; expiresAt: string; months: number }> => {
+  const fn = httpsCallable<
+    { uid: string; months: number; notes: string },
+    { ok: boolean; expiresAt: string; months: number }
+  >(functions, 'activateBusinessPlusManual');
+  const result = await fn({ uid, months, notes });
+  return result.data;
+};
+
+export const cancelBusinessPlusSubscription = async (uid: string): Promise<{ ok: boolean }> => {
+  const fn = httpsCallable<{ uid: string }, { ok: boolean }>(
+    functions,
+    'cancelBusinessPlusSubscription',
+  );
+  const result = await fn({ uid });
+  return result.data;
 };
 
 // ── User profile lookup (reuse from premiumAdminService pattern) ──

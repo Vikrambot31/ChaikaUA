@@ -470,6 +470,7 @@ function GuardedScreen({
 
   const [roleStatus, setRoleStatus] = useState<'loading' | 'allowed' | 'denied'>('loading');
   const deniedToastShownRef = useRef(false);
+  const deniedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const navigation = useNavigation();
 
@@ -496,8 +497,27 @@ function GuardedScreen({
   useEffect(() => {
     if (mode !== 'auth' && mode !== 'complete') return;
     if (!isBootstrapped) return;
-    setRoleStatus(isAuthenticated ? 'allowed' : 'denied');
+    if (isAuthenticated) {
+      if (deniedTimerRef.current !== null) {
+        clearTimeout(deniedTimerRef.current);
+        deniedTimerRef.current = null;
+      }
+      setRoleStatus('allowed');
+    } else {
+      deniedTimerRef.current = setTimeout(() => {
+        deniedTimerRef.current = null;
+        setRoleStatus('denied');
+      }, 600);
+    }
   }, [mode, isAuthenticated, isBootstrapped]);
+
+  useEffect(() => {
+    return () => {
+      if (deniedTimerRef.current !== null) {
+        clearTimeout(deniedTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (roleStatus === 'denied') {

@@ -37,6 +37,8 @@ import AppAccessGuard from './src/components/AppAccessGuard';
 import AccountResumeScreen from './src/components/AccountResumeScreen';
 import { PremiumActivatedModal } from './src/components/PremiumActivatedModal';
 import { useSubscriptionSync } from './src/hooks/useSubscriptionSync';
+import { BusinessApprovalModal } from './src/components/BusinessApprovalModal';
+import { useBusinessClaimSync } from './src/hooks/useBusinessClaimSync';
 import StartupSyncBanner from './src/components/StartupSyncBanner';
 import SoftInviteAccessGate from './src/components/SoftInviteAccessGate';
 import TactileButton from './src/components/TactileButton';
@@ -220,6 +222,7 @@ function AppWithAuthSync({ remoteConfigSnapshot, onRemoteConfigSnapshot }: AppWi
   // Realtime subscription listener: syncs user_subscription/{uid} → Redux.
   // Also triggers the "Premium activated" modal when admin grants premium live.
   const { showPremiumModal, dismissPremiumModal } = useSubscriptionSync(currentUser?.id);
+  const { claimNotification, dismissClaimNotification } = useBusinessClaimSync(currentUser?.id);
 
   useEffect(() => {
     identifyCrashUser(currentUser?.id ?? null);
@@ -294,7 +297,9 @@ function AppWithAuthSync({ remoteConfigSnapshot, onRemoteConfigSnapshot }: AppWi
     }
     // ─────────────────────────────────────────────────────────────────────────────
 
-    dispatch(setAuthBootstrapped(false));
+    if (authRetryKey === 0) {
+      dispatch(setAuthBootstrapped(false));
+    }
     setAuthOffline(false);
     let active = true;
     let unsubscribe: (() => void) | null = null;
@@ -516,6 +521,7 @@ function AppWithAuthSync({ remoteConfigSnapshot, onRemoteConfigSnapshot }: AppWi
       <StartupSyncBanner />
       <Toast config={toastConfig} />
       <PremiumActivatedModal visible={showPremiumModal} onDismiss={dismissPremiumModal} />
+      <BusinessApprovalModal notification={claimNotification} onDismiss={dismissClaimNotification} />
     </>
   );
 }

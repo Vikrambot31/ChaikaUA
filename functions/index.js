@@ -3551,6 +3551,113 @@ exports.getMyInvitedChildren = functionsV1.https.onCall(async (data, context) =>
 });
 
 // ─────────────────────────────────────────────
+// BUSINESS+ SUBSCRIPTION — MANUAL ADMIN SYSTEM
+// ─────────────────────────────────────────────
+
+const BUSINESS_PLUS_MONTHS_VALID = new Set([1, 3, 6, 12]);
+const BUSINESS_PLUS_MONTH_MS = 30 * 24 * 60 * 60 * 1000;
+
+exports.activateBusinessPlusManual = functionsV1.https.onCall(async (data, context) => {
+  try {
+    const actor = await assertAdminModerationAccess(context);
+    const uid = String(data?.uid || '').trim();
+    if (!uid) {
+      throw new functionsV1.https.HttpsError('invalid-argument', 'uid is required');
+    }
+    const months = Number(data?.months);
+    if (!BUSINESS_PLUS_MONTHS_VALID.has(months)) {
+      throw new functionsV1.https.HttpsError('invalid-argument', 'months must be 1, 3, 6, or 12');
+    }
+    const notes = String(data?.notes || '').slice(0, 300);
+
+    const db = admin.database();
+    const subRef = db.ref(`user_subscription/${uid}`);
+    const snapshot = await subRef.once('value');
+    const existing = snapshot.val() || {};
+
+    const nowMs = Date.now();
+    const nowIso = new Date(nowMs).toISOString();
+    const durationMs = months * BUSINESS_PLUS_MONTH_MS;
+
+    // Extend from current expiresAt if still active business_plus
+    let baseMs = nowMs;
+    if (existing.plan === 'business_plus' && existing.status === 'active' && existing.expiresAt) {
+      const currentExpiry = new Date(existing.expiresAt).getTime();
+      if (currentExpiry > nowMs) {
+        baseMs = currentExpiry;
+      }
+    }
+    const expiresAt = new Date(baseMs + durationMs).toISOString();
+    const startedAt = existing.startedAt || nowIso;
+
+    const record = {
+      plan: 'business_plus',
+      status: 'active',
+      startedAt,
+      expiresAt,
+      activatedBy: actor.uid,
+      activatedAt: nowIso,
+      paymentMethod: 'monobank_manual',
+      notes,
+    };
+
+    await subRef.set(record);
+    await db.ref(`users/${uid}/subscription`).set({ plan: 'business_plus', expiresAt });
+
+    // Send push notification to user
+    await sendUserNotification(uid, {
+      title: '🏪 Бізнес+ активовано!',
+      body: `Вашу підписку Бізнес+ активовано на ${months} міс. Керуйте карткою закладу вже зараз.`,
+    }, { type: 'business_plus_activated', months: String(months), expiresAt });
+
+    await writeOpsEvent('business_plus_manual_activated', {
+      targetUid: uid,
+      months,
+      expiresAt,
+      actorUid: actor.uid,
+    });
+
+    return { ok: true, expiresAt, months };
+  } catch (error) {
+    if (error instanceof functionsV1.https.HttpsError) throw error;
+    console.error('[activateBusinessPlusManual] error:', error?.message);
+    throw new functionsV1.https.HttpsError('internal', 'Failed to activate Business+');
+  }
+});
+
+exports.cancelBusinessPlusSubscription = functionsV1.https.onCall(async (data, context) => {
+  try {
+    await assertAdminModerationAccess(context);
+    const uid = String(data?.uid || '').trim();
+    if (!uid) {
+      throw new functionsV1.https.HttpsError('invalid-argument', 'uid is required');
+    }
+
+    const db = admin.database();
+    const subRef = db.ref(`user_subscription/${uid}`);
+    const snapshot = await subRef.once('value');
+    const existing = snapshot.val() || {};
+
+    if (existing.plan !== 'business_plus') {
+      throw new functionsV1.https.HttpsError('failed-precondition', 'User does not have Business+ subscription');
+    }
+
+    await subRef.update({
+      plan: 'free',
+      status: 'expired',
+      expiresAt: new Date().toISOString(),
+    });
+    await db.ref(`users/${uid}/subscription`).set({ plan: 'free', expiresAt: null });
+
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof functionsV1.https.HttpsError) throw error;
+    console.error('[cancelBusinessPlusSubscription] error:', error?.message);
+    throw new functionsV1.https.HttpsError('internal', 'Failed to cancel Business+');
+  }
+});
+
+// ─────────────────────────────────────────────
 // PREMIUM SUBSCRIPTION — MANUAL ADMIN SYSTEM
 // ─────────────────────────────────────────────
 
@@ -3785,6 +3892,56 @@ exports.cancelPremiumSubscription = functionsV1.https.onCall(async (data, contex
     throw new functionsV1.https.HttpsError('internal', 'Failed to cancel subscription');
   }
 });
+
+// ── Business claim approval/rejection push notification ──────────────────────
+// Fires whenever a business_plus_claims/{placeId} record is written.
+// Sends a push notification to the owner when status changes to approved/rejected.
+exports.onBusinessClaimStatusChange = functionsV1.database
+  .ref('business_plus_claims/{placeId}')
+  .onWrite(async (change, context) => {
+    try {
+      const before = change.before.val();
+      const after = change.after.val();
+
+      if (!after) return null; // record deleted — nothing to do
+
+      const newStatus = String(after.status || '').toLowerCase();
+      const oldStatus = String(before?.status || '').toLowerCase();
+
+      // Only react when status actually transitions to approved or rejected
+      if (newStatus === oldStatus) return null;
+      if (newStatus !== 'approved' && newStatus !== 'rejected') return null;
+
+      const ownerUid = String(after.ownerUid || '').trim();
+      const placeName = String(after.placeName || 'Ваш заклад').trim();
+      const rejectReason = String(after.rejectReason || '').trim();
+      const placeId = String(context.params.placeId || '').trim();
+
+      if (!ownerUid) return null;
+
+      const title = newStatus === 'approved'
+        ? '✅ Заявку схвалено!'
+        : '❌ Заявку відхилено';
+
+      const body = newStatus === 'approved'
+        ? `«${placeName}» — ваше право власності підтверджено. Тепер ви можете керувати карткою закладу.`
+        : `«${placeName}» — заявку відхилено.${rejectReason ? ` Причина: ${rejectReason}` : ''}`;
+
+      await sendUserNotification(ownerUid, { title, body }, {
+        type: 'business_claim_status',
+        status: newStatus,
+        placeId,
+        placeName,
+      });
+
+      return null;
+    } catch (error) {
+      await writeOpsError('onBusinessClaimStatusChange', error, {
+        placeId: context.params.placeId || null,
+      });
+      return null;
+    }
+  });
 
 exports.getAllPremiumSubscriptions = functionsV1.https.onCall(async (_data, context) => {
   try {

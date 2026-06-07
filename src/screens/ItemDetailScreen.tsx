@@ -3,8 +3,8 @@ import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, Vi
 import * as Clipboard from 'expo-clipboard';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import type { NavigationProp, RouteProp } from '@react-navigation/native';
-import { ref, get } from 'firebase/database';
-import { useSelector } from 'react-redux';
+import { ref, get, getDatabase } from 'firebase/database';
+import { useDispatch, useSelector } from 'react-redux';
 
 import { database } from '../firebase-core';
 
@@ -15,7 +15,11 @@ import MiniUserAvatar from '../components/MiniUserAvatar';
 import { useContactRequest } from '../hooks/useContactRequest';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import type { RootState } from '../redux/store';
-import { selectIsBusinessPlus } from '../redux/slices/subscriptionSlice';
+import {
+  selectIsBusinessPlus,
+  hydrateSubscription,
+  normalizeServerSubscription,
+} from '../redux/slices/subscriptionSlice';
 import { profilePermissionService, type ViewRequestContext } from '../services/profilePermissionService';
 import { getRequestTopicLabel } from '../data/categories';
 import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
@@ -99,6 +103,7 @@ export default function ItemDetailScreen({
   navigation: NavigationProp<RootStackParamList, 'ItemDetailScreen'>;
   route: RouteProp<ItemDetailParams, 'ItemDetailScreen'>;
 }) {
+  const dispatch = useDispatch();
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
   const currentUser = useSelector((state: RootState) => state.auth.user);
   const isBusinessPlus = useSelector(selectIsBusinessPlus);
@@ -169,6 +174,27 @@ export default function ItemDetailScreen({
     })();
     return () => { cancelled = true; };
   }, [isAuthenticated, item.userId, currentUser?.id, isOwnItem]);
+
+  // Fallback: load subscription directly from RTDB when screen opens.
+  // This ensures isBusinessPlus is fresh even if the App-level realtime listener
+  // hadn't fired yet (e.g. right after admin activates Business+ remotely).
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { firebaseApp } = require('../firebase-core') as typeof import('../firebase-core');
+        const db = getDatabase(firebaseApp);
+        const snap = await get(ref(db, `user_subscription/${currentUser.id}`));
+        if (cancelled) return;
+        const normalized = normalizeServerSubscription(snap.val() as Record<string, unknown> | null);
+        dispatch(hydrateSubscription(normalized));
+      } catch {
+        // silently ignore — the realtime listener in App.tsx is the primary source
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [currentUser?.id, dispatch]);
 
   // Load business claim status for place cards
   useEffect(() => {

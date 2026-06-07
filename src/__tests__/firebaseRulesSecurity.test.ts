@@ -35,18 +35,30 @@ describe('Firebase rules explicit child-read policy', () => {
   it('gates moderation collections behind auth (no public read)', () => {
     const parsed = tryParseJson(readProjectFile('firebase.rules.json')) as Record<string, any>;
 
-    // Public feeds are intentionally open for anonymous reading so guests can see activity.
-    // Write access is still restricted to real (non-anonymous) authenticated users.
-    expect(parsed.rules.requests['.read']).toBe(true);
-    expect(parsed.rules.community_photos['.read']).toBe(true);
+    // Collections with personal data (phone numbers, contacts) — auth required.
+    expect(parsed.rules.contacts_listings['.read']).toBe('auth != null');
+
+    // community_photos contains unmoderated (pending/rejected) photos — auth required.
+    // community_photos_public contains only approved photos — intentionally public.
+    expect(parsed.rules.community_photos['.read']).toBe('auth != null');
     expect(parsed.rules.community_photos_public['.read']).toBe(true);
+
+    // Public feed collections — intentionally open so guests see app activity.
+    expect(parsed.rules.requests['.read']).toBe(true);
     expect(parsed.rules.buy_sell_listings['.read']).toBe(true);
     expect(parsed.rules.food_top_listings['.read']).toBe(true);
     expect(parsed.rules.job_listings['.read']).toBe(true);
+    expect(parsed.rules.lost_found['.read']).toBe(true);
+    expect(parsed.rules.biznes_chaika_listings['.read']).toBe(true);
+    expect(parsed.rules.local_business['.read']).toBe(true);
+    expect(parsed.rules.sports_listings['.read']).toBe(true);
 
     // Write rules must require real authenticated users (not anonymous).
     expect(parsed.rules.requests.$requestId['.write']).toContain("sign_in_provider !== 'anonymous'");
     expect(parsed.rules.community_photos.$photoId['.write']).toContain("sign_in_provider !== 'anonymous'");
+    expect(parsed.rules.contacts_listings.$listingId['.write']).toContain("sign_in_provider !== 'anonymous'");
+    expect(parsed.rules.lost_found.$itemId['.write']).toContain("sign_in_provider !== 'anonymous'");
+    expect(parsed.rules.buy_sell_listings.$itemId['.write']).toContain("sign_in_provider !== 'anonymous'");
   });
 
   it('allows full users list reads for all authenticated users', () => {

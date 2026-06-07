@@ -588,7 +588,7 @@ const ProfileScreen: React.FC = () => {
         </TactileCard>
 
         {/* Trust bonuses card */}
-        <TouchableOpacity
+        {isLoggedIn && (<TouchableOpacity
           activeOpacity={0.86}
           onPress={() => navigation.navigate('BonusWalletScreen')}
           style={styles.bonusCard}
@@ -640,7 +640,7 @@ const ProfileScreen: React.FC = () => {
               <MaterialCommunityIcons name="chevron-right" size={16} color={SCREEN_THEME.textSecondary} style={{ marginLeft: 'auto' }} />
             </View>
           ) : null}
-        </TouchableOpacity>
+        </TouchableOpacity>)}
 
         <Text style={styles.sectionLabel}>{text.sectionSettings}</Text>
         <TactileCard elevated style={styles.card} pressable={false}>

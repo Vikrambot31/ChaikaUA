@@ -7,11 +7,16 @@ import {
   rejectBusinessClaim,
   approveBusinessCard,
   rejectBusinessCard,
+  subscribeToBusinessPlusSubscriptions,
+  activateBusinessPlusManual,
+  cancelBusinessPlusSubscription,
   type BusinessPlusClaim,
   type BusinessPlusCard,
+  type BusinessPlusSubscription,
 } from '../services/businessPlusAdminService';
+import { searchUsers, type UserSearchResult } from '../services/premiumAdminService';
 
-type Tab = 'claims' | 'cards';
+type Tab = 'claims' | 'cards' | 'subscriptions';
 
 const formatDate = (iso: string | undefined): string => {
   if (!iso) return '—';
@@ -464,6 +469,304 @@ function CardsTab({ adminUid }: { adminUid: string }) {
   );
 }
 
+// ── Subscriptions Tab ──
+
+const MONTHS_OPTIONS: { value: 1 | 3 | 6 | 12; label: string; price: string }[] = [
+  { value: 1,  label: '1 місяць',  price: '49 грн' },
+  { value: 3,  label: '3 місяці',  price: '147 грн' },
+  { value: 6,  label: '6 місяців', price: '294 грн' },
+  { value: 12, label: '12 місяців', price: '480 грн' },
+];
+
+function SubscriptionsTab() {
+  const [subs, setSubs] = useState<BusinessPlusSubscription[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Grant form state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<UserSearchResult | null>(null);
+  const [selectedMonths, setSelectedMonths] = useState<1 | 3 | 6 | 12>(1);
+  const [notes, setNotes] = useState('');
+  const [granting, setGranting] = useState(false);
+  const [grantError, setGrantError] = useState('');
+  const [grantSuccess, setGrantSuccess] = useState('');
+
+  // Cancel confirmation
+  const [cancelUid, setCancelUid] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    const unsub = subscribeToBusinessPlusSubscriptions((data) => {
+      setSubs(data);
+      setLoading(false);
+    });
+    return unsub;
+  }, []);
+
+  // Debounced user search
+  useEffect(() => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    if (searchQuery.length < 2) { setSearchResults([]); return; }
+    searchTimerRef.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const results = await searchUsers(searchQuery);
+        setSearchResults(results);
+      } finally {
+        setSearching(false);
+      }
+    }, 400);
+  }, [searchQuery]);
+
+  const handleGrant = async () => {
+    if (!selectedUser) return;
+    setGranting(true);
+    setGrantError('');
+    setGrantSuccess('');
+    try {
+      const result = await activateBusinessPlusManual(selectedUser.uid, selectedMonths, notes.trim());
+      const exp = new Date(result.expiresAt).toLocaleDateString('uk-UA');
+      setGrantSuccess(`✅ Бізнес+ активовано для ${selectedUser.name || selectedUser.uid}. Дійсно до ${exp}`);
+      setSelectedUser(null);
+      setSearchQuery('');
+      setSearchResults([]);
+      setNotes('');
+      setSelectedMonths(1);
+    } catch (e: unknown) {
+      setGrantError(`Помилка: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setGranting(false);
+    }
+  };
+
+  const handleCancel = async () => {
+    if (!cancelUid) return;
+    setCancelling(true);
+    try {
+      await cancelBusinessPlusSubscription(cancelUid);
+      setCancelUid(null);
+    } catch (e: unknown) {
+      console.error('cancel error', e);
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  const activeCount = subs.filter((s) => s.status === 'active').length;
+  const expiredCount = subs.filter((s) => s.status === 'expired').length;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+
+      {/* Stats */}
+      <div style={{ display: 'flex', gap: 12 }}>
+        {[
+          { label: 'Активних', value: activeCount, color: '#69f0ae' },
+          { label: 'Прострочених', value: expiredCount, color: '#ef9a9a' },
+          { label: 'Всього', value: subs.length, color: '#90caf9' },
+        ].map((s) => (
+          <div key={s.label} style={{ background: '#111', border: '1px solid #2a2a3a', borderRadius: 10, padding: '10px 20px', minWidth: 100 }}>
+            <div style={{ color: s.color, fontSize: 24, fontWeight: 900 }}>{s.value}</div>
+            <div style={{ color: '#666', fontSize: 12, fontWeight: 700 }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Grant form */}
+      <div style={{ background: '#0a1520', border: '1px solid #1a3a5a', borderRadius: 12, padding: 20 }}>
+        <div style={{ color: '#90caf9', fontWeight: 900, fontSize: 15, marginBottom: 14 }}>
+          🏪 Видати Бізнес+ підписку
+        </div>
+
+        {/* User search */}
+        {!selectedUser ? (
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ color: '#aaa', fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Пошук користувача (ім'я, телефон, UID)</div>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Введіть мінімум 2 символи..."
+              style={{
+                width: '100%', background: '#111', color: '#eee',
+                border: '1px solid #333', borderRadius: 8, padding: '8px 12px',
+                fontSize: 14, boxSizing: 'border-box',
+              }}
+            />
+            {searching && <div style={{ color: '#666', fontSize: 12, marginTop: 6 }}>Пошук...</div>}
+            {searchResults.length > 0 && (
+              <div style={{ background: '#111', border: '1px solid #2a2a3a', borderRadius: 8, marginTop: 4, maxHeight: 200, overflowY: 'auto' }}>
+                {searchResults.map((u) => (
+                  <div
+                    key={u.uid}
+                    onClick={() => { setSelectedUser(u); setSearchQuery(''); setSearchResults([]); }}
+                    style={{
+                      padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #1a1a2a',
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = '#1a1a2e')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    <span style={{ color: '#e0e0ff', fontSize: 13, fontWeight: 700 }}>{u.name || '—'}</span>
+                    <span style={{ color: '#666', fontSize: 12 }}>{u.phone || u.uid.slice(0, 12) + '...'}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div style={{ marginBottom: 14, background: '#111', borderRadius: 8, padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <span style={{ color: '#90caf9', fontWeight: 700 }}>{selectedUser.name || 'Без імені'}</span>
+              <span style={{ color: '#666', fontSize: 12, marginLeft: 8 }}>{selectedUser.phone || selectedUser.uid.slice(0, 16) + '...'}</span>
+            </div>
+            <button type="button" onClick={() => setSelectedUser(null)} style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', fontSize: 16 }}>✕</button>
+          </div>
+        )}
+
+        {/* Month selector */}
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ color: '#aaa', fontSize: 12, fontWeight: 700, marginBottom: 8 }}>Термін підписки</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {MONTHS_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setSelectedMonths(opt.value)}
+                style={{
+                  background: selectedMonths === opt.value ? '#1a3a5a' : '#111',
+                  color: selectedMonths === opt.value ? '#90caf9' : '#666',
+                  border: `1px solid ${selectedMonths === opt.value ? '#1a6ab0' : '#333'}`,
+                  borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 800,
+                }}
+              >
+                {opt.label} <span style={{ color: '#4CAF50', fontSize: 11 }}>{opt.price}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Notes */}
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ color: '#aaa', fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Нотатка (необов'язково)</div>
+          <input
+            type="text"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Оплата Monobank 07.06.26, Serega Bablyak"
+            maxLength={200}
+            style={{
+              width: '100%', background: '#111', color: '#eee',
+              border: '1px solid #333', borderRadius: 8, padding: '8px 12px',
+              fontSize: 13, boxSizing: 'border-box',
+            }}
+          />
+        </div>
+
+        {grantError && <div style={{ color: '#ef9a9a', fontSize: 13, marginBottom: 10 }}>{grantError}</div>}
+        {grantSuccess && <div style={{ color: '#69f0ae', fontSize: 13, marginBottom: 10 }}>{grantSuccess}</div>}
+
+        <button
+          type="button"
+          onClick={() => void handleGrant()}
+          disabled={!selectedUser || granting}
+          style={{
+            background: selectedUser ? '#1a3a5a' : '#111',
+            color: selectedUser ? '#90caf9' : '#444',
+            border: `1px solid ${selectedUser ? '#1a6ab0' : '#222'}`,
+            borderRadius: 8, padding: '9px 24px', cursor: selectedUser ? 'pointer' : 'not-allowed',
+            fontSize: 14, fontWeight: 900,
+          }}
+        >
+          {granting ? 'Активується...' : '🚀 Активувати Бізнес+'}
+        </button>
+      </div>
+
+      {/* Subscribers list */}
+      <div>
+        <div style={{ color: '#aaa', fontSize: 13, fontWeight: 800, marginBottom: 10 }}>
+          Всі Бізнес+ підписники ({subs.length})
+        </div>
+        {loading && <div style={{ color: '#666' }}>Завантаження...</div>}
+        {!loading && subs.length === 0 && (
+          <div style={{ color: '#444', fontSize: 13 }}>Поки що немає жодного підписника.</div>
+        )}
+        {subs.map((sub) => {
+          const isActive = sub.status === 'active' && sub.expiresAt && new Date(sub.expiresAt) > new Date();
+          const expStr = sub.expiresAt ? new Date(sub.expiresAt).toLocaleDateString('uk-UA') : '—';
+          return (
+            <div key={sub.uid} style={{
+              background: '#111', border: `1px solid ${isActive ? '#1a3a5a' : '#2a1a1a'}`,
+              borderRadius: 10, padding: '12px 16px', marginBottom: 8,
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12,
+            }}>
+              <div>
+                <div style={{ color: '#e0e0ff', fontSize: 13, fontWeight: 700 }}>{sub.uid}</div>
+                <div style={{ color: '#666', fontSize: 11, marginTop: 2 }}>
+                  До: <span style={{ color: isActive ? '#69f0ae' : '#ef9a9a' }}>{expStr}</span>
+                  {sub.notes ? <span style={{ marginLeft: 10, color: '#555' }}>{sub.notes}</span> : null}
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{
+                  background: isActive ? '#0a2010' : '#2a0808',
+                  color: isActive ? '#69f0ae' : '#ef9a9a',
+                  borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 800,
+                }}>
+                  {isActive ? 'Активна' : 'Прострочена'}
+                </span>
+                {isActive && (
+                  <button
+                    type="button"
+                    onClick={() => setCancelUid(sub.uid)}
+                    style={{
+                      background: '#2a0808', color: '#ef9a9a',
+                      border: '1px solid #7a2020', borderRadius: 6,
+                      padding: '4px 10px', cursor: 'pointer', fontSize: 11, fontWeight: 800,
+                    }}
+                  >
+                    Скасувати
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Cancel confirmation modal */}
+      {cancelUid ? (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999,
+        }}>
+          <div style={{ background: '#1a1a2e', border: '1px solid #2a2a4a', borderRadius: 12, padding: 24, width: 380, maxWidth: '90vw' }}>
+            <div style={{ color: '#fff', fontWeight: 800, fontSize: 16, marginBottom: 10 }}>Скасувати Бізнес+?</div>
+            <div style={{ color: '#aaa', fontSize: 13, marginBottom: 20 }}>
+              Підписка буде деактивована негайно. Користувач втратить доступ до функцій Бізнес+.
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button type="button" onClick={() => setCancelUid(null)}
+                style={{ background: '#222', color: '#aaa', border: '1px solid #333', borderRadius: 6, padding: '6px 14px', cursor: 'pointer', fontSize: 13 }}>
+                Ні, залишити
+              </button>
+              <button type="button" onClick={() => void handleCancel()} disabled={cancelling}
+                style={{ background: '#7a2020', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 800 }}>
+                {cancelling ? 'Скасовується...' : 'Так, скасувати'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 // ── Main Page ──
 
 export function BusinessPlusModerationPage() {
@@ -501,6 +804,7 @@ export function BusinessPlusModerationPage() {
         {([
           { key: 'claims' as Tab, label: 'Заявки власників', count: claimsCount },
           { key: 'cards' as Tab, label: 'Контент карток', count: cardsCount },
+          { key: 'subscriptions' as Tab, label: '💳 Підписки', count: 0 },
         ]).map((tab) => (
           <button key={tab.key} type="button"
             onClick={() => setActiveTab(tab.key)}
@@ -531,6 +835,7 @@ export function BusinessPlusModerationPage() {
 
       {activeTab === 'claims' && <ClaimsTab adminUid={adminUid} />}
       {activeTab === 'cards' && <CardsTab adminUid={adminUid} />}
+      {activeTab === 'subscriptions' && <SubscriptionsTab />}
     </div>
   );
 }

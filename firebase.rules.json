@@ -21,7 +21,7 @@
     },
 
     "community_photos": {
-      ".read": true,
+      ".read": "auth != null",
       ".indexOn": ["status", "sourceScreen"],
       "$photoId": {
         ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && ((root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator') || (!data.exists() && newData.child('userId').val() === auth.uid && !(root.child('yellow_list').child(auth.uid).child('active').val() === true && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now)) || (data.exists() && data.child('userId').val() === auth.uid && (!newData.exists() || (newData.child('userId').val() === auth.uid && newData.child('moderationStatus').val() !== 'approved' && newData.child('moderationStatus').val() !== 'rejected' && newData.child('status').val() !== 'approved' && newData.child('status').val() !== 'rejected'))))"
@@ -37,7 +37,7 @@
     },
 
     "contacts_listings": {
-      ".read": true,
+      ".read": "auth != null",
       ".indexOn": ["moderationStatus", "userId"],
       "$listingId": {
         ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && ((root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator') || (!data.exists() && newData.child('userId').val() === auth.uid && !(root.child('yellow_list').child(auth.uid).child('active').val() === true && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now)) || (data.exists() && data.child('userId').val() === auth.uid && (!newData.exists() || (newData.child('userId').val() === auth.uid && newData.child('moderationStatus').val() !== 'approved' && newData.child('moderationStatus').val() !== 'rejected' && newData.child('status').val() !== 'approved' && newData.child('status').val() !== 'rejected'))))"
@@ -659,6 +659,13 @@
       "$placeId": {
         ".read": "auth != null && (root.child('business_plus_claims').child($placeId).child('ownerUid').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
         ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && (root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator' || (!data.exists() && newData.child('ownerUid').val() === auth.uid) || (data.exists() && data.child('ownerUid').val() === auth.uid && data.child('status').val() !== 'approved' && newData.child('status').val() !== 'approved' && newData.child('status').val() !== 'rejected'))"
+      }
+    },
+
+    "user_business_notifications": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && (root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator' || (auth.uid === $uid && !newData.exists()))"
       }
     },
 
