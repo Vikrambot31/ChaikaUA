@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useDispatch } from 'react-redux';
-import { getDatabase, onValue, ref } from 'firebase/database';
+import { onValue, ref } from 'firebase/database';
 import {
   hydrateSubscription,
   normalizeServerSubscription,
+  type ServerSubscriptionPayload,
 } from '../redux/slices/subscriptionSlice';
+import { database } from '../firebase-core';
 import { LOCAL_MODE } from '../local/LOCAL_MODE';
 
 /**
@@ -35,14 +37,12 @@ export function useSubscriptionSync(userId: string | null | undefined): {
     firstLoadDoneRef.current = false;
     wasPremiumRef.current = false;
 
-    const { firebaseApp } = require('../firebase-core') as typeof import('../firebase-core');
-    const db = getDatabase(firebaseApp);
-    const subRef = ref(db, `user_subscription/${userId}`);
+    const subRef = ref(database, `user_subscription/${userId}`);
 
     const unsub = onValue(
       subRef,
       (snap) => {
-        const raw = snap.val() as Record<string, unknown> | null;
+        const raw = snap.val() as ServerSubscriptionPayload | null;
         const normalized = normalizeServerSubscription(raw);
 
         const isNowPremium =
