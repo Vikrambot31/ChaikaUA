@@ -13,7 +13,7 @@
     },
 
     "requests": {
-      ".read": "auth != null",
+      ".read": true,
       ".indexOn": ["status", "category", "userId", "timestamp"],
       "$requestId": {
         ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && ((root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator') || (!data.exists() && newData.child('userId').val() === auth.uid && !(root.child('yellow_list').child(auth.uid).child('active').val() === true && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now)) || (data.exists() && data.child('userId').val() === auth.uid && (!newData.exists() || (newData.child('userId').val() === auth.uid && newData.child('moderationStatus').val() !== 'approved' && newData.child('moderationStatus').val() !== 'rejected' && newData.child('status').val() !== 'approved' && newData.child('status').val() !== 'rejected'))))"
@@ -21,7 +21,7 @@
     },
 
     "community_photos": {
-      ".read": "auth != null",
+      ".read": true,
       ".indexOn": ["status", "sourceScreen"],
       "$photoId": {
         ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && ((root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator') || (!data.exists() && newData.child('userId').val() === auth.uid && !(root.child('yellow_list').child(auth.uid).child('active').val() === true && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now)) || (data.exists() && data.child('userId').val() === auth.uid && (!newData.exists() || (newData.child('userId').val() === auth.uid && newData.child('moderationStatus').val() !== 'approved' && newData.child('moderationStatus').val() !== 'rejected' && newData.child('status').val() !== 'approved' && newData.child('status').val() !== 'rejected'))))"
@@ -29,7 +29,7 @@
     },
 
     "community_photos_public": {
-      ".read": "auth != null",
+      ".read": true,
       ".indexOn": "status",
       "$photoId": {
         ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && ((root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator') || (!data.exists() && newData.child('userId').val() === auth.uid && !(root.child('yellow_list').child(auth.uid).child('active').val() === true && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now)) || (data.exists() && data.child('userId').val() === auth.uid && (!newData.exists() || (newData.child('userId').val() === auth.uid && newData.child('moderationStatus').val() !== 'approved' && newData.child('moderationStatus').val() !== 'rejected' && newData.child('status').val() !== 'approved' && newData.child('status').val() !== 'rejected'))))"
@@ -37,7 +37,7 @@
     },
 
     "contacts_listings": {
-      ".read": "auth != null",
+      ".read": true,
       ".indexOn": ["moderationStatus", "userId"],
       "$listingId": {
         ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && ((root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator') || (!data.exists() && newData.child('userId').val() === auth.uid && !(root.child('yellow_list').child(auth.uid).child('active').val() === true && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now)) || (data.exists() && data.child('userId').val() === auth.uid && (!newData.exists() || (newData.child('userId').val() === auth.uid && newData.child('moderationStatus').val() !== 'approved' && newData.child('moderationStatus').val() !== 'rejected' && newData.child('status').val() !== 'approved' && newData.child('status').val() !== 'rejected'))))"
@@ -45,7 +45,7 @@
     },
 
     "biznes_chaika_listings": {
-      ".read": "auth != null",
+      ".read": true,
       ".indexOn": ["moderationStatus", "userId"],
       "$listingId": {
         ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && ((root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator') || (!data.exists() && newData.child('userId').val() === auth.uid && !(root.child('yellow_list').child(auth.uid).child('active').val() === true && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now)) || (data.exists() && data.child('userId').val() === auth.uid && (!newData.exists() || (newData.child('userId').val() === auth.uid && newData.child('moderationStatus').val() !== 'approved' && newData.child('moderationStatus').val() !== 'rejected' && newData.child('status').val() !== 'approved' && newData.child('status').val() !== 'rejected'))))"
@@ -53,7 +53,7 @@
     },
 
     "lost_found": {
-      ".read": "auth != null",
+      ".read": true,
       ".indexOn": ["moderationStatus", "userId"],
       "$itemId": {
         ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && ((root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator') || (!data.exists() && newData.child('userId').val() === auth.uid && !(root.child('yellow_list').child(auth.uid).child('active').val() === true && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now)) || (data.exists() && data.child('userId').val() === auth.uid && (!newData.exists() || (newData.child('userId').val() === auth.uid && newData.child('moderationStatus').val() !== 'approved' && newData.child('moderationStatus').val() !== 'rejected' && newData.child('status').val() !== 'approved' && newData.child('status').val() !== 'rejected'))))"
@@ -61,7 +61,7 @@
     },
 
     "buy_sell_listings": {
-      ".read": "auth != null",
+      ".read": true,
       ".indexOn": ["moderationStatus", "userId"],
       "$itemId": {
         ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && ((root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator') || (!data.exists() && newData.child('userId').val() === auth.uid && !(root.child('yellow_list').child(auth.uid).child('active').val() === true && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now)) || (data.exists() && data.child('userId').val() === auth.uid && (!newData.exists() || (newData.child('userId').val() === auth.uid && newData.child('moderationStatus').val() !== 'approved' && newData.child('moderationStatus').val() !== 'rejected' && newData.child('status').val() !== 'approved' && newData.child('status').val() !== 'rejected'))))"
@@ -69,7 +69,7 @@
     },
 
     "food_top_listings": {
-      ".read": "auth != null",
+      ".read": true,
       ".indexOn": ["moderationStatus", "userId"],
       "$listingId": {
         ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && ((root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator') || (!data.exists() && newData.child('userId').val() === auth.uid && !(root.child('yellow_list').child(auth.uid).child('active').val() === true && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now)) || (data.exists() && data.child('userId').val() === auth.uid && (!newData.exists() || (newData.child('userId').val() === auth.uid && newData.child('moderationStatus').val() !== 'approved' && newData.child('moderationStatus').val() !== 'rejected'))))"
@@ -77,7 +77,7 @@
     },
 
     "job_listings": {
-      ".read": "auth != null",
+      ".read": true,
       ".indexOn": ["moderationStatus", "userId"],
       "$listingId": {
         ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && ((root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator') || (!data.exists() && newData.child('userId').val() === auth.uid && !(root.child('yellow_list').child(auth.uid).child('active').val() === true && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now)) || (data.exists() && data.child('userId').val() === auth.uid && (!newData.exists() || (newData.child('userId').val() === auth.uid && newData.child('moderationStatus').val() !== 'approved' && newData.child('moderationStatus').val() !== 'rejected' && newData.child('status').val() !== 'approved' && newData.child('status').val() !== 'rejected'))))"
@@ -152,7 +152,7 @@
     },
 
     "local_business": {
-      ".read": "auth != null",
+      ".read": true,
       ".indexOn": ["status", "moderationStatus", "userId"],
       "$businessId": {
         ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && ((root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator') || (!data.exists() && newData.child('userId').val() === auth.uid && !(root.child('yellow_list').child(auth.uid).child('active').val() === true && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now)) || (data.exists() && data.child('userId').val() === auth.uid && (!newData.exists() || (newData.child('userId').val() === auth.uid && newData.child('moderationStatus').val() !== 'approved' && newData.child('moderationStatus').val() !== 'rejected' && newData.child('status').val() !== 'approved' && newData.child('status').val() !== 'rejected'))))"
@@ -160,15 +160,15 @@
     },
 
     "sports_listings": {
-      ".read": "auth != null",
+      ".read": true,
       "$listingId": {
         ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && ((root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator') || (!data.exists() && newData.child('userId').val() === auth.uid && !(root.child('yellow_list').child(auth.uid).child('active').val() === true && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now)) || (data.exists() && data.child('userId').val() === auth.uid && (!newData.exists() || (newData.child('userId').val() === auth.uid && newData.child('moderationStatus').val() !== 'approved' && newData.child('moderationStatus').val() !== 'rejected' && newData.child('status').val() !== 'approved' && newData.child('status').val() !== 'rejected'))))"
       }
     },
 
     "sports": {
-      ".read": "auth != null",
-      ".write": "auth != null",
+      ".read": true,
+      ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous'",
       "$sport": {
         "players": {
           ".indexOn": "rating",
@@ -196,12 +196,12 @@
 
     "stats": {
       ".read": "auth != null",
-      ".write": "auth != null"
+      ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous'"
     },
 
     "diagnostics": {
       ".read": "auth != null",
-      ".write": "auth != null"
+      ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous'"
     },
 
     "security_config": {
@@ -260,7 +260,7 @@
 
     "problem_votes": {
       ".read": true,
-      ".write": "auth != null"
+      ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous'"
     },
 
     "places": {
@@ -337,7 +337,7 @@
 
     "osbb_members": {
       ".read": "auth != null",
-      ".write": "auth != null"
+      ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous'"
     },
 
     "age_verifications": {
@@ -440,7 +440,7 @@
         ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous'"
       },
       "shadow_deny": {
-        ".write": "auth != null",
+        ".write": "auth != null && (root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
         ".read": "auth != null && root.child('user_roles').child(auth.uid).child('role').val() === 'admin'"
       }
     },
