@@ -396,6 +396,10 @@ const ROUTE_FILE_MAP: Record<string, string> = {
   AppMonitorScreen: 'AppMonitorScreen.tsx',
   ViewUserProfile: 'ViewUserProfileScreen.tsx',
   SupportScreen: 'SupportScreen.tsx',
+  BusinessClaimScreen: 'BusinessClaimScreen.tsx',
+  BusinessPlusSubscriptionScreen: 'BusinessPlusSubscriptionScreen.tsx',
+  BusinessMenuEditorScreen: 'BusinessMenuEditorScreen.tsx',
+  BusinessPromoEditorScreen: 'BusinessPromoEditorScreen.tsx',
 };
 
 function ScreenFileInfoOverlay() {

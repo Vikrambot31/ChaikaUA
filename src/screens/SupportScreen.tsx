@@ -11,7 +11,10 @@ import {
   Alert,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
+import type { NavigationProp } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
+import type { RootStackParamList } from '../navigation/RootNavigator';
 import { selectUser } from '../redux/selectors';
 import { selectIsOnline } from '../redux/slices/networkSlice';
 import { useTranslation } from '../i18n/useTranslation';
@@ -112,9 +115,9 @@ const CATEGORY_LABELS: Record<string, Record<SupportCategory, string>> = {
   },
 };
 
-type Props = { navigation: { goBack: () => void }; route?: { params?: { prefillMessage?: string } } };
-
-const SupportScreen: React.FC<Props> = ({ navigation, route }) => {
+const SupportScreen: React.FC = () => {
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const route = useRoute<RouteProp<RootStackParamList, 'SupportScreen'>>();
   const user = useSelector(selectUser);
   const isOnline = useSelector(selectIsOnline);
   const { language } = useTranslation();
@@ -123,7 +126,7 @@ const SupportScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const [ticket, setTicket] = useState<SupportTicket | null>(null);
   const [messages, setMessages] = useState<SupportMessage[]>([]);
-  const [messageText, setMessageText] = useState(route?.params?.prefillMessage ?? '');
+  const [messageText, setMessageText] = useState(route.params?.prefillMessage ?? '');
   const [selectedCategory, setSelectedCategory] = useState<SupportCategory | null>(null);
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
