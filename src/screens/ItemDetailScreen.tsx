@@ -83,12 +83,9 @@ const UI_TEXT = {
 const REQUEST_CONTEXTS = new Set<string>(['lyudi', 'help', 'sport', 'buysell', 'job']);
 
 const formatPromoDate = (iso: string): string => {
-  try {
-    const d = new Date(iso);
-    return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
-  } catch {
-    return iso;
-  }
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
 };
 
 const getContactContext = (sourceType: string): ViewRequestContext => (
@@ -145,7 +142,7 @@ export default function ItemDetailScreen({
 
   // Owner = approved claim OR already set as card owner
   const isMyApprovedPlace = isPlaceType && claimStatus === 'approved'
-    && (businessCard?.ownerId === currentUser?.id || item.businessPlusOwnerId === currentUser?.id);
+    && businessCard?.ownerId === currentUser?.id;
   const isApprovedCard = businessCard?.moderationStatus === 'approved';
   const hasMenu = isApprovedCard && Array.isArray(businessCard?.menuItems) && (businessCard!.menuItems!.length > 0);
   const hasPromos = isApprovedCard && Array.isArray(businessCard?.promotions) && (businessCard!.promotions!.length > 0);

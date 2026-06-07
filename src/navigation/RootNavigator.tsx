@@ -217,7 +217,7 @@ export type RootStackParamList = {
   AppVersionInfoScreen: undefined;
   AppMonitorScreen: undefined;
   ViewUserProfile: { userId: string };
-  SupportScreen: undefined;
+  SupportScreen: { prefillMessage?: string } | undefined;
   BusinessClaimScreen: { item: DetailItemData };
   BusinessPlusSubscriptionScreen: undefined;
   BusinessMenuEditorScreen: { placeId: string; placeName: string };

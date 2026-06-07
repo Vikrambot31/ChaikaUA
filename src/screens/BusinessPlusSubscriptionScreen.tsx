@@ -148,9 +148,7 @@ export default function BusinessPlusSubscriptionScreen() {
       ? `Хочу оформить подписку Бизнес+ (${planLabel}). Прошу предоставить реквизиты и активировать.`
       : `I would like to subscribe to Business+ (${planLabel}). Please provide payment details.`;
 
-    navigation.navigate('SupportScreen');
-    // Note: SupportScreen will be pre-filled via params in future enhancement
-    void message; // used for future pre-fill
+    navigation.navigate('SupportScreen', { prefillMessage: message });
   }, [navigation, language, selectedPlan]);
 
   const currentPrice = selectedPlan === 'yearly' ? text.priceYearly : text.priceMonthly;

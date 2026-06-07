@@ -102,9 +102,15 @@ function parseDateInput(value: string): string | null {
   const match = value.trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
   if (!match) return null;
   const [, dd, mm, yyyy] = match;
-  const d = new Date(`${yyyy}-${mm!.padStart(2, '0')}-${dd!.padStart(2, '0')}`);
+  const d = new Date(+yyyy!, +mm! - 1, +dd!); // local time — no timezone shift
   if (isNaN(d.getTime())) return null;
-  return d.toISOString();
+  // Reject overflow dates (e.g. 30.02 rolls over to March)
+  if (d.getDate() !== +dd! || d.getMonth() !== +mm! - 1) return null;
+  // Serialize as local date string to avoid UTC offset issues
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}T00:00:00.000`;
 }
 
 export default function BusinessPromoEditorScreen({
@@ -311,12 +317,9 @@ export default function BusinessPromoEditorScreen({
 }
 
 function formatIsoToDisplay(iso: string): string {
-  try {
-    const d = new Date(iso);
-    return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
-  } catch {
-    return '';
-  }
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
 }
 
 const styles = StyleSheet.create({

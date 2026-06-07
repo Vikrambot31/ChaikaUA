@@ -112,9 +112,9 @@ const CATEGORY_LABELS: Record<string, Record<SupportCategory, string>> = {
   },
 };
 
-type Props = { navigation: { goBack: () => void } };
+type Props = { navigation: { goBack: () => void }; route?: { params?: { prefillMessage?: string } } };
 
-const SupportScreen: React.FC<Props> = ({ navigation }) => {
+const SupportScreen: React.FC<Props> = ({ navigation, route }) => {
   const user = useSelector(selectUser);
   const isOnline = useSelector(selectIsOnline);
   const { language } = useTranslation();
@@ -123,7 +123,7 @@ const SupportScreen: React.FC<Props> = ({ navigation }) => {
 
   const [ticket, setTicket] = useState<SupportTicket | null>(null);
   const [messages, setMessages] = useState<SupportMessage[]>([]);
-  const [messageText, setMessageText] = useState('');
+  const [messageText, setMessageText] = useState(route?.params?.prefillMessage ?? '');
   const [selectedCategory, setSelectedCategory] = useState<SupportCategory | null>(null);
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
