@@ -22,6 +22,42 @@ const storageUrlResolver = (firebaseStorage as Record<string, unknown>)[['get', 
   refValue: ReturnType<typeof createStorageRef>,
 ) => Promise<string>;
 
+// ─── Disk cache size limit ────────────────────────────────────────────────────
+// photo-cache/ is capped at 50 MB. After each download the oldest files are
+// removed (by modificationTime) until the total is back under the limit.
+// Eviction runs in the background and never blocks rendering.
+const MAX_DISK_CACHE_BYTES = 50 * 1024 * 1024; // 50 MB
+
+const evictCacheIfNeeded = async (dir: string): Promise<void> => {
+  try {
+    const names = await FileSystem.readDirectoryAsync(dir);
+    type FileEntry = { path: string; size: number; modTime: number };
+    const entries: FileEntry[] = [];
+    let total = 0;
+    for (const name of names) {
+      const path = `${dir}${name}`;
+      const info = await FileSystem.getInfoAsync(path, { size: true });
+      if (!info.exists) continue;
+      const size = 'size' in info && typeof info.size === 'number' ? info.size : 0;
+      const modTime = 'modificationTime' in info && typeof info.modificationTime === 'number'
+        ? info.modificationTime
+        : 0;
+      total += size;
+      entries.push({ path, size, modTime });
+    }
+    if (total <= MAX_DISK_CACHE_BYTES) return;
+    // Sort oldest first, delete until under limit
+    entries.sort((a, b) => a.modTime - b.modTime);
+    for (const entry of entries) {
+      if (total <= MAX_DISK_CACHE_BYTES) break;
+      await FileSystem.deleteAsync(entry.path, { idempotent: true });
+      total -= entry.size;
+    }
+  } catch {
+    // Cache eviction must never break the app.
+  }
+};
+
 // ─── TZ_4.3 — 30-min in-memory URL cache ─────────────────────────────────────
 // Avoids repeated getDownloadURL calls when multiple components render the same
 // storage path. Cache entries expire after 30 minutes.
@@ -74,16 +110,16 @@ const isLikelyStoragePath = (value: unknown): value is string => {
 
 const stripQuery = (value: string): string => value.split('?')[0];
 
-const getCacheFilePath = async (storagePath: string): Promise<string> => {
+const getCacheFilePath = async (storagePath: string): Promise<{ filePath: string; dir: string }> => {
   const root = FileSystem.cacheDirectory || FileSystem.documentDirectory;
-  if (!root) return '';
+  if (!root) return { filePath: '', dir: '' };
   const dir = `${root}photo-cache/`;
   await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
   const cleanPath = storagePath.split('?')[0]?.split('#')[0] || storagePath;
   const extMatch = cleanPath.match(/\.([a-zA-Z0-9]{2,5})$/);
   const ext = extMatch?.[1]?.toLowerCase() || 'jpg';
   const safeName = storagePath.replace(/[^a-zA-Z0-9_-]+/g, '_');
-  return `${dir}${safeName}.${ext === 'jpeg' ? 'jpg' : ext}`;
+  return { filePath: `${dir}${safeName}.${ext === 'jpeg' ? 'jpg' : ext}`, dir };
 };
 
 const getUriDiagnostics = (value: unknown): Record<string, unknown> => {
@@ -231,7 +267,7 @@ const AppPhotoImage: React.FC<Props> = ({
       setLocalImageUri('');
 
       try {
-        const targetPath = await getCacheFilePath(path);
+        const { filePath: targetPath, dir: cacheDir } = await getCacheFilePath(path);
         if (!targetPath) return;
         const existing = await FileSystem.getInfoAsync(targetPath);
         if (existing.exists && (!('size' in existing) || typeof existing.size !== 'number' || existing.size > 0)) {
@@ -245,6 +281,8 @@ const AppPhotoImage: React.FC<Props> = ({
         if (cancelled) return;
         if (downloaded.uri) {
           setLocalImageUri(downloaded.uri);
+          // Evict oldest cached files if disk cache exceeds 50 MB (background).
+          void evictCacheIfNeeded(cacheDir);
         }
       } catch (downloadError) {
         if (cancelled) return;
