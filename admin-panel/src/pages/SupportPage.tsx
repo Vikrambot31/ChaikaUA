@@ -217,7 +217,16 @@ function ChatPanel({
           </span>
         </div>
         <div style={chatStyles.infoRow}>
-          <strong>Користувач:</strong> {ticket.userName} ({ticket.userId.slice(0, 12)}...)
+          <strong>Користувач:</strong> {ticket.userName}
+        </div>
+        <div style={chatStyles.infoRow}>
+          <strong>UID:</strong>{' '}
+          <span
+            style={{ fontFamily: 'monospace', fontSize: 11, color: '#555', userSelect: 'all', cursor: 'text' }}
+            title="Клацніть щоб виділити UID"
+          >
+            {ticket.userId}
+          </span>
         </div>
         <div style={chatStyles.infoRow}>
           <strong>Створено:</strong> {formatDateTime(ticket.createdAt)}

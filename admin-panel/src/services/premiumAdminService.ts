@@ -1,6 +1,6 @@
 import {
   get, ref, onValue, update,
-  orderByChild, startAt, endAt, limitToFirst,
+  orderByChild, startAt, endAt, equalTo, limitToFirst,
   query as dbQuery,
   type Unsubscribe, type DataSnapshot,
 } from 'firebase/database';
@@ -163,6 +163,33 @@ export const searchUsers = async (query: string): Promise<UserSearchResult[]> =>
         limitToFirst(10),
       );
       addSnap(await get(nameQ2));
+    }
+
+    // 5. Search pending moderation requests by name/phone (client-side filter)
+    try {
+      const pendingQ = dbQuery(
+        ref(database, 'requests'),
+        orderByChild('status'),
+        equalTo('pending'),
+        limitToFirst(300),
+      );
+      const pendingSnap = await get(pendingQ);
+      if (pendingSnap.exists()) {
+        const qLower = q.toLowerCase();
+        pendingSnap.forEach((child) => {
+          if (results.size >= 30) return;
+          const d = child.val() as Record<string, unknown>;
+          const name = str(d.name) || str(d.userName) || str(d.displayName) || '';
+          const phone = str(d.phone) || '';
+          const uid = str(d.userId) || str(d.uid) || '';
+          if (!uid || results.has(uid)) return;
+          if (name.toLowerCase().includes(qLower) || phone.includes(qLower)) {
+            results.set(uid, { uid, name, phone });
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('[searchUsers] moderation search error:', e);
     }
   } catch (e) {
     console.warn('[searchUsers] error:', e);

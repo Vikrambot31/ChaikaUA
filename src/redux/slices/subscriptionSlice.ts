@@ -14,7 +14,7 @@ export interface SubscriptionState {
   paymentMethod: string | null;
 }
 
-interface ServerSubscriptionPayload {
+export interface ServerSubscriptionPayload {
   plan?: unknown;
   status?: unknown;
   expiresAt?: unknown;
@@ -50,7 +50,7 @@ const normalizeStatus = (value: unknown): SubscriptionStatus => {
 const normalizeIso = (value: unknown): string | null =>
   typeof value === 'string' && value.trim().length > 0 ? value : null;
 
-const normalizeServerSubscription = (
+export const normalizeServerSubscription = (
   payload: ServerSubscriptionPayload | null | undefined,
 ): SubscriptionState => {
   const plan = normalizePlan(payload?.plan);

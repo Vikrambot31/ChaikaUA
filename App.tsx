@@ -35,6 +35,8 @@ import { initConsoleErrorCapture } from './src/services/crashDiagnosticsService'
 import { signOutPrimarySession } from './src/services/authSessionService';
 import AppAccessGuard from './src/components/AppAccessGuard';
 import AccountResumeScreen from './src/components/AccountResumeScreen';
+import { PremiumActivatedModal } from './src/components/PremiumActivatedModal';
+import { useSubscriptionSync } from './src/hooks/useSubscriptionSync';
 import StartupSyncBanner from './src/components/StartupSyncBanner';
 import SoftInviteAccessGate from './src/components/SoftInviteAccessGate';
 import TactileButton from './src/components/TactileButton';
@@ -214,6 +216,10 @@ function AppWithAuthSync({ remoteConfigSnapshot, onRemoteConfigSnapshot }: AppWi
 
   // Monitor Firebase connection state → drives OfflineBanner.
   useNetworkMonitor();
+
+  // Realtime subscription listener: syncs user_subscription/{uid} → Redux.
+  // Also triggers the "Premium activated" modal when admin grants premium live.
+  const { showPremiumModal, dismissPremiumModal } = useSubscriptionSync(currentUser?.id);
 
   useEffect(() => {
     identifyCrashUser(currentUser?.id ?? null);
@@ -509,6 +515,7 @@ function AppWithAuthSync({ remoteConfigSnapshot, onRemoteConfigSnapshot }: AppWi
       <OfflineBanner />
       <StartupSyncBanner />
       <Toast config={toastConfig} />
+      <PremiumActivatedModal visible={showPremiumModal} onDismiss={dismissPremiumModal} />
     </>
   );
 }
