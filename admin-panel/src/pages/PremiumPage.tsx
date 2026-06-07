@@ -4,9 +4,11 @@ import {
   activatePremiumManual,
   cancelPremiumSubscription,
   searchUsers,
+  loadUserProfiles,
   type PremiumSubscription,
   type PremiumStatus,
   type UserSearchResult,
+  type UserProfile,
 } from '../services/premiumAdminService';
 
 type MonthsOption = 1 | 3 | 6 | 12;
@@ -287,6 +289,7 @@ function ActivateModal({ uid, name, onClose, onActivated }: ActivateModalProps) 
 
 export function PremiumPage() {
   const [subscriptions, setSubscriptions] = useState<PremiumSubscription[]>([]);
+  const [profiles, setProfiles] = useState<Record<string, UserProfile>>({});
   const [search, setSearch] = useState('');
   const [activateUid, setActivateUid] = useState<string | null>(null);
   const [activateName, setActivateName] = useState<string>('');
@@ -300,7 +303,15 @@ export function PremiumPage() {
   };
 
   useEffect(() => {
-    const unsub = subscribeToAllPremiumSubscriptions(setSubscriptions);
+    const unsub = subscribeToAllPremiumSubscriptions((data) => {
+      setSubscriptions(data);
+      const toLoad = data.map((s) => s.uid);
+      if (toLoad.length > 0) {
+        loadUserProfiles(toLoad).then((p) =>
+          setProfiles((prev) => ({ ...prev, ...p })),
+        );
+      }
+    });
     return unsub;
   }, [refreshKey]);
 
@@ -319,10 +330,16 @@ export function PremiumPage() {
   };
 
   const filtered = search.trim()
-    ? subscriptions.filter((s) =>
-        s.uid.toLowerCase().includes(search.toLowerCase()) ||
-        (s.notes ?? '').toLowerCase().includes(search.toLowerCase()),
-      )
+    ? subscriptions.filter((s) => {
+        const q = search.toLowerCase();
+        const prof = profiles[s.uid];
+        return (
+          s.uid.toLowerCase().includes(q) ||
+          (s.notes ?? '').toLowerCase().includes(q) ||
+          (prof?.name ?? '').toLowerCase().includes(q) ||
+          (prof?.phone ?? '').includes(q)
+        );
+      })
     : subscriptions;
 
   // Stats
@@ -383,7 +400,7 @@ export function PremiumPage() {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ background: '#111', borderBottom: '1px solid #333' }}>
-              {['UID', 'Статус', 'Тариф', 'Початок', 'Завершення', 'Днів залишилось', 'Метод оплати', 'Примітка', 'Дії'].map((h) => (
+              {['Ім\'я', 'Телефон', 'Статус', 'Дата оплати', 'Діє до', 'Днів', 'Оплата', 'Нотатка', 'Дії'].map((h) => (
                 <th key={h} style={{
                   padding: '8px 10px', textAlign: 'left',
                   fontWeight: 800, color: '#aaa', whiteSpace: 'nowrap',
@@ -397,20 +414,26 @@ export function PremiumPage() {
             {filtered.length === 0 && (
               <tr>
                 <td colSpan={9} style={{ padding: 20, textAlign: 'center', color: '#666' }}>
-                  Немає записів
+                  Немає записів. Знайдіть користувача вгорі та активуйте Premium.
                 </td>
               </tr>
             )}
             {filtered.map((sub) => {
               const days = getDaysLeft(sub.expiresAt);
               const color = statusColor(sub.status, days);
+              const prof = profiles[sub.uid];
+              const displayName = prof?.name || '—';
+              const displayPhone = prof?.phone || '—';
               return (
                 <tr
                   key={sub.uid}
                   style={{ background: rowBg(sub), borderBottom: '1px solid #222' }}
                 >
-                  <td style={{ padding: '8px 10px', fontFamily: 'monospace', fontSize: 12, color: '#ccc' }}>
-                    {shortUid(sub.uid)}
+                  <td style={{ padding: '8px 10px', fontWeight: 700, color: '#e0e0e0' }} title={sub.uid}>
+                    {displayName}
+                  </td>
+                  <td style={{ padding: '8px 10px', fontFamily: 'monospace', fontSize: 12, color: '#aaa' }}>
+                    {displayPhone}
                   </td>
                   <td style={{ padding: '8px 10px' }}>
                     <span style={{
@@ -426,37 +449,36 @@ export function PremiumPage() {
                       {statusLabel(sub.status)}
                     </span>
                   </td>
-                  <td style={{ padding: '8px 10px', color: '#ccc' }}>{sub.plan}</td>
                   <td style={{ padding: '8px 10px', color: '#aaa', whiteSpace: 'nowrap' }}>
-                    {formatDate(sub.startedAt)}
+                    {formatDate(sub.activatedAt)}
                   </td>
                   <td style={{ padding: '8px 10px', color: '#aaa', whiteSpace: 'nowrap' }}>
                     {formatDate(sub.expiresAt)}
                   </td>
                   <td style={{ padding: '8px 10px', textAlign: 'center' }}>
                     {days !== null ? (
-                      <span style={{ color: days <= 3 ? '#e53935' : days <= 7 ? '#ffa726' : '#aaa', fontWeight: 700 }}>
+                      <span style={{ color: days <= 3 ? '#e53935' : days <= 7 ? '#ffa726' : '#43a047', fontWeight: 700 }}>
                         {days}
                       </span>
                     ) : '—'}
                   </td>
                   <td style={{ padding: '8px 10px', color: '#aaa', fontSize: 12 }}>
-                    {sub.paymentMethod ?? '—'}
+                    {sub.paymentMethod === 'monobank_manual' ? 'Monobank' : sub.paymentMethod === 'trial' ? 'Пробний' : (sub.paymentMethod ?? '—')}
                   </td>
-                  <td style={{ padding: '8px 10px', color: '#aaa', fontSize: 12, maxWidth: 180 }}>
-                    {sub.notes ?? '—'}
+                  <td style={{ padding: '8px 10px', color: '#aaa', fontSize: 12, maxWidth: 160 }} title={sub.notes ?? ''}>
+                    {sub.notes || '—'}
                   </td>
                   <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
                     <button
                       type="button"
-                      onClick={() => openActivate(sub.uid)}
+                      onClick={() => openActivate(sub.uid, displayName)}
                       style={{
                         marginRight: 6, padding: '4px 10px', borderRadius: 6,
                         background: '#1a2a1a', border: '1px solid #43a04744',
                         color: '#43a047', fontWeight: 700, cursor: 'pointer', fontSize: 12,
                       }}
                     >
-                      Активувати
+                      Продовжити
                     </button>
                     {sub.status !== 'expired' && sub.status !== 'free' && (
                       <button
@@ -472,7 +494,7 @@ export function PremiumPage() {
                           opacity: cancelLoading === sub.uid ? 0.5 : 1,
                         }}
                       >
-                        {cancelLoading === sub.uid ? '...' : 'Скасувати'}
+                        {cancelLoading === sub.uid ? '...' : 'Відключити'}
                       </button>
                     )}
                   </td>
