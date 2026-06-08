@@ -25,6 +25,7 @@ import { foodTopService, type FoodTopListing } from '../services/foodTopService'
 import { FoodCategory, FoodOffer, Place } from '../types/app';
 import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
+import { getMapFocusPlaceParams } from '../utils/mapFocusParams';
 import AppPhotoImage from '../components/AppPhotoImage';
 import PhotoUploadField, { type UploadedPhoto } from '../components/PhotoUploadField';
 import { getDonePhotos, validateSubmissionRequirements } from '../utils/submissionRequirements';
@@ -274,13 +275,6 @@ function openPhone(phone?: string) {
   Linking.openURL(`tel:${safePhone}`);
 }
 
-function openRoute(lat: number, lng: number) {
-  const url = Platform.select({
-    ios: `maps:0,0?q=${lat},${lng}`,
-    default: `geo:0,0?q=${lat},${lng}`,
-  });
-  Linking.openURL(url);
-}
 
 function openTelegram(telegram?: string) {
   const handle = telegram?.trim().replace('@', '').replace('https://t.me/', '');
@@ -507,8 +501,11 @@ export default function EdaNaChaykeScreen() {
 
   const handleRoutePlace = useCallback((place: Place) => {
     logFoodEvent('food_route_place', { placeId: place.id });
-    openRoute(place.latitude, place.longitude);
-  }, []);
+    navigation.navigate('MainTabs', {
+      screen: 'MapTab',
+      params: getMapFocusPlaceParams(place),
+    });
+  }, [navigation]);
 
   const handleTelegramPlace = useCallback((place: Place, telegram?: string) => {
     if (!telegram) return;

@@ -527,6 +527,24 @@ export const adminModeratePromotion = async ({
   return result.data;
 };
 
+export const awardProfileThanksBonus = async (targetUid: string): Promise<{ ok: boolean; awarded: boolean; points?: number }> => {
+  const callable = httpsCallable<{ targetUid: string }, { ok: boolean; awarded: boolean; points?: number }>(functions, 'awardProfileThanksBonus');
+  const result = await callable({ targetUid });
+  return result.data;
+};
+
+export const awardDailyLoginBonus = async (): Promise<{ ok: boolean; awarded: boolean }> => {
+  const callable = httpsCallable<object, { ok: boolean; awarded: boolean }>(functions, 'awardDailyLoginBonus');
+  const result = await callable({});
+  return result.data;
+};
+
+export const awardMilestoneBonus = async (milestone: 'profile_complete' | 'first_request' | 'first_response'): Promise<{ ok: boolean; awarded: boolean; points?: number }> => {
+  const callable = httpsCallable<{ milestone: string }, { ok: boolean; awarded: boolean; points?: number }>(functions, 'awardMilestoneBonus');
+  const result = await callable({ milestone });
+  return result.data;
+};
+
 export const purchaseBonusPromotion = async ({
   promoType,
   duration,

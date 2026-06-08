@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -21,6 +21,8 @@ type SectionedItems = {
   sectionFrequent: string;
   sectionCommunity: string;
   sectionMarket: string;
+  seeMore: string;
+  seeLess: string;
   frequent: ServiceHubItem[];
   community: ServiceHubItem[];
   market: ServiceHubItem[];
@@ -32,6 +34,8 @@ const UI_TEXT: Record<'ua' | 'ru' | 'en', SectionedItems> = {
     sectionFrequent: 'Щодня',
     sectionCommunity: 'Спільнота',
     sectionMarket: 'Оголошення',
+    seeMore: 'Більше',
+    seeLess: 'Згорнути',
     frequent: [
       { label: 'Світло і повідомлення', desc: 'Що пишуть сусіди у будинку', screen: 'ElectricityStatusScreen', icon: 'lightning-bolt-outline', accent: '#C79C47' },
       { label: 'Місця Чайки', desc: 'Кафе, магазини та послуги поруч', screen: 'PlacesScreen', icon: 'map-marker-multiple', accent: '#00897B' },
@@ -57,6 +61,8 @@ const UI_TEXT: Record<'ua' | 'ru' | 'en', SectionedItems> = {
     sectionFrequent: 'Каждый день',
     sectionCommunity: 'Сообщество',
     sectionMarket: 'Объявления',
+    seeMore: 'Больше',
+    seeLess: 'Свернуть',
     frequent: [
       { label: 'Есть ли СВЕТ?', desc: 'Что пишут соседи в доме', screen: 'ElectricityStatusScreen', icon: 'lightning-bolt-outline', accent: '#C79C47' },
       { label: 'Места Чайки', desc: 'Кафе, магазины и сервисы рядом', screen: 'PlacesScreen', icon: 'map-marker-multiple', accent: '#00897B' },
@@ -82,6 +88,8 @@ const UI_TEXT: Record<'ua' | 'ru' | 'en', SectionedItems> = {
     sectionFrequent: 'Daily use',
     sectionCommunity: 'Community',
     sectionMarket: 'Listings',
+    seeMore: 'More',
+    seeLess: 'Less',
     frequent: [
       { label: 'Power reports', desc: 'Neighbor updates by building', screen: 'ElectricityStatusScreen', icon: 'lightning-bolt-outline', accent: '#C79C47' },
       { label: 'Chaika places', desc: 'Cafes, stores, and local services nearby', screen: 'PlacesScreen', icon: 'map-marker-multiple', accent: '#00897B' },
@@ -108,6 +116,8 @@ const ServicesHubScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const text = UI_TEXT[language];
+  const [marketExpanded, setMarketExpanded] = useState(false);
+  const [frequentExpanded, setFrequentExpanded] = useState(false);
   const soulPhotosItem: ServiceHubItem = language === 'ru'
     ? { label: 'Фото для Души', desc: 'Отдельная галерея теплых фото от жителей', screen: 'SoulPhotosScreen', icon: 'tag-heart-outline', accent: '#C97959' }
     : language === 'en'
@@ -153,13 +163,27 @@ const ServicesHubScreen: React.FC = () => {
         <Text style={styles.pageTitle}>{text.headerTitle}</Text>
 
         <Text style={styles.sectionLabel}>{text.sectionMarket}</Text>
-        <View style={styles.list}>{text.market.map(renderItem)}</View>
+        <View style={styles.list}>
+          {text.market.filter(i => i.screen !== 'AnnouncementsScreen' && i.screen !== 'JobSearchScreen' && i.screen !== 'BuySellScreen').map(renderItem)}
+          {marketExpanded && text.market.filter(i => i.screen === 'JobSearchScreen' || i.screen === 'BuySellScreen' || i.screen === 'AnnouncementsScreen').map(renderItem)}
+          <TouchableOpacity style={styles.seeMoreBtn} onPress={() => setMarketExpanded(v => !v)} activeOpacity={0.8}>
+            <Text style={styles.seeMoreText}>{marketExpanded ? text.seeLess : text.seeMore}</Text>
+            <MaterialCommunityIcons name={marketExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={SCREEN_THEME.textSecondary} />
+          </TouchableOpacity>
+        </View>
 
         <Text style={styles.sectionLabel}>{text.sectionCommunity}</Text>
         <View style={styles.list}>{text.community.map(renderItem)}</View>
 
         <Text style={styles.sectionLabel}>{text.sectionFrequent}</Text>
-        <View style={styles.list}>{[soulPhotosItem, ...text.frequent].map(renderItem)}</View>
+        <View style={styles.list}>
+          {text.frequent.filter(i => i.screen === 'ElectricityStatusScreen' || i.screen === 'FotoRayonaScreen').map(renderItem)}
+          {frequentExpanded && [soulPhotosItem, ...text.frequent.filter(i => i.screen !== 'ElectricityStatusScreen' && i.screen !== 'FotoRayonaScreen')].map(renderItem)}
+          <TouchableOpacity style={styles.seeMoreBtn} onPress={() => setFrequentExpanded(v => !v)} activeOpacity={0.8}>
+            <Text style={styles.seeMoreText}>{frequentExpanded ? text.seeLess : text.seeMore}</Text>
+            <MaterialCommunityIcons name={frequentExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={SCREEN_THEME.textSecondary} />
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -203,6 +227,24 @@ const styles = StyleSheet.create({
   foodText: { color: '#3A2800' },
   desc: { fontSize: 12, color: SCREEN_THEME.textSecondary, marginTop: 3, fontWeight: '600' },
   foodDesc: { color: '#5C4200' },
+  seeMoreBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 10,
+    borderRadius: 14,
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderWidth: 1,
+    borderColor: '#E4D0AB',
+    marginTop: 2,
+  },
+  seeMoreText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: SCREEN_THEME.textSecondary,
+    letterSpacing: 0.5,
+  },
 });
 
 export default ServicesHubScreen;

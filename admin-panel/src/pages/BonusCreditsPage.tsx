@@ -27,13 +27,14 @@ import {
   type UserProfile,
 } from '../services/premiumAdminService';
 
-type TabKey = 'users' | 'promotions' | 'fraud' | 'subscriptions';
+type TabKey = 'users' | 'promotions' | 'fraud' | 'subscriptions' | 'system';
 
 const TABS: Array<{ key: TabKey; label: string }> = [
   { key: 'users', label: 'Користувачі' },
   { key: 'promotions', label: 'Промоції' },
   { key: 'fraud', label: 'Фрод-моніторинг' },
   { key: 'subscriptions', label: '⭐ Підписки' },
+  { key: 'system', label: '📚 Система бонусів' },
 ];
 
 const formatDate = (ts: number): string => {
@@ -55,6 +56,7 @@ const shortUid = (uid: string): string =>
 function UsersTab() {
   const [bonuses, setBonuses] = useState<UserBonusInfo[]>([]);
   const [promoCredits, setPromoCredits] = useState<UserPromoInfo[]>([]);
+  const [userProfiles, setUserProfiles] = useState<Record<string, UserProfile>>({});
   const [search, setSearch] = useState('');
   const [expandedUid, setExpandedUid] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<BonusTransaction[]>([]);
@@ -62,13 +64,27 @@ function UsersTab() {
   const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
-    const unsub1 = subscribeToAllBonuses(setBonuses);
+    const unsub1 = subscribeToAllBonuses((data) => {
+      setBonuses(data);
+      const uids = data.map((b) => b.uid);
+      if (uids.length > 0) {
+        loadUserProfiles(uids).then((profiles) =>
+          setUserProfiles((prev) => ({ ...prev, ...profiles })),
+        );
+      }
+    });
     const unsub2 = subscribeToAllPromoCredits(setPromoCredits);
     return () => { unsub1(); unsub2(); };
   }, []);
 
   const filteredBonuses = search
-    ? bonuses.filter((b) => b.uid.toLowerCase().includes(search.toLowerCase()))
+    ? bonuses.filter((b) => {
+        const q = search.toLowerCase();
+        const prof = userProfiles[b.uid];
+        return b.uid.toLowerCase().includes(q) ||
+          (prof?.name ?? '').toLowerCase().includes(q) ||
+          (prof?.phone ?? '').includes(q);
+      })
     : bonuses;
 
   const filteredPromo = search
@@ -165,6 +181,8 @@ function UsersTab() {
           <table style={s.table}>
             <thead>
               <tr>
+                <th style={s.th}>Ім'я</th>
+                <th style={s.th}>Телефон</th>
                 <th style={s.th}>UID</th>
                 <th style={s.th}>Баланс</th>
                 <th style={s.th}>Бейдж</th>
@@ -173,9 +191,11 @@ function UsersTab() {
             </thead>
             <tbody>
               {filteredBonuses.length === 0 && (
-                <tr><td colSpan={4} style={s.emptyCell}>Немає даних</td></tr>
+                <tr><td colSpan={6} style={s.emptyCell}>Немає даних</td></tr>
               )}
-              {filteredBonuses.map((b) => (
+              {filteredBonuses.map((b) => {
+                const prof = userProfiles[b.uid];
+                return (
                 <>
                   <tr
                     key={b.uid}
@@ -186,6 +206,8 @@ function UsersTab() {
                     }}
                     onClick={() => handleExpand(b.uid)}
                   >
+                    <td style={{ ...s.td, fontWeight: 600 }}>{prof?.name || shortUid(b.uid)}</td>
+                    <td style={{ ...s.td, fontFamily: 'monospace', fontSize: 12 }}>{prof?.phone || ''}</td>
                     <td style={s.td} title={b.uid}>{shortUid(b.uid)}</td>
                     <td style={s.td}>{b.balance}</td>
                     <td style={s.td}>{b.badge || '-'}</td>
@@ -193,7 +215,7 @@ function UsersTab() {
                   </tr>
                   {expandedUid === b.uid && (
                     <tr key={b.uid + '_detail'}>
-                      <td colSpan={4} style={s.detailCell}>
+                      <td colSpan={6} style={s.detailCell}>
                         <UserDetail
                           uid={b.uid}
                           promo={promoMap.get(b.uid)}
@@ -208,7 +230,8 @@ function UsersTab() {
                     </tr>
                   )}
                 </>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -549,11 +572,11 @@ function FraudTab() {
               <td style={{
                 ...s.td,
                 fontWeight: 600,
-                color: f.score >= 0.8 ? '#e74c3c' : f.score >= 0.5 ? '#e67e22' : '#27ae60',
+                color: f.riskScore >= 0.8 ? '#e74c3c' : f.riskScore >= 0.5 ? '#e67e22' : '#27ae60',
               }}>
-                {f.score.toFixed(2)}
+                {f.riskScore?.toFixed(2) ?? '-'}
               </td>
-              <td style={s.td}>{f.reasons?.join(', ') || '-'}</td>
+              <td style={s.td}>{f.reason || '-'}</td>
               <td style={s.td}>{formatDate(f.at)}</td>
             </tr>
           ))}
@@ -899,6 +922,205 @@ function SubscriptionsTab() {
   );
 }
 
+// ── System Documentation Tab ──
+
+function BonusSystemDocsTab() {
+  return (
+    <div style={s.docsContainer}>
+      <div style={s.docsSection}>
+        <h2 style={s.docsTitle}>🏆 Система бонусов доверия</h2>
+        <p style={s.docsText}>
+          Бонусы доверия (Trust-бонусы) — это основная валюта Чайки, которая отражает уровень активности и надежности пользователя в сообществе.
+        </p>
+      </div>
+
+      {/* Types of Bonuses */}
+      <div style={s.docsSection}>
+        <h3 style={s.docsSubtitle}>💰 Типы бонусов</h3>
+
+        <div style={s.bonusCard}>
+          <div style={s.bonusAmount}>+10</div>
+          <div style={s.bonusTitle}>Первая заявка</div>
+          <div style={s.bonusDesc}>Один раз за регистрацию, когда вы впервые создали заявку о помощи</div>
+        </div>
+
+        <div style={s.bonusCard}>
+          <div style={s.bonusAmount}>+30</div>
+          <div style={s.bonusTitle}>Профиль заполнен</div>
+          <div style={s.bonusDesc}>Один раз, когда вы полностью заполнили профиль (имя, телефон, город, фото, и прочее)</div>
+        </div>
+
+        <div style={s.bonusCard}>
+          <div style={s.bonusAmount}>+10</div>
+          <div style={s.bonusTitle}>Первый ответ</div>
+          <div style={s.bonusDesc}>Один раз за первый раз, когда вы помогли кому-то, ответив на их заявку</div>
+        </div>
+
+        <div style={s.bonusCard}>
+          <div style={s.bonusAmount}>+5</div>
+          <div style={s.bonusTitle}>Ответ на помощь</div>
+          <div style={s.bonusDesc}>Каждый раз, когда вы помогаете кому-то, отвечая на их заявку (ограничение: 5 в неделю)</div>
+        </div>
+
+        <div style={s.bonusCard}>
+          <div style={s.bonusAmount}>+20</div>
+          <div style={s.bonusTitle}>Подтверждение помощи</div>
+          <div style={s.bonusDesc}>Когда автор заявки подтвердил, что вы действительно помогли (ограничение: 20 в неделю)</div>
+        </div>
+
+        <div style={s.bonusCard}>
+          <div style={s.bonusAmount}>+10</div>
+          <div style={s.bonusTitle}>Благодарность</div>
+          <div style={s.bonusDesc}>Когда автор заявки благодарит вас за помощь (ограничение: 10 в неделю)</div>
+        </div>
+
+        <div style={s.bonusCard}>
+          <div style={s.bonusAmount}>+5</div>
+          <div style={s.bonusTitle}>Закрытие заявки</div>
+          <div style={s.bonusDesc}>Когда автор закрывает заявку как решённую</div>
+        </div>
+      </div>
+
+      {/* How it works */}
+      <div style={s.docsSection}>
+        <h3 style={s.docsSubtitle}>🔄 Как это работает</h3>
+
+        <div style={s.flowBox}>
+          <div style={s.flowStep}>
+            <div style={s.stepNum}>1</div>
+            <div style={s.stepTitle}>Вы создаёте заявку</div>
+            <div style={s.stepText}>Опубликуйте запрос о помощи → +10 бонусов (один раз)</div>
+          </div>
+
+          <div style={s.flowArrow}>↓</div>
+
+          <div style={s.flowStep}>
+            <div style={s.stepNum}>2</div>
+            <div style={s.stepTitle}>Кто-то вам отвечает</div>
+            <div style={s.stepText}>Пользователь предлагает помощь → Им +5 бонусов</div>
+          </div>
+
+          <div style={s.flowArrow}>↓</div>
+
+          <div style={s.flowStep}>
+            <div style={s.stepNum}>3</div>
+            <div style={s.stepTitle}>Вы подтверждаете помощь</div>
+            <div style={s.stepText}>Нажимаете "Помощь получена" → Помощнику +20 бонусов, вам +5</div>
+          </div>
+
+          <div style={s.flowArrow}>↓</div>
+
+          <div style={s.flowStep}>
+            <div style={s.stepNum}>4</div>
+            <div style={s.stepTitle}>Вы закрываете заявку</div>
+            <div style={s.stepText}>Нажимаете "Закрыть как решённую" → Вам +5 бонусов</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Weekly limits */}
+      <div style={s.docsSection}>
+        <h3 style={s.docsSubtitle}>📅 Еженедельные ограничения</h3>
+        <p style={s.docsText}>
+          Система отслеживает ваши действия по неделям (понедельник-воскресенье, UTC+2) чтобы предотвратить злоупотребления.
+        </p>
+
+        <div style={s.limitBox}>
+          <div style={s.limitRow}>
+            <div style={s.limitLabel}>Ответов на помощь</div>
+            <div style={s.limitValue}>5 в неделю × 5 бонусов = макс. 25 в неделю</div>
+          </div>
+          <div style={s.limitRow}>
+            <div style={s.limitLabel}>Подтверждений помощи</div>
+            <div style={s.limitValue}>20 в неделю × 20 бонусов = макс. 400 в неделю</div>
+          </div>
+          <div style={s.limitRow}>
+            <div style={s.limitLabel}>Благодарностей</div>
+            <div style={s.limitValue}>10 в неделю × 10 бонусов = макс. 100 в неделю</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Spending */}
+      <div style={s.docsSection}>
+        <h3 style={s.docsSubtitle}>💸 На что потратить бонусы</h3>
+
+        <div style={s.spendingCard}>
+          <div style={s.spendingAmount}>50 бонусов</div>
+          <div style={s.spendingTitle}>Поднять в топ (24 часа)</div>
+          <div style={s.spendingDesc}>Ваша заявка будет видна всем в начале списка</div>
+        </div>
+
+        <div style={s.spendingCard}>
+          <div style={s.spendingAmount}>100 бонусов</div>
+          <div style={s.spendingTitle}>Выделить профиль</div>
+          <div style={s.spendingDesc}>Ваш профиль будет выделен в поиске помощников</div>
+        </div>
+
+        <div style={s.spendingCard}>
+          <div style={s.spendingAmount}>30 бонусов</div>
+          <div style={s.spendingTitle}>Отправить сообщение</div>
+          <div style={s.spendingDesc}>Напрямую написать человеку, которому нужна помощь</div>
+        </div>
+      </div>
+
+      {/* Safety & Fraud Prevention */}
+      <div style={s.docsSection}>
+        <h3 style={s.docsSubtitle}>🛡️ Защита от мошенничества</h3>
+        <p style={s.docsText}>
+          Система автоматически отслеживает подозрительную активность:
+        </p>
+
+        <div style={s.safetyBox}>
+          <div style={s.safetyItem}>
+            <strong>Кольцевые схемы:</strong> Если один и тот же человек много раз помогает вам и вы ему, система отметит это как потенциальное мошенничество
+          </div>
+          <div style={s.safetyItem}>
+            <strong>Частые повторения:</strong> Часто один и тот же пользователь отвечает на все ваши заявки — система это видит
+          </div>
+          <div style={s.safetyItem}>
+            <strong>Блокировка:</strong> Если система обнаружит мошенничество, доступ к бонусам может быть заблокирован
+          </div>
+          <div style={s.safetyItem}>
+            <strong>Ручная модерация:</strong> Админ может вручную заблокировать или разблокировать пользователя
+          </div>
+        </div>
+      </div>
+
+      {/* FAQ */}
+      <div style={s.docsSection}>
+        <h3 style={s.docsSubtitle}>❓ Часто задаваемые вопросы</h3>
+
+        <div style={s.faqItem}>
+          <div style={s.faqQuestion}>Что случится, если я потрачу все бонусы?</div>
+          <div style={s.faqAnswer}>Вы можете продолжать зарабатывать бонусы и снова тратить их. Баланс не может быть отрицательным — система просто не позволит потратить больше, чем есть.</div>
+        </div>
+
+        <div style={s.faqItem}>
+          <div style={s.faqQuestion}>Сколько бонусов я могу заработать за неделю?</div>
+          <div style={s.faqAnswer}>Теоретический максимум: 10 (первый запрос) + 30 (профиль) + 10 (первый ответ) + 25 (5 ответов) + 400 (20 подтверждений) + 100 (10 благодарностей) + 5 (закрытие) = 580 бонусов в неделю, но это при активной работе.</div>
+        </div>
+
+        <div style={s.faqItem}>
+          <div style={s.faqQuestion}>Почему я не получил ожидаемые бонусы?</div>
+          <div style={s.faqAnswer}>
+            Возможные причины:<br/>
+            • Вы уже получили одноразовый бонус (первая заявка, профиль)<br/>
+            • Вы достигли еженедельного лимита<br/>
+            • Система обнаружила подозрительную активность<br/>
+            • Ошибка в сети (попробуйте позже)
+          </div>
+        </div>
+
+        <div style={s.faqItem}>
+          <div style={s.faqQuestion}>Может ли админ изменить мои бонусы?</div>
+          <div style={s.faqAnswer}>Да, админ может вручную добавить или отнять бонусы за некорректное поведение или в качестве бонуса за активность. Все изменения логируются.</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ──
 
 export function BonusCreditsPage() {
@@ -931,6 +1153,7 @@ export function BonusCreditsPage() {
         {activeTab === 'promotions' && <PromotionsTab />}
         {activeTab === 'fraud' && <FraudTab />}
         {activeTab === 'subscriptions' && <SubscriptionsTab />}
+        {activeTab === 'system' && <BonusSystemDocsTab />}
       </div>
     </div>
   );
@@ -1179,5 +1402,232 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: 13,
     resize: 'vertical' as const,
     fontFamily: 'inherit',
+  },
+
+  // ── Bonus System Docs ──
+  docsContainer: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: 24,
+    padding: '0',
+    background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+    color: '#e0e0e0',
+  },
+
+  docsSection: {
+    padding: '24px',
+    borderRadius: 12,
+    background: 'rgba(255, 255, 255, 0.03)',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
+    backdropFilter: 'blur(10px)',
+  },
+
+  docsTitle: {
+    fontSize: 28,
+    fontWeight: 700,
+    color: '#fff',
+    margin: '0 0 12px 0',
+    background: 'linear-gradient(135deg, #4da6ff, #66d9ff)',
+    WebkitBackgroundClip: 'text' as const,
+    WebkitTextFillColor: 'transparent',
+  },
+
+  docsSubtitle: {
+    fontSize: 20,
+    fontWeight: 700,
+    color: '#4da6ff',
+    margin: '0 0 16px 0',
+  },
+
+  docsText: {
+    fontSize: 14,
+    lineHeight: 1.6,
+    color: '#b0b0b0',
+    margin: '0',
+  },
+
+  bonusCard: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: 8,
+    padding: '16px 20px',
+    marginBottom: 12,
+    background: 'linear-gradient(135deg, rgba(77, 166, 255, 0.08), rgba(102, 217, 255, 0.05))',
+    border: '1px solid rgba(77, 166, 255, 0.2)',
+    borderRadius: 8,
+    transition: 'all 0.2s',
+  },
+
+  bonusAmount: {
+    fontSize: 24,
+    fontWeight: 700,
+    color: '#66d9ff',
+    textShadow: '0 0 20px rgba(102, 217, 255, 0.4)',
+  },
+
+  bonusTitle: {
+    fontSize: 16,
+    fontWeight: 600,
+    color: '#fff',
+  },
+
+  bonusDesc: {
+    fontSize: 13,
+    color: '#a0a0a0',
+    lineHeight: 1.5,
+  },
+
+  flowBox: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: 12,
+    padding: '20px',
+    background: 'rgba(102, 217, 255, 0.05)',
+    border: '1px solid rgba(102, 217, 255, 0.15)',
+    borderRadius: 8,
+  },
+
+  flowStep: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: 8,
+    padding: '16px',
+    background: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 6,
+    borderLeft: '4px solid #66d9ff',
+  },
+
+  flowArrow: {
+    textAlign: 'center' as const,
+    color: '#66d9ff',
+    fontSize: 20,
+    fontWeight: 700,
+  },
+
+  stepNum: {
+    display: 'inline-flex',
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'linear-gradient(135deg, #4da6ff, #66d9ff)',
+    color: '#fff',
+    fontWeight: 700,
+    fontSize: 18,
+    borderRadius: '50%',
+  },
+
+  stepTitle: {
+    fontSize: 15,
+    fontWeight: 600,
+    color: '#fff',
+  },
+
+  stepText: {
+    fontSize: 13,
+    color: '#a0a0a0',
+    lineHeight: 1.5,
+  },
+
+  limitBox: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: 12,
+    padding: '16px',
+    background: 'rgba(255, 165, 0, 0.08)',
+    border: '1px solid rgba(255, 165, 0, 0.2)',
+    borderRadius: 8,
+  },
+
+  limitRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '12px',
+    background: 'rgba(255, 255, 255, 0.03)',
+    borderRadius: 4,
+  },
+
+  limitLabel: {
+    fontSize: 14,
+    fontWeight: 600,
+    color: '#ffa500',
+  },
+
+  limitValue: {
+    fontSize: 13,
+    color: '#b0b0b0',
+    textAlign: 'right' as const,
+  },
+
+  spendingCard: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: 8,
+    padding: '16px 20px',
+    marginBottom: 12,
+    background: 'linear-gradient(135deg, rgba(76, 175, 80, 0.08), rgba(102, 217, 255, 0.05))',
+    border: '1px solid rgba(76, 175, 80, 0.2)',
+    borderRadius: 8,
+  },
+
+  spendingAmount: {
+    fontSize: 18,
+    fontWeight: 700,
+    color: '#4caf50',
+  },
+
+  spendingTitle: {
+    fontSize: 15,
+    fontWeight: 600,
+    color: '#fff',
+  },
+
+  spendingDesc: {
+    fontSize: 13,
+    color: '#a0a0a0',
+    lineHeight: 1.5,
+  },
+
+  safetyBox: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: 12,
+    padding: '16px',
+    background: 'rgba(244, 67, 54, 0.08)',
+    border: '1px solid rgba(244, 67, 54, 0.2)',
+    borderRadius: 8,
+  },
+
+  safetyItem: {
+    fontSize: 13,
+    color: '#b0b0b0',
+    lineHeight: 1.6,
+    paddingLeft: 12,
+    borderLeft: '3px solid #f44336',
+  },
+
+  faqItem: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: 8,
+    padding: '16px',
+    marginBottom: 12,
+    background: 'rgba(156, 39, 176, 0.08)',
+    border: '1px solid rgba(156, 39, 176, 0.2)',
+    borderRadius: 8,
+  },
+
+  faqQuestion: {
+    fontSize: 14,
+    fontWeight: 700,
+    color: '#9c27b0',
+  },
+
+  faqAnswer: {
+    fontSize: 13,
+    color: '#a0a0a0',
+    lineHeight: 1.6,
+    whiteSpace: 'pre-wrap' as const,
   },
 };

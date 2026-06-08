@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, SafeAreaView, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import type { NavigationProp, RouteProp } from '@react-navigation/native';
@@ -49,6 +49,7 @@ const UI_TEXT = {
     copiedTitle: 'Скопійовано',
     copiedBody: 'Номер телефону скопійовано.',
     contact: "Зв'язатися",
+    share: 'Поділитися',
   },
   ru: {
     headerTitle: 'Детали',
@@ -65,6 +66,7 @@ const UI_TEXT = {
     copiedTitle: 'Скопировано',
     copiedBody: 'Номер телефона скопирован.',
     contact: 'Связаться',
+    share: 'Поделиться',
   },
   en: {
     headerTitle: 'Details',
@@ -81,6 +83,7 @@ const UI_TEXT = {
     copiedTitle: 'Copied',
     copiedBody: 'Phone number copied.',
     contact: 'Contact',
+    share: 'Share',
   },
 } as const;
 
@@ -256,6 +259,11 @@ export default function ItemDetailScreen({
     { label: text.status, value: item.status },
     { label: text.votes, value: typeof item.votesCount === 'number' ? String(item.votesCount) : undefined },
   ].filter((field) => Boolean(field.value));
+
+  const handleShare = () => {
+    const parts = [item.title, item.description, item.address].filter(Boolean);
+    void Share.share({ message: parts.join('\n') });
+  };
 
   const handleCopyPhone = async () => {
     if (!item.phone) return;
@@ -494,6 +502,10 @@ export default function ItemDetailScreen({
             >
               <MaterialCommunityIcons name="account-circle-outline" size={16} color={canOpenProfile ? '#fff' : '#9F958E'} />
               <Text style={[styles.smallActionText, !canOpenProfile && styles.disabledText]}>{profileLabel}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.smallActionAlt} onPress={handleShare} activeOpacity={0.82}>
+              <MaterialCommunityIcons name="share-variant-outline" size={16} color="#403933" />
+              <Text style={styles.smallActionAltText}>{text.share}</Text>
             </TouchableOpacity>
             {phoneVisible ? (
               <>

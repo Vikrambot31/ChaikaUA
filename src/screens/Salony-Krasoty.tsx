@@ -18,6 +18,7 @@ import { BeautyCategory, BeautyFeature, BeautyOffer, Place } from '../types/app'
 import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { subscribeActiveBonusPromotions, type BonusPromotion } from '../services/bonusService';
+import { getMapFocusPlaceParams } from '../utils/mapFocusParams';
 
 type Lang = 'ua' | 'ru' | 'en';
 type AppNavigation = NavigationProp<Record<string, object | undefined>>;
@@ -46,6 +47,7 @@ const UI_TEXT = {
     noResults: 'Нічого не знайдено. Спробуйте змінити пошук або категорію.',
     noOffers: 'Поки що немає активних пропозицій.',
     details: 'Обрати послугу',
+    route: 'Маршрут',
     share: 'Поділитись',
     validUntil: 'до',
     free: 'безкоштовно',
@@ -107,6 +109,7 @@ const UI_TEXT = {
     noResults: 'Ничего не найдено. Попробуйте изменить поиск или категорию.',
     noOffers: 'Пока нет активных предложений.',
     details: 'Выбрать услугу',
+    route: 'Маршрут',
     share: 'Поделиться',
     validUntil: 'до',
     free: 'бесплатно',
@@ -168,6 +171,7 @@ const UI_TEXT = {
     noResults: 'Nothing found. Try changing search or category.',
     noOffers: 'No active offers yet.',
     details: 'Choose service',
+    route: 'Route',
     share: 'Share',
     validUntil: 'until',
     free: 'free',
@@ -358,6 +362,13 @@ export default function SalonyKrasotyScreen() {
     navigation.navigate('DetalSalonaScreen', { place });
   };
 
+  const handleRoutePlace = (place: Place) => {
+    navigation.navigate('MainTabs', {
+      screen: 'MapTab',
+      params: getMapFocusPlaceParams(place),
+    });
+  };
+
   const openOffer = (offer: BeautyOffer) => {
     navigation.navigate('DetalPredlozheniyaSalonaScreen', { offer });
   };
@@ -443,6 +454,14 @@ export default function SalonyKrasotyScreen() {
         <View style={styles.cardActions}>
           <TouchableOpacity style={styles.primaryAction} onPress={() => openPlace(place)} activeOpacity={0.85}>
             <Text style={styles.primaryActionText}>{text.details}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.routeAction}
+            onPress={(e) => { e.stopPropagation(); handleRoutePlace(place); }}
+            activeOpacity={0.85}
+          >
+            <MaterialCommunityIcons name="map-marker-path" size={16} color={SCREEN_THEME.enamelBlueDark} />
+            <Text style={styles.routeActionText}>{text.route}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.shareAction} onPress={() => shareSalon(place)} activeOpacity={0.85}>
             <MaterialCommunityIcons name="share-variant-outline" size={18} color={SCREEN_THEME.enamelBlueDark} />
@@ -849,6 +868,22 @@ const styles = StyleSheet.create({
   primaryActionText: {
     color: '#FFFFFF',
     fontWeight: '900',
+    fontSize: 13,
+  },
+  routeAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderRadius: 15,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    backgroundColor: SCREEN_THEME.accentCream,
+    borderWidth: 1,
+    borderColor: SCREEN_THEME.borderSoft,
+  },
+  routeActionText: {
+    color: SCREEN_THEME.enamelBlueDark,
+    fontWeight: '800',
     fontSize: 13,
   },
   emptyState: {

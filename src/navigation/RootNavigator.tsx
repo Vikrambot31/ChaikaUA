@@ -633,7 +633,6 @@ function OnlineChatNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="OnlineChatList" component={OnlineChatScreen} />
-      <Stack.Screen name="RequestDetail" component={RequestDetailScreen as React.ComponentType<{}>} />
     </Stack.Navigator>
   );
 }
@@ -830,6 +829,7 @@ function AuthNavigation() {
       <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="MainTabs">
         <Stack.Screen name="MainTabs" component={MainTabNavigator} />
         <Stack.Screen name="OnlineChatTab" component={OnlineChatNavigator} />
+        <Stack.Screen name="RequestDetail" component={RequestDetailScreen as React.ComponentType<{}>} />
         <Stack.Screen name="RequestsTab" component={RequestTopicScreen} />
         <Stack.Screen name="ListScreen" component={ListScreen} />
         <Stack.Screen name="PlaceDetailsPanel" component={PlaceDetailsPanel as React.ComponentType<unknown>} />

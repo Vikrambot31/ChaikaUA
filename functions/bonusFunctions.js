@@ -30,8 +30,6 @@ const BONUS_AUTHOR_CLOSED = 5;      // Author closed request properly
 const BONUS_GRATITUDE = 10;         // Author thanked helper
 const BONUS_THANKS_PROFILE = 3;     // "Thank you" on profile
 const BONUS_INVITE = 50;            // Invited & approved new user
-const BONUS_LIKE_PROFILE = 2;       // Like on profile
-const BONUS_LIKE_POST = 1;          // Like on post/request
 const BONUS_DAILY_LOGIN = 1;        // First daily login
 const BONUS_PROFILE_COMPLETE = 30;  // One-time: filled profile fully
 const BONUS_FIRST_REQUEST = 10;     // One-time: first request created
@@ -41,7 +39,6 @@ const BONUS_FIRST_RESPONSE = 10;    // One-time: first help response
 const WEEKLY_LIMITS = {
   help: 100,
   gratitude: 50,
-  likes: 30,
   invites: 150,
   activity: 7,
   total: 250,

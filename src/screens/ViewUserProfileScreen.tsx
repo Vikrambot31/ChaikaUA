@@ -23,6 +23,7 @@ import { LIGHT_ORBS, SCREEN_THEME } from '../utils/screenTheme';
 import {
   loadProfileRecord,
 } from '../services/authProfileService';
+import { awardProfileThanksBonus } from '../services/bonusService';
 import { profilePermissionService } from '../services/profilePermissionService';
 import { query, ref, get, orderByChild, equalTo } from 'firebase/database';
 import { database } from '../firebase-config';
@@ -30,7 +31,6 @@ import type { JobListing } from '../services/jobService';
 import { getDaysInApp } from '../utils/chaikaLevels';
 import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
 import { requireAuthForDetails } from '../utils/authGuard';
-import { VideoLoadingOverlay } from '../components/VideoLoadingOverlay';
 
 const UI_TEXT = {
   ua: {
@@ -49,6 +49,13 @@ const UI_TEXT = {
     loading: 'Завантаження...',
     error: 'Помилка',
     errorLoadProfile: 'Не вдалося завантажити профіль',
+    days: 'днів',
+    likes: 'лайків',
+    thankAwarded: '+3 бонуси надіслано!',
+    thankAlready: 'Вже подяковано сьогодні',
+    thankError: 'Помилка. Спробуйте пізніше.',
+    thankSentLabel: 'Подяковано ✓',
+    thankBtnLabel: 'Подякувати +3',
   },
   ru: {
     title: 'Профиль пользователя',
@@ -66,6 +73,13 @@ const UI_TEXT = {
     loading: 'Загрузка...',
     error: 'Ошибка',
     errorLoadProfile: 'Не удалось загрузить профиль',
+    days: 'дней',
+    likes: 'лайков',
+    thankAwarded: '+3 бонуса отправлено!',
+    thankAlready: 'Уже поблагодарено сегодня',
+    thankError: 'Ошибка. Попробуйте позже.',
+    thankSentLabel: 'Поблагодарено ✓',
+    thankBtnLabel: 'Поблагодарить +3',
   },
   en: {
     title: 'User Profile',
@@ -83,6 +97,13 @@ const UI_TEXT = {
     loading: 'Loading...',
     error: 'Error',
     errorLoadProfile: 'Failed to load profile',
+    days: 'days',
+    likes: 'likes',
+    thankAwarded: '+3 bonuses sent!',
+    thankAlready: 'Already thanked today',
+    thankError: 'Error. Please try again.',
+    thankSentLabel: 'Thanked ✓',
+    thankBtnLabel: 'Thank +3',
   },
 } as const;
 
@@ -152,6 +173,7 @@ const ViewUserProfileScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [jobListing, setJobListing] = useState<JobListing | null>(null);
   const [contactApproved, setContactApproved] = useState(false);
+  const [thankSent, setThankSent] = useState(false);
   const isAuthenticated = Boolean(currentUser?.id);
   const isOwnProfile = Boolean(userId && currentUser?.id && userId === currentUser.id);
 
@@ -239,25 +261,54 @@ const ViewUserProfileScreen: React.FC = () => {
     };
 
     void loadUserProfile();
-  }, [isAuthenticated, userId, text]);
+  }, [isAuthenticated, userId, language]);
 
   const genderLabel = getGenderShortLabel(gender);
   const ageGenderLabel = [
     typeof age === 'number' ? String(age) : '',
     genderLabel,
   ].filter(Boolean).join(' / ');
-  const daysInApp = getDaysInApp(registeredAt);
+  const daysInApp = registeredAt ? getDaysInApp(registeredAt) : 0;
   const profileMeta = [
     ageGenderLabel,
-    `${daysInApp} days`,
-    `${profileLikes} likes`,
+    `${daysInApp} ${text.days}`,
+    `${profileLikes} ${text.likes}`,
   ].filter(Boolean).join(' · ');
 
   const avatarUri = pickUserAvatarUri({ photoURL: profilePhotoURL, startAvatarKey: profileStartAvatarKey });
   const phoneVisible = isOwnProfile || contactApproved;
   const hasPhone = phoneVisible && Boolean(phone.trim());
-  const canRequestContact = Boolean(userId && userId !== currentUser?.id);
+  const canRequestContact = Boolean(userId && userId !== currentUser?.id && !contactApproved);
   const canContact = canRequestContact || hasPhone;
+
+  const handleThank = async () => {
+    if (!userId || isOwnProfile) return;
+    try {
+      const result = await awardProfileThanksBonus(userId);
+      setThankSent(true);
+      if (result.awarded) {
+        Alert.alert('', text.thankAwarded);
+      } else {
+        Alert.alert('', text.thankAlready);
+      }
+    } catch {
+      Alert.alert('', text.thankError);
+    }
+  };
+
+  const handleSendRequest = async (reason: string) => {
+    await sendRequest(reason);
+    if (!currentUser?.id || !userId) return;
+    try {
+      const [status, privacyMode] = await Promise.all([
+        profilePermissionService.checkAccess(userId, currentUser.id),
+        profilePermissionService.getPrivacyMode(userId),
+      ]);
+      setContactApproved(status === 'approved' || privacyMode === 'open');
+    } catch {
+      // keep current state
+    }
+  };
 
   const handleCopyPhone = async () => {
     if (!phone) return;
@@ -375,6 +426,17 @@ const ViewUserProfileScreen: React.FC = () => {
             <Text style={[styles.contactBtnText, !canContact && styles.disabledText]}>{contactText.contact}</Text>
           </TouchableOpacity>
 
+          {!isOwnProfile && isAuthenticated ? (
+            <TouchableOpacity
+              style={[styles.thankBtn, thankSent && styles.thankBtnDone]}
+              onPress={() => void handleThank()}
+              disabled={thankSent}
+              activeOpacity={0.86}
+            >
+              <Text style={styles.thankBtnText}>{thankSent ? text.thankSentLabel : text.thankBtnLabel}</Text>
+            </TouchableOpacity>
+          ) : null}
+
           <Text style={styles.inputLabel}>{text.cityLabel}</Text>
           <View style={styles.valueBox}>
             <Text style={styles.valueText}>{city || '—'}</Text>
@@ -396,10 +458,9 @@ const ViewUserProfileScreen: React.FC = () => {
         visible={modalVisible}
         pending={pending}
         target={currentTarget}
-        onSelect={(reason) => void sendRequest(reason)}
+        onSelect={(reason) => void handleSendRequest(reason)}
         onClose={closeModal}
       />
-      <VideoLoadingOverlay visible={loading} />
     </SafeAreaView>
   );
 };
@@ -542,6 +603,21 @@ const styles = StyleSheet.create({
   },
   disabledText: {
     color: '#9F958E',
+  },
+  thankBtn: {
+    alignItems: 'center',
+    backgroundColor: '#2E7D4F',
+    borderRadius: 16,
+    paddingVertical: 12,
+    marginTop: 8,
+  },
+  thankBtnDone: {
+    backgroundColor: '#7A9E85',
+  },
+  thankBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '900',
   },
   metaText: {
     marginTop: 5,

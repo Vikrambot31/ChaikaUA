@@ -53,6 +53,7 @@ import { initFreezeWatchdog } from './src/services/freezeWatchdogService';
 import { isSafePromiseTimeoutError, safePromiseTimeout } from './src/utils/safePromiseTimeout';
 import { UploadQueue } from './src/photo-module';
 import { LOCAL_MODE, getCurrentLocalUser } from './src/local/LOCAL_MODE';
+import { awardDailyLoginBonus } from './src/services/bonusService';
 import type { User } from './src/types/app';
 
 const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
@@ -419,6 +420,7 @@ function AppWithAuthSync({ remoteConfigSnapshot, onRemoteConfigSnapshot }: AppWi
           );
           if (active) {
             dispatch(setUser(mapFirebaseUserToAppUser(user, profile)));
+            awardDailyLoginBonus().catch(() => {});
             void recordRuntimeTrace({
               screen: 'AppAuthSync',
               action: 'profile_load',

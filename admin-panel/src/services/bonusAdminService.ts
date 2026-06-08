@@ -39,10 +39,11 @@ export interface BonusTransaction {
 export interface FraudFlag {
   uid1: string;
   uid2: string;
-  score: number;
-  reasons: string[];
+  riskScore: number;
+  reason: string;
   at: number;
   type: string;
+  requestId?: string;
 }
 
 export interface BonusPromotion {
@@ -73,10 +74,10 @@ const snapshotToBonuses = (snap: DataSnapshot): UserBonusInfo[] => {
     if (data) {
       result.push({
         uid: child.key!,
-        balance: data.balance ?? 0,
+        balance: data.available ?? 0,
         badge: data.badge ?? '',
         totalEarned: data.earned?.total ?? 0,
-        weeklyUsed: data.earned?.weekKey ? (data.earned?.help ?? 0) : 0,
+        weeklyUsed: data.earned?.weekKey ? (data.earned?.weeklyTotal ?? 0) : 0,
       });
     }
   });
@@ -91,8 +92,8 @@ const snapshotToPromoCredits = (snap: DataSnapshot): UserPromoInfo[] => {
       result.push({
         uid: child.key!,
         balance: data.balance ?? 0,
-        totalGranted: data.totalGranted ?? 0,
-        totalSpent: data.totalSpent ?? 0,
+        totalGranted: data.lifetime ?? 0,
+        totalSpent: data.spent?.total ?? 0,
       });
     }
   });
@@ -134,13 +135,11 @@ export const loadFraudFlags = async (): Promise<FraudFlag[]> => {
   const snap = await get(ref(database, 'bonus_fraud_flags'));
   if (!snap.exists()) return [];
   const result: FraudFlag[] = [];
-  snap.forEach((uidChild) => {
-    uidChild.forEach((flagChild) => {
-      const data = flagChild.val();
-      if (data) {
-        result.push(data as FraudFlag);
-      }
-    });
+  snap.forEach((child) => {
+    const data = child.val();
+    if (data) {
+      result.push(data as FraudFlag);
+    }
   });
   return result.sort((a, b) => b.at - a.at);
 };

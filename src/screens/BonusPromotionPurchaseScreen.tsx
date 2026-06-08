@@ -52,6 +52,13 @@ const buildOptions = (t: any): PromotionOption[] => [
     durations: { '24h': 80, '3d': 200, '7d': 420 },
   },
   {
+    promoType: 'services_top',
+    title: t.bonus.servicesTop ?? 'Послуги в топ',
+    subtitle: t.bonus.boostServices ?? 'Підняти свою послугу вгору',
+    currency: 'trust',
+    durations: { '24h': 100, '3d': 250, '7d': 500 },
+  },
+  {
     promoType: 'business_top',
     title: t.bonus.businessTop,
     subtitle: t.bonus.boostBusiness,

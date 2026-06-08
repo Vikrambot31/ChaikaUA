@@ -116,6 +116,7 @@ const UI_TEXT = {
     socialGeneric: 'Помилка соціального входу. Спробуйте ще раз пізніше.',
     appleLoginFailed: 'Не вдалося увійти через Apple. Спробуйте ще раз.',
     loginLocked: 'Забагато невдалих спроб. Спробуйте знову через 15 хвилин.',
+    loginRateLimitServer: 'Забагато спроб. Кнопка заблокована на',
     forgotPassword: 'Забули пароль?',
     resetPasswordTitle: 'Готово',
     resetPasswordSent: 'Інструкцію для скидання пароля надіслано на ваш email.',
@@ -149,6 +150,7 @@ const UI_TEXT = {
     socialGeneric: 'Ошибка социального входа. Попробуйте позже.',
     appleLoginFailed: 'Не удалось войти через Apple. Попробуйте ещё раз.',
     loginLocked: 'Слишком много неудачных попыток. Попробуйте снова через 15 минут.',
+    loginRateLimitServer: 'Слишком много попыток. Кнопка заблокирована на',
     forgotPassword: 'Забыли пароль?',
     resetPasswordTitle: 'Готово',
     resetPasswordSent: 'Инструкция по сбросу пароля отправлена на ваш email.',
@@ -182,6 +184,7 @@ const UI_TEXT = {
     socialGeneric: 'Social sign-in error. Please try again later.',
     appleLoginFailed: 'Could not sign in with Apple. Please try again.',
     loginLocked: 'Too many failed attempts. Try again in 15 minutes.',
+    loginRateLimitServer: 'Too many attempts. Button locked for',
     forgotPassword: 'Forgot password?',
     resetPasswordTitle: 'Done',
     resetPasswordSent: 'Password reset instructions were sent to your email.',
@@ -274,10 +277,8 @@ const LoginScreen: React.FC = () => {
   );
 
   useEffect(() => {
-    if (error) {
-      dispatch(clearError());
-    }
-  }, [email, password, error, dispatch]);
+    dispatch(clearError());
+  }, [email, password, dispatch]);
 
   useEffect(() => {
     let active = true;
@@ -343,14 +344,15 @@ const LoginScreen: React.FC = () => {
     } catch (loginError) {
       const lock = await recordLoginFailure(normalizedEmail);
       const retryAfterSeconds = getRateLimitRetryAfterSeconds(loginError);
-      const message = retryAfterSeconds
-        ? `Слишком много попыток входа. Кнопка заблокирована на ${formatCountdown(retryAfterSeconds)}.`
-        : text.errorLogin;
       if (retryAfterSeconds) {
         setLoginRateLimitUntil(Date.now() + retryAfterSeconds * 1000);
       }
-      dispatch(setError(message));
-      Alert.alert(text.errorLoginTitle, lock.lockedUntil > Date.now() ? text.loginLocked : message);
+      const message = lock.lockedUntil > Date.now()
+        ? text.loginLocked
+        : retryAfterSeconds
+        ? `${text.loginRateLimitServer} ${formatCountdown(retryAfterSeconds)}.`
+        : text.errorLogin;
+      Alert.alert(text.errorLoginTitle, message);
     } finally {
       dispatch(setLoading(false));
     }

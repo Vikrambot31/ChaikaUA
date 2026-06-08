@@ -37,6 +37,7 @@ import { getStartAvatarByKey, saveSelectedStartAvatar, START_AVATARS, START_AVAT
 import { pickPhotoFromLibrary } from '../utils/photoPicker';
 import useSoftToast from '../hooks/useSoftToast';
 import { subscribeToUserTicket, hasUnreadAdminReply } from '../services/supportService';
+import { awardMilestoneBonus } from '../services/bonusService';
 
 const UI_TEXT = {
   ua: {
@@ -155,9 +156,9 @@ const EditProfileScreen: React.FC<{ navigation: { goBack: () => void; navigate: 
   const [name, setName] = useState(user?.name || '');
   const [phone, setPhone] = useState(user?.phone || '');
   const [city, setCity] = useState(user?.city || '');
-  const [houseNumber, setHouseNumber] = useState('');
-  const [profession, setProfession] = useState('');
-  const [about, setAbout] = useState('');
+  const [houseNumber, setHouseNumber] = useState(user?.houseNumber || '');
+  const [profession, setProfession] = useState(user?.profession || '');
+  const [about, setAbout] = useState(user?.about || '');
   const [loading, setLoading] = useState(false);
   const [avatarSaving, setAvatarSaving] = useState(false);
   const [showTemporaryAvatars, setShowTemporaryAvatars] = useState(false);
@@ -169,9 +170,9 @@ const EditProfileScreen: React.FC<{ navigation: { goBack: () => void; navigate: 
     name: user?.name || '',
     phone: user?.phone || '',
     city: user?.city || '',
-    houseNumber: '',
-    profession: '',
-    about: '',
+    houseNumber: user?.houseNumber || '',
+    profession: user?.profession || '',
+    about: user?.about || '',
   }));
   const [supportUnread, setSupportUnread] = useState(false);
 
@@ -307,15 +308,16 @@ const EditProfileScreen: React.FC<{ navigation: { goBack: () => void; navigate: 
 
     if (manageLoading) setAvatarSaving(true);
     try {
-      if (auth.currentUser && !isStartAvatarUri(nextPhotoURL)) {
-        await firebaseUpdateProfile(auth.currentUser, { photoURL: nextPhotoURL || null });
-      }
+      // RTDB first — if this fails, Auth photoURL stays unchanged (no desync)
       await updateProfileRecord(uid, {
         photoURL: nextPhotoURL,
         photoURLs: nextPhotoURLs,
         photoStoragePaths: nextPhotoStoragePaths,
         startAvatarKey: nextStartAvatarKey,
       });
+      if (auth.currentUser && !isStartAvatarUri(nextPhotoURL)) {
+        await firebaseUpdateProfile(auth.currentUser, { photoURL: nextPhotoURL || null });
+      }
       setPhotoURL(nextPhotoURL);
       setPhotoStoragePaths(nextPhotoStoragePaths);
       setStartAvatarKey(nextStartAvatarKey);
@@ -339,7 +341,7 @@ const EditProfileScreen: React.FC<{ navigation: { goBack: () => void; navigate: 
     setAvatarSaving(true);
     try {
       const picked = await pickPhotoFromLibrary({ allowsEditing: true, quality: 0.86 });
-      if (!picked) {
+      if (!picked || !picked.uri) {
         return;
       }
       const uploaded = await uploadProfilePhoto(picked.uri);
@@ -391,12 +393,8 @@ const EditProfileScreen: React.FC<{ navigation: { goBack: () => void; navigate: 
     const normalizedAbout = sanitizeStoredText(about);
 
     try {
-      // BUG-8.5: success path only runs when auth is confirmed; no silent fail
       if (auth.currentUser) {
-        await firebaseUpdateProfile(auth.currentUser, {
-          displayName: normalizedName,
-        });
-
+        // RTDB first — if this fails, Auth stays unchanged (no desync)
         await updateProfileRecord(auth.currentUser.uid, {
           name: normalizedName,
           phone: normalizedPhone,
@@ -404,6 +402,10 @@ const EditProfileScreen: React.FC<{ navigation: { goBack: () => void; navigate: 
           houseNumber: normalizedHouseNumber,
           profession: normalizedProfession,
           about: normalizedAbout,
+        });
+
+        await firebaseUpdateProfile(auth.currentUser, {
+          displayName: normalizedName,
         });
 
         if (user) {
@@ -431,6 +433,7 @@ const EditProfileScreen: React.FC<{ navigation: { goBack: () => void; navigate: 
           profession: normalizedProfession,
           about: normalizedAbout,
         });
+        awardMilestoneBonus('profile_complete').catch(() => {});
         Alert.alert(t.profile.successTitle, t.profile.successMessage);
         navigation.goBack();
       } else {

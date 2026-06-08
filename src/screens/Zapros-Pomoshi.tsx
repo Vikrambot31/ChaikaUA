@@ -15,6 +15,7 @@ import { showUserError } from '../utils/userFacingErrors';
 import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField';
 import { getDonePhotos, validateSubmissionRequirements } from '../utils/submissionRequirements';
 import { checkYellowList } from '../utils/yellowListCheck';
+import { awardMilestoneBonus } from '../services/bonusService';
 
 // RootState type for language selector
 interface LangState { language?: { current?: string } }
@@ -455,6 +456,7 @@ const HelpRequestScreen: React.FC = () => {
         return;
       }
       RATE_LIMITERS.helpRequest.recordSubmit();
+      awardMilestoneBonus('first_request').catch(() => {});
 
       // Show success with request ID when available
       const requestId = result.data?.id;

@@ -303,7 +303,8 @@ const biznesChaikaService = {
           ? Object.entries(raw as Record<string, any>)
               .map(([id, data]) => mapBizItem(id, data))
               .filter((item) => {
-                const expired = item.expiresAt && new Date(item.expiresAt).getTime() < now;
+                const expiresAtMs = item.expiresAt ? new Date(item.expiresAt).getTime() : NaN;
+                const expired = !isNaN(expiresAtMs) && expiresAtMs < now;
                 return item.moderationStatus === 'approved' && !expired;
               })
               .reverse()
@@ -876,7 +877,7 @@ const BiznesChaikaScreen: React.FC = () => {
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const text = UI_TEXT[language];
   const toast = useSoftToast();
-  const { startOperation, trace } = useOperationTrace('Biznes-XXX');
+  const { startOperation, trace } = useOperationTrace('Bizznes-Chaika');
   const [itemName, setItemName] = useState('');
   const [category, setCategory] = useState('');
   const [condition, setCondition] = useState('');
@@ -986,7 +987,11 @@ const BiznesChaikaScreen: React.FC = () => {
       closeMsg,
       [
         { text: language === 'ua' ? 'Ні' : language === 'ru' ? 'Нет' : 'No', style: 'cancel' },
-        { text: language === 'ua' ? 'Так' : language === 'ru' ? 'Да' : 'Yes', onPress: () => setAddFormVisible(false) },
+        { text: language === 'ua' ? 'Так' : language === 'ru' ? 'Да' : 'Yes', onPress: () => {
+          skipNextDraftFlushRef.current = true;
+          void AsyncStorage.removeItem(BIZ_DRAFT_KEY).catch(() => {});
+          setAddFormVisible(false);
+        }},
       ],
     );
   }, [category, condition, contactName, description, formPhotos.length, itemName, language, locationArea, locationHouseNumber, locationStreet, phone, priceFrom, priceTo, showPhoneOnCard, user?.phone, workFormat, workHours]);
@@ -1314,7 +1319,7 @@ const BiznesChaikaScreen: React.FC = () => {
 
     const trimmedItemName = itemName.trim();
 
-    if (!category || !condition || !description.trim() || !phone.trim() || !priceValid) {
+    if (!category || !condition || !description.trim() || !phone.trim()) {
       trace('validate', 'fail', { missing: 'requiredFields' });
       toast.showWarning(text.errorTitle, text.errorFill);
       return;
@@ -1439,7 +1444,7 @@ const BiznesChaikaScreen: React.FC = () => {
       toast.showWarning(text.errorTitle, text.errorPhone);
       return;
     }
-    const langError = getLanguageValidationError(editDescription.trim(), language as 'ua' | 'ru' | 'en');
+    const langError = getLanguageValidationError(`${editItemName.trim()} ${editDescription.trim()}`.trim(), language as 'ua' | 'ru' | 'en');
     if (langError) {
       toast.showWarning(text.errorTitle, langError);
       return;

@@ -96,6 +96,8 @@ const UI_TEXT = {
     bonusBadgeAmbassador: 'Посол довіри',
     bonusNextBadge: (badge: string, points: number) => `До "${badge}" ще ${points} бонусів`,
     bonusMaxBadge: 'Максимальний статус',
+    seeMore: 'Більше',
+    seeLess: 'Згорнути',
   },
   ru: {
     guest: 'Гость',
@@ -166,6 +168,8 @@ const UI_TEXT = {
     bonusBadgeAmbassador: 'Посол доверия',
     bonusNextBadge: (badge: string, points: number) => `До "${badge}" ещё ${points} бонусов`,
     bonusMaxBadge: 'Максимальный статус',
+    seeMore: 'Больше',
+    seeLess: 'Свернуть',
   },
   en: {
     guest: 'Guest',
@@ -236,6 +240,8 @@ const UI_TEXT = {
     bonusBadgeAmbassador: 'Trust Ambassador',
     bonusNextBadge: (badge: string, points: number) => `${points} bonuses until "${badge}"`,
     bonusMaxBadge: 'Maximum status',
+    seeMore: 'More',
+    seeLess: 'Less',
   },
 } as const;
 
@@ -261,6 +267,7 @@ const ProfileScreen: React.FC = () => {
   const approvedRequests = useSelector((state: RootState) => state.requests?.approved ?? []);
   const helpRequests = useSelector((state: RootState) => state.helpRequests?.items ?? []);
   const [levelsOpen, setLevelsOpen] = useState(false);
+  const [settingsExpanded, setSettingsExpanded] = useState(false);
   const [moderationPinVisible, setModerationPinVisible] = useState(false);
   const [moderationPin, setModerationPin] = useState('');
   const [moderationPinError, setModerationPinError] = useState('');
@@ -669,11 +676,13 @@ const ProfileScreen: React.FC = () => {
             <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('FavoritesScreen')} activeOpacity={0.84}>
-            <TactileIcon icon="bookmark-outline" size={40} iconSize={18} backgroundColor="#C77A5D" />
-            <Text style={styles.menuLabel}>{text.favorites}</Text>
-            <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
-          </TouchableOpacity>
+          {settingsExpanded && (
+            <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('FavoritesScreen')} activeOpacity={0.84}>
+              <TactileIcon icon="bookmark-outline" size={40} iconSize={18} backgroundColor="#C77A5D" />
+              <Text style={styles.menuLabel}>{text.favorites}</Text>
+              <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity
             style={styles.menuItem}
@@ -696,26 +705,31 @@ const ProfileScreen: React.FC = () => {
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('MyRequestsScreen')} activeOpacity={0.84}>
-            <TactileIcon icon="clipboard-text-outline" size={40} iconSize={18} backgroundColor="#4B7F9E" />
-            <Text style={styles.menuLabel}>{text.myRequests}</Text>
-            <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
-          </TouchableOpacity>
+          {settingsExpanded && (
+            <>
+              <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('MyRequestsScreen')} activeOpacity={0.84}>
+                <TactileIcon icon="clipboard-text-outline" size={40} iconSize={18} backgroundColor="#4B7F9E" />
+                <Text style={styles.menuLabel}>{text.myRequests}</Text>
+                <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
+              </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('HelpHistoryScreen')} activeOpacity={0.84}>
-            <TactileIcon icon="history" size={40} iconSize={18} backgroundColor="#8A7AB1" />
-            <Text style={styles.menuLabel}>{text.helpHistory}</Text>
-            <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
-          </TouchableOpacity>
+              <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('HelpHistoryScreen')} activeOpacity={0.84}>
+                <TactileIcon icon="history" size={40} iconSize={18} backgroundColor="#8A7AB1" />
+                <Text style={styles.menuLabel}>{text.helpHistory}</Text>
+                <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
+              </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => navigation.navigate('AppMonitorScreen')}
-            activeOpacity={0.84}
-          >
-            <TactileIcon icon="monitor-dashboard" size={40} iconSize={18} backgroundColor="#4B7F9E" />
-            <Text style={styles.menuLabel}>{text.appMonitor}</Text>
-            <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
+              <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('AppMonitorScreen')} activeOpacity={0.84}>
+                <TactileIcon icon="monitor-dashboard" size={40} iconSize={18} backgroundColor="#4B7F9E" />
+                <Text style={styles.menuLabel}>{text.appMonitor}</Text>
+                <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
+              </TouchableOpacity>
+            </>
+          )}
+
+          <TouchableOpacity style={styles.settingsSeeMoreBtn} onPress={() => setSettingsExpanded(v => !v)} activeOpacity={0.8}>
+            <Text style={styles.settingsSeeMoreText}>{settingsExpanded ? text.seeLess : text.seeMore}</Text>
+            <MaterialCommunityIcons name={settingsExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={SCREEN_THEME.textSecondary} />
           </TouchableOpacity>
 
           {isAdmin ? (
@@ -1298,6 +1312,21 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 11,
     fontWeight: '900',
+  },
+  settingsSeeMoreBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: SCREEN_THEME.borderSoft,
+  },
+  settingsSeeMoreText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: SCREEN_THEME.textSecondary,
+    letterSpacing: 0.5,
   },
 });
 

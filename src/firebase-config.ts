@@ -493,7 +493,7 @@ const mapDbRequestToAppRequest = (id: string, value: unknown): AppRequest => {
     isCensored: Boolean(v?.isCensored),
     isApproved,
     status:
-      status === 'approved' || status === 'rejected' || status === 'pending'
+      status === 'approved' || status === 'rejected' || status === 'pending' || status === 'closed'
         ? status
         : 'pending',
     createdAt,

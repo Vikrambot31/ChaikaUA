@@ -19,6 +19,7 @@ import { ChildCategory, ChildFeature, ChildOffer, Place, PlaceType } from '../ty
 import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { subscribeActiveBonusPromotions, type BonusPromotion } from '../services/bonusService';
+import { getMapFocusPlaceParams } from '../utils/mapFocusParams';
 import { safeCallPhone, safeOpenExternalUrl } from '../utils/communicationActions';
 import { selectUserId } from '../redux/selectors';
 import FeedLikeButton from '../components/FeedLikeButton';
@@ -50,6 +51,7 @@ const UI_TEXT = {
     noResults: 'Нічого не знайдено. Спробуйте змінити пошук або категорію.',
     noOffers: 'Поки що немає активних подій або пропозицій.',
     details: 'Детальніше',
+    route: 'Маршрут',
     call: 'Подзвонити',
     telegram: 'Telegram',
     validUntil: 'до',
@@ -128,6 +130,7 @@ const UI_TEXT = {
     noResults: 'Ничего не найдено. Попробуйте изменить поиск или категорию.',
     noOffers: 'Пока нет активных событий или предложений.',
     details: 'Подробнее',
+    route: 'Маршрут',
     call: 'Позвонить',
     telegram: 'Telegram',
     validUntil: 'до',
@@ -206,6 +209,7 @@ const UI_TEXT = {
     noResults: 'Nothing found. Try changing search or category.',
     noOffers: 'No active events or offers yet.',
     details: 'Details',
+    route: 'Route',
     call: 'Call',
     telegram: 'Telegram',
     validUntil: 'until',
@@ -520,6 +524,13 @@ export default function VseDlyaDeteyScreen() {
     void safeOpenExternalUrl(buildMapUrl(place), language);
   };
 
+  const handleRoutePlace = (place: Place) => {
+    navigation.navigate('MainTabs', {
+      screen: 'MapTab',
+      params: getMapFocusPlaceParams(place),
+    });
+  };
+
   const handleToggleFavorite = async (placeId: string) => {
     const added = await toggleFavorite(placeId, FAVORITE_SOURCE);
     setFavoriteIds((prev) => {
@@ -605,10 +616,20 @@ export default function VseDlyaDeteyScreen() {
           </View>
         ) : null}
 
-        {/* Action row: details, contacts, share, like, favorite */}
+        {/* Action row: details, route, contacts, share, like, favorite */}
         <View style={styles.cardActions}>
           <TouchableOpacity style={styles.primaryAction} onPress={() => openPlace(place)} activeOpacity={0.85}>
             <Text style={styles.primaryActionText}>{text.details}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.routeAction}
+            onPress={(e) => { e.stopPropagation(); handleRoutePlace(place); }}
+            activeOpacity={0.85}
+            accessibilityLabel={text.route}
+          >
+            <MaterialCommunityIcons name="map-marker-path" size={16} color={SCREEN_THEME.enamelBlueDark} />
+            <Text style={styles.routeActionText}>{text.route}</Text>
           </TouchableOpacity>
 
           {hasPhone ? (
@@ -1137,6 +1158,22 @@ const styles = StyleSheet.create({
   primaryActionText: {
     color: '#FFFFFF',
     fontWeight: '900',
+    fontSize: 13,
+  },
+  routeAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderRadius: 15,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    backgroundColor: SCREEN_THEME.accentCream,
+    borderWidth: 1,
+    borderColor: SCREEN_THEME.borderSoft,
+  },
+  routeActionText: {
+    color: SCREEN_THEME.enamelBlueDark,
+    fontWeight: '800',
     fontSize: 13,
   },
   contactAction: {

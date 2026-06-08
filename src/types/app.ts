@@ -222,7 +222,7 @@ export interface Request {
   description: string;
   isCensored: boolean;
   isApproved: boolean;
-  status?: 'pending' | 'approved' | 'rejected' | 'expired';
+  status?: 'pending' | 'approved' | 'rejected' | 'expired' | 'closed';
   createdAt: number;
   timestamp: number;
   text?: string;

@@ -8,7 +8,6 @@ import {
   Platform,
   SafeAreaView,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -19,9 +18,6 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import MiniTabBar from '../components/MiniTabBar';
 import MiniUserAvatar from '../components/MiniUserAvatar';
-import TactileIcon from '../components/TactileIcon';
-import ContactReasonModal from '../components/ContactReasonModal';
-import { useContactRequest } from '../hooks/useContactRequest';
 import AppPhotoImage from '../components/AppPhotoImage';
 import FeedLikeButton from '../components/FeedLikeButton';
 import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField';
@@ -29,7 +25,6 @@ import { SCREEN_THEME } from '../utils/screenTheme';
 import { RootState } from '../redux/store';
 import { lostFoundService, LostFoundItem, RequestType } from '../services/lostFoundService';
 import { showUserError } from '../utils/userFacingErrors';
-import { safeCallPhone } from '../utils/communicationActions';
 import { validatePhone, normalizeUkrainianPhoneStrict } from '../utils/validators';
 import { normalizePhoneText } from '../utils/textUtils';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
@@ -208,7 +203,6 @@ const LostAndFoundScreen: React.FC = () => {
   const user = useSelector((state: RootState) => state.auth.user);
   const text = UI_TEXT[language];
   const { startOperation, trace } = useOperationTrace('Kto-Poteryal');
-  const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const [items, setItems] = useState<LostFoundItem[]>([]);
   const [loadingItems, setLoadingItems] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -457,10 +451,12 @@ const LostAndFoundScreen: React.FC = () => {
   const mapToDetailData = (item: LostFoundItem): DetailItemData => ({
     id: item.id,
     title: item.name || getLostFoundCategoryLabel(item.category, language),
+    description: item.description,
     photoUri: item.photoUri,
     photoStoragePath: item.photoStoragePath,
     phone: item.phone,
     category: item.type === 'lost' ? text.typeLost : text.typeFound,
+    address: item.locationText,
     status: item.moderationStatus === 'approved'
       ? text.approved
       : item.moderationStatus === 'rejected'
@@ -580,28 +576,6 @@ const LostAndFoundScreen: React.FC = () => {
                     likeId={item.id}
                     style={styles.likeAction}
                   />
-                  <TouchableOpacity
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    onPress={(event) => { event.stopPropagation(); void Share.share({ message: [getLostFoundCategoryLabel(item.category, language), item.description, item.locationText].filter(Boolean).join('\n') }); }}
-                    activeOpacity={0.7}
-                  >
-                    <MaterialCommunityIcons name="share-variant-outline" size={20} color={SCREEN_THEME.textSecondary} />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.phoneAction} onPress={(event) => { event.stopPropagation(); if (requireAuthForDetails({ userId: user?.id, navigation, language })) void safeCallPhone(item.phone, language); }} activeOpacity={0.75}>
-                    <TactileIcon icon="phone-outline" size={34} iconSize={14} backgroundColor="#403933" />
-                  </TouchableOpacity>
-                  {item.userId && item.userId !== user?.id ? (
-                    <TouchableOpacity
-                      style={styles.phoneAction}
-                      onPress={(event) => {
-                        event.stopPropagation();
-                        openContactModal({ userId: item.userId as string, name: item.name || text.anonymous, photoURL: (item.userId && avatarByUserId[item.userId]) || item.userPhotoURL || undefined, sourceType: 'help', sourceId: item.id, sourceTitle: getLostFoundCategoryLabel(item.category, language) });
-                      }}
-                      activeOpacity={0.75}
-                    >
-                      <TactileIcon icon="account-arrow-right-outline" size={34} iconSize={14} backgroundColor="#7A1E5C" />
-                    </TouchableOpacity>
-                  ) : null}
                 </View>
 
                 {item.userId === user?.id ? (
@@ -684,13 +658,6 @@ const LostAndFoundScreen: React.FC = () => {
       </View>
 
       <MiniTabBar />
-      <ContactReasonModal
-        visible={contactModalVisible}
-        pending={contactPending}
-        target={contactTarget}
-        onSelect={(reason) => void sendContactRequest(reason)}
-        onClose={closeContactModal}
-      />
 
       {/* -- Add request bottom sheet (same pattern as Gallery) -- */}
       <Modal

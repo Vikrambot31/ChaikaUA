@@ -5,7 +5,7 @@ import * as Clipboard from 'expo-clipboard';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationProp, ParamListBase, RouteProp } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
-import { get, ref } from 'firebase/database';
+import { onValue, ref } from 'firebase/database';
 import { database, firebaseChatAPI } from '../firebase-config';
 import type { RootState } from '../redux/store';
 import type { Request } from '../types/app';
@@ -21,6 +21,7 @@ import { loadProfileRecord } from '../services/authProfileService';
 import {
   awardGratitudeBonus,
   awardHelpRespondBonus,
+  awardMilestoneBonus,
   checkIfHelped,
   closeRequestWithBonus,
   confirmHelperForRequest,
@@ -29,6 +30,7 @@ import {
   type HelpConfirmation,
   type HelpResponse,
 } from '../services/bonusService';
+import Toast from 'react-native-toast-message';
 import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
 import ContactReasonModal from '../components/ContactReasonModal';
 import { useContactRequest } from '../hooks/useContactRequest';
@@ -54,6 +56,7 @@ const UI_TEXT = {
     connectSentBody: 'Користувач побачить ваш запит і зможе відкрити доступ до контактів.',
     backToList: 'Повернутися до списку заявок',
     numberTitle: 'Номер',
+    justNow: 'щойно',
     minAgo: 'хв тому',
     hourAgo: 'год тому',
     dayAgo: 'д тому',
@@ -88,6 +91,7 @@ const UI_TEXT = {
     connectSentBody: 'Пользователь увидит ваш запрос и сможет открыть доступ к контактам.',
     backToList: 'Вернуться к списку заявок',
     numberTitle: 'Номер',
+    justNow: 'только что',
     minAgo: 'мин назад',
     hourAgo: 'ч назад',
     dayAgo: 'д назад',
@@ -122,6 +126,7 @@ const UI_TEXT = {
     connectSentBody: 'This user will see your request and can grant access to contacts.',
     backToList: 'Back to request list',
     numberTitle: 'Phone number',
+    justNow: 'just now',
     minAgo: 'min ago',
     hourAgo: 'h ago',
     dayAgo: 'd ago',
@@ -229,6 +234,7 @@ const HELP_FLOW_TEXT = {
     thanksSuccess: 'Подяку надіслано. +10 бонусів, якщо ліміти дозволяють.',
     closeSolved: 'Закрити як вирішену',
     closed: 'Заявку закрито',
+    alreadyClosed: 'Заявку вже закрито раніше.',
     closeSuccess: 'Заявку закрито. +5 бонусів, якщо ліміти дозволяють.',
     helpersTitle: 'Помічники',
     helpersEmpty: 'Поки ніхто не відгукнувся.',
@@ -248,6 +254,7 @@ const HELP_FLOW_TEXT = {
     thanksSuccess: 'Благодарность отправлена. +10 бонусов, если лимиты позволяют.',
     closeSolved: 'Закрыть как решенную',
     closed: 'Заявка закрыта',
+    alreadyClosed: 'Заявка уже была закрыта ранее.',
     closeSuccess: 'Заявка закрыта. +5 бонусов, если лимиты позволяют.',
     helpersTitle: 'Помощники',
     helpersEmpty: 'Пока никто не откликнулся.',
@@ -267,6 +274,7 @@ const HELP_FLOW_TEXT = {
     thanksSuccess: 'Thanks sent. +10 bonuses if limits allow.',
     closeSolved: 'Close as solved',
     closed: 'Request closed',
+    alreadyClosed: 'Request was already closed.',
     closeSuccess: 'Request closed. +5 bonuses if limits allow.',
     helpersTitle: 'Helpers',
     helpersEmpty: 'No helpers have responded yet.',
@@ -291,6 +299,7 @@ const RequestDetailScreen = ({
   const { request } = route.params;
   const [deleting, setDeleting] = useState(false);
   const [accessStatus, setAccessStatus] = useState<'pending' | 'approved' | 'denied' | null>(null);
+  const [accessLoading, setAccessLoading] = useState(true);
   const [profileName, setProfileName] = useState('');
   const [profileAge, setProfileAge] = useState<number | undefined>();
   const [profileGender, setProfileGender] = useState('');
@@ -302,7 +311,7 @@ const RequestDetailScreen = ({
   const [busyHelperUid, setBusyHelperUid] = useState<string | null>(null);
   const [thankedHelpers, setThankedHelpers] = useState<Record<string, boolean>>({});
   const [closingRequest, setClosingRequest] = useState(false);
-  const [requestSolved, setRequestSolved] = useState(false);
+  const [requestSolved, setRequestSolved] = useState(request.status === 'closed');
   const helperIds = useMemo(() => helpResponses.map((item) => item.helperUid).filter(Boolean), [helpResponses]);
   const avatarByUserId = useUserAvatarMap([request.userId, ...helperIds].filter(Boolean));
   const resolvedAvatarUri = (request.userId && avatarByUserId[request.userId]) || pickUserAvatarUri({ userPhotoURL: request.userPhotoURL, startAvatarKey: request.startAvatarKey }) || pickUserAvatarUri(request);
@@ -314,6 +323,7 @@ const RequestDetailScreen = ({
 
   const getTimeAgo = (timestamp: number) => {
     const diff = Date.now() - timestamp;
+    if (diff < 60000) return text.justNow;
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(diff / 3600000);
     const days = Math.floor(diff / 86400000);
@@ -326,6 +336,7 @@ const RequestDetailScreen = ({
     const loadAccess = async () => {
       if (!currentUser?.id || !request.userId || currentUser.id === request.userId) {
         setAccessStatus(null);
+        setAccessLoading(false);
         return;
       }
       try {
@@ -335,7 +346,9 @@ const RequestDetailScreen = ({
         ]);
         setAccessStatus(privacyMode === 'open' ? 'approved' : access);
       } catch {
-        setAccessStatus(null);
+        // keep existing accessStatus on network error
+      } finally {
+        setAccessLoading(false);
       }
     };
     void loadAccess();
@@ -373,29 +386,25 @@ const RequestDetailScreen = ({
   }, [request.userId]);
 
   useEffect(() => {
-    let cancelled = false;
+    if (!request.id) {
+      setRequestLikes(0);
+      return;
+    }
+    const likesRef = ref(database, `feed_likes/requests/${toSafeRtdbKey(request.id)}`);
+    const unsubscribe = onValue(likesRef, (snapshot) => {
+      const value = snapshot.val();
+      setRequestLikes(value && typeof value === 'object' ? Object.keys(value).length : 0);
+    }, () => { setRequestLikes(0); });
+    return unsubscribe;
+  }, [request.id]);
 
-    const loadRequestLikes = async () => {
-      if (!request.id) {
-        setRequestLikes(0);
-        return;
-      }
-
-      try {
-        const likesSnap = await get(ref(database, `feed_likes/requests/${toSafeRtdbKey(request.id)}`));
-        const likesValue = likesSnap.val();
-        if (!cancelled) {
-          setRequestLikes(likesValue && typeof likesValue === 'object' ? Object.keys(likesValue).length : 0);
-        }
-      } catch {
-        if (!cancelled) setRequestLikes(0);
-      }
-    };
-
-    void loadRequestLikes();
-    return () => {
-      cancelled = true;
-    };
+  useEffect(() => {
+    if (!request.id) return;
+    const statusRef = ref(database, `requests/${request.id}/status`);
+    const unsubStatus = onValue(statusRef, (snapshot) => {
+      if (snapshot.val() === 'closed') setRequestSolved(true);
+    }, () => {});
+    return unsubStatus;
   }, [request.id]);
 
   useEffect(() => {
@@ -448,13 +457,15 @@ const RequestDetailScreen = ({
   }, [currentUser, request.userId, request.name]);
 
   const phoneVisible = isOwnRequest || accessStatus === 'approved';
-  const hasPhone = phoneVisible && Boolean(request.phone?.trim());
+  // For own request: use real phone from auth profile (request.phone is always masked in RTDB)
+  const callPhone = isOwnRequest ? (currentUser?.phone || request.phone) : request.phone;
+  const hasPhone = phoneVisible && Boolean(callPhone?.trim());
   const canContact = canRequestContact || hasPhone;
 
   const handleCopyPhone = async () => {
-    if (!request.phone) return;
-    await Clipboard.setStringAsync(request.phone);
-    Alert.alert(text.numberTitle, request.phone);
+    if (!callPhone) return;
+    await Clipboard.setStringAsync(callPhone);
+    Alert.alert(text.numberTitle, callPhone);
   };
 
   const handleProfile = () => {
@@ -479,7 +490,14 @@ const RequestDetailScreen = ({
 
   const handleContact = () => {
     if (canRequestContact && request.userId) {
-      if (accessStatus === 'pending' || accessStatus === 'approved') return;
+      if (accessStatus === 'pending') {
+        Toast.show({ type: 'info', text1: text.connectPending });
+        return;
+      }
+      if (accessStatus === 'approved') {
+        Toast.show({ type: 'success', text1: text.connectApproved });
+        return;
+      }
       void openModal({
         userId: request.userId,
         name: displayName,
@@ -493,8 +511,8 @@ const RequestDetailScreen = ({
 
     if (!hasPhone) return;
     Alert.alert(text.connect, displayName, [
-      { text: contactActionText.call, onPress: () => { void safeCallPhone(request.phone, language); } },
-      { text: contactActionText.viber, onPress: () => { void safeOpenViber(request.phone, language); } },
+      { text: contactActionText.call, onPress: () => { void safeCallPhone(callPhone, language); } },
+      { text: contactActionText.viber, onPress: () => { void safeOpenViber(callPhone, language); } },
       { text: text.cancel, style: 'cancel' },
     ]);
   };
@@ -522,6 +540,7 @@ const RequestDetailScreen = ({
       } else {
         setHelpStatus('helped');
         Alert.alert(text.ok, helpText.respondSuccess);
+        awardMilestoneBonus('first_response').catch(() => {});
       }
     } catch (error) {
       setHelpStatus('idle');
@@ -572,7 +591,11 @@ const RequestDetailScreen = ({
     try {
       const result = await closeRequestWithBonus(request.id);
       setRequestSolved(true);
-      Alert.alert(text.ok, result.ok ? helpText.closeSuccess : helpText.closed);
+      if (result.status === 'already_closed') {
+        Alert.alert(text.ok, helpText.alreadyClosed);
+      } else {
+        Alert.alert(text.ok, result.ok ? helpText.closeSuccess : helpText.closed);
+      }
     } catch (error) {
       Alert.alert(text.ok, parseFunctionError(error, helpText.bonusError, language));
     } finally {
@@ -668,7 +691,7 @@ const RequestDetailScreen = ({
 
         <View style={styles.card}>
           <Text style={styles.cardLabel}>{text.contact}</Text>
-          <Text style={styles.phoneText}>{phoneVisible ? (request.phone || '—') : '***'}</Text>
+          <Text style={styles.phoneText}>{phoneVisible ? (callPhone || '—') : '***'}</Text>
           <View style={styles.contactActions}>
             <TouchableOpacity
               style={[styles.smallAction, !canOpenProfile && styles.disabledContactAction]}
@@ -683,7 +706,7 @@ const RequestDetailScreen = ({
               <>
                 <TouchableOpacity
                   style={[styles.smallAction, !hasPhone && styles.disabledContactAction]}
-                  onPress={() => void safeCallPhone(request.phone, language)}
+                  onPress={() => void safeCallPhone(callPhone, language)}
                   disabled={!hasPhone}
                   activeOpacity={0.82}
                 >
@@ -692,7 +715,7 @@ const RequestDetailScreen = ({
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.smallAction, !hasPhone && styles.disabledContactAction]}
-                  onPress={() => void safeOpenViber(request.phone, language)}
+                  onPress={() => void safeOpenViber(callPhone, language)}
                   disabled={!hasPhone}
                   activeOpacity={0.82}
                 >
@@ -711,9 +734,9 @@ const RequestDetailScreen = ({
         </View>
 
         <TouchableOpacity
-          style={[styles.contactBtn, !canContact && styles.disabledContactAction]}
+          style={[styles.contactBtn, (!canContact || accessLoading) && styles.disabledContactAction]}
           onPress={handleContact}
-          disabled={!canContact}
+          disabled={!canContact || accessLoading}
           activeOpacity={0.86}
         >
           <Text style={[styles.contactBtnText, !canContact && styles.disabledContactText]}>{text.connect}</Text>

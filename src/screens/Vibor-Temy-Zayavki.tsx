@@ -41,6 +41,8 @@ const UI_TEXT = {
     activityFallback: 'активність за добу',
     sosCaption: 'допомога сусідів сьогодні',
     offerCaption: 'робота і бізнес сьогодні',
+    seeMore: 'Більше',
+    seeLess: 'Згорнути',
     topics: [
       { label: 'Допомога сусідам', desc: 'Термінові запити від мешканців - тільки сьогодні', screen: 'HelpNeighborsScreen', icon: 'hand-heart-outline', accent: SCREEN_THEME.woodGreen },
       { label: 'Нова заявка', desc: 'Категорія, деталі або терміново - одна форма', screen: 'RequestFormScreen', icon: 'clipboard-edit-outline', accent: SCREEN_THEME.terracotta },
@@ -57,6 +59,8 @@ const UI_TEXT = {
     activityFallback: 'активность за сутки',
     sosCaption: 'помощь соседей сегодня',
     offerCaption: 'работа и бизнес сегодня',
+    seeMore: 'Больше',
+    seeLess: 'Свернуть',
     topics: [
       { label: 'Помощь соседям', desc: 'Срочные запросы жителей - только сегодня', screen: 'HelpNeighborsScreen', icon: 'hand-heart-outline', accent: SCREEN_THEME.woodGreen },
       { label: 'Новая заявка', desc: 'Категория, детали или срочно - одна форма', screen: 'RequestFormScreen', icon: 'clipboard-edit-outline', accent: SCREEN_THEME.terracotta },
@@ -73,6 +77,8 @@ const UI_TEXT = {
     activityFallback: 'activity in 24h',
     sosCaption: 'neighbor help today',
     offerCaption: 'jobs and business today',
+    seeMore: 'More',
+    seeLess: 'Less',
     topics: [
       { label: 'Neighbor Help', desc: 'Urgent requests from residents - today only', screen: 'HelpNeighborsScreen', icon: 'hand-heart-outline', accent: SCREEN_THEME.woodGreen },
       { label: 'New Request', desc: 'Category, details, or urgent - one form', screen: 'RequestFormScreen', icon: 'clipboard-edit-outline', accent: SCREEN_THEME.terracotta },
@@ -112,6 +118,7 @@ const RequestTopicScreen: React.FC = () => {
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const text = UI_TEXT[language];
   const currentUser = useSelector((state: RootState) => state.auth.user) as User | null;
+  const [topicsExpanded, setTopicsExpanded] = useState(false);
   const [todayOffersCount, setTodayOffersCount] = useState(0);
   const [offerActivityUsers, setOfferActivityUsers] = useState<ActivityUser[]>([]);
   const todayHelpRequests = useSelector((state: RootState) => selectTodayHelpRequests(state)) as HelpRequest[];
@@ -319,7 +326,7 @@ const RequestTopicScreen: React.FC = () => {
         </View>
 
         <View style={styles.topicsGrid}>
-          {text.topics.map((topic) => (
+          {text.topics.filter(t => t.screen !== 'RequestFormScreen' && t.screen !== 'RatingScreen').map((topic) => (
             <TouchableOpacity
               key={topic.screen}
               style={styles.topicCard}
@@ -337,6 +344,28 @@ const RequestTopicScreen: React.FC = () => {
               </View>
             </TouchableOpacity>
           ))}
+          {topicsExpanded && text.topics.filter(t => t.screen === 'RequestFormScreen' || t.screen === 'RatingScreen').map((topic) => (
+            <TouchableOpacity
+              key={topic.screen}
+              style={styles.topicCard}
+              onPress={() => openTopic(topic.screen)}
+              activeOpacity={0.86}
+            >
+              <View style={styles.topicGloss} />
+              <View style={styles.topicRow}>
+                <TactileIcon icon={topic.icon} size={46} iconSize={21} backgroundColor={topic.accent} />
+                <View style={styles.topicCopy}>
+                  <Text style={styles.topicLabel}>{topic.label}</Text>
+                  <Text style={styles.topicDesc}>{topic.desc}</Text>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
+              </View>
+            </TouchableOpacity>
+          ))}
+          <TouchableOpacity style={styles.seeMoreBtn} onPress={() => setTopicsExpanded(v => !v)} activeOpacity={0.8}>
+            <Text style={styles.seeMoreText}>{topicsExpanded ? text.seeLess : text.seeMore}</Text>
+            <MaterialCommunityIcons name={topicsExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={SCREEN_THEME.textSecondary} />
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -508,6 +537,24 @@ const styles = StyleSheet.create({
   topicCopy: { flex: 1, marginLeft: 12, marginRight: 8 },
   topicLabel: { fontSize: 15, fontWeight: '900', color: SCREEN_THEME.textPrimary },
   topicDesc: { fontSize: 12, color: SCREEN_THEME.textSecondary, marginTop: 3, fontWeight: '600' },
+  seeMoreBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 10,
+    borderRadius: 14,
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderWidth: 1,
+    borderColor: '#E4D0AB',
+    marginTop: 2,
+  },
+  seeMoreText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: SCREEN_THEME.textSecondary,
+    letterSpacing: 0.5,
+  },
 });
 
 export default RequestTopicScreen;

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   SafeAreaView,
   ScrollView,
@@ -9,13 +9,21 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationProp, RouteProp, useNavigation, useRoute } from '@react-navigation/native';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
+import { ref, get, getDatabase } from 'firebase/database';
 import { ChildCategory, ChildFeature, ChildOffer, Place, PlaceType } from '../types/app';
 import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
-import { openInGoogleMaps } from '../utils/googleMapsLink';
 import { safeCallPhone, safeOpenExternalUrl } from '../utils/communicationActions';
 import { getActiveOffers } from '../services/childrenSeed';
+import { database } from '../firebase-core';
+import {
+  selectIsBusinessPlus,
+  hydrateSubscription,
+  normalizeServerSubscription,
+} from '../redux/slices/subscriptionSlice';
+import { getMapFocusPlaceParams } from '../utils/mapFocusParams';
+import type { DetailItemData } from '../utils/detailViewTypes';
 
 type Lang = 'ua' | 'ru' | 'en';
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
@@ -276,9 +284,70 @@ export default function DetalDetskogoMestaScreen() {
   const category: ChildCategory = info?.category
     ?? (place.type === PlaceType.SCHOOL ? 'school' : place.type === PlaceType.KINDERGARTEN ? 'kindergarten' : 'development');
 
+  const dispatch = useDispatch();
   const language = useSelector((s: RootState) => s.language?.current ?? 'ua') as Lang;
+  const currentUser = useSelector((s: RootState) => s.auth.user);
+  const isBusinessPlus = useSelector(selectIsBusinessPlus);
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+  const [claimStatus, setClaimStatus] = useState<'none' | 'pending' | 'approved' | 'rejected'>('none');
+  const [businessCard, setBusinessCard] = useState<{ ownerId?: string } | null>(null);
+
+  const isAuthenticated = Boolean(currentUser?.id);
+  const isMyApprovedPlace = claimStatus === 'approved' && businessCard?.ownerId === currentUser?.id;
+
+  // Sync subscription from RTDB on screen open
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { firebaseApp } = require('../firebase-core') as typeof import('../firebase-core');
+        const db = getDatabase(firebaseApp);
+        const snap = await get(ref(db, `user_subscription/${currentUser.id}`));
+        if (cancelled) return;
+        const normalized = normalizeServerSubscription(snap.val() as Record<string, unknown> | null);
+        dispatch(hydrateSubscription(normalized));
+      } catch { /* realtime listener in App.tsx is primary */ }
+    })();
+    return () => { cancelled = true; };
+  }, [currentUser?.id, dispatch]);
+
+  // Load business claim status
+  useEffect(() => {
+    if (!isAuthenticated || !currentUser?.id) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const claimRef = ref(database, `business_plus_claims/${place.id}`);
+        const snap = await get(claimRef);
+        if (cancelled) return;
+        if (!snap.exists()) { setClaimStatus('none'); return; }
+        const data = snap.val() as { ownerUid?: string; status?: string };
+        if (data.ownerUid === currentUser.id) {
+          setClaimStatus((data.status as 'pending' | 'approved' | 'rejected') ?? 'none');
+        } else {
+          setClaimStatus('approved');
+        }
+      } catch { if (!cancelled) setClaimStatus('none'); }
+    })();
+    return () => { cancelled = true; };
+  }, [isAuthenticated, place.id, currentUser?.id]);
+
+  // Load business+ card (to check ownerId)
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const cardRef = ref(database, `business_plus_cards/${place.id}`);
+        const snap = await get(cardRef);
+        if (cancelled) return;
+        if (snap.exists()) setBusinessCard(snap.val() as { ownerId?: string });
+      } catch { /* optional content */ }
+    })();
+    return () => { cancelled = true; };
+  }, [isAuthenticated, place.id]);
 
   const offers = useMemo(() => getActiveOffers(place.id), [place.id]);
 
@@ -320,6 +389,21 @@ export default function DetalDetskogoMestaScreen() {
     return items;
   }, [info, text]);
 
+  const claimLabel = language === 'ua' ? 'Я власник цього закладу' : language === 'ru' ? 'Я владелец этого заведения' : 'I am the owner';
+  const claimPendingLabel = language === 'ua' ? 'Заявку надіслано — на розгляді' : language === 'ru' ? 'Заявка отправлена — на рассмотрении' : 'Claim submitted — pending review';
+  const claimApprovedLabel = language === 'ua' ? 'Підтверджений власник' : language === 'ru' ? 'Подтверждённый владелец' : 'Verified owner';
+  const claimRejectedLabel = language === 'ua' ? 'Заявку відхилено — подати нову' : language === 'ru' ? 'Заявка отклонена — подать новую' : 'Claim rejected — resubmit';
+  const activateBusinessPlusLabel = language === 'ua' ? 'Активувати Бізнес+ (49 грн/міс)' : language === 'ru' ? 'Активировать Бизнес+ (49 грн/мес)' : 'Activate Business+ (49 UAH/mo)';
+
+  const claimItem: DetailItemData = {
+    id: place.id,
+    title: place.name,
+    address: place.address,
+    phone: place.phone,
+    sourceType: 'place',
+    sourceId: place.id,
+  };
+
   const handleCall = () => safeCallPhone(place.phone, language);
   const handleTelegram = () => {
     const tg = info?.telegram;
@@ -328,7 +412,12 @@ export default function DetalDetskogoMestaScreen() {
   const handleWebsite = () => {
     if (place.website) void safeOpenExternalUrl(place.website, language);
   };
-  const handleRoute = () => openInGoogleMaps(place.name, place.address);
+  const handleRoute = () => {
+    navigation.navigate('MainTabs', {
+      screen: 'MapTab',
+      params: getMapFocusPlaceParams(place),
+    });
+  };
 
   const renderInfoRow = (label: string, value: string) => (
     <View style={styles.infoRow} key={label}>
@@ -476,6 +565,44 @@ export default function DetalDetskogoMestaScreen() {
             </View>
           </View>
         ) : null}
+
+        {/* Business ownership claim section */}
+        <View>
+          {claimStatus === 'none' || claimStatus === 'rejected' ? (
+            <TouchableOpacity
+              style={styles.claimBtn}
+              onPress={() => navigation.navigate('BusinessClaimScreen', { item: claimItem })}
+              activeOpacity={0.86}
+            >
+              <MaterialCommunityIcons name="store-plus-outline" size={18} color={SCREEN_THEME.terracotta} />
+              <Text style={styles.claimBtnText}>
+                {claimStatus === 'rejected' ? claimRejectedLabel : claimLabel}
+              </Text>
+            </TouchableOpacity>
+          ) : claimStatus === 'pending' ? (
+            <View style={styles.claimStatusCard}>
+              <MaterialCommunityIcons name="clock-outline" size={16} color="#8A7A5A" />
+              <Text style={styles.claimStatusText}>{claimPendingLabel}</Text>
+            </View>
+          ) : isMyApprovedPlace ? (
+            <View style={{ gap: 8 }}>
+              <View style={[styles.claimStatusCard, styles.claimStatusApproved]}>
+                <MaterialCommunityIcons name="check-circle-outline" size={16} color="#2E7D32" />
+                <Text style={[styles.claimStatusText, styles.claimStatusApprovedText]}>{claimApprovedLabel}</Text>
+              </View>
+              {!isBusinessPlus && (
+                <TouchableOpacity
+                  style={styles.activateBusinessBtn}
+                  onPress={() => navigation.navigate('BusinessPlusSubscriptionScreen')}
+                  activeOpacity={0.86}
+                >
+                  <MaterialCommunityIcons name="storefront" size={16} color="#fff" />
+                  <Text style={styles.activateBusinessBtnText}>{activateBusinessPlusLabel}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : null}
+        </View>
 
       </ScrollView>
     </SafeAreaView>
@@ -708,5 +835,63 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     color: SCREEN_THEME.textMuted,
+  },
+  claimBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    borderWidth: 1,
+    borderColor: SCREEN_THEME.terracotta,
+    marginBottom: 12,
+  },
+  claimBtnText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+    color: SCREEN_THEME.terracotta,
+  },
+  claimStatusCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFF8E6',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    borderWidth: 1,
+    borderColor: '#D4B95E',
+    marginBottom: 12,
+  },
+  claimStatusApproved: {
+    backgroundColor: '#F0FFF4',
+    borderColor: '#81C784',
+  },
+  claimStatusText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#8A7A5A',
+  },
+  claimStatusApprovedText: {
+    color: '#2E7D32',
+  },
+  activateBusinessBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#7A1E5C',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    marginBottom: 12,
+  },
+  activateBusinessBtnText: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#fff',
   },
 });
