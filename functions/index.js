@@ -649,7 +649,7 @@ const signInWithEmailRateLimitedHandler = functionsV1
   }
 
   const rateLimit = await assertAuthAttemptAllowed(email, context.rawRequest?.ip);
-  const apiKey = process.env.FIREBASE_API_KEY || '';
+  const apiKey = process.env.APP_API_KEY || '';
   if (!apiKey) {
     throw new functionsV1.https.HttpsError('failed-precondition', 'Server sign-in API key is not configured');
   }
