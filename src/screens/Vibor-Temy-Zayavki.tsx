@@ -364,7 +364,7 @@ const RequestTopicScreen: React.FC = () => {
           ))}
           <TouchableOpacity style={styles.seeMoreBtn} onPress={() => setTopicsExpanded(v => !v)} activeOpacity={0.8}>
             <Text style={styles.seeMoreText}>{topicsExpanded ? text.seeLess : text.seeMore}</Text>
-            <MaterialCommunityIcons name={topicsExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={SCREEN_THEME.textSecondary} />
+            <MaterialCommunityIcons name={topicsExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={SCREEN_THEME.accentGold} />
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -552,7 +552,7 @@ const styles = StyleSheet.create({
   seeMoreText: {
     fontSize: 13,
     fontWeight: '800',
-    color: SCREEN_THEME.textSecondary,
+    color: SCREEN_THEME.accentGold,
     letterSpacing: 0.5,
   },
 });

@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -10,6 +11,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+
+const HERO_IMAGE = require('../../assets/_readme.webp');
 import { SCREEN_THEME } from '../utils/screenTheme';
 
 type ScreenTooltipProps = {
@@ -66,6 +69,8 @@ export default function ScreenTooltip({
               <MaterialCommunityIcons name="close" size={22} color={SCREEN_THEME.textSecondary} />
             </TouchableOpacity>
           </View>
+
+          <Image source={HERO_IMAGE} style={styles.heroImage} resizeMode="cover" />
 
           <ScrollView contentContainerStyle={styles.steps} showsVerticalScrollIndicator={false}>
             {items.map((item, index) => (
@@ -142,6 +147,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: SCREEN_THEME.cardCream,
+  },
+  heroImage: {
+    width: '100%',
+    height: 160,
+    borderRadius: 8,
+    marginTop: 14,
   },
   steps: {
     paddingTop: 18,

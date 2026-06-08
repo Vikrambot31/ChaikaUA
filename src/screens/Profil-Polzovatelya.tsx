@@ -23,6 +23,14 @@ import { signOutPrimarySession } from '../services/authSessionService';
 import { subscribeCurrentUserSecurityRole, type SecurityRole } from '../services/securityRoles';
 import { pickUserAvatarUri } from '../utils/userAvatar';
 import { subscribeMyBonuses, BONUS_CAPS, type UserBonuses } from '../services/bonusService';
+import { subscribeToUserTicket, hasUnreadAdminReply } from '../services/supportService';
+import {
+  setHasContactRequest,
+  setHasSupportReply,
+  setHasSubscriptionChanged,
+  selectHasSupportReply,
+  selectHasSubscriptionChanged,
+} from '../redux/slices/notificationSlice';
 
 type AppNavigation = import('@react-navigation/native').NavigationProp<Record<string, object | undefined>>;
 
@@ -277,6 +285,8 @@ const ProfileScreen: React.FC = () => {
   const [moderationUnlocked, setModerationUnlocked] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [bonuses, setBonuses] = useState<UserBonuses | null>(null);
+  const hasSupportReply = useSelector(selectHasSupportReply);
+  const hasSubscriptionChanged = useSelector(selectHasSubscriptionChanged);
   const isLoggedIn = Boolean(user?.id);
   const hasPrimaryModerationAccess = Boolean(
     user?.id &&
@@ -356,6 +366,21 @@ const ProfileScreen: React.FC = () => {
 
   const hasUnreadPendingRequests = pendingRequestsCount > 0 && latestPendingRequestedAtMs > lastSeenPendingAtMs;
 
+  useEffect(() => {
+    dispatch(setHasContactRequest(hasUnreadPendingRequests));
+  }, [hasUnreadPendingRequests, dispatch]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      dispatch(setHasSupportReply(false));
+      return;
+    }
+    const unsub = subscribeToUserTicket(user.id, (ticket) => {
+      dispatch(setHasSupportReply(hasUnreadAdminReply(ticket)));
+    });
+    return unsub;
+  }, [user?.id, dispatch]);
+
   const markPendingRequestsSeen = useCallback(() => {
     if (!user?.id) return;
     const seenAt = Date.now();
@@ -403,8 +428,9 @@ const ProfileScreen: React.FC = () => {
   }, [navigation]);
 
   const handleSupportPress = useCallback(() => {
+    dispatch(setHasSupportReply(false));
     navigation.navigate('SupportScreen');
-  }, [navigation]);
+  }, [navigation, dispatch]);
 
   const openServiceModerationPin = useCallback(() => {
     if (!hasPrimaryModerationAccess) {
@@ -741,7 +767,7 @@ const ProfileScreen: React.FC = () => {
 
           <TouchableOpacity style={styles.settingsSeeMoreBtn} onPress={() => setSettingsExpanded(v => !v)} activeOpacity={0.8}>
             <Text style={styles.settingsSeeMoreText}>{settingsExpanded ? text.seeLess : text.seeMore}</Text>
-            <MaterialCommunityIcons name={settingsExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={SCREEN_THEME.textSecondary} />
+            <MaterialCommunityIcons name={settingsExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={SCREEN_THEME.accentGold} />
           </TouchableOpacity>
 
           {isAdmin ? (
@@ -823,31 +849,41 @@ const ProfileScreen: React.FC = () => {
             ) : null}
           </View>
 
-          <Animated.View style={[
-            styles.subscriptionButtonWrapper,
-            {
-              opacity: subGlowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.82, 1] }),
-            },
-          ]}>
-            <TactileButton
-              title={text.manageSubscription}
-              onPress={() => navigation.navigate('SubscriptionScreen')}
-              variant="primary"
-              style={styles.subscriptionButton}
-              textStyle={{ color: '#FFFFFF', letterSpacing: 0.5 }}
-              icon={<MaterialCommunityIcons name="crown" size={18} color="#C9A84C" />}
-            />
-          </Animated.View>
+          <View style={{ position: 'relative' }}>
+            <Animated.View style={[
+              styles.subscriptionButtonWrapper,
+              {
+                opacity: subGlowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.82, 1] }),
+              },
+            ]}>
+              <TactileButton
+                title={text.manageSubscription}
+                onPress={() => { dispatch(setHasSubscriptionChanged(false)); navigation.navigate('SubscriptionScreen'); }}
+                variant="primary"
+                style={styles.subscriptionButton}
+                textStyle={{ color: '#FFFFFF', letterSpacing: 0.5 }}
+                icon={<MaterialCommunityIcons name="crown" size={18} color="#C9A84C" />}
+              />
+            </Animated.View>
+            {hasSubscriptionChanged && (
+              <View style={styles.greenNotifDotButton} />
+            )}
+          </View>
 
         </TactileCard>
 
-        <TactileButton
-          title={language === 'ua' ? 'Служба підтримки' : language === 'ru' ? 'Служба поддержки' : 'Support service'}
-          onPress={handleSupportPress}
-          variant="secondary"
-          style={styles.supportButton}
-          icon={<MaterialCommunityIcons name="headset" size={22} color="#4E5F43" />}
-        />
+        <View style={{ position: 'relative' }}>
+          <TactileButton
+            title={language === 'ua' ? 'Служба підтримки' : language === 'ru' ? 'Служба поддержки' : 'Support service'}
+            onPress={handleSupportPress}
+            variant="secondary"
+            style={styles.supportButton}
+            icon={<MaterialCommunityIcons name="headset" size={22} color="#4E5F43" />}
+          />
+          {hasSupportReply && (
+            <View style={styles.greenNotifDotButton} />
+          )}
+        </View>
 
         <TactileButton
           title={isLoggedIn ? text.exit : text.login}
@@ -1357,8 +1393,30 @@ const styles = StyleSheet.create({
   settingsSeeMoreText: {
     fontSize: 13,
     fontWeight: '800',
-    color: SCREEN_THEME.textSecondary,
+    color: SCREEN_THEME.accentGold,
     letterSpacing: 0.5,
+  },
+  greenNotifDot: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#4CAF50',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  greenNotifDotButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#4CAF50',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
   },
 });
 

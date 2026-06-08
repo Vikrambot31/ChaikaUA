@@ -13,6 +13,8 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
+import { ref, get } from 'firebase/database';
+import { database } from '../firebase-core';
 import { chaykaPlaces } from '../services/chaykaPlacesData';
 import { CHILDREN_SCREEN_BLACKLIST, childInfoSeed, getActiveOffers } from '../services/childrenSeed';
 import { ChildCategory, ChildFeature, ChildOffer, Place, PlaceType } from '../types/app';
@@ -386,7 +388,10 @@ export default function VseDlyaDeteyScreen() {
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as Lang;
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
   const currentUserId = useSelector(selectUserId);
+  const currentUserEmail = useSelector((state: RootState) => state.auth.user?.email);
+  const isAdmin = currentUserEmail === 'vikramsave@ukr.net';
   const [activeCategory, setActiveCategory] = useState<CategoryKey>('all');
+  const [claimPlaceIds, setClaimPlaceIds] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
   const [activePromotions, setActivePromotions] = useState<BonusPromotion[]>([]);
   const [filterShelter, setFilterShelter] = useState(false);
@@ -400,6 +405,21 @@ export default function VseDlyaDeteyScreen() {
   useEffect(() => {
     return subscribeActiveBonusPromotions('kids', setActivePromotions);
   }, []);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    void (async () => {
+      try {
+        const snap = await get(ref(database, 'business_plus_claims'));
+        if (!snap.exists()) return;
+        const ids = new Set<string>();
+        snap.forEach((child) => {
+          if (child.val()?.status === 'pending') ids.add(child.key!);
+        });
+        setClaimPlaceIds(ids);
+      } catch { /* ignore */ }
+    })();
+  }, [isAdmin]);
 
   useEffect(() => {
     getFavorites(FAVORITE_SOURCE).then((items) => {
@@ -577,9 +597,10 @@ export default function VseDlyaDeteyScreen() {
     const hasPhone = Boolean(place.phone);
     const hasTelegram = Boolean(place.childInfo?.telegram);
     const isFav = favoriteIds.has(place.id);
+    const hasClaim = isAdmin && claimPlaceIds.has(place.id);
 
     return (
-      <TouchableOpacity key={place.id} style={styles.placeCard} activeOpacity={0.88} onPress={() => openPlace(place)}>
+      <TouchableOpacity key={place.id} style={[styles.placeCard, hasClaim && styles.placeCardClaimed]} activeOpacity={0.88} onPress={() => openPlace(place)}>
         <View style={styles.placeHeader}>
           <View style={styles.placeIconWrap}>
             <MaterialCommunityIcons
@@ -1075,6 +1096,11 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
     elevation: 3,
+  },
+  placeCardClaimed: {
+    borderColor: '#F9C400',
+    borderWidth: 2,
+    backgroundColor: '#FFFDE7',
   },
   placeHeader: {
     flexDirection: 'row',

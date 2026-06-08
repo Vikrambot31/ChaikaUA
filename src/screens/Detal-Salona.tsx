@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -10,7 +11,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationProp, RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
-import { ref, get, getDatabase } from 'firebase/database';
+import { ref, get, set, getDatabase } from 'firebase/database';
 import { BeautyCategory, BeautyFeature, BeautyOffer, Place } from '../types/app';
 import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
@@ -241,6 +242,7 @@ export default function DetalSalonaScreen() {
   const [businessCard, setBusinessCard] = useState<{ ownerId?: string } | null>(null);
 
   const isAuthenticated = Boolean(currentUser?.id);
+  const isAdmin = currentUser?.email === 'vikramsave@ukr.net';
   const isMyApprovedPlace = claimStatus === 'approved' && businessCard?.ownerId === currentUser?.id;
 
   // Sync subscription from RTDB on screen open
@@ -271,7 +273,9 @@ export default function DetalSalonaScreen() {
         if (cancelled) return;
         if (!snap.exists()) { setClaimStatus('none'); return; }
         const data = snap.val() as { ownerUid?: string; status?: string };
-        if (data.ownerUid === currentUser.id) {
+        if (currentUser.email === 'vikramsave@ukr.net') {
+          setClaimStatus((data.status as 'pending' | 'approved' | 'rejected') ?? 'none');
+        } else if (data.ownerUid === currentUser.id) {
           setClaimStatus((data.status as 'pending' | 'approved' | 'rejected') ?? 'none');
         } else {
           setClaimStatus('approved');
@@ -340,6 +344,37 @@ export default function DetalSalonaScreen() {
       screen: 'MapTab',
       params: getMapFocusPlaceParams(place),
     });
+  };
+
+  const handleAdminApprove = () => {
+    void (async () => {
+      try {
+        const now = new Date().toISOString();
+        await set(ref(database, `business_plus_claims/${place.id}/status`), 'approved');
+        await set(ref(database, `business_plus_claims/${place.id}/moderatedAt`), now);
+        setClaimStatus('approved');
+      } catch { /* ignore */ }
+    })();
+  };
+
+  const handleAdminReject = () => {
+    Alert.alert('Відхилити заявку?', '', [
+      { text: 'Скасувати', style: 'cancel' },
+      {
+        text: 'Відхилити',
+        style: 'destructive',
+        onPress: () => {
+          void (async () => {
+            try {
+              const now = new Date().toISOString();
+              await set(ref(database, `business_plus_claims/${place.id}/status`), 'rejected');
+              await set(ref(database, `business_plus_claims/${place.id}/moderatedAt`), now);
+              setClaimStatus('rejected');
+            } catch { /* ignore */ }
+          })();
+        },
+      },
+    ]);
   };
 
   const renderInfoRow = (label: string, value: string) => (
@@ -473,6 +508,40 @@ export default function DetalSalonaScreen() {
             <Text style={styles.sectionTitle}>{text.offersTitle}</Text>
             <View style={styles.offersList}>
               {offers.map(renderOfferCard)}
+            </View>
+          </View>
+        ) : null}
+
+        {/* Admin moderation panel — only for vikramsave@ukr.net */}
+        {isAdmin && claimStatus !== 'none' ? (
+          <View style={styles.adminSection}>
+            <View style={styles.adminSectionHeader}>
+              <MaterialCommunityIcons name="shield-account-outline" size={15} color="#8A7A5A" />
+              <Text style={styles.adminSectionTitle}>МОДЕРАЦІЯ</Text>
+            </View>
+            <View style={[styles.claimStatusCard, claimStatus === 'approved' && styles.claimStatusApproved]}>
+              <MaterialCommunityIcons
+                name={claimStatus === 'pending' ? 'clock-outline' : claimStatus === 'approved' ? 'check-circle-outline' : 'close-circle-outline'}
+                size={15}
+                color={claimStatus === 'approved' ? '#2E7D32' : '#8A7A5A'}
+              />
+              <Text style={[styles.claimStatusText, claimStatus === 'approved' && styles.claimStatusApprovedText]}>
+                {claimStatus === 'pending' ? 'На розгляді' : claimStatus === 'approved' ? 'Схвалено' : 'Відхилено'}
+              </Text>
+            </View>
+            <View style={styles.adminActions}>
+              {claimStatus !== 'approved' ? (
+                <TouchableOpacity style={styles.adminApproveBtn} onPress={handleAdminApprove} activeOpacity={0.85}>
+                  <MaterialCommunityIcons name="check-circle-outline" size={15} color="#fff" />
+                  <Text style={styles.adminBtnText}>Схвалити</Text>
+                </TouchableOpacity>
+              ) : null}
+              {claimStatus !== 'rejected' ? (
+                <TouchableOpacity style={styles.adminRejectBtn} onPress={handleAdminReject} activeOpacity={0.85}>
+                  <MaterialCommunityIcons name="close-circle-outline" size={15} color="#fff" />
+                  <Text style={styles.adminBtnText}>Відхилити</Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
           </View>
         ) : null}
@@ -849,5 +918,53 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: SCREEN_THEME.textMuted,
+  },
+  adminSection: {
+    backgroundColor: '#FFF8E1',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#F9C400',
+    marginBottom: 12,
+    gap: 8,
+  },
+  adminSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  adminSectionTitle: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#8A7A5A',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  adminActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  adminApproveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#2E7D32',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  adminRejectBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#C62828',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  adminBtnText: {
+    color: '#fff',
+    fontWeight: '900',
+    fontSize: 13,
   },
 });

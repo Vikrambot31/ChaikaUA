@@ -6,6 +6,7 @@ import {
   normalizeServerSubscription,
   type ServerSubscriptionPayload,
 } from '../redux/slices/subscriptionSlice';
+import { setHasSubscriptionChanged } from '../redux/slices/notificationSlice';
 import { database } from '../firebase-core';
 import { LOCAL_MODE } from '../local/LOCAL_MODE';
 
@@ -64,6 +65,7 @@ export function useSubscriptionSync(userId: string | null | undefined): {
         // Subsequent snapshots: show modal only on fresh premium grant
         if (!wasPremiumRef.current && isNowPremium) {
           setShowPremiumModal(true);
+          dispatch(setHasSubscriptionChanged(true));
         }
 
         wasPremiumRef.current = isNowPremium;

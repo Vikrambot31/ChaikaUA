@@ -23,6 +23,7 @@ import languageReducer from './slices/languageSlice';
 import subscriptionReducer from './slices/subscriptionSlice';
 import osbbReducer from './slices/osbbSlice';
 import networkReducer from './slices/networkSlice';
+import notificationReducer from './slices/notificationSlice';
 
 // Ліміт кількості записів, що зберігаються в AsyncStorage.
 // Запобігає накопиченню 10–50 МБ після тривалого використання.
@@ -192,6 +193,7 @@ export const store = configureStore({
     subscription: persistedSubscriptionReducer,
     osbb: persistedOsbbReducer,
     network: networkReducer,
+    notifications: notificationReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

@@ -43,7 +43,7 @@ const UI_TEXT: Record<'ua' | 'ru' | 'en', SectionedItems> = {
     ] as ServiceHubItem[],
     community: [
       { label: 'Люди Чайки', desc: 'Мешканці та спільнота', screen: 'TopGirlsBoysScreen', icon: 'account-multiple-outline', accent: '#7B6EB1' },
-      { label: 'Контакти Чайки', desc: 'Знайдіть людей поруч для спілкування', screen: 'KontaktiChaikyScreen', icon: 'account-heart-outline', accent: '#6A8BA5' },
+      { label: 'Знайомства на каву', desc: 'Знайдіть людей поруч для спілкування', screen: 'KontaktiChaikyScreen', icon: 'account-heart-outline', accent: '#6A8BA5' },
       { label: 'Спорт на Чайці', desc: 'Баскетбол, футбол і теніс з сусідами', screen: 'SportNaChaykeScreen', icon: 'run-fast', accent: '#4F8D5F' },
     ] as ServiceHubItem[],
     market: [
@@ -70,7 +70,7 @@ const UI_TEXT: Record<'ua' | 'ru' | 'en', SectionedItems> = {
     ] as ServiceHubItem[],
     community: [
       { label: 'Люди Чайки', desc: 'Жители и сообщество', screen: 'TopGirlsBoysScreen', icon: 'account-multiple-outline', accent: '#7B6EB1' },
-      { label: 'Контакты Чайки', desc: 'Найдите людей рядом для общения', screen: 'KontaktiChaikyScreen', icon: 'account-heart-outline', accent: '#6A8BA5' },
+      { label: 'Знакомства на кофе', desc: 'Найдите людей рядом для общения', screen: 'KontaktiChaikyScreen', icon: 'account-heart-outline', accent: '#6A8BA5' },
       { label: 'Спорт на Чайке', desc: 'Баскетбол, футбол и теннис с соседями', screen: 'SportNaChaykeScreen', icon: 'run-fast', accent: '#4F8D5F' },
     ] as ServiceHubItem[],
     market: [
@@ -97,7 +97,7 @@ const UI_TEXT: Record<'ua' | 'ru' | 'en', SectionedItems> = {
     ] as ServiceHubItem[],
     community: [
       { label: 'Chaika Life people', desc: 'Residents and community', screen: 'TopGirlsBoysScreen', icon: 'account-multiple-outline', accent: '#7B6EB1' },
-      { label: 'Chaika Contacts', desc: 'Find people nearby to connect with', screen: 'KontaktiChaikyScreen', icon: 'account-heart-outline', accent: '#6A8BA5' },
+      { label: 'Coffee Meetups', desc: 'Find people nearby to connect with', screen: 'KontaktiChaikyScreen', icon: 'account-heart-outline', accent: '#6A8BA5' },
       { label: 'Sports in Chaika', desc: 'Basketball, football, and tennis with neighbors', screen: 'SportNaChaykeScreen', icon: 'run-fast', accent: '#4F8D5F' },
     ] as ServiceHubItem[],
     market: [
@@ -168,7 +168,7 @@ const ServicesHubScreen: React.FC = () => {
           {marketExpanded && text.market.filter(i => i.screen === 'JobSearchScreen' || i.screen === 'BuySellScreen' || i.screen === 'AnnouncementsScreen').map(renderItem)}
           <TouchableOpacity style={styles.seeMoreBtn} onPress={() => setMarketExpanded(v => !v)} activeOpacity={0.8}>
             <Text style={styles.seeMoreText}>{marketExpanded ? text.seeLess : text.seeMore}</Text>
-            <MaterialCommunityIcons name={marketExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={SCREEN_THEME.textSecondary} />
+            <MaterialCommunityIcons name={marketExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={SCREEN_THEME.accentGold} />
           </TouchableOpacity>
         </View>
 
@@ -181,7 +181,7 @@ const ServicesHubScreen: React.FC = () => {
           {frequentExpanded && [soulPhotosItem, ...text.frequent.filter(i => i.screen !== 'ElectricityStatusScreen' && i.screen !== 'FotoRayonaScreen')].map(renderItem)}
           <TouchableOpacity style={styles.seeMoreBtn} onPress={() => setFrequentExpanded(v => !v)} activeOpacity={0.8}>
             <Text style={styles.seeMoreText}>{frequentExpanded ? text.seeLess : text.seeMore}</Text>
-            <MaterialCommunityIcons name={frequentExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={SCREEN_THEME.textSecondary} />
+            <MaterialCommunityIcons name={frequentExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={SCREEN_THEME.accentGold} />
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
   seeMoreText: {
     fontSize: 13,
     fontWeight: '800',
-    color: SCREEN_THEME.textSecondary,
+    color: SCREEN_THEME.accentGold,
     letterSpacing: 0.5,
   },
 });

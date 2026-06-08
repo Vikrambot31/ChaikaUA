@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  Animated,
   Dimensions,
   ScrollView,
   StyleSheet,
@@ -7,6 +8,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSelector } from 'react-redux';
+import { selectHasAnyProfileNotification } from '../redux/slices/notificationSlice';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
@@ -39,6 +42,8 @@ const ScrollableTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, nav
   const scrollViewRef = useRef<ScrollView>(null);
   const scrollThreshold = Dimensions.get('window').width / 2;
   const [pulseRequests, setPulseRequests] = useState(false);
+  const hasProfileNotification = useSelector(selectHasAnyProfileNotification);
+  const profileBlinkAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     const activeIndex = state.index;
@@ -76,6 +81,21 @@ const ScrollableTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, nav
       if (timer) clearTimeout(timer);
     };
   }, []);
+
+  useEffect(() => {
+    if (!hasProfileNotification) {
+      profileBlinkAnim.setValue(1);
+      return;
+    }
+    const blink = Animated.loop(
+      Animated.sequence([
+        Animated.timing(profileBlinkAnim, { toValue: 0.35, duration: 1000, useNativeDriver: true }),
+        Animated.timing(profileBlinkAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
+      ])
+    );
+    blink.start();
+    return () => blink.stop();
+  }, [hasProfileNotification, profileBlinkAnim]);
 
   return (
     <View style={styles.container}>
@@ -138,11 +158,24 @@ const ScrollableTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, nav
                 </>
               )}
               <View style={[styles.iconWrap, isFocused && { backgroundColor: `${activeColor}22` }, shouldPulse && styles.pulseIconWrap]}>
-                <MaterialCommunityIcons
-                  name={ICONS[route.name] ?? 'help-circle'}
-                  size={isFocused ? 25 : 22}
-                  color={isFocused ? activeColor : '#998969'}
-                />
+                {route.name === 'ProfileTab' && hasProfileNotification && !isFocused ? (
+                  <Animated.View style={{ opacity: profileBlinkAnim }}>
+                    <MaterialCommunityIcons
+                      name={ICONS[route.name] ?? 'help-circle'}
+                      size={22}
+                      color="#9D5E45"
+                    />
+                  </Animated.View>
+                ) : (
+                  <MaterialCommunityIcons
+                    name={ICONS[route.name] ?? 'help-circle'}
+                    size={isFocused ? 25 : 22}
+                    color={isFocused ? activeColor : '#998969'}
+                  />
+                )}
+                {route.name === 'ProfileTab' && hasProfileNotification && !isFocused && (
+                  <View style={styles.profileNotifDot} />
+                )}
               </View>
               <Text style={[styles.label, isFocused && { color: activeColor }]} numberOfLines={1}>
                 {label}
@@ -249,6 +282,15 @@ const styles = StyleSheet.create({
   },
   pulseIconWrap: {
     backgroundColor: 'rgba(214,123,79,0.18)',
+  },
+  profileNotifDot: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#9D5E45',
   },
   label: {
     fontSize: 10,

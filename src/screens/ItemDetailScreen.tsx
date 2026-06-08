@@ -3,7 +3,7 @@ import { Alert, SafeAreaView, ScrollView, Share, StyleSheet, Text, TouchableOpac
 import * as Clipboard from 'expo-clipboard';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import type { NavigationProp, RouteProp } from '@react-navigation/native';
-import { ref, get, getDatabase } from 'firebase/database';
+import { ref, get, set, getDatabase } from 'firebase/database';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { database } from '../firebase-core';
@@ -167,6 +167,7 @@ export default function ItemDetailScreen({
   const hasBusinessPhoto = Boolean(businessCard?.photoUri || businessCard?.photoStoragePath);
 
   const isAuthenticated = Boolean(currentUser?.id);
+  const isAdmin = currentUser?.email === 'vikramsave@ukr.net';
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -223,7 +224,9 @@ export default function ItemDetailScreen({
           return;
         }
         const data = snap.val() as { ownerUid?: string; status?: string };
-        if (data.ownerUid === currentUser.id) {
+        if (currentUser.email === 'vikramsave@ukr.net') {
+          setClaimStatus((data.status as 'pending' | 'approved' | 'rejected') ?? 'none');
+        } else if (data.ownerUid === currentUser.id) {
           setClaimStatus((data.status as 'pending' | 'approved' | 'rejected') ?? 'none');
         } else {
           // Place already claimed by someone else
@@ -261,6 +264,37 @@ export default function ItemDetailScreen({
     })();
     return () => { cancelled = true; };
   }, [isAuthenticated, isPlaceType, item.sourceId]);
+
+  const handleAdminApprove = () => {
+    void (async () => {
+      try {
+        const now = new Date().toISOString();
+        await set(ref(database, `business_plus_claims/${item.sourceId}/status`), 'approved');
+        await set(ref(database, `business_plus_claims/${item.sourceId}/moderatedAt`), now);
+        setClaimStatus('approved');
+      } catch { /* ignore */ }
+    })();
+  };
+
+  const handleAdminReject = () => {
+    Alert.alert('Відхилити заявку?', '', [
+      { text: 'Скасувати', style: 'cancel' },
+      {
+        text: 'Відхилити',
+        style: 'destructive',
+        onPress: () => {
+          void (async () => {
+            try {
+              const now = new Date().toISOString();
+              await set(ref(database, `business_plus_claims/${item.sourceId}/status`), 'rejected');
+              await set(ref(database, `business_plus_claims/${item.sourceId}/moderatedAt`), now);
+              setClaimStatus('rejected');
+            } catch { /* ignore */ }
+          })();
+        },
+      },
+    ]);
+  };
 
   const fields = [
     { label: text.description, value: item.description },
@@ -547,6 +581,40 @@ export default function ItemDetailScreen({
             ) : null}
           </View>
         </View>
+
+        {/* Admin moderation panel — only for vikramsave@ukr.net */}
+        {isAdmin && isPlaceType && claimStatus !== 'none' ? (
+          <View style={styles.adminSection}>
+            <View style={styles.adminSectionHeader}>
+              <MaterialCommunityIcons name="shield-account-outline" size={15} color="#8A7A5A" />
+              <Text style={styles.adminSectionTitle}>МОДЕРАЦІЯ</Text>
+            </View>
+            <View style={[styles.claimStatusCard, claimStatus === 'approved' && styles.claimStatusApproved]}>
+              <MaterialCommunityIcons
+                name={claimStatus === 'pending' ? 'clock-outline' : claimStatus === 'approved' ? 'check-circle-outline' : 'close-circle-outline'}
+                size={15}
+                color={claimStatus === 'approved' ? '#2E7D32' : '#8A7A5A'}
+              />
+              <Text style={[styles.claimStatusText, claimStatus === 'approved' && styles.claimStatusApprovedText]}>
+                {claimStatus === 'pending' ? 'На розгляді' : claimStatus === 'approved' ? 'Схвалено' : 'Відхилено'}
+              </Text>
+            </View>
+            <View style={styles.adminActions}>
+              {claimStatus !== 'approved' ? (
+                <TouchableOpacity style={styles.adminApproveBtn} onPress={handleAdminApprove} activeOpacity={0.85}>
+                  <MaterialCommunityIcons name="check-circle-outline" size={15} color="#fff" />
+                  <Text style={styles.adminBtnText}>Схвалити</Text>
+                </TouchableOpacity>
+              ) : null}
+              {claimStatus !== 'rejected' ? (
+                <TouchableOpacity style={styles.adminRejectBtn} onPress={handleAdminReject} activeOpacity={0.85}>
+                  <MaterialCommunityIcons name="close-circle-outline" size={15} color="#fff" />
+                  <Text style={styles.adminBtnText}>Відхилити</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          </View>
+        ) : null}
 
         {/* Business ownership claim section — only for place cards */}
         {isPlaceType ? (
@@ -902,6 +970,53 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
 
+  adminSection: {
+    backgroundColor: '#FFF8E1',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#F9C400',
+    gap: 8,
+  },
+  adminSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  adminSectionTitle: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#8A7A5A',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  adminActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  adminApproveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#2E7D32',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  adminRejectBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#C62828',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  adminBtnText: {
+    color: '#fff',
+    fontWeight: '900',
+    fontSize: 13,
+  },
   // Owner edit controls
   ownerControls: {
     gap: 8,

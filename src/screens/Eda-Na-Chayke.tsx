@@ -18,6 +18,8 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
+import { ref, get } from 'firebase/database';
+import { database } from '../firebase-core';
 import { chaykaPlaces } from '../services/chaykaPlacesData';
 import { getFoodPlaces, getActiveFoodOffers, foodInfoSeed } from '../services/foodSeed';
 import { logFoodEvent } from '../services/foodAnalytics';
@@ -294,10 +296,12 @@ export default function EdaNaChaykeScreen() {
   const navigation = useNavigation<AppNavigation>();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as Lang;
   const user = useSelector((state: RootState) => state.auth.user);
+  const isAdmin = user?.email === 'vikramsave@ukr.net';
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
 
   const currentUserId = useSelector(selectUserId);
   const [mode, setMode] = useState<ScreenMode>('home');
+  const [claimPlaceIds, setClaimPlaceIds] = useState<Set<string>>(new Set());
   const [eatFilter, setEatFilter] = useState<EatFilter>('all');
   const [query, setQuery] = useState('');
   const [topListings, setTopListings] = useState<FoodTopListing[]>([]);
@@ -314,6 +318,21 @@ export default function EdaNaChaykeScreen() {
   useEffect(() => {
     logFoodEvent('food_open_screen');
   }, []);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    void (async () => {
+      try {
+        const snap = await get(ref(database, 'business_plus_claims'));
+        if (!snap.exists()) return;
+        const ids = new Set<string>();
+        snap.forEach((child) => {
+          if (child.val()?.status === 'pending') ids.add(child.key!);
+        });
+        setClaimPlaceIds(ids);
+      } catch { /* ignore */ }
+    })();
+  }, [isAdmin]);
 
   useEffect(() => {
     getFavorites(FOOD_FAVORITE_SOURCE).then((items) => {
@@ -675,11 +694,12 @@ export default function EdaNaChaykeScreen() {
     const isPartner = false; // MVP: no paid places yet
     const hasDelivery = !!info?.deliveryAvailable;
     const isFav = favoriteIds.has(place.id);
+    const hasClaim = isAdmin && claimPlaceIds.has(place.id);
 
     return (
       <TouchableOpacity
         key={place.id}
-        style={styles.placeCard}
+        style={[styles.placeCard, hasClaim && styles.placeCardClaimed]}
         activeOpacity={0.88}
         onPress={() => handleOpenPlaceDetail(place)}
       >
@@ -1426,6 +1446,11 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
     elevation: 3,
+  },
+  placeCardClaimed: {
+    borderColor: '#F9C400',
+    borderWidth: 2,
+    backgroundColor: '#FFFDE7',
   },
   placeHeader: {
     flexDirection: 'row',
