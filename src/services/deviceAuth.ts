@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import * as Crypto from 'expo-crypto';
-import { get, off, onValue, ref, set, update } from 'firebase/database';
+import { get, onValue, ref, set, update } from 'firebase/database';
 import { Platform } from 'react-native';
 import { auth, database } from '../firebase-core';
 import { getCurrentAppVersion } from './appVersion';
@@ -637,5 +637,5 @@ export const subscribeAuthorizedDeviceStatus = async (
     });
   });
 
-  return () => off(deviceRef, 'value', unsubscribe);
+  return unsubscribe;
 };

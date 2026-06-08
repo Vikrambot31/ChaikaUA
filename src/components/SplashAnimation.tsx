@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
 import { SCREEN_W as width, SCREEN_H as height } from '../utils/webDimensions';
@@ -17,6 +17,12 @@ const SplashAnimation: React.FC<Props> = ({ onFinish }) => {
     setVideoVisible(false);
     onFinish?.();
   };
+
+  useEffect(() => {
+    const timer = setTimeout(handleFinish, 8000);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <View style={styles.container}>

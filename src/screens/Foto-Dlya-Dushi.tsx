@@ -32,6 +32,7 @@ import { logClientError } from '../utils/errorLogger';
 import { VideoLoadingOverlay } from '../components/VideoLoadingOverlay';
 
 const SCREEN_ID = 'SoulPhotosScreen';
+const PHOTO_UPLOAD_SCREEN_ID = 'PhotoUploadScreen';
 const STORAGE_PATH = 'community_photos';
 const MAX_ITEMS = 60;
 const NUM_COLUMNS = 3;

@@ -62,7 +62,8 @@ export const sportsService = {
   getTodayEntries: async (sport: SportKey): Promise<SportTodayEntry[]> => {
     try {
       const snap = await get(ref(database, `sports/${sport}/days/${todayKey()}`));
-      return toList<SportTodayEntry>(snap.val()).sort((a, b) => a.time.localeCompare(b.time));
+      const toMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + (m || 0); };
+      return toList<SportTodayEntry>(snap.val()).sort((a, b) => toMin(a.time) - toMin(b.time));
     } catch (err) {
       console.error(`[sportsService] getTodayEntries failed for ${sport}:`, err);
       return [];

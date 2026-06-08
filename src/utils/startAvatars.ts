@@ -52,6 +52,7 @@ export type TempProfileData = {
   gender: 'male' | 'female';
   age: number;
   startAvatarKey: string;
+  customAvatarUri?: string;
 };
 
 export const saveTempProfileData = async (data: TempProfileData): Promise<void> => {

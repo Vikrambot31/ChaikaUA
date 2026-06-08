@@ -440,7 +440,9 @@ export default function DetalDetskogoMestaScreen() {
         await set(ref(database, `business_plus_claims/${place.id}/status`), 'approved');
         await set(ref(database, `business_plus_claims/${place.id}/moderatedAt`), now);
         setClaimStatus('approved');
-      } catch { /* ignore */ }
+      } catch {
+        Alert.alert('Помилка', 'Не вдалося схвалити заявку. Спробуйте ще раз.');
+      }
     })();
   };
 
@@ -457,7 +459,9 @@ export default function DetalDetskogoMestaScreen() {
               await set(ref(database, `business_plus_claims/${place.id}/status`), 'rejected');
               await set(ref(database, `business_plus_claims/${place.id}/moderatedAt`), now);
               setClaimStatus('rejected');
-            } catch { /* ignore */ }
+            } catch {
+              Alert.alert('Помилка', 'Не вдалося відхилити заявку. Спробуйте ще раз.');
+            }
           })();
         },
       },

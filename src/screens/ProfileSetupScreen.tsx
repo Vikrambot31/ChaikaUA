@@ -191,6 +191,7 @@ export default function ProfileSetupScreen() {
     if (!isNameDone) missing.push(`- ${text.missingName}`);
     if (!isGenderDone) missing.push(`- ${text.missingGender}`);
     if (!isAgeDone) missing.push(`- ${text.missingAge}`);
+    if (!isAvatarDone) missing.push(`- ${text.missingAvatar}`);
     return missing;
   };
 
@@ -228,6 +229,7 @@ export default function ProfileSetupScreen() {
         gender: gender!,
         age: parsedAge,
         startAvatarKey: selectedKey,
+        ...(customAvatarUri ? { customAvatarUri } : {}),
       });
       Toast.show({ type: 'success', text1: text.quickSavedTitle, text2: text.quickSavedMessage });
       navigation.navigate('LoginScreen');
@@ -246,7 +248,7 @@ export default function ProfileSetupScreen() {
 
     setSaving(true);
     try {
-      const uid = auth.currentUser?.uid || user?.id;
+      const uid = auth.currentUser?.uid;
       let nextPhotoURL = existingPhotoURL;
       let nextPhotoURLs = user?.photoURLs?.filter((url) => url.trim()) ?? (existingPhotoURL ? [existingPhotoURL] : []);
       let nextStartAvatarKey = user?.startAvatarKey ?? '';
@@ -400,7 +402,7 @@ export default function ProfileSetupScreen() {
         <TouchableOpacity
           style={[styles.continueButton, (!canSubmit || saving) && styles.continueButtonDisabled]}
           onPress={handleContinuePress}
-          disabled={saving}
+          disabled={!canSubmit || saving}
           activeOpacity={0.86}
         >
           {saving

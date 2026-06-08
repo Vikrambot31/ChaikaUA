@@ -376,13 +376,6 @@ const LoginScreen: React.FC = () => {
     }
   }, [dispatch, completeLogin, mapSocialAuthError, text]);
 
-  const handleFacebookLogin = useCallback(async () => {
-    Alert.alert(
-      text.errorLoginTitle,
-      'Facebook вхід буде доступний після появи застосунку в Google Play Store. Будь ласка, використовуйте вхід через Email або Google.'
-    );
-  }, [text]);
-
   const handleAppleLogin = useCallback(async () => {
     dispatch(setLoading(true));
     try {
@@ -485,15 +478,6 @@ const LoginScreen: React.FC = () => {
               onPress={handleGoogleLogin}
               disabled={loading}
               variant="secondary"
-            />
-          </View>
-
-          <View style={styles.btnSpacing}>
-            <TactileButton
-              title={text.facebookBtn}
-              onPress={handleFacebookLogin}
-              disabled={loading}
-              variant="social"
             />
           </View>
 

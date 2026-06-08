@@ -6,7 +6,7 @@ const makeSeedPhoto = (id: string, imageUri: number, title: string): CommunityPh
   description: 'Архивное фото ЖК Чайка.',
   imageUri,
   uploadedBy: 'Chaika archive',
-  createdAt: new Date('2025-01-01T00:00:00.000Z'),
+  createdAt: new Date('2025-01-01T00:00:00.000Z').getTime(),
   status: 'approved',
   likes: 0,
 });

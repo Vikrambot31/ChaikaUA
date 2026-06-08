@@ -184,7 +184,7 @@ const SportNaChaykeScreen: React.FC = () => {
         time,
         players,
       }));
-    }).sort((a, b) => a.time.localeCompare(b.time) || text.sports[a.sport.key].localeCompare(text.sports[b.sport.key]));
+    }).sort((a, b) => { const toMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + (m || 0); }; return toMin(a.time) - toMin(b.time) || text.sports[a.sport.key].localeCompare(text.sports[b.sport.key]); });
   }, [todayEntriesBySport, text.sports]);
 
   return (

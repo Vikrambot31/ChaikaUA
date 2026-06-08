@@ -1,14 +1,14 @@
 import { useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationProp } from '@react-navigation/native';
-import { createUserWithEmailAndPassword, signOut, updateProfile } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { equalTo, get, orderByChild, query, ref as dbRef, set as dbSet } from 'firebase/database';
 import Toast from 'react-native-toast-message';
 import { useDispatch } from 'react-redux';
 import { auth, database } from '../firebase-config';
 import { Building } from '../data/buildings';
 import { setError, setLoading, setUser } from '../redux/slices/authSlice';
-import { loadProfileRecord, mapFirebaseUserToAppUser } from '../services/authProfileService';
+import { loadProfileRecord, mapFirebaseUserToAppUser, uploadProfilePhoto } from '../services/authProfileService';
 import { getPasswordBreachCount } from '../utils/passwordBreachCheck';
 import {
   clearSelectedStartAvatar,
@@ -120,6 +120,19 @@ export const useFullRegistration = ({
         }
       }
 
+      if (referrerPhone && !isCompletingExistingAccount) {
+        const normalizedReferrer = normalizePhoneText(referrerPhone);
+        const referrerSnap = await get(query(dbRef(database, 'users'), orderByChild('phone'), equalTo(normalizedReferrer)));
+        const referrerSnapAlt = await get(query(dbRef(database, 'users'), orderByChild('phone'), equalTo(referrerPhone.trim())));
+        const referrerVerified = referrerSnap.exists() || referrerSnapAlt.exists();
+
+        if (!referrerVerified) {
+          dispatch(setError(text.referrerNotFound));
+          Toast.show({ type: 'error', text1: text.error, text2: text.referrerNotFound });
+          return;
+        }
+      }
+
       const authUser = isCompletingExistingAccount
         ? auth.currentUser
         : (await createUserWithEmailAndPassword(auth, normalizedEmail, password)).user;
@@ -130,21 +143,13 @@ export const useFullRegistration = ({
 
       await updateProfile(authUser, { displayName: normalizedName });
 
-      if (referrerPhone) {
+      if (referrerPhone && isCompletingExistingAccount) {
         const normalizedReferrer = normalizePhoneText(referrerPhone);
         const referrerSnap = await get(query(dbRef(database, 'users'), orderByChild('phone'), equalTo(normalizedReferrer)));
         const referrerSnapAlt = await get(query(dbRef(database, 'users'), orderByChild('phone'), equalTo(referrerPhone.trim())));
         const referrerVerified = referrerSnap.exists() || referrerSnapAlt.exists();
 
         if (!referrerVerified) {
-          if (!isCompletingExistingAccount) {
-            try {
-              await authUser.delete();
-            } catch {
-              await signOut(auth).catch(() => null);
-            }
-          }
-
           dispatch(setError(text.referrerNotFound));
           Toast.show({ type: 'error', text1: text.error, text2: text.referrerNotFound });
           return;
@@ -154,8 +159,19 @@ export const useFullRegistration = ({
       const uid = authUser.uid;
       const selectedStartAvatar = await getSelectedStartAvatar();
       const tempProfile = await loadTempProfileData();
-      const avatarUri = authUser.photoURL || selectedStartAvatar?.uri || (tempProfile ? `start-avatar://${tempProfile.startAvatarKey}` : '');
-      const avatarKey = selectedStartAvatar?.key || tempProfile?.startAvatarKey;
+
+      let avatarUri = authUser.photoURL || selectedStartAvatar?.uri || (tempProfile ? `start-avatar://${tempProfile.startAvatarKey}` : '');
+      let avatarKey = selectedStartAvatar?.key || tempProfile?.startAvatarKey;
+
+      if (!authUser.photoURL && tempProfile?.customAvatarUri) {
+        try {
+          const uploaded = await uploadProfilePhoto(tempProfile.customAvatarUri, { moderationStatus: 'approved' });
+          avatarUri = uploaded.url;
+          avatarKey = '';
+        } catch {
+          // Upload failed — fall back to start avatar
+        }
+      }
 
       await dbSet(dbRef(database, `users/${uid}`), {
         name: tempProfile?.name || normalizedName,

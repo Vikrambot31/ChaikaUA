@@ -43,6 +43,7 @@ export type RegistrationFullText = {
   invalidRedirect: string;
   quickReg: string;
   addressData: string;
+  passwordMismatch: string;
 };
 
 const TEXTS: Record<RegistrationLanguage, RegistrationFullText> = {
@@ -89,6 +90,7 @@ const TEXTS: Record<RegistrationLanguage, RegistrationFullText> = {
     invalidRedirect: 'Не вдалося відкрити потрібний екран. Відкриваємо профіль.',
     quickReg: 'Швидка реєстрація',
     addressData: 'Адреса і дані',
+    passwordMismatch: 'Паролі не збігаються',
   },
   ru: {
     error: 'Ошибка',
@@ -133,6 +135,7 @@ const TEXTS: Record<RegistrationLanguage, RegistrationFullText> = {
     invalidRedirect: 'Не удалось открыть нужный экран. Открываем профиль.',
     quickReg: 'Быстрая регистрация',
     addressData: 'Адрес и данные',
+    passwordMismatch: 'Пароли не совпадают',
   },
   en: {
     error: 'Error',
@@ -177,6 +180,7 @@ const TEXTS: Record<RegistrationLanguage, RegistrationFullText> = {
     invalidRedirect: 'Could not open the requested screen. Opening your profile.',
     quickReg: 'Quick registration',
     addressData: 'Address and details',
+    passwordMismatch: 'Passwords do not match',
   },
 };
 

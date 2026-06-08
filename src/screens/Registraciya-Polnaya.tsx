@@ -248,6 +248,10 @@ const RegisterScreenFull: React.FC = () => {
                 </TouchableOpacity>
               </View>
 
+              {password.length > 0 && !isPasswordValid ? (
+                <Text style={styles.fieldHint}>{text.minPassword}</Text>
+              ) : null}
+
               <FormSectionLabel label={text.confirmPassword} completed={isPasswordsMatch && confirmPassword.length > 0} labelStyle={styles.label} containerStyle={styles.labelRow} />
               <View style={styles.passwordWrap}>
                 <TactileInput
@@ -262,6 +266,9 @@ const RegisterScreenFull: React.FC = () => {
                   <Text style={styles.toggleText}>{showConfirmPassword ? text.hide : text.show}</Text>
                 </TouchableOpacity>
               </View>
+              {confirmPassword.length > 0 && !isPasswordsMatch ? (
+                <Text style={styles.fieldHint}>{text.passwordMismatch}</Text>
+              ) : null}
             </>
           ) : null}
 
@@ -403,6 +410,7 @@ const styles = StyleSheet.create({
   termsText: { flex: 1, fontSize: 13, color: SCREEN_THEME.textPrimary, fontWeight: '600', lineHeight: 18 },
   termsCheckDot: { width: 14, height: 14, borderRadius: 7, backgroundColor: '#2EB85C' },
   errorText: { fontSize: 12, color: '#D05B4D', marginBottom: 8, fontWeight: '700' },
+  fieldHint: { fontSize: 12, color: '#D05B4D', marginTop: 4, marginBottom: 6, fontWeight: '600' },
   btnSpacing: { marginTop: 10 },
   loginContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   loginText: { fontSize: 14, color: SCREEN_THEME.textSecondary, fontWeight: '600' },

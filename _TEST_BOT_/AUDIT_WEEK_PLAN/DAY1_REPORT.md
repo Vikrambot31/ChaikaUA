@@ -2,17 +2,17 @@
 
 ## Дата: 2026-06-08
 ## Агент: DeepSeek v4
-## Статус: Перевірено 8 з 10 задач
+## Статус: Перевірено 10 з 10 задач
 
 ---
 
 ## СТАТИСТИКА
 
-- **Перевірено файлів:** ~35
-- **Знайдено багів:** 16
+- **Перевірено файлів:** ~43
+- **Знайдено багів:** 20
   - **CRITICAL:** 0
-  - **HIGH:** 1
-  - **MEDIUM:** 15
+  - **HIGH:** 2
+  - **MEDIUM:** 17
   - **LOW:** 1
 
 ---
@@ -315,6 +315,107 @@ if (!isBypassUser) {
 
 ---
 
+### BUG-1.8.1: "Quick Registration" не зберігає власне фото [MEDIUM]
+
+- **Severity:** MEDIUM
+- **Файл:** `src/screens/ProfileSetupScreen.tsx`
+- **Строка:** 225-231
+- **Функція:** `handleQuickRegistrationPress()`
+- **Проблема:** Зберігає тільки `selectedKey` (startAvatar), але ігнорує `customAvatarUri`. Якщо користувач завантажив власне фото і натиснув "Швидка реєстрація" — фото втрачається.
+- **Код:**
+```typescript
+setSaving(true);
+try {
+  if (selectedKey) await saveSelectedStartAvatar(selectedKey);
+  await saveTempProfileData({
+    name: trimmedName,
+    gender: gender!,
+    age: parsedAge,
+    startAvatarKey: selectedKey, // ← customAvatarUri не збережено
+  });
+```
+- **Очікувано:** `saveTempProfileData` має також приймати `customAvatarUri` для подальшого завантаження після реєстрації.
+
+---
+
+### BUG-1.8.2: `getMissingMessages` не перевіряє avatar — кнопка Continue мовчки не працює [MEDIUM]
+
+- **Severity:** MEDIUM
+- **Файл:** `src/screens/ProfileSetupScreen.tsx`
+- **Строка:** 189-195, 197-207
+- **Функція:** `getMissingMessages()`, `handleContinuePress()`
+- **Проблема:** Функція перевіряє тільки name/gender/age, але НЕ avatar (`text.missingAvatar` існує в словнику, але не використовується). Коли всі поля заповнені, крім аватара:
+  1. `getMissingMessages()` повертає `[]` (пусто)
+  2. `handleContinuePress` викликає `confirm()`
+  3. `confirm()` бачить `!canSubmit` (бо `isAvatarDone === false`) і тихо виходить
+  4. Користувач натискає кнопку — **нічого не відбувається**, жодного повідомлення
+- **Код:**
+```typescript
+const getMissingMessages = () => {
+  const missing: string[] = [];
+  if (!isNameDone) missing.push(`- ${text.missingName}`);
+  if (!isGenderDone) missing.push(`- ${text.missingGender}`);
+  if (!isAgeDone) missing.push(`- ${text.missingAge}`);
+  // ← avatar не перевіряється!
+  return missing;
+};
+```
+- **Очікувано:** Додати `if (!isAvatarDone) missing.push(text.missingAvatar);`
+
+---
+
+### BUG-1.8.3: Кнопка Continue візуально неактивна, але натискається [MEDIUM]
+
+- **Severity:** MEDIUM
+- **Файл:** `src/screens/ProfileSetupScreen.tsx`
+- **Строка:** 400-409
+- **Функція:** `render`
+- **Проблема:** `disabled={saving}` — кнопка блокується тільки під час збереження. Коли `canSubmit === false`, застосовується стиль `continueButtonDisabled` (opacity 0.45), але кнопка залишається активною. Користувач бачить "сірий" колір (очікує що не можна натиснути), але може натиснути — і нічого не станеться (через BUG-1.8.2).
+- **Код:**
+```typescript
+<TouchableOpacity
+  style={[styles.continueButton, (!canSubmit || saving) && styles.continueButtonDisabled]}
+  onPress={handleContinuePress}
+  disabled={saving}  // ← має бути: disabled={!canSubmit || saving}
+  activeOpacity={0.86}
+>
+```
+- **Очікувано:** `disabled={!canSubmit || saving}`
+
+---
+
+### BUG-1.8.4: Stale `user?.id` fallback може записати дані під чужий uid [MEDIUM]
+
+- **Severity:** MEDIUM
+- **Файл:** `src/screens/ProfileSetupScreen.tsx`
+- **Строка:** 249
+- **Функція:** `confirm()`
+- **Проблема:** Якщо `auth.currentUser` — null (не автентифіковано), але `user?.id` зберігся в Redux від попередньої (anonymous) сесії, то `uid` буде старим. Дані профілю запишуться під старим uid, а новий Firebase Auth User нічого не отримає. Пов'язано з BUG-1.7.1.
+- **Код:** `const uid = auth.currentUser?.uid || user?.id;`
+- **Очікувано:** Не використовувати `user?.id` як fallback. Якщо `auth.currentUser` немає — зберігати тільки локально.
+
+---
+
+### BUG-1.10.1: `subscribeAuthorizedDeviceStatus` некоректно видаляє Firebase listener [MEDIUM]
+
+- **Severity:** MEDIUM
+- **Файл:** `src/services/deviceAuth.ts`
+- **Строка:** 640
+- **Функція:** `subscribeAuthorizedDeviceStatus()`
+- **Проблема:** `onValue` повертає unsubscribe-функцію. Код загортає її в `off(deviceRef, 'value', unsubscribe)`, передаючи функцію unsubscribe як callback. `off()` очікує ту саму callback-функцію, що передавалась у `onValue`, а не обгортку. Listener ніколи не видаляється → **витік пам'яті + дубльовані сповіщення**.
+- **Код:**
+```typescript
+const unsubscribe = onValue(deviceRef, (snapshot) => {
+  // ...
+}, (error) => {
+  // ...
+});
+return () => off(deviceRef, 'value', unsubscribe); // ← unsubscribe !== оригінальний callback
+```
+- **Очікувано:** `return unsubscribe;` — використовувати вбудовану функцію відписки від `onValue`.
+
+---
+
 ## ПЕРЕВІРЕНІ ФАЙЛИ БЕЗ БАГІВ
 
 | Файл | Задача | Примітка |
@@ -327,24 +428,29 @@ if (!isBypassUser) {
 | `src/screens/AccessRestrictedScreen.tsx` | 1.9 | OK (але dead code через SoftInviteAccessGate) |
 | `src/utils/imageSafety.ts` | 1.6 | OK |
 | `src/utils/passwordBreachCheck.ts` | 1.6 | OK (інтегровано в useFullRegistration) |
+| `src/services/authProfileService.ts` | 1.8 | OK |
+| `src/redux/slices/authSlice.ts` | 1.10 | OK |
+| `src/services/sessionService.ts` | 1.10 | OK |
+| `src/services/deviceAuth.ts` | 1.10 | 1 баг (BUG-1.10.1) |
+| `src/utils/authGuard.ts` | 1.10 | OK |
+| `src/firebase-auth-session.ts` | 1.10 | OK |
 
 ---
 
 ## НЕ ПЕРЕВІРЕНІ ЗАДАЧІ
 
-| Задача | Файли |
-|--------|-------|
-| **1.8** Налаштування профілю | `ProfileSetupScreen.tsx`, `authProfileService.ts` |
-| **1.10** Загальні auth | `authSlice.ts`, `firebase-auth-session.ts`, `sessionService.ts`, `deviceAuth.ts`, `authGuard.ts` |
+*Всі 10 задач Дня 1 виконано.*
 
 ---
 
 ## РЕКОМЕНДАЦІЇ — що виправити ПЕРШИМ
 
-1. **BUG-1.1.1** (HIGH) — ForceUpdateScreen не блокує онбординг. Найнебезпечніший баг — юзери Old версії не бачать примусового оновлення.
-2. **BUG-1.6.6** (HIGH) — Орфанні акаунти. Вже виправлено частково (signInAnonymously → signOut), але треба перевірити fix.
-3. **BUG-1.3.2** (MEDIUM) — Різні вимоги до пароля — дезорієнтує користувачів.
-4. **BUG-1.1.2** (MEDIUM) — Splash без timeout — може зависнути на Web.
+1. **BUG-1.1.1** (HIGH) — ForceUpdateScreen не блокує онбординг.
+2. **BUG-1.6.6** (HIGH) — Орфанні акаунти.
+3. **BUG-1.8.2 + 1.8.3** (MEDIUM) — Кнопка Continue не працює/вводить в оману при відсутньому аватарі.
+4. **BUG-1.3.2** (MEDIUM) — Різні вимоги до пароля.
+5. **BUG-1.1.2** (MEDIUM) — Splash без timeout на Web.
+6. **BUG-1.10.1** (MEDIUM) — Витік пам'яті в deviceAuth listener.
 
 ---
 
@@ -354,7 +460,5 @@ if (!isBypassUser) {
 ```
 AGENT_SYSTEM_PROMPT.md — скинути в чат
 Продовжити з:
-- DAY1_TASK_1.8: ProfileSetupScreen.tsx, authProfileService.ts
-- DAY1_TASK_1.10: authSlice.ts, firebase-auth-session.ts, sessionService.ts, deviceAuth.ts, authGuard.ts
-Або перейти до DAY2_FEED_REQUESTS.md
+DAY2_FEED_REQUESTS.md — День 2 (задачі 2.1-2.4 виконано, почати з 2.5)
 ```

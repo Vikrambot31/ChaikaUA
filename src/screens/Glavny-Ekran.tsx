@@ -75,6 +75,7 @@ type TopInfoItem = {
 
 type LiveFeedItem = {
   id: string;
+  createdAt: number;
   icon: React.ComponentProps<typeof MaterialCommunityIcons>['name'];
   iconColor: string;
   iconBg: string;
@@ -588,6 +589,7 @@ const HomeScreen: React.FC = () => {
       const badge = getFeedBadge({ category: 'help', group: 'help', urgent: hr.isBurning });
       items.push({
         id: `help-${hr.id}`,
+        createdAt: new Date(hr.createdAt).getTime(),
         icon: visual.icon,
         iconColor: visual.iconColor,
         iconBg: visual.iconBg,
@@ -619,6 +621,7 @@ const HomeScreen: React.FC = () => {
       });
       items.push({
         id: `req-${req.id}`,
+        createdAt: req.createdAt,
         icon: visual.icon,
         iconColor: visual.iconColor,
         iconBg: visual.iconBg,
@@ -639,6 +642,7 @@ const HomeScreen: React.FC = () => {
       const badge = getFeedBadge({ category: 'electricity' });
       items.push({
         id: `elec-${report.id}`,
+        createdAt: report.createdAt instanceof Date ? report.createdAt.getTime() : Number(report.createdAt),
         icon: report.status === 'on' ? 'lightning-bolt' : 'flash-off',
         iconColor: report.status === 'on' ? visual.iconColor : SCREEN_THEME.enamelBlueDark,
         iconBg: report.status === 'on' ? visual.iconBg : 'rgba(95, 132, 180, 0.14)',
@@ -653,8 +657,8 @@ const HomeScreen: React.FC = () => {
       });
     }
 
-    // Sort by id (Firebase push IDs are chronological), newest first
-    items.sort((a, b) => b.id.localeCompare(a.id));
+    // Sort by createdAt timestamp, newest first
+    items.sort((a, b) => b.createdAt - a.createdAt);
 
     return items.slice(0, MAX_FEED_ITEMS);
   }, [avatarByUserId, helpRequests, liveRequests, electricityReports, feedText, language]);

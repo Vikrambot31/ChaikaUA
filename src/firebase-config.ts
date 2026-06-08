@@ -619,7 +619,7 @@ const mapDbPhotoToAppPhoto = (id: string, value: unknown): AppPhoto => {
         : typeof v?.uploadedByEmail === 'string' && v.uploadedByEmail
           ? v.uploadedByEmail
         : 'Anonymous',
-    createdAt: new Date(createdAt),
+    createdAt: new Date(createdAt).getTime(),
     status,
     target: v?.target === 'my_photos' ? 'my_photos' : 'gallery_public',
     sourceScreen:

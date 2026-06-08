@@ -529,37 +529,6 @@ const RequestsScreen: React.FC = () => {
     };
   }, [user?.id, user?.email, loadPage, loadPendingPhotos, loadPendingLostFound, loadPendingBuySell, loadPendingContacts, loadPendingLocalBusiness, loadPendingAppSuggestions]);
 
-  // When user applies a non-'all' filter, load all pages so filter works on complete data
-  useEffect(() => {
-    if (statusFilter !== 'all' && hasMore && !loading && !loadingMore) {
-      void loadAllRequests();
-    }
-  }, [statusFilter, hasMore, loading, loadingMore, loadAllRequests]);
-
-  const handleRefresh = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      await Promise.all([
-        loadPage(null, false),
-        isModerator ? loadPendingPhotos() : Promise.resolve(),
-        isModerator ? loadPendingLostFound() : Promise.resolve(),
-        isModerator ? loadPendingBuySell() : Promise.resolve(),
-        isModerator ? loadPendingContacts() : Promise.resolve(),
-        isModerator ? loadPendingLocalBusiness() : Promise.resolve(),
-        isModerator ? loadPendingAppSuggestions() : Promise.resolve(),
-      ]);
-    } finally {
-      setRefreshing(false);
-    }
-  }, [isModerator, loadPage, loadPendingPhotos, loadPendingLostFound, loadPendingBuySell, loadPendingContacts, loadPendingLocalBusiness, loadPendingAppSuggestions]);
-
-  const handleLoadMore = useCallback(async () => {
-    if (loading || loadingMore || !hasMore || !nextCursor) return;
-    setLoadingMore(true);
-    await loadPage(nextCursor, true);
-    setLoadingMore(false);
-  }, [hasMore, loadPage, loading, loadingMore, nextCursor]);
-
   // When a non-'all' filter is selected, load all remaining pages so filter works on complete data
   const loadAllRequests = useCallback(async () => {
     let cursor: number | null = null;
@@ -594,6 +563,37 @@ const RequestsScreen: React.FC = () => {
       setLoadingMore(false);
     }
   }, []);
+
+  // When user applies a non-'all' filter, load all pages so filter works on complete data
+  useEffect(() => {
+    if (statusFilter !== 'all' && hasMore && !loading && !loadingMore) {
+      void loadAllRequests();
+    }
+  }, [statusFilter, hasMore, loading, loadingMore, loadAllRequests]);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        loadPage(null, false),
+        isModerator ? loadPendingPhotos() : Promise.resolve(),
+        isModerator ? loadPendingLostFound() : Promise.resolve(),
+        isModerator ? loadPendingBuySell() : Promise.resolve(),
+        isModerator ? loadPendingContacts() : Promise.resolve(),
+        isModerator ? loadPendingLocalBusiness() : Promise.resolve(),
+        isModerator ? loadPendingAppSuggestions() : Promise.resolve(),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [isModerator, loadPage, loadPendingPhotos, loadPendingLostFound, loadPendingBuySell, loadPendingContacts, loadPendingLocalBusiness, loadPendingAppSuggestions]);
+
+  const handleLoadMore = useCallback(async () => {
+    if (loading || loadingMore || !hasMore || !nextCursor) return;
+    setLoadingMore(true);
+    await loadPage(nextCursor, true);
+    setLoadingMore(false);
+  }, [hasMore, loadPage, loading, loadingMore, nextCursor]);
 
   const moderate = useCallback(
     async (requestId: string, status: 'approved' | 'rejected') => {

@@ -66,7 +66,7 @@ const AppAccessGuard: React.FC<AppAccessGuardProps> = ({
 }) => {
   const currentUser = useSelector(selectUser);
   const [isBypassUser, setIsBypassUser] = useState(() => isPrimaryServiceEmail(auth.currentUser));
-  const [isBypassReady, setIsBypassReady] = useState(() => !auth.currentUser?.uid || isPrimaryServiceEmail(auth.currentUser));
+  const [isBypassReady, setIsBypassReady] = useState(() => isPrimaryServiceEmail(auth.currentUser));
   const [remoteSnapshot, setRemoteSnapshot] = useState<RemoteConfigSnapshot>(
     initialRemoteConfigSnapshot ?? createDefaultRemoteConfigSnapshot(),
   );

@@ -15,6 +15,7 @@ import { CommonActions, NavigationProp, RouteProp, useNavigation, useRoute } fro
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../redux/store';
 import { auth } from '../firebase-config';
+import { isAnonymousFirebaseUser } from '../firebase-auth-session';
 import { setUser } from '../redux/slices/authSlice';
 import { selectUser } from '../redux/selectors';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -76,7 +77,7 @@ export default function StartAvatarPickerScreen() {
     try {
       await saveSelectedStartAvatar(selectedAvatar.key);
 
-      const uid = auth.currentUser?.uid || user?.id;
+      const uid = !isAnonymousFirebaseUser(auth.currentUser) ? auth.currentUser?.uid : null;
       if (uid) {
         await updateProfileRecord(uid, {
           photoURL: selectedAvatar.uri,
