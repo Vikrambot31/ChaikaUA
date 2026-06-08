@@ -123,7 +123,7 @@ const UI_TEXT = {
     resetPasswordNeedEmail: 'Введіть коректний email, щоб скинути пароль.',
     resetPasswordFailed: 'Не вдалося надіслати лист для скидання пароля.',
     inlineEmailError: 'Введіть коректний email.',
-    inlinePasswordError: 'Пароль має містити щонайменше 6 символів.',
+    inlinePasswordError: 'Пароль має містити щонайменше 8 символів.',
   },
   ru: {
     subtitle: 'Вход в аккаунт',
@@ -157,7 +157,7 @@ const UI_TEXT = {
     resetPasswordNeedEmail: 'Введите корректный email, чтобы сбросить пароль.',
     resetPasswordFailed: 'Не удалось отправить письмо для сброса пароля.',
     inlineEmailError: 'Введите корректный email.',
-    inlinePasswordError: 'Пароль должен содержать минимум 6 символов.',
+    inlinePasswordError: 'Пароль должен содержать минимум 8 символов.',
   },
   en: {
     subtitle: 'Sign in to your account',
@@ -191,7 +191,7 @@ const UI_TEXT = {
     resetPasswordNeedEmail: 'Enter a valid email so we can send a password reset link.',
     resetPasswordFailed: 'Could not send the password reset email.',
     inlineEmailError: 'Enter a valid email.',
-    inlinePasswordError: 'Password must be at least 6 characters.',
+    inlinePasswordError: 'Password must be at least 8 characters.',
   },
 } as const;
 
@@ -217,7 +217,7 @@ const LoginScreen: React.FC = () => {
 
   const normalizedEmail = normalizeEmailText(email);
   const isEmailValid = validateEmail(normalizedEmail);
-  const isPasswordValid = password.length >= 6;
+  const isPasswordValid = password.length >= 8;
   const isFormValid = isEmailValid && isPasswordValid;
   const loginRateLimitSeconds = Math.max(0, Math.ceil((loginRateLimitUntil - now) / 1000));
 

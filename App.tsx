@@ -56,6 +56,35 @@ import { LOCAL_MODE, getCurrentLocalUser } from './src/local/LOCAL_MODE';
 import { awardDailyLoginBonus } from './src/services/bonusService';
 import type { User } from './src/types/app';
 
+// Web: center the phone container in the browser viewport.
+// Expo dev server ignores web/index.html, so we inject styles via JS.
+if (Platform.OS === 'web' && typeof document !== 'undefined') {
+  (() => {
+    const applyWebLayout = () => {
+      document.body.style.setProperty('display', 'flex', 'important');
+      document.body.style.setProperty('justify-content', 'center', 'important');
+      document.body.style.setProperty('align-items', 'flex-start', 'important');
+      document.body.style.setProperty('background-color', '#d6cfc6', 'important');
+      document.body.style.setProperty('overflow', 'hidden', 'important');
+      const root = document.getElementById('root');
+      if (root) {
+        root.style.setProperty('width', '430px', 'important');
+        root.style.setProperty('max-width', '430px', 'important');
+        root.style.setProperty('min-width', '320px', 'important');
+        root.style.setProperty('height', '100vh', 'important');
+        root.style.setProperty('overflow', 'hidden', 'important');
+        root.style.setProperty('background-color', '#f7f3ee', 'important');
+        root.style.setProperty('box-shadow', '0 0 40px rgba(0,0,0,0.25)', 'important');
+        root.style.setProperty('flex-shrink', '0', 'important');
+      }
+    };
+    applyWebLayout();
+    // Re-apply after a tick in case RNW resets styles during bootstrap
+    setTimeout(applyWebLayout, 0);
+    setTimeout(applyWebLayout, 100);
+  })();
+}
+
 const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
 const decodeBase64ToBinary = (input: string): string => {
@@ -653,9 +682,10 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <Provider store={store}>
-        {showSplash || isCheckingFirstLaunch || isPreparingStartupImages || isCheckingVersion || isLoadingRemoteConfig ? (
+        {showSplash ? (
           <SplashAnimation onFinish={() => setShowSplash(false)} />
-        ) : versionCheck?.requiresUpdate ? (
+        ) : isCheckingFirstLaunch || isPreparingStartupImages || isCheckingVersion || isLoadingRemoteConfig ? null
+        : versionCheck?.requiresUpdate ? (
           <ForceUpdateScreen result={versionCheck} onRetry={runVersionCheck} />
         ) : showOnboarding && !showLanguagePicker ? (
           <FirstLaunchOnboarding onDone={handleOnboardingDone} />
