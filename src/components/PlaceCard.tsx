@@ -1,19 +1,19 @@
 import React from 'react';
-import { Dimensions, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useSelector } from 'react-redux';
 import { Place, PlaceType } from '../types/app';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { RootState } from '../redux/store';
 import TactileIcon from './TactileIcon';
 import TactileCard from './TactileCard';
+import { SCREEN_W } from '../utils/webDimensions';
 
 interface PlaceCardProps {
   place: Place;
   onPress: () => void;
 }
 
-const { width } = Dimensions.get('window');
-const CARD_WIDTH = width - 32;
+const CARD_WIDTH = SCREEN_W - 32;
 
 const TYPE_COLORS: Record<PlaceType, string> = {
   [PlaceType.SHOP]: SCREEN_THEME.terracotta,

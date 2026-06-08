@@ -115,9 +115,13 @@ const requestsSlice = createSlice({
       state.items[index] = action.payload;
 
       const approvedIndex = state.approved.findIndex((r) => r.id === action.payload.id);
-      if (approvedIndex !== -1 && action.payload.isApproved) {
-        state.approved[approvedIndex] = action.payload;
-      } else if (approvedIndex !== -1 && !action.payload.isApproved) {
+      if (action.payload.isApproved) {
+        if (approvedIndex !== -1) {
+          state.approved[approvedIndex] = action.payload;
+        } else {
+          state.approved.push(action.payload);
+        }
+      } else if (approvedIndex !== -1) {
         state.approved.splice(approvedIndex, 1);
       }
     },

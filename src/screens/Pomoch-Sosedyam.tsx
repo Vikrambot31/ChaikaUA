@@ -66,11 +66,12 @@ const UI_TEXT = {
   },
 } as const;
 
-const formatPublishedAt = (createdAt: Date) => {
-  const day = String(createdAt.getDate()).padStart(2, '0');
-  const month = String(createdAt.getMonth() + 1).padStart(2, '0');
-  const hours = String(createdAt.getHours()).padStart(2, '0');
-  const minutes = String(createdAt.getMinutes()).padStart(2, '0');
+const formatPublishedAt = (createdAt: string | Date) => {
+  const d = createdAt instanceof Date ? createdAt : new Date(createdAt);
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
   return `${day}.${month} ${hours}:${minutes}`;
 };
 
@@ -87,7 +88,7 @@ const HelpNeighborsScreen: React.FC = () => {
   const todayRequests = useSelector((state: RootState) => selectTodayHelpRequests(state)) as HelpRequest[];
   const yesterdayRequests = useSelector((state: RootState) => selectYesterdayHelpRequests(state));
   const burningRequests = useMemo(
-    () => todayRequests.filter((request) => request.isBurning && request.expiresAt > new Date()),
+    () => todayRequests.filter((request) => request.isBurning && request.expiresAt > new Date().toISOString()),
     [todayRequests]
   );
   const listData = useMemo((): ListItem[] => [
@@ -152,9 +153,9 @@ const HelpNeighborsScreen: React.FC = () => {
     description: item.description,
     phone: item.phone,
     category: undefined,
-    status: item.isBurning && item.expiresAt > new Date() ? text.listTitle : text.expired,
+    status: item.isBurning && item.expiresAt > new Date().toISOString() ? text.listTitle : text.expired,
     userId: item.userId,
-    createdAt: item.createdAt.toISOString(),
+    createdAt: item.createdAt,
     sourceType: 'help',
     sourceId: item.id,
     photoUri: item.photoUri,

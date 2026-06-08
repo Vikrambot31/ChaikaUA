@@ -58,6 +58,8 @@ const TEXT = {
     avatarError: 'Не вдалося обрати або зберегти фото. Спробуйте ще раз.',
     loginRequiredForPhoto: 'Щоб зберегти власне фото, спочатку потрібно увійти в акаунт.',
     saveError: 'Не вдалося зберегти дані. Спробуйте ще раз.',
+    quickSavedTitle: 'Дані збережено',
+    quickSavedMessage: 'Профіль буде завершено після реєстрації.',
   },
   ru: {
     title: 'Расскажите о себе',
@@ -84,6 +86,8 @@ const TEXT = {
     avatarError: 'Не удалось выбрать или сохранить фото. Попробуйте еще раз.',
     loginRequiredForPhoto: 'Чтобы сохранить свое фото, сначала нужно войти в аккаунт.',
     saveError: 'Не удалось сохранить данные. Попробуйте еще раз.',
+    quickSavedTitle: 'Данные сохранены',
+    quickSavedMessage: 'Профиль будет завершён после регистрации.',
   },
   en: {
     title: 'Tell us about yourself',
@@ -110,6 +114,8 @@ const TEXT = {
     avatarError: 'Could not choose or save the photo. Please try again.',
     loginRequiredForPhoto: 'To save your own photo, please sign in first.',
     saveError: 'Could not save data. Please try again.',
+    quickSavedTitle: 'Data saved',
+    quickSavedMessage: 'Your profile will be completed after registration.',
   },
 } as const;
 
@@ -196,7 +202,7 @@ export default function ProfileSetupScreen() {
       return;
     }
     void confirm().catch(() => {
-      Alert.alert(text.missingTitle, text.avatarError);
+      Alert.alert(text.missingTitle, text.saveError);
     });
   };
 
@@ -223,6 +229,7 @@ export default function ProfileSetupScreen() {
         age: parsedAge,
         startAvatarKey: selectedKey,
       });
+      Toast.show({ type: 'success', text1: text.quickSavedTitle, text2: text.quickSavedMessage });
       navigation.navigate('LoginScreen');
     } catch {
       Toast.show({ type: 'error', text1: text.missingTitle, text2: text.saveError });

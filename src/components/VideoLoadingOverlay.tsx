@@ -4,10 +4,10 @@ import {
   Text,
   StyleSheet,
   Animated,
-  Dimensions,
   Easing,
 } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
+import { SCREEN_W } from '../utils/webDimensions';
 
 interface VideoLoadingOverlayProps {
   visible: boolean;
@@ -18,7 +18,7 @@ interface VideoLoadingOverlayProps {
   minDuration?: number;
 }
 
-const CIRCLE_SIZE = Dimensions.get('window').width * 0.55;
+const CIRCLE_SIZE = SCREEN_W * 0.55;
 const FADE_DURATION = 250;
 
 const CHAIKA_PHRASES = [

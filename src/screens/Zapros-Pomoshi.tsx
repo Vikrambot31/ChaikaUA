@@ -311,7 +311,7 @@ const HelpRequestScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const route = useRoute<RouteProp<HelpRequestRouteParams, 'HelpRequestScreen'>>();
   const language = useSelector((state: LangState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
-  const user = useSelector((state: { auth?: { user?: { id?: string; name?: string; phone?: string; photoURL?: string; startAvatarKey?: string } } }) => state.auth?.user);
+  const user = useSelector((state: { auth?: { user?: { id?: string; name?: string; phone?: string; photoURL?: string; startAvatarKey?: string; houseNumber?: string } } }) => state.auth?.user);
   const text = UI_TEXT[language];
   const helpTypeLabels = HELP_TYPES_LABELS[language];
   const prefill = route.params?.prefill;
@@ -444,7 +444,7 @@ const HelpRequestScreen: React.FC = () => {
         category,
         group: 'help_neighbors',
         subcategory: helpType,
-        building: 'Чайка',
+        building: user?.houseNumber ? `Чайка, буд. ${user.houseNumber}` : 'Чайка',
         text: finalText,
         description: finalDescription,
         photoUri: firstPhoto?.downloadUrl ?? '',

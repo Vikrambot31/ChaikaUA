@@ -4,6 +4,7 @@ import {
   Dimensions,
   Image,
   ImageSourcePropType,
+  Platform,
   SafeAreaView,
   ScrollView,
   StatusBar,
@@ -40,12 +41,16 @@ const INTRO_VIDEO_KEY = '@chaika:intro_video_shown';
 
 const MAX_FEED_ITEMS = 5;
 
-const SCREEN_W = Dimensions.get('window').width;
+const SCREEN_W = Platform.OS === 'web'
+  ? Math.min(Dimensions.get('window').width, 430)
+  : Dimensions.get('window').width;
 const IS_NARROW_SCREEN = SCREEN_W < 360;
 const GRID_HORIZONTAL_PADDING = 16;
 const GRID_CELL_W = Math.floor((SCREEN_W - GRID_HORIZONTAL_PADDING * 2) / 2) - 4;
 const BTN_ASPECT = 138 / 150;
-const BTN_W = Math.round(GRID_CELL_W * (IS_NARROW_SCREEN ? 0.79 : 0.85));
+// On web reduce button artwork size so 4 buttons + rest of content fit on screen
+const BTN_SCALE = Platform.OS === 'web' ? 0.58 : (IS_NARROW_SCREEN ? 0.79 : 0.85);
+const BTN_W = Math.round(GRID_CELL_W * BTN_SCALE);
 const BTN_H = Math.round(BTN_W * BTN_ASPECT);
 const PANEL2_H = Math.round((SCREEN_W - GRID_HORIZONTAL_PADDING * 2) * 1080 / 713);
 const PANEL2_IMAGE = require('../../assets/WEBP-version/Panel2.webp');
@@ -657,7 +662,7 @@ const HomeScreen: React.FC = () => {
   const handleOnboardingDone = () => {
     setShowOnboarding(false);
     void AsyncStorage.setItem(ONBOARDING_KEY, '1');
-    navigation.navigate('ProfileSetupScreen' as never);
+    navigation.navigate('ProfileSetupScreen');
   };
 
   const BUTTONS: HomeButtonConfig[] = [

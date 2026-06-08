@@ -4,6 +4,8 @@ import { useGuestGuard } from '../hooks/useGuestGuard';
 import {
   ActivityIndicator,
   FlatList,
+  Modal,
+  Pressable,
   SafeAreaView,
   StyleSheet,
   Text,
@@ -97,6 +99,9 @@ type SoulPhoto = {
   local?: boolean;
   uploading?: boolean;
   progress?: number;
+  description?: string;
+  author?: string;
+  likes?: number;
 };
 
 type RawPhoto = {
@@ -109,6 +114,9 @@ type RawPhoto = {
   sourceScreen?: unknown;
   uid?: unknown;
   userId?: unknown;
+  description?: unknown;
+  uploadedBy?: unknown;
+  likes?: unknown;
 };
 
 const clean = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
@@ -196,6 +204,7 @@ export default function SoulPhotosScreen() {
   const [address, setAddress] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [previewPhoto, setPreviewPhoto] = useState<SoulPhoto | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -225,12 +234,18 @@ export default function SoulPhotosScreen() {
                   const isApproved = status === 'approved';
                   const isOwnPending = status === 'pending' && Boolean(currentUid) && owner === currentUid;
                   if (!isApproved && !isOwnPending) return null;
+                  const description = clean(photo.description);
+                  const author = clean(photo.uploadedBy);
+                  const likes = typeof photo.likes === 'number' ? photo.likes : 0;
                   return {
                     id,
                     uri: clean(photo.thumbnailUrl) || clean(photo.imageUri),
                     storagePath: clean(photo.storagePath),
                     createdAt: timestamp(photo.createdAt) || timestamp(photo.uploadedAt),
                     status: isApproved ? 'approved' : 'pending',
+                    ...(description ? { description } : {}),
+                    ...(author ? { author } : {}),
+                    likes,
                   };
                 })
                 .filter((item): item is SoulPhoto => item !== null)
@@ -302,9 +317,16 @@ export default function SoulPhotosScreen() {
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: SoulPhoto }) => (
-      <SoulTile item={item} size={tileSize} pendingLabel={text.pending} uploadLabel={text.upload} />
-    ),
+    ({ item }: { item: SoulPhoto }) => {
+      if (!item.local && !item.uploading && item.uri) {
+        return (
+          <TouchableOpacity activeOpacity={0.85} onPress={() => setPreviewPhoto(item)}>
+            <SoulTile item={item} size={tileSize} pendingLabel={text.pending} uploadLabel={text.upload} />
+          </TouchableOpacity>
+        );
+      }
+      return <SoulTile item={item} size={tileSize} pendingLabel={text.pending} uploadLabel={text.upload} />;
+    },
     [text.pending, text.upload, tileSize],
   );
 
@@ -420,6 +442,27 @@ export default function SoulPhotosScreen() {
       <MiniTabBar />
       <GuestRegisterBanner visible={guestBannerVisible} onClose={hideGuestBanner} />
       <VideoLoadingOverlay visible={loading} />
+      <Modal visible={!!previewPhoto} transparent animationType="fade" onRequestClose={() => setPreviewPhoto(null)}>
+        <Pressable style={styles.previewOverlay} onPress={() => setPreviewPhoto(null)}>
+          {previewPhoto ? (
+            <>
+              <AppPhotoImage
+                uri={previewPhoto.uri}
+                storagePath={previewPhoto.storagePath}
+                style={styles.previewImage}
+                resizeMode="contain"
+                debugLabel={`SoulPhotoPreview:${previewPhoto.id}`}
+                showDebugInfo={false}
+              />
+              {previewPhoto.description ? (
+                <View style={styles.previewCaption}>
+                  <Text style={styles.previewCaptionText}>{previewPhoto.description}</Text>
+                </View>
+              ) : null}
+            </>
+          ) : null}
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -604,6 +647,27 @@ const styles = StyleSheet.create({
     color: '#75684F',
     fontSize: 16,
     fontWeight: '900',
+    textAlign: 'center',
+  },
+  previewOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.88)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewImage: {
+    width: '100%',
+    height: '80%',
+  },
+  previewCaption: {
+    marginTop: 12,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  previewCaptionText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
     textAlign: 'center',
   },
 });

@@ -120,7 +120,11 @@ export const ensureFirebaseAuth = async (): Promise<any> => {
   if (!anonymousSignInPromise) {
     anonymousSignInPromise = signInAnonymously(auth)
       .then((credential) => credential.user)
-      .catch(() => null)
+      .catch(() =>
+        signInAnonymously(auth)
+          .then((credential) => credential.user)
+          .catch(() => null)
+      )
       .finally(() => { anonymousSignInPromise = null; });
   }
 

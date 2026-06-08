@@ -94,6 +94,25 @@ const PICK_ERROR_BY_LANG: Record<Lang, { title: string; body: string }> = {
   en: { title: 'Error', body: 'Could not add the photo. Try again.' },
 };
 
+// Module-level registry: persists across component remounts within the same JS session.
+// Key: `uid::storagePath`, Value: Set of photo IDs picked in this form session.
+// Cleared when PhotoUploadField unmounts (user navigates away), so fresh forms start clean.
+const photoSessionRegistry = new Map<string, Set<string>>();
+
+function registerSessionPhoto(uid: string, path: string, photoId: string): void {
+  const key = `${uid}::${path}`;
+  if (!photoSessionRegistry.has(key)) photoSessionRegistry.set(key, new Set());
+  photoSessionRegistry.get(key)!.add(photoId);
+}
+
+function unregisterSessionPhoto(uid: string, path: string, photoId: string): void {
+  const key = `${uid}::${path}`;
+  const set = photoSessionRegistry.get(key);
+  if (!set) return;
+  set.delete(photoId);
+  if (set.size === 0) photoSessionRegistry.delete(key);
+}
+
 const mapStatus = (status: UserPhoto['status']): UploadedPhoto['status'] => {
   if (status === 'uploaded') return 'done';
   if (status === 'error') return 'error';
@@ -133,6 +152,13 @@ export default function PhotoUploadField({
   const onPhotosChangeRef = useRef(onPhotosChange);
   onPhotosChangeRef.current = onPhotosChange;
 
+  const uidRef = useRef(uid);
+  uidRef.current = uid;
+  const storagePathRef = useRef(storagePath);
+  storagePathRef.current = storagePath;
+  const maxPhotosRef = useRef(maxPhotos);
+  maxPhotosRef.current = maxPhotos;
+
   useEffect(() => {
     onDebugEvent?.({
       source: 'PhotoUploadField',
@@ -153,17 +179,34 @@ export default function PhotoUploadField({
     Alert.alert(e.title, failed.error || e.body);
   }, [language, selected]);
 
-  // Синхронизируем статусы уже выбранных фото из ImageStorage (обновляет статус загрузки)
+  // Синхронизируем статусы уже выбранных фото из ImageStorage (обновляет статус загрузки).
+  // После remount компонента (Android lifecycle, кратковременный сброс user) восстанавливаем
+  // фото по ID из photoSessionRegistry вместо простого пропуска пустого selected.
   useEffect(() => {
     const unsubscribe = ImageStorage.subscribe((photos) => {
       setSelected((current) => {
-        if (current.length === 0) return current;
+        if (current.length === 0) {
+          const sessionIds = photoSessionRegistry.get(`${uidRef.current}::${storagePathRef.current}`);
+          if (!sessionIds?.size) return current;
+          const max = maxPhotosRef.current;
+          const restored = photos
+            .filter((p) => sessionIds.has(p.id) && !p.deleted)
+            .slice(0, max > 0 ? max : undefined);
+          return restored.length > 0 ? restored : current;
+        }
         return current
           .map((photo) => photos.find((item) => item.id === photo.id) ?? photo)
           .filter((photo) => !photo.deleted);
       });
     });
     return unsubscribe;
+  }, []);
+
+  // Очищаем registry при размонтировании — следующее открытие формы начинается с чистого листа.
+  useEffect(() => {
+    return () => {
+      photoSessionRegistry.delete(`${uidRef.current}::${storagePathRef.current}`);
+    };
   }, []);
 
   const addSelectedPhoto = useCallback((photo: UserPhoto) => {
@@ -179,6 +222,7 @@ export default function PhotoUploadField({
       if (current.some((item) => item.id === photo.id)) return current;
       return maxPhotos > 0 ? [...current, photo].slice(0, maxPhotos) : [...current, photo];
     });
+    registerSessionPhoto(uid, storagePath, photo.id);
     void UploadQueue.enqueue(
       photo.id,
       photo.localUri,
@@ -192,11 +236,13 @@ export default function PhotoUploadField({
       },
     ).then((accepted) => {
       if (!accepted) {
+        unregisterSessionPhoto(uid, storagePath, photo.id);
         setSelected((current) => current.filter((item) => item.id !== photo.id));
         const q = QUEUE_FULL_ALERT_BY_LANG[language] ?? QUEUE_FULL_ALERT_BY_LANG.ua;
         Alert.alert(q.title, q.message);
       }
     }).catch((error) => {
+      unregisterSessionPhoto(uid, storagePath, photo.id);
       safeLogError('PhotoUploadField.UploadQueue.enqueue', error, { photoId: photo.id });
       setSelected((current) => current.filter((item) => item.id !== photo.id));
       const e = PICK_ERROR_BY_LANG[language] ?? PICK_ERROR_BY_LANG.ua;
@@ -248,6 +294,7 @@ export default function PhotoUploadField({
   }, [language, limitReached, navigation, onBeforePickerOpen, onDebugEvent, pickFrom, storagePath, uid]);
 
   const removePhoto = useCallback((photoId: string) => {
+    unregisterSessionPhoto(uidRef.current, storagePathRef.current, photoId);
     setSelected((current) => current.filter((photo) => photo.id !== photoId));
     void UploadQueue.remove(photoId);
   }, []);

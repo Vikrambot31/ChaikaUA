@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Dimensions, Easing, Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, Easing, Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
@@ -89,7 +89,8 @@ const UI_TEXT = {
   },
 } as const;
 
-const SCREEN_W = Dimensions.get('window').width;
+import { SCREEN_W as _SCREEN_W } from '../utils/webDimensions';
+const SCREEN_W = _SCREEN_W;
 const SOS_MAX_VISIBLE_COUNT = 20;
 const OFFERS_MAX_VISIBLE_COUNT = 20;
 
@@ -123,7 +124,7 @@ const RequestTopicScreen: React.FC = () => {
   const [offerActivityUsers, setOfferActivityUsers] = useState<ActivityUser[]>([]);
   const todayHelpRequests = useSelector((state: RootState) => selectTodayHelpRequests(state)) as HelpRequest[];
   const sosRequests = useMemo(
-    () => todayHelpRequests.filter((request) => request.isBurning && request.expiresAt > new Date()),
+    () => todayHelpRequests.filter((request) => request.isBurning && request.expiresAt > new Date().toISOString()),
     [todayHelpRequests]
   );
   const sosUsers = useMemo<ActivityUser[]>(() => {

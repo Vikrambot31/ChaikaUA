@@ -276,7 +276,7 @@ export default function TopGirlsBoysScreen() {
       userPhotoURL?: string;
       startAvatarKey?: string;
       building?: string;
-      createdAt?: number | Date;
+      createdAt?: number | Date | string;
       timestamp?: number;
     }) => {
       const id = typeof item.userId === 'string' ? item.userId.trim() : '';
@@ -290,9 +290,11 @@ export default function TopGirlsBoysScreen() {
         ? item.createdAt.getTime()
         : typeof item.createdAt === 'number'
           ? item.createdAt
-          : typeof item.timestamp === 'number'
-            ? item.timestamp
-            : undefined;
+          : typeof item.createdAt === 'string'
+            ? new Date(item.createdAt).getTime()
+            : typeof item.timestamp === 'number'
+              ? item.timestamp
+              : undefined;
       const next: CommunityUser = {
         id,
         name: firstText(item.name) || text.residentFallback,

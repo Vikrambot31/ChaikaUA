@@ -154,7 +154,8 @@ export const selectHelpRequestsError = (state: RootState) => state.helpRequests?
  */
 export const selectActiveBurningRequests = (state: RootState) => {
   const today = state.helpRequests?.todayItems ?? [];
-  return today.filter((r: HelpRequest) => r.isBurning && r.expiresAt > new Date());
+  const nowIso = new Date().toISOString();
+  return today.filter((r: HelpRequest) => r.isBurning && r.expiresAt > nowIso);
 };
 
 /**
@@ -169,7 +170,8 @@ export const selectCompletedRequests = (state: RootState) => {
  */
 export const selectActiveBurningCount = (state: RootState) => {
   const today = state.helpRequests?.todayItems ?? [];
-  return today.filter((r: HelpRequest) => r.isBurning && r.expiresAt > new Date()).length;
+  const nowIso = new Date().toISOString();
+  return today.filter((r: HelpRequest) => r.isBurning && r.expiresAt > nowIso).length;
 };
 
 /**
@@ -178,7 +180,7 @@ export const selectActiveBurningCount = (state: RootState) => {
 export const selectHelpRequestsByTime = (state: RootState, hours: number) => {
   const today = state.helpRequests?.todayItems ?? [];
   const cutoffTime = new Date(Date.now() - hours * 60 * 60 * 1000);
-  return today.filter((r: HelpRequest) => r.createdAt > cutoffTime);
+  return today.filter((r: HelpRequest) => new Date(r.createdAt) > cutoffTime);
 };
 
 /**

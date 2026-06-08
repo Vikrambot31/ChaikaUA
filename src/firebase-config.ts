@@ -743,7 +743,7 @@ export const firebaseChatAPI = {
   /** Submits a new help-request for moderation. */
   addRequest: async (
     requestData: AddRequestPayload,
-  ): Promise<ApiResult<{ id: string | null }> | FailResult> => {
+  ): Promise<ApiResult<{ id: string | null; createdAt?: number }> | FailResult> => {
     try {
       const user: FirebaseUser = await requireWriteSession({
         operation: 'create',
@@ -856,7 +856,7 @@ export const firebaseChatAPI = {
         id: pushResult.key,
         category: newRequest.category,
       });
-      return { success: true, data: { id: pushResult.key } };
+      return { success: true, data: { id: pushResult.key, createdAt: nowMs } };
     } catch (error: unknown) {
       void logClientError('firebaseChatAPI.addRequest', error);
       return {
@@ -1376,6 +1376,10 @@ export const photoAPI = {
   ): Promise<ApiVoidResult> => {
     try {
       const user: FirebaseUser = await ensureFirebaseAuth();
+      const isModerator = await isModeratorUser();
+      if (!isModerator) {
+        throw new Error('permission_denied: moderator role required');
+      }
       if (!photoId || (status !== 'approved' && status !== 'rejected')) {
         throw new Error('Invalid moderation payload');
       }
@@ -1389,11 +1393,14 @@ export const photoAPI = {
           }
         : {};
 
+      let photoSnapshot: Record<string, unknown> | null = null;
+
       if (status === 'approved') {
         try {
           const snapshot = await get(ref(database, `community_photos/${photoId}`));
-          const current = snapshot.val() as { safetyStatus?: string } | null;
-          if (current?.safetyStatus && canPublishImage(current.safetyStatus)) {
+          const current = snapshot.val() as Record<string, unknown> | null;
+          photoSnapshot = current;
+          if (current?.safetyStatus && canPublishImage(current.safetyStatus as string)) {
             safetyUpdate.safetyStatus = current.safetyStatus as 'passed' | 'manual_reviewed';
           }
         } catch (error: unknown) {
@@ -1405,19 +1412,38 @@ export const photoAPI = {
         }
       }
 
+      const moderationFields = {
+        status,
+        moderatedAt: Date.now(),
+        moderatedBy: user.uid,
+        moderationReason: status === 'rejected' ? 'default_rejected' : null,
+        rejectionReason: status === 'rejected' ? 'default_rejected' : null,
+        ...safetyUpdate,
+      };
+
       try {
-        await update(ref(database, `community_photos/${photoId}`), {
-          status,
-          moderatedAt: Date.now(),
-          moderatedBy: user.uid,
-          moderationReason: status === 'rejected' ? 'default_rejected' : null,
-          rejectionReason: status === 'rejected' ? 'default_rejected' : null,
-          ...safetyUpdate,
-        });
+        await update(ref(database, `community_photos/${photoId}`), moderationFields);
       } catch (error: unknown) {
         void logClientError('photoAPI.moderatePhoto.updatePhotoStatus', error, {
           firebasePath: `community_photos/${photoId}`,
           stage: 'write_photo_moderation',
+        });
+        throw error;
+      }
+
+      try {
+        if (status === 'approved' && photoSnapshot) {
+          await set(dbRef(database, `community_photos_public/${photoId}`), {
+            ...photoSnapshot,
+            ...moderationFields,
+          });
+        } else if (status === 'rejected') {
+          await remove(dbRef(database, `community_photos_public/${photoId}`));
+        }
+      } catch (error: unknown) {
+        void logClientError('photoAPI.moderatePhoto.syncPublicCollection', error, {
+          firebasePath: `community_photos_public/${photoId}`,
+          stage: 'sync_public_collection',
         });
         throw error;
       }

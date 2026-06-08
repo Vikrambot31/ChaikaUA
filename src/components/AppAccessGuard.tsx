@@ -66,6 +66,7 @@ const AppAccessGuard: React.FC<AppAccessGuardProps> = ({
 }) => {
   const currentUser = useSelector(selectUser);
   const [isBypassUser, setIsBypassUser] = useState(() => isPrimaryServiceEmail(auth.currentUser));
+  const [isBypassReady, setIsBypassReady] = useState(() => !auth.currentUser?.uid || isPrimaryServiceEmail(auth.currentUser));
   const [remoteSnapshot, setRemoteSnapshot] = useState<RemoteConfigSnapshot>(
     initialRemoteConfigSnapshot ?? createDefaultRemoteConfigSnapshot(),
   );
@@ -111,16 +112,20 @@ const AppAccessGuard: React.FC<AppAccessGuardProps> = ({
     const firebaseUser = auth.currentUser;
     if (isPrimaryServiceEmail(firebaseUser)) {
       setIsBypassUser(true);
+      setIsBypassReady(true);
       return;
     }
     if (!currentUser?.id) {
       setIsBypassUser(false);
+      setIsBypassReady(true);
       return;
     }
+    setIsBypassReady(false);
     let active = true;
     void getCurrentUserSecurityRole().then((snapshot) => {
       if (active) {
         setIsBypassUser(snapshot.role === 'admin' || snapshot.role === 'moderator');
+        setIsBypassReady(true);
       }
     }).catch(() => {
       if (active) {
@@ -128,6 +133,7 @@ const AppAccessGuard: React.FC<AppAccessGuardProps> = ({
         if (!isPrimaryServiceEmail(auth.currentUser)) {
           setIsBypassUser(false);
         }
+        setIsBypassReady(true);
       }
     });
     return () => { active = false; };
@@ -389,8 +395,8 @@ const AppAccessGuard: React.FC<AppAccessGuardProps> = ({
     }
   }, [remoteSnapshot.config.beta_mode_enabled]);
 
-  if (!isRemoteReady) {
-    console.log(`[AAG] render→SplashAnimation (remoteConfig not ready yet)`);
+  if (!isRemoteReady || !isBypassReady) {
+    console.log(`[AAG] render→SplashAnimation (remoteConfig=${isRemoteReady} bypassReady=${isBypassReady})`);
     return <SplashAnimation />;
   }
 

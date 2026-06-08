@@ -672,7 +672,7 @@ const RequestFormScreen: React.FC = () => {
         category: submitCategory,
         group: requestGroup,
         subcategory: submitSubcategory,
-        building: 'Чайка',
+        building: user?.houseNumber ? `Чайка, буд. ${user.houseNumber}` : 'Чайка',
         text: finalDescription,
         description: finalDescription,
         ...(requestPhoto ?? {}),

@@ -264,8 +264,8 @@ export interface HelpRequest {
   subcategory?: string;
   photoUri?: string;
   photoStoragePath?: string;
-  createdAt: Date;
-  expiresAt: Date;
+  createdAt: string; // ISO string — Redux requires serializable values
+  expiresAt: string; // ISO string — Redux requires serializable values
   isBurning: boolean;
   moderationStatus?: 'pending' | 'approved' | 'rejected' | 'expired';
   submittedForModerationAt?: string;

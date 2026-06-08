@@ -1,8 +1,7 @@
 import React, { useRef, useState } from 'react';
-import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
-
-const { width, height } = Dimensions.get('window');
+import { SCREEN_W as width, SCREEN_H as height } from '../utils/webDimensions';
 
 interface Props {
   onFinish?: () => void;

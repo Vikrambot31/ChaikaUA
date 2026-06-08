@@ -35,8 +35,8 @@ export const demoHelpRequests: HelpRequest[] = [
     name: 'Олена',
     phone: '+380671234111',
     description: 'Потрібно допомогти занести пакети з магазину додому.',
-    createdAt: new Date(),
-    expiresAt: endOfDay(),
+    createdAt: new Date().toISOString(),
+    expiresAt: endOfDay().toISOString(),
     isBurning: true,
   },
   {
@@ -44,8 +44,8 @@ export const demoHelpRequests: HelpRequest[] = [
     name: 'Ігор',
     phone: '+380501112233',
     description: 'Шукаю людину, яка підкаже дорогу до спортивного комплексу.',
-    createdAt: new Date(),
-    expiresAt: endOfDay(),
+    createdAt: new Date().toISOString(),
+    expiresAt: endOfDay().toISOString(),
     isBurning: true,
   },
   {
@@ -53,8 +53,8 @@ export const demoHelpRequests: HelpRequest[] = [
     name: 'Марія',
     phone: '+380931112244',
     description: 'Потрібна коротка допомога з доставкою ліків для сусідки.',
-    createdAt: new Date(Date.now() - 1000 * 60 * 40),
-    expiresAt: endOfDay(),
+    createdAt: new Date(Date.now() - 1000 * 60 * 40).toISOString(),
+    expiresAt: endOfDay().toISOString(),
     isBurning: false,
   },
 ];
