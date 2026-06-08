@@ -22,7 +22,7 @@ import TactileInput from '../components/TactileInput';
 import TactileButton from '../components/TactileButton';
 import FormSectionLabel from '../components/FormSectionLabel';
 import { normalizeEmailText, normalizePersonName, normalizePhoneText } from '../utils/textUtils';
-import { validateEmail, validateName, validatePassword, validatePhone } from '../utils/validators';
+import { normalizeUkrainianPhoneStrict, validateEmail, validateName, validatePassword, validatePhone } from '../utils/validators';
 import { RootState } from '../redux/store';
 import { QuickRegistrationParams, useFullRegistration } from '../hooks/useFullRegistration';
 import { getRegistrationFullText } from './registrationFullText';
@@ -137,7 +137,7 @@ const RegisterScreenFull: React.FC = () => {
 
   const normalizedName = useMemo(() => normalizePersonName(name), [name]);
   const normalizedEmail = useMemo(() => normalizeEmailText(email), [email]);
-  const normalizedPhone = useMemo(() => normalizePhoneText(phone), [phone]);
+  const normalizedPhone = useMemo(() => normalizeUkrainianPhoneStrict(phone) ?? normalizePhoneText(phone), [phone]);
   const isNameValid = validateName(normalizedName);
   const isEmailValid = validateEmail(normalizedEmail);
   const isPhoneValid = validatePhone(normalizedPhone);
@@ -238,7 +238,7 @@ const RegisterScreenFull: React.FC = () => {
                 <TactileInput
                   placeholder={text.minPassword}
                   value={password}
-                  onChangeText={setPassword}
+                  onChangeText={(text) => { setPassword(text); if (error) dispatch(clearError()); }}
                   secureTextEntry={!showPassword}
                   editable={!loading}
                   maxLength={MAX_PASSWORD_LENGTH}
@@ -253,7 +253,7 @@ const RegisterScreenFull: React.FC = () => {
                 <TactileInput
                   placeholder={text.repeatPassword}
                   value={confirmPassword}
-                  onChangeText={setConfirmPassword}
+                  onChangeText={(text) => { setConfirmPassword(text); if (error) dispatch(clearError()); }}
                   secureTextEntry={!showConfirmPassword}
                   editable={!loading}
                   maxLength={MAX_PASSWORD_LENGTH}
@@ -336,7 +336,7 @@ const RegisterScreenFull: React.FC = () => {
 
         <View style={styles.loginContainer}>
           <Text style={styles.loginText}>{text.haveAccount}</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('LoginScreen')} disabled={loading}>
+          <TouchableOpacity onPress={() => navigation.navigate('LoginScreen')}>
             <Text style={styles.loginLink}>{text.login}</Text>
           </TouchableOpacity>
         </View>

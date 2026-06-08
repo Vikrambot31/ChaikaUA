@@ -1,7 +1,7 @@
 import { useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationProp } from '@react-navigation/native';
-import { createUserWithEmailAndPassword, signInAnonymously, updateProfile } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signOut, updateProfile } from 'firebase/auth';
 import { equalTo, get, orderByChild, query, ref as dbRef, set as dbSet } from 'firebase/database';
 import Toast from 'react-native-toast-message';
 import { useDispatch } from 'react-redux';
@@ -141,7 +141,7 @@ export const useFullRegistration = ({
             try {
               await authUser.delete();
             } catch {
-              await signInAnonymously(auth).catch(() => null);
+              await signOut(auth).catch(() => null);
             }
           }
 
