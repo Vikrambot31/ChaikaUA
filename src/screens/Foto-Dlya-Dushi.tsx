@@ -208,61 +208,103 @@ export default function SoulPhotosScreen() {
 
   useEffect(() => {
     let active = true;
-    let unsubscribe: (() => void) | undefined;
+    let unsubPublic: (() => void) | undefined;
+    let unsubPending: (() => void) | undefined;
+
+    const updatePhotos = (approved: SoulPhoto[], pending: SoulPhoto[]) => {
+      if (!active) return;
+      const combined = [...approved, ...pending]
+        .sort((a, b) => b.createdAt - a.createdAt || b.id.localeCompare(a.id))
+        .slice(0, MAX_ITEMS);
+      setRemotePhotos(combined);
+      setLoading(false);
+    };
+
+    const parsePhoto = (id: string, raw: unknown, isApproved: boolean): SoulPhoto | null => {
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+      const photo = raw as RawPhoto;
+      const sourceScreen = clean(photo.sourceScreen);
+      if (sourceScreen !== SCREEN_ID && sourceScreen !== PHOTO_UPLOAD_SCREEN_ID) return null;
+      const description = clean(photo.description);
+      const author = clean(photo.uploadedBy);
+      const likes = typeof photo.likes === 'number' ? photo.likes : 0;
+      return {
+        id,
+        uri: clean(photo.thumbnailUrl) || clean(photo.imageUri),
+        storagePath: clean(photo.storagePath),
+        createdAt: timestamp(photo.createdAt) || timestamp(photo.uploadedAt),
+        status: isApproved ? 'approved' : 'pending',
+        ...(description ? { description } : {}),
+        ...(author ? { author } : {}),
+        likes,
+      };
+    };
 
     void ensureFirebaseAuth()
       .then(() => {
         if (!active) return;
-        const photosQuery = query(ref(database, 'community_photos'), orderByChild('sourceScreen'), equalTo(SCREEN_ID));
-        unsubscribe = onValue(
-          photosQuery,
+        const currentUid = user?.id ?? '';
+        const approvedPhotos: SoulPhoto[] = [];
+        const pendingPhotos: SoulPhoto[] = [];
+
+        // Approved photos from public collection
+        const publicQuery = query(ref(database, 'community_photos_public'), orderByChild('sourceScreen'), equalTo(SCREEN_ID));
+        unsubPublic = onValue(
+          publicQuery,
           (snapshot) => {
             try {
               const value = snapshot.val() as unknown;
-              if (!value || typeof value !== 'object' || Array.isArray(value)) {
-                if (active) { setRemotePhotos([]); setLoading(false); }
-                return;
+              approvedPhotos.length = 0;
+              if (value && typeof value === 'object' && !Array.isArray(value)) {
+                Object.entries(value as Record<string, unknown>).forEach(([id, raw]) => {
+                  const photo = parsePhoto(id, raw, true);
+                  if (photo) approvedPhotos.push(photo);
+                });
               }
-
-              const currentUid = user?.id ?? '';
-              const items = Object.entries(value as Record<string, unknown>)
-                .map<SoulPhoto | null>(([id, raw]) => {
-                  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-                  const photo = raw as RawPhoto;
-                  const status = clean(photo.status);
-                  const owner = clean(photo.uid) || clean(photo.userId);
-                  const isApproved = status === 'approved';
-                  const isOwnPending = status === 'pending' && Boolean(currentUid) && owner === currentUid;
-                  if (!isApproved && !isOwnPending) return null;
-                  const description = clean(photo.description);
-                  const author = clean(photo.uploadedBy);
-                  const likes = typeof photo.likes === 'number' ? photo.likes : 0;
-                  return {
-                    id,
-                    uri: clean(photo.thumbnailUrl) || clean(photo.imageUri),
-                    storagePath: clean(photo.storagePath),
-                    createdAt: timestamp(photo.createdAt) || timestamp(photo.uploadedAt),
-                    status: isApproved ? 'approved' : 'pending',
-                    ...(description ? { description } : {}),
-                    ...(author ? { author } : {}),
-                    likes,
-                  };
-                })
-                .filter((item): item is SoulPhoto => item !== null)
-                .sort((a, b) => b.createdAt - a.createdAt || b.id.localeCompare(a.id))
-                .slice(0, MAX_ITEMS);
-
-              if (active) { setRemotePhotos(items); setLoading(false); }
+              updatePhotos(approvedPhotos, pendingPhotos);
             } catch (error) {
-              void logClientError('SoulPhotosScreen.load', error);
-              if (active) { setRemotePhotos([]); setLoading(false); }
+              void logClientError('SoulPhotosScreen.publicPhotos', error);
             }
           },
           (error) => {
-            void logClientError('SoulPhotosScreen.firebase', error);
-            if (active) { setRemotePhotos([]); setLoadError(true); setLoading(false); }
+            void logClientError('SoulPhotosScreen.publicPhotosError', error);
+            if (active) setLoadError(true);
           },
         );
+
+        // Own pending photos
+        if (currentUid) {
+          const ownPendingRef = ref(database, 'community_photos');
+          unsubPending = onValue(
+            ownPendingRef,
+            (snapshot) => {
+              try {
+                const value = snapshot.val() as unknown;
+                pendingPhotos.length = 0;
+                if (value && typeof value === 'object' && !Array.isArray(value)) {
+                  Object.entries(value as Record<string, unknown>).forEach(([id, raw]) => {
+                    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return;
+                    const photo = raw as RawPhoto;
+                    const status = clean(photo.status);
+                    const owner = clean(photo.uid) || clean(photo.userId);
+                    if (status === 'pending' && owner === currentUid) {
+                      const parsed = parsePhoto(id, raw, false);
+                      if (parsed) pendingPhotos.push(parsed);
+                    }
+                  });
+                }
+                updatePhotos(approvedPhotos, pendingPhotos);
+              } catch (error) {
+                void logClientError('SoulPhotosScreen.pendingPhotos', error);
+              }
+            },
+            (error) => {
+              void logClientError('SoulPhotosScreen.pendingPhotosError', error);
+              if (active) setLoadError(true);
+            },
+          );
+        }
+        // loading will be resolved when unsubPublic fires
       })
       .catch((error) => {
         void logClientError('SoulPhotosScreen.auth', error);
@@ -271,7 +313,8 @@ export default function SoulPhotosScreen() {
 
     return () => {
       active = false;
-      unsubscribe?.();
+      unsubPublic?.();
+      unsubPending?.();
     };
   }, [user?.id]);
 
@@ -454,11 +497,22 @@ export default function SoulPhotosScreen() {
                 debugLabel={`SoulPhotoPreview:${previewPhoto.id}`}
                 showDebugInfo={false}
               />
-              {previewPhoto.description ? (
-                <View style={styles.previewCaption}>
+              <View style={styles.previewCaption}>
+                {previewPhoto.description ? (
                   <Text style={styles.previewCaptionText}>{previewPhoto.description}</Text>
-                </View>
-              ) : null}
+                ) : null}
+                {previewPhoto.author ? (
+                  <Text style={styles.previewMetaText}>{previewPhoto.author}</Text>
+                ) : null}
+                {(previewPhoto.likes ?? 0) > 0 ? (
+                  <Text style={styles.previewMetaText}>{`❤ ${previewPhoto.likes}`}</Text>
+                ) : null}
+                {previewPhoto.createdAt > 0 ? (
+                  <Text style={styles.previewMetaText}>
+                    {new Date(previewPhoto.createdAt).toLocaleDateString()}
+                  </Text>
+                ) : null}
+              </View>
             </>
           ) : null}
         </Pressable>
@@ -663,11 +717,18 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingHorizontal: 20,
     alignItems: 'center',
+    gap: 4,
   },
   previewCaptionText: {
     color: '#fff',
     fontSize: 15,
     fontWeight: '700',
+    textAlign: 'center',
+  },
+  previewMetaText: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 13,
+    fontWeight: '600',
     textAlign: 'center',
   },
 });

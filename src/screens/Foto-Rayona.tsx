@@ -4,6 +4,8 @@ import { useGuestGuard } from '../hooks/useGuestGuard';
 import {
   ActivityIndicator,
   FlatList,
+  Modal,
+  Pressable,
   SafeAreaView,
   StyleSheet,
   Text,
@@ -71,6 +73,8 @@ type SoulPhoto = {
   storagePath: string;
   createdAt: number;
   status: 'approved' | 'pending';
+  author?: string;
+  likes?: number;
 };
 
 type RawPhoto = {
@@ -83,6 +87,8 @@ type RawPhoto = {
   sourceScreen?: unknown;
   uid?: unknown;
   userId?: unknown;
+  uploadedBy?: unknown;
+  likes?: unknown;
 };
 
 const clean = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
@@ -144,60 +150,116 @@ export default function FotoRayonaScreen() {
   const [remotePhotos, setRemotePhotos] = useState<SoulPhoto[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [previewPhoto, setPreviewPhoto] = useState<SoulPhoto | null>(null);
 
   useEffect(() => {
     let active = true;
-    let unsubscribe: (() => void) | undefined;
+    let unsubPublic: (() => void) | undefined;
+    let unsubPending: (() => void) | undefined;
+
+    const updatePhotos = (approved: SoulPhoto[], pending: SoulPhoto[]) => {
+      if (!active) return;
+      const combined = [...approved, ...pending]
+        .sort((a, b) => b.createdAt - a.createdAt || b.id.localeCompare(a.id))
+        .slice(0, MAX_ITEMS);
+      setRemotePhotos(combined);
+      setLoading(false);
+    };
+
+    const parsePhoto = (id: string, raw: unknown): SoulPhoto | null => {
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+      const photo = raw as RawPhoto;
+      const sourceScreen = clean(photo.sourceScreen);
+      if (sourceScreen !== SCREEN_ID && sourceScreen !== PHOTO_UPLOAD_SCREEN_ID) return null;
+      const author = clean(photo.uploadedBy);
+      const likes = typeof photo.likes === 'number' ? photo.likes : 0;
+      return {
+        id,
+        uri: clean(photo.thumbnailUrl) || clean(photo.imageUri),
+        storagePath: clean(photo.storagePath),
+        createdAt: timestamp(photo.createdAt) || timestamp(photo.uploadedAt),
+        status: 'approved',
+        ...(author ? { author } : {}),
+        likes,
+      };
+    };
 
     void ensureFirebaseAuth()
       .then(() => {
         if (!active) return;
-        const photosRef = ref(database, 'community_photos');
-        unsubscribe = onValue(
-          photosRef,
+        const currentUid = user?.id ?? '';
+        const approvedPhotos: SoulPhoto[] = [];
+        const pendingPhotos: SoulPhoto[] = [];
+
+        // Approved photos from public collection
+        const publicRef = ref(database, 'community_photos_public');
+        unsubPublic = onValue(
+          publicRef,
           (snapshot) => {
             try {
               const value = snapshot.val() as unknown;
-              if (!value || typeof value !== 'object' || Array.isArray(value)) {
-                if (active) { setRemotePhotos([]); setLoading(false); }
-                return;
+              approvedPhotos.length = 0;
+              if (value && typeof value === 'object' && !Array.isArray(value)) {
+                Object.entries(value as Record<string, unknown>).forEach(([id, raw]) => {
+                  const photo = parsePhoto(id, raw);
+                  if (photo) approvedPhotos.push(photo);
+                });
               }
-
-              const currentUid = user?.id ?? '';
-              const items = Object.entries(value as Record<string, unknown>)
-                .map<SoulPhoto | null>(([id, raw]) => {
-                  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-                  const photo = raw as RawPhoto;
-                  const status = clean(photo.status);
-                  const sourceScreen = clean(photo.sourceScreen);
-                  const owner = clean(photo.uid) || clean(photo.userId);
-                  if (sourceScreen !== SCREEN_ID && sourceScreen !== PHOTO_UPLOAD_SCREEN_ID) return null;
-                  const isApproved = status === 'approved';
-                  const isOwnPending = status === 'pending' && Boolean(currentUid) && owner === currentUid;
-                  if (!isApproved && !isOwnPending) return null;
-                  return {
-                    id,
-                    uri: clean(photo.thumbnailUrl) || clean(photo.imageUri),
-                    storagePath: clean(photo.storagePath),
-                    createdAt: timestamp(photo.createdAt) || timestamp(photo.uploadedAt),
-                    status: isApproved ? 'approved' : 'pending',
-                  };
-                })
-                .filter((item): item is SoulPhoto => item !== null)
-                .sort((a, b) => b.createdAt - a.createdAt || b.id.localeCompare(a.id))
-                .slice(0, MAX_ITEMS);
-
-              if (active) { setRemotePhotos(items); setLoading(false); }
+              updatePhotos(approvedPhotos, pendingPhotos);
             } catch (error) {
-              void logClientError('FotoRayonaScreen.load', error);
-              if (active) { setRemotePhotos([]); setLoading(false); }
+              void logClientError('FotoRayonaScreen.publicPhotos', error);
             }
           },
           (error) => {
-            void logClientError('FotoRayonaScreen.firebase', error);
-            if (active) { setRemotePhotos([]); setLoadError(true); setLoading(false); }
+            void logClientError('FotoRayonaScreen.publicPhotosError', error);
+            if (active) setLoadError(true);
           },
         );
+
+        // Own pending photos
+        if (currentUid) {
+          const ownPendingRef = ref(database, 'community_photos');
+          unsubPending = onValue(
+            ownPendingRef,
+            (snapshot) => {
+              try {
+                const value = snapshot.val() as unknown;
+                pendingPhotos.length = 0;
+                if (value && typeof value === 'object' && !Array.isArray(value)) {
+                  Object.entries(value as Record<string, unknown>).forEach(([id, raw]) => {
+                    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return;
+                    const photo = raw as RawPhoto;
+                    const status = clean(photo.status);
+                    const owner = clean(photo.uid) || clean(photo.userId);
+                    const sourceScreen = clean(photo.sourceScreen);
+                    if (status === 'pending' && owner === currentUid &&
+                        (sourceScreen === SCREEN_ID || sourceScreen === PHOTO_UPLOAD_SCREEN_ID)) {
+                      const author = clean(photo.uploadedBy);
+                      const likes = typeof photo.likes === 'number' ? photo.likes : 0;
+                      pendingPhotos.push({
+                        id,
+                        uri: clean(photo.thumbnailUrl) || clean(photo.imageUri),
+                        storagePath: clean(photo.storagePath),
+                        createdAt: timestamp(photo.createdAt) || timestamp(photo.uploadedAt),
+                        status: 'pending',
+                        ...(author ? { author } : {}),
+                        likes,
+                      });
+                    }
+                  });
+                }
+                updatePhotos(approvedPhotos, pendingPhotos);
+              } catch (error) {
+                void logClientError('FotoRayonaScreen.pendingPhotos', error);
+              }
+            },
+            (error) => {
+              void logClientError('FotoRayonaScreen.pendingPhotosError', error);
+              if (active) setLoadError(true);
+            },
+          );
+        }
+        // loading will be resolved when unsubPublic fires
       })
       .catch((error) => {
         void logClientError('FotoRayonaScreen.auth', error);
@@ -206,7 +268,8 @@ export default function FotoRayonaScreen() {
 
     return () => {
       active = false;
-      unsubscribe?.();
+      unsubPublic?.();
+      unsubPending?.();
     };
   }, [user?.id]);
 
@@ -221,9 +284,16 @@ export default function FotoRayonaScreen() {
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: SoulPhoto }) => (
-      <SoulTile item={item} size={tileSize} pendingLabel={text.pending} />
-    ),
+    ({ item }: { item: SoulPhoto }) => {
+      if (item.status === 'approved' && item.uri) {
+        return (
+          <TouchableOpacity activeOpacity={0.85} onPress={() => setPreviewPhoto(item)}>
+            <SoulTile item={item} size={tileSize} pendingLabel={text.pending} />
+          </TouchableOpacity>
+        );
+      }
+      return <SoulTile item={item} size={tileSize} pendingLabel={text.pending} />;
+    },
     [text.pending, tileSize],
   );
 
@@ -285,6 +355,35 @@ export default function FotoRayonaScreen() {
       <MiniTabBar />
       <GuestRegisterBanner visible={guestBannerVisible} onClose={hideGuestBanner} />
       <VideoLoadingOverlay visible={loading} />
+      <Modal visible={!!previewPhoto} transparent animationType="fade" onRequestClose={() => setPreviewPhoto(null)}>
+        <Pressable style={styles.previewOverlay} onPress={() => setPreviewPhoto(null)}>
+          {previewPhoto ? (
+            <>
+              <AppPhotoImage
+                uri={previewPhoto.uri}
+                storagePath={previewPhoto.storagePath}
+                style={styles.previewImage}
+                resizeMode="contain"
+                debugLabel={`DistrictPhotoPreview:${previewPhoto.id}`}
+                showDebugInfo={false}
+              />
+              <View style={styles.previewMeta}>
+                {previewPhoto.author ? (
+                  <Text style={styles.previewMetaText}>{previewPhoto.author}</Text>
+                ) : null}
+                {(previewPhoto.likes ?? 0) > 0 ? (
+                  <Text style={styles.previewMetaText}>{`❤ ${previewPhoto.likes}`}</Text>
+                ) : null}
+                {previewPhoto.createdAt > 0 ? (
+                  <Text style={styles.previewMetaText}>
+                    {new Date(previewPhoto.createdAt).toLocaleDateString()}
+                  </Text>
+                ) : null}
+              </View>
+            </>
+          ) : null}
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -390,6 +489,28 @@ const styles = StyleSheet.create({
     color: '#75684F',
     fontSize: 16,
     fontWeight: '900',
+    textAlign: 'center',
+  },
+  previewOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.88)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewImage: {
+    width: '100%',
+    height: '75%',
+  },
+  previewMeta: {
+    marginTop: 12,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    gap: 4,
+  },
+  previewMetaText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
     textAlign: 'center',
   },
 });

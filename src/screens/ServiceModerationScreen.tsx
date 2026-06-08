@@ -644,7 +644,7 @@ const ServiceModerationScreen: React.FC = () => {
           imageUri: typeof value.imageUri === 'string' ? value.imageUri : '',
           storagePath: typeof value.storagePath === 'string' ? value.storagePath : undefined,
           uploadedBy: typeof value.uploadedBy === 'string' ? value.uploadedBy : '',
-          createdAt: new Date(typeof value.uploadedAt === 'number' ? value.uploadedAt : 0),
+          createdAt: typeof value.uploadedAt === 'number' ? value.uploadedAt : 0,
           status: (value.status === 'approved' || value.status === 'rejected' ? value.status : 'pending') as 'pending' | 'approved' | 'rejected',
           target: (value.target === 'my_photos' ? 'my_photos' : 'gallery_public') as CommunityPhoto['target'],
           likes: 0,

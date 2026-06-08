@@ -282,7 +282,7 @@ export interface CommunityPhoto {
   storagePath?: string;
   uploadedBy: string;
   userId?: string;
-  createdAt: Date;
+  createdAt: number;
   status: 'pending' | 'approved' | 'rejected';
   target?: 'gallery_public' | 'my_photos';
   sourceScreen?: string;
