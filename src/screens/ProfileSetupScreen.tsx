@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -27,6 +27,7 @@ import {
   START_AVATARS,
   saveSelectedStartAvatar,
   saveTempProfileData,
+  getDefaultAvatarKey,
 } from '../utils/startAvatars';
 import { updateProfileRecord, uploadProfilePhoto } from '../services/authProfileService';
 import { pickPhotoFromLibrary } from '../utils/photoPicker';
@@ -136,6 +137,15 @@ export default function ProfileSetupScreen() {
   const isGenderDone = gender !== null;
   const isAgeDone = !isNaN(parsedAge) && parsedAge >= 14 && parsedAge <= 100;
 
+  // Auto-select avatar when gender + age are filled and user has no custom photo
+  useEffect(() => {
+    if (customAvatarUri) return;
+    const age = parseInt(ageText, 10);
+    if (gender && !isNaN(age) && age >= 14 && age <= 100) {
+      setSelectedKey(getDefaultAvatarKey(gender, age));
+    }
+  }, [gender, ageText, customAvatarUri]);
+
   const handleGenderSelect = (g: 'male' | 'female') => {
     setGender(g);
   };
@@ -173,7 +183,6 @@ export default function ProfileSetupScreen() {
   const getMissingMessages = () => {
     const missing: string[] = [];
     if (!isNameDone) missing.push(`- ${text.missingName}`);
-    if (!isAvatarDone) missing.push(`- ${text.missingAvatar}`);
     if (!isGenderDone) missing.push(`- ${text.missingGender}`);
     if (!isAgeDone) missing.push(`- ${text.missingAge}`);
     return missing;
@@ -321,29 +330,6 @@ export default function ProfileSetupScreen() {
           {customAvatarUri ? (
             <Image source={{ uri: customAvatarUri }} style={styles.customAvatarPreview} resizeMode="cover" />
           ) : null}
-
-          {/* Avatar */}
-          {renderSectionLabel(text.temporaryAvatarSection, selectedKey !== '')}
-          <View style={styles.grid}>
-            {START_AVATARS.map((avatar) => {
-              const isSelected = avatar.key === selectedKey;
-              return (
-                <TouchableOpacity
-                  key={avatar.key}
-                  style={[styles.avatarCard, isSelected && styles.avatarCardSelected]}
-                  onPress={() => { setSelectedKey(avatar.key); setCustomAvatarUri(''); }}
-                  activeOpacity={0.86}
-                >
-                  <Image source={avatar.source} style={styles.avatarImage} resizeMode="cover" />
-                  {isSelected && (
-                    <View style={styles.selectedBadge}>
-                      <MaterialCommunityIcons name="check" size={15} color="#fff" />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
 
           {/* Gender */}
           {renderSectionLabel(text.genderSection, isGenderDone)}

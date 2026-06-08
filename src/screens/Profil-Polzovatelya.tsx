@@ -285,6 +285,7 @@ const ProfileScreen: React.FC = () => {
   );
   const uaTapCountRef = React.useRef(0);
   const pulseAnim = React.useRef(new Animated.Value(1)).current;
+  const subGlowAnim = React.useRef(new Animated.Value(0)).current;
 
   const handleLogout = useCallback(() => {
     Alert.alert(text.exitTitle, text.exitConfirm, [
@@ -361,6 +362,17 @@ const ProfileScreen: React.FC = () => {
     setLastSeenPendingAtMs(seenAt);
     void AsyncStorage.setItem(`${PROFILE_REQUESTS_LAST_SEEN_AT_KEY}${user.id}`, String(seenAt)).catch(() => undefined);
   }, [user?.id]);
+
+  useEffect(() => {
+    const glow = Animated.loop(
+      Animated.sequence([
+        Animated.timing(subGlowAnim, { toValue: 1, duration: 1400, useNativeDriver: true }),
+        Animated.timing(subGlowAnim, { toValue: 0, duration: 1400, useNativeDriver: true }),
+      ])
+    );
+    glow.start();
+    return () => glow.stop();
+  }, [subGlowAnim]);
 
   useEffect(() => {
     if (!hasUnreadPendingRequests) return;
@@ -811,13 +823,21 @@ const ProfileScreen: React.FC = () => {
             ) : null}
           </View>
 
-          <TactileButton
-            title={text.manageSubscription}
-            onPress={() => navigation.navigate('SubscriptionScreen')}
-            variant="secondary"
-            style={styles.subscriptionButton}
-            icon={<MaterialCommunityIcons name="cog-outline" size={20} color="#4E5F43" />}
-          />
+          <Animated.View style={[
+            styles.subscriptionButtonWrapper,
+            {
+              opacity: subGlowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.82, 1] }),
+            },
+          ]}>
+            <TactileButton
+              title={text.manageSubscription}
+              onPress={() => navigation.navigate('SubscriptionScreen')}
+              variant="primary"
+              style={styles.subscriptionButton}
+              textStyle={{ color: '#FFFFFF', letterSpacing: 0.5 }}
+              icon={<MaterialCommunityIcons name="crown" size={18} color="#C9A84C" />}
+            />
+          </Animated.View>
 
         </TactileCard>
 
@@ -1207,7 +1227,19 @@ const styles = StyleSheet.create({
   },
   subscriptionPlan: { fontSize: 16, fontWeight: '900', color: '#7B69A8' },
   subscriptionExpiry: { marginTop: 4, fontSize: 12, fontWeight: '700', color: SCREEN_THEME.textSecondary },
-  subscriptionButton: { marginHorizontal: 16, marginBottom: 14 },
+  subscriptionButtonWrapper: {
+    marginHorizontal: 16,
+    marginBottom: 14,
+    borderRadius: 16,
+    shadowColor: '#C9A84C',
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 10,
+  },
+  subscriptionButton: {
+    backgroundColor: '#111111',
+    borderColor: '#C9A84C',
+  },
   sectionLabel: {
     fontSize: 11,
     fontWeight: '800',

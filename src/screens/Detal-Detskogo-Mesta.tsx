@@ -44,6 +44,9 @@ const UI_TEXT = {
     offersTitle: 'Актуальні пропозиції',
     readMore: 'Читати повністю',
     readLess: 'Згорнути',
+    showMore: 'Показати більше',
+    hide: 'Сховати',
+    businessSectionTitle: 'Для власників бізнесу',
     age: 'Вік дітей',
     price: 'Ціна від',
     schedule: 'Графік',
@@ -112,6 +115,9 @@ const UI_TEXT = {
     offersTitle: 'Актуальные предложения',
     readMore: 'Читать полностью',
     readLess: 'Свернуть',
+    showMore: 'Показать больше',
+    hide: 'Скрыть',
+    businessSectionTitle: 'Для владельцев бизнеса',
     age: 'Возраст детей',
     price: 'Цена от',
     schedule: 'График',
@@ -180,6 +186,9 @@ const UI_TEXT = {
     offersTitle: 'Current offers',
     readMore: 'Read more',
     readLess: 'Collapse',
+    showMore: 'Show more',
+    hide: 'Hide',
+    businessSectionTitle: 'For business owners',
     age: 'Age range',
     price: 'Price from',
     schedule: 'Schedule',
@@ -290,6 +299,7 @@ export default function DetalDetskogoMestaScreen() {
   const isBusinessPlus = useSelector(selectIsBusinessPlus);
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+  const [showBusinessSection, setShowBusinessSection] = useState(false);
   const [claimStatus, setClaimStatus] = useState<'none' | 'pending' | 'approved' | 'rejected'>('none');
   const [businessCard, setBusinessCard] = useState<{ ownerId?: string } | null>(null);
 
@@ -567,42 +577,56 @@ export default function DetalDetskogoMestaScreen() {
         ) : null}
 
         {/* Business ownership claim section */}
-        <View>
-          {claimStatus === 'none' || claimStatus === 'rejected' ? (
-            <TouchableOpacity
-              style={styles.claimBtn}
-              onPress={() => navigation.navigate('BusinessClaimScreen', { item: claimItem })}
-              activeOpacity={0.86}
-            >
-              <MaterialCommunityIcons name="store-plus-outline" size={18} color={SCREEN_THEME.terracotta} />
-              <Text style={styles.claimBtnText}>
-                {claimStatus === 'rejected' ? claimRejectedLabel : claimLabel}
-              </Text>
-            </TouchableOpacity>
-          ) : claimStatus === 'pending' ? (
-            <View style={styles.claimStatusCard}>
-              <MaterialCommunityIcons name="clock-outline" size={16} color="#8A7A5A" />
-              <Text style={styles.claimStatusText}>{claimPendingLabel}</Text>
+        {showBusinessSection ? (
+          <View style={styles.businessSectionContainer}>
+            <View style={styles.businessSectionHeader}>
+              <MaterialCommunityIcons name="briefcase-outline" size={18} color={SCREEN_THEME.textSecondary} />
+              <Text style={styles.businessSectionTitle}>{text.businessSectionTitle}</Text>
             </View>
-          ) : isMyApprovedPlace ? (
-            <View style={{ gap: 8 }}>
-              <View style={[styles.claimStatusCard, styles.claimStatusApproved]}>
-                <MaterialCommunityIcons name="check-circle-outline" size={16} color="#2E7D32" />
-                <Text style={[styles.claimStatusText, styles.claimStatusApprovedText]}>{claimApprovedLabel}</Text>
+            {claimStatus === 'none' || claimStatus === 'rejected' ? (
+              <TouchableOpacity
+                style={styles.claimBtn}
+                onPress={() => navigation.navigate('BusinessClaimScreen', { item: claimItem })}
+                activeOpacity={0.86}
+              >
+                <MaterialCommunityIcons name="store-plus-outline" size={18} color={SCREEN_THEME.terracotta} />
+                <Text style={styles.claimBtnText}>
+                  {claimStatus === 'rejected' ? claimRejectedLabel : claimLabel}
+                </Text>
+              </TouchableOpacity>
+            ) : claimStatus === 'pending' ? (
+              <View style={styles.claimStatusCard}>
+                <MaterialCommunityIcons name="clock-outline" size={16} color="#8A7A5A" />
+                <Text style={styles.claimStatusText}>{claimPendingLabel}</Text>
               </View>
-              {!isBusinessPlus && (
-                <TouchableOpacity
-                  style={styles.activateBusinessBtn}
-                  onPress={() => navigation.navigate('BusinessPlusSubscriptionScreen')}
-                  activeOpacity={0.86}
-                >
-                  <MaterialCommunityIcons name="storefront" size={16} color="#fff" />
-                  <Text style={styles.activateBusinessBtnText}>{activateBusinessPlusLabel}</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          ) : null}
-        </View>
+            ) : isMyApprovedPlace ? (
+              <View style={{ gap: 8 }}>
+                <View style={[styles.claimStatusCard, styles.claimStatusApproved]}>
+                  <MaterialCommunityIcons name="check-circle-outline" size={16} color="#2E7D32" />
+                  <Text style={[styles.claimStatusText, styles.claimStatusApprovedText]}>{claimApprovedLabel}</Text>
+                </View>
+                {!isBusinessPlus && (
+                  <TouchableOpacity
+                    style={styles.activateBusinessBtn}
+                    onPress={() => navigation.navigate('BusinessPlusSubscriptionScreen')}
+                    activeOpacity={0.86}
+                  >
+                    <MaterialCommunityIcons name="storefront" size={16} color="#fff" />
+                    <Text style={styles.activateBusinessBtnText}>{activateBusinessPlusLabel}</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : null}
+            <TouchableOpacity style={styles.hideBtn} onPress={() => setShowBusinessSection(false)}>
+              <Text style={styles.hideBtnText}>{text.hide}</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity style={styles.showMoreBtn} onPress={() => setShowBusinessSection(true)}>
+            <MaterialCommunityIcons name="chevron-down-circle-outline" size={18} color={SCREEN_THEME.enamelBlueDark} />
+            <Text style={styles.showMoreBtnText}>{text.showMore}</Text>
+          </TouchableOpacity>
+        )}
 
       </ScrollView>
     </SafeAreaView>
@@ -893,5 +917,54 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '900',
     color: '#fff',
+  },
+  showMoreBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 16,
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderWidth: 1,
+    borderColor: SCREEN_THEME.borderSoft,
+    marginBottom: 12,
+  },
+  showMoreBtnText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: SCREEN_THEME.enamelBlueDark,
+  },
+  businessSectionContainer: {
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: SCREEN_THEME.borderSoft,
+    gap: 8,
+  },
+  businessSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  businessSectionTitle: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: SCREEN_THEME.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  hideBtn: {
+    alignItems: 'center',
+    paddingVertical: 10,
+    marginTop: 4,
+  },
+  hideBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: SCREEN_THEME.textMuted,
   },
 });
