@@ -236,7 +236,13 @@ const ImportantNewsScreen: React.FC = () => {
       );
     }
 
-    return null;
+    return (
+      <View style={styles.stateCard}>
+        <MaterialCommunityIcons name="newspaper-variant-outline" size={38} color={SCREEN_THEME.textMuted} />
+        <Text style={styles.stateTitle}>{text.heroEmptyTitle}</Text>
+        <Text style={styles.stateText}>{text.heroEmptyText}</Text>
+      </View>
+    );
   };
 
   return (

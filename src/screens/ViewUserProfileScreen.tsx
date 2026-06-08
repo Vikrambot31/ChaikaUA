@@ -297,7 +297,7 @@ const ViewUserProfileScreen: React.FC = () => {
   };
 
   const handleSendRequest = async (reason: string) => {
-    await sendRequest(reason);
+    await sendRequest(reason as Parameters<typeof sendRequest>[0]);
     if (!currentUser?.id || !userId) return;
     try {
       const [status, privacyMode] = await Promise.all([

@@ -154,9 +154,7 @@ export const loadChaykaNewsDetailed = async (): Promise<{ status: ChaykaNewsLoad
       await persistChaykaNewsCache(remote.items);
       return { status: 'remote', fromCache: false, items: remote.items };
     }
-
-    // Remote feed exists but is empty. Do not fall back to fake draft news.
-    return { status: 'empty', fromCache: false, items: [] };
+    // Remote returned 200 OK but items array is empty — still check database and cache.
   }
 
   const databaseFeed = await loadChaykaNewsFromDatabase();
