@@ -124,7 +124,7 @@ const RequestTopicScreen: React.FC = () => {
   const [offerActivityUsers, setOfferActivityUsers] = useState<ActivityUser[]>([]);
   const todayHelpRequests = useSelector((state: RootState) => selectTodayHelpRequests(state)) as HelpRequest[];
   const sosRequests = useMemo(
-    () => todayHelpRequests.filter((request) => request.isBurning && request.expiresAt > new Date().toISOString()),
+    () => todayHelpRequests.filter((request) => request.isBurning && new Date(request.expiresAt).getTime() > Date.now()),
     [todayHelpRequests]
   );
   const sosUsers = useMemo<ActivityUser[]>(() => {

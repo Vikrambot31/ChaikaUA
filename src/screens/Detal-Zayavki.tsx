@@ -200,8 +200,8 @@ const parseFunctionError = (error: unknown, fallback: string, language: Lang): s
 };
 
 const AVATAR_COLORS = ['#C77A5D', '#D8AF59', '#7E9D69', '#5F84B4', '#A56B55'];
-const RTDB_FORBIDDEN_KEY_CHARS = /[.#$[\]/]/g;
-const toSafeRtdbKey = (value: string): string => (value ?? '').replace(RTDB_FORBIDDEN_KEY_CHARS, '_').trim();
+const toSafeRtdbKey = (value: string): string =>
+  (value ?? '').replace(/[.#$[\]/]/g, (c) => `_${c.charCodeAt(0).toString(16).toUpperCase()}_`).trim();
 
 const getGenderShortLabel = (gender?: string) => {
   if (gender === 'male') return 'M';

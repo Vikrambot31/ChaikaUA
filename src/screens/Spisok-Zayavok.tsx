@@ -234,7 +234,7 @@ const RequestsScreen: React.FC = () => {
             category: toStr(raw.category) || undefined,
             address: toStr(raw.address) || toStr(raw.location) || undefined,
             sourceScreen,
-            createdAt: toNumber(raw.createdAt) || toNumber(raw.uploadedAt),
+            createdAt: toTimestamp(raw.createdAt) || toTimestamp(raw.uploadedAt),
             status: 'pending',
           };
         })
@@ -418,7 +418,7 @@ const RequestsScreen: React.FC = () => {
             price: priceText || undefined,
             address: toStr(raw.address) || toStr(raw.serviceArea) || undefined,
             sourceScreen: 'LocalBusinessScreen',
-            createdAt: toTimestamp(raw.updatedAt) || toTimestamp(raw.createdAt),
+            createdAt: toTimestamp(raw.createdAt) || toTimestamp(raw.submittedForModerationAt),
             status: 'pending',
           };
         })
@@ -529,6 +529,13 @@ const RequestsScreen: React.FC = () => {
     };
   }, [user?.id, user?.email, loadPage, loadPendingPhotos, loadPendingLostFound, loadPendingBuySell, loadPendingContacts, loadPendingLocalBusiness, loadPendingAppSuggestions]);
 
+  // When user applies a non-'all' filter, load all pages so filter works on complete data
+  useEffect(() => {
+    if (statusFilter !== 'all' && hasMore && !loading && !loadingMore) {
+      void loadAllRequests();
+    }
+  }, [statusFilter, hasMore, loading, loadingMore, loadAllRequests]);
+
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -552,6 +559,41 @@ const RequestsScreen: React.FC = () => {
     await loadPage(nextCursor, true);
     setLoadingMore(false);
   }, [hasMore, loadPage, loading, loadingMore, nextCursor]);
+
+  // When a non-'all' filter is selected, load all remaining pages so filter works on complete data
+  const loadAllRequests = useCallback(async () => {
+    let cursor: number | null = null;
+    let accumulated: Request[] = [];
+    let iterations = 0;
+    const MAX_ITERATIONS = 50; // safety cap (~1000 items)
+
+    setLoadingMore(true);
+    try {
+      while (iterations < MAX_ITERATIONS) {
+        const result = await firebaseChatAPI.getRequestsPaginated({ limit: PAGE_SIZE + 1, cursorBefore: cursor });
+        if (!isRequestsPageResult(result) || !result.success || !result.data) break;
+        const pageItems = (result.data as Request[])
+          .map((item) => ({
+            ...item,
+            createdAt: typeof item.createdAt === 'number' ? item.createdAt : new Date(item.createdAt).getTime(),
+          }))
+          .sort((a, b) => b.createdAt - a.createdAt);
+        const page = pageItems.slice(0, PAGE_SIZE);
+        accumulated = [...accumulated, ...page];
+        const moreAvailable = pageItems.length > PAGE_SIZE && page.length > 0;
+        cursor = moreAvailable ? (page[page.length - 1].timestamp ?? null) : null;
+        if (!moreAvailable || cursor === null) break;
+        iterations++;
+      }
+      if (accumulated.length > 0) {
+        setRequests(accumulated);
+        setHasMore(false);
+        setNextCursor(null);
+      }
+    } finally {
+      setLoadingMore(false);
+    }
+  }, []);
 
   const moderate = useCallback(
     async (requestId: string, status: 'approved' | 'rejected') => {
