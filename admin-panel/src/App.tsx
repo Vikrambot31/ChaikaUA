@@ -20,13 +20,14 @@ import { BonusCreditsPage } from './pages/BonusCreditsPage';
 import { AdChatPage } from './pages/AdChatPage';
 import { PremiumPage } from './pages/PremiumPage';
 import { BusinessPlusModerationPage } from './pages/BusinessPlusModerationPage';
+import { FeatureRatingsPage } from './pages/FeatureRatingsPage';
 import { ViewModeProvider } from './contexts/ViewModeContext';
 import { DashboardProvider } from './contexts/DashboardContext';
 
 const AppRulesPage = lazy(() => import('./pages/AppRulesPage'));
 
 const VALID_PAGES = new Set<AdminPageKey>([
-  'dashboard', 'moderation', 'archive', 'invite_access', 'guarantor_tree', 'access_control', 'security', 'errors', 'photo_approval', 'releases', 'ai_diagnostics', 'app_rules', 'support', 'bonus_credits', 'ad_chat', 'premium', 'business_plus',
+  'dashboard', 'moderation', 'archive', 'invite_access', 'guarantor_tree', 'access_control', 'security', 'errors', 'photo_approval', 'releases', 'ai_diagnostics', 'app_rules', 'support', 'bonus_credits', 'ad_chat', 'premium', 'business_plus', 'feature_ratings',
 ]);
 
 const getPageFromHash = (): AdminPageKey => {
@@ -80,6 +81,7 @@ export const App = () => {
     ad_chat: 'Рекламний чат',
     premium: 'Premium підписки',
     business_plus: 'Бізнес+ картки',
+    feature_ratings: 'Оцінка функцій',
   };
 
   const renderPage = () => {
@@ -98,6 +100,7 @@ export const App = () => {
     if (activePage === 'ad_chat') return <AdChatPage />;
     if (activePage === 'premium') return <PremiumPage />;
     if (activePage === 'business_plus') return <BusinessPlusModerationPage />;
+    if (activePage === 'feature_ratings') return <FeatureRatingsPage />;
     if (activePage === 'app_rules') {
       return (
         <Suspense fallback={<div className="loadingScreen">Завантаження серверних правил...</div>}>

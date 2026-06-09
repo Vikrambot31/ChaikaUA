@@ -10,7 +10,7 @@ import { useViewMode, type ViewMode } from '../contexts/ViewModeContext';
 import { useDashboardContext } from '../contexts/DashboardContext';
 import type { DashboardStats } from '../services/dashboardService';
 
-export type AdminPageKey = 'dashboard' | 'moderation' | 'archive' | 'invite_access' | 'guarantor_tree' | 'access_control' | 'security' | 'errors' | 'photo_approval' | 'releases' | 'ai_diagnostics' | 'app_rules' | 'support' | 'bonus_credits' | 'ad_chat' | 'premium' | 'business_plus';
+export type AdminPageKey = 'dashboard' | 'moderation' | 'archive' | 'invite_access' | 'guarantor_tree' | 'access_control' | 'security' | 'errors' | 'photo_approval' | 'releases' | 'ai_diagnostics' | 'app_rules' | 'support' | 'bonus_credits' | 'ad_chat' | 'premium' | 'business_plus' | 'feature_ratings';
 
 type AppShellProps = {
   children: ReactNode;
@@ -107,6 +107,11 @@ const navItems: Array<{ key: AdminPageKey; label: string; hint: string }> = [
     label: 'Бізнес+ картки',
     hint: 'Заявки власників закладів та модерація контенту меню, акцій і фото для Бізнес+ карток.',
   },
+  {
+    key: 'feature_ratings',
+    label: 'Оцінка функцій',
+    hint: 'Оцінки та коментарі користувачів по розділах додатку: середній рейтинг, тренди, зворотний зв\'язок.',
+  },
 ];
 
 const navItemIcons: Record<AdminPageKey, string> = {
@@ -127,6 +132,7 @@ const navItemIcons: Record<AdminPageKey, string> = {
   ad_chat: '\u{1F4E2}',
   premium: '\u2B50',
   business_plus: '🏪',
+  feature_ratings: '\u2B50',
 };
 
 type AttentionLevel = 'low' | 'medium' | 'high';

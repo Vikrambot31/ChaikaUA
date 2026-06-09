@@ -17,6 +17,9 @@ import { ensureFirebaseAuth, isModeratorUser, requireWriteSession } from './fire
 import { Request as AppRequest, CommunityPhoto as AppPhoto, AudioAttachment, type ProblemResolutionStatus } from './types/app';
 import { resolveMediaAccessUrls } from './services/mediaAccess';
 import { assertTextMatchesLanguage, normalizeAppLang } from './utils/contentLanguageGuard';
+import { addWeightedRating, replaceWeightedRating } from './utils/monthlyRating';
+import { getCurrentAppVersion } from './services/appVersion';
+import type { FeatureRating, FeatureRatingSummary } from './types/app';
 
 
 export { auth, database, storage };
@@ -1928,6 +1931,159 @@ export const socialAuthAPI = {
         success: false,
         error: error instanceof Error ? error.message : String(error),
       };
+    }
+  },
+};
+
+// ─── Feature Ratings API ──────────────────────────────────────────────────────
+
+const getMonthStartTimestamp = (): number => {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+};
+
+export const featureRatingAPI = {
+
+  /** Check if user can rate this screen (once per calendar month per screen). */
+  canRate: async (screenId: string): Promise<ApiResult<boolean>> => {
+    try {
+      const uid = await ensureFirebaseAuth();
+      const snapshot = await get(ref(database, `feature_ratings/${screenId}/${uid}`));
+      if (!snapshot.exists()) return { success: true, data: true };
+
+      const data = snapshot.val() as { createdAt?: number } | null;
+      const createdAt = typeof data?.createdAt === 'number' ? data.createdAt : 0;
+      const canRate = createdAt < getMonthStartTimestamp();
+      return { success: true, data: canRate };
+    } catch (error: unknown) {
+      void logClientError('featureRatingAPI.canRate', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  },
+
+  /** Submit a rating and atomically update the summary. */
+  submitRating: async (
+    screenId: string,
+    rating: number,
+    comment?: string,
+  ): Promise<ApiVoidResult> => {
+    try {
+      if (rating < 1 || rating > 5 || !Number.isInteger(rating)) {
+        return { success: false, error: 'Rating must be an integer 1-5' };
+      }
+
+      const uid = await ensureFirebaseAuth();
+
+      // 1. Read existing user rating (to decide add vs replace)
+      const existingSnap = await get(ref(database, `feature_ratings/${screenId}/${uid}`));
+      const previousRating = existingSnap.exists()
+        ? (existingSnap.val() as { rating?: number })?.rating
+        : undefined;
+
+      // 2. Read current summary
+      const summarySnap = await get(ref(database, `feature_ratings_summary/${screenId}`));
+      const currentSummary: FeatureRatingSummary = summarySnap.exists()
+        ? (summarySnap.val() as FeatureRatingSummary)
+        : { avgRating: 0, totalVotes: 0, monthlyAvg: 0, monthlyVotes: 0, lastUpdated: 0 };
+
+      // 3. Recalculate summary
+      const now = Date.now();
+      const monthStart = getMonthStartTimestamp();
+
+      const totalAgg = previousRating && previousRating >= 1 && previousRating <= 5
+        ? replaceWeightedRating({ rating: currentSummary.avgRating, votes: currentSummary.totalVotes }, rating, previousRating)
+        : addWeightedRating({ rating: currentSummary.avgRating, votes: currentSummary.totalVotes }, rating);
+
+      // Monthly: if previous rating was this month, replace; otherwise add
+      const wasThisMonth = previousRating && typeof (existingSnap.val() as { createdAt?: number })?.createdAt === 'number'
+        && ((existingSnap.val() as { createdAt: number }).createdAt >= monthStart);
+
+      let monthlyAgg;
+      if (wasThisMonth) {
+        monthlyAgg = replaceWeightedRating(
+          { rating: currentSummary.monthlyAvg, votes: currentSummary.monthlyVotes },
+          rating,
+          previousRating,
+        );
+      } else {
+        monthlyAgg = addWeightedRating(
+          { rating: currentSummary.monthlyAvg, votes: currentSummary.monthlyVotes },
+          rating,
+        );
+      }
+
+      const newSummary: FeatureRatingSummary = {
+        avgRating: Math.round(totalAgg.rating * 100) / 100,
+        totalVotes: totalAgg.votes,
+        monthlyAvg: Math.round(monthlyAgg.rating * 100) / 100,
+        monthlyVotes: monthlyAgg.votes,
+        lastUpdated: now,
+      };
+
+      // 4. Build rating record
+      const ratingRecord: FeatureRating = {
+        screenId,
+        rating,
+        comment: comment?.trim() || null,
+        platform: Platform.OS === 'ios' ? 'ios' : 'android',
+        appVersion: getCurrentAppVersion(),
+        createdAt: now,
+      };
+
+      // 5. Atomic multi-path update
+      const updates: Record<string, unknown> = {
+        [`feature_ratings/${screenId}/${uid}`]: ratingRecord,
+        [`feature_ratings_summary/${screenId}`]: newSummary,
+      };
+
+      await update(ref(database), updates);
+      return { success: true };
+    } catch (error: unknown) {
+      void logClientError('featureRatingAPI.submitRating', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  },
+
+  /** Get summaries for all screens (admin panel). */
+  getAllSummaries: async (): Promise<ApiResult<Record<string, FeatureRatingSummary>>> => {
+    try {
+      await ensureFirebaseAuth();
+      const snapshot = await get(ref(database, 'feature_ratings_summary'));
+      const data = snapshot.val() as Record<string, FeatureRatingSummary> | null;
+      return { success: true, data: data || {} };
+    } catch (error: unknown) {
+      void logClientError('featureRatingAPI.getAllSummaries', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  },
+
+  /** Get recent comments for a screen (admin panel). */
+  getComments: async (screenId: string, limit = 20): Promise<ApiResult<FeatureRating[]>> => {
+    try {
+      await ensureFirebaseAuth();
+      const q = query(
+        ref(database, `feature_ratings/${screenId}`),
+        orderByChild('createdAt'),
+        limitToLast(limit),
+      );
+      const snapshot = await get(q);
+      const comments: FeatureRating[] = [];
+
+      if (snapshot.exists()) {
+        snapshot.forEach((child) => {
+          const val = child.val() as FeatureRating | null;
+          if (val && typeof val.rating === 'number') {
+            comments.push({ ...val, screenId });
+          }
+        });
+      }
+
+      // Sort newest first
+      comments.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      return { success: true, data: comments };
+    } catch (error: unknown) {
+      void logClientError('featureRatingAPI.getComments', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   },
 };

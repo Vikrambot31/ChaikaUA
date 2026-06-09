@@ -26,6 +26,7 @@ import { subscribeActiveBonusPromotions, subscribeBiznesPlusPlaces, type BonusPr
 import { safeCallPhone, safeOpenExternalUrl } from '../utils/communicationActions';
 import { selectUserId } from '../redux/selectors';
 import FeedLikeButton from '../components/FeedLikeButton';
+import { FeatureRatingBanner } from '../components/FeatureRatingBanner';
 import { toggleFavorite, getFavorites, type FavoriteSource } from '../services/favoritesService';
 import { useSoftToast } from '../hooks/useSoftToast';
 
@@ -843,6 +844,8 @@ export default function VseDlyaDeteyScreen() {
             </View>
           )}
         </View>
+
+        <FeatureRatingBanner screenId="deti" />
       </ScrollView>
     </SafeAreaView>
   );

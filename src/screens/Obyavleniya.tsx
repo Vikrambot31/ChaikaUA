@@ -2,6 +2,7 @@ import React from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import MiniTabBar from '../components/MiniTabBar';
+import { FeatureRatingBanner } from '../components/FeatureRatingBanner';
 import { useTranslation } from '../i18n/useTranslation';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import TactileIcon from '../components/TactileIcon';
@@ -46,6 +47,8 @@ const AnnouncementsScreen: React.FC = () => {
           <Text style={styles.infoTitle}>{text.infoTitle}</Text>
           <Text style={styles.infoText}>{text.info}</Text>
         </View>
+
+        <FeatureRatingBanner screenId="obyavleniya" />
       </ScrollView>
       <MiniTabBar />
     </SafeAreaView>

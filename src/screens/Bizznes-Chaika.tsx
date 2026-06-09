@@ -6,6 +6,7 @@ import { NavigationProp, useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import MiniTabBar from '../components/MiniTabBar';
+import { FeatureRatingBanner } from '../components/FeatureRatingBanner';
 import MiniUserAvatar from '../components/MiniUserAvatar';
 import AppPhotoImage from '../components/AppPhotoImage';
 import { SCREEN_THEME } from '../utils/screenTheme';
@@ -1815,6 +1816,8 @@ const BiznesChaikaScreen: React.FC = () => {
             )}
           </View>
         )}
+
+        <FeatureRatingBanner screenId="biznes" />
       </ScrollView>
       <View style={styles.addBar}>
         <TouchableOpacity style={styles.addBarBtn} onPress={() => {

@@ -27,6 +27,7 @@ import {
   normalizeChatRequests,
 } from '../utils/chatRequests';
 import TactileIcon from '../components/TactileIcon';
+import { FeatureRatingBanner } from '../components/FeatureRatingBanner';
 import TactileCard from '../components/TactileCard';
 import TactileInput from '../components/TactileInput';
 import TactileButton from '../components/TactileButton';
@@ -780,15 +781,18 @@ const OnlineChatScreen = () => {
             </View>
           }
           ListFooterComponent={
-            !loading && !loadError && filteredRequests.length > 0 && hasMore ? (
-              <TactileButton
-                title={loadingMore ? '...' : text.loadMore}
-                onPress={() => void handleLoadMore()}
-                variant="secondary"
-                disabled={loadingMore}
-                style={styles.loadMoreButton}
-              />
-            ) : null
+            <>
+              {!loading && !loadError && filteredRequests.length > 0 && hasMore ? (
+                <TactileButton
+                  title={loadingMore ? '...' : text.loadMore}
+                  onPress={() => void handleLoadMore()}
+                  variant="secondary"
+                  disabled={loadingMore}
+                  style={styles.loadMoreButton}
+                />
+              ) : null}
+              <FeatureRatingBanner screenId="chat" />
+            </>
           }
           renderItem={({ item }) => {
             const timestamp = getChatRequestTimestamp(item) || Date.now();

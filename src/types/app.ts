@@ -414,6 +414,25 @@ export interface ElectricityState {
   error: string | null;
 }
 
+// --- Feature Ratings (оцінка функцій додатку) ---
+
+export type FeatureRating = {
+  screenId: string;
+  rating: number;       // 1-5
+  comment: string | null;
+  platform: 'android' | 'ios';
+  appVersion: string;
+  createdAt: number;
+};
+
+export type FeatureRatingSummary = {
+  avgRating: number;
+  totalVotes: number;
+  monthlyAvg: number;
+  monthlyVotes: number;
+  lastUpdated: number;
+};
+
 export interface OsbbState {
   buildingId: string | null;
   street: string | null;

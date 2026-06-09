@@ -33,6 +33,7 @@ import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { getMapFocusPlaceParams } from '../utils/mapFocusParams';
 import AppPhotoImage from '../components/AppPhotoImage';
+import { FeatureRatingBanner } from '../components/FeatureRatingBanner';
 import PhotoUploadField, { type UploadedPhoto } from '../components/PhotoUploadField';
 import { getDonePhotos, validateSubmissionRequirements } from '../utils/submissionRequirements';
 import { getLanguageValidationError } from '../utils/contentLanguageGuard';
@@ -1071,6 +1072,8 @@ export default function EdaNaChaykeScreen() {
             </View>
           </>
         )}
+
+        <FeatureRatingBanner screenId="eda" />
       </ScrollView>
     </SafeAreaView>
   );
