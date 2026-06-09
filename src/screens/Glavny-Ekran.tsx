@@ -1208,7 +1208,7 @@ const styles = StyleSheet.create({
     left: 0,
     width: '100%',
     height: PANEL2_H,
-    zIndex: 2,
+    zIndex: 5,
   },
   chatListWrap: {
     position: 'absolute',

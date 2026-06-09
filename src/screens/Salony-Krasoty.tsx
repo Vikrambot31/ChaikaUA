@@ -7,7 +7,6 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  Share,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
@@ -20,7 +19,6 @@ import { BeautyCategory, BeautyFeature, BeautyOffer, Place } from '../types/app'
 import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { subscribeActiveBonusPromotions, type BonusPromotion } from '../services/bonusService';
-import { getMapFocusPlaceParams } from '../utils/mapFocusParams';
 import UserCardActionBar from '../components/UserCardActionBar';
 import { toggleFavorite, getFavorites, type FavoriteSource } from '../services/favoritesService';
 import { useSoftToast } from '../hooks/useSoftToast';
@@ -412,25 +410,8 @@ export default function SalonyKrasotyScreen() {
     navigation.navigate('DetalSalonaScreen', { place });
   };
 
-  const handleRoutePlace = (place: Place) => {
-    navigation.navigate('MainTabs', {
-      screen: 'MapTab',
-      params: getMapFocusPlaceParams(place),
-    });
-  };
-
   const openOffer = (offer: BeautyOffer) => {
     navigation.navigate('DetalPredlozheniyaSalonaScreen', { offer });
-  };
-
-  const shareSalon = async (place: Place) => {
-    try {
-      await Share.share({
-        message: `${place.name}\n${place.address}\n\nЧайка — Салони краси`,
-      });
-    } catch {
-      // пользователь закрыл шторку — ничего не делаем
-    }
   };
 
   const openBusinessForm = () => {

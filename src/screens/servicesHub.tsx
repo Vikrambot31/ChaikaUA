@@ -37,6 +37,7 @@ const UI_TEXT: Record<'ua' | 'ru' | 'en', SectionedItems> = {
     seeMore: 'Більше',
     seeLess: 'Згорнути',
     frequent: [
+      { label: 'Новини Чайки', desc: 'Важливі новини та оголошення', screen: 'ImportantNewsScreen', icon: 'newspaper-variant-outline', accent: '#3A7BD5' },
       { label: 'Світло і повідомлення', desc: 'Що пишуть сусіди у будинку', screen: 'ElectricityStatusScreen', icon: 'lightning-bolt-outline', accent: '#C79C47' },
       { label: 'Місця Чайки', desc: 'Кафе, магазини та послуги поруч', screen: 'PlacesScreen', icon: 'map-marker-multiple', accent: '#00897B' },
       { label: 'Фото району', desc: 'Галерея фотографій ЖК Чайка', screen: 'FotoRayonaScreen', icon: 'image-plus', accent: '#5C6BC0' },
@@ -64,6 +65,7 @@ const UI_TEXT: Record<'ua' | 'ru' | 'en', SectionedItems> = {
     seeMore: 'Больше',
     seeLess: 'Свернуть',
     frequent: [
+      { label: 'Новости Чайки', desc: 'Важные новости и объявления', screen: 'ImportantNewsScreen', icon: 'newspaper-variant-outline', accent: '#3A7BD5' },
       { label: 'Есть ли СВЕТ?', desc: 'Что пишут соседи в доме', screen: 'ElectricityStatusScreen', icon: 'lightning-bolt-outline', accent: '#C79C47' },
       { label: 'Места Чайки', desc: 'Кафе, магазины и сервисы рядом', screen: 'PlacesScreen', icon: 'map-marker-multiple', accent: '#00897B' },
       { label: 'Фото района', desc: 'Галерея фотографий ЖК Чайка', screen: 'FotoRayonaScreen', icon: 'image-plus', accent: '#5C6BC0' },
@@ -91,6 +93,7 @@ const UI_TEXT: Record<'ua' | 'ru' | 'en', SectionedItems> = {
     seeMore: 'More',
     seeLess: 'Less',
     frequent: [
+      { label: 'Chaika News', desc: 'Important news and announcements', screen: 'ImportantNewsScreen', icon: 'newspaper-variant-outline', accent: '#3A7BD5' },
       { label: 'Power reports', desc: 'Neighbor updates by building', screen: 'ElectricityStatusScreen', icon: 'lightning-bolt-outline', accent: '#C79C47' },
       { label: 'Chaika places', desc: 'Cafes, stores, and local services nearby', screen: 'PlacesScreen', icon: 'map-marker-multiple', accent: '#00897B' },
       { label: 'District Photos', desc: 'Photo gallery of Chaika neighborhood', screen: 'FotoRayonaScreen', icon: 'image-plus', accent: '#5C6BC0' },
@@ -177,8 +180,8 @@ const ServicesHubScreen: React.FC = () => {
 
         <Text style={styles.sectionLabel}>{text.sectionFrequent}</Text>
         <View style={styles.list}>
-          {text.frequent.filter(i => i.screen === 'ElectricityStatusScreen' || i.screen === 'FotoRayonaScreen').map(renderItem)}
-          {frequentExpanded && [soulPhotosItem, ...text.frequent.filter(i => i.screen !== 'ElectricityStatusScreen' && i.screen !== 'FotoRayonaScreen')].map(renderItem)}
+          {text.frequent.filter(i => i.screen === 'ImportantNewsScreen' || i.screen === 'ElectricityStatusScreen' || i.screen === 'FotoRayonaScreen').map(renderItem)}
+          {frequentExpanded && [soulPhotosItem, ...text.frequent.filter(i => i.screen !== 'ImportantNewsScreen' && i.screen !== 'ElectricityStatusScreen' && i.screen !== 'FotoRayonaScreen')].map(renderItem)}
           <TouchableOpacity style={styles.seeMoreBtn} onPress={() => setFrequentExpanded(v => !v)} activeOpacity={0.8}>
             <Text style={styles.seeMoreText}>{frequentExpanded ? text.seeLess : text.seeMore}</Text>
             <MaterialCommunityIcons name={frequentExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={SCREEN_THEME.accentGold} />

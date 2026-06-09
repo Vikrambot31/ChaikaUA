@@ -955,9 +955,7 @@ const OnlineChatScreen = () => {
                         debugLabel={`OnlineChatLostFound:${item.id}`}
                         showDebugInfo={false}
                       />
-                      <View style={[styles.lostFoundTypeDot, lostFoundType === 'lost' ? styles.lostFoundLostDot : styles.lostFoundFoundDot]}>
-                        <MaterialCommunityIcons name={lostFoundType === 'lost' ? 'alert-circle-outline' : 'check-circle-outline'} size={13} color="#fff" />
-                      </View>
+
                     </View>
                     {cardContent}
                   </TouchableOpacity>
@@ -1506,20 +1504,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: '#F0E8D8',
   },
-  lostFoundTypeDot: {
-    position: 'absolute',
-    left: 8,
-    top: 8,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: SCREEN_THEME.paperStrong,
-  },
-  lostFoundFoundDot: { backgroundColor: SCREEN_THEME.woodGreenDark },
-  lostFoundLostDot: { backgroundColor: SCREEN_THEME.terracottaDark },
+
   lostFoundChatCopy: { flex: 1, justifyContent: 'space-between', minWidth: 0 },
   lostFoundChatTopRow: {
     flexDirection: 'row',
