@@ -980,7 +980,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 12,
-    backgroundColor: '#E65100',
+    backgroundColor: '#8E2E24',
   },
   pendingBannerText: {
     flex: 1,

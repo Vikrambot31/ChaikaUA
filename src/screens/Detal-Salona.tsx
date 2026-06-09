@@ -58,6 +58,9 @@ const UI_TEXT = {
     priceUnknown: 'уточнюйте',
     infoUnknown: 'уточнюйте',
     descriptionEmpty: 'Детальна інформація поки не заповнена. Можна скористатися маршрутом або контактами.',
+    bookingTitle: 'Записатися на послуги',
+    bookingEmptyText: 'Власник салону ще не підключив онлайн-запис.\n\nЯкщо ви власник — оформіть підписку Бізнес+, щоб клієнти бачили ваші контакти, ціни та актуальні акції прямо тут.',
+    bookingCta: 'Підключити Бізнес+',
     categoryLabel: {
       hair: 'Перукарня',
       nails: 'Нігті',
@@ -111,6 +114,9 @@ const UI_TEXT = {
     priceUnknown: 'уточняйте',
     infoUnknown: 'уточняйте',
     descriptionEmpty: 'Подробная информация пока не заполнена. Можно воспользоваться маршрутом или контактами.',
+    bookingTitle: 'Записаться на услуги',
+    bookingEmptyText: 'Владелец салона ещё не подключил онлайн-запись.\n\nЕсли вы владелец — оформите подписку Бизнес+, чтобы клиенты видели ваши контакты, цены и актуальные акции прямо здесь.',
+    bookingCta: 'Подключить Бизнес+',
     categoryLabel: {
       hair: 'Парикмахерская',
       nails: 'Ногти',
@@ -164,6 +170,9 @@ const UI_TEXT = {
     priceUnknown: 'ask',
     infoUnknown: 'ask',
     descriptionEmpty: 'Detailed information has not been filled in yet. You can use route or contacts if available.',
+    bookingTitle: 'Book a service',
+    bookingEmptyText: "The salon owner hasn't set up online booking yet.\n\nAre you the owner? Get a Business+ subscription so clients can see your contacts, prices and current offers right here.",
+    bookingCta: 'Get Business+',
     categoryLabel: {
       hair: 'Hair salon',
       nails: 'Nails',
@@ -475,6 +484,23 @@ export default function DetalSalonaScreen() {
             {renderInfoRow(text.schedule, info?.workingHours ?? text.infoUnknown)}
             {info?.masterName ? renderInfoRow(text.master, info.masterName) : null}
             {renderInfoRow(text.slots, info?.hasAvailableSlots == null ? text.infoUnknown : info.hasAvailableSlots ? text.slotsYes : text.slotsNo)}
+          </View>
+        </View>
+
+        {/* Booking upsell section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{text.bookingTitle}</Text>
+          <View style={styles.bookingEmptyBlock}>
+            <MaterialCommunityIcons name="calendar-clock-outline" size={38} color={SCREEN_THEME.textMuted} />
+            <Text style={styles.bookingEmptyText}>{text.bookingEmptyText}</Text>
+            <TouchableOpacity
+              style={styles.bookingCta}
+              onPress={() => navigation.navigate('BusinessPlusSubscriptionScreen')}
+              activeOpacity={0.86}
+            >
+              <MaterialCommunityIcons name="storefront" size={16} color="#fff" />
+              <Text style={styles.bookingCtaText}>{text.bookingCta}</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -970,5 +996,32 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '900',
     fontSize: 13,
+  },
+  bookingEmptyBlock: {
+    alignItems: 'center',
+    paddingVertical: 8,
+    gap: 12,
+  },
+  bookingEmptyText: {
+    fontSize: 13,
+    lineHeight: 20,
+    fontWeight: '600',
+    color: SCREEN_THEME.textSecondary,
+    textAlign: 'center',
+  },
+  bookingCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#7A1E5C',
+    borderRadius: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 13,
+    marginTop: 4,
+  },
+  bookingCtaText: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#fff',
   },
 });

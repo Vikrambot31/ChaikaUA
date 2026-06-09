@@ -21,11 +21,15 @@ import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { subscribeActiveBonusPromotions, type BonusPromotion } from '../services/bonusService';
 import { getMapFocusPlaceParams } from '../utils/mapFocusParams';
+import UserCardActionBar from '../components/UserCardActionBar';
+import { toggleFavorite, getFavorites, type FavoriteSource } from '../services/favoritesService';
+import { useSoftToast } from '../hooks/useSoftToast';
 
 type Lang = 'ua' | 'ru' | 'en';
 type AppNavigation = NavigationProp<Record<string, object | undefined>>;
 
 const TILE_GAP = 10;
+const FAVORITE_SOURCE: FavoriteSource = 'beauty';
 type CategoryKey = 'all' | BeautyCategory;
 type ScreenText = (typeof UI_TEXT)[Lang];
 
@@ -57,6 +61,8 @@ const UI_TEXT = {
     currency: 'грн',
     priceUnknown: 'ціну уточнюйте',
     hasSlots: 'є вільні вікна',
+    favoriteAdded: 'Додано в обране',
+    favoriteRemoved: 'Видалено з обраного',
     categories: {
       all: 'Всі',
       hair: 'Перукарні',
@@ -119,6 +125,8 @@ const UI_TEXT = {
     currency: 'грн',
     priceUnknown: 'цену уточняйте',
     hasSlots: 'есть свободные окна',
+    favoriteAdded: 'Добавлено в избранное',
+    favoriteRemoved: 'Удалено из избранного',
     categories: {
       all: 'Все',
       hair: 'Парикмахерские',
@@ -181,6 +189,8 @@ const UI_TEXT = {
     currency: 'UAH',
     priceUnknown: 'ask for price',
     hasSlots: 'slots available',
+    favoriteAdded: 'Added to favorites',
+    favoriteRemoved: 'Removed from favorites',
     categories: {
       all: 'All',
       hair: 'Hair salons',
@@ -285,18 +295,38 @@ export default function SalonyKrasotyScreen() {
   const navigation = useNavigation<AppNavigation>();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as Lang;
   const currentUserEmail = useSelector((state: RootState) => state.auth.user?.email);
+  const currentUserId = useSelector((state: RootState) => state.auth.user?.id);
   const isAdmin = currentUserEmail === 'vikramsave@ukr.net';
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
   const [activeCategory, setActiveCategory] = useState<CategoryKey>('all');
   const [claimPlaceIds, setClaimPlaceIds] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
   const [activePromotions, setActivePromotions] = useState<BonusPromotion[]>([]);
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const scrollRef = useRef<ScrollView>(null);
   const resultsAnchorY = useRef(0);
+  const { showSuccess } = useSoftToast();
 
   useEffect(() => {
     return subscribeActiveBonusPromotions('beauty', setActivePromotions);
   }, []);
+
+  useEffect(() => {
+    void getFavorites(FAVORITE_SOURCE).then((items) => {
+      setFavoriteIds(new Set(items.map((item) => item.id)));
+    });
+  }, []);
+
+  const handleToggleFavorite = async (placeId: string) => {
+    const added = await toggleFavorite(placeId, FAVORITE_SOURCE);
+    setFavoriteIds((prev) => {
+      const next = new Set(prev);
+      if (added) next.add(placeId);
+      else next.delete(placeId);
+      return next;
+    });
+    showSuccess(added ? text.favoriteAdded : text.favoriteRemoved);
+  };
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -457,11 +487,6 @@ export default function SalonyKrasotyScreen() {
           </View>
         </View>
 
-        <View style={styles.addressRow}>
-          <MaterialCommunityIcons name="map-marker-outline" size={16} color={SCREEN_THEME.textMuted} />
-          <Text style={styles.addressText} numberOfLines={1}>{place.address}</Text>
-        </View>
-
         {featureBadges.length > 0 ? (
           <View style={styles.badgeRow}>
             {featureBadges.map((badge) => (
@@ -476,18 +501,20 @@ export default function SalonyKrasotyScreen() {
           <TouchableOpacity style={styles.primaryAction} onPress={() => openPlace(place)} activeOpacity={0.85}>
             <Text style={styles.primaryActionText}>{text.details}</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.routeAction}
-            onPress={(e) => { e.stopPropagation(); handleRoutePlace(place); }}
-            activeOpacity={0.85}
-          >
-            <MaterialCommunityIcons name="map-marker-path" size={16} color={SCREEN_THEME.enamelBlueDark} />
-            <Text style={styles.routeActionText}>{text.route}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.shareAction} onPress={() => shareSalon(place)} activeOpacity={0.85}>
-            <MaterialCommunityIcons name="share-variant-outline" size={18} color={SCREEN_THEME.enamelBlueDark} />
-          </TouchableOpacity>
         </View>
+        <UserCardActionBar
+          showAvatar={false}
+          showProfile={false}
+          showContact={false}
+          showLikeAvatars
+          likePath="feed_likes/salony"
+          likeId={place.id}
+          currentUserId={currentUserId ?? undefined}
+          language={language}
+          shareMessage={`${place.name}\n\nЧайка — Салони краси`}
+          isFav={favoriteIds.has(place.id)}
+          onToggleFavorite={() => { void handleToggleFavorite(place.id); }}
+        />
       </TouchableOpacity>
     );
   };
