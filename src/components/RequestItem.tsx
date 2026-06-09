@@ -189,6 +189,7 @@ const RequestItem: React.FC<RequestItemProps> = ({
   language = 'ua',
 }) => {
   const [descExpanded, setDescExpanded] = useState(false);
+  const [photoVisible, setPhotoVisible] = useState(true);
   const topic = useMemo(() => getTopicVisual(request, language), [language, request]);
   const hasPhoto = Boolean(request.photoUri || request.photoStoragePath);
 
@@ -256,7 +257,7 @@ const RequestItem: React.FC<RequestItemProps> = ({
           </View>
         </View>
 
-        {hasPhoto ? (
+        {hasPhoto && photoVisible ? (
           <AppPhotoImage
             uri={request.photoUri}
             storagePath={request.photoStoragePath}
@@ -264,6 +265,7 @@ const RequestItem: React.FC<RequestItemProps> = ({
             resizeMode="cover"
             isOwner={Boolean(isModerator)}
             debugLabel={`RequestItem:${request.id}`}
+            onLoadFailed={() => setPhotoVisible(false)}
           />
         ) : null}
 

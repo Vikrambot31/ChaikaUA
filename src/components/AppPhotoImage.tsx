@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as FileSystem from 'expo-file-system';
 import {
-  ActivityIndicator,
+  Animated,
   Image,
   ImageProps,
   NativeSyntheticEvent,
@@ -79,6 +79,10 @@ const setCachedUrl = (path: string, url: string): void => {
   _urlCache.set(path, { url, expiresAt: Date.now() + URL_CACHE_TTL_MS });
 };
 
+const invalidateCachedUrl = (path: string): void => {
+  _urlCache.delete(path);
+};
+
 type ImageErrorEvent = NativeSyntheticEvent<{ error?: string }>;
 
 type Props = {
@@ -93,6 +97,7 @@ type Props = {
   safetyStatus?: string;
   moderationStatus?: string;
   onError?: (event: ImageErrorEvent) => void;
+  onLoadFailed?: () => void;
 };
 
 const isHttpsUri = (value: unknown): value is string =>
@@ -182,6 +187,7 @@ const AppPhotoImage: React.FC<Props> = ({
   safetyStatus,
   moderationStatus,
   onError,
+  onLoadFailed,
 }) => {
   const isPendingModeration = safetyStatus === 'pending' || moderationStatus === 'pending';
   const startAvatar = useMemo(() => getStartAvatarByUri(uri), [uri]);
@@ -193,6 +199,18 @@ const AppPhotoImage: React.FC<Props> = ({
   const [resolvedImageUri, setResolvedImageUri] = useState('');
   const [localImageUri, setLocalImageUri] = useState('');
   const [resolving, setResolving] = useState(false);
+  const shimmerAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!resolving) { shimmerAnim.setValue(0); return; }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(shimmerAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.timing(shimmerAnim, { toValue: 0, duration: 700, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [resolving, shimmerAnim]);
   const finalImageUri = useMemo(() => {
     if (isFileUri(localImageUri)) return localImageUri.trim();
     if (isHttpsUri(resolvedImageUri)) return resolvedImageUri.trim();
@@ -340,6 +358,7 @@ const AppPhotoImage: React.FC<Props> = ({
         });
         setResolvedImageUri('');
         setLocalImageUri('');
+        onLoadFailed?.();
         setFailureReason('Не удалось получить ссылку на фото. Проверьте интернет.');
         await recordRuntimeTrace({
           screen: 'AppPhotoImage',
@@ -572,7 +591,9 @@ const AppPhotoImage: React.FC<Props> = ({
           style={StyleSheet.absoluteFill}
           resizeMode={resizeMode}
           onError={(event) => {
+            if (preferredPath) invalidateCachedUrl(preferredPath);
             setFailed(true);
+            onLoadFailed?.();
             onError?.(event);
           }}
         />
@@ -599,7 +620,9 @@ const AppPhotoImage: React.FC<Props> = ({
               storagePath: toDebugString(storagePath).slice(0, 180),
               error: event.nativeEvent?.error,
             });
+            if (preferredPath) invalidateCachedUrl(preferredPath);
             setFailed(true);
+            onLoadFailed?.();
             setFailureReason('Фото временно недоступно. Попробуйте обновить экран.');
             void recordRuntimeTrace({
               screen: 'AppPhotoImage',
@@ -622,16 +645,17 @@ const AppPhotoImage: React.FC<Props> = ({
             onError?.(event);
           }}
         />
+      ) : resolving ? (
+        <Animated.View
+          style={[
+            styles.shimmer,
+            { opacity: shimmerAnim.interpolate({ inputRange: [0, 1], outputRange: [0.45, 0.9] }) },
+          ]}
+        />
       ) : (
         <View style={styles.fallback}>
-          {resolving ? (
-            <ActivityIndicator size="small" color="#5E5E5E" />
-          ) : (
-            <>
-              <MaterialCommunityIcons name="image-off-outline" size={22} color="#6B625B" />
-              <Text style={styles.fallbackText}>{failureReason || fallbackText}</Text>
-            </>
-          )}
+          <MaterialCommunityIcons name="image-off-outline" size={22} color="#6B625B" />
+          <Text style={styles.fallbackText}>{failureReason || fallbackText}</Text>
         </View>
       )}
       {showDebugInfo ? (
@@ -652,6 +676,10 @@ const styles = StyleSheet.create({
   container: {
     overflow: 'hidden',
     backgroundColor: '#E7DDD0',
+  },
+  shimmer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#D8D8D8',
   },
   fallback: {
     ...StyleSheet.absoluteFillObject,

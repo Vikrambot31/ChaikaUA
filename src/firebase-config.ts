@@ -1476,6 +1476,7 @@ export const photoAPI = {
 
       await deleteStoragePathQuietly(storagePath);
       await remove(ref(database, `community_photos/${photoId}`));
+      await remove(dbRef(database, `community_photos_public/${photoId}`));
       return { success: true };
     } catch (error: unknown) {
       void logClientError('photoAPI.deletePhoto', error);
