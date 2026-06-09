@@ -70,7 +70,7 @@ export default function ScreenTooltip({
             </TouchableOpacity>
           </View>
 
-          <Image source={HERO_IMAGE} style={styles.heroImage} resizeMode="cover" />
+          <Image source={HERO_IMAGE} style={styles.heroImage} resizeMode="contain" />
 
           <ScrollView contentContainerStyle={styles.steps} showsVerticalScrollIndicator={false}>
             {items.map((item, index) => (
@@ -106,6 +106,7 @@ const styles = StyleSheet.create({
     backgroundColor: SCREEN_THEME.paperStrong,
     borderWidth: 1,
     borderColor: SCREEN_THEME.borderStrong,
+    overflow: 'hidden',
     padding: 18,
     shadowColor: '#2F241A',
     shadowOffset: { width: 0, height: 12 },
@@ -150,7 +151,7 @@ const styles = StyleSheet.create({
   },
   heroImage: {
     width: '100%',
-    height: 160,
+    height: 150,
     borderRadius: 8,
     marginTop: 14,
   },
