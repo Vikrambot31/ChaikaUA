@@ -311,12 +311,11 @@ export default function DetalDetskogoMestaScreen() {
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [showBusinessSection, setShowBusinessSection] = useState(false);
   const [claimStatus, setClaimStatus] = useState<'none' | 'pending' | 'approved' | 'rejected'>('none');
-  const [businessCard, setBusinessCard] = useState<{ ownerId?: string } | null>(null);
   const [isBiznesPlusActive, setIsBiznesPlusActive] = useState(false);
 
   const isAuthenticated = Boolean(currentUser?.id);
   const isAdmin = currentUser?.email === 'vikramsave@ukr.net';
-  const isMyApprovedPlace = claimStatus === 'approved' && businessCard?.ownerId === currentUser?.id;
+  const isMyApprovedPlace = claimStatus === 'approved';
 
   // Sync subscription from RTDB on screen open
   useEffect(() => {
@@ -351,27 +350,12 @@ export default function DetalDetskogoMestaScreen() {
         } else if (data.ownerUid === currentUser.id) {
           setClaimStatus((data.status as 'pending' | 'approved' | 'rejected') ?? 'none');
         } else {
-          setClaimStatus('approved');
+          setClaimStatus('none');
         }
       } catch { if (!cancelled) setClaimStatus('none'); }
     })();
     return () => { cancelled = true; };
   }, [isAuthenticated, place.id, currentUser?.id]);
-
-  // Load business+ card (to check ownerId)
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const cardRef = ref(database, `business_plus_cards/${place.id}`);
-        const snap = await get(cardRef);
-        if (cancelled) return;
-        if (snap.exists()) setBusinessCard(snap.val() as { ownerId?: string });
-      } catch { /* optional content */ }
-    })();
-    return () => { cancelled = true; };
-  }, [isAuthenticated, place.id]);
 
   const offers = useMemo(() => getActiveOffers(place.id), [place.id]);
 
@@ -444,16 +428,15 @@ export default function DetalDetskogoMestaScreen() {
     });
   };
 
-  // Load Business+ active status for admin
+  // Load Business+ active status
   useEffect(() => {
-    if (!isAdmin) return;
     let cancelled = false;
     void (async () => {
       const snap = await get(ref(database, `business_plus_active/${place.id}`));
       if (!cancelled) setIsBiznesPlusActive(snap.exists());
     })();
     return () => { cancelled = true; };
-  }, [isAdmin, place.id]);
+  }, [place.id]);
 
   const handleAdminToggleBiznesPlus = () => {
     void (async () => {
@@ -614,22 +597,26 @@ export default function DetalDetskogoMestaScreen() {
           </View>
         </View>
 
-        {/* Booking upsell section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{text.bookingTitle}</Text>
-          <View style={styles.bookingEmptyBlock}>
-            <MaterialCommunityIcons name="calendar-clock-outline" size={38} color={SCREEN_THEME.textMuted} />
-            <Text style={styles.bookingEmptyText}>{text.bookingEmptyText}</Text>
-            <TouchableOpacity
-              style={styles.bookingCta}
-              onPress={() => navigation.navigate('BusinessPlusSubscriptionScreen')}
-              activeOpacity={0.86}
-            >
-              <MaterialCommunityIcons name="storefront" size={16} color="#fff" />
-              <Text style={styles.bookingCtaText}>{text.bookingCta}</Text>
-            </TouchableOpacity>
+        {/* Booking upsell section — only when Business+ not yet active for this place */}
+        {!isBiznesPlusActive && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{text.bookingTitle}</Text>
+            <View style={styles.bookingEmptyBlock}>
+              <MaterialCommunityIcons name="calendar-clock-outline" size={38} color={SCREEN_THEME.textMuted} />
+              <Text style={styles.bookingEmptyText}>{text.bookingEmptyText}</Text>
+              {isMyApprovedPlace && (
+                <TouchableOpacity
+                  style={styles.bookingCta}
+                  onPress={() => navigation.navigate('BusinessPlusSubscriptionScreen')}
+                  activeOpacity={0.86}
+                >
+                  <MaterialCommunityIcons name="storefront" size={16} color="#fff" />
+                  <Text style={styles.bookingCtaText}>{text.bookingCta}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
-        </View>
+        )}
 
         {/* 10.3 Safety */}
         {safetyItems.length > 0 ? (

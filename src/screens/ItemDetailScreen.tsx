@@ -160,9 +160,7 @@ export default function ItemDetailScreen({
   const editPhotoLabel = language === 'ua' ? 'Змінити фото закладу' : language === 'ru' ? 'Изменить фото заведения' : 'Change business photo';
   const pendingModerationLabel = language === 'ua' ? 'На модерації — зміни незабаром з\'являться' : language === 'ru' ? 'На модерации — изменения скоро появятся' : 'Pending review — changes will appear soon';
 
-  // Owner = approved claim OR already set as card owner
-  const isMyApprovedPlace = isPlaceType && claimStatus === 'approved'
-    && businessCard?.ownerId === currentUser?.id;
+  const isMyApprovedPlace = isPlaceType && claimStatus === 'approved';
   const isApprovedCard = businessCard?.moderationStatus === 'approved';
   const hasMenu = isApprovedCard && Array.isArray(businessCard?.menuItems) && (businessCard!.menuItems!.length > 0);
   const hasPromos = isApprovedCard && Array.isArray(businessCard?.promotions) && (businessCard!.promotions!.length > 0);
@@ -231,8 +229,7 @@ export default function ItemDetailScreen({
         } else if (data.ownerUid === currentUser.id) {
           setClaimStatus((data.status as 'pending' | 'approved' | 'rejected') ?? 'none');
         } else {
-          // Place already claimed by someone else
-          setClaimStatus('approved');
+          setClaimStatus('none');
         }
       } catch {
         if (!cancelled) setClaimStatus('none');
@@ -268,14 +265,14 @@ export default function ItemDetailScreen({
   }, [isAuthenticated, isPlaceType, item.sourceId]);
 
   useEffect(() => {
-    if (!isAdmin || !item.sourceId) return;
+    if (!item.sourceId) return;
     let cancelled = false;
     void (async () => {
       const snap = await get(ref(database, `business_plus_active/${item.sourceId}`));
       if (!cancelled) setIsBiznesPlusActive(snap.exists());
     })();
     return () => { cancelled = true; };
-  }, [isAdmin, item.sourceId]);
+  }, [item.sourceId]);
 
   const handleAdminToggleBiznesPlus = () => {
     const screen = isPlaceType ? (feedScreen ?? 'food') : 'business';
