@@ -152,10 +152,11 @@ export const InviteAccessPage = ({ role }: InviteAccessPageProps) => {
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Firebase недоступен';
       const isPermDenied = msg.toLowerCase().includes('permission_denied') || msg.toLowerCase().includes('permission denied');
-      if (!isPermDenied) {
+      if (isPermDenied) {
+        setMessage('Нет доступа к данным (permission_denied). Проверьте Firebase Rules или войдите под правильным аккаунтом.');
+      } else {
         setMessage(`Не удалось загрузить данные: ${msg}`);
       }
-      // permission_denied handled via state.rulesNotConfigured banner below
     } finally {
       setLoading(false);
     }
@@ -300,6 +301,10 @@ export const InviteAccessPage = ({ role }: InviteAccessPageProps) => {
   const grantTempAccess = (request: InviteRequest) => {
     if (!request.requesterUid) {
       setMessage('Нельзя выдать временный доступ: у заявки нет requesterUid.');
+      return;
+    }
+    if (request.status === 'approved') {
+      setMessage('Этот пользователь уже имеет постоянный доступ. Временный доступ не нужен.');
       return;
     }
 

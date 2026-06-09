@@ -446,8 +446,9 @@ export const PhotoApprovalPage = () => {
                             className="smallButton dangerButton"
                             disabled={rowBusy}
                             onClick={() => {
-                              const reason = window.prompt('Причина отклонения (необязательно):', p.moderationReason || '') || '';
-                              void handleReject(p, reason);
+                              const result = window.prompt('Причина отклонения (необязательно):', p.moderationReason || '');
+                              if (result === null) return;
+                              void handleReject(p, result);
                             }}
                           >
                             Отклонить

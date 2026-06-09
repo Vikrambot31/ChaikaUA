@@ -285,6 +285,7 @@ function ChatPanel({
             onChange={(e) => setReplyText(e.target.value)}
             onKeyDown={handleKeyDown}
             rows={3}
+            maxLength={2000}
             disabled={sending}
           />
           <div style={chatStyles.replyActions}>
