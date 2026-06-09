@@ -532,6 +532,8 @@ const OnlineChatScreen = () => {
   useFocusEffect(
     useCallback(() => {
       if (hasInitialLoadRef.current) {
+        setNextCursor(null);
+        setHasMore(true);
         void loadRequests();
       }
     // eslint-disable-next-line react-hooks/exhaustive-deps

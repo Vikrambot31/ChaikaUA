@@ -63,9 +63,11 @@ export const subscribeOsbbNews = (
   callback: (items: OsbbNewsItem[]) => void,
   options: { includePending?: boolean; onError?: (error: Error) => void } = {}
 ): (() => void) => {
+  let disposed = false;
+
   if (!buildingId) {
     callback([]);
-    return () => {};
+    return () => { disposed = true; };
   }
 
   const listRef = options.includePending
@@ -73,7 +75,6 @@ export const subscribeOsbbNews = (
     : query(ref(database, `${PATH}/${buildingId}`), orderByChild('moderationStatus'), equalTo('approved'), limitToLast(100));
 
   let unsubscribe: (() => void) | undefined;
-  let disposed = false;
 
   void ensureFirebaseAuth().then(() => {
     if (disposed) return;

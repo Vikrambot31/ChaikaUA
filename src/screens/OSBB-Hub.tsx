@@ -73,6 +73,8 @@ const UI_TEXT = {
     topicSentBody: 'Нова тема збережена і відправлена на модерацію. Вона зʼявиться після схвалення.',
     alreadyVoted: 'Ви вже підтримали цю тему.',
     voteError: 'Не вдалося зарахувати голос.',
+    topicNotFound: 'Тему не знайдено або вона була видалена.',
+    topicNotApproved: 'Ця тема ще не схвалена модератором.',
     votingTitle: 'Голосування',
     setupTitle: 'Збір',
     setupBody: 'Спочатку налаштуйте будинок ОСББ.',
@@ -119,6 +121,8 @@ const UI_TEXT = {
     topicSentBody: 'Новая тема сохранена и отправлена на модерацию. Она появится после одобрения.',
     alreadyVoted: 'Вы уже поддержали эту тему.',
     voteError: 'Не удалось засчитать голос.',
+    topicNotFound: 'Тема не найдена или была удалена.',
+    topicNotApproved: 'Эта тема ещё не одобрена модератором.',
     votingTitle: 'Голосование',
     setupTitle: 'Сбор',
     setupBody: 'Сначала настройте дом ОСББ.',
@@ -165,6 +169,8 @@ const UI_TEXT = {
     topicSentBody: 'New topic is saved and sent for moderation. It will appear after approval.',
     alreadyVoted: 'You have already supported this topic.',
     voteError: 'Failed to count vote.',
+    topicNotFound: 'Topic not found or has been deleted.',
+    topicNotApproved: 'This topic has not been approved by a moderator yet.',
     votingTitle: 'Voting',
     setupTitle: 'Collection',
     setupBody: 'Set up OSBB building first.',
@@ -248,8 +254,13 @@ const OsbbHubScreen: React.FC = () => {
       await supportHouseTopic(osbb.buildingId, topicId, user.id);
       setSelectedTopicId(topicId);
     } catch (error) {
-      const message = error instanceof Error && error.message === 'already-voted'
+      const msg = error instanceof Error ? error.message : '';
+      const message = msg === 'already-voted'
         ? text.alreadyVoted
+        : msg === 'topic-not-found'
+        ? text.topicNotFound
+        : msg === 'topic-not-approved'
+        ? text.topicNotApproved
         : text.voteError;
       Alert.alert(text.votingTitle, message);
     }

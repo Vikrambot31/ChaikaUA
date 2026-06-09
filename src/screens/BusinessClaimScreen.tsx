@@ -50,6 +50,7 @@ const UI_TEXT = {
     errorBody: 'Не вдалося надіслати заявку. Спробуйте ще раз.',
     requiredName: "Введіть ім'я",
     requiredPhone: 'Введіть коректний номер телефону',
+    notLoggedIn: 'Увійдіть в акаунт, щоб надіслати заявку.',
     back: 'Назад',
   },
   ru: {
@@ -71,6 +72,7 @@ const UI_TEXT = {
     errorBody: 'Не удалось отправить заявку. Попробуйте снова.',
     requiredName: 'Введите имя',
     requiredPhone: 'Введите корректный номер телефона',
+    notLoggedIn: 'Войдите в аккаунт, чтобы отправить заявку.',
     back: 'Назад',
   },
   en: {
@@ -92,6 +94,7 @@ const UI_TEXT = {
     errorBody: 'Failed to submit claim. Please try again.',
     requiredName: 'Enter your name',
     requiredPhone: 'Enter a valid phone number',
+    notLoggedIn: 'Please log in to submit a claim.',
     back: 'Back',
   },
 } as const;
@@ -126,7 +129,10 @@ export default function BusinessClaimScreen({
       return;
     }
 
-    if (!currentUser?.id) return;
+    if (!currentUser?.id) {
+      Alert.alert(text.errorTitle, text.notLoggedIn);
+      return;
+    }
 
     setSubmitting(true);
     try {

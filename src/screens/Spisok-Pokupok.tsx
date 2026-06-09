@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
   Linking,
@@ -48,6 +49,8 @@ const UI_TEXT = {
     bought: 'Куплено',
     newWeek: 'Новий тиждень',
     restoreHidden: 'Повернути приховані',
+    addItemPlaceholder: 'Додати свій пункт...',
+    add: 'Додати',
     shopsNearby: 'Магазини поруч',
     noShops: 'Немає магазинів поруч.',
     route: 'Маршрут',
@@ -70,6 +73,8 @@ const UI_TEXT = {
     bought: 'Куплено',
     newWeek: 'Новая неделя',
     restoreHidden: 'Вернуть скрытые',
+    addItemPlaceholder: 'Добавить свой пункт...',
+    add: 'Добавить',
     shopsNearby: 'Магазины рядом',
     noShops: 'Нет магазинов рядом.',
     route: 'Маршрут',
@@ -92,6 +97,8 @@ const UI_TEXT = {
     bought: 'Bought',
     newWeek: 'New week',
     restoreHidden: 'Restore hidden',
+    addItemPlaceholder: 'Add your own item...',
+    add: 'Add',
     shopsNearby: 'Shops nearby',
     noShops: 'No shops nearby.',
     route: 'Route',
@@ -120,6 +127,8 @@ export default function SpisokPokupokScreen() {
   const [items, setItems] = useState<ShoppingItem[]>([]);
   const [collapsedCategories, setCollapsedCategories] = useState<Set<ShoppingCategory>>(new Set());
   const [isLoaded, setIsLoaded] = useState(false);
+  const [newItemText, setNewItemText] = useState('');
+  const addInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     logFoodEvent('food_open_shopping');
@@ -209,6 +218,24 @@ export default function SpisokPokupokScreen() {
     );
   }, []);
 
+  const addCustomItem = useCallback(() => {
+    const name = newItemText.trim();
+    if (!name) return;
+    const id = `custom-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const newItem: ShoppingItem = {
+      id,
+      name,
+      category: 'other',
+      icon: 'dots-horizontal',
+      isChecked: false,
+      isHidden: false,
+      sortOrder: Date.now(),
+    };
+    setItems((prev) => [...prev, newItem]);
+    setNewItemText('');
+    addInputRef.current?.blur();
+  }, [newItemText]);
+
   const toggleCategory = useCallback((cat: ShoppingCategory) => {
     setCollapsedCategories((prev) => {
       const next = new Set(prev);
@@ -273,6 +300,24 @@ export default function SpisokPokupokScreen() {
               <Text style={styles.actionBtnText}>{text.restoreHidden}</Text>
             </TouchableOpacity>
           )}
+        </View>
+
+        {/* Add custom item */}
+        <View style={styles.addItemRow}>
+          <TextInput
+            ref={addInputRef}
+            style={styles.addItemInput}
+            value={newItemText}
+            onChangeText={setNewItemText}
+            placeholder={text.addItemPlaceholder}
+            placeholderTextColor={SCREEN_THEME.textMuted}
+            onSubmitEditing={addCustomItem}
+            returnKeyType="done"
+            maxLength={80}
+          />
+          <TouchableOpacity style={styles.addItemBtn} activeOpacity={0.85} onPress={addCustomItem}>
+            <MaterialCommunityIcons name="plus" size={22} color="#fff" />
+          </TouchableOpacity>
         </View>
 
         {/* Shopping list by categories */}
@@ -486,6 +531,33 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '900',
     color: SCREEN_THEME.enamelBlueDark,
+  },
+
+  // Add custom item
+  addItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 14,
+  },
+  addItemInput: {
+    flex: 1,
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: SCREEN_THEME.borderSoft,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: SCREEN_THEME.textPrimary,
+  },
+  addItemBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: SCREEN_THEME.enamelBlueDark,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // Category section
