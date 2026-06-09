@@ -15,7 +15,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { equalTo, get, orderByChild, query, ref } from 'firebase/database';
 import { selectUser } from '../redux/selectors';
-import { database } from '../firebase-core';
+import { auth, database } from '../firebase-core';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { purchaseBonusPromotion, subscribeMyBonuses, subscribeMyPromoCredits, type PromoCredits, type UserBonuses } from '../services/bonusService';
 import { useTranslation } from '../i18n/useTranslation';
@@ -249,6 +249,10 @@ const BonusPromotionPurchaseScreen: React.FC = () => {
 
   const buyPromotion = async () => {
     if (!selectedTargetId || buying) return;
+    if (!auth.currentUser || auth.currentUser.isAnonymous) {
+      Alert.alert(t.common.error, 'Необхідно авторизуватись.');
+      return;
+    }
     setBuying(true);
     try {
       const result = await purchaseBonusPromotion({

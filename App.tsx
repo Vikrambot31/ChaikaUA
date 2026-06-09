@@ -33,6 +33,7 @@ import { initRuntimeMonitorGlobalHandlers, recordRuntimeTrace } from './src/serv
 import { flushLiveDiagnostics, initLiveDiagnostics } from './src/services/liveDiagnosticsService';
 import { initConsoleErrorCapture } from './src/services/crashDiagnosticsService';
 import { signOutPrimarySession } from './src/services/authSessionService';
+import { drainBonusQueue, clearBonusQueueForUser } from './src/services/bonusQueue';
 import AppAccessGuard from './src/components/AppAccessGuard';
 import AccountResumeScreen from './src/components/AccountResumeScreen';
 import { PremiumActivatedModal } from './src/components/PremiumActivatedModal';
@@ -418,6 +419,7 @@ function AppWithAuthSync({ remoteConfigSnapshot, onRemoteConfigSnapshot }: AppWi
           ) {
             if (active) {
               void fcmAPI.removeTokenForUser(user.uid).catch((e: unknown) => logClientError('fcm.removeToken.tokenExpired', e));
+              clearBonusQueueForUser(user.uid).catch(() => {});
               await signOutPrimarySession().catch((e: unknown) => logClientError('auth.signOut.tokenExpired', e));
               dispatch(logout());
               identifyCrashUser(null);
@@ -449,6 +451,7 @@ function AppWithAuthSync({ remoteConfigSnapshot, onRemoteConfigSnapshot }: AppWi
           );
           if (active) {
             dispatch(setUser(mapFirebaseUserToAppUser(user, profile)));
+            drainBonusQueue().catch(() => {});
             awardDailyLoginBonus().catch(() => {});
             void recordRuntimeTrace({
               screen: 'AppAuthSync',
@@ -486,6 +489,7 @@ function AppWithAuthSync({ remoteConfigSnapshot, onRemoteConfigSnapshot }: AppWi
         });
         if (active) {
           dispatch(setUser(mapFirebaseUserToAppUser(user, null)));
+          drainBonusQueue().catch(() => {});
         }
       }
       });

@@ -15,6 +15,7 @@ import type { NavigationProp } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from '../i18n/useTranslation';
 import { SCREEN_THEME } from '../utils/screenTheme';
+import { requireWriteSession } from '../firebase-auth-session';
 import { subscribeToAllAdTickets } from '../services/adService';
 import {
   adminGrantPromoCredits,
@@ -113,6 +114,7 @@ const PromoCreditsAdminScreen: React.FC = () => {
 
     setBusyTicketId(ticket.ticketId);
     try {
+      await requireWriteSession({ requireRealUser: true, operation: 'adminGrantPromoCredits', screen: 'PromoCreditsAdmin' });
       const result = await adminGrantPromoCredits({
         targetUid: ticket.userId,
         amount: credits,
@@ -131,6 +133,7 @@ const PromoCreditsAdminScreen: React.FC = () => {
     const reason = rejectReasons[promotion.id]?.trim();
     setBusyPromotionId(promotion.id);
     try {
+      await requireWriteSession({ requireRealUser: true, operation: 'adminModeratePromotion', screen: 'PromoCreditsAdmin' });
       await adminModeratePromotion({
         promotionId: promotion.id,
         action,

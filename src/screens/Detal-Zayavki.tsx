@@ -6,7 +6,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationProp, ParamListBase, RouteProp } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { onValue, ref } from 'firebase/database';
-import { database, firebaseChatAPI } from '../firebase-config';
+import { auth, database, firebaseChatAPI } from '../firebase-config';
 import type { RootState } from '../redux/store';
 import type { Request } from '../types/app';
 import AppPhotoImage from '../components/AppPhotoImage';
@@ -528,6 +528,10 @@ const RequestDetailScreen = ({
 
   const handleHelp = async () => {
     if (!request.id || helpStatus !== 'idle') return;
+    if (!auth.currentUser || auth.currentUser.isAnonymous) {
+      Alert.alert(text.ok, FUNCTION_ERROR_MESSAGES[language].auth_required);
+      return;
+    }
     setHelpStatus('sending');
     try {
       const result = await awardHelpRespondBonus(request.id);
@@ -555,6 +559,10 @@ const RequestDetailScreen = ({
 
   const handleConfirmHelper = async (helperUid: string) => {
     if (!request.id || busyHelperUid) return;
+    if (!auth.currentUser || auth.currentUser.isAnonymous) {
+      Alert.alert(text.ok, FUNCTION_ERROR_MESSAGES[language].auth_required);
+      return;
+    }
     setBusyHelperUid(helperUid);
     try {
       const result = await confirmHelperForRequest(request.id, helperUid);
@@ -573,6 +581,10 @@ const RequestDetailScreen = ({
 
   const handleThankHelper = async (helperUid: string) => {
     if (!request.id || busyHelperUid) return;
+    if (!auth.currentUser || auth.currentUser.isAnonymous) {
+      Alert.alert(text.ok, FUNCTION_ERROR_MESSAGES[language].auth_required);
+      return;
+    }
     setBusyHelperUid(helperUid);
     try {
       const result = await awardGratitudeBonus(request.id, helperUid);
@@ -587,6 +599,10 @@ const RequestDetailScreen = ({
 
   const handleCloseSolved = async () => {
     if (!request.id || closingRequest || requestSolved) return;
+    if (!auth.currentUser || auth.currentUser.isAnonymous) {
+      Alert.alert(text.ok, FUNCTION_ERROR_MESSAGES[language].auth_required);
+      return;
+    }
     setClosingRequest(true);
     try {
       const result = await closeRequestWithBonus(request.id);

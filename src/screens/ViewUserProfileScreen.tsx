@@ -26,7 +26,7 @@ import {
 import { awardProfileThanksBonus } from '../services/bonusService';
 import { profilePermissionService } from '../services/profilePermissionService';
 import { query, ref, get, orderByChild, equalTo } from 'firebase/database';
-import { database } from '../firebase-config';
+import { auth, database } from '../firebase-config';
 import type { JobListing } from '../services/jobService';
 import { getDaysInApp } from '../utils/chaikaLevels';
 import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
@@ -283,6 +283,10 @@ const ViewUserProfileScreen: React.FC = () => {
 
   const handleThank = async () => {
     if (!userId || isOwnProfile) return;
+    if (!auth.currentUser || auth.currentUser.isAnonymous) {
+      Alert.alert('', text.thankError);
+      return;
+    }
     try {
       const result = await awardProfileThanksBonus(userId);
       setThankSent(true);
