@@ -161,27 +161,10 @@ export const loadPhotos = async (): Promise<PhotoRecord[]> => {
     }
   }
 
-  // Load request_photos (photos attached to help_neighbors requests)
-  const requestPhotosRootSnap = await get(ref(database, 'request_photos'));
-  const requestPhotos: PhotoRecord[] = [];
-  if (requestPhotosRootSnap.exists()) {
-    const allRequestPhotos = requestPhotosRootSnap.val() as Record<string, Record<string, unknown>>;
-    for (const [ownerUid, photos] of Object.entries(allRequestPhotos)) {
-      if (typeof photos !== 'object' || photos === null) continue;
-      for (const [photoId, photoData] of Object.entries(photos)) {
-        if (!isRecord(photoData) || !isSubmittedForModeration(photoData)) continue;
-        const record = normalizeRecord(photoId, photoData, ownerUid);
-        if (record) requestPhotos.push({
-          ...record,
-          collection: 'request_photos',
-          sourceScreen: record.sourceScreen || 'HelpNeighborsScreen',
-          sourceScreenLabel: record.sourceScreenLabel || 'Помощь соседям',
-        });
-      }
-    }
-  }
+  // request_photos are moderated via the Moderation page (#moderation), not here.
+  // Deleting a request there automatically removes the attached photo.
 
-  return [...communityPhotos, ...userPhotos, ...requestPhotos].sort((a, b) => b.uploadedAt - a.uploadedAt);
+  return [...communityPhotos, ...userPhotos].sort((a, b) => b.uploadedAt - a.uploadedAt);
 };
 
 export const approvePhoto = async (id: string, uid?: string, collection?: PhotoRecord['collection']): Promise<void> => {

@@ -345,7 +345,7 @@ export const PhotoApprovalPage = () => {
           <p className="eyebrow">Модерация</p>
           <h2>Одобрение фото</h2>
           <p style={{ color: '#5d6f8b', fontSize: 13, marginTop: 4 }}>
-            Фото из community_photos, user_photos и request_photos. Таблица показывает экран-источник каждого фото.
+            Фото сообщества: Фото района, Фото для душі, Мої фотографії, аватарки. Фото из заявок модерируются на странице <strong style={{ color: '#c8d6e8' }}>Модерация</strong> — удаление заявки там автоматически удаляет прикреплённое фото.
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

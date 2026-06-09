@@ -712,6 +712,25 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
                       {item.editedAt ? <small className="editedBadge">ред.</small> : null}
                     </strong>
                     <small>{item.subtitle || item.id}</small>
+                    {(item.photoUrl || item.photoUrls.length > 0) ? (
+                      <small
+                        title="До заявки прикріплено фото. Видалення заявки видалить і фото."
+                        style={{
+                          display: 'inline-block',
+                          marginTop: 4,
+                          padding: '2px 7px',
+                          borderRadius: 6,
+                          background: '#1a3a52',
+                          border: '1px solid #2e5f82',
+                          color: '#7ec8f0',
+                          fontSize: 11,
+                          fontWeight: 700,
+                          letterSpacing: 0.3,
+                        }}
+                      >
+                        📷 Фото
+                      </small>
+                    ) : null}
                   </td>
                   <td>{sectionLabel(item.section)}</td>
                   <td className={
