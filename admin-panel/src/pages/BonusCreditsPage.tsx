@@ -57,6 +57,7 @@ function UsersTab() {
   const [bonuses, setBonuses] = useState<UserBonusInfo[]>([]);
   const [promoCredits, setPromoCredits] = useState<UserPromoInfo[]>([]);
   const [userProfiles, setUserProfiles] = useState<Record<string, UserProfile>>({});
+  const [loadError, setLoadError] = useState('');
   const [search, setSearch] = useState('');
   const [expandedUid, setExpandedUid] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<BonusTransaction[]>([]);
@@ -64,6 +65,7 @@ function UsersTab() {
   const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
+    const handleError = (err: Error) => setLoadError(err.message);
     const unsub1 = subscribeToAllBonuses((data) => {
       setBonuses(data);
       const uids = data.map((b) => b.uid);
@@ -72,8 +74,8 @@ function UsersTab() {
           setUserProfiles((prev) => ({ ...prev, ...profiles })),
         );
       }
-    });
-    const unsub2 = subscribeToAllPromoCredits(setPromoCredits);
+    }, handleError);
+    const unsub2 = subscribeToAllPromoCredits(setPromoCredits, handleError);
     return () => { unsub1(); unsub2(); };
   }, []);
 
@@ -160,6 +162,11 @@ function UsersTab() {
 
   return (
     <div>
+      {loadError && (
+        <div style={{ background: '#2a1a1a', color: '#ef9a9a', padding: '8px 12px', borderRadius: 6, marginBottom: 12, fontSize: 13 }}>
+          ⚠️ Помилка завантаження: {loadError}
+        </div>
+      )}
       {/* Search */}
       <div style={s.searchRow}>
         <input
@@ -375,11 +382,12 @@ function UserDetail({
 
 function PromotionsTab() {
   const [promotions, setPromotions] = useState<BonusPromotion[]>([]);
+  const [loadError, setLoadError] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
-    const unsub = subscribeToPromotions(setPromotions);
+    const unsub = subscribeToPromotions(setPromotions, (err) => setLoadError(err.message));
     return unsub;
   }, []);
 
@@ -404,6 +412,11 @@ function PromotionsTab() {
 
   return (
     <div>
+      {loadError && (
+        <div style={{ background: '#2a1a1a', color: '#ef9a9a', padding: '8px 12px', borderRadius: 6, marginBottom: 12, fontSize: 13 }}>
+          ⚠️ Помилка завантаження: {loadError}
+        </div>
+      )}
       {/* Filter */}
       <div style={s.searchRow}>
         <select
@@ -504,6 +517,7 @@ function FraudTab() {
   const [fraudFlags, setFraudFlags] = useState<FraudFlag[]>([]);
   const [blocks, setBlocks] = useState<Record<string, BonusBlock>>({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
@@ -515,6 +529,8 @@ function FraudTab() {
           setFraudFlags(flags);
           setBlocks(bl);
         }
+      } catch (err) {
+        if (!cancelled) setLoadError(err instanceof Error ? err.message : 'Помилка завантаження');
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -541,6 +557,10 @@ function FraudTab() {
 
   if (loading) {
     return <div style={{ padding: 20, color: '#888' }}>Завантаження...</div>;
+  }
+
+  if (loadError) {
+    return <div style={{ padding: 20, color: '#ef9a9a' }}>⚠️ {loadError}</div>;
   }
 
   const blockedEntries = Object.entries(blocks);
@@ -654,6 +674,7 @@ function daysLeft(expiresAt: string | null): number | null {
 function SubscriptionsTab() {
   const [subs, setSubs] = useState<PremiumSubscription[]>([]);
   const [profiles, setProfiles] = useState<Record<string, UserProfile>>({});
+  const [loadError, setLoadError] = useState('');
   const [filter, setFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
@@ -671,7 +692,7 @@ function SubscriptionsTab() {
           setProfiles((prev) => ({ ...prev, ...p })),
         );
       }
-    });
+    }, (err) => setLoadError(err.message));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -737,6 +758,11 @@ function SubscriptionsTab() {
 
   return (
     <div>
+      {loadError && (
+        <div style={{ background: '#2a1a1a', color: '#ef9a9a', padding: '8px 12px', borderRadius: 6, marginBottom: 12, fontSize: 13 }}>
+          ⚠️ Помилка завантаження: {loadError}
+        </div>
+      )}
       {/* Stats */}
       <div style={s.statsRow}>
         <div style={{ ...s.statCard, borderColor: '#27ae60' }}>

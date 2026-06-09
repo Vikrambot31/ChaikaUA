@@ -122,17 +122,19 @@ const toCardList = (snap: import('firebase/database').DataSnapshot): BusinessPlu
 
 export const subscribeToBusinessPlusClaims = (
   callback: (claims: BusinessPlusClaim[]) => void,
+  onError?: (err: Error) => void,
 ): Unsubscribe =>
   onValue(ref(database, 'business_plus_claims'), (snap) => {
     callback(snap.exists() ? toClaimList(snap) : []);
-  });
+  }, onError ? (err) => onError(err) : undefined);
 
 export const subscribeToBusinessPlusCards = (
   callback: (cards: BusinessPlusCard[]) => void,
+  onError?: (err: Error) => void,
 ): Unsubscribe =>
   onValue(ref(database, 'business_plus_cards'), (snap) => {
     callback(snap.exists() ? toCardList(snap) : []);
-  });
+  }, onError ? (err) => onError(err) : undefined);
 
 // ── Claim actions ──
 
@@ -259,6 +261,7 @@ export interface BusinessPlusSubscription {
 
 export const subscribeToBusinessPlusSubscriptions = (
   callback: (subs: BusinessPlusSubscription[]) => void,
+  onError?: (err: Error) => void,
 ): Unsubscribe =>
   onValue(ref(database, 'user_subscription'), (snap) => {
     const result: BusinessPlusSubscription[] = [];
@@ -278,7 +281,7 @@ export const subscribeToBusinessPlusSubscriptions = (
       });
     }
     callback(result);
-  });
+  }, onError ? (err) => onError(err) : undefined);
 
 export const activateBusinessPlusManual = async (
   uid: string,

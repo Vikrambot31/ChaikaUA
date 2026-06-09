@@ -62,7 +62,7 @@ function ClaimsTab({ adminUid }: { adminUid: string }) {
     const unsub = subscribeToBusinessPlusClaims((data) => {
       setClaims(data);
       setLoading(false);
-    });
+    }, () => setLoading(false));
     return unsub;
   }, []);
 
@@ -250,7 +250,7 @@ function CardsTab({ adminUid }: { adminUid: string }) {
     const unsub = subscribeToBusinessPlusCards((data) => {
       setCards(data);
       setLoading(false);
-    });
+    }, () => setLoading(false));
     return unsub;
   }, []);
 
@@ -504,7 +504,7 @@ function SubscriptionsTab() {
     const unsub = subscribeToBusinessPlusSubscriptions((data) => {
       setSubs(data);
       setLoading(false);
-    });
+    }, () => setLoading(false));
     return unsub;
   }, []);
 
@@ -775,14 +775,15 @@ export function BusinessPlusModerationPage() {
   const [claimsCount, setClaimsCount] = useState(0);
   const [cardsCount, setCardsCount] = useState(0);
 
+
   // Track pending counts for tab badges
   useEffect(() => {
     const unsub1 = subscribeToBusinessPlusClaims((data) => {
       setClaimsCount(data.filter((c) => c.status === 'pending').length);
-    });
+    }, () => {});
     const unsub2 = subscribeToBusinessPlusCards((data) => {
       setCardsCount(data.filter((c) => c.moderationStatus === 'pending').length);
-    });
+    }, () => {});
     return () => { unsub1(); unsub2(); };
   }, []);
 

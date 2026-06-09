@@ -58,10 +58,11 @@ const snapshotToSubscriptions = (snap: DataSnapshot): PremiumSubscription[] => {
 
 export const subscribeToAllPremiumSubscriptions = (
   callback: (subscriptions: PremiumSubscription[]) => void,
+  onError?: (err: Error) => void,
 ): Unsubscribe => {
   return onValue(ref(database, 'user_subscription'), (snap) => {
     callback(snap.exists() ? snapshotToSubscriptions(snap) : []);
-  });
+  }, onError ? (err) => onError(err) : undefined);
 };
 
 // ── User profile lookup ──
@@ -88,16 +89,20 @@ export const loadUserProfiles = async (
   uids: string[],
 ): Promise<Record<string, UserProfile>> => {
   if (uids.length === 0) return {};
-  try {
-    const snap = await get(ref(database, 'users'));
-    if (!snap.exists()) return {};
-    const all = snap.val() as Record<string, Record<string, unknown>>;
-    return Object.fromEntries(
-      uids.map((uid) => [uid, all[uid] ? rawToProfile(uid, all[uid]) : { name: '', phone: '' }]),
-    );
-  } catch {
-    return {};
-  }
+  const entries = await Promise.all(
+    uids.map(async (uid) => {
+      try {
+        const snap = await get(ref(database, `users/${uid}`));
+        const profile: UserProfile = snap.exists()
+          ? rawToProfile(uid, snap.val() as Record<string, unknown>)
+          : { name: '', phone: '' };
+        return [uid, profile] as const;
+      } catch {
+        return [uid, { name: '', phone: '' }] as const;
+      }
+    }),
+  );
+  return Object.fromEntries(entries);
 };
 
 export interface UserSearchResult {

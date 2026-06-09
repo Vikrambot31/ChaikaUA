@@ -1,4 +1,4 @@
-import { get, off, onValue, ref, set, update } from 'firebase/database';
+import { get, off, onValue, query, limitToLast, ref, set, update } from 'firebase/database';
 import { database } from '../firebase/firebase';
 import {
   SECURITY_APP_CONTROL_PATH,
@@ -303,7 +303,8 @@ export const subscribeSecurityLogs = (
     return () => {};
   }
 
-  const logsRef = ref(database, SECURITY_LOGS_PATH);
+  // Limit to last 3 monthly partitions to avoid loading all history
+  const logsRef = query(ref(database, SECURITY_LOGS_PATH), limitToLast(3));
   const unsubscribe = onValue(
     logsRef,
     (snapshot) => {

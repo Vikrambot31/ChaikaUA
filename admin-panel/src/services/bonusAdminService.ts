@@ -104,18 +104,20 @@ const snapshotToPromoCredits = (snap: DataSnapshot): UserPromoInfo[] => {
 
 export const subscribeToAllBonuses = (
   callback: (bonuses: UserBonusInfo[]) => void,
+  onError?: (err: Error) => void,
 ): Unsubscribe => {
   return onValue(ref(database, 'user_bonuses'), (snap) => {
     callback(snap.exists() ? snapshotToBonuses(snap) : []);
-  });
+  }, onError ? (err) => onError(err) : undefined);
 };
 
 export const subscribeToAllPromoCredits = (
   callback: (credits: UserPromoInfo[]) => void,
+  onError?: (err: Error) => void,
 ): Unsubscribe => {
   return onValue(ref(database, 'promo_credits'), (snap) => {
     callback(snap.exists() ? snapshotToPromoCredits(snap) : []);
-  });
+  }, onError ? (err) => onError(err) : undefined);
 };
 
 export const loadTransactions = async (uid: string): Promise<BonusTransaction[]> => {
@@ -159,6 +161,7 @@ export const loadBonusBlocks = async (): Promise<Record<string, BonusBlock>> => 
 
 export const subscribeToPromotions = (
   callback: (promotions: BonusPromotion[]) => void,
+  onError?: (err: Error) => void,
 ): Unsubscribe => {
   return onValue(ref(database, 'bonus_promotions'), (snap) => {
     if (!snap.exists()) {
@@ -174,7 +177,7 @@ export const subscribeToPromotions = (
     });
     result.sort((a, b) => b.createdAt - a.createdAt);
     callback(result);
-  });
+  }, onError ? (err) => onError(err) : undefined);
 };
 
 // ── Admin actions (Cloud Functions) ──

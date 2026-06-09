@@ -310,7 +310,7 @@ export function PremiumPage() {
           setProfiles((prev) => ({ ...prev, ...p })),
         );
       }
-    });
+    }, (err) => setActionError(err.message));
     return unsub;
   }, []);
 
