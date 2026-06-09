@@ -688,6 +688,7 @@ export default function ProfileRequestsScreen() {
         storageKey={PROFILE_REQUESTS_TOOLTIP.storageKey}
         title={PROFILE_REQUESTS_TOOLTIP.title}
         items={PROFILE_REQUESTS_TOOLTIP.items}
+        language={language}
         accentColor={ACCENT}
       />
       <View style={styles.header}>

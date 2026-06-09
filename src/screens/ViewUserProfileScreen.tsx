@@ -27,7 +27,7 @@ import { awardProfileThanksBonus } from '../services/bonusService';
 import { tryBonusOrEnqueue } from '../services/bonusQueue';
 import { profilePermissionService } from '../services/profilePermissionService';
 import { query, ref, get, orderByChild, equalTo } from 'firebase/database';
-import { auth, database } from '../firebase-config';
+import { database } from '../firebase-config';
 import type { JobListing } from '../services/jobService';
 import { getDaysInApp } from '../utils/chaikaLevels';
 import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';

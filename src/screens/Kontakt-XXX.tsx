@@ -996,6 +996,7 @@ const KontaktiChaikyScreen: React.FC = () => {
         storageKey={CONTACTS_CHAIKA_TOOLTIP.storageKey}
         title={CONTACTS_CHAIKA_TOOLTIP.title}
         items={CONTACTS_CHAIKA_TOOLTIP.items}
+        language={language}
         accentColor={SCREEN_THEME.woodGreen}
       />
       <Modal visible={searchModalVisible} animationType="slide" transparent onRequestClose={() => setSearchModalVisible(false)}>

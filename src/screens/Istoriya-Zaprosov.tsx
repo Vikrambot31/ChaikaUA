@@ -365,6 +365,7 @@ const HelpHistoryScreen: React.FC = () => {
         storageKey={HELP_HISTORY_TOOLTIP.storageKey}
         title={HELP_HISTORY_TOOLTIP.title}
         items={HELP_HISTORY_TOOLTIP.items}
+        language={language}
         accentColor={COLORS.primary}
       />
       <FlatList

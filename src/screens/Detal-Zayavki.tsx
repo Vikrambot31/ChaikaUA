@@ -30,7 +30,6 @@ import {
   type HelpConfirmation,
   type HelpResponse,
 } from '../services/bonusService';
-import Toast from 'react-native-toast-message';
 import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
 import ContactReasonModal from '../components/ContactReasonModal';
 import { useContactRequest } from '../hooks/useContactRequest';

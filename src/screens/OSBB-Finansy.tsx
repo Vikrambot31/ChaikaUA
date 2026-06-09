@@ -482,6 +482,7 @@ const OsbbFinansyScreen: React.FC = () => {
         storageKey={OSBB_FINANCE_TOOLTIP.storageKey}
         title={OSBB_FINANCE_TOOLTIP.title}
         items={OSBB_FINANCE_TOOLTIP.items}
+        language={language}
         accentColor={SCREEN_THEME.enamelBlue}
       />
       <ScrollView

@@ -65,7 +65,7 @@ const buildTopupMessage = (pack: typeof PACKAGES[number], pc: { topupRequestTitl
 
 const PromoCreditsTopupScreen: React.FC = () => {
   const navigation = useNavigation<AppNav>();
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const user = useSelector(selectUser);
   const isOnline = useSelector(selectIsOnline);
   const [authUid, setAuthUid] = useState<string | null>(null);
@@ -202,6 +202,7 @@ const PromoCreditsTopupScreen: React.FC = () => {
         storageKey={PROMO_CREDITS_TOPUP_TOOLTIP.storageKey}
         title={PROMO_CREDITS_TOPUP_TOOLTIP.title}
         items={PROMO_CREDITS_TOPUP_TOOLTIP.items}
+        language={language}
         accentColor={SCREEN_THEME.terracotta}
       />
       <View style={styles.header}>

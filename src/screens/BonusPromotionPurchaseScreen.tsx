@@ -162,7 +162,7 @@ const getPromotionErrorMessage = (error: any, fallback: string, bonus: { errorOw
 const BonusPromotionPurchaseScreen: React.FC = () => {
   const navigation = useNavigation<AppNav>();
   const route = useRoute<RouteProp<RouteParams, 'BonusPromotionPurchaseScreen'>>();
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const user = useSelector(selectUser);
   const initialPromoType = route.params?.initialPromoType || 'contacts_top';
   const [selectedPromoType, setSelectedPromoType] = useState(initialPromoType);
@@ -280,6 +280,7 @@ const BonusPromotionPurchaseScreen: React.FC = () => {
         storageKey={BONUS_PROMOTION_PURCHASE_TOOLTIP.storageKey}
         title={BONUS_PROMOTION_PURCHASE_TOOLTIP.title}
         items={BONUS_PROMOTION_PURCHASE_TOOLTIP.items}
+        language={language}
         accentColor={SCREEN_THEME.woodGreen}
       />
       <View style={styles.header}>

@@ -209,6 +209,7 @@ const BonusWalletScreen: React.FC = () => {
         storageKey={BONUS_WALLET_TOOLTIP.storageKey}
         title={BONUS_WALLET_TOOLTIP.title}
         items={BONUS_WALLET_TOOLTIP.items}
+        language={language}
         accentColor={SCREEN_THEME.woodGreen}
       />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>

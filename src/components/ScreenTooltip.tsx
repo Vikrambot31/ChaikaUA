@@ -14,22 +14,33 @@ import {
 
 const HERO_IMAGE = require('../../assets/_readme.webp');
 import { SCREEN_THEME } from '../utils/screenTheme';
+import { Language } from '../i18n/translations';
 
 type ScreenTooltipProps = {
   storageKey: string;
-  title: string;
-  items: string[];
+  title: Record<Language, string>;
+  items: Record<Language, string[]>;
+  language: Language;
   accentColor?: string;
 };
 
 const DONE_VALUE = '1';
-const QUICK_READ_LABEL = '15 \u0441\u0435\u043a\u0443\u043d\u0434';
-const DONE_LABEL = '\u041f\u043e\u043d\u044f\u0442\u043d\u043e';
+const QUICK_READ_LABELS: Record<Language, string> = {
+  ua: '15 СЕКУНД',
+  ru: '15 СЕКУНД',
+  en: '15 SECONDS',
+};
+const DONE_LABELS: Record<Language, string> = {
+  ua: 'Зрозуміло',
+  ru: 'Понятно',
+  en: 'Got It',
+};
 
 export default function ScreenTooltip({
   storageKey,
   title,
   items,
+  language,
   accentColor = SCREEN_THEME.terracotta,
 }: ScreenTooltipProps) {
   const [visible, setVisible] = useState(false);
@@ -53,6 +64,11 @@ export default function ScreenTooltip({
     void AsyncStorage.setItem(storageKey, DONE_VALUE).catch(() => undefined);
   }, [storageKey]);
 
+  const localizedTitle = title[language];
+  const localizedItems = items[language];
+  const quickReadLabel = QUICK_READ_LABELS[language];
+  const doneLabel = DONE_LABELS[language];
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={close}>
       <Pressable style={styles.overlay} onPress={close}>
@@ -62,8 +78,8 @@ export default function ScreenTooltip({
               <MaterialCommunityIcons name="lightbulb-on-outline" size={24} color="#FFF9EE" />
             </View>
             <View style={styles.titleWrap}>
-              <Text style={styles.kicker}>{QUICK_READ_LABEL}</Text>
-              <Text style={styles.title}>{title}</Text>
+              <Text style={styles.kicker}>{quickReadLabel}</Text>
+              <Text style={styles.title}>{localizedTitle}</Text>
             </View>
             <TouchableOpacity style={styles.closeButton} onPress={close} activeOpacity={0.78}>
               <MaterialCommunityIcons name="close" size={22} color={SCREEN_THEME.textSecondary} />
@@ -73,7 +89,7 @@ export default function ScreenTooltip({
           <Image source={HERO_IMAGE} style={styles.heroImage} resizeMode="contain" />
 
           <ScrollView contentContainerStyle={styles.steps} showsVerticalScrollIndicator={false}>
-            {items.map((item, index) => (
+            {localizedItems.map((item, index) => (
               <View key={`${storageKey}-${index}`} style={styles.stepRow}>
                 <View style={[styles.stepNumber, { borderColor: accentColor }]}>
                   <Text style={[styles.stepNumberText, { color: accentColor }]}>{index + 1}</Text>
@@ -84,7 +100,7 @@ export default function ScreenTooltip({
           </ScrollView>
 
           <TouchableOpacity style={[styles.actionButton, { backgroundColor: accentColor }]} onPress={close} activeOpacity={0.86}>
-            <Text style={styles.actionText}>{DONE_LABEL}</Text>
+            <Text style={styles.actionText}>{doneLabel}</Text>
             <MaterialCommunityIcons name="check" size={18} color="#FFF9EE" />
           </TouchableOpacity>
         </Pressable>

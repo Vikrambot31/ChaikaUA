@@ -746,6 +746,7 @@ const MyPhotosScreen: React.FC = () => {
         storageKey={MY_PHOTOS_TOOLTIP.storageKey}
         title={MY_PHOTOS_TOOLTIP.title}
         items={MY_PHOTOS_TOOLTIP.items}
+        language={language}
         accentColor={SCREEN_THEME.accentPurple}
       />
       {/* Header */}
