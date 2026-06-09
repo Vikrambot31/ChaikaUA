@@ -490,14 +490,6 @@ const RequestDetailScreen = ({
 
   const handleContact = () => {
     if (canRequestContact && request.userId) {
-      if (accessStatus === 'pending') {
-        Toast.show({ type: 'info', text1: text.connectPending });
-        return;
-      }
-      if (accessStatus === 'approved') {
-        Toast.show({ type: 'success', text1: text.connectApproved });
-        return;
-      }
       void openModal({
         userId: request.userId,
         name: displayName,

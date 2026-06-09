@@ -24,6 +24,7 @@ import {
   loadProfileRecord,
 } from '../services/authProfileService';
 import { awardProfileThanksBonus } from '../services/bonusService';
+import { tryBonusOrEnqueue } from '../services/bonusQueue';
 import { profilePermissionService } from '../services/profilePermissionService';
 import { query, ref, get, orderByChild, equalTo } from 'firebase/database';
 import { auth, database } from '../firebase-config';
@@ -283,19 +284,24 @@ const ViewUserProfileScreen: React.FC = () => {
 
   const handleThank = async () => {
     if (!userId || isOwnProfile) return;
-    if (!auth.currentUser || auth.currentUser.isAnonymous) {
-      Alert.alert('', text.thankError);
-      return;
-    }
+    setThankSent(true);
     try {
-      const result = await awardProfileThanksBonus(userId);
-      setThankSent(true);
-      if (result.awarded) {
+      const queued = await tryBonusOrEnqueue(
+        { type: 'profile_thanks', payload: { targetUid: userId } },
+        async () => {
+          const result = await awardProfileThanksBonus(userId);
+          if (result.awarded) {
+            Alert.alert('', text.thankAwarded);
+          } else {
+            Alert.alert('', text.thankAlready);
+          }
+        },
+      );
+      if (queued) {
         Alert.alert('', text.thankAwarded);
-      } else {
-        Alert.alert('', text.thankAlready);
       }
     } catch {
+      setThankSent(false);
       Alert.alert('', text.thankError);
     }
   };
