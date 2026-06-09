@@ -89,7 +89,7 @@ export const DEFAULT_REMOTE_APP_CONTROL_CONFIG: RemoteAppControlConfig = {
   updated_at: 0,
 };
 const INVALID_BOOLEAN_FALLBACKS = {
-  allow_new_devices: true,
+  allow_new_devices: false, // safer: deny when value is corrupted/missing
   app_enabled: true,
   maintenance_mode: false,
   force_update_required: false,
@@ -194,17 +194,27 @@ const getValidDeviceRecordForWrite = (
   };
 };
 
+let userEmailsCache: Record<string, string> | null = null;
+let userEmailsCacheTime = 0;
+const USER_EMAILS_CACHE_TTL_MS = 60_000; // 1 minute
+
 const readUserEmails = async (): Promise<Record<string, string>> => {
+  const now = Date.now();
+  if (userEmailsCache && now - userEmailsCacheTime < USER_EMAILS_CACHE_TTL_MS) {
+    return userEmailsCache;
+  }
   const snapshot = await get(ref(database, USERS_PATH));
   const raw = snapshot.val() as Record<string, RawUser> | null;
   if (!raw) return {};
 
-  return Object.fromEntries(
+  userEmailsCache = Object.fromEntries(
     Object.entries(raw).map(([uid, user]) => [
       uid,
       typeof user?.email === 'string' ? user.email : typeof user?.name === 'string' ? user.name : '',
     ]),
   );
+  userEmailsCacheTime = now;
+  return userEmailsCache;
 };
 
 export const subscribeSecurityAppControl = (

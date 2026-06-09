@@ -87,10 +87,17 @@ export const loadUserProfile = async (uid: string): Promise<UserProfile> => {
 export const loadUserProfiles = async (
   uids: string[],
 ): Promise<Record<string, UserProfile>> => {
-  const entries = await Promise.all(
-    uids.map(async (uid) => [uid, await loadUserProfile(uid)] as const),
-  );
-  return Object.fromEntries(entries);
+  if (uids.length === 0) return {};
+  try {
+    const snap = await get(ref(database, 'users'));
+    if (!snap.exists()) return {};
+    const all = snap.val() as Record<string, Record<string, unknown>>;
+    return Object.fromEntries(
+      uids.map((uid) => [uid, all[uid] ? rawToProfile(uid, all[uid]) : { name: '', phone: '' }]),
+    );
+  } catch {
+    return {};
+  }
 };
 
 export interface UserSearchResult {

@@ -117,10 +117,10 @@ export const subscribeAuthAccess = LOCAL_MODE
           (snapshot) => applyRole(normalizeRole(snapshot.val())),
           (error) => {
             stopRoleSubscription();
-            lastAccessDeniedError = ACCESS_DENIED_MESSAGE;
             console.error('[auth] access check failed', error);
-            callback({ status: 'denied', user, role: 'user', error: ACCESS_DENIED_MESSAGE });
-            void signOut(auth).catch((err) => console.error('[auth] signOut failed', err));
+            // Network error reading role — show denied but do NOT sign out.
+            // Signing out on a transient RTDB error causes random logouts.
+            callback({ status: 'denied', user, role: 'user', error: 'Не вдалося перевірити роль. Оновіть сторінку.' });
           },
         );
       });

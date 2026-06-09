@@ -295,7 +295,6 @@ export function PremiumPage() {
   const [activateName, setActivateName] = useState<string>('');
   const [cancelLoading, setCancelLoading] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
 
   const openActivate = (uid: string, name = '') => {
     setActivateUid(uid);
@@ -313,7 +312,7 @@ export function PremiumPage() {
       }
     });
     return unsub;
-  }, [refreshKey]);
+  }, []);
 
   const handleCancel = async (uid: string) => {
     if (!window.confirm(`Скасувати Premium для ${uid}?`)) return;
@@ -321,7 +320,7 @@ export function PremiumPage() {
     setActionError(null);
     try {
       await cancelPremiumSubscription(uid);
-      setRefreshKey((k) => k + 1);
+      // onValue listener updates automatically — no need to recreate subscription
     } catch (err: any) {
       setActionError(err?.message ?? 'Помилка скасування');
     } finally {
@@ -472,10 +471,14 @@ export function PremiumPage() {
                     <button
                       type="button"
                       onClick={() => openActivate(sub.uid, displayName)}
+                      disabled={cancelLoading === sub.uid}
                       style={{
                         marginRight: 6, padding: '4px 10px', borderRadius: 6,
                         background: '#1a2a1a', border: '1px solid #43a04744',
-                        color: '#43a047', fontWeight: 700, cursor: 'pointer', fontSize: 12,
+                        color: '#43a047', fontWeight: 700,
+                        cursor: cancelLoading === sub.uid ? 'not-allowed' : 'pointer',
+                        fontSize: 12,
+                        opacity: cancelLoading === sub.uid ? 0.5 : 1,
                       }}
                     >
                       Продовжити
@@ -510,7 +513,7 @@ export function PremiumPage() {
           uid={activateUid}
           name={activateName}
           onClose={() => { setActivateUid(null); setActivateName(''); }}
-          onActivated={() => setRefreshKey((k) => k + 1)}
+          onActivated={() => { /* onValue updates automatically */ }}
         />
       )}
     </div>
