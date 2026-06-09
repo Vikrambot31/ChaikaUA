@@ -150,7 +150,7 @@ export const SecurityPage = ({ user }: SecurityPageProps) => {
       setMessage('Неверный формат версии. Используйте формат X.Y.Z (например 1.2.3).');
       return;
     }
-    void patchConfig({ minimum_required_version: value || null }, 'minimum_version');
+    void patchConfig({ minimum_required_version: value || undefined }, 'minimum_version');
   };
 
   const blockUserDevice = (item: UserLastSeenRow) => {

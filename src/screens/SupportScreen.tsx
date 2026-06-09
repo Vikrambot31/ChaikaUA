@@ -199,6 +199,7 @@ const SupportScreen: React.FC = () => {
     Boolean(supportUserId) &&
     messageText.trim().length > 0 &&
     messageText.length <= MAX_MESSAGE_LENGTH &&
+    !isClosed &&
     (ticket != null || selectedCategory != null);
 
   const handleSend = useCallback(async () => {

@@ -266,7 +266,7 @@ function AppWithAuthSync({ remoteConfigSnapshot, onRemoteConfigSnapshot }: AppWi
 
     void UploadQueue.process();
     const intervalId = setInterval(() => {
-      void UploadQueue.process();
+      if (!UploadQueue.isEmpty()) void UploadQueue.process();
     }, 25000);
 
     const subscription = AppState.addEventListener('change', (state) => {

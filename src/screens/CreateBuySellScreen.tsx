@@ -123,10 +123,13 @@ const CreateBuySellScreen: React.FC = () => {
 
   useEffect(() => {
     if (!isDirty) return;
-    void AsyncStorage.setItem(
-      DRAFT_KEY,
-      JSON.stringify({ itemName, listingType, category, condition, price, description, phone, hadPhotos: formPhotos.length > 0 }),
-    ).catch(() => {});
+    const timer = setTimeout(() => {
+      void AsyncStorage.setItem(
+        DRAFT_KEY,
+        JSON.stringify({ itemName, listingType, category, condition, price, description, phone, hadPhotos: formPhotos.length > 0 }),
+      ).catch(() => {});
+    }, 600);
+    return () => clearTimeout(timer);
   }, [category, condition, description, formPhotos.length, isDirty, itemName, listingType, phone, price]);
 
   useEffect(() => {

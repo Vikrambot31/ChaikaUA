@@ -54,13 +54,13 @@ const formatTime = (timestamp: number) => {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 };
 
-const buildTopupMessage = (pack: typeof PACKAGES[number]) =>
+const buildTopupMessage = (pack: typeof PACKAGES[number], pc: { topupRequestTitle: string; topupPackageLabel: string; topupAmountLabel: string; topupPackageIdLabel: string; topupAdminNote: string }) =>
   [
-    'Заявка на пополнение промо-кредитов',
-    `Пакет: ${pack.credits} кредитов`,
-    `Ожидаемая сумма: ${pack.amount} UAH`,
-    `ID пакета: ${pack.id}`,
-    'Прошу администратора подтвердить оплату и начислить кредиты.',
+    pc.topupRequestTitle,
+    `${pc.topupPackageLabel}: ${pack.credits}`,
+    `${pc.topupAmountLabel}: ${pack.amount} UAH`,
+    `${pc.topupPackageIdLabel}: ${pack.id}`,
+    pc.topupAdminNote,
   ].join('\n');
 
 const PromoCreditsTopupScreen: React.FC = () => {
@@ -137,7 +137,7 @@ const PromoCreditsTopupScreen: React.FC = () => {
     try {
       await createAdTicket({
         category: 'promo_topup',
-        firstMessage: buildTopupMessage(selectedPackage),
+        firstMessage: buildTopupMessage(selectedPackage, t.promoCredits),
         userName: user?.name || 'User',
         requestedCredits: selectedPackage.credits,
         expectedAmount: selectedPackage.amount,

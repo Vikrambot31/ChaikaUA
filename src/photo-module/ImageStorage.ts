@@ -61,7 +61,7 @@ export const ImageStorage = {
   },
 
   async updatePhoto(photoId: string, patch: Partial<UserPhoto>): Promise<UserPhoto | null> {
-    const photos = await this.getPhotos();
+    const photos = memoryPhotos ?? await readStoredPhotos();
     let updated: UserPhoto | null = null;
     const next = photos.map((photo) => {
       if (photo.id !== photoId) return photo;

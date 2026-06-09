@@ -8,20 +8,12 @@ import {
   ScrollView,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useTranslation } from '../i18n/useTranslation';
 
 interface PremiumActivatedModalProps {
   visible: boolean;
   onDismiss: () => void;
 }
-
-const FEATURES = [
-  'Люди Чайки — повний доступ',
-  'Більше оголошень (до 5)',
-  'Більше заявок (до 6)',
-  'Більше фото (до 10/день)',
-  'Бонуси x1.5',
-  'Пріоритетна підтримка',
-];
 
 /**
  * Beautiful modal shown once when the admin grants the user a Premium
@@ -29,6 +21,16 @@ const FEATURES = [
  * listener in useSubscriptionSync).
  */
 export function PremiumActivatedModal({ visible, onDismiss }: PremiumActivatedModalProps) {
+  const { t } = useTranslation();
+  const features = [
+    t.premium.featurePeople,
+    t.premium.featureAds,
+    t.premium.featureRequests,
+    t.premium.featurePhotos,
+    t.premium.featureBonuses,
+    t.premium.featureSupport,
+  ];
+
   return (
     <Modal
       visible={visible}
@@ -44,16 +46,13 @@ export function PremiumActivatedModal({ visible, onDismiss }: PremiumActivatedMo
           </View>
 
           <Text style={styles.emoji}>🎉</Text>
-          <Text style={styles.title}>Вітаємо!</Text>
-          <Text style={styles.subtitle}>Premium активовано</Text>
+          <Text style={styles.title}>{t.premium.activatedTitle}</Text>
+          <Text style={styles.subtitle}>{t.premium.activatedSubtitle}</Text>
 
-          <Text style={styles.desc}>
-            Ваш преміум-доступ щойно активовано.{'\n'}
-            Тепер вам доступні всі можливості:
-          </Text>
+          <Text style={styles.desc}>{t.premium.activatedDesc}</Text>
 
           <ScrollView style={styles.featureScroll} showsVerticalScrollIndicator={false}>
-            {FEATURES.map((f) => (
+            {features.map((f) => (
               <View key={f} style={styles.featureRow}>
                 <MaterialCommunityIcons name="check-circle" size={16} color="#43a047" />
                 <Text style={styles.featureText}>{f}</Text>
@@ -67,7 +66,7 @@ export function PremiumActivatedModal({ visible, onDismiss }: PremiumActivatedMo
             activeOpacity={0.85}
           >
             <MaterialCommunityIcons name="crown" size={18} color="#1a1a2e" />
-            <Text style={styles.btnText}>Дякую! 🙌</Text>
+            <Text style={styles.btnText}>{t.premium.activatedDismiss} 🙌</Text>
           </TouchableOpacity>
         </View>
       </View>

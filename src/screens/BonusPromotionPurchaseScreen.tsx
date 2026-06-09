@@ -127,34 +127,34 @@ const fetchOwnedTargets = async (
   return next;
 };
 
-const getPromotionErrorMessage = (error: any, fallback: string) => {
+const getPromotionErrorMessage = (error: any, fallback: string, bonus: { errorOwnCard: string; errorInsufficientFunds: string; errorAlreadyActive: string; errorMaxSlots: string; errorAccessNotConfirmed: string; errorMinBadge: string; errorSubscriptionExists: string; errorInvalidDuration: string; errorSaveFailed: string }) => {
   const raw = String(error?.message || error?.code || '').toLowerCase();
   if (raw.includes('permission-denied') || raw.includes('can_only_promote_own')) {
-    return 'Можна просувати тільки свою картку. Виберіть свій запис зі списку.';
+    return bonus.errorOwnCard;
   }
   if (raw.includes('insufficient') || raw.includes('not_enough') || raw.includes('insufficient_credits') || raw.includes('insufficient_bonuses')) {
-    return 'Недостатньо бонусів або промо-кредитів для цього просування.';
+    return bonus.errorInsufficientFunds;
   }
   if (raw.includes('already_has_active_promotion')) {
-    return 'У цієї картки вже є активне просування.';
+    return bonus.errorAlreadyActive;
   }
   if (raw.includes('max_top_slots_reached')) {
-    return 'Зараз всі місця просування зайняті. Спробуйте пізніше.';
+    return bonus.errorMaxSlots;
   }
   if (raw.includes('access_not_confirmed')) {
-    return 'Ваш доступ ще не підтверджено. Просування стане доступним після підтвердження.';
+    return bonus.errorAccessNotConfirmed;
   }
   if (raw.includes('min_badge')) {
-    return 'Недостатній рівень бонусів для цього типу просування.';
+    return bonus.errorMinBadge;
   }
   if (raw.includes('active_subscription_already_exists')) {
-    return 'У вас вже є активна підписка для цього місця.';
+    return bonus.errorSubscriptionExists;
   }
   if (raw.includes('invalid_promo_type_or_duration') || raw.includes('invalid_duration')) {
-    return 'Невірний тип або тривалість просування.';
+    return bonus.errorInvalidDuration;
   }
   if (raw.includes('promotion_write_failed_funds_returned')) {
-    return 'Помилка збереження. Кошти повернено на баланс. Спробуйте ще раз.';
+    return bonus.errorSaveFailed;
   }
   return fallback;
 };
@@ -264,7 +264,7 @@ const BonusPromotionPurchaseScreen: React.FC = () => {
       );
       navigation.goBack();
     } catch (error: any) {
-      Alert.alert(t.common.error, getPromotionErrorMessage(error, t.common.error));
+      Alert.alert(t.common.error, getPromotionErrorMessage(error, t.common.error, t.bonus));
     } finally {
       setBuying(false);
     }

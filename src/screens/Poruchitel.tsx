@@ -66,6 +66,8 @@ const UI_TEXT = {
     statusDenied: 'Заявку відхилено',
     statusManualReview: 'Заявка на ручній модерації',
     statusDisabled: 'Система заявок вимкнена',
+    statusCancelled: 'Заявку скасовано',
+    statusTemporaryAccess: 'Тимчасовий доступ',
     bonusTitle: 'Бонуси за довіру',
     noTrustNode: 'Ви поки не в дереві довіри. Подайте заявку або зареєструйтеся з поручителем.',
     retry: 'Спробувати ще раз',
@@ -97,6 +99,8 @@ const UI_TEXT = {
     statusDenied: 'Заявка отклонена',
     statusManualReview: 'Заявка на ручной модерации',
     statusDisabled: 'Система заявок отключена',
+    statusCancelled: 'Заявка отменена',
+    statusTemporaryAccess: 'Временный доступ',
     bonusTitle: 'Бонусы за доверие',
     noTrustNode: 'Вы пока не в дереве доверия. Подайте заявку или зарегистрируйтесь с поручителем.',
     retry: 'Попробовать еще раз',
@@ -128,6 +132,8 @@ const UI_TEXT = {
     statusDenied: 'Request was denied',
     statusManualReview: 'Request is under manual review',
     statusDisabled: 'Invite system is disabled',
+    statusCancelled: 'Request was cancelled',
+    statusTemporaryAccess: 'Temporary access',
     bonusTitle: 'Trust bonuses',
     noTrustNode: 'You are not yet in the trust tree. Submit a request or register with a sponsor.',
     retry: 'Try again',
@@ -142,6 +148,8 @@ const STATUS_ICON: Record<string, { name: React.ComponentProps<typeof MaterialCo
   needs_manual_review: { name: 'account-search', color: '#2196F3' },
   denied: { name: 'close-circle', color: '#F44336' },
   auto_denied: { name: 'close-circle', color: '#F44336' },
+  cancelled: { name: 'cancel', color: '#9E9E9E' },
+  temporary_access: { name: 'timer-outline', color: '#8BC34A' },
   none: { name: 'help-circle-outline', color: '#9E9E9E' },
   disabled: { name: 'power-plug-off', color: '#9E9E9E' },
 };
@@ -154,6 +162,8 @@ const getStatusText = (status: string, t: (typeof UI_TEXT)[Lang]): string => {
     needs_manual_review: t.statusManualReview,
     denied: t.statusDenied,
     auto_denied: t.statusDenied,
+    cancelled: t.statusCancelled,
+    temporary_access: t.statusTemporaryAccess,
     disabled: t.statusDisabled,
     none: t.statusNone,
   };
@@ -372,7 +382,7 @@ const PoruchitelScreen: React.FC = () => {
                   <View style={styles.cardInfo}>
                     <Text style={styles.cardName}>{item.requesterPhoneMasked || item.requesterUid}</Text>
                     {item.comment ? <Text style={styles.cardPhone}>{item.comment}</Text> : null}
-                    <Text style={styles.cardPhone}>{text.expiresAt}: {new Date(item.expiresAt).toLocaleString()}</Text>
+                    <Text style={styles.cardPhone}>{text.expiresAt}: {new Date(item.expiresAt).toLocaleString(language === 'ru' ? 'ru-RU' : language === 'en' ? 'en-GB' : 'uk-UA')}</Text>
                   </View>
                   <View style={styles.confirmationActions}>
                     <TouchableOpacity

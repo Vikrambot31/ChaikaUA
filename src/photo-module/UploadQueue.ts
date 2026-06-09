@@ -32,6 +32,7 @@ const MAX_ERROR_LENGTH = 300;
 
 let processing = false;
 let pendingRerun = false;
+let knownEmpty = false;
 
 // Photo IDs the user removed while their upload may already be in flight.
 // process() checks this set before and after each upload so a cancelled photo
@@ -170,6 +171,7 @@ export const UploadQueue = {
       },
     });
 
+    knownEmpty = false;
     if (processing) {
       // process() is already running and has already read the queue snapshot.
       // Mark that a re-run is needed so the new task is picked up immediately
@@ -296,9 +298,15 @@ export const UploadQueue = {
                   target: defaultTarget,
                 }
               : { target: defaultTarget },
-            onProgress: (percent) => {
-              void ImageStorage.updatePhoto(task.photoId, { progress: percent });
-            },
+            onProgress: (() => {
+              let lastProgressUpdate = 0;
+              return (percent: number) => {
+                const now = Date.now();
+                if (now - lastProgressUpdate < 500) return;
+                lastProgressUpdate = now;
+                void ImageStorage.updatePhoto(task.photoId, { progress: percent });
+              };
+            })(),
           });
 
           // Cache compressed file path in the task so retries skip re-compression
@@ -388,8 +396,15 @@ export const UploadQueue = {
       if (pendingRerun) {
         pendingRerun = false;
         void this.process().catch((error) => safeLogError('UploadQueue.process.rerun', error));
+      } else {
+        knownEmpty = true;
       }
     }
+  },
+
+  /** Returns true if the queue is known to be empty (no AsyncStorage read). */
+  isEmpty(): boolean {
+    return knownEmpty;
   },
 
   /** Returns true if any photo with this localUri is already in the queue. */

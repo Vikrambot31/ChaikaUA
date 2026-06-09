@@ -5,6 +5,7 @@ import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { selectIsPremium } from '../redux/slices/subscriptionSlice';
 import { SCREEN_THEME } from '../utils/screenTheme';
+import { useTranslation } from '../i18n/useTranslation';
 
 interface PremiumGateProps {
   /** Whether premium is required to see the content */
@@ -30,6 +31,7 @@ export const PremiumGate: React.FC<PremiumGateProps> = ({
 }) => {
   const isPremium = useSelector(selectIsPremium);
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
+  const { t } = useTranslation();
 
   // If not required or user has premium — show content as normal
   if (!required || isPremium) {
@@ -57,7 +59,7 @@ export const PremiumGate: React.FC<PremiumGateProps> = ({
           <Text style={styles.badgeText}>{'\u2B50 Premium'}</Text>
         </View>
         <Text style={styles.lockMessage}>
-          {'Ця функція доступна лише для Premium-учасників.'}
+          {t.premium.gateMessage}
         </Text>
         <TouchableOpacity
           style={styles.upgradeButton}
@@ -65,7 +67,7 @@ export const PremiumGate: React.FC<PremiumGateProps> = ({
           onPress={handleUpgrade}
         >
           <MaterialCommunityIcons name="crown" size={16} color="#FFF9EE" />
-          <Text style={styles.upgradeButtonText}>{'Оформити Premium'}</Text>
+          <Text style={styles.upgradeButtonText}>{t.premium.upgradeButton}</Text>
         </TouchableOpacity>
       </View>
     </View>

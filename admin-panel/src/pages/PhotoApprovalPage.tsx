@@ -251,6 +251,36 @@ export const PhotoApprovalPage = () => {
     }
   };
 
+  const handleApproveAll = async () => {
+    if (shown.length === 0) return;
+    const confirmed = window.confirm(`Одобрить все ${shown.length} фото в текущем фильтре?`);
+    if (!confirmed) return;
+    setBulkBusy(true);
+    setBulkProgress({ current: 0, total: shown.length });
+    setActionError('');
+    try {
+      const allIds = shown.map((p) => p.id);
+      for (let i = 0; i < allIds.length; i += BATCH_CONCURRENCY) {
+        const chunk = allIds.slice(i, i + BATCH_CONCURRENCY);
+        await Promise.allSettled(
+          chunk.map(async (id) => {
+            const photo = idMap.get(id);
+            if (photo) {
+              await approvePhoto(photo.id, photo.uid, photo.collection);
+              patchStatus(id, 'approved');
+            }
+          }),
+        );
+        setBulkProgress({ current: Math.min(i + BATCH_CONCURRENCY, allIds.length), total: allIds.length });
+      }
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Не удалось одобрить все фото.');
+    } finally {
+      setBulkBusy(false);
+      setBulkProgress(null);
+    }
+  };
+
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((k) => k !== id) : [...prev, id]));
   };
@@ -418,6 +448,25 @@ export const PhotoApprovalPage = () => {
 
       {shown.length > 0 ? (
         <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button
+            type="button"
+            disabled={bulkBusy}
+            onClick={() => void handleApproveAll()}
+            style={{
+              padding: '7px 14px',
+              borderRadius: 8,
+              fontWeight: 800,
+              fontSize: 13,
+              border: '1px solid #1e5e3b',
+              background: '#1e7d42',
+              color: '#fff',
+              cursor: bulkBusy ? 'not-allowed' : 'pointer',
+              opacity: bulkBusy ? 0.6 : 1,
+            }}
+            title={`Одобрить все ${shown.length} фото в текущем фильтре`}
+          >
+            {bulkBusy ? 'Обработка...' : `✓ Одобрить все (${shown.length})`}
+          </button>
           <button
             type="button"
             onClick={() => {

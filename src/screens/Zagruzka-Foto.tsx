@@ -244,8 +244,11 @@ const PhotoUploadScreen: React.FC = () => {
   // Save draft whenever text fields change so Android activity-kill can't wipe them.
   useEffect(() => {
     if (!title && !description && !selectedCategory && !locationSearch) return;
-    const draft = { title, description, selectedCategory, locationSearch };
-    void AsyncStorage.setItem(PHOTO_UPLOAD_DRAFT_KEY, JSON.stringify(draft)).catch(() => {});
+    const timer = setTimeout(() => {
+      const draft = { title, description, selectedCategory, locationSearch };
+      void AsyncStorage.setItem(PHOTO_UPLOAD_DRAFT_KEY, JSON.stringify(draft)).catch(() => {});
+    }, 600);
+    return () => clearTimeout(timer);
   }, [title, description, selectedCategory, locationSearch]);
 
   const donePhotos = useMemo(() => formPhotos.filter((photo) => photo.status === 'done'), [formPhotos]);
