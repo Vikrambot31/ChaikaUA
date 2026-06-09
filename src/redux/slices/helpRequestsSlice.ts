@@ -89,9 +89,7 @@ const helpRequestsSlice = createSlice({
             moderatedAt: item.moderatedAt ? new Date(item.moderatedAt).toISOString() : undefined,
           } as HelpRequest;
         });
-      const mappedIds = new Set(mapped.map((item) => item.id));
-      const localOnly = state.items.filter((item) => !mappedIds.has(item.id));
-      const merged = [...localOnly, ...mapped];
+      const merged = mapped;
       state.items = merged;
       const today = new Date();
       today.setHours(0, 0, 0, 0);

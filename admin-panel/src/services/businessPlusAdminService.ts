@@ -1,5 +1,5 @@
 import {
-  get, ref, update, onValue,
+  get, ref, update, remove, onValue,
   type Unsubscribe,
 } from 'firebase/database';
 import { httpsCallable } from 'firebase/functions';
@@ -14,6 +14,7 @@ export interface BusinessPlusClaim {
   placeId: string;
   placeName: string;
   placeAddress: string;
+  category: string;
   ownerUid: string;
   ownerName: string;
   ownerPhone: string;
@@ -42,6 +43,7 @@ export interface BusinessPromotion {
 export interface BusinessPlusCard {
   placeId: string;
   placeName: string;
+  category: string;
   ownerId: string;
   moderationStatus: CardModerationStatus;
   menuItems?: BusinessMenuItem[];
@@ -67,6 +69,7 @@ const toClaimList = (snap: import('firebase/database').DataSnapshot): BusinessPl
       placeId: child.key ?? d.placeId ?? '',
       placeName: d.placeName ?? '',
       placeAddress: d.placeAddress ?? '',
+      category: (d.category && d.category.trim()) ? d.category : 'business',
       ownerUid: d.ownerUid ?? '',
       ownerName: d.ownerName ?? '',
       ownerPhone: d.ownerPhone ?? '',
@@ -97,6 +100,7 @@ const toCardList = (snap: import('firebase/database').DataSnapshot): BusinessPlu
     result.push({
       placeId: child.key ?? d.placeId ?? '',
       placeName: d.placeName ?? '',
+      category: (d.category && d.category.trim()) ? d.category : 'business',
       ownerId: d.ownerId ?? '',
       moderationStatus: d.moderationStatus ?? 'pending',
       menuItems: Array.isArray(d.menuItems) ? d.menuItems : undefined,
@@ -159,6 +163,7 @@ export const approveBusinessClaim = async (
       await update(ref(database, `business_plus_cards/${placeId}`), {
         placeId,
         placeName: claim.placeName,
+        category: (claim.category && claim.category.trim()) ? claim.category : 'business',
         ownerId: claim.ownerUid,
         moderationStatus: 'approved',
         updatedAt: now,
@@ -306,6 +311,38 @@ export const cancelBusinessPlusSubscription = async (uid: string): Promise<{ ok:
 };
 
 // ── User profile lookup (reuse from premiumAdminService pattern) ──
+
+// ── Delete / Update card ──
+
+export const deleteBusinessCard = async (placeId: string): Promise<void> => {
+  await remove(ref(database, `business_plus_cards/${placeId}`));
+};
+
+export const deleteBusinessClaim = async (placeId: string): Promise<void> => {
+  await remove(ref(database, `business_plus_claims/${placeId}`));
+};
+
+export const updateBusinessCard = async (
+  placeId: string,
+  data: Record<string, unknown>,
+): Promise<void> => {
+  await update(ref(database, `business_plus_cards/${placeId}`), {
+    ...data,
+    updatedAt: new Date().toISOString(),
+  });
+};
+
+export const updateBusinessClaim = async (
+  placeId: string,
+  data: Record<string, unknown>,
+): Promise<void> => {
+  await update(ref(database, `business_plus_claims/${placeId}`), {
+    ...data,
+    updatedAt: new Date().toISOString(),
+  });
+};
+
+// ── User profile lookup ──
 
 export const loadOwnerName = async (uid: string): Promise<string> => {
   try {

@@ -424,6 +424,7 @@ export default function DetalDetskogoMestaScreen() {
     title: place.name,
     address: place.address,
     phone: place.phone,
+    category: 'kids',
     sourceType: 'place',
     sourceId: place.id,
   };

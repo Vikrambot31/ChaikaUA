@@ -336,6 +336,7 @@ export default function DetalSalonaScreen() {
     title: place.name,
     address: place.address,
     phone: place.phone,
+    category: 'beauty',
     sourceType: 'place',
     sourceId: place.id,
   };

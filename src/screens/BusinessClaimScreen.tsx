@@ -141,6 +141,7 @@ export default function BusinessClaimScreen({
         placeId: item.sourceId,
         placeName: item.title,
         placeAddress: item.address ?? '',
+        category: item.category ?? 'business',
         ownerUid: currentUser.id,
         ownerName: trimmedName,
         ownerPhone: normalizedPhone ?? phone.trim(),

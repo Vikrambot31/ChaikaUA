@@ -668,7 +668,7 @@ export default function ItemDetailScreen({
               {claimStatus === 'none' || claimStatus === 'rejected' ? (
                 <TouchableOpacity
                   style={styles.claimBtn}
-                  onPress={() => navigation.navigate('BusinessClaimScreen', { item })}
+                  onPress={() => navigation.navigate('BusinessClaimScreen', { item: { ...item, category: feedScreen ?? 'food' } })}
                   activeOpacity={0.86}
                 >
                   <MaterialCommunityIcons name="store-plus-outline" size={18} color={SCREEN_THEME.terracotta} />

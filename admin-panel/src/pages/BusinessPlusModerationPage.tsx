@@ -7,6 +7,10 @@ import {
   rejectBusinessClaim,
   approveBusinessCard,
   rejectBusinessCard,
+  deleteBusinessClaim,
+  deleteBusinessCard,
+  updateBusinessClaim,
+  updateBusinessCard,
   subscribeToBusinessPlusSubscriptions,
   activateBusinessPlusManual,
   cancelBusinessPlusSubscription,
@@ -17,6 +21,35 @@ import {
 import { searchUsers, type UserSearchResult } from '../services/premiumAdminService';
 
 type Tab = 'claims' | 'cards' | 'subscriptions';
+
+type CategoryFilter = 'all' | 'food' | 'beauty' | 'kids' | 'business';
+
+const CATEGORY_LABELS: Record<CategoryFilter, string> = {
+  all: 'Всі',
+  food: 'Еда на чайке',
+  beauty: 'Салони красоти',
+  kids: 'Все для дітей',
+  business: 'Бізнес Чайка',
+};
+
+const categoryBadge = (cat: string) => {
+  const colors: Record<string, { bg: string; color: string; label: string }> = {
+    food:     { bg: '#1a2a00', color: '#c6ff00', label: 'Еда' },
+    beauty:   { bg: '#2a0020', color: '#f48fb1', label: 'Салон' },
+    kids:     { bg: '#00202a', color: '#4fc3f7', label: 'Діти' },
+    business: { bg: '#1a1a00', color: '#ffd54f', label: 'Бізнес' },
+  };
+  const s = colors[cat] ?? { bg: '#1a1a1a', color: '#888', label: cat || '—' };
+  return (
+    <span style={{
+      background: s.bg, color: s.color,
+      borderRadius: 6, padding: '2px 8px',
+      fontSize: 10, fontWeight: 800, whiteSpace: 'nowrap',
+    }}>
+      {s.label}
+    </span>
+  );
+};
 
 const formatDate = (iso: string | undefined): string => {
   if (!iso) return '—';
@@ -49,7 +82,7 @@ const statusBadge = (status: string) => {
 
 // ── Claims Tab ──
 
-function ClaimsTab({ adminUid }: { adminUid: string }) {
+function ClaimsTab({ adminUid, categoryFilter }: { adminUid: string; categoryFilter: CategoryFilter }) {
   const [claims, setClaims] = useState<BusinessPlusClaim[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState<string | null>(null);
@@ -66,13 +99,14 @@ function ClaimsTab({ adminUid }: { adminUid: string }) {
     return unsub;
   }, []);
 
-  const filtered = filter === 'all' ? claims : claims.filter((c) => c.status === filter);
-  const pendingCount = claims.filter((c) => c.status === 'pending').length;
+  const catFiltered = categoryFilter === 'all' ? claims : claims.filter((c) => (c.category || 'business') === categoryFilter);
+  const filtered = filter === 'all' ? catFiltered : catFiltered.filter((c) => c.status === filter);
+  const pendingCount = catFiltered.filter((c) => c.status === 'pending').length;
 
   const handleApprove = async (placeId: string) => {
     setActionId(placeId);
     try { await approveBusinessClaim(placeId, adminUid); }
-    catch (e) { console.error(e); }
+    catch (e) { console.error(e); alert('Помилка при схваленні. Спробуйте ще раз.'); }
     finally { setActionId(null); }
   };
 
@@ -83,7 +117,18 @@ function ClaimsTab({ adminUid }: { adminUid: string }) {
       await rejectBusinessClaim(rejectId, adminUid, rejectReason.trim() || 'Відхилено адміном');
       setRejectId(null);
       setRejectReason('');
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error(e); alert('Помилка при відхиленні. Спробуйте ще раз.'); }
+    finally { setActionId(null); }
+  };
+
+  const handleDelete = async (placeId: string) => {
+    if (!window.confirm('Видалити цю заявку назавжди?')) return;
+    setActionId(placeId);
+    try { await deleteBusinessClaim(placeId); }
+    catch (e) {
+      console.error(e);
+      alert('Помилка при видаленні. Спробуйте ще раз.');
+    }
     finally { setActionId(null); }
   };
 
@@ -123,8 +168,8 @@ function ClaimsTab({ adminUid }: { adminUid: string }) {
           }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
               <div style={{ flex: 1, minWidth: 200 }}>
-                <div style={{ color: '#e0e0ff', fontWeight: 800, fontSize: 14, marginBottom: 3 }}>
-                  🏪 {claim.placeName}
+                <div style={{ color: '#e0e0ff', fontWeight: 800, fontSize: 14, marginBottom: 3, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  🏪 {claim.placeName} {categoryBadge(claim.category)}
                 </div>
                 <div style={{ color: '#aaa', fontSize: 12, marginBottom: 2 }}>
                   {claim.placeAddress}
@@ -183,6 +228,18 @@ function ClaimsTab({ adminUid }: { adminUid: string }) {
                     </button>
                   </div>
                 )}
+                <button type="button"
+                  onClick={() => void handleDelete(claim.placeId)}
+                  disabled={actionId === claim.placeId}
+                  style={{
+                    background: '#1a0a0a', color: '#888',
+                    border: '1px solid #333', borderRadius: 6,
+                    padding: '4px 10px', cursor: 'pointer', fontSize: 11, fontWeight: 700,
+                    opacity: actionId === claim.placeId ? 0.5 : 1,
+                  }}
+                >
+                  🗑 Видалити
+                </button>
               </div>
             </div>
           </div>
@@ -236,7 +293,7 @@ function ClaimsTab({ adminUid }: { adminUid: string }) {
 
 // ── Cards Tab ──
 
-function CardsTab({ adminUid }: { adminUid: string }) {
+function CardsTab({ adminUid, categoryFilter }: { adminUid: string; categoryFilter: CategoryFilter }) {
   const [cards, setCards] = useState<BusinessPlusCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState<string | null>(null);
@@ -244,6 +301,10 @@ function CardsTab({ adminUid }: { adminUid: string }) {
   const [rejectReason, setRejectReason] = useState('');
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editCategory, setEditCategory] = useState('');
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -254,13 +315,44 @@ function CardsTab({ adminUid }: { adminUid: string }) {
     return unsub;
   }, []);
 
-  const filtered = filter === 'all' ? cards : cards.filter((c) => c.moderationStatus === filter);
-  const pendingCount = cards.filter((c) => c.moderationStatus === 'pending').length;
+  const startEdit = (card: BusinessPlusCard) => {
+    setEditingId(card.placeId);
+    setEditName(card.placeName);
+    setEditCategory(card.category || 'business');
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditName('');
+    setEditCategory('');
+  };
+
+  const VALID_CATEGORIES = ['food', 'beauty', 'kids', 'business'] as const;
+
+  const saveEdit = async () => {
+    if (!editingId) return;
+    if (!editName.trim()) { alert('Назва не може бути порожньою'); return; }
+    if (!VALID_CATEGORIES.includes(editCategory as typeof VALID_CATEGORIES[number])) { alert('Невірна категорія'); return; }
+    if (!window.confirm('Зберегти зміни?')) return;
+    setSaving(true);
+    try {
+      await updateBusinessCard(editingId, { placeName: editName.trim(), category: editCategory });
+      setEditingId(null);
+    } catch (e) {
+      console.error(e);
+      alert('Помилка при збереженні. Спробуйте ще раз.');
+    }
+    finally { setSaving(false); }
+  };
+
+  const catFiltered = categoryFilter === 'all' ? cards : cards.filter((c) => (c.category || 'business') === categoryFilter);
+  const filtered = filter === 'all' ? catFiltered : catFiltered.filter((c) => c.moderationStatus === filter);
+  const pendingCount = catFiltered.filter((c) => c.moderationStatus === 'pending').length;
 
   const handleApprove = async (placeId: string) => {
     setActionId(placeId);
     try { await approveBusinessCard(placeId, adminUid); }
-    catch (e) { console.error(e); }
+    catch (e) { console.error(e); alert('Помилка при схваленні. Спробуйте ще раз.'); }
     finally { setActionId(null); }
   };
 
@@ -271,7 +363,18 @@ function CardsTab({ adminUid }: { adminUid: string }) {
       await rejectBusinessCard(rejectId, adminUid, rejectReason.trim() || 'Відхилено адміном');
       setRejectId(null);
       setRejectReason('');
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error(e); alert('Помилка при відхиленні. Спробуйте ще раз.'); }
+    finally { setActionId(null); }
+  };
+
+  const handleDeleteCard = async (placeId: string) => {
+    if (!window.confirm('Видалити цю картку назавжди?')) return;
+    setActionId(placeId);
+    try { await deleteBusinessCard(placeId); }
+    catch (e) {
+      console.error(e);
+      alert('Помилка при видаленні. Спробуйте ще раз.');
+    }
     finally { setActionId(null); }
   };
 
@@ -310,13 +413,56 @@ function CardsTab({ adminUid }: { adminUid: string }) {
           }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
               <div style={{ flex: 1, minWidth: 200 }}>
-                <div style={{ color: '#e0e0ff', fontWeight: 800, fontSize: 14, marginBottom: 3 }}>
-                  🏪 {card.placeName}
-                </div>
-                <div style={{ color: '#888', fontSize: 12, marginBottom: 6 }}>
-                  OwnerUID: {card.ownerId.slice(0, 16)}...
-                  &nbsp;·&nbsp;Оновлено: {formatDate(card.updatedAt)}
-                </div>
+                {editingId === card.placeId ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        style={{
+                          flex: 1, background: '#111', color: '#e0e0ff',
+                          border: '1px solid #444', borderRadius: 6, padding: '4px 8px',
+                          fontSize: 14, fontWeight: 800,
+                        }}
+                      />
+                      <select
+                        value={editCategory}
+                        onChange={(e) => setEditCategory(e.target.value)}
+                        style={{
+                          background: '#111', color: '#ccc',
+                          border: '1px solid #444', borderRadius: 6, padding: '4px 8px',
+                          fontSize: 12,
+                        }}
+                      >
+                        <option value="food">Еда</option>
+                        <option value="beauty">Салон</option>
+                        <option value="kids">Діти</option>
+                        <option value="business">Бізнес</option>
+                      </select>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button type="button" onClick={() => void saveEdit()} disabled={saving}
+                        style={{ background: '#1b5e20', color: '#a5d6a7', border: '1px solid #2e7d32', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontSize: 11, fontWeight: 800 }}>
+                        {saving ? '...' : '✓ Зберегти'}
+                      </button>
+                      <button type="button" onClick={cancelEdit}
+                        style={{ background: '#222', color: '#888', border: '1px solid #333', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontSize: 11 }}>
+                        Скасувати
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ color: '#e0e0ff', fontWeight: 800, fontSize: 14, marginBottom: 3, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      🏪 {card.placeName} {categoryBadge(card.category)}
+                    </div>
+                    <div style={{ color: '#888', fontSize: 12, marginBottom: 6 }}>
+                      OwnerUID: {card.ownerId.slice(0, 16)}...
+                      &nbsp;·&nbsp;Оновлено: {formatDate(card.updatedAt)}
+                    </div>
+                  </>
+                )}
 
                 {/* Content summary */}
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
@@ -418,6 +564,30 @@ function CardsTab({ adminUid }: { adminUid: string }) {
                     </button>
                   </div>
                 )}
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <button type="button"
+                    onClick={() => startEdit(card)}
+                    style={{
+                      background: '#0a1520', color: '#90caf9',
+                      border: '1px solid #1a3a5a', borderRadius: 6,
+                      padding: '4px 10px', cursor: 'pointer', fontSize: 11, fontWeight: 700,
+                    }}
+                  >
+                    ✎ Редагувати
+                  </button>
+                  <button type="button"
+                    onClick={() => void handleDeleteCard(card.placeId)}
+                    disabled={actionId === card.placeId}
+                    style={{
+                      background: '#1a0a0a', color: '#888',
+                      border: '1px solid #333', borderRadius: 6,
+                      padding: '4px 10px', cursor: 'pointer', fontSize: 11, fontWeight: 700,
+                      opacity: actionId === card.placeId ? 0.5 : 1,
+                    }}
+                  >
+                    🗑 Видалити
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -772,6 +942,7 @@ function SubscriptionsTab() {
 export function BusinessPlusModerationPage() {
   const access = useAuthAccess();
   const [activeTab, setActiveTab] = useState<Tab>('claims');
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
   const [claimsCount, setClaimsCount] = useState(0);
   const [cardsCount, setCardsCount] = useState(0);
 
@@ -834,8 +1005,28 @@ export function BusinessPlusModerationPage() {
         ))}
       </div>
 
-      {activeTab === 'claims' && <ClaimsTab adminUid={adminUid} />}
-      {activeTab === 'cards' && <CardsTab adminUid={adminUid} />}
+      {/* Category filter (for claims & cards tabs) */}
+      {activeTab !== 'subscriptions' && (
+        <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
+          {(Object.keys(CATEGORY_LABELS) as CategoryFilter[]).map((cat) => (
+            <button key={cat} type="button"
+              onClick={() => setCategoryFilter(cat)}
+              style={{
+                background: categoryFilter === cat ? '#0a2040' : '#111',
+                color: categoryFilter === cat ? '#90caf9' : '#666',
+                border: `1px solid ${categoryFilter === cat ? '#1a5ab0' : '#222'}`,
+                borderRadius: 6, padding: '3px 10px',
+                cursor: 'pointer', fontSize: 12, fontWeight: 700,
+              }}
+            >
+              {CATEGORY_LABELS[cat]}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {activeTab === 'claims' && <ClaimsTab adminUid={adminUid} categoryFilter={categoryFilter} />}
+      {activeTab === 'cards' && <CardsTab adminUid={adminUid} categoryFilter={categoryFilter} />}
       {activeTab === 'subscriptions' && <SubscriptionsTab />}
     </div>
   );
