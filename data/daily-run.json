@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-06-09",
+      "publishedAt": "2026-06-09T11:44:10.256Z",
+      "key": "https://bigkyiv.com.ua/na-bulvari-shevchenka-i-bilya-arsenalnoyi-uskladeno-ruh-cherez-provallya-na-dorozi/"
+    },
+    {
       "type": "places",
       "date": "2026-06-09",
       "publishedAt": "2026-06-09T10:50:19.821Z",
