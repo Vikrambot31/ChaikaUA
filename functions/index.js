@@ -933,6 +933,7 @@ const ADMIN_MODERATION_SECTIONS = {
   appSuggestions: { path: 'app_suggestions', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
   communityPhotos: { path: 'community_photos', statusField: 'status', approvedValue: 'approved', rejectedValue: 'rejected' },
   userPhotos: { path: 'user_photos', statusField: 'status', approvedValue: 'approved', rejectedValue: 'rejected', nested: true },
+  requestPhotos: { path: 'request_photos', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected', nested: true },
   datingProfiles: { path: 'dating_profiles', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
   datingAnketaListings: { path: 'dating_anketa_listings', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
   coffeeRequests: { path: 'coffee_requests', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
@@ -1038,7 +1039,7 @@ exports.adminModerateContentItem = functionsV1.https.onCall(async (data, context
         patch.rejectionReason = null;
       }
 
-      if (section === 'communityPhotos') {
+      if (section === 'communityPhotos' || section === 'userPhotos' || section === 'requestPhotos') {
         patch.moderationStatus = nextStatusValue;
       }
 
@@ -1059,6 +1060,20 @@ exports.adminModerateContentItem = functionsV1.https.onCall(async (data, context
       }
 
       await targetRef.update(patch);
+
+      if (section === 'communityPhotos' || section === 'userPhotos' || section === 'requestPhotos') {
+        const parts = targetPath.split('/');
+        const ownerUid = config.nested ? parts[1] : String(target.userId || '').trim();
+        if (ownerUid) {
+          const isApproved = action === 'approved';
+          await sendUserNotification(ownerUid, {
+            title: isApproved ? 'Фото схвалено ✅' : 'Фото відхилено',
+            body: isApproved
+              ? 'Ваше фото пройшло модерацію і опубліковано.'
+              : `Ваше фото відхилено. ${patch.moderationReason || ''}`.trim(),
+          }, { type: 'photo_moderation', action });
+        }
+      }
     }
 
     await writeOpsEvent('admin_moderation_action', {

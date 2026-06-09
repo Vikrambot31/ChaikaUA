@@ -38,6 +38,8 @@ const PhotoThumb = ({
       <img
         src={src}
         alt=""
+        loading="lazy"
+        decoding="async"
         style={{ width: 64, height: 64, borderRadius: 8, objectFit: 'cover', display: 'block' }}
         onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0.3'; }}
       />
@@ -104,8 +106,11 @@ export const PhotoApprovalPage = () => {
   const [filter, setFilter] = useState<Filter>('pending');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<PhotoRecord | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
 
   const photos = localPhotos ?? allPhotos;
   const [uidFilter, setUidFilter] = useState('');
@@ -193,15 +198,56 @@ export const PhotoApprovalPage = () => {
   const handleDeleteSelected = async () => {
     if (selectedInShown.length === 0) return;
     setBulkBusy(true);
+    setBulkProgress({ current: 0, total: selectedInShown.length });
     setActionError('');
     try {
-      const items = selectedInShown.map((id) => ({ id, uid: idMap.get(id)?.uid, collection: idMap.get(id)?.collection }));
-      await deletePhotos(items);
-      selectedInShown.forEach((id) => removeLocal(id));
+      for (let i = 0; i < selectedInShown.length; i += BATCH_CONCURRENCY) {
+        const chunk = selectedInShown.slice(i, i + BATCH_CONCURRENCY);
+        await Promise.allSettled(
+          chunk.map(async (id) => {
+            const photo = idMap.get(id);
+            if (photo) {
+              await deletePhoto(photo.id, photo.uid, photo.collection);
+              removeLocal(id);
+            }
+          }),
+        );
+        setBulkProgress({ current: Math.min(i + BATCH_CONCURRENCY, selectedInShown.length), total: selectedInShown.length });
+      }
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Не удалось удалить выбранные фото.');
     } finally {
       setBulkBusy(false);
+      setBulkProgress(null);
+    }
+  };
+
+  const BATCH_CONCURRENCY = 5;
+
+  const handleApproveSelected = async () => {
+    if (selectedInShown.length === 0) return;
+    setBulkBusy(true);
+    setBulkProgress({ current: 0, total: selectedInShown.length });
+    setActionError('');
+    try {
+      for (let i = 0; i < selectedInShown.length; i += BATCH_CONCURRENCY) {
+        const chunk = selectedInShown.slice(i, i + BATCH_CONCURRENCY);
+        await Promise.allSettled(
+          chunk.map(async (id) => {
+            const photo = idMap.get(id);
+            if (photo) {
+              await approvePhoto(photo.id, photo.uid, photo.collection);
+              patchStatus(id, 'approved');
+            }
+          }),
+        );
+        setBulkProgress({ current: Math.min(i + BATCH_CONCURRENCY, selectedInShown.length), total: selectedInShown.length });
+      }
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Не удалось одобрить выбранные фото.');
+    } finally {
+      setBulkBusy(false);
+      setBulkProgress(null);
     }
   };
 
@@ -212,6 +258,58 @@ export const PhotoApprovalPage = () => {
   return (
     <section>
       {lightboxUrl ? <Lightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} /> : null}
+      {rejectTarget ? (
+        <div
+          onClick={() => { setRejectTarget(null); setRejectReason(''); }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: '#1a2435', borderRadius: 12, padding: 24, width: 420, maxWidth: '90vw' }}
+          >
+            <h3 style={{ color: '#c8d6e8', marginTop: 0, marginBottom: 16, fontSize: 16 }}>Причина відхилення</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
+              {['Не відповідає темі', 'Спам / реклама', 'Неприйнятний контент', 'Особисті дані', 'Низька якість'].map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => setRejectReason(preset)}
+                  style={{ textAlign: 'left', padding: '7px 12px', borderRadius: 8, border: rejectReason === preset ? '1px solid #4b7f9e' : '1px solid #253040', background: rejectReason === preset ? '#253f54' : '#141b24', color: '#c8d6e8', cursor: 'pointer', fontSize: 13 }}
+                >
+                  {preset}
+                </button>
+              ))}
+            </div>
+            <textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="Або введіть власну причину..."
+              rows={2}
+              style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #253040', background: '#141b24', color: '#c8d6e8', fontSize: 13, resize: 'vertical', boxSizing: 'border-box' }}
+            />
+            <div style={{ display: 'flex', gap: 8, marginTop: 16, justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={() => { setRejectTarget(null); setRejectReason(''); }}
+                style={{ padding: '8px 18px', borderRadius: 8, border: '1px solid #253040', background: '#141b24', color: '#c8d6e8', cursor: 'pointer', fontSize: 13 }}
+              >
+                Скасувати
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void handleReject(rejectTarget, rejectReason);
+                  setRejectTarget(null);
+                  setRejectReason('');
+                }}
+                style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: '#7a1e1e', color: '#ffb3b3', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}
+              >
+                Відхилити
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <div className="pageHeader">
         <div>
           <p className="eyebrow">Модерация</p>
@@ -261,6 +359,18 @@ export const PhotoApprovalPage = () => {
 
       {error ? <p className="formError">{error}</p> : null}
       {actionError ? <p className="formError">{actionError}</p> : null}
+
+      {bulkProgress ? (
+        <div style={{ marginBottom: 12, padding: '10px 14px', background: '#1a2435', borderRadius: 10, border: '1px solid #253040' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 13, color: '#c8d6e8' }}>
+            <span>Обработка...</span>
+            <span>{bulkProgress.current} / {bulkProgress.total}</span>
+          </div>
+          <div style={{ height: 6, background: '#253040', borderRadius: 3, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${(bulkProgress.current / bulkProgress.total) * 100}%`, background: '#4b7f9e', borderRadius: 3, transition: 'width 0.3s ease' }} />
+          </div>
+        </div>
+      ) : null}
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         <input
@@ -333,6 +443,24 @@ export const PhotoApprovalPage = () => {
           <button
             type="button"
             disabled={bulkBusy || selectedInShown.length === 0}
+            onClick={() => void handleApproveSelected()}
+            style={{
+              padding: '7px 14px',
+              borderRadius: 8,
+              fontWeight: 800,
+              fontSize: 13,
+              border: '1px solid #1e5e3b',
+              background: '#173b25',
+              color: '#b3ffd1',
+              cursor: bulkBusy || selectedInShown.length === 0 ? 'not-allowed' : 'pointer',
+              opacity: bulkBusy || selectedInShown.length === 0 ? 0.6 : 1,
+            }}
+          >
+            {bulkBusy ? 'Обработка...' : `Одобрить выбранные (${selectedInShown.length})`}
+          </button>
+          <button
+            type="button"
+            disabled={bulkBusy || selectedInShown.length === 0}
             onClick={() => void handleDeleteSelected()}
             style={{
               padding: '7px 14px',
@@ -346,7 +474,7 @@ export const PhotoApprovalPage = () => {
               opacity: bulkBusy || selectedInShown.length === 0 ? 0.6 : 1,
             }}
           >
-            {bulkBusy ? 'Удаление...' : `Удалить выбранные (${selectedInShown.length})`}
+            {bulkBusy ? 'Обработка...' : `Удалить выбранные (${selectedInShown.length})`}
           </button>
           {selectedInShown.length > 0 ? (
             <button
@@ -445,11 +573,7 @@ export const PhotoApprovalPage = () => {
                             type="button"
                             className="smallButton dangerButton"
                             disabled={rowBusy}
-                            onClick={() => {
-                              const result = window.prompt('Причина отклонения (необязательно):', p.moderationReason || '');
-                              if (result === null) return;
-                              void handleReject(p, result);
-                            }}
+                            onClick={() => { setRejectTarget(p); setRejectReason(p.moderationReason || ''); }}
                           >
                             Отклонить
                           </button>

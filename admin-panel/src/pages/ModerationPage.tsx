@@ -72,6 +72,7 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
   const [massStrategy, setMassStrategy] = useState<MassAnalysisStrategy>('oldest-first');
   const [massProgress, setMassProgress] = useState({ current: 0, total: 0 });
   const massCancelRef = useRef(false);
+  const [batchProgress, setBatchProgress] = useState<{ current: number; total: number; label: string } | null>(null);
 
   // --- Yellow List state ---
   const [yellowList, setYellowList] = useState<Map<string, YellowListEntry>>(new Map());
@@ -419,8 +420,26 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
     });
   };
 
+  const BATCH_CONCURRENCY = 5;
+
+  const runBatch = async (
+    items: ModerationItem[],
+    action: 'approved' | 'rejected' | 'delete',
+    label: string,
+    options?: { reason?: string },
+  ) => {
+    setBatchProgress({ current: 0, total: items.length, label });
+    for (let i = 0; i < items.length; i += BATCH_CONCURRENCY) {
+      const chunk = items.slice(i, i + BATCH_CONCURRENCY);
+      await Promise.allSettled(
+        chunk.map((item) => runAction(item, action, { skipDeleteConfirm: true, reason: options?.reason })),
+      );
+      setBatchProgress({ current: Math.min(i + BATCH_CONCURRENCY, items.length), total: items.length, label });
+    }
+    setBatchProgress(null);
+  };
+
   const approveSelected = async () => {
-    // Фиксируем список на момент нажатия — не допускаем каскадного одобрения
     const itemsToApprove = [...approvableSelectedItems];
     if (!itemsToApprove.length) {
       setMessage('Нет выбранных записей для одобрения.');
@@ -428,13 +447,10 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
     }
     const confirmed = window.confirm(`Одобрить ${itemsToApprove.length} выбранных записей?`);
     if (!confirmed) return;
-    for (const item of itemsToApprove) {
-      await runAction(item, 'approved');
-    }
+    await runBatch(itemsToApprove, 'approved', 'Одобрение');
   };
 
   const deleteSelected = async () => {
-    // Фиксируем список на момент нажатия — не допускаем каскадного удаления
     const itemsToDelete = [...deletableSelectedItems];
     if (!itemsToDelete.length) {
       setMessage('Нет выбранных записей для удаления.');
@@ -442,9 +458,7 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
     }
     const confirmed = window.confirm(`Удалить ${itemsToDelete.length} выбранных записей?`);
     if (!confirmed) return;
-    for (const item of itemsToDelete) {
-      await runAction(item, 'delete', { skipDeleteConfirm: true });
-    }
+    await runBatch(itemsToDelete, 'delete', 'Удаление');
   };
 
   const openPreview = (item: ModerationItem, startIndex = 0) => {
@@ -481,6 +495,18 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
       </div>
 
       {message ? <p className="infoMessage">{message}</p> : null}
+
+      {batchProgress ? (
+        <div style={{ marginBottom: 16, padding: '12px 16px', background: '#1a2435', borderRadius: 10, border: '1px solid #253040' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 13, color: '#c8d6e8' }}>
+            <span>{batchProgress.label}...</span>
+            <span>{batchProgress.current} / {batchProgress.total}</span>
+          </div>
+          <div style={{ height: 6, background: '#253040', borderRadius: 3, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${(batchProgress.current / batchProgress.total) * 100}%`, background: '#4b7f9e', borderRadius: 3, transition: 'width 0.3s ease' }} />
+          </div>
+        </div>
+      ) : null}
 
       <div className="statsGrid">
         <article className="metric metric-primary"><span>Всего</span><strong>{summary.total}</strong></article>
@@ -608,7 +634,7 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
           <button
             type="button"
             className="smallButton"
-            disabled={!approvableSelectedItems.length || busyActions.size > 0}
+            disabled={!approvableSelectedItems.length || busyActions.size > 0 || !!batchProgress}
             onClick={() => void approveSelected()}
           >
             Одобрить все
@@ -616,7 +642,7 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
           <button
             type="button"
             className="smallButton dangerButton"
-            disabled={!rejectableSelectedItems.length || busyActions.size > 0}
+            disabled={!rejectableSelectedItems.length || busyActions.size > 0 || !!batchProgress}
             onClick={() => setRejectTarget({ kind: 'batch', items: [...rejectableSelectedItems] })}
           >
             Отклонить выбранные
@@ -624,7 +650,7 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
           <button
             type="button"
             className="smallButton dangerButton"
-            disabled={!deletableSelectedItems.length || busyActions.size > 0}
+            disabled={!deletableSelectedItems.length || busyActions.size > 0 || !!batchProgress}
             onClick={() => void deleteSelected()}
           >
             Удалить все
@@ -727,7 +753,7 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
                       <div className="mediaGallery">
                         {item.mediaUrls.map((url, idx) => (
                           <button key={idx} type="button" className="mediaPreview" onClick={() => openPreview(item, idx)}>
-                            <img src={url} alt="" />
+                            <img src={url} alt="" loading="lazy" decoding="async" />
                           </button>
                         ))}
                       </div>
@@ -1023,14 +1049,11 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
           onCancel={() => setRejectTarget(null)}
           onConfirm={async (reason) => {
             const target = rejectTarget;
+            setRejectTarget(null);
             if (target.kind === 'single') {
-              setRejectTarget(null);
               await runAction(target.item, 'rejected', { reason });
             } else {
-              await Promise.allSettled(
-                target.items.map((item) => runAction(item, 'rejected', { reason }))
-              );
-              setRejectTarget(null);
+              await runBatch(target.items, 'rejected', 'Отклонение', { reason });
             }
           }}
         />

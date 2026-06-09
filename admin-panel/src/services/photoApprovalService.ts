@@ -1,7 +1,9 @@
-import { get, ref, update, remove } from 'firebase/database';
+import { get, ref } from 'firebase/database';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { database, firebaseApp, storage } from '../firebase/firebase';
 import { LOCAL_MODE, LOCAL_API } from '../local/LOCAL_MODE';
+
+const functions = LOCAL_MODE ? null : getFunctions(firebaseApp);
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
 
@@ -113,6 +115,12 @@ const getPhotoRtdbPath = (id: string, uid?: string, collection?: PhotoRecord['co
   return `community_photos/${id}`;
 };
 
+const getPhotoSectionKey = (uid?: string, collection?: PhotoRecord['collection']): string => {
+  if (collection === 'request_photos') return 'requestPhotos';
+  if (uid) return 'userPhotos';
+  return 'communityPhotos';
+};
+
 export const loadPhotos = async (): Promise<PhotoRecord[]> => {
   if (LOCAL_MODE) {
     const data = await fetch(`${LOCAL_API}/photos`).then(r => r.json()) as Array<Record<string, unknown>>;
@@ -185,10 +193,13 @@ export const approvePhoto = async (id: string, uid?: string, collection?: PhotoR
     });
     return;
   }
-  return update(ref(database, getPhotoRtdbPath(id, uid, collection)), {
-    status: 'approved',
-    moderationStatus: 'approved',
-    moderatedAt: Date.now(),
+  if (!functions) throw new Error('Firebase Functions не инициализированы.');
+  const callable = httpsCallable<object, { ok: boolean }>(functions, 'adminModerateContentItem');
+  await callable({
+    section: getPhotoSectionKey(uid, collection),
+    path: getPhotoRtdbPath(id, uid, collection),
+    currentStatus: 'pending',
+    action: 'approved',
   });
 };
 
@@ -201,11 +212,14 @@ export const rejectPhoto = async (id: string, reason: string, uid?: string, coll
     });
     return;
   }
-  return update(ref(database, getPhotoRtdbPath(id, uid, collection)), {
-    status: 'rejected',
-    moderationStatus: 'rejected',
-    moderatedAt: Date.now(),
-    moderationReason: reason.trim() || 'rejected',
+  if (!functions) throw new Error('Firebase Functions не инициализированы.');
+  const callable = httpsCallable<object, { ok: boolean }>(functions, 'adminModerateContentItem');
+  await callable({
+    section: getPhotoSectionKey(uid, collection),
+    path: getPhotoRtdbPath(id, uid, collection),
+    currentStatus: 'pending',
+    action: 'rejected',
+    reason: reason.trim() || undefined,
   });
 };
 
@@ -214,7 +228,12 @@ export const deletePhoto = async (id: string, uid?: string, collection?: PhotoRe
     await fetch(`${LOCAL_API}/photos/${id}`, { method: 'DELETE' });
     return;
   }
-  return remove(ref(database, getPhotoRtdbPath(id, uid, collection)));
+  if (!functions) throw new Error('Firebase Functions не инициализированы.');
+  const callable = httpsCallable<object, { ok: boolean }>(functions, 'adminDeleteContentItem');
+  await callable({
+    section: getPhotoSectionKey(uid, collection),
+    path: getPhotoRtdbPath(id, uid, collection),
+  });
 };
 
 export const deletePhotos = async (items: Array<{ id: string; uid?: string; collection?: PhotoRecord['collection'] }>): Promise<void> => {

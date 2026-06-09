@@ -13,6 +13,8 @@ const isStoragePath = (value: string): boolean => {
   return /^(community_photos|dating|dating_profiles|dating_anketa|coffee_requests|buy_sell|buy_sell_listings|contacts|contacts_listings|biznes_chaika_listings|lost_found|local_business|requests|job_listings|osbb_news|osbb_votes|osbb_house_topics|osbb_collections|uploads)\//.test(value);
 };
 
+const mediaUrlCache = new Map<string, string>();
+
 export const resolveMediaUrl = async (value: string): Promise<string> => {
   const trimmed = value.trim();
   if (!trimmed) return '';
@@ -25,8 +27,13 @@ export const resolveMediaUrl = async (value: string): Promise<string> => {
   if (isHttpUrl(trimmed)) return trimmed;
   if (!isStoragePath(trimmed)) return '';
 
+  const cached = mediaUrlCache.get(trimmed);
+  if (cached) return cached;
+
   try {
-    return await resolveStorageUrl(createStorageRef(storage, trimmed));
+    const url = await resolveStorageUrl(createStorageRef(storage, trimmed));
+    mediaUrlCache.set(trimmed, url);
+    return url;
   } catch (err) {
     console.warn('[mediaService] getDownloadURL failed for path:', trimmed, err);
     return '';

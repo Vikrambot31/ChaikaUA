@@ -314,7 +314,7 @@ export const loadModerationItems = async (): Promise<ModerationItem[]> => {
   );
 
   // Resolve media URLs in batches to avoid Storage rate limiting
-  const MEDIA_BATCH_SIZE = 10;
+  const MEDIA_BATCH_SIZE = 25;
   const resolvedItems: ModerationItem[] = [];
   for (let i = 0; i < items.length; i += MEDIA_BATCH_SIZE) {
     const batch = items.slice(i, i + MEDIA_BATCH_SIZE);
