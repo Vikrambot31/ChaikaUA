@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-06-09",
+      "publishedAt": "2026-06-09T10:50:19.821Z",
+      "key": "places-Кав'ярня ХЛІБ та КАВА-Мозаїка Espresso bar-2026-06-09"
+    },
+    {
       "type": "news",
       "date": "2026-06-09",
       "publishedAt": "2026-06-09T07:41:34.063Z",
