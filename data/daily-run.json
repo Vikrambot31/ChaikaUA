@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-06-09",
+      "publishedAt": "2026-06-09T07:41:34.063Z",
+      "key": "https://bigkyiv.com.ua/na-sumshhyni-cherez-vorozhi-ataky-dvoye-lyudej-zagynuly-shhe-13-postrazhdaly/"
+    },
+    {
       "type": "places",
       "date": "2026-06-08",
       "publishedAt": "2026-06-08T12:20:09.175Z",
