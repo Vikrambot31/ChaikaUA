@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Image,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -8,6 +9,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+
+const OFFER_PLACEHOLDER = require('../../assets/_zaglushka-lenta.webp');
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
@@ -18,7 +21,7 @@ import { beautyInfoSeed, getActiveBeautyOffers } from '../services/beautySeed';
 import { BeautyCategory, BeautyFeature, BeautyOffer, Place } from '../types/app';
 import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
-import { subscribeActiveBonusPromotions, type BonusPromotion } from '../services/bonusService';
+import { subscribeActiveBonusPromotions, subscribeBiznesPlusPlaces, type BonusPromotion } from '../services/bonusService';
 import UserCardActionBar from '../components/UserCardActionBar';
 import { toggleFavorite, getFavorites, type FavoriteSource } from '../services/favoritesService';
 import { useSoftToast } from '../hooks/useSoftToast';
@@ -300,6 +303,7 @@ export default function SalonyKrasotyScreen() {
   const [claimPlaceIds, setClaimPlaceIds] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
   const [activePromotions, setActivePromotions] = useState<BonusPromotion[]>([]);
+  const [biznesPlusIds, setBiznesPlusIds] = useState<string[]>([]);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const scrollRef = useRef<ScrollView>(null);
   const resultsAnchorY = useRef(0);
@@ -307,6 +311,10 @@ export default function SalonyKrasotyScreen() {
 
   useEffect(() => {
     return subscribeActiveBonusPromotions('beauty', setActivePromotions);
+  }, []);
+
+  useEffect(() => {
+    return subscribeBiznesPlusPlaces('beauty', setBiznesPlusIds);
   }, []);
 
   useEffect(() => {
@@ -377,6 +385,13 @@ export default function SalonyKrasotyScreen() {
         return `${place.name} ${place.address}`.toLowerCase().includes(normalizedQuery);
       })
       .sort((a, b) => {
+        const aPlus = biznesPlusIds.indexOf(a.place.id);
+        const bPlus = biznesPlusIds.indexOf(b.place.id);
+        if (aPlus !== -1 || bPlus !== -1) {
+          if (aPlus === -1) return 1;
+          if (bPlus === -1) return -1;
+          return aPlus - bPlus;
+        }
         const aPromoted = promotedSalonIds.get(a.place.id);
         const bPromoted = promotedSalonIds.get(b.place.id);
         if (aPromoted !== undefined || bPromoted !== undefined) {
@@ -386,7 +401,7 @@ export default function SalonyKrasotyScreen() {
         }
         return 0;
       });
-  }, [activeCategory, activePromotions, beautyPlaces, query]);
+  }, [activeCategory, activePromotions, biznesPlusIds, beautyPlaces, query]);
 
   const activeOffers = useMemo(() => {
     const promotedOfferIds = new Map(
@@ -438,13 +453,20 @@ export default function SalonyKrasotyScreen() {
         activeOpacity={0.88}
         onPress={() => openOffer(offer)}
       >
-        <View style={styles.offerBadge}>
-          <Text style={styles.offerBadgeText}>{text.offerTypes[offer.type]}</Text>
+        <Image
+          source={OFFER_PLACEHOLDER}
+          style={[styles.offerImage, wide && styles.offerImageWide]}
+          resizeMode="cover"
+        />
+        <View style={styles.offerCardBody}>
+          <View style={styles.offerBadge}>
+            <Text style={styles.offerBadgeText}>{text.offerTypes[offer.type]}</Text>
+          </View>
+          {offerPlace ? <Text style={styles.offerPlaceName} numberOfLines={1}>{offerPlace.name}</Text> : null}
+          <Text style={styles.offerTitle} numberOfLines={2}>{offer.title}</Text>
+          <Text style={styles.offerShortText} numberOfLines={wide ? 3 : 2}>{offer.shortText}</Text>
+          {offerMeta ? <Text style={styles.offerMeta} numberOfLines={1}>{offerMeta}</Text> : null}
         </View>
-        <Text style={styles.offerTitle} numberOfLines={2}>{offer.title}</Text>
-        <Text style={styles.offerShortText} numberOfLines={wide ? 3 : 2}>{offer.shortText}</Text>
-        {offerMeta ? <Text style={styles.offerMeta} numberOfLines={1}>{offerMeta}</Text> : null}
-        {offerPlace ? <Text style={styles.offerPlaceName} numberOfLines={1}>{offerPlace.name}</Text> : null}
       </TouchableOpacity>
     );
   };
@@ -944,12 +966,22 @@ const styles = StyleSheet.create({
     width: 220,
     backgroundColor: '#FFF7E3',
     borderRadius: 18,
-    padding: 14,
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(216, 175, 89, 0.35)',
   },
   offerCardWide: {
     width: '100%',
+  },
+  offerImage: {
+    width: '100%',
+    height: 110,
+  },
+  offerImageWide: {
+    height: 160,
+  },
+  offerCardBody: {
+    padding: 12,
   },
   offerBadge: {
     alignSelf: 'flex-start',
@@ -984,7 +1016,7 @@ const styles = StyleSheet.create({
     color: SCREEN_THEME.terracottaDark,
   },
   offerPlaceName: {
-    marginTop: 6,
+    marginBottom: 3,
     fontSize: 11,
     fontWeight: '800',
     color: SCREEN_THEME.enamelBlueDark,

@@ -3,7 +3,7 @@ import { Alert, SafeAreaView, ScrollView, Share, StyleSheet, Text, TouchableOpac
 import * as Clipboard from 'expo-clipboard';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import type { NavigationProp, RouteProp } from '@react-navigation/native';
-import { ref, get, set, getDatabase } from 'firebase/database';
+import { ref, get, set, remove, getDatabase } from 'firebase/database';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { database } from '../firebase-core';
@@ -30,7 +30,7 @@ import { SCREEN_THEME } from '../utils/screenTheme';
 type Lang = 'ua' | 'ru' | 'en';
 
 type ItemDetailParams = {
-  ItemDetailScreen: { item: DetailItemData };
+  ItemDetailScreen: { item: DetailItemData; feedScreen?: string };
 };
 
 const UI_TEXT = {
@@ -121,10 +121,12 @@ export default function ItemDetailScreen({
   const isBusinessPlus = useSelector(selectIsBusinessPlus);
   const { modalVisible, pending, currentTarget, openModal, closeModal, sendRequest } = useContactRequest();
   const item = route.params.item;
+  const feedScreen = route.params.feedScreen;
   const text = UI_TEXT[language];
   const [contactApproved, setContactApproved] = useState(false);
   const [showBusinessSection, setShowBusinessSection] = useState(false);
   const [claimStatus, setClaimStatus] = useState<'none' | 'pending' | 'approved' | 'rejected'>('none');
+  const [isBiznesPlusActive, setIsBiznesPlusActive] = useState(false);
   const [businessCard, setBusinessCard] = useState<{
     ownerId?: string;
     moderationStatus?: string;
@@ -264,6 +266,37 @@ export default function ItemDetailScreen({
     })();
     return () => { cancelled = true; };
   }, [isAuthenticated, isPlaceType, item.sourceId]);
+
+  useEffect(() => {
+    if (!isAdmin || !item.sourceId) return;
+    let cancelled = false;
+    void (async () => {
+      const snap = await get(ref(database, `business_plus_active/${item.sourceId}`));
+      if (!cancelled) setIsBiznesPlusActive(snap.exists());
+    })();
+    return () => { cancelled = true; };
+  }, [isAdmin, item.sourceId]);
+
+  const handleAdminToggleBiznesPlus = () => {
+    const screen = isPlaceType ? (feedScreen ?? 'food') : 'business';
+    void (async () => {
+      try {
+        if (isBiznesPlusActive) {
+          await remove(ref(database, `business_plus_active/${item.sourceId}`));
+          setIsBiznesPlusActive(false);
+        } else {
+          await set(ref(database, `business_plus_active/${item.sourceId}`), {
+            screen,
+            activatedAt: Date.now(),
+            expiresAt: 0,
+          });
+          setIsBiznesPlusActive(true);
+        }
+      } catch {
+        Alert.alert('Помилка', 'Не вдалося змінити Бізнес+ статус.');
+      }
+    })();
+  };
 
   const handleAdminApprove = () => {
     void (async () => {
@@ -613,6 +646,14 @@ export default function ItemDetailScreen({
                 </TouchableOpacity>
               ) : null}
             </View>
+            <TouchableOpacity
+              style={[styles.adminBiznesPlusBtn, isBiznesPlusActive && styles.adminBiznesPlusBtnActive]}
+              onPress={handleAdminToggleBiznesPlus}
+              activeOpacity={0.85}
+            >
+              <MaterialCommunityIcons name="briefcase-check-outline" size={15} color="#fff" />
+              <Text style={styles.adminBtnText}>{isBiznesPlusActive ? 'Бізнес+ ВКЛ ✓' : 'Бізнес+ ВИКЛ'}</Text>
+            </TouchableOpacity>
           </View>
         ) : null}
 
@@ -1016,6 +1057,19 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '900',
     fontSize: 13,
+  },
+  adminBiznesPlusBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#607D8B',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginTop: 4,
+  },
+  adminBiznesPlusBtnActive: {
+    backgroundColor: '#1565C0',
   },
   // Owner edit controls
   ownerControls: {

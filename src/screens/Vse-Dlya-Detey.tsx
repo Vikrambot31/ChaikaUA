@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Platform,
+  Image,
   SafeAreaView,
   ScrollView,
   Share,
@@ -10,6 +10,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+
+const OFFER_PLACEHOLDER = require('../../assets/_zaglushka-lenta.webp');
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
@@ -20,8 +22,7 @@ import { CHILDREN_SCREEN_BLACKLIST, childInfoSeed, getActiveOffers } from '../se
 import { ChildCategory, ChildFeature, ChildOffer, Place, PlaceType } from '../types/app';
 import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
-import { subscribeActiveBonusPromotions, type BonusPromotion } from '../services/bonusService';
-import { getMapFocusPlaceParams } from '../utils/mapFocusParams';
+import { subscribeActiveBonusPromotions, subscribeBiznesPlusPlaces, type BonusPromotion } from '../services/bonusService';
 import { safeCallPhone, safeOpenExternalUrl } from '../utils/communicationActions';
 import { selectUserId } from '../redux/selectors';
 import FeedLikeButton from '../components/FeedLikeButton';
@@ -373,16 +374,6 @@ const matchesAgeRange = (place: Place, range: { from: number; to: number }): boo
   return placeAgeTo >= range.from && ageFrom <= range.to;
 };
 
-const buildMapUrl = (place: Place): string => {
-  if (place.latitude && place.longitude) {
-    if (Platform.OS === 'ios') {
-      return `https://maps.apple.com/?ll=${place.latitude},${place.longitude}&q=${encodeURIComponent(place.name)}`;
-    }
-    return `https://www.google.com/maps/search/?api=1&query=${place.latitude},${place.longitude}`;
-  }
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.address)}`;
-};
-
 export default function VseDlyaDeteyScreen() {
   const navigation = useNavigation<AppNavigation>();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as Lang;
@@ -394,6 +385,7 @@ export default function VseDlyaDeteyScreen() {
   const [claimPlaceIds, setClaimPlaceIds] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
   const [activePromotions, setActivePromotions] = useState<BonusPromotion[]>([]);
+  const [biznesPlusIds, setBiznesPlusIds] = useState<string[]>([]);
   const [filterShelter, setFilterShelter] = useState(false);
   const [filterEnglish, setFilterEnglish] = useState(false);
   const [filterAge, setFilterAge] = useState<AgeRangeKey | null>(null);
@@ -404,6 +396,10 @@ export default function VseDlyaDeteyScreen() {
 
   useEffect(() => {
     return subscribeActiveBonusPromotions('kids', setActivePromotions);
+  }, []);
+
+  useEffect(() => {
+    return subscribeBiznesPlusPlaces('kids', setBiznesPlusIds);
   }, []);
 
   useEffect(() => {
@@ -469,6 +465,13 @@ export default function VseDlyaDeteyScreen() {
         return true;
       })
       .sort((a, b) => {
+        const aPlus = biznesPlusIds.indexOf(a.place.id);
+        const bPlus = biznesPlusIds.indexOf(b.place.id);
+        if (aPlus !== -1 || bPlus !== -1) {
+          if (aPlus === -1) return 1;
+          if (bPlus === -1) return -1;
+          return aPlus - bPlus;
+        }
         const aPromoted = promotedPlaceIds.get(a.place.id);
         const bPromoted = promotedPlaceIds.get(b.place.id);
         if (aPromoted !== undefined || bPromoted !== undefined) {
@@ -478,7 +481,7 @@ export default function VseDlyaDeteyScreen() {
         }
         return 0;
       });
-  }, [activeCategory, activePromotions, childPlaces, query, filterShelter, filterEnglish, filterAge]);
+  }, [activeCategory, activePromotions, biznesPlusIds, childPlaces, query, filterShelter, filterEnglish, filterAge]);
 
   const activeOffers = useMemo(() => {
     const promotedEventIds = new Map(
@@ -540,17 +543,6 @@ export default function VseDlyaDeteyScreen() {
     }
   };
 
-  const handleOpenMap = (place: Place) => {
-    void safeOpenExternalUrl(buildMapUrl(place), language);
-  };
-
-  const handleRoutePlace = (place: Place) => {
-    navigation.navigate('MainTabs', {
-      screen: 'MapTab',
-      params: getMapFocusPlaceParams(place),
-    });
-  };
-
   const handleToggleFavorite = async (placeId: string) => {
     const added = await toggleFavorite(placeId, FAVORITE_SOURCE);
     setFavoriteIds((prev) => {
@@ -572,22 +564,29 @@ export default function VseDlyaDeteyScreen() {
         activeOpacity={0.88}
         onPress={() => openOffer(offer)}
       >
-        <View style={styles.offerTopRow}>
-          <View style={styles.offerBadge}>
-            <Text style={styles.offerBadgeText}>{text.offerTypes[offer.type]}</Text>
+        <Image
+          source={OFFER_PLACEHOLDER}
+          style={[styles.offerImage, wide && styles.offerImageWide]}
+          resizeMode="cover"
+        />
+        <View style={styles.offerCardBody}>
+          <View style={styles.offerTopRow}>
+            <View style={styles.offerBadge}>
+              <Text style={styles.offerBadgeText}>{text.offerTypes[offer.type]}</Text>
+            </View>
+            <TouchableOpacity
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              onPress={(e) => { e.stopPropagation(); void handleShareOffer(offer); }}
+              activeOpacity={0.7}
+            >
+              <MaterialCommunityIcons name="share-variant-outline" size={18} color={SCREEN_THEME.textSecondary} />
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            onPress={(e) => { e.stopPropagation(); void handleShareOffer(offer); }}
-            activeOpacity={0.7}
-          >
-            <MaterialCommunityIcons name="share-variant-outline" size={18} color={SCREEN_THEME.textSecondary} />
-          </TouchableOpacity>
+          {offerPlace ? <Text style={styles.offerPlaceName} numberOfLines={1}>{offerPlace.name}</Text> : null}
+          <Text style={styles.offerTitle} numberOfLines={2}>{offer.title}</Text>
+          <Text style={styles.offerShortText} numberOfLines={wide ? 3 : 2}>{offer.shortText}</Text>
+          {offerMeta ? <Text style={styles.offerMeta} numberOfLines={1}>{offerMeta}</Text> : null}
         </View>
-        <Text style={styles.offerTitle} numberOfLines={2}>{offer.title}</Text>
-        <Text style={styles.offerShortText} numberOfLines={wide ? 3 : 2}>{offer.shortText}</Text>
-        {offerMeta ? <Text style={styles.offerMeta} numberOfLines={1}>{offerMeta}</Text> : null}
-        {offerPlace ? <Text style={styles.offerPlaceName} numberOfLines={1}>{offerPlace.name}</Text> : null}
       </TouchableOpacity>
     );
   };
@@ -615,18 +614,6 @@ export default function VseDlyaDeteyScreen() {
           </View>
         </View>
 
-        {/* Address — tappable to open map */}
-        <TouchableOpacity
-          style={styles.addressRow}
-          activeOpacity={0.7}
-          onPress={(e) => { e.stopPropagation(); handleOpenMap(place); }}
-          accessibilityLabel={text.openMap}
-        >
-          <MaterialCommunityIcons name="map-marker-outline" size={16} color={SCREEN_THEME.terracotta} />
-          <Text style={[styles.addressText, styles.addressLink]} numberOfLines={1}>{place.address}</Text>
-          <MaterialCommunityIcons name="open-in-new" size={12} color={SCREEN_THEME.textMuted} />
-        </TouchableOpacity>
-
         {featureBadges.length > 0 ? (
           <View style={styles.badgeRow}>
             {featureBadges.map((badge) => (
@@ -641,16 +628,6 @@ export default function VseDlyaDeteyScreen() {
         <View style={styles.cardActions}>
           <TouchableOpacity style={styles.primaryAction} onPress={() => openPlace(place)} activeOpacity={0.85}>
             <Text style={styles.primaryActionText}>{text.details}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.routeAction}
-            onPress={(e) => { e.stopPropagation(); handleRoutePlace(place); }}
-            activeOpacity={0.85}
-            accessibilityLabel={text.route}
-          >
-            <MaterialCommunityIcons name="map-marker-path" size={16} color={SCREEN_THEME.enamelBlueDark} />
-            <Text style={styles.routeActionText}>{text.route}</Text>
           </TouchableOpacity>
 
           {hasPhone ? (
@@ -1244,12 +1221,22 @@ const styles = StyleSheet.create({
     width: 220,
     backgroundColor: '#FFF7E3',
     borderRadius: 18,
-    padding: 14,
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(216, 175, 89, 0.35)',
   },
   offerCardWide: {
     width: '100%',
+  },
+  offerImage: {
+    width: '100%',
+    height: 110,
+  },
+  offerImageWide: {
+    height: 160,
+  },
+  offerCardBody: {
+    padding: 12,
   },
   offerTopRow: {
     flexDirection: 'row',
@@ -1289,7 +1276,7 @@ const styles = StyleSheet.create({
     color: SCREEN_THEME.terracottaDark,
   },
   offerPlaceName: {
-    marginTop: 6,
+    marginBottom: 3,
     fontSize: 11,
     fontWeight: '800',
     color: SCREEN_THEME.enamelBlueDark,

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Modal,
   SafeAreaView,
@@ -15,10 +16,13 @@ import {
   Linking,
   Platform,
 } from 'react-native';
+
+const OFFER_PLACEHOLDER = require('../../assets/_zaglushka-lenta.webp');
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { ref, get } from 'firebase/database';
+import { subscribeBiznesPlusPlaces } from '../services/bonusService';
 import { database } from '../firebase-core';
 import { chaykaPlaces } from '../services/chaykaPlacesData';
 import { getFoodPlaces, getActiveFoodOffers, foodInfoSeed } from '../services/foodSeed';
@@ -311,12 +315,17 @@ export default function EdaNaChaykeScreen() {
   const [topPhotos, setTopPhotos] = useState<UploadedPhoto[]>([]);
   const [topSubmitting, setTopSubmitting] = useState(false);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+  const [biznesPlusIds, setBiznesPlusIds] = useState<string[]>([]);
   const scrollRef = useRef<ScrollView>(null);
   const offersSectionY = useRef(0);
   const { showSuccess } = useSoftToast();
 
   useEffect(() => {
     logFoodEvent('food_open_screen');
+  }, []);
+
+  useEffect(() => {
+    return subscribeBiznesPlusPlaces('food', setBiznesPlusIds);
   }, []);
 
   useEffect(() => {
@@ -350,15 +359,26 @@ export default function EdaNaChaykeScreen() {
   // Eat mode: filtered by category + search
   const eatPlaces = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    return allFoodPlaces.filter((place) => {
-      // exclude grocery from eat mode
-      const cat = getPlaceFoodCategory(place);
-      if (cat === 'grocery') return false;
-      if (!matchesEatFilter(place, eatFilter)) return false;
-      if (!normalizedQuery) return true;
-      return `${place.name} ${place.address}`.toLowerCase().includes(normalizedQuery);
-    });
-  }, [allFoodPlaces, eatFilter, query]);
+    return allFoodPlaces
+      .filter((place) => {
+        // exclude grocery from eat mode
+        const cat = getPlaceFoodCategory(place);
+        if (cat === 'grocery') return false;
+        if (!matchesEatFilter(place, eatFilter)) return false;
+        if (!normalizedQuery) return true;
+        return `${place.name} ${place.address}`.toLowerCase().includes(normalizedQuery);
+      })
+      .sort((a, b) => {
+        const aPlus = biznesPlusIds.indexOf(a.id);
+        const bPlus = biznesPlusIds.indexOf(b.id);
+        if (aPlus !== -1 || bPlus !== -1) {
+          if (aPlus === -1) return 1;
+          if (bPlus === -1) return -1;
+          return aPlus - bPlus;
+        }
+        return 0;
+      });
+  }, [allFoodPlaces, biznesPlusIds, eatFilter, query]);
 
   // Home mode: recommended (non-grocery, max 4)
   const recommendedPlaces = useMemo(() => {
@@ -549,6 +569,7 @@ export default function EdaNaChaykeScreen() {
         sourceType: 'place',
         sourceId: place.id,
       },
+      feedScreen: 'food',
     });
   }, [navigation, text.closed, text.hoursUnknown, text.open, text.openUntil]);
 
@@ -833,9 +854,11 @@ export default function EdaNaChaykeScreen() {
         }}
       >
         <View style={styles.offerRow}>
-          <View style={styles.offerVisual}>
-            <MaterialCommunityIcons name="tag-heart" size={28} color="#FFFFFF" />
-          </View>
+          <Image
+            source={OFFER_PLACEHOLDER}
+            style={styles.offerVisual}
+            resizeMode="cover"
+          />
           <View style={styles.offerTextBlock}>
             <View style={styles.offerBadge}>
               <Text style={styles.offerBadgeText}>{text.offerBadge}</Text>
@@ -1599,10 +1622,9 @@ const styles = StyleSheet.create({
   },
   offerVisual: {
     width: 62,
+    height: 62,
     borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#C0392B',
+    overflow: 'hidden',
     marginRight: 12,
   },
   offerTextBlock: {

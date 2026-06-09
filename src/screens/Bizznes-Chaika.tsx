@@ -34,7 +34,7 @@ import { resolveMediaAccessUrls } from '../services/mediaAccess';
 import { VideoLoadingOverlay } from '../components/VideoLoadingOverlay';
 import { ensureFirebaseAuth, requireWriteSession } from '../firebase-auth-session';
 import { getBuildingsByStreet, getStreets } from '../data/buildings';
-import { subscribeActiveBonusPromotions, type BonusPromotion } from '../services/bonusService';
+import { subscribeActiveBonusPromotions, subscribeBiznesPlusPlaces, type BonusPromotion } from '../services/bonusService';
 import ScreenTooltip from '../components/ScreenTooltip';
 import { BUSINESS_CHAIKA_TOOLTIP } from '../utils/screenTooltips';
 
@@ -911,6 +911,7 @@ const BiznesChaikaScreen: React.FC = () => {
   const [searchDescription, setSearchDescription] = useState('');
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [activePromotions, setActivePromotions] = useState<BonusPromotion[]>([]);
+  const [biznesPlusIds, setBiznesPlusIds] = useState<string[]>([]);
   const [editingItem, setEditingItem] = useState<BizListing | null>(null);
   const [editFormVisible, setEditFormVisible] = useState(false);
   const [editItemName, setEditItemName] = useState('');
@@ -1044,6 +1045,10 @@ const BiznesChaikaScreen: React.FC = () => {
 
   useEffect(() => {
     return subscribeActiveBonusPromotions('business', setActivePromotions);
+  }, []);
+
+  useEffect(() => {
+    return subscribeBiznesPlusPlaces('business', setBiznesPlusIds);
   }, []);
 
   useEffect(() => {
@@ -1223,8 +1228,15 @@ const BiznesChaikaScreen: React.FC = () => {
         .map((promotion, index) => [promotion.targetId, index]),
     );
     return [...listings]
-      .filter((item) => !item.isArchived && (item.photoUri || item.photoStoragePath || promotedByListingId.has(item.id)))
+      .filter((item) => !item.isArchived && (item.photoUri || item.photoStoragePath || promotedByListingId.has(item.id) || biznesPlusIds.includes(item.id)))
       .sort((a, b) => {
+        const aPlus = biznesPlusIds.indexOf(a.id);
+        const bPlus = biznesPlusIds.indexOf(b.id);
+        if (aPlus !== -1 || bPlus !== -1) {
+          if (aPlus === -1) return 1;
+          if (bPlus === -1) return -1;
+          return aPlus - bPlus;
+        }
         const aPromoted = promotedByListingId.get(a.id);
         const bPromoted = promotedByListingId.get(b.id);
         if (aPromoted !== undefined || bPromoted !== undefined) {
@@ -1235,7 +1247,7 @@ const BiznesChaikaScreen: React.FC = () => {
         return (b.createdAt || '').localeCompare(a.createdAt || '');
       })
       .slice(0, 10);
-  }, [activePromotions, listings]);
+  }, [activePromotions, biznesPlusIds, listings]);
 
   const hasAdvancedSearch = useMemo(
     () =>

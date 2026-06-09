@@ -340,6 +340,31 @@ export const subscribeActiveBonusPromotions = (
   });
 };
 
+// Subscribes to Business+ active entities for a given feed screen.
+// Returns entity IDs sorted by activatedAt DESC (newest payer = position 1).
+export const subscribeBiznesPlusPlaces = (
+  screen: string,
+  onChanged: (entityIds: string[]) => void,
+): (() => void) => {
+  const q = query(
+    ref(database, 'business_plus_active'),
+    orderByChild('screen'),
+    equalTo(screen),
+  );
+  return onValue(q, (snapshot) => {
+    const now = Date.now();
+    const items: { id: string; activatedAt: number }[] = [];
+    snapshot.forEach((child) => {
+      const val = child.val() as { screen: string; activatedAt: number; expiresAt: number };
+      if (!val.expiresAt || val.expiresAt > now) {
+        items.push({ id: child.key!, activatedAt: val.activatedAt || 0 });
+      }
+    });
+    items.sort((a, b) => b.activatedAt - a.activatedAt);
+    onChanged(items.map((i) => i.id));
+  });
+};
+
 export const subscribeAdminBonusPromotions = (
   onChanged: (promotions: BonusPromotion[]) => void,
   maxItems = 100,

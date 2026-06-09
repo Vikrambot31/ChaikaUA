@@ -11,7 +11,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationProp, RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
-import { ref, get, set, getDatabase } from 'firebase/database';
+import { ref, get, set, remove, getDatabase } from 'firebase/database';
 import { ChildCategory, ChildFeature, ChildOffer, Place, PlaceType } from '../types/app';
 import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
@@ -312,6 +312,7 @@ export default function DetalDetskogoMestaScreen() {
   const [showBusinessSection, setShowBusinessSection] = useState(false);
   const [claimStatus, setClaimStatus] = useState<'none' | 'pending' | 'approved' | 'rejected'>('none');
   const [businessCard, setBusinessCard] = useState<{ ownerId?: string } | null>(null);
+  const [isBiznesPlusActive, setIsBiznesPlusActive] = useState(false);
 
   const isAuthenticated = Boolean(currentUser?.id);
   const isAdmin = currentUser?.email === 'vikramsave@ukr.net';
@@ -440,6 +441,37 @@ export default function DetalDetskogoMestaScreen() {
       screen: 'MapTab',
       params: getMapFocusPlaceParams(place),
     });
+  };
+
+  // Load Business+ active status for admin
+  useEffect(() => {
+    if (!isAdmin) return;
+    let cancelled = false;
+    void (async () => {
+      const snap = await get(ref(database, `business_plus_active/${place.id}`));
+      if (!cancelled) setIsBiznesPlusActive(snap.exists());
+    })();
+    return () => { cancelled = true; };
+  }, [isAdmin, place.id]);
+
+  const handleAdminToggleBiznesPlus = () => {
+    void (async () => {
+      try {
+        if (isBiznesPlusActive) {
+          await remove(ref(database, `business_plus_active/${place.id}`));
+          setIsBiznesPlusActive(false);
+        } else {
+          await set(ref(database, `business_plus_active/${place.id}`), {
+            screen: 'kids',
+            activatedAt: Date.now(),
+            expiresAt: 0,
+          });
+          setIsBiznesPlusActive(true);
+        }
+      } catch {
+        Alert.alert('Помилка', 'Не вдалося змінити Бізнес+ статус.');
+      }
+    })();
   };
 
   const handleAdminApprove = () => {
@@ -672,6 +704,14 @@ export default function DetalDetskogoMestaScreen() {
                 </TouchableOpacity>
               ) : null}
             </View>
+            <TouchableOpacity
+              style={[styles.adminBiznesPlusBtn, isBiznesPlusActive && styles.adminBiznesPlusBtnActive]}
+              onPress={handleAdminToggleBiznesPlus}
+              activeOpacity={0.85}
+            >
+              <MaterialCommunityIcons name="briefcase-check-outline" size={15} color="#fff" />
+              <Text style={styles.adminBtnText}>{isBiznesPlusActive ? 'Бізнес+ ВКЛ ✓' : 'Бізнес+ ВИКЛ'}</Text>
+            </TouchableOpacity>
           </View>
         ) : null}
 
@@ -1113,6 +1153,19 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '900',
     fontSize: 13,
+  },
+  adminBiznesPlusBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#607D8B',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginTop: 4,
+  },
+  adminBiznesPlusBtnActive: {
+    backgroundColor: '#1565C0',
   },
   bookingEmptyBlock: {
     alignItems: 'center',

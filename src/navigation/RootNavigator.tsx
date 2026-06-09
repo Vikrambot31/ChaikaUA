@@ -126,7 +126,7 @@ export type RootStackParamList = {
   OnlineChatTab: undefined;
   OnlineChatList: undefined;
   RequestDetail: { request: Request };
-  ItemDetailScreen: { item: DetailItemData };
+  ItemDetailScreen: { item: DetailItemData; feedScreen?: string };
   RequestsTab: undefined;
   ListScreen: undefined;
   PlaceDetailsPanel: { place: Place };
