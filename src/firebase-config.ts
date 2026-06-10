@@ -1947,8 +1947,11 @@ export const featureRatingAPI = {
   /** Check if user can rate this screen (once per calendar month per screen). */
   canRate: async (screenId: string): Promise<ApiResult<boolean>> => {
     try {
-      const uid = await ensureFirebaseAuth();
-      const snapshot = await get(ref(database, `feature_ratings/${screenId}/${uid}`));
+      const user: FirebaseUser = await ensureFirebaseAuth();
+      // Anonymous Firebase users cannot rate
+      if (!user?.uid || user.isAnonymous) return { success: true, data: false };
+
+      const snapshot = await get(ref(database, `feature_ratings/${screenId}/${user.uid}`));
       if (!snapshot.exists()) return { success: true, data: true };
 
       const data = snapshot.val() as { createdAt?: number } | null;
@@ -1975,7 +1978,12 @@ export const featureRatingAPI = {
       }
 
       const rating = Math.round((ratingUsability + ratingUsefulness) / 2 * 10) / 10;
-      const uid = await ensureFirebaseAuth();
+      // requireWriteSession rejects anonymous Firebase users by default
+      const sessionUser: FirebaseUser = await requireWriteSession({
+        operation: 'feature_rating_submit',
+        screen: screenId,
+      });
+      const uid = sessionUser.uid;
 
       // 1. Read existing entry (to decide add vs replace)
       const existingSnap = await get(ref(database, `feature_ratings/${screenId}/${uid}`));
