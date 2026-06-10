@@ -61,7 +61,8 @@ const UI_TEXT = {
     infoUnknown: 'уточнюйте',
     descriptionEmpty: 'Детальна інформація поки не заповнена. Можна скористатися маршрутом або контактами, якщо вони доступні.',
     bookingTitle: 'Записати дитину',
-    bookingEmptyText: 'Власник закладу ще не підключив онлайн-запис.\n\nЯкщо ви власник — оформіть підписку Бізнес+, щоб батьки бачили контакти, розклад та актуальні пропозиції прямо тут.',
+    bookingVisitorText: 'Власник закладу ще не налаштував онлайн-запис. Зв\'яжіться із власником для запису.',
+    bookingOwnerText: 'Підключіть Бізнес+, щоб батьки бачили контакти, розклад та актуальні пропозиції прямо тут.',
     bookingCta: 'Підключити Бізнес+',
     categoryLabel: {
       kindergarten: 'Садочок',
@@ -135,7 +136,8 @@ const UI_TEXT = {
     infoUnknown: 'уточняйте',
     descriptionEmpty: 'Подробная информация пока не заполнена. Можно воспользоваться маршрутом или контактами, если они доступны.',
     bookingTitle: 'Записать ребёнка',
-    bookingEmptyText: 'Владелец заведения ещё не подключил онлайн-запись.\n\nЕсли вы владелец — оформите подписку Бизнес+, чтобы родители видели контакты, расписание и актуальные предложения прямо здесь.',
+    bookingVisitorText: 'Владелец заведения ещё не настроил онлайн-запись. Свяжитесь с владельцем для записи.',
+    bookingOwnerText: 'Подключите Бизнес+, чтобы родители видели контакты, расписание и актуальные предложения прямо здесь.',
     bookingCta: 'Подключить Бизнес+',
     categoryLabel: {
       kindergarten: 'Садик',
@@ -209,7 +211,8 @@ const UI_TEXT = {
     infoUnknown: 'ask',
     descriptionEmpty: 'Detailed information has not been filled in yet. You can use route or contacts if available.',
     bookingTitle: 'Enroll your child',
-    bookingEmptyText: "The place owner hasn't set up online enrollment yet.\n\nAre you the owner? Get a Business+ subscription so parents can see contacts, schedule and current offers right here.",
+    bookingVisitorText: "Online enrollment hasn't been set up yet. Contact the venue owner to sign up.",
+    bookingOwnerText: 'Connect Business+ so parents can see contacts, schedule and current offers right here.',
     bookingCta: 'Get Business+',
     categoryLabel: {
       kindergarten: 'Kindergarten',
@@ -597,23 +600,15 @@ export default function DetalDetskogoMestaScreen() {
           </View>
         </View>
 
-        {/* Booking upsell section — only when Business+ not yet active for this place */}
+        {/* Booking section — visible to all when Business+ not active for this place */}
         {!isBiznesPlusActive && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>{text.bookingTitle}</Text>
             <View style={styles.bookingEmptyBlock}>
               <MaterialCommunityIcons name="calendar-clock-outline" size={38} color={SCREEN_THEME.textMuted} />
-              <Text style={styles.bookingEmptyText}>{text.bookingEmptyText}</Text>
-              {isMyApprovedPlace && (
-                <TouchableOpacity
-                  style={styles.bookingCta}
-                  onPress={() => navigation.navigate('BusinessPlusSubscriptionScreen')}
-                  activeOpacity={0.86}
-                >
-                  <MaterialCommunityIcons name="storefront" size={16} color="#fff" />
-                  <Text style={styles.bookingCtaText}>{text.bookingCta}</Text>
-                </TouchableOpacity>
-              )}
+              <Text style={styles.bookingEmptyText}>
+                {isMyApprovedPlace ? text.bookingOwnerText : text.bookingVisitorText}
+              </Text>
             </View>
           </View>
         )}

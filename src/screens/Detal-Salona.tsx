@@ -59,7 +59,8 @@ const UI_TEXT = {
     infoUnknown: 'уточнюйте',
     descriptionEmpty: 'Детальна інформація поки не заповнена. Можна скористатися маршрутом або контактами.',
     bookingTitle: 'Записатися на послуги',
-    bookingEmptyText: 'Власник салону ще не підключив онлайн-запис.\n\nЯкщо ви власник — оформіть підписку Бізнес+, щоб клієнти бачили ваші контакти, ціни та актуальні акції прямо тут.',
+    bookingVisitorText: 'Власник салону ще не налаштував онлайн-запис. Зв\'яжіться із власником для запису.',
+    bookingOwnerText: 'Підключіть Бізнес+, щоб клієнти бачили ваші контакти, ціни та актуальні акції прямо тут.',
     bookingCta: 'Підключити Бізнес+',
     categoryLabel: {
       hair: 'Перукарня',
@@ -115,7 +116,8 @@ const UI_TEXT = {
     infoUnknown: 'уточняйте',
     descriptionEmpty: 'Подробная информация пока не заполнена. Можно воспользоваться маршрутом или контактами.',
     bookingTitle: 'Записаться на услуги',
-    bookingEmptyText: 'Владелец салона ещё не подключил онлайн-запись.\n\nЕсли вы владелец — оформите подписку Бизнес+, чтобы клиенты видели ваши контакты, цены и актуальные акции прямо здесь.',
+    bookingVisitorText: 'Владелец салона ещё не настроил онлайн-запись. Свяжитесь с владельцем для записи.',
+    bookingOwnerText: 'Подключите Бизнес+, чтобы клиенты видели ваши контакты, цены и актуальные акции прямо здесь.',
     bookingCta: 'Подключить Бизнес+',
     categoryLabel: {
       hair: 'Парикмахерская',
@@ -171,7 +173,8 @@ const UI_TEXT = {
     infoUnknown: 'ask',
     descriptionEmpty: 'Detailed information has not been filled in yet. You can use route or contacts if available.',
     bookingTitle: 'Book a service',
-    bookingEmptyText: "The salon owner hasn't set up online booking yet.\n\nAre you the owner? Get a Business+ subscription so clients can see your contacts, prices and current offers right here.",
+    bookingVisitorText: "Online booking hasn't been set up yet. Contact the salon owner to make an appointment.",
+    bookingOwnerText: 'Connect Business+ so clients can see your contacts, prices and current offers right here.',
     bookingCta: 'Get Business+',
     categoryLabel: {
       hair: 'Hair salon',
@@ -503,23 +506,15 @@ export default function DetalSalonaScreen() {
           </View>
         </View>
 
-        {/* Booking upsell section — only when Business+ not yet active for this place */}
+        {/* Booking section — visible to all when Business+ not active for this place */}
         {!isBiznesPlusActive && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>{text.bookingTitle}</Text>
             <View style={styles.bookingEmptyBlock}>
               <MaterialCommunityIcons name="calendar-clock-outline" size={38} color={SCREEN_THEME.textMuted} />
-              <Text style={styles.bookingEmptyText}>{text.bookingEmptyText}</Text>
-              {isMyApprovedPlace && (
-                <TouchableOpacity
-                  style={styles.bookingCta}
-                  onPress={() => navigation.navigate('BusinessPlusSubscriptionScreen')}
-                  activeOpacity={0.86}
-                >
-                  <MaterialCommunityIcons name="storefront" size={16} color="#fff" />
-                  <Text style={styles.bookingCtaText}>{text.bookingCta}</Text>
-                </TouchableOpacity>
-              )}
+              <Text style={styles.bookingEmptyText}>
+                {isMyApprovedPlace ? text.bookingOwnerText : text.bookingVisitorText}
+              </Text>
             </View>
           </View>
         )}

@@ -262,6 +262,10 @@ export interface BusinessPlusSubscription {
   activatedAt: string | null;
   activatedBy: string | null;
   notes: string | null;
+  // Enriched from users/{uid}
+  userName?: string;
+  userPhone?: string;
+  businessEmail?: string;
 }
 
 export const subscribeToBusinessPlusSubscriptions = (
@@ -269,12 +273,12 @@ export const subscribeToBusinessPlusSubscriptions = (
   onError?: (err: Error) => void,
 ): Unsubscribe =>
   onValue(ref(database, 'user_subscription'), (snap) => {
-    const result: BusinessPlusSubscription[] = [];
+    const base: BusinessPlusSubscription[] = [];
     if (snap.exists()) {
       snap.forEach((child) => {
         const d = child.val();
         if (!d || d.plan !== 'business_plus') return;
-        result.push({
+        base.push({
           uid: child.key!,
           plan: d.plan,
           status: d.status ?? 'free',
@@ -285,7 +289,26 @@ export const subscribeToBusinessPlusSubscriptions = (
         });
       });
     }
-    callback(result);
+    if (base.length === 0) { callback([]); return; }
+
+    // Enrich with user profiles (name, phone, businessEmail)
+    Promise.all(
+      base.map(async (sub) => {
+        try {
+          const profileSnap = await get(ref(database, `users/${sub.uid}`));
+          if (profileSnap.exists()) {
+            const p = profileSnap.val() as Record<string, unknown>;
+            return {
+              ...sub,
+              userName: typeof p.name === 'string' ? p.name : undefined,
+              userPhone: typeof p.phone === 'string' ? p.phone : undefined,
+              businessEmail: typeof p.businessEmail === 'string' ? p.businessEmail : undefined,
+            };
+          }
+        } catch { /* ignore */ }
+        return sub;
+      })
+    ).then(callback).catch(() => callback(base));
   }, onError ? (err) => onError(err) : undefined);
 
 export const activateBusinessPlusManual = async (
@@ -298,6 +321,8 @@ export const activateBusinessPlusManual = async (
     { ok: boolean; expiresAt: string; months: number }
   >(functions, 'activateBusinessPlusManual');
   const result = await fn({ uid, months, notes });
+  // Clear the pending request flag now that subscription is active
+  try { await remove(ref(database, `users/${uid}/businessPlusRequest`)); } catch { /* non-blocking */ }
   return result.data;
 };
 
