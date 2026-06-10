@@ -65,12 +65,15 @@ const tryRequireSecureStore = (): SecureStoreModule | null => {
 };
 
 const getSecureStoreModule = (): SecureStoreModule | null => {
-  if (secureStoreModuleCache !== undefined) {
+  if (secureStoreModuleCache != null) {
     return secureStoreModuleCache;
   }
 
-  secureStoreModuleCache = tryRequireSecureStore();
-  return secureStoreModuleCache;
+  const result = tryRequireSecureStore();
+  if (result != null) {
+    secureStoreModuleCache = result;
+  }
+  return result;
 };
 
 export const isSecureStoreBacked = (): boolean => Boolean(getSecureStoreModule());
@@ -129,7 +132,14 @@ const readSecureValue = async (key: string): Promise<string | null> => {
         }
         return null;
       }
-      throw error;
+      // Timeout or transient SecureStore failure — fall back to AsyncStorage
+      // instead of throwing, so a slow device doesn't lose its device ID.
+      void logClientError('deviceAuth.readSecureValue.fallback', error, {
+        key,
+        safeKey,
+        action: 'fallback_to_secureGet',
+      });
+      return secureGet(key);
     }
   }
 
@@ -493,15 +503,6 @@ export const syncAuthorizedDeviceForUser = async (
         return evaluateDeviceAuthorizationStatus(deviceId, record);
       }
 
-      if (await shouldWriteLastSeen(uid, deviceId)) {
-        await update(deviceRef, {
-          last_seen_at: Date.now(),
-          app_version: getCurrentAppVersion(),
-          device_name: getDeviceName(),
-          security_flags: getSecurityFlags(),
-        });
-      }
-
       const nextStatus = evaluateDeviceAuthorizationStatus(deviceId, {
         ...existingRecord,
         app_version: getCurrentAppVersion(),
@@ -512,6 +513,13 @@ export const syncAuthorizedDeviceForUser = async (
       if (nextStatus.status === 'blocked') {
         void logSecurityAuditEvent('device_blocked', {
           platform: Platform.OS,
+        });
+      } else if (await shouldWriteLastSeen(uid, deviceId)) {
+        await update(deviceRef, {
+          last_seen_at: Date.now(),
+          app_version: getCurrentAppVersion(),
+          device_name: getDeviceName(),
+          security_flags: getSecurityFlags(),
         });
       }
 

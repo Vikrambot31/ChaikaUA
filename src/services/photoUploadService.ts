@@ -564,11 +564,5 @@ async function uploadViaBlobFetch(
 }
 const getStorageInstance = firebaseStorage.getStorage;
 const createStorageRef = firebaseStorage.ref;
-const uploadBlobToStorage = (firebaseStorage as Record<string, unknown>)[['upload', 'Bytes'].join('')] as (
-  refValue: ReturnType<typeof createStorageRef>,
-  data: Blob,
-  metadata: { contentType: string },
-) => Promise<unknown>;
-const resolveStorageUrl = (firebaseStorage as Record<string, unknown>)[['get', 'DownloadURL'].join('')] as (
-  refValue: ReturnType<typeof createStorageRef>,
-) => Promise<string>;
+const uploadBlobToStorage = firebaseStorage.uploadBytes;
+const resolveStorageUrl = firebaseStorage.getDownloadURL;

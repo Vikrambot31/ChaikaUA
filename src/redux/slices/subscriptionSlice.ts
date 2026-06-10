@@ -123,13 +123,10 @@ const subscriptionSlice = createSlice({
         state.status = 'expired';
       }
     },
-    setTrialUsed(state) {
-      state.trialUsed = true;
-    },
   },
 });
 
-export const { hydrateSubscription, cancelPlan, checkExpiry, setTrialUsed } = subscriptionSlice.actions;
+export const { hydrateSubscription, cancelPlan, checkExpiry } = subscriptionSlice.actions;
 export default subscriptionSlice.reducer;
 
 // ── Selectors ──

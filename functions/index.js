@@ -4025,3 +4025,50 @@ exports.getAllPremiumSubscriptions = functionsV1.https.onCall(async (_data, cont
     throw new functionsV1.https.HttpsError('internal', 'Failed to load subscriptions');
   }
 });
+
+// Scheduled: purge security_logs entries older than 30 days, keep at most 1000 records.
+// Runs daily at 03:00 UTC.
+exports.purgeSecurityLogs = functionsV1.pubsub
+  .schedule('0 3 * * *')
+  .timeZone('UTC')
+  .onRun(async () => {
+    const db = admin.database();
+    const logsRef = db.ref('security_logs');
+    const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+    const MAX_RECORDS = 1000;
+    const cutoff = Date.now() - RETENTION_MS;
+
+    try {
+      const snap = await logsRef.once('value');
+      if (!snap.exists()) return;
+
+      const entries = [];
+      snap.forEach((child) => {
+        entries.push({ key: child.key, ts: child.val()?.timestamp ?? 0 });
+      });
+
+      // Delete entries older than 30 days
+      const toDelete = entries.filter((e) => e.ts < cutoff);
+      // Also delete oldest entries beyond MAX_RECORDS cap
+      const remaining = entries.filter((e) => e.ts >= cutoff);
+      if (remaining.length > MAX_RECORDS) {
+        const overflow = remaining.sort((a, b) => a.ts - b.ts).slice(0, remaining.length - MAX_RECORDS);
+        toDelete.push(...overflow);
+      }
+
+      if (toDelete.length === 0) {
+        console.log('[purgeSecurityLogs] nothing to delete');
+        return;
+      }
+
+      const updates = {};
+      for (const { key } of toDelete) {
+        updates[key] = null;
+      }
+      await logsRef.update(updates);
+      console.log(`[purgeSecurityLogs] deleted ${toDelete.length} entries`);
+    } catch (err) {
+      console.error('[purgeSecurityLogs] error:', err?.message);
+    }
+  }
+);

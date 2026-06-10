@@ -1,5 +1,5 @@
 import { ref, onValue, query, orderByChild, limitToLast } from 'firebase/database';
-import { database } from '../firebase-core';
+import { database, firebaseApp } from '../firebase-core';
 import { ensureFirebaseAuth } from '../firebase-auth-session';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { ModerationStatus } from '../utils/moderation';
@@ -165,7 +165,6 @@ export const osbbVotingService = {
       totalApartments?: number;
     }
   ): Promise<string> {
-    const { firebaseApp } = require('../firebase-core') as typeof import('../firebase-core');
     const callable = httpsCallable<
       { buildingId: string; title: string; question: string; totalApartments?: number },
       { id: string | null }
@@ -189,7 +188,6 @@ export const osbbVotingService = {
       throw new Error('unauthenticated');
     }
 
-    const { firebaseApp } = require('../firebase-core') as typeof import('../firebase-core');
     const callable = httpsCallable<
       { buildingId: string; voteId: string; optionId: string },
       { ok: boolean }
@@ -204,14 +202,13 @@ export const osbbVotingService = {
       const message = typeof error === 'object' && error !== null && 'message' in error
         ? String((error as { message?: unknown }).message || '')
         : '';
-      const raw = `${code} ${message}`.toLowerCase();
 
-      if (raw.includes('already-voted')) throw new Error('already-voted');
-      if (raw.includes('vote-not-approved')) throw new Error('vote-not-approved');
-      if (raw.includes('vote-closed')) throw new Error('vote-closed');
-      if (raw.includes('invalid-option')) throw new Error('invalid-option');
-      if (raw.includes('vote-not-found')) throw new Error('vote-not-found');
-      if (raw.includes('vote-not-committed')) throw new Error('vote-not-committed');
+      const known = ['already-voted', 'vote-not-approved', 'vote-closed', 'invalid-option', 'vote-not-found', 'vote-not-committed'];
+      for (const token of known) {
+        if (code.includes(token) || message.toLowerCase().includes(token)) {
+          throw new Error(token);
+        }
+      }
       throw error instanceof Error ? error : new Error('vote-call-failed');
     }
   },
