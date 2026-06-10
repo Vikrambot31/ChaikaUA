@@ -75,6 +75,8 @@ const UI_TEXT = {
     },
     alreadyHelped: 'Ви вже відгукнулись',
     helpError: 'Не вдалося надіслати відгук',
+    loginToContact: 'Увійдіть, щоб побачити контакт',
+    loginBtn: 'Увійти / Зареєструватись',
   },
   ru: {
     headerTitle: 'Детали заявки',
@@ -110,6 +112,8 @@ const UI_TEXT = {
     },
     alreadyHelped: 'Вы уже откликнулись',
     helpError: 'Не удалось отправить отклик',
+    loginToContact: 'Войдите, чтобы увидеть контакт',
+    loginBtn: 'Войти / Зарегистрироваться',
   },
   en: {
     headerTitle: 'Request Details',
@@ -145,6 +149,8 @@ const UI_TEXT = {
     },
     alreadyHelped: 'You already responded',
     helpError: 'Could not send response',
+    loginToContact: 'Sign in to see contact info',
+    loginBtn: 'Sign in / Register',
   },
 } as const;
 
@@ -699,6 +705,18 @@ const RequestDetailScreen = ({
         <View style={styles.card}>
           <Text style={styles.cardLabel}>{text.contact}</Text>
           <Text style={styles.phoneText}>{phoneVisible ? (callPhone || '—') : '***'}</Text>
+          {!currentUser?.id ? (
+            <TouchableOpacity
+              onPress={() => navigation.navigate('LoginScreen', {})}
+              activeOpacity={0.82}
+              style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, marginBottom: 2 }}
+            >
+              <MaterialCommunityIcons name="lock-outline" size={14} color="#C77A5D" />
+              <Text style={{ color: '#C77A5D', fontSize: 13, marginLeft: 5, textDecorationLine: 'underline' }}>
+                {text.loginToContact}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
           <View style={styles.contactActions}>
             <TouchableOpacity
               style={[styles.smallAction, !canOpenProfile && styles.disabledContactAction]}

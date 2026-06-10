@@ -4,10 +4,10 @@
     ".write": false,
 
     "users": {
-      ".read": "auth != null",
+      ".read": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous'",
       ".indexOn": ["phone", "name"],
       "$uid": {
-        ".read": "auth != null",
+        ".read": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous'",
         ".write": "auth != null && (auth.uid === $uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin')"
       }
     },
@@ -96,7 +96,7 @@
       ".read": "auth != null",
       ".indexOn": "moderationStatus",
       "$itemId": {
-        ".write": "auth != null && ((!data.exists() && (!(root.child('yellow_list').child(auth.uid).child('active').val() === true && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now))) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
+        ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && ((!data.exists() && (!(root.child('yellow_list').child(auth.uid).child('active').val() === true && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now))) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
       }
     },
 
@@ -104,7 +104,7 @@
       ".read": "auth != null",
       ".indexOn": "moderationStatus",
       "$voteId": {
-        ".write": "auth != null && ((!data.exists() && (!(root.child('yellow_list').child(auth.uid).child('active').val() === true && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now))) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
+        ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && ((!data.exists() && (!(root.child('yellow_list').child(auth.uid).child('active').val() === true && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now))) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
       }
     },
 
@@ -112,7 +112,7 @@
       ".read": "auth != null",
       ".indexOn": "moderationStatus",
       "$topicId": {
-        ".write": "auth != null && ((!data.exists() && (!(root.child('yellow_list').child(auth.uid).child('active').val() === true && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now))) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
+        ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && ((!data.exists() && (!(root.child('yellow_list').child(auth.uid).child('active').val() === true && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now))) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
       }
     },
 
@@ -120,7 +120,7 @@
       ".read": "auth != null",
       ".indexOn": "moderationStatus",
       "$collectionId": {
-        ".write": "auth != null && ((!data.exists() && (!(root.child('yellow_list').child(auth.uid).child('active').val() === true && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now))) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
+        ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && ((!data.exists() && (!(root.child('yellow_list').child(auth.uid).child('active').val() === true && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now))) || data.child('userId').val() === auth.uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')"
       }
     },
 
