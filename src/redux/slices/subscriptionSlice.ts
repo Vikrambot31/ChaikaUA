@@ -66,10 +66,10 @@ export const normalizeServerSubscription = (
     ? status
     : (plan !== 'free' && isActive ? 'active' : 'free');
 
-  if ((resolvedStatus === 'free' || resolvedStatus === 'expired') && !trialUsed) {
+  if (resolvedStatus === 'free') {
     return {
       plan: 'free',
-      status: resolvedStatus,
+      status: 'free',
       expiresAt: null,
       activatedAt: null,
       trialUsed,
@@ -77,14 +77,15 @@ export const normalizeServerSubscription = (
     };
   }
 
-  if (resolvedStatus === 'free' || resolvedStatus === 'expired') {
+  // Expired: preserve plan and activatedAt so UI can show "Your <Plan> has expired"
+  if (resolvedStatus === 'expired') {
     return {
-      plan: 'free',
-      status: resolvedStatus,
-      expiresAt: null,
-      activatedAt: null,
+      plan,
+      status: 'expired',
+      expiresAt,
+      activatedAt,
       trialUsed,
-      paymentMethod: null,
+      paymentMethod,
     };
   }
 
@@ -118,9 +119,8 @@ const subscriptionSlice = createSlice({
     },
     checkExpiry(state) {
       if (state.expiresAt && new Date() > new Date(state.expiresAt)) {
-        state.plan = 'free';
+        // Preserve plan and expiresAt so UI can show "Your <Plan> has expired"
         state.status = 'expired';
-        state.expiresAt = null;
       }
     },
     setTrialUsed(state) {
@@ -140,10 +140,11 @@ export const selectPlan = (state: { subscription: SubscriptionState }) =>
 export const selectSubscriptionStatus = (state: { subscription: SubscriptionState }) =>
   state.subscription.status;
 
-/** True if user has active or trial premium AND it has not expired locally */
+/** True if user has active or trial premium AND it has not expired locally.
+ * business_plus inherits all premium limits. */
 export const selectIsPremium = (state: { subscription: SubscriptionState }): boolean => {
   const { plan, status, expiresAt } = state.subscription;
-  if (plan !== 'premium' && plan !== 'premium_plus') return false;
+  if (plan !== 'premium' && plan !== 'premium_plus' && plan !== 'business_plus') return false;
   if (status !== 'active' && status !== 'trial') return false;
   if (!expiresAt) return false;
   return new Date() < new Date(expiresAt);
@@ -232,7 +233,8 @@ export async function tryActivateFreePremium(plan: SubscriptionPlan): Promise<bo
       isActive: result.data?.ok === true,
     });
     return subscription.plan === plan;
-  } catch {
+  } catch (err) {
+    console.warn('[tryActivateFreePremium] failed silently:', err);
     return false;
   }
 }

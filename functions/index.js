@@ -2199,6 +2199,18 @@ exports.deleteCommunityUserFully = functionsV1.https.onCall(async (data, context
     );
     await Promise.all(directRemovals);
 
+    // Clean up Business+ cards and active promotions for all places owned by this user
+    const bpCardsSnap = await db.ref('business_plus_cards')
+      .orderByChild('ownerId').equalTo(uid).once('value');
+    const bpUpdates = {};
+    bpCardsSnap.forEach((child) => {
+      bpUpdates[`business_plus_cards/${child.key}`] = null;
+      bpUpdates[`business_plus_active/${child.key}`] = null;
+    });
+    if (Object.keys(bpUpdates).length > 0) {
+      await db.ref().update(bpUpdates);
+    }
+
     const storageResults = await Promise.all(
       STORAGE_USER_PREFIXES.map(async (prefix) => ({
         prefix,
@@ -3587,36 +3599,37 @@ exports.activateBusinessPlusManual = functionsV1.https.onCall(async (data, conte
 
     const db = admin.database();
     const subRef = db.ref(`user_subscription/${uid}`);
-    const snapshot = await subRef.once('value');
-    const existing = snapshot.val() || {};
 
     const nowMs = Date.now();
     const nowIso = new Date(nowMs).toISOString();
     const durationMs = months * BUSINESS_PLUS_MONTH_MS;
 
-    // Extend from current expiresAt if still active business_plus
-    let baseMs = nowMs;
-    if (existing.plan === 'business_plus' && existing.status === 'active' && existing.expiresAt) {
-      const currentExpiry = new Date(existing.expiresAt).getTime();
-      if (currentExpiry > nowMs) {
-        baseMs = currentExpiry;
+    // Atomic read-modify-write: prevents two simultaneous activations
+    // from both calculating extension from the same base expiresAt
+    const txResult = await subRef.transaction((current) => {
+      const existing = current || {};
+      let baseMs = nowMs;
+      if (existing.plan === 'business_plus' && existing.status === 'active' && existing.expiresAt) {
+        const currentExpiry = new Date(existing.expiresAt).getTime();
+        if (currentExpiry > nowMs) baseMs = currentExpiry;
       }
+      return {
+        plan: 'business_plus',
+        status: 'active',
+        startedAt: existing.startedAt || nowIso,
+        expiresAt: new Date(baseMs + durationMs).toISOString(),
+        activatedBy: actor.uid,
+        activatedAt: nowIso,
+        paymentMethod: 'monobank_manual',
+        notes,
+      };
+    });
+
+    if (!txResult.committed) {
+      throw new functionsV1.https.HttpsError('aborted', 'subscription_update_conflict');
     }
-    const expiresAt = new Date(baseMs + durationMs).toISOString();
-    const startedAt = existing.startedAt || nowIso;
 
-    const record = {
-      plan: 'business_plus',
-      status: 'active',
-      startedAt,
-      expiresAt,
-      activatedBy: actor.uid,
-      activatedAt: nowIso,
-      paymentMethod: 'monobank_manual',
-      notes,
-    };
-
-    await subRef.set(record);
+    const expiresAt = txResult.snapshot.val().expiresAt;
     await db.ref(`users/${uid}/subscription`).set({ plan: 'business_plus', expiresAt });
 
     // Send push notification to user
@@ -3711,6 +3724,17 @@ exports.activatePremiumManual = functionsV1.https.onCall(async (data, context) =
     }
     const expiresAt = new Date(baseMs + durationMs).toISOString();
     const startedAt = existing.startedAt || nowIso;
+
+    // Don't downgrade an active Business+ subscription to premium
+    if (existing.plan === 'business_plus' && existing.status === 'active') {
+      const currentExpiry = existing.expiresAt ? new Date(existing.expiresAt).getTime() : 0;
+      if (currentExpiry > nowMs) {
+        throw new functionsV1.https.HttpsError(
+          'failed-precondition',
+          'User has an active Business+ subscription. Cancel it first before activating Premium.',
+        );
+      }
+    }
 
     const record = {
       plan: 'premium',

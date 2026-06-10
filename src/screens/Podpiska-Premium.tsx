@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useRef } from 'react';
 import {
   SafeAreaView,
   ScrollView,
@@ -74,6 +74,7 @@ export default function SubscriptionScreen() {
   const trialUsed = useSelector(selectTrialUsed);
 
   const [loading, setLoading] = useState(false);
+  const isSubmitting = useRef(false);
 
   const text = useMemo(() => {
     if (language === 'ua') {
@@ -169,6 +170,8 @@ export default function SubscriptionScreen() {
         {
           text: text.trialConfirmOk,
           onPress: async () => {
+            if (isSubmitting.current) return;
+            isSubmitting.current = true;
             setLoading(true);
             try {
               const result = await callActivateTrialPremium();
@@ -181,8 +184,10 @@ export default function SubscriptionScreen() {
                   trialUsed: true,
                   paymentMethod: 'trial',
                 }));
+                Alert.alert(text.trialSuccessTitle, text.trialSuccessMsg, [{ text: text.ok }]);
+              } else {
+                Alert.alert(text.trialErrorTitle, text.trialError, [{ text: text.ok }]);
               }
-              Alert.alert(text.trialSuccessTitle, text.trialSuccessMsg, [{ text: text.ok }]);
             } catch (err: any) {
               const code = err?.code || '';
               if (code.includes('already-exists')) {
@@ -191,6 +196,7 @@ export default function SubscriptionScreen() {
                 Alert.alert(text.trialErrorTitle, text.trialError, [{ text: text.ok }]);
               }
             } finally {
+              isSubmitting.current = false;
               setLoading(false);
             }
           },
