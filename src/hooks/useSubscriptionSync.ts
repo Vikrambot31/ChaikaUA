@@ -3,6 +3,7 @@ import { useDispatch } from 'react-redux';
 import { onValue, ref } from 'firebase/database';
 import {
   hydrateSubscription,
+  checkExpiry,
   normalizeServerSubscription,
   type ServerSubscriptionPayload,
 } from '../redux/slices/subscriptionSlice';
@@ -54,6 +55,8 @@ export function useSubscriptionSync(userId: string | null | undefined): {
 
         // Always sync Redux with the latest server state
         dispatch(hydrateSubscription(normalized));
+        // Immediately mark as expired if expiresAt already passed (server may lag)
+        dispatch(checkExpiry());
 
         if (!firstLoadDoneRef.current) {
           // First snapshot after login: hydrate silently, no modal

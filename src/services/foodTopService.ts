@@ -6,7 +6,8 @@ import { sanitizeStoredText } from '../utils/textUtils';
 import { assertTextMatchesLanguage, normalizeAppLang, type AppLang } from '../utils/contentLanguageGuard';
 
 const PATH = 'food_top_listings';
-const ACTIVE_LIMIT = 40;
+const ACTIVE_LIMIT = 30;
+const LISTING_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 export interface FoodTopListing {
   id: string;
@@ -18,6 +19,7 @@ export interface FoodTopListing {
   moderationStatus: ModerationStatus;
   submittedForModerationAt: string;
   createdAt: string;
+  expiresAt?: string; // ISO — відсутнє у старих записах, вважається "не прострочений"
   userId: string;
   language?: AppLang;
 }
@@ -32,6 +34,7 @@ const mapFoodTopItem = (id: string, data: any): FoodTopListing => ({
   moderationStatus: data.moderationStatus || 'pending',
   submittedForModerationAt: data.submittedForModerationAt || '',
   createdAt: data.createdAt || '',
+  expiresAt: typeof data.expiresAt === 'string' ? data.expiresAt : undefined,
   userId: data.userId || '',
   language: normalizeAppLang(data.language, 'ua'),
 });
@@ -56,10 +59,15 @@ export const foodTopService = {
 
     const unsubscribeApproved = onValue(approvedRef, (snapshot) => {
       const raw = snapshot.val();
+      const nowMs = Date.now();
       approvedItems = raw
         ? Object.entries(raw as Record<string, any>)
             .map(([id, data]) => mapFoodTopItem(id, data))
-            .filter((item) => item.title.trim() && item.photoUri)
+            .filter((item) =>
+              item.title.trim() &&
+              item.photoUri &&
+              (!item.expiresAt || new Date(item.expiresAt).getTime() > nowMs),
+            )
             .reverse()
         : [];
       emit();
@@ -110,6 +118,7 @@ export const foodTopService = {
       userId: user.uid,
       moderationStatus: pendingModeration.moderationStatus,
       submittedForModerationAt: pendingModeration.submittedForModerationAt,
+      expiresAt: new Date(Date.now() + LISTING_TTL_MS).toISOString(),
       language,
     };
     assertTextMatchesLanguage(`${sanitized.title} ${sanitized.description}`.trim(), language);

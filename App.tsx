@@ -290,6 +290,8 @@ function AppWithAuthSync({ remoteConfigSnapshot, onRemoteConfigSnapshot }: AppWi
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
         void UploadQueue.process();
+        // Re-check subscription expiry whenever app returns to foreground
+        dispatch(checkExpiry());
       }
     });
 

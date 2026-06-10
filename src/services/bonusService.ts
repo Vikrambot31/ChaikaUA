@@ -255,6 +255,7 @@ export const subscribeMyBonuses = (
     onChanged(normalizeBonuses(snapshot.val()));
   }, (error) => {
     console.error('[subscribeMyBonuses] RTDB error:', error.message);
+    onChanged(EMPTY_BONUSES);
   });
 };
 
@@ -270,6 +271,7 @@ export const subscribeMyPromoCredits = (
     onChanged(normalizePromoCredits(snapshot.val()));
   }, (error) => {
     console.error('[subscribeMyPromoCredits] RTDB error:', error.message);
+    onChanged(EMPTY_PROMO_CREDITS);
   });
 };
 
@@ -294,6 +296,9 @@ export const subscribeMyBonusTransactions = (
     });
     items.sort((a, b) => b.createdAt - a.createdAt);
     onChanged(items);
+  }, (error) => {
+    console.error('[subscribeMyBonusTransactions] RTDB error:', error.message);
+    onChanged([]);
   });
 };
 
@@ -317,6 +322,9 @@ export const subscribeMyBonusPromotions = (
     });
     items.sort((a, b) => b.createdAt - a.createdAt);
     onChanged(items);
+  }, (error) => {
+    console.error('[subscribeMyBonusPromotions] RTDB error:', error.message);
+    onChanged([]);
   });
 };
 
@@ -333,6 +341,7 @@ export const subscribeActiveBonusPromotions = (
     orderByChild('screen'),
     equalTo(screen),
   );
+  const MAX_ACTIVE = 30;
   return onValue(promotionsQuery, (snapshot) => {
     const now = Date.now();
     const items: BonusPromotion[] = [];
@@ -343,9 +352,10 @@ export const subscribeActiveBonusPromotions = (
       }
     });
     items.sort((a, b) => b.createdAt - a.createdAt);
-    onChanged(items);
+    onChanged(items.slice(0, MAX_ACTIVE));
   }, (error) => {
     console.error('[subscribeActiveBonusPromotions] RTDB error:', error.message);
+    onChanged([]);
   });
 };
 
@@ -373,6 +383,7 @@ export const subscribeBiznesPlusPlaces = (
     onChanged(items.map((i) => i.id));
   }, (error) => {
     console.error('[subscribeBiznesPlusPlaces] RTDB error:', error.message);
+    onChanged([]);
   });
 };
 
