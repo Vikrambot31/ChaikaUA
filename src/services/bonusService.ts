@@ -441,6 +441,9 @@ export const subscribeHelpResponses = (
     });
     items.sort((a, b) => a.at - b.at);
     onChanged(items);
+  }, (error) => {
+    console.error('[subscribeHelpResponses] RTDB error:', error.message);
+    onChanged([]);
   });
 };
 
@@ -459,6 +462,9 @@ export const subscribeHelpConfirmations = (
     });
     items.sort((a, b) => a.at - b.at);
     onChanged(items);
+  }, (error) => {
+    console.error('[subscribeHelpConfirmations] RTDB error:', error.message);
+    onChanged([]);
   });
 };
 

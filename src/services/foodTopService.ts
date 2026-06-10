@@ -71,7 +71,8 @@ export const foodTopService = {
             .reverse()
         : [];
       emit();
-    }, () => {
+    }, (error) => {
+      console.error('[foodTopService] approved items RTDB error:', error.message);
       approvedItems = [];
       emit();
     });
@@ -88,7 +89,8 @@ export const foodTopService = {
               .reverse()
           : [];
         emit();
-      }, () => {
+      }, (error) => {
+        console.error('[foodTopService] own pending items RTDB error:', error.message);
         ownPendingItems = [];
         emit();
       });
