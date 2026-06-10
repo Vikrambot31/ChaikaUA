@@ -527,7 +527,7 @@ const RequestsScreen: React.FC = () => {
       mounted = false;
       active = false;
     };
-  }, [user?.id, user?.email, loadPage, loadPendingPhotos, loadPendingLostFound, loadPendingBuySell, loadPendingContacts, loadPendingLocalBusiness, loadPendingAppSuggestions]);
+  }, [user?.id, user?.email, loadPage, loadPendingPhotos, loadPendingLostFound, loadPendingBuySell, loadPendingContacts, loadPendingLocalBusiness, loadPendingBiznesChaika, loadPendingAppSuggestions]);
 
   // When a non-'all' filter is selected, load all remaining pages so filter works on complete data
   const loadAllRequests = useCallback(async () => {
@@ -581,12 +581,13 @@ const RequestsScreen: React.FC = () => {
         isModerator ? loadPendingBuySell() : Promise.resolve(),
         isModerator ? loadPendingContacts() : Promise.resolve(),
         isModerator ? loadPendingLocalBusiness() : Promise.resolve(),
+        isModerator ? loadPendingBiznesChaika() : Promise.resolve(),
         isModerator ? loadPendingAppSuggestions() : Promise.resolve(),
       ]);
     } finally {
       setRefreshing(false);
     }
-  }, [isModerator, loadPage, loadPendingPhotos, loadPendingLostFound, loadPendingBuySell, loadPendingContacts, loadPendingLocalBusiness, loadPendingAppSuggestions]);
+  }, [isModerator, loadPage, loadPendingPhotos, loadPendingLostFound, loadPendingBuySell, loadPendingContacts, loadPendingLocalBusiness, loadPendingBiznesChaika, loadPendingAppSuggestions]);
 
   const handleLoadMore = useCallback(async () => {
     if (loading || loadingMore || !hasMore || !nextCursor) return;
