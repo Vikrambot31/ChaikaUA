@@ -312,6 +312,8 @@ const PhotoUploadScreen: React.FC = () => {
             sourceFeature: 'gallery_full_form',
             locationLabel: selectedLocation?.label,
             locationType: selectedLocation?.type,
+            category: selectedCategory || undefined,
+            moderationDeferred: true,
           }),
         ),
       );

@@ -256,6 +256,8 @@ interface AddPhotoPayload {
   sourceFeature?: string;
   locationLabel?: string;
   locationType?: 'building' | 'place';
+  category?: string;
+  moderationDeferred?: boolean;
 }
 
 /** Options accepted by firebaseChatAPI.getRequestsPaginated. */
@@ -1288,6 +1290,8 @@ export const photoAPI = {
         photoData.locationType === 'place'
           ? photoData.locationType
           : undefined;
+      const normalizedCategory = normalizeText(photoData.category || '', 80);
+      const isDeferred = Boolean(photoData.moderationDeferred);
 
       const resolvedStoragePath =
         photoData.storagePath ||
@@ -1315,6 +1319,7 @@ export const photoAPI = {
           ...(normalizedSourceFeature ? { sourceFeature: normalizedSourceFeature } : {}),
           storagePath: resolvedStoragePath,
           updatedAt: now,
+          ...(normalizedCategory ? { category: normalizedCategory } : {}),
           ...(normalizedLocationLabel
             ? {
                 locationLabel: normalizedLocationLabel,
@@ -1337,7 +1342,8 @@ export const photoAPI = {
           ...(normalizedUploadedByEmail ? { uploadedByEmail: normalizedUploadedByEmail } : {}),
           createdAt: now,
           uploadedAt: now,
-          status: 'pending',
+          status: isDeferred ? 'saved' : 'pending',
+          moderationStatus: isDeferred ? 'not_submitted' : 'pending',
           target: photoData.target || 'gallery_public',
           ...(normalizedSourceScreen ? { sourceScreen: normalizedSourceScreen } : {}),
           ...(normalizedSourceScreenLabel ? { sourceScreenLabel: normalizedSourceScreenLabel } : {}),
@@ -1346,6 +1352,7 @@ export const photoAPI = {
           likes: 0,
           userId: user.uid,
           storagePath: resolvedStoragePath,
+          ...(normalizedCategory ? { category: normalizedCategory } : {}),
           ...(normalizedLocationLabel
             ? {
                 locationLabel: normalizedLocationLabel,

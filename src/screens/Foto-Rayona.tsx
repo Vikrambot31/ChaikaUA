@@ -1,7 +1,6 @@
 import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
-import GuestRegisterBanner from '../components/GuestRegisterBanner';
-import { useGuestGuard } from '../hooks/useGuestGuard';
 import {
+  Animated,
   ActivityIndicator,
   FlatList,
   Modal,
@@ -16,8 +15,10 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { onValue, ref } from 'firebase/database';
+import { onValue, ref, update } from 'firebase/database';
 import { useSelector } from 'react-redux';
+import GuestRegisterBanner from '../components/GuestRegisterBanner';
+import { useGuestGuard } from '../hooks/useGuestGuard';
 
 import AppPhotoImage from '../components/AppPhotoImage';
 import MiniTabBar from '../components/MiniTabBar';
@@ -72,7 +73,7 @@ type SoulPhoto = {
   uri: string;
   storagePath: string;
   createdAt: number;
-  status: 'approved' | 'pending';
+  status: 'approved' | 'pending' | 'saved';
   author?: string;
   likes?: number;
 };
@@ -151,6 +152,32 @@ export default function FotoRayonaScreen() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [previewPhoto, setPreviewPhoto] = useState<SoulPhoto | null>(null);
+  const [submittedRtdbIds, setSubmittedRtdbIds] = useState<Set<string>>(new Set());
+  const [submitting, setSubmitting] = useState(false);
+  const pulseAnim = useMemo(() => new Animated.Value(1), []);
+  const pulseLoopRef = React.useRef<Animated.CompositeAnimation | null>(null);
+
+  const deferredPhotos = useMemo(
+    () => remotePhotos.filter((p) => p.status === 'saved' && !submittedRtdbIds.has(p.id)),
+    [remotePhotos, submittedRtdbIds],
+  );
+  const hasUnsubmitted = deferredPhotos.length > 0;
+
+  useEffect(() => {
+    if (hasUnsubmitted) {
+      const loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, { toValue: 1.04, duration: 650, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 1, duration: 650, useNativeDriver: true }),
+        ]),
+      );
+      pulseLoopRef.current = loop;
+      loop.start();
+    } else {
+      pulseLoopRef.current?.stop();
+      pulseAnim.setValue(1);
+    }
+  }, [hasUnsubmitted, pulseAnim]);
 
   useEffect(() => {
     let active = true;
@@ -166,19 +193,20 @@ export default function FotoRayonaScreen() {
       setLoading(false);
     };
 
-    const parsePhoto = (id: string, raw: unknown): SoulPhoto | null => {
+    const parsePhoto = (id: string, raw: unknown, statusOverride?: 'approved'): SoulPhoto | null => {
       if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
       const photo = raw as RawPhoto;
       const sourceScreen = clean(photo.sourceScreen);
       if (sourceScreen !== SCREEN_ID && sourceScreen !== PHOTO_UPLOAD_SCREEN_ID) return null;
       const author = clean(photo.uploadedBy);
       const likes = typeof photo.likes === 'number' ? photo.likes : 0;
+      const rawStatus = clean(photo.status);
       return {
         id,
         uri: clean(photo.thumbnailUrl) || clean(photo.imageUri),
         storagePath: clean(photo.storagePath),
         createdAt: timestamp(photo.createdAt) || timestamp(photo.uploadedAt),
-        status: 'approved',
+        status: statusOverride === 'approved' ? 'approved' : (rawStatus === 'saved' ? 'saved' : 'pending'),
         ...(author ? { author } : {}),
         likes,
       };
@@ -191,8 +219,8 @@ export default function FotoRayonaScreen() {
         const approvedPhotos: SoulPhoto[] = [];
         const pendingPhotos: SoulPhoto[] = [];
 
-        // Approved photos from public collection
-        const publicRef = ref(database, 'community_photos_public');
+        // Approved photos from community_photos collection (filtered by status)
+        const publicRef = ref(database, 'community_photos');
         unsubPublic = onValue(
           publicRef,
           (snapshot) => {
@@ -201,7 +229,10 @@ export default function FotoRayonaScreen() {
               approvedPhotos.length = 0;
               if (value && typeof value === 'object' && !Array.isArray(value)) {
                 Object.entries(value as Record<string, unknown>).forEach(([id, raw]) => {
-                  const photo = parsePhoto(id, raw);
+                  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return;
+                  const status = clean((raw as RawPhoto).status);
+                  if (status !== 'approved') return;
+                  const photo = parsePhoto(id, raw, 'approved');
                   if (photo) approvedPhotos.push(photo);
                 });
               }
@@ -232,19 +263,10 @@ export default function FotoRayonaScreen() {
                     const status = clean(photo.status);
                     const owner = clean(photo.uid) || clean(photo.userId);
                     const sourceScreen = clean(photo.sourceScreen);
-                    if (status === 'pending' && owner === currentUid &&
+                    if ((status === 'pending' || status === 'saved') && owner === currentUid &&
                         (sourceScreen === SCREEN_ID || sourceScreen === PHOTO_UPLOAD_SCREEN_ID)) {
-                      const author = clean(photo.uploadedBy);
-                      const likes = typeof photo.likes === 'number' ? photo.likes : 0;
-                      pendingPhotos.push({
-                        id,
-                        uri: clean(photo.thumbnailUrl) || clean(photo.imageUri),
-                        storagePath: clean(photo.storagePath),
-                        createdAt: timestamp(photo.createdAt) || timestamp(photo.uploadedAt),
-                        status: 'pending',
-                        ...(author ? { author } : {}),
-                        likes,
-                      });
+                      const item = parsePhoto(id, photo);
+                      if (item) pendingPhotos.push(item);
                     }
                   });
                 }
@@ -283,6 +305,26 @@ export default function FotoRayonaScreen() {
     [width],
   );
 
+  const submitToModeration = useCallback(async () => {
+    if (submitting || !user?.id) return;
+    const toSubmit = deferredPhotos.filter((p) => !submittedRtdbIds.has(p.id));
+    if (toSubmit.length === 0) return;
+    setSubmitting(true);
+    try {
+      const batch: Record<string, unknown> = {};
+      const now = Date.now();
+      for (const photo of toSubmit) {
+        batch[`community_photos/${photo.id}/status`] = 'pending';
+        batch[`community_photos/${photo.id}/moderationStatus`] = 'pending';
+        batch[`community_photos/${photo.id}/updatedAt`] = now;
+      }
+      await update(ref(database), batch);
+      setSubmittedRtdbIds((prev) => new Set([...prev, ...toSubmit.map((p) => p.id)]));
+    } finally {
+      setSubmitting(false);
+    }
+  }, [deferredPhotos, submittedRtdbIds, submitting, user?.id]);
+
   const renderItem = useCallback(
     ({ item }: { item: SoulPhoto }) => {
       if (item.status === 'approved' && item.uri) {
@@ -292,7 +334,8 @@ export default function FotoRayonaScreen() {
           </TouchableOpacity>
         );
       }
-      return <SoulTile item={item} size={tileSize} pendingLabel={text.pending} />;
+      const pendingLabel = item.status === 'saved' ? 'чекаю підтвердження' : text.pending;
+      return <SoulTile item={item} size={tileSize} pendingLabel={pendingLabel} />;
     },
     [text.pending, tileSize],
   );
@@ -309,10 +352,25 @@ export default function FotoRayonaScreen() {
 
   const uploadPanel = (
     <View style={styles.uploadPanel}>
+      {hasUnsubmitted && (
+        <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+          <TouchableOpacity
+            style={[styles.submitButton, styles.pulsingSubmitButton]}
+            onPress={submitToModeration}
+            activeOpacity={0.86}
+            disabled={submitting}
+          >
+            <Text style={styles.submitText}>
+              {submitting ? 'Відправляю...' : 'Підтвердити'}
+            </Text>
+          </TouchableOpacity>
+        </Animated.View>
+      )}
       <TouchableOpacity
         style={styles.submitButton}
         onPress={guestGuard(() => navigation.navigate('PhotoUploadScreen'))}
         activeOpacity={0.86}
+        disabled={hasUnsubmitted}
       >
         <MaterialCommunityIcons name="camera-plus-outline" size={19} color="#fff" />
         <Text style={styles.submitText}>{text.addPhoto}</Text>
@@ -472,6 +530,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#8FA77A',
+  },
+  pulsingSubmitButton: {
+    backgroundColor: '#E74C3C',
   },
   submitText: {
     color: '#fff',
