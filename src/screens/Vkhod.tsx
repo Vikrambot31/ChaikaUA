@@ -209,6 +209,8 @@ const LoginScreen: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [emailTouched, setEmailTouched] = useState(false);
+  const [passwordTouched, setPasswordTouched] = useState(false);
   const [appleSignInAvailable, setAppleSignInAvailable] = useState(false);
   const [loginRateLimitUntil, setLoginRateLimitUntil] = useState(0);
   const [now, setNow] = useState(Date.now());
@@ -438,16 +440,18 @@ const LoginScreen: React.FC = () => {
             placeholder={text.emailPlaceholder}
             value={email}
             onChangeText={(value) => setEmail(normalizeEmailText(value))}
+            onBlur={() => setEmailTouched(true)}
             keyboardType="email-address"
             autoCapitalize="none"
             editable={!loading}
           />
-          <FormFieldError visible={submitAttempted && !isEmailValid} error={text.inlineEmailError} />
+          <FormFieldError visible={(submitAttempted || emailTouched) && !isEmailValid} error={text.inlineEmailError} />
           <View style={styles.passwordRow}>
             <TactileInput
               placeholder={text.passwordPlaceholder}
               value={password}
               onChangeText={setPassword}
+              onBlur={() => setPasswordTouched(true)}
               secureTextEntry={!showPassword}
               editable={!loading}
             />
@@ -455,7 +459,7 @@ const LoginScreen: React.FC = () => {
               <Text style={styles.toggleText}>{showPassword ? text.hidePassword : text.showPassword}</Text>
             </TouchableOpacity>
           </View>
-          <FormFieldError visible={submitAttempted && !isPasswordValid} error={text.inlinePasswordError} />
+          <FormFieldError visible={(submitAttempted || passwordTouched) && !isPasswordValid} error={text.inlinePasswordError} />
           <TouchableOpacity onPress={() => void handleForgotPassword()} disabled={loading} style={styles.forgotPasswordWrap}>
             <Text style={styles.forgotPasswordText}>{text.forgotPassword}</Text>
           </TouchableOpacity>
@@ -464,7 +468,7 @@ const LoginScreen: React.FC = () => {
             <TactileButton
               title={loginRateLimitSeconds > 0 ? `${text.loginBtn} (${formatCountdown(loginRateLimitSeconds)})` : text.loginBtn}
               onPress={handleLogin}
-              disabled={!isFormValid || loading || loginRateLimitSeconds > 0}
+              disabled={loading || loginRateLimitSeconds > 0}
               variant="primary"
               style={styles.loginButtonStyle}
               textStyle={styles.loginButtonText}
