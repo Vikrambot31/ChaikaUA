@@ -253,6 +253,8 @@ export const subscribeMyBonuses = (
   }
   return onValue(ref(database, `user_bonuses/${uid}`), (snapshot) => {
     onChanged(normalizeBonuses(snapshot.val()));
+  }, (error) => {
+    console.error('[subscribeMyBonuses] RTDB error:', error.message);
   });
 };
 
@@ -266,6 +268,8 @@ export const subscribeMyPromoCredits = (
   }
   return onValue(ref(database, `promo_credits/${uid}`), (snapshot) => {
     onChanged(normalizePromoCredits(snapshot.val()));
+  }, (error) => {
+    console.error('[subscribeMyPromoCredits] RTDB error:', error.message);
   });
 };
 
@@ -340,6 +344,8 @@ export const subscribeActiveBonusPromotions = (
     });
     items.sort((a, b) => b.createdAt - a.createdAt);
     onChanged(items);
+  }, (error) => {
+    console.error('[subscribeActiveBonusPromotions] RTDB error:', error.message);
   });
 };
 
@@ -365,6 +371,8 @@ export const subscribeBiznesPlusPlaces = (
     });
     items.sort((a, b) => b.activatedAt - a.activatedAt);
     onChanged(items.map((i) => i.id));
+  }, (error) => {
+    console.error('[subscribeBiznesPlusPlaces] RTDB error:', error.message);
   });
 };
 

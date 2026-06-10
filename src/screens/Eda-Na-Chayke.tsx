@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -310,6 +311,7 @@ export default function EdaNaChaykeScreen() {
   const [eatFilter, setEatFilter] = useState<EatFilter>('all');
   const [query, setQuery] = useState('');
   const [topListings, setTopListings] = useState<FoodTopListing[]>([]);
+  const [topListingsReady, setTopListingsReady] = useState(false);
   const [topFormVisible, setTopFormVisible] = useState(false);
   const [topTitle, setTopTitle] = useState('');
   const [topDescription, setTopDescription] = useState('');
@@ -350,7 +352,10 @@ export default function EdaNaChaykeScreen() {
     });
   }, []);
 
-  useEffect(() => foodTopService.subscribe(setTopListings, user?.id), [user?.id]);
+  useEffect(() => foodTopService.subscribe((items) => {
+    setTopListings(items);
+    setTopListingsReady(true);
+  }, user?.id), [user?.id]);
 
   const allFoodPlaces = useMemo(() => getFoodPlaces(chaykaPlaces), []);
 
@@ -943,7 +948,9 @@ export default function EdaNaChaykeScreen() {
             })}
           </ScrollView>
 
-          {visibleTopListings.length > 0 ? (
+          {!topListingsReady ? (
+            <ActivityIndicator size="small" color={SCREEN_THEME.accentGold} style={{ marginVertical: 8 }} />
+          ) : visibleTopListings.length > 0 ? (
             <View style={styles.topFoodSection}>
               <Text style={styles.topFoodTitle}>{text.topFoodTitle}</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.topFoodScroll}>
@@ -953,16 +960,19 @@ export default function EdaNaChaykeScreen() {
           ) : null}
 
           {/* Place list */}
-          {eatPlaces.length > 0 ? (
-            <View style={styles.cardList}>
-              {eatPlaces.map((place) => renderPlaceCard(place))}
-            </View>
-          ) : (
-            <View style={styles.emptyState}>
-              <MaterialCommunityIcons name="magnify-close" size={34} color={SCREEN_THEME.textMuted} />
-              <Text style={styles.emptyText}>{text.noPlaces}</Text>
-            </View>
-          )}
+          <FlatList
+            scrollEnabled={false}
+            data={eatPlaces}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => renderPlaceCard(item)}
+            contentContainerStyle={eatPlaces.length > 0 ? styles.cardList : undefined}
+            ListEmptyComponent={
+              <View style={styles.emptyState}>
+                <MaterialCommunityIcons name="magnify-close" size={34} color={SCREEN_THEME.textMuted} />
+                <Text style={styles.emptyText}>{text.noPlaces}</Text>
+              </View>
+            }
+          />
         </ScrollView>
         <View style={styles.addTopBar}>
           <TouchableOpacity style={styles.addTopButton} onPress={handleOpenTopForm} activeOpacity={0.88}>

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  FlatList,
   Image,
   SafeAreaView,
   ScrollView,
@@ -829,25 +830,33 @@ export default function VseDlyaDeteyScreen() {
           </View>
 
           {isEventsCategory ? (
-            activeOffers.length > 0 ? (
-              <View style={styles.cardList}>
-                {activeOffers.map((offer) => renderOfferCard(offer, true))}
-              </View>
-            ) : (
-              <View style={styles.emptyState}>
-                <MaterialCommunityIcons name="calendar-remove-outline" size={34} color={SCREEN_THEME.textMuted} />
-                <Text style={styles.emptyText}>{text.noOffers}</Text>
-              </View>
-            )
-          ) : filteredPlaces.length > 0 ? (
-            <View style={styles.cardList}>
-              {filteredPlaces.map((item) => renderPlaceCard(item))}
-            </View>
+            <FlatList
+              scrollEnabled={false}
+              data={activeOffers}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => renderOfferCard(item, true)}
+              contentContainerStyle={activeOffers.length > 0 ? styles.cardList : undefined}
+              ListEmptyComponent={
+                <View style={styles.emptyState}>
+                  <MaterialCommunityIcons name="calendar-remove-outline" size={34} color={SCREEN_THEME.textMuted} />
+                  <Text style={styles.emptyText}>{text.noOffers}</Text>
+                </View>
+              }
+            />
           ) : (
-            <View style={styles.emptyState}>
-              <MaterialCommunityIcons name="magnify-close" size={34} color={SCREEN_THEME.textMuted} />
-              <Text style={styles.emptyText}>{text.noResults}</Text>
-            </View>
+            <FlatList
+              scrollEnabled={false}
+              data={filteredPlaces}
+              keyExtractor={(item) => item.place.id}
+              renderItem={({ item }) => renderPlaceCard(item)}
+              contentContainerStyle={filteredPlaces.length > 0 ? styles.cardList : undefined}
+              ListEmptyComponent={
+                <View style={styles.emptyState}>
+                  <MaterialCommunityIcons name="magnify-close" size={34} color={SCREEN_THEME.textMuted} />
+                  <Text style={styles.emptyText}>{text.noResults}</Text>
+                </View>
+              }
+            />
           )}
         </View>
 

@@ -1,5 +1,5 @@
 import 'react-native-gesture-handler';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { AppState, Image, Platform, StyleSheet, Text, View } from 'react-native';
 import { Provider, useDispatch, useSelector } from 'react-redux';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -14,6 +14,8 @@ import {
   resetAuthBootstrap,
 } from './src/firebase-auth-session';
 import { setUser, logout, selectAuthBootstrapped, selectUser, setAuthBootstrapped } from './src/redux/slices/authSlice';
+import { checkExpiry } from './src/redux/slices/subscriptionSlice';
+import { selectIsOnline } from './src/redux/slices/networkSlice';
 import { useFCMToken } from './src/hooks/useFCMToken';
 import { useNetworkMonitor } from './src/hooks/useNetworkMonitor';
 import OfflineBanner from './src/components/OfflineBanner';
@@ -240,6 +242,8 @@ function AppWithAuthSync({ remoteConfigSnapshot, onRemoteConfigSnapshot }: AppWi
   const dispatch = useDispatch();
   const currentUser = useSelector(selectUser);
   const authBootstrapped = useSelector(selectAuthBootstrapped);
+  const isOnline = useSelector(selectIsOnline);
+  const prevIsOnlineRef = useRef<boolean>(true);
   const [resumeDecisionMade, setResumeDecisionMade] = useState(false);
   const [authOffline, setAuthOffline] = useState(false);
   const [authRetryKey, setAuthRetryKey] = useState(0);
@@ -254,6 +258,19 @@ function AppWithAuthSync({ remoteConfigSnapshot, onRemoteConfigSnapshot }: AppWi
   // Also triggers the "Premium activated" modal when admin grants premium live.
   const { showPremiumModal, dismissPremiumModal } = useSubscriptionSync(currentUser?.id);
   const { claimNotification, dismissClaimNotification } = useBusinessClaimSync(currentUser?.id);
+
+  // Check subscription expiry once after Redux Persist rehydrates
+  useEffect(() => {
+    dispatch(checkExpiry());
+  }, [dispatch]);
+
+  // Drain offline bonus queue when network comes back online
+  useEffect(() => {
+    if (isOnline && !prevIsOnlineRef.current && currentUser?.id) {
+      drainBonusQueue().catch(() => {});
+    }
+    prevIsOnlineRef.current = isOnline;
+  }, [isOnline, currentUser?.id]);
 
   useEffect(() => {
     identifyCrashUser(currentUser?.id ?? null);

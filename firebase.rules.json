@@ -670,6 +670,12 @@
       }
     },
 
+    "business_plus_active": {
+      ".read": "auth != null",
+      ".write": false,
+      ".indexOn": ["screen", "expiresAt"]
+    },
+
     "business_plus_cards": {
       ".read": "auth != null",
       ".indexOn": ["moderationStatus", "ownerId"],
