@@ -407,6 +407,10 @@ const HelpRequestScreen: React.FC = () => {
 
     setFieldErrors({});
 
+    if (formPhotos.some(p => p.status === 'uploading')) {
+      Alert.alert(text.errorTitle, language === 'ru' ? 'Подождите, фото ещё загружается.' : language === 'en' ? 'Please wait, photo is still uploading.' : 'Зачекайте, фото ще завантажується.');
+      return;
+    }
     if (formPhotos.some(p => p.status === 'error')) {
       Alert.alert(text.errorTitle, text.photoErrorMessage);
       return;
@@ -464,8 +468,8 @@ const HelpRequestScreen: React.FC = () => {
         ? `${text.successMsg}\n\n${text.successRequestId}: ${String(requestId).slice(-6).toUpperCase()}`
         : text.successMsg;
       Alert.alert(text.successTitle, successDetail);
-      setName('');
-      setPhone('+380');
+      setName(normalizePersonName(user?.name || ''));
+      setPhone(normalizePhoneText(user?.phone || '+380'));
       setHelpType('');
       setSubType('');
       setDescription('');
@@ -491,7 +495,7 @@ const HelpRequestScreen: React.FC = () => {
           <Text style={styles.heroSubtitle}>{text.heroSubtitle}</Text>
         </View>
 
-        {!user && (
+        {!user?.id && (
           <View style={styles.authNoticeCard}>
             <Text style={styles.authNoticeTitle}>{text.authNoticeTitle}</Text>
             <Text style={styles.authNoticeBody}>{text.authNoticeBody}</Text>
@@ -562,7 +566,7 @@ const HelpRequestScreen: React.FC = () => {
           <TextInput
             placeholder={text.descriptionPlaceholder}
             value={description}
-            onChangeText={(value) => setDescription(value.slice(0, MAX_DESCRIPTION_LENGTH))}
+            onChangeText={(value) => { setDescription(value.slice(0, MAX_DESCRIPTION_LENGTH)); if (fieldErrors.description) setFieldErrors((prev) => ({ ...prev, description: undefined })); }}
             style={[styles.input, styles.textArea]}
             placeholderTextColor={SCREEN_THEME.textMuted}
             multiline
@@ -576,7 +580,7 @@ const HelpRequestScreen: React.FC = () => {
           <FormFieldError error={fieldErrors.description} />
 
           <FormSectionLabel label={text.labelPhoto} completed={getDonePhotos(formPhotos).length > 0} containerStyle={styles.labelRow} labelStyle={styles.label} />
-          {user ? (
+          {user?.id ? (
             <PhotoUploadField
               uid={user.id ?? ''}
               userName={user.name ?? ''}

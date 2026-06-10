@@ -23,6 +23,7 @@ import {
   getMyTrustChain,
   getMyTrustNode,
   listMySponsorConfirmations,
+  subscribeMyConfirmations,
   subscribeMyInviteAccessStatus,
   subscribeMyTrustNode,
   type InviteRequestSnapshot,
@@ -186,6 +187,7 @@ const PoruchitelScreen: React.FC = () => {
   const [confirmationsLoading, setConfirmationsLoading] = useState(false);
   const [busyConfirmationId, setBusyConfirmationId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState('');
+  const [confirmActionError, setConfirmActionError] = useState(false);
 
   const load = React.useCallback(async () => {
     setLoadError('');
@@ -200,7 +202,7 @@ const PoruchitelScreen: React.FC = () => {
       setChildren(childrenResult);
       setInviteStatus(statusResult);
       if (node && node.rootPath.length > 0) {
-        const chainResult = await getMyTrustChain();
+        const chainResult = await getMyTrustChain(node);
         setChain(chainResult);
       } else {
         setChain([]);
@@ -221,7 +223,7 @@ const PoruchitelScreen: React.FC = () => {
     const unsubTrust = subscribeMyTrustNode((node) => {
       setTrustNode(node);
       if (node && node.rootPath.length > 0) {
-        void getMyTrustChain().then(setChain).catch(() => setChain([]));
+        void getMyTrustChain(node).then(setChain).catch(() => setChain([]));
       }
       void getMyInvitedChildren().then(setChildren).catch(() => setChildren([]));
     });
@@ -257,13 +259,20 @@ const PoruchitelScreen: React.FC = () => {
     void loadConfirmations();
   }, [loadConfirmations]);
 
+  // Realtime: reload confirmations when sponsor_confirmations changes for this user
+  useEffect(() => {
+    const unsub = subscribeMyConfirmations(() => { void loadConfirmations(); });
+    return unsub;
+  }, [loadConfirmations]);
+
   const respondToConfirmation = async (confirmationId: string, decision: 'approve' | 'deny') => {
+    setConfirmActionError(false);
     setBusyConfirmationId(confirmationId);
     try {
       if (decision === 'approve') await approveSponsorConfirmation(confirmationId);
       else await denySponsorConfirmation(confirmationId);
     } catch {
-      setLoadError(text.loadError);
+      setConfirmActionError(true);
       setBusyConfirmationId(null);
       return;
     }
@@ -373,6 +382,15 @@ const PoruchitelScreen: React.FC = () => {
             <Text style={styles.sectionTitle}>{text.confirmations}</Text>
             <View style={styles.confirmationsCard}>
               <Text style={styles.confirmationHint}>{text.confirmationHint}</Text>
+              {confirmActionError ? (
+                <View style={styles.confirmErrorRow}>
+                  <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#B84A3A" />
+                  <Text style={styles.confirmErrorText}>{text.loadError}</Text>
+                  <TouchableOpacity onPress={() => { setConfirmActionError(false); void loadConfirmations(); }} activeOpacity={0.82}>
+                    <Text style={styles.retryButtonText}>{text.retry}</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
               {confirmationsLoading ? (
                 <ActivityIndicator size="small" color={SCREEN_THEME.terracotta} style={{ marginTop: 12 }} />
               ) : confirmations.length === 0 ? (
@@ -382,7 +400,9 @@ const PoruchitelScreen: React.FC = () => {
                   <View style={styles.cardInfo}>
                     <Text style={styles.cardName}>{item.requesterPhoneMasked || item.requesterUid}</Text>
                     {item.comment ? <Text style={styles.cardPhone}>{item.comment}</Text> : null}
-                    <Text style={styles.cardPhone}>{text.expiresAt}: {new Date(item.expiresAt).toLocaleString(language === 'ru' ? 'ru-RU' : language === 'en' ? 'en-GB' : 'uk-UA')}</Text>
+                    {item.expiresAt > 0 ? (
+                      <Text style={styles.cardPhone}>{text.expiresAt}: {new Date(item.expiresAt).toLocaleString(language === 'ru' ? 'ru-RU' : language === 'en' ? 'en-GB' : 'uk-UA')}</Text>
+                    ) : null}
                   </View>
                   <View style={styles.confirmationActions}>
                     <TouchableOpacity
@@ -701,6 +721,19 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     opacity: 0.55,
+  },
+  confirmErrorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+    flexWrap: 'wrap',
+  },
+  confirmErrorText: {
+    flex: 1,
+    color: '#A44333',
+    fontSize: 12,
+    fontWeight: '700',
   },
 });
 
