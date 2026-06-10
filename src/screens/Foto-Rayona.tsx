@@ -1,5 +1,6 @@
 import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   Animated,
   ActivityIndicator,
   FlatList,
@@ -43,6 +44,10 @@ const UI_TEXT = {
     title: 'Фото району',
     approvedNote: 'Схвалені модератором фото',
     pending: 'на модерації',
+    awaitConfirm: 'чекаю підтвердження',
+    confirmBtn: 'Підтвердити',
+    confirmingBtn: 'Відправляю...',
+    confirmError: 'Не вдалося відправити. Спробуйте ще.',
     addPhoto: 'Додати фото',
     login: 'Увійдіть, щоб додати фото',
     empty: 'Поки немає фото району',
@@ -52,6 +57,10 @@ const UI_TEXT = {
     title: 'Фото района',
     approvedNote: 'Одобренные модератором фото',
     pending: 'на модерации',
+    awaitConfirm: 'ждёт подтверждения',
+    confirmBtn: 'Подтвердить',
+    confirmingBtn: 'Отправляю...',
+    confirmError: 'Не удалось отправить. Попробуйте ещё.',
     addPhoto: 'Добавить фото',
     login: 'Войдите, чтобы добавить фото',
     empty: 'Пока нет фото района',
@@ -61,6 +70,10 @@ const UI_TEXT = {
     title: 'District Photos',
     approvedNote: 'Photos approved by moderators',
     pending: 'in moderation',
+    awaitConfirm: 'awaiting confirmation',
+    confirmBtn: 'Confirm',
+    confirmingBtn: 'Submitting...',
+    confirmError: 'Could not submit. Try again.',
     addPhoto: 'Add photo',
     login: 'Sign in to add a photo',
     empty: 'No district photos yet',
@@ -177,111 +190,77 @@ export default function FotoRayonaScreen() {
       pulseLoopRef.current?.stop();
       pulseAnim.setValue(1);
     }
+    return () => {
+      pulseLoopRef.current?.stop();
+      pulseAnim.setValue(1);
+    };
   }, [hasUnsubmitted, pulseAnim]);
 
   useEffect(() => {
     let active = true;
-    let unsubPublic: (() => void) | undefined;
-    let unsubPending: (() => void) | undefined;
-
-    const updatePhotos = (approved: SoulPhoto[], pending: SoulPhoto[]) => {
-      if (!active) return;
-      const combined = [...approved, ...pending]
-        .sort((a, b) => b.createdAt - a.createdAt || b.id.localeCompare(a.id))
-        .slice(0, MAX_ITEMS);
-      setRemotePhotos(combined);
-      setLoading(false);
-    };
-
-    const parsePhoto = (id: string, raw: unknown, statusOverride?: 'approved'): SoulPhoto | null => {
-      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-      const photo = raw as RawPhoto;
-      const sourceScreen = clean(photo.sourceScreen);
-      if (sourceScreen !== SCREEN_ID && sourceScreen !== PHOTO_UPLOAD_SCREEN_ID) return null;
-      const author = clean(photo.uploadedBy);
-      const likes = typeof photo.likes === 'number' ? photo.likes : 0;
-      const rawStatus = clean(photo.status);
-      return {
-        id,
-        uri: clean(photo.thumbnailUrl) || clean(photo.imageUri),
-        storagePath: clean(photo.storagePath),
-        createdAt: timestamp(photo.createdAt) || timestamp(photo.uploadedAt),
-        status: statusOverride === 'approved' ? 'approved' : (rawStatus === 'saved' ? 'saved' : 'pending'),
-        ...(author ? { author } : {}),
-        likes,
-      };
-    };
+    let unsub: (() => void) | undefined;
 
     void ensureFirebaseAuth()
       .then(() => {
         if (!active) return;
         const currentUid = user?.id ?? '';
-        const approvedPhotos: SoulPhoto[] = [];
-        const pendingPhotos: SoulPhoto[] = [];
 
-        // Approved photos from community_photos collection (filtered by status)
-        const publicRef = ref(database, 'community_photos');
-        unsubPublic = onValue(
-          publicRef,
+        // Single listener on community_photos — partitions into approved + own pending/saved
+        const photosRef = ref(database, 'community_photos');
+        unsub = onValue(
+          photosRef,
           (snapshot) => {
             try {
               const value = snapshot.val() as unknown;
-              approvedPhotos.length = 0;
+              const approved: SoulPhoto[] = [];
+              const pending: SoulPhoto[] = [];
+
               if (value && typeof value === 'object' && !Array.isArray(value)) {
                 Object.entries(value as Record<string, unknown>).forEach(([id, raw]) => {
                   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return;
-                  const status = clean((raw as RawPhoto).status);
-                  if (status !== 'approved') return;
-                  const photo = parsePhoto(id, raw, 'approved');
-                  if (photo) approvedPhotos.push(photo);
+                  const photo = raw as RawPhoto;
+                  const sourceScreen = clean(photo.sourceScreen);
+                  if (sourceScreen !== SCREEN_ID && sourceScreen !== PHOTO_UPLOAD_SCREEN_ID) return;
+
+                  const status = clean(photo.status);
+                  const author = clean(photo.uploadedBy);
+                  const likes = typeof photo.likes === 'number' ? photo.likes : 0;
+                  const base: SoulPhoto = {
+                    id,
+                    uri: clean(photo.thumbnailUrl) || clean(photo.imageUri),
+                    storagePath: clean(photo.storagePath),
+                    createdAt: timestamp(photo.createdAt) || timestamp(photo.uploadedAt),
+                    status: status === 'approved' ? 'approved' : (status === 'saved' ? 'saved' : 'pending'),
+                    ...(author ? { author } : {}),
+                    likes,
+                  };
+
+                  if (status === 'approved') {
+                    approved.push(base);
+                  } else if ((status === 'pending' || status === 'saved') && currentUid) {
+                    const owner = clean(photo.uid) || clean(photo.userId);
+                    if (owner === currentUid) {
+                      pending.push(base);
+                    }
+                  }
                 });
               }
-              updatePhotos(approvedPhotos, pendingPhotos);
+
+              if (!active) return;
+              const combined = [...approved, ...pending]
+                .sort((a, b) => b.createdAt - a.createdAt || b.id.localeCompare(a.id))
+                .slice(0, MAX_ITEMS);
+              setRemotePhotos(combined);
+              setLoading(false);
             } catch (error) {
-              void logClientError('FotoRayonaScreen.publicPhotos', error);
+              void logClientError('FotoRayonaScreen.photosListener', error);
             }
           },
           (error) => {
-            void logClientError('FotoRayonaScreen.publicPhotosError', error);
+            void logClientError('FotoRayonaScreen.photosListenerError', error);
             if (active) setLoadError(true);
           },
         );
-
-        // Own pending photos
-        if (currentUid) {
-          const ownPendingRef = ref(database, 'community_photos');
-          unsubPending = onValue(
-            ownPendingRef,
-            (snapshot) => {
-              try {
-                const value = snapshot.val() as unknown;
-                pendingPhotos.length = 0;
-                if (value && typeof value === 'object' && !Array.isArray(value)) {
-                  Object.entries(value as Record<string, unknown>).forEach(([id, raw]) => {
-                    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return;
-                    const photo = raw as RawPhoto;
-                    const status = clean(photo.status);
-                    const owner = clean(photo.uid) || clean(photo.userId);
-                    const sourceScreen = clean(photo.sourceScreen);
-                    if ((status === 'pending' || status === 'saved') && owner === currentUid &&
-                        (sourceScreen === SCREEN_ID || sourceScreen === PHOTO_UPLOAD_SCREEN_ID)) {
-                      const item = parsePhoto(id, photo);
-                      if (item) pendingPhotos.push(item);
-                    }
-                  });
-                }
-                updatePhotos(approvedPhotos, pendingPhotos);
-              } catch (error) {
-                void logClientError('FotoRayonaScreen.pendingPhotos', error);
-              }
-            },
-            (error) => {
-              void logClientError('FotoRayonaScreen.pendingPhotosError', error);
-              if (active) setLoadError(true);
-            },
-          );
-        }
-        // loading will be resolved when unsubPublic fires
       })
       .catch((error) => {
         void logClientError('FotoRayonaScreen.auth', error);
@@ -290,8 +269,7 @@ export default function FotoRayonaScreen() {
 
     return () => {
       active = false;
-      unsubPublic?.();
-      unsubPending?.();
+      unsub?.();
     };
   }, [user?.id]);
 
@@ -320,10 +298,13 @@ export default function FotoRayonaScreen() {
       }
       await update(ref(database), batch);
       setSubmittedRtdbIds((prev) => new Set([...prev, ...toSubmit.map((p) => p.id)]));
+    } catch (error) {
+      void logClientError('FotoRayonaScreen.submitToModeration', error);
+      Alert.alert('', text.confirmError);
     } finally {
       setSubmitting(false);
     }
-  }, [deferredPhotos, submittedRtdbIds, submitting, user?.id]);
+  }, [deferredPhotos, submitting, text.confirmError, user?.id]);
 
   const renderItem = useCallback(
     ({ item }: { item: SoulPhoto }) => {
@@ -334,10 +315,10 @@ export default function FotoRayonaScreen() {
           </TouchableOpacity>
         );
       }
-      const pendingLabel = item.status === 'saved' ? 'чекаю підтвердження' : text.pending;
+      const pendingLabel = item.status === 'saved' ? text.awaitConfirm : text.pending;
       return <SoulTile item={item} size={tileSize} pendingLabel={pendingLabel} />;
     },
-    [text.pending, tileSize],
+    [text.awaitConfirm, text.pending, tileSize],
   );
 
   const header = (
@@ -361,7 +342,7 @@ export default function FotoRayonaScreen() {
             disabled={submitting}
           >
             <Text style={styles.submitText}>
-              {submitting ? 'Відправляю...' : 'Підтвердити'}
+              {submitting ? text.confirmingBtn : text.confirmBtn}
             </Text>
           </TouchableOpacity>
         </Animated.View>

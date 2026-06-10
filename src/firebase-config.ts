@@ -1314,6 +1314,8 @@ export const photoAPI = {
           uploadedBy: normalizedUploadedBy,
           ...(normalizedUploadedByEmail ? { uploadedByEmail: normalizedUploadedByEmail } : {}),
           target: photoData.target || 'gallery_public',
+          status: isDeferred ? 'saved' : 'pending',
+          moderationStatus: isDeferred ? 'not_submitted' : 'pending',
           ...(normalizedSourceScreen ? { sourceScreen: normalizedSourceScreen } : {}),
           ...(normalizedSourceScreenLabel ? { sourceScreenLabel: normalizedSourceScreenLabel } : {}),
           ...(normalizedSourceFeature ? { sourceFeature: normalizedSourceFeature } : {}),

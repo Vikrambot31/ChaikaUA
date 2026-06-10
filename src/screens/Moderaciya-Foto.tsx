@@ -169,6 +169,8 @@ const PhotoModerationScreen: React.FC = () => {
         const items: CommunityPhoto[] = Object.entries(value)
           .map(([id, raw]) => {
             if (!raw || typeof raw !== 'object') return null;
+            // Skip deferred photos (status='saved') — they haven't been submitted yet
+            if (raw.status === 'saved') return null;
             return {
               id,
               title: String(raw.title ?? ''),

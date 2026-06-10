@@ -3,6 +3,7 @@ import GuestRegisterBanner from '../components/GuestRegisterBanner';
 import { useGuestGuard } from '../hooks/useGuestGuard';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   FlatList,
   Modal,
@@ -19,7 +20,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { equalTo, get, onValue, orderByChild, query, ref, update } from 'firebase/database';
+import { onValue, ref, update } from 'firebase/database';
 import { useSelector } from 'react-redux';
 
 import AppPhotoImage from '../components/AppPhotoImage';
@@ -286,111 +287,74 @@ export default function SoulPhotosScreen() {
 
   useEffect(() => {
     let active = true;
-    let unsubPublic: (() => void) | undefined;
-    let unsubPending: (() => void) | undefined;
-
-    const updatePhotos = (approved: SoulPhoto[], pending: SoulPhoto[]) => {
-      if (!active) return;
-      const combined = [...approved, ...pending]
-        .sort((a, b) => b.createdAt - a.createdAt || b.id.localeCompare(a.id))
-        .slice(0, MAX_ITEMS);
-      setRemotePhotos(combined);
-      setLoading(false);
-    };
-
-    const parsePhoto = (id: string, raw: unknown, isApproved: boolean): SoulPhoto | null => {
-      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-      const photo = raw as RawPhoto;
-      const sourceScreen = clean(photo.sourceScreen);
-      if (sourceScreen !== SCREEN_ID && sourceScreen !== PHOTO_UPLOAD_SCREEN_ID) return null;
-      const description = clean(photo.description);
-      const author = clean(photo.uploadedBy);
-      const likes = typeof photo.likes === 'number' ? photo.likes : 0;
-      const categoryRaw = clean(photo.category);
-      const category: CategoryId | undefined = isValidCategoryId(categoryRaw) ? categoryRaw : undefined;
-      return {
-        id,
-        uri: clean(photo.thumbnailUrl) || clean(photo.imageUri),
-        storagePath: clean(photo.storagePath),
-        createdAt: timestamp(photo.createdAt) || timestamp(photo.uploadedAt),
-        status: isApproved ? 'approved' : 'pending',
-        category,
-        ...(description ? { description } : {}),
-        ...(author ? { author } : {}),
-        likes,
-      };
-    };
+    let unsub: (() => void) | undefined;
 
     void ensureFirebaseAuth()
       .then(() => {
         if (!active) return;
         const currentUid = user?.id ?? '';
-        const approvedPhotos: SoulPhoto[] = [];
-        const pendingPhotos: SoulPhoto[] = [];
 
-        // Approved photos from community_photos (moderatePhoto only updates status here,
-        // it does NOT copy to community_photos_public — so we read from the source).
-        // Firebase rules have ".indexOn": ["status", "sourceScreen"] on community_photos.
-        const publicQuery = query(ref(database, 'community_photos'), orderByChild('sourceScreen'), equalTo(SCREEN_ID));
-        unsubPublic = onValue(
-          publicQuery,
+        // Single listener on community_photos — partitions into approved + own pending/saved
+        const photosRef = ref(database, 'community_photos');
+        unsub = onValue(
+          photosRef,
           (snapshot) => {
             try {
               const value = snapshot.val() as unknown;
-              approvedPhotos.length = 0;
+              const approved: SoulPhoto[] = [];
+              const pending: SoulPhoto[] = [];
+
               if (value && typeof value === 'object' && !Array.isArray(value)) {
                 Object.entries(value as Record<string, unknown>).forEach(([id, raw]) => {
                   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return;
-                  // Only show approved photos in the gallery
-                  if (clean((raw as RawPhoto).status) !== 'approved') return;
-                  const photo = parsePhoto(id, raw, true);
-                  if (photo) approvedPhotos.push(photo);
+                  const photo = raw as RawPhoto;
+                  const sourceScreen = clean(photo.sourceScreen);
+                  if (sourceScreen !== SCREEN_ID && sourceScreen !== PHOTO_UPLOAD_SCREEN_ID) return;
+
+                  const status = clean(photo.status);
+                  const description = clean(photo.description);
+                  const author = clean(photo.uploadedBy);
+                  const likes = typeof photo.likes === 'number' ? photo.likes : 0;
+                  const categoryRaw = clean(photo.category);
+                  const category: CategoryId | undefined = isValidCategoryId(categoryRaw) ? categoryRaw : undefined;
+                  const base: SoulPhoto = {
+                    id,
+                    uri: clean(photo.thumbnailUrl) || clean(photo.imageUri),
+                    storagePath: clean(photo.storagePath),
+                    createdAt: timestamp(photo.createdAt) || timestamp(photo.uploadedAt),
+                    status: status === 'approved' ? 'approved' : 'pending',
+                    category,
+                    ...(description ? { description } : {}),
+                    ...(author ? { author } : {}),
+                    likes,
+                  };
+
+                  if (status === 'approved') {
+                    approved.push(base);
+                  } else if ((status === 'pending' || status === 'saved') && currentUid) {
+                    const owner = clean(photo.uid) || clean(photo.userId);
+                    if (owner === currentUid) {
+                      pending.push(base);
+                    }
+                  }
                 });
               }
-              updatePhotos(approvedPhotos, pendingPhotos);
+
+              if (!active) return;
+              const combined = [...approved, ...pending]
+                .sort((a, b) => b.createdAt - a.createdAt || b.id.localeCompare(a.id))
+                .slice(0, MAX_ITEMS);
+              setRemotePhotos(combined);
+              setLoading(false);
             } catch (error) {
-              void logClientError('SoulPhotosScreen.publicPhotos', error);
+              void logClientError('SoulPhotosScreen.photosListener', error);
             }
           },
           (error) => {
-            void logClientError('SoulPhotosScreen.publicPhotosError', error);
+            void logClientError('SoulPhotosScreen.photosListenerError', error);
             if (active) setLoadError(true);
           },
         );
-
-        // Own pending photos
-        if (currentUid) {
-          const ownPendingRef = ref(database, 'community_photos');
-          unsubPending = onValue(
-            ownPendingRef,
-            (snapshot) => {
-              try {
-                const value = snapshot.val() as unknown;
-                pendingPhotos.length = 0;
-                if (value && typeof value === 'object' && !Array.isArray(value)) {
-                  Object.entries(value as Record<string, unknown>).forEach(([id, raw]) => {
-                    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return;
-                    const photo = raw as RawPhoto;
-                    const status = clean(photo.status);
-                    const owner = clean(photo.uid) || clean(photo.userId);
-                    if (status === 'pending' && owner === currentUid) {
-                      const parsed = parsePhoto(id, raw, false);
-                      if (parsed) pendingPhotos.push(parsed);
-                    }
-                  });
-                }
-                updatePhotos(approvedPhotos, pendingPhotos);
-              } catch (error) {
-                void logClientError('SoulPhotosScreen.pendingPhotos', error);
-              }
-            },
-            (error) => {
-              void logClientError('SoulPhotosScreen.pendingPhotosError', error);
-              if (active) setLoadError(true);
-            },
-          );
-        }
-        // loading will be resolved when unsubPublic fires
       })
       .catch((error) => {
         void logClientError('SoulPhotosScreen.auth', error);
@@ -399,8 +363,7 @@ export default function SoulPhotosScreen() {
 
     return () => {
       active = false;
-      unsubPublic?.();
-      unsubPending?.();
+      unsub?.();
     };
   }, [user?.id]);
 
@@ -479,6 +442,7 @@ export default function SoulPhotosScreen() {
       setSubmittedRtdbIds((prev) => new Set([...prev, ...toSubmit.map((p) => p.rtdbId!)]));
     } catch (error) {
       void logClientError('SoulPhotosScreen.submitToModeration', error);
+      Alert.alert('', text.uploadError);
     } finally {
       setSubmitting(false);
     }
