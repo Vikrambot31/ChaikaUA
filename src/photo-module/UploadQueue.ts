@@ -286,17 +286,7 @@ export const UploadQueue = {
             collection,
             compressedUri: task.compressedUri,
             metadata: task.metadata
-              ? {
-                  uploadedBy: task.metadata.uploadedBy,
-                  title: task.metadata.title,
-                  description: task.metadata.description,
-                  sourceScreen: task.metadata.sourceScreen,
-                  sourceScreenLabel: task.metadata.sourceScreenLabel,
-                  sourceFeature: task.metadata.sourceFeature,
-                  locationLabel: task.metadata.locationLabel,
-                  locationType: task.metadata.locationType,
-                  target: defaultTarget,
-                }
+              ? { ...task.metadata, target: defaultTarget }
               : { target: defaultTarget },
             onProgress: (() => {
               let lastProgressUpdate = 0;
@@ -349,8 +339,12 @@ export const UploadQueue = {
           await ImageStorage.updatePhoto(task.photoId, {
             imageUrl: result.downloadUrl,
             storagePath: result.storagePath,
+            rtdbId: result.rtdbId,
             status: 'uploaded',
-            moderationStatus: collection === 'community_photos' ? 'pending' : 'not_submitted',
+            moderationStatus:
+              collection === 'community_photos' && !task.metadata?.moderationDeferred
+                ? 'pending'
+                : 'not_submitted',
             error: undefined,
             retryCount: task.retryCount,
           });

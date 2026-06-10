@@ -81,8 +81,8 @@ const maybeFinishStartupSync = (): void => {
 };
 
 export const beginStartupSync = (): void => {
-  if (startedAt) {
-    return;
+  if (startedAt && !completionReason) {
+    return; // already in-flight — do not restart
   }
 
   startedAt = Date.now();
@@ -186,6 +186,12 @@ export const classifyStartupTransientIssue = ({
 
   if (isFirebaseBootstrap && /permission_denied|permission denied|network|fetch failed|offline/.test(haystack)) {
     return { shouldSuppress: true, reason: 'startup_firebase_bootstrap' };
+  }
+
+  // Any permission_denied during startup is transient — Firebase auth hasn't
+  // finished initialising yet, so RTDB rejects reads on protected paths.
+  if (/permission_denied|permission denied/.test(haystack)) {
+    return { shouldSuppress: true, reason: 'startup_permission_bootstrap' };
   }
 
   return { shouldSuppress: false };

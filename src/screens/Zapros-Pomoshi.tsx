@@ -330,7 +330,7 @@ const HelpRequestScreen: React.FC = () => {
     description?: string;
   }>({});
 
-  const MAX_DESCRIPTION_LENGTH = 500;
+  const MAX_DESCRIPTION_LENGTH = 280;
 
   const subtypes = useMemo(
     () => (HELP_SUBTYPES[helpType] ?? []).map((subtype) => ({
@@ -439,10 +439,7 @@ const HelpRequestScreen: React.FC = () => {
     const helpLabel = helpTypeIndex >= 0 ? helpTypeLabels[helpTypeIndex] : helpType;
     const subLabel = subtypes.find((s) => s.value === subType)?.label;
     const categoryLabel = subLabel ? `${helpLabel} • ${subLabel}` : helpLabel;
-    const finalText = sanitizeStoredText(description.trim() || categoryLabel);
-    const finalDescription = sanitizeStoredText(
-      description.trim() ? description.trim() : categoryLabel
-    );
+    const finalDescription = sanitizeStoredText(description.trim() || categoryLabel);
 
     setSubmitting(true);
     try {
@@ -454,7 +451,6 @@ const HelpRequestScreen: React.FC = () => {
         group: 'help_neighbors',
         subcategory: helpType,
         building: user?.houseNumber ? `Чайка, буд. ${user.houseNumber}` : 'Чайка',
-        text: finalText,
         description: finalDescription,
         photoUri: firstPhoto?.downloadUrl ?? '',
         photoStoragePath: firstPhoto?.storagePath ?? '',
@@ -522,6 +518,7 @@ const HelpRequestScreen: React.FC = () => {
               onChangeText={(value) => { setName(normalizePersonName(value)); if (fieldErrors.name) setFieldErrors((prev) => ({ ...prev, name: undefined })); }}
               style={styles.input}
               placeholderTextColor={SCREEN_THEME.textMuted}
+              editable={!submitting}
             />
             <FormFieldError error={fieldErrors.name} />
 
@@ -534,6 +531,7 @@ const HelpRequestScreen: React.FC = () => {
               keyboardType="phone-pad"
               style={styles.input}
               placeholderTextColor={SCREEN_THEME.textMuted}
+              editable={!submitting}
             />
             <FormFieldError error={fieldErrors.phone} />
 
@@ -578,6 +576,7 @@ const HelpRequestScreen: React.FC = () => {
             multiline
             maxLength={MAX_DESCRIPTION_LENGTH}
             textAlignVertical="top"
+            editable={!submitting}
           />
           <Text style={styles.counter}>
             {description.length}/{MAX_DESCRIPTION_LENGTH} {text.charsLeft}

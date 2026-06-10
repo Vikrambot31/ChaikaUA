@@ -1,8 +1,9 @@
-import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import GuestRegisterBanner from '../components/GuestRegisterBanner';
 import { useGuestGuard } from '../hooks/useGuestGuard';
 import {
   ActivityIndicator,
+  Animated,
   FlatList,
   Modal,
   Pressable,
@@ -18,7 +19,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { equalTo, onValue, orderByChild, query, ref } from 'firebase/database';
+import { equalTo, get, onValue, orderByChild, query, ref, update } from 'firebase/database';
 import { useSelector } from 'react-redux';
 
 import AppPhotoImage from '../components/AppPhotoImage';
@@ -87,6 +88,9 @@ const UI_TEXT = {
     tabAll: 'Всі',
     categoryLabel: 'Категорія',
     categoryRequired: 'Оберіть категорію для фото',
+    submitBtn: 'Відправити на модерацію',
+    submitting: 'Надсилаємо...',
+    uploadingLabel: 'Фото завантажується...',
   },
   ru: {
     title: 'Фото для Души',
@@ -106,6 +110,9 @@ const UI_TEXT = {
     tabAll: 'Все',
     categoryLabel: 'Категория',
     categoryRequired: 'Выберите категорию для фото',
+    submitBtn: 'Отправить на модерацию',
+    submitting: 'Отправляем...',
+    uploadingLabel: 'Фото загружается...',
   },
   en: {
     title: 'Photos for the Soul',
@@ -125,6 +132,9 @@ const UI_TEXT = {
     tabAll: 'All',
     categoryLabel: 'Category',
     categoryRequired: 'Choose a category for this photo',
+    submitBtn: 'Submit for moderation',
+    submitting: 'Submitting...',
+    uploadingLabel: 'Photo is uploading...',
   },
 } as const;
 
@@ -266,6 +276,14 @@ export default function SoulPhotosScreen() {
   // Category chosen for new upload
   const [uploadCategory, setUploadCategory] = useState<CategoryId | null>(null);
 
+  // Deferred moderation: track which rtdbIds have been submitted by the user
+  const [submittedRtdbIds, setSubmittedRtdbIds] = useState<Set<string>>(new Set());
+  const [submitting, setSubmitting] = useState(false);
+
+  // Pulsing animation for the submit button
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const pulseLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+
   useEffect(() => {
     let active = true;
     let unsubPublic: (() => void) | undefined;
@@ -394,6 +412,72 @@ export default function SoulPhotosScreen() {
       return next;
     });
   }, []);
+
+  // Photos that finished uploading to Storage
+  const donePhotos = useMemo(
+    () => Object.values(pickedPhotos).filter((p) => p.status === 'done'),
+    [pickedPhotos],
+  );
+
+  // True when at least one done photo hasn't been submitted to moderation yet
+  const hasUnsubmitted = useMemo(
+    () => donePhotos.some((p) => p.rtdbId && !submittedRtdbIds.has(p.rtdbId)),
+    [donePhotos, submittedRtdbIds],
+  );
+
+  const isUploading = useMemo(
+    () => Object.values(pickedPhotos).some((p) => p.status === 'uploading'),
+    [pickedPhotos],
+  );
+
+  // Start/stop pulse when submit button becomes available
+  useEffect(() => {
+    if (hasUnsubmitted) {
+      const loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, { toValue: 1.04, duration: 650, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 1, duration: 650, useNativeDriver: true }),
+        ]),
+      );
+      pulseLoopRef.current = loop;
+      loop.start();
+    } else {
+      pulseLoopRef.current?.stop();
+      pulseLoopRef.current = null;
+      pulseAnim.setValue(1);
+    }
+    return () => {
+      pulseLoopRef.current?.stop();
+    };
+  }, [hasUnsubmitted, pulseAnim]);
+
+  // Submit the uploaded photos to moderation queue
+  const submitToModeration = useCallback(async () => {
+    if (submitting || !user?.id) return;
+    const toSubmit = donePhotos.filter((p) => p.rtdbId && !submittedRtdbIds.has(p.rtdbId));
+    if (toSubmit.length === 0) return;
+
+    setSubmitting(true);
+    try {
+      const batch: Record<string, unknown> = {};
+      const now = Date.now();
+      for (const photo of toSubmit) {
+        batch[`community_photos/${photo.rtdbId}/status`] = 'pending';
+        batch[`community_photos/${photo.rtdbId}/moderationStatus`] = 'pending';
+        batch[`community_photos/${photo.rtdbId}/updatedAt`] = now;
+        // Update category/description/address at submit time so edits are captured
+        if (uploadCategory) batch[`community_photos/${photo.rtdbId}/category`] = uploadCategory;
+        if (description.trim()) batch[`community_photos/${photo.rtdbId}/description`] = description.trim();
+        if (address.trim()) batch[`community_photos/${photo.rtdbId}/locationLabel`] = address.trim();
+      }
+      await update(ref(database), batch);
+      setSubmittedRtdbIds((prev) => new Set([...prev, ...toSubmit.map((p) => p.rtdbId!)]));
+    } catch (error) {
+      void logClientError('SoulPhotosScreen.submitToModeration', error);
+    } finally {
+      setSubmitting(false);
+    }
+  }, [submitting, user?.id, donePhotos, submittedRtdbIds, uploadCategory, description, address]);
 
   const data = useMemo<SoulPhoto[]>(() => {
     const remotePaths = new Set(remotePhotos.map((photo) => photo.storagePath).filter(Boolean));
@@ -583,6 +667,7 @@ export default function SoulPhotosScreen() {
                 locationLabel: address.trim(),
                 locationType: address.trim() ? 'place' : undefined,
                 category: uploadCategory,
+                moderationDeferred: true,
               }}
             />
           )}
@@ -598,7 +683,37 @@ export default function SoulPhotosScreen() {
         </TouchableOpacity>
       )}
 
-      {(hasUploadedLocal || pendingCount > 0) && (
+      {/* Uploading indicator */}
+      {isUploading && (
+        <View style={styles.statusBadge}>
+          <ActivityIndicator size="small" color="#fff" />
+          <Text style={styles.submitText}>{text.uploadingLabel}</Text>
+        </View>
+      )}
+
+      {/* Pulsing submit button — shown when photo is ready but not yet sent */}
+      {hasUnsubmitted && !isUploading && (
+        <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+          <TouchableOpacity
+            style={styles.submitButton}
+            onPress={() => void submitToModeration()}
+            disabled={submitting}
+            activeOpacity={0.82}
+          >
+            {submitting ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <MaterialCommunityIcons name="send-check-outline" size={18} color="#fff" />
+            )}
+            <Text style={styles.submitButtonText}>
+              {submitting ? text.submitting : text.submitBtn}
+            </Text>
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+
+      {/* Sent badge — shown after user pressed submit */}
+      {!hasUnsubmitted && !isUploading && (hasUploadedLocal || pendingCount > 0) && (
         <View style={styles.statusBadge}>
           <MaterialCommunityIcons name="clock-outline" size={16} color="#fff" />
           <Text style={styles.submitText}>{text.sending}</Text>
@@ -956,6 +1071,25 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '900',
     textAlign: 'center',
+  },
+  submitButton: {
+    minHeight: 52,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#C97959',
+    shadowColor: '#C97959',
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
+  submitButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '900',
   },
 
   // Empty state

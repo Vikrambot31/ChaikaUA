@@ -9,7 +9,6 @@ import {
   rejectBusinessCard,
   deleteBusinessClaim,
   deleteBusinessCard,
-  updateBusinessClaim,
   updateBusinessCard,
   subscribeToBusinessPlusSubscriptions,
   activateBusinessPlusManual,
@@ -26,15 +25,15 @@ type CategoryFilter = 'all' | 'food' | 'beauty' | 'kids' | 'business';
 
 const CATEGORY_LABELS: Record<CategoryFilter, string> = {
   all: 'Всі',
-  food: 'Еда на чайке',
-  beauty: 'Салони красоти',
+  food: 'Їжа на Чайці',
+  beauty: 'Салони краси',
   kids: 'Все для дітей',
   business: 'Бізнес Чайка',
 };
 
 const categoryBadge = (cat: string) => {
   const colors: Record<string, { bg: string; color: string; label: string }> = {
-    food:     { bg: '#f1f8e9', color: '#558b2f', label: 'Еда' },
+    food:     { bg: '#f1f8e9', color: '#558b2f', label: 'Їжа' },
     beauty:   { bg: '#fce4ec', color: '#ad1457', label: 'Салон' },
     kids:     { bg: '#e1f5fe', color: '#0277bd', label: 'Діти' },
     business: { bg: '#fffde7', color: '#f57f17', label: 'Бізнес' },
@@ -886,7 +885,18 @@ function SubscriptionsTab() {
               display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12,
             }}>
               <div>
-                <div style={{ color: '#1a1a2e', fontSize: 14, fontWeight: 700 }}>{sub.uid}</div>
+                <div style={{ color: '#1a1a2e', fontSize: 14, fontWeight: 700 }}>
+                  {sub.userName ?? '—'}
+                  {sub.userPhone ? <span style={{ color: '#666', fontWeight: 400, marginLeft: 8 }}>{sub.userPhone}</span> : null}
+                </div>
+                {sub.businessEmail && (
+                  <div style={{ color: '#7A1E5C', fontSize: 13, fontWeight: 700, marginTop: 2 }}>
+                    ✉ {sub.businessEmail}
+                  </div>
+                )}
+                <div style={{ color: '#999', fontSize: 12, marginTop: 2 }}>
+                  UID: {sub.uid}
+                </div>
                 <div style={{ color: '#777', fontSize: 13, marginTop: 2 }}>
                   До: <span style={{ color: isActive ? '#2e7d32' : '#c62828' }}>{expStr}</span>
                   {sub.notes ? <span style={{ marginLeft: 10, color: '#666' }}>{sub.notes}</span> : null}

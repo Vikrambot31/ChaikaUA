@@ -296,13 +296,7 @@ const EditProfileScreen: React.FC<{ navigation: { goBack: () => void; navigate: 
   }) => {
     const uid = auth.currentUser?.uid || user?.id;
     if (!uid) {
-      if (nextStartAvatarKey) {
-        await saveSelectedStartAvatar(nextStartAvatarKey);
-      }
-      setPhotoURL(nextPhotoURL);
-      setPhotoStoragePaths(nextPhotoStoragePaths);
-      setStartAvatarKey(nextStartAvatarKey);
-      Alert.alert(text.avatarSavedTitle, text.avatarSavedBody);
+      Alert.alert(t.profile.errorTitle, text.avatarError);
       return;
     }
 

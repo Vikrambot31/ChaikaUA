@@ -139,6 +139,7 @@ const CreateBuySellScreen: React.FC = () => {
   }, [text.draftRestoredMsg, text.draftRestoredOk, text.draftRestoredTitle]);
 
   const handleSubmit = async () => {
+    if (submitting) return;
     startOperation();
 
     trace('validate', 'start');
@@ -218,6 +219,7 @@ const CreateBuySellScreen: React.FC = () => {
         photoUri: donePhotos[0]?.downloadUrl ?? '',
         photoStoragePath: donePhotos[0]?.storagePath ?? '',
         photoId: '',
+        photos: donePhotos.map((p) => ({ downloadUrl: p.downloadUrl, storagePath: p.storagePath })),
         moderationStatus: 'pending',
         submittedForModerationAt: createdAt.toISOString(),
         createdAt: createdAt.toISOString(),

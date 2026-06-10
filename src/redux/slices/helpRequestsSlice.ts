@@ -6,6 +6,7 @@ import { Request } from '../../types/app';
 export interface HelpRequestsState {
   items: HelpRequest[];
   todayItems: HelpRequest[];
+  hiddenIds: string[];
   loading: boolean;
   error: string | null;
 }
@@ -13,6 +14,7 @@ export interface HelpRequestsState {
 const initialState: HelpRequestsState = {
   items: [],
   todayItems: [],
+  hiddenIds: [],
   loading: false,
   error: null,
 };
@@ -43,6 +45,9 @@ const helpRequestsSlice = createSlice({
       }
     },
     removeHelpRequest: (state, action: PayloadAction<string>) => {
+      if (!state.hiddenIds.includes(action.payload)) {
+        state.hiddenIds.push(action.payload);
+      }
       state.items = state.items.filter((r) => r.id !== action.payload);
       state.todayItems = state.todayItems.filter((r) => r.id !== action.payload);
     },
@@ -89,7 +94,7 @@ const helpRequestsSlice = createSlice({
             moderatedAt: item.moderatedAt ? new Date(item.moderatedAt).toISOString() : undefined,
           } as HelpRequest;
         });
-      const merged = mapped;
+      const merged = mapped.filter((item) => !state.hiddenIds.includes(item.id));
       state.items = merged;
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -100,6 +105,7 @@ const helpRequestsSlice = createSlice({
     builder.addCase('auth/logout', (state) => {
       state.items = [];
       state.todayItems = [];
+      state.hiddenIds = [];
     });
   },
 });

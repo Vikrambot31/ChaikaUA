@@ -20,6 +20,8 @@ export type UploadedPhoto = {
   thumbUri: string;
   downloadUrl: string;
   storagePath: string;
+  /** RTDB push-key of the pending record — populated after upload completes. */
+  rtdbId?: string;
   status: 'uploading' | 'done' | 'error';
   progress: number;
   error?: string;
@@ -125,6 +127,7 @@ const mapPhoto = (photo: UserPhoto): UploadedPhoto => ({
   thumbUri: getPhotoThumbnailUri(photo) || photo.thumbnail || photo.localUri,
   downloadUrl: photo.imageUrl || getBestPhotoUri(photo),
   storagePath: photo.storagePath || photo.filePath || '',
+  rtdbId: photo.rtdbId,
   status: mapStatus(photo.status),
   progress: photo.progress ?? (photo.status === 'uploaded' ? 100 : 0),
   error: photo.error,

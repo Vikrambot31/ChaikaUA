@@ -22,7 +22,15 @@ export const getUserRole = async (uid: string): Promise<SecurityRole> => {
   try {
     const snapshot = await get(ref(database, `user_roles/${uid}/role`));
     return normalizeSecurityRole(snapshot.val());
-  } catch {
+  } catch (error) {
+    // Fall back to cached role so a network error doesn't silently strip
+    // admin/moderator privileges.
+    void logClientError('moderatorService.getUserRole', error instanceof Error ? error : new Error(String(error)), { uid });
+    const { getCachedSecurityRole } = await import('./securityRoles');
+    const cached = await getCachedSecurityRole(uid);
+    if (cached) {
+      return cached.role;
+    }
     return 'user';
   }
 };

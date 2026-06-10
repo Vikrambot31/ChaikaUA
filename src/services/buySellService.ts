@@ -20,6 +20,7 @@ export interface BuySellListing {
   photoUri: string;
   photoStoragePath?: string;
   photoId?: string;
+  photos?: Array<{ downloadUrl: string; storagePath: string }>;
   moderationStatus: ModerationStatus;
   submittedForModerationAt: string;
   createdAt: string;

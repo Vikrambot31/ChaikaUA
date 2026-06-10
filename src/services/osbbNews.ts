@@ -1,4 +1,4 @@
-import { ref, push, update, onValue, query, orderByChild, equalTo, limitToLast, runTransaction, remove } from 'firebase/database';
+import { ref, push, update, onValue, get, query, orderByChild, equalTo, limitToLast, runTransaction, remove } from 'firebase/database';
 import { database, auth } from '../firebase-core';
 import { ensureFirebaseAuth } from '../firebase-auth-session';
 import { createPendingModeration, ModerationStatus } from '../utils/moderation';
@@ -99,12 +99,20 @@ export const subscribeOsbbNews = (
 };
 
 export const loadOsbbNews = async (buildingId: string | null | undefined): Promise<OsbbNewsItem[]> => {
-  return await new Promise((resolve) => {
-    const unsubscribe = subscribeOsbbNews(buildingId, (items) => {
-      unsubscribe();
-      resolve(items);
-    });
-  });
+  if (!buildingId) return [];
+  await ensureFirebaseAuth();
+  const listRef = query(
+    ref(database, `${PATH}/${buildingId}`),
+    orderByChild('moderationStatus'),
+    equalTo('approved'),
+    limitToLast(100),
+  );
+  const snapshot = await get(listRef);
+  const raw = snapshot.val();
+  if (!raw) return [];
+  return Object.entries(raw as Record<string, StoredNews>)
+    .map((entry) => mapNews(entry as [string, StoredNews]))
+    .sort((a, b) => getNewsTime(b) - getNewsTime(a));
 };
 
 export const addOsbbNews = async (

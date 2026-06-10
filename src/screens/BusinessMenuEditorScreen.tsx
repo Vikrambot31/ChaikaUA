@@ -190,6 +190,10 @@ export default function BusinessMenuEditorScreen({
   };
 
   const handleSave = async () => {
+    if (!currentUser?.id) {
+      Alert.alert(text.errorTitle, 'Необхідно увійти в акаунт');
+      return;
+    }
     const validItems = menuItems.filter((d) => d.name.trim());
     setSaving(true);
     try {
@@ -205,7 +209,7 @@ export default function BusinessMenuEditorScreen({
         menuItems: validItems,
         ...(photoStoragePath ? { photoStoragePath } : {}),
         ...(photoUri ? { photoUri } : {}),
-        moderationStatus: 'pending',
+        moderationStatus: (existing.moderationStatus as string | undefined) ?? 'pending',
         updatedAt: new Date().toISOString(),
       });
 
@@ -242,7 +246,7 @@ export default function BusinessMenuEditorScreen({
         <View style={styles.headerSpacer} />
       </View>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
           {/* Photo section */}

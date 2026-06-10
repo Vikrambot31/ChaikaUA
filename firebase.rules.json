@@ -676,6 +676,23 @@
       ".indexOn": ["screen", "expiresAt"]
     },
 
+    "feature_ratings": {
+      ".read": "auth != null && (root.child('user_roles').child(auth.uid).child('role').val() === 'admin' || root.child('user_roles').child(auth.uid).child('role').val() === 'moderator')",
+      "$screenId": {
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": "auth != null && auth.uid === $uid && auth.token.firebase.sign_in_provider !== 'anonymous'"
+        }
+      }
+    },
+
+    "feature_ratings_summary": {
+      ".read": "auth != null",
+      "$screenId": {
+        ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous'"
+      }
+    },
+
     "business_plus_cards": {
       ".read": "auth != null",
       ".indexOn": ["moderationStatus", "ownerId"],

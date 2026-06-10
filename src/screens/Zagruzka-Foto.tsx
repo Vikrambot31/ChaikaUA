@@ -213,12 +213,6 @@ const PhotoUploadScreen: React.FC = () => {
     if (user?.name) setAuthor(normalizePersonName(user.name));
   }, [user?.name]);
 
-  // Clear draft when leaving the screen without submitting
-  useEffect(() => {
-    return () => {
-      void AsyncStorage.removeItem(PHOTO_UPLOAD_DRAFT_KEY).catch(() => {});
-    };
-  }, []);
 
   useEffect(() => {
     // Restore draft if Android restarts activity while picker/camera is open.
@@ -287,6 +281,7 @@ const PhotoUploadScreen: React.FC = () => {
   const submit = useCallback(async () => {
     startOperation();
 
+    if (uploading) return;
     trace('validate', 'start');
     if (!canSubmit) {
       trace('validate', 'fail', { missing: 'canSubmit' });
@@ -366,17 +361,21 @@ const PhotoUploadScreen: React.FC = () => {
         </View>
 
         <View style={styles.previewWrapper}>
-          <PhotoUploadField
-            uid={user?.id ?? ''}
-            userName={user?.name ?? ''}
-            maxPhotos={5}
-            storagePath="community_photos"
-            onPhotosChange={setFormPhotos}
-          />
+          {user?.id ? (
+            <PhotoUploadField
+              uid={user.id}
+              userName={user?.name ?? ''}
+              maxPhotos={5}
+              storagePath="community_photos"
+              onPhotosChange={setFormPhotos}
+            />
+          ) : (
+            <Text style={styles.fieldHint}>{text.signInRequired}</Text>
+          )}
           <UploadedPhotosGrid />
         </View>
         <Text style={styles.fieldHint}>{text.hintPhoto}</Text>
-        <InlineFieldHint message={text.addPhotoWarning} type="warning" visible={donePhotos.length === 0} />
+        <InlineFieldHint message={text.addPhotoWarning} type="warning" visible={donePhotos.length === 0 && !hasUploadingPhotos} />
         <InlineFieldHint message={text.waitUploadWarning} type="hint" visible={hasUploadingPhotos} />
         <InlineFieldHint message={text.fixPhotoWarning} type="error" visible={hasPhotoErrors} />
 

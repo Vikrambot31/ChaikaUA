@@ -60,6 +60,8 @@ export interface EngineUploadOptions {
     sourceFeature?: string;
     locationLabel?: string;
     locationType?: 'building' | 'place';
+    category?: string;
+    moderationDeferred?: boolean;
   };
   /** Called with 0–100 as upload progresses. */
   onProgress?: (percent: number) => void;
@@ -344,12 +346,13 @@ export async function uploadPhotoWithEngine(
 
   const isRequestPhoto = collection === 'requests';
   const isPersonalPhoto = collection !== 'community_photos' && !isRequestPhoto;
+  const isDeferred = Boolean(metadata?.moderationDeferred);
   const rtdbPayload: Record<string, unknown> = {
     storagePath,
     imageUri: downloadUrl ?? storagePath,
-    status: isPersonalPhoto ? 'saved' : 'pending',
+    status: isPersonalPhoto || isDeferred ? 'saved' : 'pending',
     uploadStatus: 'saved',
-    moderationStatus: isPersonalPhoto ? 'not_submitted' : 'pending',
+    moderationStatus: isPersonalPhoto || isDeferred ? 'not_submitted' : 'pending',
     uploadedAt: now,
     createdAt: now,
     updatedAt: now,
@@ -365,6 +368,7 @@ export async function uploadPhotoWithEngine(
     ...(metadata?.sourceFeature ? { sourceFeature: metadata.sourceFeature } : {}),
     ...(metadata?.locationLabel ? { locationLabel: metadata.locationLabel } : {}),
     ...(metadata?.locationType ? { locationType: metadata.locationType } : {}),
+    ...(metadata?.category ? { category: metadata.category } : {}),
     ...(thumbnailUrl ? { thumbnailUrl } : {}),
   };
 

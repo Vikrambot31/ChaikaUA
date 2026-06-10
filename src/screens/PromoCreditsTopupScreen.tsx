@@ -112,9 +112,10 @@ const PromoCreditsTopupScreen: React.FC = () => {
   }, [authUid]);
 
   useEffect(() => {
+    if (!authUid) return;
     const unsub = subscribeMyPromoCredits(setCredits);
     return unsub;
-  }, []);
+  }, [authUid]);
 
   useEffect(() => {
     if (!ticket?.ticketId) {
@@ -237,7 +238,7 @@ const PromoCreditsTopupScreen: React.FC = () => {
                   activeOpacity={0.84}
                 >
                   <Text style={[styles.packageCredits, active && styles.packageCreditsActive]}>{pack.credits}</Text>
-                  <Text style={[styles.packageLabel, active && styles.packageLabelActive]}>{t.common.loading}</Text>
+                  <Text style={[styles.packageLabel, active && styles.packageLabelActive]}>{pack.label}</Text>
                   <Text style={[styles.packageAmount, active && styles.packageAmountActive]}>{pack.amount} UAH</Text>
                 </TouchableOpacity>
               );
@@ -252,9 +253,9 @@ const PromoCreditsTopupScreen: React.FC = () => {
           </View>
 
           <TouchableOpacity
-            style={[styles.createButton, (!isOnline || creating) && styles.disabledButton]}
+            style={[styles.createButton, (!isOnline || creating || !authUid) && styles.disabledButton]}
             onPress={() => void createTopupTicket()}
-            disabled={!isOnline || creating}
+            disabled={!isOnline || creating || !authUid}
             activeOpacity={0.86}
           >
             {creating ? (

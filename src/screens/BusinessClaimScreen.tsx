@@ -117,6 +117,7 @@ export default function BusinessClaimScreen({
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async () => {
+    if (submitting) return;
     const trimmedName = name.trim();
     const normalizedPhone = normalizeUkrainianPhoneStrict(phone.trim());
 
@@ -136,7 +137,7 @@ export default function BusinessClaimScreen({
 
     setSubmitting(true);
     try {
-      const claimRef = ref(database, `business_plus_claims/${item.sourceId}`);
+      const claimRef = ref(database, `business_plus_claims/${item.sourceId}/${currentUser.id}`);
       await set(claimRef, {
         placeId: item.sourceId,
         placeName: item.title,
@@ -172,7 +173,7 @@ export default function BusinessClaimScreen({
         <View style={styles.headerSpacer} />
       </View>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <View style={styles.infoCard}>
             <MaterialCommunityIcons name="store-check-outline" size={28} color={SCREEN_THEME.terracotta} />

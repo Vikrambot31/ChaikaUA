@@ -310,23 +310,13 @@ const MyPhotosScreen: React.FC = () => {
 
   const userId = uid || userEmail || 'local-user';
 
-  // Derived moderation sections
-  const savedPhotos = useMemo(() => rtdbPhotos.filter((p) => p.status === 'not_submitted'), [rtdbPhotos]);
-  const pendingPhotos = useMemo(() => rtdbPhotos.filter((p) => p.status === 'pending'), [rtdbPhotos]);
-  const approvedPhotos = useMemo(() => rtdbPhotos.filter((p) => p.status === 'approved'), [rtdbPhotos]);
-  const rejectedPhotos = useMemo(() => rtdbPhotos.filter((p) => p.status === 'rejected'), [rtdbPhotos]);
-  const rtdbPhotoKeys = useMemo(() => {
-    const keys = new Set<string>();
-    rtdbPhotos.forEach((photo) => {
-      if (photo.storagePath) keys.add(photo.storagePath);
-      if (photo.imageUri) keys.add(photo.imageUri);
-    });
-    return keys;
-  }, [rtdbPhotos]);
-  const displayedLocalPhotos = useMemo(() => localPhotos.filter((photo) => (
-    photo.status !== 'uploaded' ||
-    !((photo.storagePath && rtdbPhotoKeys.has(photo.storagePath)) || (photo.imageUrl && rtdbPhotoKeys.has(photo.imageUrl)))
-  )), [localPhotos, rtdbPhotoKeys]);
+  // Only show local photos that are NOT yet successfully uploaded.
+  // Once status='uploaded', the photo lives in Firebase and should appear
+  // in the RTDB section (user_photos) — no need to track it locally anymore.
+  const displayedLocalPhotos = useMemo(
+    () => localPhotos.filter((photo) => photo.status !== 'uploaded'),
+    [localPhotos],
+  );
   const requestLocalPhotos = useMemo(
     () => displayedLocalPhotos.filter((photo) => isRequestPhoto(photo) && !isExpiredRequestPhoto(photo)),
     [displayedLocalPhotos],
@@ -335,7 +325,21 @@ const MyPhotosScreen: React.FC = () => {
     () => displayedLocalPhotos.filter((photo) => !isRequestPhoto(photo)),
     [displayedLocalPhotos],
   );
-  const totalPhotoCount = rtdbPhotos.length + personalLocalPhotos.length;
+  // Split local photos into distinct groups for clearer UI
+  const activeUploadPhotos = useMemo(
+    () => personalLocalPhotos.filter((p) => p.status === 'queued' || p.status === 'uploading'),
+    [personalLocalPhotos],
+  );
+  const savedLocalPhotos = useMemo(
+    () => personalLocalPhotos.filter((p) => p.status === 'local'),
+    [personalLocalPhotos],
+  );
+  const errorLocalPhotos = useMemo(
+    () => personalLocalPhotos.filter((p) => p.status === 'error'),
+    [personalLocalPhotos],
+  );
+  // Counter: only RTDB photos (they represent confirmed saves), plus unsent local ones
+  const totalPhotoCount = rtdbPhotos.length + savedLocalPhotos.length + activeUploadPhotos.length + errorLocalPhotos.length;
 
   const limitReached = totalPhotoCount >= MAX_USER_PHOTOS;
   const selectedCount = selectedForReview.length;
@@ -733,12 +737,11 @@ const MyPhotosScreen: React.FC = () => {
   };
 
   const hasAnyPhotos =
-    personalLocalPhotos.length > 0 ||
+    activeUploadPhotos.length > 0 ||
+    savedLocalPhotos.length > 0 ||
+    errorLocalPhotos.length > 0 ||
     requestLocalPhotos.length > 0 ||
-    pendingPhotos.length > 0 ||
-    savedPhotos.length > 0 ||
-    approvedPhotos.length > 0 ||
-    rejectedPhotos.length > 0;
+    rtdbPhotos.length > 0;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -814,21 +817,61 @@ const MyPhotosScreen: React.FC = () => {
           </View>
         ) : null}
 
-        {/* Section: Local in-flight uploads (queued/uploading/error/local) */}
-        {personalLocalPhotos.length > 0 ? (
+        {/* Section: Currently uploading (queued / uploading) */}
+        {activeUploadPhotos.length > 0 ? (
           <View style={styles.section}>
             <SectionHeader
-              label={personalLocalPhotos.every((p) => p.status === 'local') ? text.sectionSaved : text.sectionUploading}
-              count={personalLocalPhotos.length}
+              label={text.sectionUploading}
+              count={activeUploadPhotos.length}
+              color={SCREEN_THEME.enamelBlueDark}
             />
             <FlatList
-              data={personalLocalPhotos}
+              data={activeUploadPhotos}
               keyExtractor={(item: UserPhoto) => item.id}
               renderItem={renderLocalPhoto}
               numColumns={2}
               scrollEnabled={false}
               contentContainerStyle={styles.grid}
-              columnWrapperStyle={personalLocalPhotos.length > 1 ? styles.gridRow : undefined}
+              columnWrapperStyle={activeUploadPhotos.length > 1 ? styles.gridRow : undefined}
+            />
+          </View>
+        ) : null}
+
+        {/* Section: Saved on device only (not yet submitted to any form) */}
+        {savedLocalPhotos.length > 0 ? (
+          <View style={styles.section}>
+            <SectionHeader
+              label={text.sectionSaved}
+              count={savedLocalPhotos.length}
+            />
+            <FlatList
+              data={savedLocalPhotos}
+              keyExtractor={(item: UserPhoto) => item.id}
+              renderItem={renderLocalPhoto}
+              numColumns={2}
+              scrollEnabled={false}
+              contentContainerStyle={styles.grid}
+              columnWrapperStyle={savedLocalPhotos.length > 1 ? styles.gridRow : undefined}
+            />
+          </View>
+        ) : null}
+
+        {/* Section: Upload errors */}
+        {errorLocalPhotos.length > 0 ? (
+          <View style={styles.section}>
+            <SectionHeader
+              label={text.error}
+              count={errorLocalPhotos.length}
+              color={SCREEN_THEME.terracottaDark}
+            />
+            <FlatList
+              data={errorLocalPhotos}
+              keyExtractor={(item: UserPhoto) => item.id}
+              renderItem={renderLocalPhoto}
+              numColumns={2}
+              scrollEnabled={false}
+              contentContainerStyle={styles.grid}
+              columnWrapperStyle={errorLocalPhotos.length > 1 ? styles.gridRow : undefined}
             />
           </View>
         ) : null}
