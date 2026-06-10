@@ -81,10 +81,9 @@ export const inferRegistrationStatus = (
 
   // Social auth users (Google, Facebook, Apple) are considered complete if they have a name.
   // They authenticate via the provider — phone and address can be filled later.
-  const isSocialProvider =
-    firebaseUser.providerData[0]?.providerId === 'google.com' ||
-    firebaseUser.providerData[0]?.providerId === 'facebook.com' ||
-    firebaseUser.providerData[0]?.providerId === 'apple.com';
+  const isSocialProvider = firebaseUser.providerData.some(
+    (p) => p.providerId === 'google.com' || p.providerId === 'facebook.com' || p.providerId === 'apple.com',
+  );
   const hasName = Boolean(profile?.name || firebaseUser.displayName);
 
   if (isSocialProvider && hasName) {
@@ -133,13 +132,15 @@ export const mapFirebaseUserToAppUser = (
     startAvatarKey: normalizedProfile.startAvatarKey || undefined,
     gender: normalizedProfile.gender,
     age: normalizedProfile.age,
-    provider: (normalizedProfile.provider as User['provider']) || (firebaseUser.providerData[0]?.providerId === 'facebook.com'
-      ? 'facebook'
-      : firebaseUser.providerData[0]?.providerId === 'google.com'
-        ? 'google'
-        : firebaseUser.providerData[0]?.providerId === 'apple.com'
-          ? 'apple'
-        : 'email'),
+    provider: (normalizedProfile.provider as User['provider']) || (() => {
+      const sp = firebaseUser.providerData.find(
+        (p) => p.providerId === 'facebook.com' || p.providerId === 'google.com' || p.providerId === 'apple.com',
+      );
+      if (!sp) return 'email';
+      if (sp.providerId === 'facebook.com') return 'facebook';
+      if (sp.providerId === 'google.com') return 'google';
+      return 'apple';
+    })(),
     providerId: normalizedProfile.providerId || firebaseUser.uid,
     referrerPhone: normalizedProfile.referrerPhone || undefined,
   };

@@ -124,6 +124,7 @@ const UI_TEXT = {
     resetPasswordFailed: 'Не вдалося надіслати лист для скидання пароля.',
     inlineEmailError: 'Введіть коректний email.',
     inlinePasswordError: 'Пароль має містити щонайменше 8 символів.',
+    facebookPlayServicesNote: 'Вхід через Facebook буде доступний після підключення Google Play Services',
   },
   ru: {
     subtitle: 'Вход в аккаунт',
@@ -158,6 +159,7 @@ const UI_TEXT = {
     resetPasswordFailed: 'Не удалось отправить письмо для сброса пароля.',
     inlineEmailError: 'Введите корректный email.',
     inlinePasswordError: 'Пароль должен содержать минимум 8 символов.',
+    facebookPlayServicesNote: 'Вход через Facebook будет доступен после подключения Google Play Services',
   },
   en: {
     subtitle: 'Sign in to your account',
@@ -192,6 +194,7 @@ const UI_TEXT = {
     resetPasswordFailed: 'Could not send the password reset email.',
     inlineEmailError: 'Enter a valid email.',
     inlinePasswordError: 'Password must be at least 8 characters.',
+    facebookPlayServicesNote: 'Facebook sign-in will be available after connecting Google Play Services',
   },
 } as const;
 
@@ -378,6 +381,24 @@ const LoginScreen: React.FC = () => {
     }
   }, [dispatch, completeLogin, mapSocialAuthError, text]);
 
+  const handleFacebookLogin = useCallback(async () => {
+    dispatch(setLoading(true));
+    try {
+      const result = await socialAuthAPI.signInWithFacebook();
+      const socialUser = 'data' in result ? result.data : null;
+      if (!socialUser) {
+        const rawError = 'error' in result ? result.error : undefined;
+        Alert.alert(text.errorLoginTitle, mapSocialAuthError(rawError, 'facebook'));
+        return;
+      }
+      await completeLogin(socialUser, 'facebook', true);
+    } catch {
+      Alert.alert(text.errorLoginTitle, text.facebookLoginFailed);
+    } finally {
+      dispatch(setLoading(false));
+    }
+  }, [dispatch, completeLogin, mapSocialAuthError, text]);
+
   const handleAppleLogin = useCallback(async () => {
     dispatch(setLoading(true));
     try {
@@ -485,6 +506,16 @@ const LoginScreen: React.FC = () => {
             />
           </View>
 
+          <View style={styles.btnSpacing}>
+            <TactileButton
+              title={text.facebookBtn}
+              onPress={handleFacebookLogin}
+              disabled={loading}
+              variant="secondary"
+            />
+            <Text style={styles.facebookNoteText}>{text.facebookPlayServicesNote}</Text>
+          </View>
+
           {Platform.OS === 'ios' && appleSignInAvailable ? (
             <View style={styles.btnSpacing}>
               <TactileButton
@@ -534,6 +565,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   loaderOverlay: { position: 'absolute', alignSelf: 'center', top: 12 },
+  facebookNoteText: { fontSize: 11, color: SCREEN_THEME.textSecondary, textAlign: 'center', marginTop: 4 },
   signupRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   signupText: { fontSize: 14, color: SCREEN_THEME.textSecondary },
   signupLink: { fontSize: 14, color: SCREEN_THEME.terracottaDark, fontWeight: '800' },
