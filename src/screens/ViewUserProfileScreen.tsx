@@ -23,8 +23,9 @@ import { LIGHT_ORBS, SCREEN_THEME } from '../utils/screenTheme';
 import {
   loadProfileRecord,
 } from '../services/authProfileService';
-import { awardProfileThanksBonus } from '../services/bonusService';
-import { tryBonusOrEnqueue } from '../services/bonusQueue';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { auth } from '../firebase-core';
+import { enqueueAndDrainAsync } from '../services/bonusQueue';
 import { profilePermissionService } from '../services/profilePermissionService';
 import { query, ref, get, orderByChild, equalTo } from 'firebase/database';
 import { database } from '../firebase-config';
@@ -178,6 +179,16 @@ const ViewUserProfileScreen: React.FC = () => {
   const isAuthenticated = Boolean(currentUser?.id);
   const isOwnProfile = Boolean(userId && currentUser?.id && userId === currentUser.id);
 
+  // Restore daily "already thanked" state from local storage (no server call)
+  useEffect(() => {
+    if (!userId || !currentUser?.id || isOwnProfile) return;
+    const key = `@profile_thanks_${currentUser.id}_${userId}`;
+    const today = new Date().toISOString().slice(0, 10);
+    AsyncStorage.getItem(key).then((stored) => {
+      if (stored === today) setThankSent(true);
+    }).catch(() => {});
+  }, [userId, currentUser?.id, isOwnProfile]);
+
   useEffect(() => {
     if (!isAuthenticated) {
       requireAuthForDetails({ userId: currentUser?.id, navigation, language });
@@ -282,28 +293,32 @@ const ViewUserProfileScreen: React.FC = () => {
   const canRequestContact = Boolean(userId && userId !== currentUser?.id && !contactApproved);
   const canContact = canRequestContact || hasPhone;
 
-  const handleThank = async () => {
+  const handleThank = () => {
     if (!userId || isOwnProfile) return;
-    setThankSent(true);
-    try {
-      const queued = await tryBonusOrEnqueue(
-        { type: 'profile_thanks', payload: { targetUid: userId } },
-        async () => {
-          const result = await awardProfileThanksBonus(userId);
-          if (result.awarded) {
-            Alert.alert('', text.thankAwarded);
-          } else {
-            Alert.alert('', text.thankAlready);
-          }
-        },
-      );
-      if (queued) {
-        Alert.alert('', text.thankAwarded);
+    const currentUid = auth.currentUser?.uid ?? currentUser?.id;
+    if (!currentUid) return;
+
+    // Check local daily rate limit — no server call needed
+    const key = `@profile_thanks_${currentUid}_${userId}`;
+    const today = new Date().toISOString().slice(0, 10);
+    AsyncStorage.getItem(key).then((stored) => {
+      if (stored === today) {
+        Alert.alert('', text.thankAlready);
+        setThankSent(true);
+        return;
       }
-    } catch {
-      setThankSent(false);
-      Alert.alert('', text.thankError);
-    }
+      // Optimistic UI — show success immediately, process in background
+      setThankSent(true);
+      AsyncStorage.setItem(key, today).catch(() => {});
+      Alert.alert('', text.thankAwarded);
+      enqueueAndDrainAsync('profile_thanks', { targetUid: userId });
+    }).catch(() => {
+      // If AsyncStorage fails, still proceed optimistically
+      setThankSent(true);
+      AsyncStorage.setItem(key, today).catch(() => {});
+      Alert.alert('', text.thankAwarded);
+      enqueueAndDrainAsync('profile_thanks', { targetUid: userId });
+    });
   };
 
   const handleSendRequest = async (reason: string) => {

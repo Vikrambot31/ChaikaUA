@@ -261,3 +261,17 @@ export const tryBonusOrEnqueue = async (
   await enqueueBonusAction(queueItem.type, queueItem.payload);
   return true; // true = действие поставлено в очередь
 };
+
+/**
+ * Оптимистичный вариант: немедленно ставит действие в очередь,
+ * затем запускает дренирование в фоне (fire-and-forget).
+ * Никогда не бросает ошибок — UI всегда показывает успех.
+ */
+export const enqueueAndDrainAsync = (
+  type: BonusQueueItemType,
+  payload: Record<string, string>,
+): void => {
+  enqueueBonusAction(type, payload)
+    .then(() => drainBonusQueue())
+    .catch(() => {}); // тихий сбой — очередь сохранится и дренируется при следующем старте
+};
