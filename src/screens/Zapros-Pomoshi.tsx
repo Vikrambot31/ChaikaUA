@@ -350,9 +350,10 @@ const HelpRequestScreen: React.FC = () => {
       validatePhone(normalizedPhone) &&
       Boolean(helpType) &&
       (!hasSubtypes || Boolean(subType)) &&
-      description.trim().length >= 10
+      description.trim().length >= 10 &&
+      !formPhotos.some(p => p.status === 'uploading')
     );
-  }, [user?.id, hasSubtypes, helpType, name, phone, subType, description]);
+  }, [user?.id, hasSubtypes, helpType, name, phone, subType, description, formPhotos]);
   const isNameComplete = useMemo(() => validateName(normalizePersonName(name)), [name]);
   const isPhoneComplete = useMemo(() => validatePhone(normalizePhoneText(phone)), [phone]);
   const isHelpTypeComplete = Boolean(helpType);
@@ -363,7 +364,11 @@ const HelpRequestScreen: React.FC = () => {
     if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, userStartAvatarKey: user?.startAvatarKey, navigation })) {
       return;
     }
-    if (await checkYellowList(user?.id, language)) return;
+    try {
+      if (await checkYellowList(user?.id, language)) return;
+    } catch {
+      // якщо перевірка жовтого списку не вдалася — дозволяємо публікацію
+    }
     const nextErrors: {
       name?: string;
       phone?: string;
@@ -524,7 +529,8 @@ const HelpRequestScreen: React.FC = () => {
             <TextInput
               placeholder={text.phonePlaceholder}
               value={phone}
-              onChangeText={(value) => { setPhone(normalizePhoneText(value)); if (fieldErrors.phone) setFieldErrors((prev) => ({ ...prev, phone: undefined })); }}
+              onChangeText={(value) => { setPhone(value); if (fieldErrors.phone) setFieldErrors((prev) => ({ ...prev, phone: undefined })); }}
+              onBlur={() => setPhone(prev => normalizePhoneText(prev))}
               keyboardType="phone-pad"
               style={styles.input}
               placeholderTextColor={SCREEN_THEME.textMuted}
