@@ -394,17 +394,13 @@ const PhotoModerationScreen: React.FC = () => {
     modAction(id, () => contactsService.remove(id)),
   [modAction]);
 
-  const deleteJob = useCallback(async (id: string) => {
-    if (busyId) return;
-    setBusyId(id);
-    try { await jobService.remove(id); await loadAll(); } finally { setBusyId(null); }
-  }, [busyId, loadAll]);
+  const deleteJob = useCallback((id: string) =>
+    modAction(id, () => jobService.remove(id)),
+  [modAction]);
 
-  const deleteLostFound = useCallback(async (id: string) => {
-    if (busyId) return;
-    setBusyId(id);
-    try { await lostFoundService.remove(id); await loadAll(); } finally { setBusyId(null); }
-  }, [busyId, loadAll]);
+  const deleteLostFound = useCallback((id: string) =>
+    modAction(id, () => lostFoundService.remove(id)),
+  [modAction]);
 
   // Helpers
 
