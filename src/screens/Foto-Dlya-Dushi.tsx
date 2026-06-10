@@ -7,6 +7,7 @@ import {
   Modal,
   Pressable,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -40,6 +41,33 @@ const GRID_GAP = 7;
 
 type Lang = 'ua' | 'ru' | 'en';
 
+// ---------------------------------------------------------------------------
+// Categories
+// ---------------------------------------------------------------------------
+type CategoryId = 'style' | 'cars' | 'places' | 'animals' | 'unusual';
+type TabId = 'all' | CategoryId;
+
+type CategoryDef = {
+  id: CategoryId;
+  icon: string;
+  ua: string;
+  ru: string;
+  en: string;
+};
+
+const CATEGORIES: CategoryDef[] = [
+  { id: 'style',   icon: 'tshirt-crew-outline',   ua: 'Люди на стилі',         ru: 'Люди на стиле',          en: 'People in Style' },
+  { id: 'cars',    icon: 'car-outline',            ua: 'Авто Чайки',            ru: 'Авто Чайки',             en: 'Chaika Cars' },
+  { id: 'places',  icon: 'image-outline',          ua: 'Люди і красиві місця',  ru: 'Люди и красивые места',  en: 'People & Places' },
+  { id: 'animals', icon: 'paw-outline',            ua: 'Тварини Чайки',         ru: 'Животные Чайки',         en: 'Chaika Animals' },
+  { id: 'unusual', icon: 'star-shooting-outline',  ua: 'Незвичайне на Чайці',   ru: 'Необычное на Чайке',     en: 'Unusual on Chaika' },
+];
+
+const getCategoryLabel = (cat: CategoryDef, lang: Lang): string => cat[lang];
+
+// ---------------------------------------------------------------------------
+// UI text
+// ---------------------------------------------------------------------------
 const UI_TEXT = {
   ua: {
     title: 'Фото для душі',
@@ -53,9 +81,12 @@ const UI_TEXT = {
     descPlaceholder: 'Опис до 5 слів',
     addressPlaceholder: 'Адреса місця',
     login: 'Увійдіть, щоб додати фото',
-    empty: 'Поки немає фото для душі',
+    empty: 'Поки немає фото в цій категорії',
     loadError: 'Не вдалося завантажити фото',
     uploadError: 'Не вдалося завантажити фото. Спробуйте ще раз.',
+    tabAll: 'Всі',
+    categoryLabel: 'Категорія',
+    categoryRequired: 'Оберіть категорію для фото',
   },
   ru: {
     title: 'Фото для Души',
@@ -69,9 +100,12 @@ const UI_TEXT = {
     descPlaceholder: 'Описание до 5 слов',
     addressPlaceholder: 'Адрес места',
     login: 'Войдите, чтобы добавить фото',
-    empty: 'Пока нет фото для души',
+    empty: 'Пока нет фото в этой категории',
     loadError: 'Не удалось загрузить фото',
     uploadError: 'Не удалось загрузить фото. Попробуйте ещё раз.',
+    tabAll: 'Все',
+    categoryLabel: 'Категория',
+    categoryRequired: 'Выберите категорию для фото',
   },
   en: {
     title: 'Photos for the Soul',
@@ -85,18 +119,25 @@ const UI_TEXT = {
     descPlaceholder: 'Up to 5 words',
     addressPlaceholder: 'Place address',
     login: 'Sign in to add a photo',
-    empty: 'No soul photos yet',
+    empty: 'No photos in this category yet',
     loadError: 'Could not load photos',
     uploadError: 'Failed to upload photo. Please try again.',
+    tabAll: 'All',
+    categoryLabel: 'Category',
+    categoryRequired: 'Choose a category for this photo',
   },
 } as const;
 
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 type SoulPhoto = {
   id: string;
   uri: string;
   storagePath: string;
   createdAt: number;
   status: 'approved' | 'pending';
+  category?: CategoryId;
   local?: boolean;
   uploading?: boolean;
   progress?: number;
@@ -118,8 +159,12 @@ type RawPhoto = {
   description?: unknown;
   uploadedBy?: unknown;
   likes?: unknown;
+  category?: unknown;
 };
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 const clean = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 
 const timestamp = (value: unknown): number => {
@@ -144,6 +189,12 @@ const limitWords = (value: string, maxWords: number): string => {
   return words.slice(0, maxWords).join(' ');
 };
 
+const isValidCategoryId = (val: string): val is CategoryId =>
+  CATEGORIES.some((c) => c.id === val);
+
+// ---------------------------------------------------------------------------
+// SoulTile
+// ---------------------------------------------------------------------------
 const SoulTile = memo(function SoulTile({
   item,
   size,
@@ -191,6 +242,9 @@ const SoulTile = memo(function SoulTile({
   );
 });
 
+// ---------------------------------------------------------------------------
+// Main screen
+// ---------------------------------------------------------------------------
 export default function SoulPhotosScreen() {
   const { width } = useWindowDimensions();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -206,6 +260,11 @@ export default function SoulPhotosScreen() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [previewPhoto, setPreviewPhoto] = useState<SoulPhoto | null>(null);
+
+  // Active tab for gallery filtering
+  const [activeTab, setActiveTab] = useState<TabId>('all');
+  // Category chosen for new upload
+  const [uploadCategory, setUploadCategory] = useState<CategoryId | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -229,12 +288,15 @@ export default function SoulPhotosScreen() {
       const description = clean(photo.description);
       const author = clean(photo.uploadedBy);
       const likes = typeof photo.likes === 'number' ? photo.likes : 0;
+      const categoryRaw = clean(photo.category);
+      const category: CategoryId | undefined = isValidCategoryId(categoryRaw) ? categoryRaw : undefined;
       return {
         id,
         uri: clean(photo.thumbnailUrl) || clean(photo.imageUri),
         storagePath: clean(photo.storagePath),
         createdAt: timestamp(photo.createdAt) || timestamp(photo.uploadedAt),
         status: isApproved ? 'approved' : 'pending',
+        category,
         ...(description ? { description } : {}),
         ...(author ? { author } : {}),
         likes,
@@ -343,13 +405,16 @@ export default function SoulPhotosScreen() {
         storagePath: photo.storagePath,
         createdAt: Number.MAX_SAFE_INTEGER,
         status: 'pending',
+        category: uploadCategory ?? undefined,
         local: true,
         uploading: photo.status === 'uploading',
         progress: photo.progress,
       }));
 
-    return [...local, ...remotePhotos].slice(0, MAX_ITEMS);
-  }, [pickedPhotos, remotePhotos]);
+    const all = [...local, ...remotePhotos].slice(0, MAX_ITEMS);
+    if (activeTab === 'all') return all;
+    return all.filter((p) => p.category === activeTab);
+  }, [pickedPhotos, remotePhotos, activeTab, uploadCategory]);
 
   const pendingCount = data.filter((photo) => photo.status === 'pending').length;
   const hasUploadedLocal = Object.values(pickedPhotos).some((photo) => photo.status === 'done');
@@ -374,6 +439,82 @@ export default function SoulPhotosScreen() {
     [text.pending, text.upload, tileSize],
   );
 
+  // ---------------------------------------------------------------------------
+  // Category tabs (gallery filter)
+  // ---------------------------------------------------------------------------
+  const categoryTabs = (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.tabsScroll}
+      contentContainerStyle={styles.tabsContent}
+    >
+      <TouchableOpacity
+        activeOpacity={0.78}
+        style={[styles.tab, activeTab === 'all' && styles.tabActive]}
+        onPress={() => setActiveTab('all')}
+      >
+        <Text style={[styles.tabText, activeTab === 'all' && styles.tabTextActive]}>{text.tabAll}</Text>
+      </TouchableOpacity>
+      {CATEGORIES.map((cat) => (
+        <TouchableOpacity
+          key={cat.id}
+          activeOpacity={0.78}
+          style={[styles.tab, activeTab === cat.id && styles.tabActive]}
+          onPress={() => setActiveTab(cat.id)}
+        >
+          <MaterialCommunityIcons
+            name={cat.icon as any}
+            size={14}
+            color={activeTab === cat.id ? '#fff' : '#75684F'}
+            style={styles.tabIcon}
+          />
+          <Text style={[styles.tabText, activeTab === cat.id && styles.tabTextActive]}>
+            {getCategoryLabel(cat, language)}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
+  );
+
+  // ---------------------------------------------------------------------------
+  // Category picker (upload panel)
+  // ---------------------------------------------------------------------------
+  const categoryPicker = (
+    <View style={styles.pickerBlock}>
+      <Text style={styles.pickerLabel}>{text.categoryLabel}</Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.pickerRow}
+      >
+        {CATEGORIES.map((cat) => {
+          const active = uploadCategory === cat.id;
+          return (
+            <TouchableOpacity
+              key={cat.id}
+              activeOpacity={0.78}
+              style={[styles.pickerChip, active && styles.pickerChipActive]}
+              onPress={() => setUploadCategory(cat.id)}
+            >
+              <MaterialCommunityIcons
+                name={cat.icon as any}
+                size={15}
+                color={active ? '#fff' : '#75684F'}
+              />
+              <Text style={[styles.pickerChipText, active && styles.pickerChipTextActive]}>
+                {getCategoryLabel(cat, language)}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+
+  // ---------------------------------------------------------------------------
+  // Header
+  // ---------------------------------------------------------------------------
   const header = (
     <View style={styles.header}>
       <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} activeOpacity={0.78}>
@@ -381,11 +522,17 @@ export default function SoulPhotosScreen() {
       </TouchableOpacity>
       <Text style={styles.title}>{text.title}</Text>
       <Text style={styles.subtitle}>{text.approvedNote}</Text>
+      {categoryTabs}
     </View>
   );
 
+  // ---------------------------------------------------------------------------
+  // Upload panel
+  // ---------------------------------------------------------------------------
   const uploadPanel = (
     <View style={styles.uploadPanel}>
+      {categoryPicker}
+
       <View style={styles.descriptionRow}>
         <View style={styles.descriptionIcon}>
           <MaterialCommunityIcons name="map-marker-outline" size={18} color="#fff" />
@@ -412,24 +559,33 @@ export default function SoulPhotosScreen() {
       </View>
 
       {user ? (
-        <View style={styles.realPickerWrap}>
-          <PhotoUploadField
-            uid={user.id}
-            userName={user.name ?? user.email ?? ''}
-            maxPhotos={1}
-            storagePath={STORAGE_PATH}
-            onPhotosChange={handlePhotosChange}
-            hideSelectedPreview
-            metadata={{
-              title: text.title,
-              description: description.trim(),
-              sourceScreen: SCREEN_ID,
-              sourceScreenLabel: text.title,
-              sourceFeature: 'soul_photos_upload',
-              locationLabel: address.trim(),
-              locationType: address.trim() ? 'place' : undefined,
-            }}
-          />
+        <View style={[styles.realPickerWrap, !uploadCategory && styles.pickerDisabled]}>
+          {!uploadCategory && (
+            <View style={styles.pickerBlocker}>
+              <MaterialCommunityIcons name="tag-outline" size={17} color="#75684F" />
+              <Text style={styles.pickerBlockerText}>{text.categoryRequired}</Text>
+            </View>
+          )}
+          {uploadCategory && (
+            <PhotoUploadField
+              uid={user.id}
+              userName={user.name ?? user.email ?? ''}
+              maxPhotos={1}
+              storagePath={STORAGE_PATH}
+              onPhotosChange={handlePhotosChange}
+              hideSelectedPreview
+              metadata={{
+                title: text.title,
+                description: description.trim(),
+                sourceScreen: SCREEN_ID,
+                sourceScreenLabel: text.title,
+                sourceFeature: 'soul_photos_upload',
+                locationLabel: address.trim(),
+                locationType: address.trim() ? 'place' : undefined,
+                category: uploadCategory,
+              }}
+            />
+          )}
         </View>
       ) : (
         <TouchableOpacity
@@ -451,6 +607,9 @@ export default function SoulPhotosScreen() {
     </View>
   );
 
+  // ---------------------------------------------------------------------------
+  // Empty state
+  // ---------------------------------------------------------------------------
   const empty = (
     <View style={styles.empty}>
       {loading ? (
@@ -526,9 +685,11 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F6E9C9' },
   photoList: { flex: 1 },
   content: { paddingHorizontal: 12, paddingBottom: 14 },
+
+  // Header
   header: {
     paddingTop: 10,
-    paddingBottom: 12,
+    paddingBottom: 4,
     alignItems: 'center',
   },
   backButton: {
@@ -557,6 +718,45 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textAlign: 'center',
   },
+
+  // Category tabs (gallery filter)
+  tabsScroll: {
+    marginTop: 10,
+    marginHorizontal: -12,
+  },
+  tabsContent: {
+    paddingHorizontal: 12,
+    gap: 7,
+    paddingBottom: 8,
+  },
+  tab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#D8BF8B',
+    backgroundColor: '#FFF8E9',
+  },
+  tabActive: {
+    backgroundColor: '#C97959',
+    borderColor: '#C97959',
+  },
+  tabIcon: {
+    marginRight: 1,
+  },
+  tabText: {
+    color: '#75684F',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  tabTextActive: {
+    color: '#fff',
+  },
+
+  // Grid
   row: { gap: GRID_GAP, marginBottom: GRID_GAP },
   tile: {
     borderRadius: 8,
@@ -617,16 +817,58 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     textAlign: 'center',
   },
+
+  // Upload panel
   uploadPanel: {
     flexShrink: 0,
     paddingHorizontal: 12,
-    paddingTop: 12,
+    paddingTop: 10,
     paddingBottom: 10,
-    gap: 10,
+    gap: 9,
     borderTopWidth: 2,
     borderTopColor: '#D8BF8B',
     backgroundColor: '#F6E9C9',
   },
+
+  // Category picker
+  pickerBlock: {
+    gap: 6,
+  },
+  pickerLabel: {
+    color: '#6D5740',
+    fontSize: 11,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  pickerRow: {
+    gap: 7,
+  },
+  pickerChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: '#D8BF8B',
+    backgroundColor: '#FFF8E9',
+  },
+  pickerChipActive: {
+    backgroundColor: '#C97959',
+    borderColor: '#C97959',
+  },
+  pickerChipText: {
+    color: '#75684F',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  pickerChipTextActive: {
+    color: '#fff',
+  },
+
+  // Description row
   descriptionRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -659,9 +901,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: 11,
     paddingVertical: 8,
   },
+
+  // Upload button area
   realPickerWrap: {
     overflow: 'hidden',
   },
+  pickerDisabled: {
+    minHeight: 52,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#D8BF8B',
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pickerBlocker: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    padding: 14,
+  },
+  pickerBlockerText: {
+    color: '#75684F',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
   loginButton: {
     minHeight: 52,
     borderRadius: 12,
@@ -692,6 +957,8 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     textAlign: 'center',
   },
+
+  // Empty state
   empty: {
     minHeight: 230,
     alignItems: 'center',
@@ -704,6 +971,8 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     textAlign: 'center',
   },
+
+  // Preview modal
   previewOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.88)',
