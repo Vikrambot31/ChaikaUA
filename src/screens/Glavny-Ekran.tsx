@@ -585,8 +585,10 @@ const HomeScreen: React.FC = () => {
 
     for (const hr of helpRequests) {
       const previewText = normalizeFeedText(hr.description) || feedText.help;
-      const visual = getFeedVisual({ category: 'help', group: 'help', urgent: hr.isBurning });
-      const badge = getFeedBadge({ category: 'help', group: 'help', urgent: hr.isBurning });
+      const timeRemaining = new Date(hr.expiresAt).getTime() - Date.now();
+      const isUrgent = hr.isBurning && timeRemaining < 4 * 60 * 60 * 1000;
+      const visual = getFeedVisual({ category: 'help', group: 'help', urgent: isUrgent });
+      const badge = getFeedBadge({ category: 'help', group: 'help', urgent: isUrgent });
       items.push({
         id: `help-${hr.id}`,
         createdAt: new Date(hr.createdAt).getTime(),
@@ -602,7 +604,7 @@ const HomeScreen: React.FC = () => {
         name: hr.name,
         text: previewText.slice(0, 72),
         screen: 'HelpNeighborsScreen',
-        urgent: hr.isBurning,
+        urgent: isUrgent,
       });
     }
 

@@ -682,7 +682,6 @@ const RequestFormScreen: React.FC = () => {
         const friendlyError = getSubmitFailureMessage(result.error || t.sendFailed, t);
         setSubmitError(friendlyError);
         trace('api_call', 'fail', { reason: 'resultNotSuccess' });
-        Alert.alert(t.errorTitle, friendlyError);
         return;
       }
       trace('api_call', 'success');
