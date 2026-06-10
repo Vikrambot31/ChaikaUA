@@ -337,8 +337,8 @@ const BuySellScreen: React.FC = () => {
     const queryItemName = searchItemName.trim().toLowerCase();
     const queryContact = searchContact.trim().toLowerCase();
     const queryDescription = searchDescription.trim().toLowerCase();
-    const priceFrom = searchPriceFrom ? Number(searchPriceFrom) : null;
-    const priceTo = searchPriceTo ? Number(searchPriceTo) : null;
+    const priceFrom = searchPriceFrom ? Number(searchPriceFrom.replace(',', '.')) : null;
+    const priceTo = searchPriceTo ? Number(searchPriceTo.replace(',', '.')) : null;
 
     return listings.filter((item) => {
       const numericPrice = Number(String(item.price).replace(',', '.').replace(/[^\d.]/g, ''));
@@ -416,7 +416,7 @@ const BuySellScreen: React.FC = () => {
       phone: item.phone,
       photoUri: item.photoUri,
       photoStoragePath: item.photoStoragePath,
-      price: item.price ? `${item.price} грн` : undefined,
+      price: item.price !== null && item.price !== undefined ? `${item.price} грн` : undefined,
       category: categoryLabel,
       status: getModerationLabel(item.moderationStatus, {
         pending: text.pending,

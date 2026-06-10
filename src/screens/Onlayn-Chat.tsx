@@ -519,6 +519,7 @@ const OnlineChatScreen = () => {
     void loadRequests().finally(() => {
       clearTimeout(timeout);
       setLoading(false);
+      setLoadError(null);
       hasInitialLoadRef.current = true;
     });
 
