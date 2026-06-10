@@ -34,17 +34,17 @@ const CATEGORY_LABELS: Record<CategoryFilter, string> = {
 
 const categoryBadge = (cat: string) => {
   const colors: Record<string, { bg: string; color: string; label: string }> = {
-    food:     { bg: '#1a2a00', color: '#c6ff00', label: 'Еда' },
-    beauty:   { bg: '#2a0020', color: '#f48fb1', label: 'Салон' },
-    kids:     { bg: '#00202a', color: '#4fc3f7', label: 'Діти' },
-    business: { bg: '#1a1a00', color: '#ffd54f', label: 'Бізнес' },
+    food:     { bg: '#f1f8e9', color: '#558b2f', label: 'Еда' },
+    beauty:   { bg: '#fce4ec', color: '#ad1457', label: 'Салон' },
+    kids:     { bg: '#e1f5fe', color: '#0277bd', label: 'Діти' },
+    business: { bg: '#fffde7', color: '#f57f17', label: 'Бізнес' },
   };
-  const s = colors[cat] ?? { bg: '#1a1a1a', color: '#888', label: cat || '—' };
+  const s = colors[cat] ?? { bg: '#e8e8e8', color: '#666', label: cat || '—' };
   return (
     <span style={{
       background: s.bg, color: s.color,
       borderRadius: 6, padding: '2px 8px',
-      fontSize: 10, fontWeight: 800, whiteSpace: 'nowrap',
+      fontSize: 13, fontWeight: 800, whiteSpace: 'nowrap',
     }}>
       {s.label}
     </span>
@@ -59,21 +59,21 @@ const formatDate = (iso: string | undefined): string => {
 
 const statusBadge = (status: string) => {
   const colors: Record<string, { bg: string; color: string }> = {
-    pending:  { bg: '#2a2000', color: '#ffd54f' },
-    approved: { bg: '#0a2010', color: '#69f0ae' },
-    rejected: { bg: '#2a0808', color: '#ef9a9a' },
+    pending:  { bg: '#fff8e1', color: '#f57f17' },
+    approved: { bg: '#e8f5e9', color: '#2e7d32' },
+    rejected: { bg: '#fce8e8', color: '#c62828' },
   };
   const labels: Record<string, string> = {
     pending: 'Очікує',
     approved: 'Схвалено',
     rejected: 'Відхилено',
   };
-  const s = colors[status] ?? { bg: '#1a1a1a', color: '#aaa' };
+  const s = colors[status] ?? { bg: '#e8e8e8', color: '#555' };
   return (
     <span style={{
       background: s.bg, color: s.color,
       borderRadius: 6, padding: '2px 8px',
-      fontSize: 11, fontWeight: 800, whiteSpace: 'nowrap',
+      fontSize: 13, fontWeight: 800, whiteSpace: 'nowrap',
     }}>
       {labels[status] ?? status}
     </span>
@@ -88,7 +88,7 @@ function ClaimsTab({ adminUid, categoryFilter }: { adminUid: string; categoryFil
   const [actionId, setActionId] = useState<string | null>(null);
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
-  const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
+  const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
 
   useEffect(() => {
     setLoading(true);
@@ -132,29 +132,34 @@ function ClaimsTab({ adminUid, categoryFilter }: { adminUid: string; categoryFil
     finally { setActionId(null); }
   };
 
-  if (loading) return <div style={{ color: '#888', padding: 24 }}>Завантаження заявок...</div>;
+  if (loading) return <div style={{ color: '#666', padding: 24 }}>Завантаження заявок...</div>;
 
   return (
     <div>
-      {/* Filter */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-        {(['pending', 'approved', 'rejected', 'all'] as const).map((f) => (
-          <button key={f} type="button"
-            onClick={() => setFilter(f)}
-            style={{
-              background: filter === f ? '#1565c0' : '#1a1a2a',
-              color: filter === f ? '#fff' : '#aaa',
-              border: '1px solid #2a2a4a', borderRadius: 6,
-              padding: '4px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700,
-            }}
-          >
-            {f === 'pending' ? `Очікують (${pendingCount})` : f === 'approved' ? 'Схвалені' : f === 'rejected' ? 'Відхилені' : 'Всі'}
-          </button>
-        ))}
+      {/* Status filter */}
+      <div style={{ marginTop: 14, marginBottom: 16 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#999', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>
+          Статус заявки
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {(['pending', 'approved', 'rejected', 'all'] as const).map((f) => (
+            <button key={f} type="button"
+              onClick={() => setFilter(f)}
+              style={{
+                background: filter === f ? '#1565c0' : '#e8eaf0',
+                color: filter === f ? '#fff' : '#555',
+                border: '1px solid #d0d4e8', borderRadius: 6,
+                padding: '4px 12px', cursor: 'pointer', fontSize: 13, fontWeight: 700,
+              }}
+            >
+              {f === 'pending' ? `Очікують (${pendingCount})` : f === 'approved' ? 'Схвалені' : f === 'rejected' ? 'Відхилені' : 'Всі'}
+            </button>
+          ))}
+        </div>
       </div>
 
       {filtered.length === 0 && (
-        <div style={{ color: '#666', padding: '24px 0', textAlign: 'center', fontSize: 14 }}>
+        <div style={{ color: '#777', padding: '24px 0', textAlign: 'center', fontSize: 15 }}>
           Заявок немає
         </div>
       )}
@@ -162,37 +167,37 @@ function ClaimsTab({ adminUid, categoryFilter }: { adminUid: string; categoryFil
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {filtered.map((claim) => (
           <div key={claim.placeId} style={{
-            background: claim.status === 'pending' ? '#151520' : '#111118',
-            border: `1px solid ${claim.status === 'pending' ? '#2a2a4a' : '#1a1a28'}`,
+            background: claim.status === 'pending' ? '#f0f2f8' : '#f5f6fa',
+            border: `1px solid ${claim.status === 'pending' ? '#d0d4e8' : '#dde0f0'}`,
             borderRadius: 10, padding: '14px 16px',
           }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
               <div style={{ flex: 1, minWidth: 200 }}>
-                <div style={{ color: '#e0e0ff', fontWeight: 800, fontSize: 14, marginBottom: 3, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ color: '#1a1a2e', fontWeight: 800, fontSize: 15, marginBottom: 3, display: 'flex', alignItems: 'center', gap: 8 }}>
                   🏪 {claim.placeName} {categoryBadge(claim.category)}
                 </div>
-                <div style={{ color: '#aaa', fontSize: 12, marginBottom: 2 }}>
+                <div style={{ color: '#555', fontSize: 13, marginBottom: 2 }}>
                   {claim.placeAddress}
                 </div>
-                <div style={{ color: '#ccc', fontSize: 13, fontWeight: 700, marginBottom: 2 }}>
+                <div style={{ color: '#444', fontSize: 14, fontWeight: 700, marginBottom: 2 }}>
                   👤 {claim.ownerName}
-                  {claim.ownerPhone ? <span style={{ color: '#888', fontWeight: 400, marginLeft: 8 }}>{claim.ownerPhone}</span> : null}
+                  {claim.ownerPhone ? <span style={{ color: '#666', fontWeight: 400, marginLeft: 8 }}>{claim.ownerPhone}</span> : null}
                 </div>
                 {claim.comment ? (
                   <div style={{
-                    color: '#b0b0c0', fontSize: 12, lineHeight: 1.5,
-                    background: '#1a1a28', borderRadius: 6, padding: '6px 10px', marginTop: 6,
+                    color: '#444', fontSize: 13, lineHeight: 1.5,
+                    background: '#eef0f8', borderRadius: 6, padding: '6px 10px', marginTop: 6,
                     maxWidth: 500,
                   }}>
                     {claim.comment}
                   </div>
                 ) : null}
-                <div style={{ color: '#555', fontSize: 11, marginTop: 6 }}>
-                  UID: <span style={{ color: '#666' }}>{claim.ownerUid}</span>
+                <div style={{ color: '#777', fontSize: 13, marginTop: 6 }}>
+                  UID: <span style={{ color: '#777' }}>{claim.ownerUid}</span>
                   &nbsp;·&nbsp;Подано: {formatDate(claim.createdAt)}
                 </div>
                 {claim.rejectReason ? (
-                  <div style={{ color: '#ef9a9a', fontSize: 12, marginTop: 4 }}>
+                  <div style={{ color: '#c62828', fontSize: 13, marginTop: 4 }}>
                     Причина відмови: {claim.rejectReason}
                   </div>
                 ) : null}
@@ -208,7 +213,7 @@ function ClaimsTab({ adminUid, categoryFilter }: { adminUid: string; categoryFil
                       style={{
                         background: '#1b5e20', color: '#a5d6a7',
                         border: '1px solid #2e7d32', borderRadius: 6,
-                        padding: '5px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 800,
+                        padding: '5px 12px', cursor: 'pointer', fontSize: 13, fontWeight: 800,
                         opacity: actionId === claim.placeId ? 0.5 : 1,
                       }}
                     >
@@ -220,7 +225,7 @@ function ClaimsTab({ adminUid, categoryFilter }: { adminUid: string; categoryFil
                       style={{
                         background: '#4a1010', color: '#ef9a9a',
                         border: '1px solid #7a2020', borderRadius: 6,
-                        padding: '5px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 800,
+                        padding: '5px 12px', cursor: 'pointer', fontSize: 13, fontWeight: 800,
                         opacity: actionId === claim.placeId ? 0.5 : 1,
                       }}
                     >
@@ -232,9 +237,9 @@ function ClaimsTab({ adminUid, categoryFilter }: { adminUid: string; categoryFil
                   onClick={() => void handleDelete(claim.placeId)}
                   disabled={actionId === claim.placeId}
                   style={{
-                    background: '#1a0a0a', color: '#888',
-                    border: '1px solid #333', borderRadius: 6,
-                    padding: '4px 10px', cursor: 'pointer', fontSize: 11, fontWeight: 700,
+                    background: '#f5f0f0', color: '#666',
+                    border: '1px solid #ddd', borderRadius: 6,
+                    padding: '4px 10px', cursor: 'pointer', fontSize: 13, fontWeight: 700,
                     opacity: actionId === claim.placeId ? 0.5 : 1,
                   }}
                 >
@@ -253,10 +258,10 @@ function ClaimsTab({ adminUid, categoryFilter }: { adminUid: string; categoryFil
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999,
         }}>
           <div style={{
-            background: '#1a1a2e', border: '1px solid #2a2a4a', borderRadius: 12,
+            background: '#eef0f8', border: '1px solid #d0d4e8', borderRadius: 12,
             padding: 24, width: 400, maxWidth: '90vw',
           }}>
-            <div style={{ color: '#fff', fontWeight: 800, fontSize: 16, marginBottom: 12 }}>
+            <div style={{ color: '#1a1a2e', fontWeight: 800, fontSize: 16, marginBottom: 12 }}>
               Причина відмови
             </div>
             <textarea
@@ -264,22 +269,22 @@ function ClaimsTab({ adminUid, categoryFilter }: { adminUid: string; categoryFil
               onChange={(e) => setRejectReason(e.target.value)}
               placeholder="Необов'язково..."
               style={{
-                width: '100%', minHeight: 80, background: '#111', color: '#ccc',
-                border: '1px solid #333', borderRadius: 8, padding: 10,
-                fontSize: 13, resize: 'vertical', boxSizing: 'border-box',
+                width: '100%', minHeight: 80, background: '#fff', color: '#333',
+                border: '1px solid #ddd', borderRadius: 8, padding: 10,
+                fontSize: 14, resize: 'vertical', boxSizing: 'border-box',
               }}
             />
             <div style={{ display: 'flex', gap: 8, marginTop: 12, justifyContent: 'flex-end' }}>
               <button type="button"
                 onClick={() => setRejectId(null)}
-                style={{ background: '#222', color: '#aaa', border: '1px solid #333', borderRadius: 6, padding: '6px 14px', cursor: 'pointer', fontSize: 13 }}
+                style={{ background: '#f0f0f0', color: '#555', border: '1px solid #ddd', borderRadius: 6, padding: '6px 14px', cursor: 'pointer', fontSize: 14 }}
               >
                 Скасувати
               </button>
               <button type="button"
                 onClick={() => void handleReject()}
                 disabled={actionId === rejectId}
-                style={{ background: '#7a2020', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 800 }}
+                style={{ background: '#7a2020', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 14px', cursor: 'pointer', fontSize: 14, fontWeight: 800 }}
               >
                 Відхилити
               </button>
@@ -299,7 +304,7 @@ function CardsTab({ adminUid, categoryFilter }: { adminUid: string; categoryFilt
   const [actionId, setActionId] = useState<string | null>(null);
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
-  const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
+  const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [expanded, setExpanded] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
@@ -378,28 +383,33 @@ function CardsTab({ adminUid, categoryFilter }: { adminUid: string; categoryFilt
     finally { setActionId(null); }
   };
 
-  if (loading) return <div style={{ color: '#888', padding: 24 }}>Завантаження карток...</div>;
+  if (loading) return <div style={{ color: '#666', padding: 24 }}>Завантаження карток...</div>;
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-        {(['pending', 'approved', 'rejected', 'all'] as const).map((f) => (
-          <button key={f} type="button"
-            onClick={() => setFilter(f)}
-            style={{
-              background: filter === f ? '#1565c0' : '#1a1a2a',
-              color: filter === f ? '#fff' : '#aaa',
-              border: '1px solid #2a2a4a', borderRadius: 6,
-              padding: '4px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700,
-            }}
-          >
-            {f === 'pending' ? `Очікують (${pendingCount})` : f === 'approved' ? 'Схвалені' : f === 'rejected' ? 'Відхилені' : 'Всі'}
-          </button>
-        ))}
+      <div style={{ marginTop: 14, marginBottom: 16 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#999', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>
+          Статус картки
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {(['pending', 'approved', 'rejected', 'all'] as const).map((f) => (
+            <button key={f} type="button"
+              onClick={() => setFilter(f)}
+              style={{
+                background: filter === f ? '#1565c0' : '#e8eaf0',
+                color: filter === f ? '#fff' : '#555',
+                border: '1px solid #d0d4e8', borderRadius: 6,
+                padding: '4px 12px', cursor: 'pointer', fontSize: 13, fontWeight: 700,
+              }}
+            >
+              {f === 'pending' ? `Очікують (${pendingCount})` : f === 'approved' ? 'Схвалені' : f === 'rejected' ? 'Відхилені' : 'Всі'}
+            </button>
+          ))}
+        </div>
       </div>
 
       {filtered.length === 0 && (
-        <div style={{ color: '#666', padding: '24px 0', textAlign: 'center', fontSize: 14 }}>
+        <div style={{ color: '#777', padding: '24px 0', textAlign: 'center', fontSize: 15 }}>
           Карток немає
         </div>
       )}
@@ -407,8 +417,8 @@ function CardsTab({ adminUid, categoryFilter }: { adminUid: string; categoryFilt
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {filtered.map((card) => (
           <div key={card.placeId} style={{
-            background: card.moderationStatus === 'pending' ? '#151520' : '#111118',
-            border: `1px solid ${card.moderationStatus === 'pending' ? '#2a2a4a' : '#1a1a28'}`,
+            background: card.moderationStatus === 'pending' ? '#f0f2f8' : '#f5f6fa',
+            border: `1px solid ${card.moderationStatus === 'pending' ? '#d0d4e8' : '#dde0f0'}`,
             borderRadius: 10, padding: '14px 16px',
           }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
@@ -421,18 +431,18 @@ function CardsTab({ adminUid, categoryFilter }: { adminUid: string; categoryFilt
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
                         style={{
-                          flex: 1, background: '#111', color: '#e0e0ff',
-                          border: '1px solid #444', borderRadius: 6, padding: '4px 8px',
-                          fontSize: 14, fontWeight: 800,
+                          flex: 1, background: '#fff', color: '#333',
+                          border: '1px solid #ccc', borderRadius: 6, padding: '4px 8px',
+                          fontSize: 15, fontWeight: 800,
                         }}
                       />
                       <select
                         value={editCategory}
                         onChange={(e) => setEditCategory(e.target.value)}
                         style={{
-                          background: '#111', color: '#ccc',
-                          border: '1px solid #444', borderRadius: 6, padding: '4px 8px',
-                          fontSize: 12,
+                          background: '#fff', color: '#333',
+                          border: '1px solid #ccc', borderRadius: 6, padding: '4px 8px',
+                          fontSize: 13,
                         }}
                       >
                         <option value="food">Еда</option>
@@ -443,21 +453,21 @@ function CardsTab({ adminUid, categoryFilter }: { adminUid: string; categoryFilt
                     </div>
                     <div style={{ display: 'flex', gap: 6 }}>
                       <button type="button" onClick={() => void saveEdit()} disabled={saving}
-                        style={{ background: '#1b5e20', color: '#a5d6a7', border: '1px solid #2e7d32', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontSize: 11, fontWeight: 800 }}>
+                        style={{ background: '#1b5e20', color: '#a5d6a7', border: '1px solid #2e7d32', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontSize: 13, fontWeight: 800 }}>
                         {saving ? '...' : '✓ Зберегти'}
                       </button>
                       <button type="button" onClick={cancelEdit}
-                        style={{ background: '#222', color: '#888', border: '1px solid #333', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontSize: 11 }}>
+                        style={{ background: '#f0f0f0', color: '#666', border: '1px solid #ddd', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontSize: 13 }}>
                         Скасувати
                       </button>
                     </div>
                   </div>
                 ) : (
                   <>
-                    <div style={{ color: '#e0e0ff', fontWeight: 800, fontSize: 14, marginBottom: 3, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ color: '#1a1a2e', fontWeight: 800, fontSize: 15, marginBottom: 3, display: 'flex', alignItems: 'center', gap: 8 }}>
                       🏪 {card.placeName} {categoryBadge(card.category)}
                     </div>
-                    <div style={{ color: '#888', fontSize: 12, marginBottom: 6 }}>
+                    <div style={{ color: '#666', fontSize: 13, marginBottom: 6 }}>
                       OwnerUID: {card.ownerId.slice(0, 16)}...
                       &nbsp;·&nbsp;Оновлено: {formatDate(card.updatedAt)}
                     </div>
@@ -467,17 +477,17 @@ function CardsTab({ adminUid, categoryFilter }: { adminUid: string; categoryFilt
                 {/* Content summary */}
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
                   {card.menuItems?.length ? (
-                    <span style={{ background: '#1a2a1a', color: '#81c784', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>
+                    <span style={{ background: '#e8f5e9', color: '#2e7d32', borderRadius: 6, padding: '2px 8px', fontSize: 13, fontWeight: 700 }}>
                       🍽 Меню: {card.menuItems.length} позицій
                     </span>
                   ) : null}
                   {card.promotions?.length ? (
-                    <span style={{ background: '#2a2000', color: '#ffd54f', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>
+                    <span style={{ background: '#fffde7', color: '#f57f17', borderRadius: 6, padding: '2px 8px', fontSize: 13, fontWeight: 700 }}>
                       🏷 Акцій: {card.promotions.length}
                     </span>
                   ) : null}
                   {card.photoUri || card.photoStoragePath ? (
-                    <span style={{ background: '#1a1a2a', color: '#90caf9', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>
+                    <span style={{ background: '#e8f0fc', color: '#1565c0', borderRadius: 6, padding: '2px 8px', fontSize: 13, fontWeight: 700 }}>
                       📸 Фото
                     </span>
                   ) : null}
@@ -486,7 +496,7 @@ function CardsTab({ adminUid, categoryFilter }: { adminUid: string; categoryFilt
                 {/* Expandable content preview */}
                 <button type="button"
                   onClick={() => setExpanded(expanded === card.placeId ? null : card.placeId)}
-                  style={{ background: 'none', border: 'none', color: '#5c8ee0', cursor: 'pointer', fontSize: 12, fontWeight: 700, padding: 0 }}
+                  style={{ background: 'none', border: 'none', color: '#1565c0', cursor: 'pointer', fontSize: 13, fontWeight: 700, padding: 0 }}
                 >
                   {expanded === card.placeId ? '▲ Сховати зміст' : '▼ Переглянути зміст'}
                 </button>
@@ -502,9 +512,9 @@ function CardsTab({ adminUid, categoryFilter }: { adminUid: string; categoryFilt
 
                     {card.menuItems?.length ? (
                       <div>
-                        <div style={{ color: '#81c784', fontSize: 12, fontWeight: 800, marginBottom: 4 }}>Меню:</div>
+                        <div style={{ color: '#2e7d32', fontSize: 13, fontWeight: 800, marginBottom: 4 }}>Меню:</div>
                         {card.menuItems.map((item, i) => (
-                          <div key={i} style={{ color: '#ccc', fontSize: 12, display: 'flex', justifyContent: 'space-between', maxWidth: 300, padding: '2px 0' }}>
+                          <div key={i} style={{ color: '#444', fontSize: 13, display: 'flex', justifyContent: 'space-between', maxWidth: 300, padding: '2px 0' }}>
                             <span>{item.name}</span>
                             <span style={{ color: '#a5d6a7', fontWeight: 700 }}>{item.price}</span>
                           </div>
@@ -514,12 +524,12 @@ function CardsTab({ adminUid, categoryFilter }: { adminUid: string; categoryFilt
 
                     {card.promotions?.length ? (
                       <div>
-                        <div style={{ color: '#ffd54f', fontSize: 12, fontWeight: 800, marginBottom: 4 }}>Акції:</div>
+                        <div style={{ color: '#f57f17', fontSize: 13, fontWeight: 800, marginBottom: 4 }}>Акції:</div>
                         {card.promotions.map((promo, i) => (
-                          <div key={i} style={{ background: '#1a1500', borderRadius: 6, padding: '6px 10px', marginBottom: 4, maxWidth: 380 }}>
-                            <div style={{ color: '#ffe082', fontWeight: 700, fontSize: 13 }}>{promo.title}</div>
-                            {promo.description ? <div style={{ color: '#bbb', fontSize: 12, marginTop: 2 }}>{promo.description}</div> : null}
-                            {promo.dateUntil ? <div style={{ color: '#888', fontSize: 11, marginTop: 2 }}>До: {formatDate(promo.dateUntil)}</div> : null}
+                          <div key={i} style={{ background: '#fffde7', borderRadius: 6, padding: '6px 10px', marginBottom: 4, maxWidth: 380 }}>
+                            <div style={{ color: '#f57f17', fontWeight: 700, fontSize: 14 }}>{promo.title}</div>
+                            {promo.description ? <div style={{ color: '#555', fontSize: 13, marginTop: 2 }}>{promo.description}</div> : null}
+                            {promo.dateUntil ? <div style={{ color: '#666', fontSize: 13, marginTop: 2 }}>До: {formatDate(promo.dateUntil)}</div> : null}
                           </div>
                         ))}
                       </div>
@@ -528,7 +538,7 @@ function CardsTab({ adminUid, categoryFilter }: { adminUid: string; categoryFilt
                 )}
 
                 {card.rejectReason ? (
-                  <div style={{ color: '#ef9a9a', fontSize: 12, marginTop: 6 }}>
+                  <div style={{ color: '#c62828', fontSize: 13, marginTop: 6 }}>
                     Причина відмови: {card.rejectReason}
                   </div>
                 ) : null}
@@ -544,7 +554,7 @@ function CardsTab({ adminUid, categoryFilter }: { adminUid: string; categoryFilt
                       style={{
                         background: '#1b5e20', color: '#a5d6a7',
                         border: '1px solid #2e7d32', borderRadius: 6,
-                        padding: '5px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 800,
+                        padding: '5px 12px', cursor: 'pointer', fontSize: 13, fontWeight: 800,
                         opacity: actionId === card.placeId ? 0.5 : 1,
                       }}
                     >
@@ -556,7 +566,7 @@ function CardsTab({ adminUid, categoryFilter }: { adminUid: string; categoryFilt
                       style={{
                         background: '#4a1010', color: '#ef9a9a',
                         border: '1px solid #7a2020', borderRadius: 6,
-                        padding: '5px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 800,
+                        padding: '5px 12px', cursor: 'pointer', fontSize: 13, fontWeight: 800,
                         opacity: actionId === card.placeId ? 0.5 : 1,
                       }}
                     >
@@ -568,9 +578,9 @@ function CardsTab({ adminUid, categoryFilter }: { adminUid: string; categoryFilt
                   <button type="button"
                     onClick={() => startEdit(card)}
                     style={{
-                      background: '#0a1520', color: '#90caf9',
+                      background: '#eef4fc', color: '#1565c0',
                       border: '1px solid #1a3a5a', borderRadius: 6,
-                      padding: '4px 10px', cursor: 'pointer', fontSize: 11, fontWeight: 700,
+                      padding: '4px 10px', cursor: 'pointer', fontSize: 13, fontWeight: 700,
                     }}
                   >
                     ✎ Редагувати
@@ -579,9 +589,9 @@ function CardsTab({ adminUid, categoryFilter }: { adminUid: string; categoryFilt
                     onClick={() => void handleDeleteCard(card.placeId)}
                     disabled={actionId === card.placeId}
                     style={{
-                      background: '#1a0a0a', color: '#888',
-                      border: '1px solid #333', borderRadius: 6,
-                      padding: '4px 10px', cursor: 'pointer', fontSize: 11, fontWeight: 700,
+                      background: '#f5f0f0', color: '#666',
+                      border: '1px solid #ddd', borderRadius: 6,
+                      padding: '4px 10px', cursor: 'pointer', fontSize: 13, fontWeight: 700,
                       opacity: actionId === card.placeId ? 0.5 : 1,
                     }}
                   >
@@ -601,10 +611,10 @@ function CardsTab({ adminUid, categoryFilter }: { adminUid: string; categoryFilt
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999,
         }}>
           <div style={{
-            background: '#1a1a2e', border: '1px solid #2a2a4a', borderRadius: 12,
+            background: '#eef0f8', border: '1px solid #d0d4e8', borderRadius: 12,
             padding: 24, width: 400, maxWidth: '90vw',
           }}>
-            <div style={{ color: '#fff', fontWeight: 800, fontSize: 16, marginBottom: 12 }}>
+            <div style={{ color: '#1a1a2e', fontWeight: 800, fontSize: 16, marginBottom: 12 }}>
               Причина відмови контенту
             </div>
             <textarea
@@ -612,22 +622,22 @@ function CardsTab({ adminUid, categoryFilter }: { adminUid: string; categoryFilt
               onChange={(e) => setRejectReason(e.target.value)}
               placeholder="Вкажіть, що потрібно виправити..."
               style={{
-                width: '100%', minHeight: 80, background: '#111', color: '#ccc',
-                border: '1px solid #333', borderRadius: 8, padding: 10,
-                fontSize: 13, resize: 'vertical', boxSizing: 'border-box',
+                width: '100%', minHeight: 80, background: '#fff', color: '#333',
+                border: '1px solid #ddd', borderRadius: 8, padding: 10,
+                fontSize: 14, resize: 'vertical', boxSizing: 'border-box',
               }}
             />
             <div style={{ display: 'flex', gap: 8, marginTop: 12, justifyContent: 'flex-end' }}>
               <button type="button"
                 onClick={() => setRejectId(null)}
-                style={{ background: '#222', color: '#aaa', border: '1px solid #333', borderRadius: 6, padding: '6px 14px', cursor: 'pointer', fontSize: 13 }}
+                style={{ background: '#f0f0f0', color: '#555', border: '1px solid #ddd', borderRadius: 6, padding: '6px 14px', cursor: 'pointer', fontSize: 14 }}
               >
                 Скасувати
               </button>
               <button type="button"
                 onClick={() => void handleReject()}
                 disabled={actionId === rejectId}
-                style={{ background: '#7a2020', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 800 }}
+                style={{ background: '#7a2020', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 14px', cursor: 'pointer', fontSize: 14, fontWeight: 800 }}
               >
                 Відхилити
               </button>
@@ -740,68 +750,68 @@ function SubscriptionsTab() {
           { label: 'Прострочених', value: expiredCount, color: '#ef9a9a' },
           { label: 'Всього', value: subs.length, color: '#90caf9' },
         ].map((s) => (
-          <div key={s.label} style={{ background: '#111', border: '1px solid #2a2a3a', borderRadius: 10, padding: '10px 20px', minWidth: 100 }}>
+          <div key={s.label} style={{ background: '#f8f8f8', border: '1px solid #dde0f0', borderRadius: 10, padding: '10px 20px', minWidth: 100 }}>
             <div style={{ color: s.color, fontSize: 24, fontWeight: 900 }}>{s.value}</div>
-            <div style={{ color: '#666', fontSize: 12, fontWeight: 700 }}>{s.label}</div>
+            <div style={{ color: '#777', fontSize: 13, fontWeight: 700 }}>{s.label}</div>
           </div>
         ))}
       </div>
 
       {/* Grant form */}
-      <div style={{ background: '#0a1520', border: '1px solid #1a3a5a', borderRadius: 12, padding: 20 }}>
-        <div style={{ color: '#90caf9', fontWeight: 900, fontSize: 15, marginBottom: 14 }}>
+      <div style={{ background: '#eef4fc', border: '1px solid #1a3a5a', borderRadius: 12, padding: 20 }}>
+        <div style={{ color: '#1565c0', fontWeight: 900, fontSize: 16, marginBottom: 14 }}>
           🏪 Видати Бізнес+ підписку
         </div>
 
         {/* User search */}
         {!selectedUser ? (
           <div style={{ marginBottom: 14 }}>
-            <div style={{ color: '#aaa', fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Пошук користувача (ім'я, телефон, UID)</div>
+            <div style={{ color: '#555', fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Пошук користувача (ім'я, телефон, UID)</div>
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Введіть мінімум 2 символи..."
               style={{
-                width: '100%', background: '#111', color: '#eee',
-                border: '1px solid #333', borderRadius: 8, padding: '8px 12px',
-                fontSize: 14, boxSizing: 'border-box',
+                width: '100%', background: '#fff', color: '#333',
+                border: '1px solid #ddd', borderRadius: 8, padding: '8px 12px',
+                fontSize: 15, boxSizing: 'border-box',
               }}
             />
-            {searching && <div style={{ color: '#666', fontSize: 12, marginTop: 6 }}>Пошук...</div>}
+            {searching && <div style={{ color: '#777', fontSize: 13, marginTop: 6 }}>Пошук...</div>}
             {searchResults.length > 0 && (
-              <div style={{ background: '#111', border: '1px solid #2a2a3a', borderRadius: 8, marginTop: 4, maxHeight: 200, overflowY: 'auto' }}>
+              <div style={{ background: '#fff', border: '1px solid #dde0f0', borderRadius: 8, marginTop: 4, maxHeight: 200, overflowY: 'auto' }}>
                 {searchResults.map((u) => (
                   <div
                     key={u.uid}
                     onClick={() => { setSelectedUser(u); setSearchQuery(''); setSearchResults([]); }}
                     style={{
-                      padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #1a1a2a',
+                      padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #e8eaf0',
                       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                     }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = '#1a1a2e')}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = '#e8f0fc')}
                     onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                   >
-                    <span style={{ color: '#e0e0ff', fontSize: 13, fontWeight: 700 }}>{u.name || '—'}</span>
-                    <span style={{ color: '#666', fontSize: 12 }}>{u.phone || u.uid.slice(0, 12) + '...'}</span>
+                    <span style={{ color: '#1a1a2e', fontSize: 14, fontWeight: 700 }}>{u.name || '—'}</span>
+                    <span style={{ color: '#777', fontSize: 13 }}>{u.phone || u.uid.slice(0, 12) + '...'}</span>
                   </div>
                 ))}
               </div>
             )}
           </div>
         ) : (
-          <div style={{ marginBottom: 14, background: '#111', borderRadius: 8, padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ marginBottom: 14, background: '#fff', borderRadius: 8, padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <span style={{ color: '#90caf9', fontWeight: 700 }}>{selectedUser.name || 'Без імені'}</span>
-              <span style={{ color: '#666', fontSize: 12, marginLeft: 8 }}>{selectedUser.phone || selectedUser.uid.slice(0, 16) + '...'}</span>
+              <span style={{ color: '#1565c0', fontWeight: 700 }}>{selectedUser.name || 'Без імені'}</span>
+              <span style={{ color: '#777', fontSize: 13, marginLeft: 8 }}>{selectedUser.phone || selectedUser.uid.slice(0, 16) + '...'}</span>
             </div>
-            <button type="button" onClick={() => setSelectedUser(null)} style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', fontSize: 16 }}>✕</button>
+            <button type="button" onClick={() => setSelectedUser(null)} style={{ background: 'none', border: 'none', color: '#777', cursor: 'pointer', fontSize: 16 }}>✕</button>
           </div>
         )}
 
         {/* Month selector */}
         <div style={{ marginBottom: 14 }}>
-          <div style={{ color: '#aaa', fontSize: 12, fontWeight: 700, marginBottom: 8 }}>Термін підписки</div>
+          <div style={{ color: '#555', fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Термін підписки</div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {MONTHS_OPTIONS.map((opt) => (
               <button
@@ -809,13 +819,13 @@ function SubscriptionsTab() {
                 type="button"
                 onClick={() => setSelectedMonths(opt.value)}
                 style={{
-                  background: selectedMonths === opt.value ? '#1a3a5a' : '#111',
-                  color: selectedMonths === opt.value ? '#90caf9' : '#666',
-                  border: `1px solid ${selectedMonths === opt.value ? '#1a6ab0' : '#333'}`,
-                  borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 800,
+                  background: selectedMonths === opt.value ? '#d8eaf8' : '#fff',
+                  color: selectedMonths === opt.value ? '#1565c0' : '#777',
+                  border: `1px solid ${selectedMonths === opt.value ? '#1a6ab0' : '#ddd'}`,
+                  borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 14, fontWeight: 800,
                 }}
               >
-                {opt.label} <span style={{ color: '#4CAF50', fontSize: 11 }}>{opt.price}</span>
+                {opt.label} <span style={{ color: '#4CAF50', fontSize: 13 }}>{opt.price}</span>
               </button>
             ))}
           </div>
@@ -823,7 +833,7 @@ function SubscriptionsTab() {
 
         {/* Notes */}
         <div style={{ marginBottom: 14 }}>
-          <div style={{ color: '#aaa', fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Нотатка (необов'язково)</div>
+          <div style={{ color: '#555', fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Нотатка (необов'язково)</div>
           <input
             type="text"
             value={notes}
@@ -831,26 +841,26 @@ function SubscriptionsTab() {
             placeholder="Оплата Monobank 07.06.26, Serega Bablyak"
             maxLength={200}
             style={{
-              width: '100%', background: '#111', color: '#eee',
-              border: '1px solid #333', borderRadius: 8, padding: '8px 12px',
-              fontSize: 13, boxSizing: 'border-box',
+              width: '100%', background: '#fff', color: '#333',
+              border: '1px solid #ddd', borderRadius: 8, padding: '8px 12px',
+              fontSize: 14, boxSizing: 'border-box',
             }}
           />
         </div>
 
-        {grantError && <div style={{ color: '#ef9a9a', fontSize: 13, marginBottom: 10 }}>{grantError}</div>}
-        {grantSuccess && <div style={{ color: '#69f0ae', fontSize: 13, marginBottom: 10 }}>{grantSuccess}</div>}
+        {grantError && <div style={{ color: '#ef9a9a', fontSize: 14, marginBottom: 10 }}>{grantError}</div>}
+        {grantSuccess && <div style={{ color: '#2e7d32', fontSize: 14, marginBottom: 10 }}>{grantSuccess}</div>}
 
         <button
           type="button"
           onClick={() => void handleGrant()}
           disabled={!selectedUser || granting}
           style={{
-            background: selectedUser ? '#1a3a5a' : '#111',
-            color: selectedUser ? '#90caf9' : '#444',
-            border: `1px solid ${selectedUser ? '#1a6ab0' : '#222'}`,
+            background: selectedUser ? '#d8eaf8' : '#f0f0f0',
+            color: selectedUser ? '#1565c0' : '#aaa',
+            border: `1px solid ${selectedUser ? '#1a6ab0' : '#ddd'}`,
             borderRadius: 8, padding: '9px 24px', cursor: selectedUser ? 'pointer' : 'not-allowed',
-            fontSize: 14, fontWeight: 900,
+            fontSize: 15, fontWeight: 900,
           }}
         >
           {granting ? 'Активується...' : '🚀 Активувати Бізнес+'}
@@ -859,34 +869,34 @@ function SubscriptionsTab() {
 
       {/* Subscribers list */}
       <div>
-        <div style={{ color: '#aaa', fontSize: 13, fontWeight: 800, marginBottom: 10 }}>
+        <div style={{ color: '#555', fontSize: 14, fontWeight: 800, marginBottom: 10 }}>
           Всі Бізнес+ підписники ({subs.length})
         </div>
-        {loading && <div style={{ color: '#666' }}>Завантаження...</div>}
+        {loading && <div style={{ color: '#777' }}>Завантаження...</div>}
         {!loading && subs.length === 0 && (
-          <div style={{ color: '#444', fontSize: 13 }}>Поки що немає жодного підписника.</div>
+          <div style={{ color: '#777', fontSize: 14 }}>Поки що немає жодного підписника.</div>
         )}
         {subs.map((sub) => {
           const isActive = sub.status === 'active' && sub.expiresAt && new Date(sub.expiresAt) > new Date();
           const expStr = sub.expiresAt ? new Date(sub.expiresAt).toLocaleDateString('uk-UA') : '—';
           return (
             <div key={sub.uid} style={{
-              background: '#111', border: `1px solid ${isActive ? '#1a3a5a' : '#2a1a1a'}`,
+              background: '#f8f8f8', border: `1px solid ${isActive ? '#1a3a5a' : '#e0c8c8'}`,
               borderRadius: 10, padding: '12px 16px', marginBottom: 8,
               display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12,
             }}>
               <div>
-                <div style={{ color: '#e0e0ff', fontSize: 13, fontWeight: 700 }}>{sub.uid}</div>
-                <div style={{ color: '#666', fontSize: 11, marginTop: 2 }}>
-                  До: <span style={{ color: isActive ? '#69f0ae' : '#ef9a9a' }}>{expStr}</span>
-                  {sub.notes ? <span style={{ marginLeft: 10, color: '#555' }}>{sub.notes}</span> : null}
+                <div style={{ color: '#1a1a2e', fontSize: 14, fontWeight: 700 }}>{sub.uid}</div>
+                <div style={{ color: '#777', fontSize: 13, marginTop: 2 }}>
+                  До: <span style={{ color: isActive ? '#2e7d32' : '#c62828' }}>{expStr}</span>
+                  {sub.notes ? <span style={{ marginLeft: 10, color: '#666' }}>{sub.notes}</span> : null}
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{
-                  background: isActive ? '#0a2010' : '#2a0808',
-                  color: isActive ? '#69f0ae' : '#ef9a9a',
-                  borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 800,
+                  background: isActive ? '#e8f5e9' : '#fce8e8',
+                  color: isActive ? '#2e7d32' : '#c62828',
+                  borderRadius: 6, padding: '2px 8px', fontSize: 13, fontWeight: 800,
                 }}>
                   {isActive ? 'Активна' : 'Прострочена'}
                 </span>
@@ -895,9 +905,9 @@ function SubscriptionsTab() {
                     type="button"
                     onClick={() => setCancelUid(sub.uid)}
                     style={{
-                      background: '#2a0808', color: '#ef9a9a',
+                      background: '#4a1010', color: '#ef9a9a',
                       border: '1px solid #7a2020', borderRadius: 6,
-                      padding: '4px 10px', cursor: 'pointer', fontSize: 11, fontWeight: 800,
+                      padding: '4px 10px', cursor: 'pointer', fontSize: 13, fontWeight: 800,
                     }}
                   >
                     Скасувати
@@ -915,18 +925,18 @@ function SubscriptionsTab() {
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999,
         }}>
-          <div style={{ background: '#1a1a2e', border: '1px solid #2a2a4a', borderRadius: 12, padding: 24, width: 380, maxWidth: '90vw' }}>
-            <div style={{ color: '#fff', fontWeight: 800, fontSize: 16, marginBottom: 10 }}>Скасувати Бізнес+?</div>
-            <div style={{ color: '#aaa', fontSize: 13, marginBottom: 20 }}>
+          <div style={{ background: '#eef0f8', border: '1px solid #d0d4e8', borderRadius: 12, padding: 24, width: 380, maxWidth: '90vw' }}>
+            <div style={{ color: '#1a1a2e', fontWeight: 800, fontSize: 16, marginBottom: 10 }}>Скасувати Бізнес+?</div>
+            <div style={{ color: '#555', fontSize: 14, marginBottom: 20 }}>
               Підписка буде деактивована негайно. Користувач втратить доступ до функцій Бізнес+.
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button type="button" onClick={() => setCancelUid(null)}
-                style={{ background: '#222', color: '#aaa', border: '1px solid #333', borderRadius: 6, padding: '6px 14px', cursor: 'pointer', fontSize: 13 }}>
+                style={{ background: '#f0f0f0', color: '#555', border: '1px solid #ddd', borderRadius: 6, padding: '6px 14px', cursor: 'pointer', fontSize: 14 }}>
                 Ні, залишити
               </button>
               <button type="button" onClick={() => void handleCancel()} disabled={cancelling}
-                style={{ background: '#7a2020', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 800 }}>
+                style={{ background: '#7a2020', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 14px', cursor: 'pointer', fontSize: 14, fontWeight: 800 }}>
                 {cancelling ? 'Скасовується...' : 'Так, скасувати'}
               </button>
             </div>
@@ -963,16 +973,16 @@ export function BusinessPlusModerationPage() {
   return (
     <div style={{ padding: '20px 24px', maxWidth: 900, margin: '0 auto' }}>
       <div style={{ marginBottom: 24 }}>
-        <h2 style={{ color: '#e0e0ff', fontSize: 22, fontWeight: 900, margin: 0 }}>
+        <h2 style={{ color: '#1a1a2e', fontSize: 22, fontWeight: 900, margin: 0 }}>
           🏪 Бізнес+ картки
         </h2>
-        <p style={{ color: '#666', fontSize: 13, margin: '4px 0 0' }}>
+        <p style={{ color: '#777', fontSize: 14, margin: '4px 0 0' }}>
           Заявки власників та модерація контенту меню/акцій/фото
         </p>
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid #2a2a3a', paddingBottom: 0 }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid #dde0f0', paddingBottom: 0 }}>
         {([
           { key: 'claims' as Tab, label: 'Заявки власників', count: claimsCount },
           { key: 'cards' as Tab, label: 'Контент карток', count: cardsCount },
@@ -981,13 +991,13 @@ export function BusinessPlusModerationPage() {
           <button key={tab.key} type="button"
             onClick={() => setActiveTab(tab.key)}
             style={{
-              background: activeTab === tab.key ? '#1a1a3a' : 'transparent',
-              color: activeTab === tab.key ? '#90caf9' : '#666',
+              background: activeTab === tab.key ? '#e8f0fc' : 'transparent',
+              color: activeTab === tab.key ? '#1565c0' : '#777',
               border: 'none',
-              borderBottom: activeTab === tab.key ? '2px solid #90caf9' : '2px solid transparent',
+              borderBottom: activeTab === tab.key ? '2px solid #1565c0' : '2px solid transparent',
               borderRadius: '6px 6px 0 0',
               padding: '10px 18px',
-              cursor: 'pointer', fontSize: 14, fontWeight: 800,
+              cursor: 'pointer', fontSize: 15, fontWeight: 800,
               display: 'flex', alignItems: 'center', gap: 6,
             }}
           >
@@ -996,7 +1006,7 @@ export function BusinessPlusModerationPage() {
               <span style={{
                 background: '#e53935', color: '#fff',
                 borderRadius: 10, padding: '0px 6px',
-                fontSize: 11, fontWeight: 900, lineHeight: 1.8,
+                fontSize: 13, fontWeight: 900, lineHeight: 1.8,
               }}>
                 {tab.count}
               </span>
@@ -1007,21 +1017,27 @@ export function BusinessPlusModerationPage() {
 
       {/* Category filter (for claims & cards tabs) */}
       {activeTab !== 'subscriptions' && (
-        <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
-          {(Object.keys(CATEGORY_LABELS) as CategoryFilter[]).map((cat) => (
-            <button key={cat} type="button"
-              onClick={() => setCategoryFilter(cat)}
-              style={{
-                background: categoryFilter === cat ? '#0a2040' : '#111',
-                color: categoryFilter === cat ? '#90caf9' : '#666',
-                border: `1px solid ${categoryFilter === cat ? '#1a5ab0' : '#222'}`,
-                borderRadius: 6, padding: '3px 10px',
-                cursor: 'pointer', fontSize: 12, fontWeight: 700,
-              }}
-            >
-              {CATEGORY_LABELS[cat]}
-            </button>
-          ))}
+        <div style={{ marginBottom: 0 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#999', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>
+            Категорія
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {(Object.keys(CATEGORY_LABELS) as CategoryFilter[]).map((cat) => (
+              <button key={cat} type="button"
+                onClick={() => setCategoryFilter(cat)}
+                style={{
+                  background: categoryFilter === cat ? '#d8eaf8' : '#f8f8f8',
+                  color: categoryFilter === cat ? '#1565c0' : '#777',
+                  border: `1px solid ${categoryFilter === cat ? '#1a5ab0' : '#ddd'}`,
+                  borderRadius: 6, padding: '3px 10px',
+                  cursor: 'pointer', fontSize: 13, fontWeight: 700,
+                }}
+              >
+                {CATEGORY_LABELS[cat]}
+              </button>
+            ))}
+          </div>
+          <hr style={{ border: 'none', borderTop: '1px solid #e8eaf0', margin: '14px 0 0' }} />
         </div>
       )}
 

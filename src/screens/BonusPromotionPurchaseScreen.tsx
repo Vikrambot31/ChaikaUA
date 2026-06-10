@@ -128,34 +128,26 @@ const fetchOwnedTargets = async (
 };
 
 const getPromotionErrorMessage = (error: any, fallback: string, bonus: { errorOwnCard: string; errorInsufficientFunds: string; errorAlreadyActive: string; errorMaxSlots: string; errorAccessNotConfirmed: string; errorMinBadge: string; errorSubscriptionExists: string; errorInvalidDuration: string; errorSaveFailed: string }) => {
-  const raw = String(error?.message || error?.code || '').toLowerCase();
-  if (raw.includes('permission-denied') || raw.includes('can_only_promote_own')) {
-    return bonus.errorOwnCard;
+  const code = String(error?.code || '').replace('functions/', '');
+  const msg = String(error?.message || '');
+
+  if (code === 'permission-denied') return bonus.errorOwnCard;
+
+  if (code === 'failed-precondition') {
+    if (msg === 'already_has_active_promotion') return bonus.errorAlreadyActive;
+    if (msg === 'max_top_slots_reached') return bonus.errorMaxSlots;
+    if (msg === 'access_not_confirmed') return bonus.errorAccessNotConfirmed;
+    if (msg.startsWith('min_badge')) return bonus.errorMinBadge;
+    if (msg === 'active_subscription_already_exists') return bonus.errorSubscriptionExists;
+    if (msg === 'insufficient_funds' || msg === 'insufficient_credits' || msg === 'not_enough_credits') return bonus.errorInsufficientFunds;
   }
-  if (raw.includes('insufficient') || raw.includes('not_enough') || raw.includes('insufficient_credits') || raw.includes('insufficient_bonuses')) {
-    return bonus.errorInsufficientFunds;
+
+  if (code === 'invalid-argument') {
+    if (msg === 'invalid_promo_type_or_duration' || msg === 'invalid_duration') return bonus.errorInvalidDuration;
   }
-  if (raw.includes('already_has_active_promotion')) {
-    return bonus.errorAlreadyActive;
-  }
-  if (raw.includes('max_top_slots_reached')) {
-    return bonus.errorMaxSlots;
-  }
-  if (raw.includes('access_not_confirmed')) {
-    return bonus.errorAccessNotConfirmed;
-  }
-  if (raw.includes('min_badge')) {
-    return bonus.errorMinBadge;
-  }
-  if (raw.includes('active_subscription_already_exists')) {
-    return bonus.errorSubscriptionExists;
-  }
-  if (raw.includes('invalid_promo_type_or_duration') || raw.includes('invalid_duration')) {
-    return bonus.errorInvalidDuration;
-  }
-  if (raw.includes('promotion_write_failed_funds_returned')) {
-    return bonus.errorSaveFailed;
-  }
+
+  if (code === 'internal' && msg === 'promotion_write_failed_funds_returned') return bonus.errorSaveFailed;
+
   return fallback;
 };
 

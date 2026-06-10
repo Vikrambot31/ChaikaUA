@@ -29,7 +29,7 @@ import { BONUS_WALLET_TOOLTIP } from '../utils/screenTooltips';
 
 type AppNav = NavigationProp<Record<string, object | undefined>>;
 
-const WEEKLY_FREE_LIMIT_FALLBACK = 250;
+const WEEKLY_FREE_LIMIT_FALLBACK = 250; // fallback if server hasn't written weeklyLimit yet
 const EMPTY_PROMO_CREDITS: PromoCredits = {
   balance: 0,
   lifetime: 0,
@@ -167,7 +167,7 @@ const BonusWalletScreen: React.FC = () => {
 
   const trustAvailable = bonuses?.available ?? bonuses?.total ?? 0;
   const weeklyEarned = bonuses?.earned?.weeklyTotal ?? 0;
-  const weeklyLimit = WEEKLY_FREE_LIMIT_FALLBACK;
+  const weeklyLimit = bonuses?.earned?.weeklyLimit ?? WEEKLY_FREE_LIMIT_FALLBACK;
   const weeklyProgress = Math.min(100, (weeklyEarned / weeklyLimit) * 100);
   const totalProgress = Math.min(100, ((bonuses?.total ?? 0) / BONUS_CAPS.total) * 100);
   const activePromotions = useMemo(() => {

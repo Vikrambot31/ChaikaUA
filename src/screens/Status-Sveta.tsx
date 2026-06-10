@@ -488,49 +488,6 @@ const ElectricityStatusScreen: React.FC = () => {
           />
         </View>
 
-        <TactileCard elevated style={styles.statusCard} pressable={false}>
-          <Text style={styles.cardTitle}>{text.selectStatus}</Text>
-
-          <View style={styles.statusButtonsRow}>
-            <TactileCard
-              onPress={() => { if (!submitting) void handleStatusSubmit('on'); }}
-              style={styles.statusButtonOn}
-            >
-              {submitting ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <>
-                  <View style={styles.ledIndicatorOn}>
-                    <View style={styles.ledGlow} />
-                    <View style={styles.ledShine} />
-                  </View>
-                  <MaterialCommunityIcons name="lightning-bolt" size={24} color="#FFFFFF" />
-                  <Text style={styles.statusButtonText}>{text.btnOn}</Text>
-                  <Text style={styles.statusButtonSubtext}>{text.btnOnSub}</Text>
-                </>
-              )}
-            </TactileCard>
-
-            <TactileCard
-              onPress={() => { if (!submitting) void handleStatusSubmit('off'); }}
-              style={styles.statusButtonOff}
-            >
-              {submitting ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <>
-                  <View style={styles.ledIndicatorOff}>
-                    <View style={styles.ledShine} />
-                  </View>
-                  <MaterialCommunityIcons name="candle" size={24} color="#FFFFFF" />
-                  <Text style={styles.statusButtonText}>{text.btnOff}</Text>
-                  <Text style={styles.statusButtonSubtext}>{text.btnOffSub}</Text>
-                </>
-              )}
-            </TactileCard>
-          </View>
-        </TactileCard>
-
         <TactileCard elevated style={styles.formCard} pressable={false}>
           <Text style={styles.cardTitle}>{text.whereAreYou}</Text>
 
@@ -573,6 +530,49 @@ const ElectricityStatusScreen: React.FC = () => {
           )}
 
           <Text style={styles.helperText}>{text.helper}</Text>
+        </TactileCard>
+
+        <TactileCard elevated style={styles.statusCard} pressable={false}>
+          <Text style={styles.cardTitle}>{text.selectStatus}</Text>
+
+          <View style={styles.statusButtonsRow}>
+            <TactileCard
+              onPress={() => { if (!submitting) void handleStatusSubmit('on'); }}
+              style={styles.statusButtonOn}
+            >
+              {submitting ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <View style={styles.ledIndicatorOn}>
+                    <View style={styles.ledGlow} />
+                    <View style={styles.ledShine} />
+                  </View>
+                  <MaterialCommunityIcons name="lightning-bolt" size={24} color="#FFFFFF" />
+                  <Text style={styles.statusButtonText}>{text.btnOn}</Text>
+                  <Text style={styles.statusButtonSubtext}>{text.btnOnSub}</Text>
+                </>
+              )}
+            </TactileCard>
+
+            <TactileCard
+              onPress={() => { if (!submitting) void handleStatusSubmit('off'); }}
+              style={styles.statusButtonOff}
+            >
+              {submitting ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <View style={styles.ledIndicatorOff}>
+                    <View style={styles.ledShine} />
+                  </View>
+                  <MaterialCommunityIcons name="candle" size={24} color="#FFFFFF" />
+                  <Text style={styles.statusButtonText}>{text.btnOff}</Text>
+                  <Text style={styles.statusButtonSubtext}>{text.btnOffSub}</Text>
+                </>
+              )}
+            </TactileCard>
+          </View>
         </TactileCard>
 
         <TactileCard elevated style={styles.activityCard} pressable={false}>

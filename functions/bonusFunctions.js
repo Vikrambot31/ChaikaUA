@@ -218,19 +218,27 @@ const writeBonusTransaction = async (db, uid, tx) => {
 // ─── Core bonus award (atomic transaction) ───────────────────────────────────
 
 /**
- * Award trust bonuses atomically.
+ * Award trust bonuses atomically with optional plan multiplier.
  *
  * @param {object} db - admin.database()
  * @param {string} uid - recipient UID
  * @param {string} category - help|gratitude|invites|likes|activity
- * @param {number} points - points to add
+ * @param {number} points - base points to add
  * @param {string} idempotencyKey - unique key for this award
  * @param {object} txMeta - { sourceId, sourceType, note }
  * @param {number} now - timestamp
  * @param {boolean} isNewcomer - restrict to newcomer limits
+ * @param {string} [plan] - user plan (free|premium|premium_plus|business_plus) for multiplier
  * @returns {{ awarded: boolean, reason: string|null, newTotal: number }}
  */
-const awardTrustBonus = async (db, uid, category, points, idempotencyKey, txMeta, now, isNewcomer) => {
+const awardTrustBonus = async (db, uid, category, points, idempotencyKey, txMeta, now, isNewcomer, plan) => {
+  // Apply subscription multiplier: business_plus=x2, premium*=x1.5, free=x1
+  let multipliedPoints = points;
+  if (plan === 'business_plus') {
+    multipliedPoints = Math.floor(points * 2);
+  } else if (plan === 'premium' || plan === 'premium_plus') {
+    multipliedPoints = Math.floor(points * 1.5);
+  }
   // FIX BUG 1: Atomic idempotency via transaction on the idempotency key itself.
   // This prevents the race where two concurrent calls both pass the check.
   let alreadyExists = false;
@@ -269,7 +277,7 @@ const awardTrustBonus = async (db, uid, category, points, idempotencyKey, txMeta
     // Category counters
     const cat = d[category] && typeof d[category] === 'object' ? { ...d[category] } : { count: 0, points: 0 };
     cat.count = Number(cat.count || 0) + 1;
-    cat.points = Number(cat.points || 0) + points;
+    cat.points = Number(cat.points || 0) + multipliedPoints;
 
     // Earned tracking
     const earned = d.earned && typeof d.earned === 'object' ? { ...d.earned } : {};
@@ -277,10 +285,10 @@ const awardTrustBonus = async (db, uid, category, points, idempotencyKey, txMeta
       ? (earned.weeklyByCategory && typeof earned.weeklyByCategory === 'object' ? { ...earned.weeklyByCategory } : {})
       : {};
 
-    weeklyByCategory[category] = Number(weeklyByCategory[category] || 0) + points;
+    weeklyByCategory[category] = Number(weeklyByCategory[category] || 0) + multipliedPoints;
 
-    earned.total = Number(earned.total || 0) + points;
-    earned.weeklyTotal = earned.weekKey === weekKey ? Number(earned.weeklyTotal || 0) + points : points;
+    earned.total = Number(earned.total || 0) + multipliedPoints;
+    earned.weeklyTotal = earned.weekKey === weekKey ? Number(earned.weeklyTotal || 0) + multipliedPoints : multipliedPoints;
     earned.weekKey = weekKey;
     earned.weeklyByCategory = weeklyByCategory;
     earned.weeklyLimit = WEEKLY_LIMITS.total;
@@ -538,12 +546,16 @@ const createBonusFunctions = ({ functions, admin, writeOpsEvent, writeOpsError, 
     const accessSnap = await db.ref(`trust_tree/${helperUid}/status`).once('value');
     const isNewcomer = accessSnap.val() !== 'active';
 
+    // Load user's subscription plan for bonus multiplier
+    const subSnap = await db.ref(`user_subscription/${helperUid}`).once('value');
+    const userPlan = subSnap.val()?.plan || 'free';
+
     // Award bonus
     const result = await awardTrustBonus(
       db, helperUid, 'help', BONUS_HELP_RESPOND,
       `help_respond_${requestId}`,
       { sourceId: requestId, sourceType: 'request', note: 'Responded to help request' },
-      now, isNewcomer,
+      now, isNewcomer, userPlan,
     );
 
     await writeOpsEvent('bonus_help_respond', { uid: helperUid, requestId, awarded: result.awarded, points: BONUS_HELP_RESPOND });
@@ -605,12 +617,16 @@ const createBonusFunctions = ({ functions, admin, writeOpsEvent, writeOpsError, 
     const accessSnap = await db.ref(`trust_tree/${helperUid}/status`).once('value');
     const isNewcomer = accessSnap.val() !== 'active';
 
+    // Load user's subscription plan for bonus multiplier
+    const subSnap = await db.ref(`user_subscription/${helperUid}`).once('value');
+    const userPlan = subSnap.val()?.plan || 'free';
+
     // Award to helper
     const result = await awardTrustBonus(
       db, helperUid, 'help', BONUS_HELP_CONFIRMED,
       `help_confirmed_${requestId}_${helperUid}`,
       { sourceId: requestId, sourceType: 'request', note: `Confirmed by ${authorUid}` },
-      now, isNewcomer,
+      now, isNewcomer, userPlan,
     );
 
     // Write confirmation record
@@ -652,11 +668,15 @@ const createBonusFunctions = ({ functions, admin, writeOpsEvent, writeOpsError, 
     const accessSnap = await db.ref(`trust_tree/${authorUid}/status`).once('value');
     const isNewcomer = accessSnap.val() !== 'active';
 
+    // Load user's subscription plan for bonus multiplier
+    const subSnap = await db.ref(`user_subscription/${authorUid}`).once('value');
+    const userPlan = subSnap.val()?.plan || 'free';
+
     const result = await awardTrustBonus(
       db, authorUid, 'help', BONUS_AUTHOR_CLOSED,
       `request_closed_${requestId}`,
       { sourceId: requestId, sourceType: 'request', note: 'Author closed request' },
-      now, isNewcomer,
+      now, isNewcomer, userPlan,
     );
 
     return { ok: true, status: result.awarded ? 'closed' : result.reason, points: result.awarded ? BONUS_AUTHOR_CLOSED : 0 };
@@ -689,11 +709,15 @@ const createBonusFunctions = ({ functions, admin, writeOpsEvent, writeOpsError, 
     const accessSnap = await db.ref(`trust_tree/${helperUid}/status`).once('value');
     const isNewcomer = accessSnap.val() !== 'active';
 
+    // Load user's subscription plan for bonus multiplier
+    const subSnap = await db.ref(`user_subscription/${helperUid}`).once('value');
+    const userPlan = subSnap.val()?.plan || 'free';
+
     const result = await awardTrustBonus(
       db, helperUid, 'gratitude', BONUS_GRATITUDE,
       `gratitude_${requestId}_${authorUid}`,
       { sourceId: requestId, sourceType: 'request', note: `Thanks from ${authorUid}` },
-      now, isNewcomer,
+      now, isNewcomer, userPlan,
     );
 
     return { ok: true, awarded: result.awarded, points: result.awarded ? BONUS_GRATITUDE : 0 };
@@ -718,11 +742,15 @@ const createBonusFunctions = ({ functions, admin, writeOpsEvent, writeOpsError, 
     const accessSnap = await db.ref(`trust_tree/${targetUid}/status`).once('value');
     const isNewcomer = accessSnap.val() !== 'active';
 
+    // Load user's subscription plan for bonus multiplier
+    const subSnap = await db.ref(`user_subscription/${targetUid}`).once('value');
+    const userPlan = subSnap.val()?.plan || 'free';
+
     const result = await awardTrustBonus(
       db, targetUid, 'gratitude', BONUS_THANKS_PROFILE,
       idempKey,
       { sourceId: context.auth.uid, sourceType: 'profile', note: 'Profile thanks' },
-      now, isNewcomer,
+      now, isNewcomer, userPlan,
     );
 
     return { ok: true, awarded: result.awarded, points: result.awarded ? BONUS_THANKS_PROFILE : 0 };
@@ -741,11 +769,15 @@ const createBonusFunctions = ({ functions, admin, writeOpsEvent, writeOpsError, 
     const accessSnap = await db.ref(`trust_tree/${uid}/status`).once('value');
     const isNewcomer = accessSnap.val() !== 'active';
 
+    // Load user's subscription plan for bonus multiplier
+    const subSnap = await db.ref(`user_subscription/${uid}`).once('value');
+    const userPlan = subSnap.val()?.plan || 'free';
+
     const result = await awardTrustBonus(
       db, uid, 'activity', BONUS_DAILY_LOGIN,
       `daily_login_${dayKey}`,
       { sourceId: dayKey, sourceType: 'activity', note: 'Daily login' },
-      now, isNewcomer,
+      now, isNewcomer, userPlan,
     );
 
     return { ok: true, awarded: result.awarded, points: result.awarded ? BONUS_DAILY_LOGIN : 0 };
@@ -773,11 +805,15 @@ const createBonusFunctions = ({ functions, admin, writeOpsEvent, writeOpsError, 
     const accessSnap = await db.ref(`trust_tree/${uid}/status`).once('value');
     const isNewcomer = accessSnap.val() !== 'active';
 
+    // Load user's subscription plan for bonus multiplier
+    const subSnap = await db.ref(`user_subscription/${uid}`).once('value');
+    const userPlan = subSnap.val()?.plan || 'free';
+
     const result = await awardTrustBonus(
       db, uid, 'activity', points,
       `milestone_${milestone}`,
       { sourceId: milestone, sourceType: 'activity', note: `Milestone: ${milestone}` },
-      now, isNewcomer,
+      now, isNewcomer, userPlan,
     );
 
     return { ok: true, awarded: result.awarded, milestone, points: result.awarded ? points : 0 };

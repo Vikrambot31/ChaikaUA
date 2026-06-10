@@ -48,6 +48,7 @@ const UI_TEXT = {
     actualEmptyTitle: 'Тут зʼявляться акції та знижки',
     actualEmptyText: 'Салони зможуть показувати свої акції, нових майстрів та вільні вікна для мешканців району.',
     addOffer: 'Додати акцію',
+    addPlace: 'Додати місце',
     businessOwner: 'Ви власник салону?',
     categoriesTitle: 'Категорії',
     allPlacesTitle: 'Всі салони',
@@ -112,6 +113,7 @@ const UI_TEXT = {
     actualEmptyTitle: 'Здесь появятся акции и скидки',
     actualEmptyText: 'Салоны смогут показывать свои акции, новых мастеров и свободные окна для жителей района.',
     addOffer: 'Добавить акцию',
+    addPlace: 'Добавить место',
     businessOwner: 'Вы владелец салона?',
     categoriesTitle: 'Категории',
     allPlacesTitle: 'Все салоны',
@@ -176,6 +178,7 @@ const UI_TEXT = {
     actualEmptyTitle: 'Deals and discounts will appear here',
     actualEmptyText: 'Salons will be able to show their promotions, new masters and available slots for local residents.',
     addOffer: 'Add promotion',
+    addPlace: 'Add place',
     businessOwner: 'Salon owner?',
     categoriesTitle: 'Categories',
     allPlacesTitle: 'All salons',
@@ -554,17 +557,9 @@ export default function SalonyKrasotyScreen() {
             {activeOffers.map((offer) => renderOfferCard(offer))}
           </ScrollView>
         ) : (
-          <TouchableOpacity style={styles.actualCard} activeOpacity={0.88} onPress={openBusinessForm}>
-            <View style={styles.actualIcon}>
-              <MaterialCommunityIcons name="bell-plus-outline" size={24} color="#FFFFFF" />
-            </View>
-            <View style={styles.actualTextBlock}>
-              <Text style={styles.actualTitle}>{text.businessOwner}</Text>
-              <Text style={styles.actualText}>{text.actualEmptyText}</Text>
-            </View>
-            <View style={styles.actualCta}>
-              <Text style={styles.actualCtaText}>{text.addOffer}</Text>
-            </View>
+          <TouchableOpacity style={styles.addPlaceButton} activeOpacity={0.88} onPress={openBusinessForm}>
+            <MaterialCommunityIcons name="store-plus" size={16} color="#FFFFFF" />
+            <Text style={styles.addPlaceBtnText}>{text.addPlace}</Text>
           </TouchableOpacity>
         )}
 
@@ -612,7 +607,13 @@ export default function SalonyKrasotyScreen() {
         >
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>{text.allPlacesTitle}</Text>
-            <Text style={styles.resultCount}>{filteredPlaces.length}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={styles.resultCount}>{filteredPlaces.length}</Text>
+              <TouchableOpacity style={styles.addPlaceButton} activeOpacity={0.88} onPress={openBusinessForm}>
+                <MaterialCommunityIcons name="store-plus" size={14} color="#FFFFFF" />
+                <Text style={styles.addPlaceBtnText}>{text.addPlace}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {filteredPlaces.length > 0 ? (
@@ -1020,5 +1021,19 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     color: SCREEN_THEME.enamelBlueDark,
+  },
+  addPlaceButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2E7D5B',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    gap: 6,
+  },
+  addPlaceBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
   },
 });

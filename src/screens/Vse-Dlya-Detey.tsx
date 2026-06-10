@@ -49,6 +49,7 @@ const UI_TEXT = {
     actualTitle: 'Актуально для дітей',
     actualEmptyTitle: 'Тут зʼявляться відкриті дні та акції',
     actualEmptyText: 'Садочки, школи та гуртки зможуть показувати набори, пробні заняття й події для мешканців району.',
+    addPlace: 'Додати місце',
     categoriesTitle: 'Категорії',
     allPlacesTitle: 'Всі місця для дітей',
     eventsListTitle: 'Події та пропозиції',
@@ -128,6 +129,7 @@ const UI_TEXT = {
     actualTitle: 'Актуально для детей',
     actualEmptyTitle: 'Здесь появятся открытые дни и акции',
     actualEmptyText: 'Садики, школы и кружки смогут показывать наборы, пробные занятия и события для жителей района.',
+    addPlace: 'Добавить место',
     categoriesTitle: 'Категории',
     allPlacesTitle: 'Все места для детей',
     eventsListTitle: 'События и предложения',
@@ -207,6 +209,7 @@ const UI_TEXT = {
     actualTitle: 'Relevant for kids',
     actualEmptyTitle: 'Open days and offers will appear here',
     actualEmptyText: 'Kindergartens, schools and clubs will be able to show enrollments, trial lessons and local events.',
+    addPlace: 'Add place',
     categoriesTitle: 'Categories',
     allPlacesTitle: 'All kids places',
     eventsListTitle: 'Events and offers',
@@ -512,6 +515,10 @@ export default function VseDlyaDeteyScreen() {
     navigation.navigate('DetalDetskogoPredlozheniyaScreen', { offer });
   };
 
+  const openBusinessForm = () => {
+    navigation.navigate('BizznesChaikaScreen', {});
+  };
+
   const handleCategoryPress = (category: CategoryKey) => {
     setActiveCategory(category);
     setTimeout(() => {
@@ -764,15 +771,10 @@ export default function VseDlyaDeteyScreen() {
             {activeOffers.map((offer) => renderOfferCard(offer))}
           </ScrollView>
         ) : (
-          <View style={styles.actualCard}>
-            <View style={styles.actualIcon}>
-              <MaterialCommunityIcons name="calendar-star" size={24} color="#FFFFFF" />
-            </View>
-            <View style={styles.actualTextBlock}>
-              <Text style={styles.actualTitle}>{text.actualEmptyTitle}</Text>
-              <Text style={styles.actualText}>{text.actualEmptyText}</Text>
-            </View>
-          </View>
+          <TouchableOpacity style={styles.addPlaceButton} activeOpacity={0.88} onPress={openBusinessForm}>
+            <MaterialCommunityIcons name="store-plus" size={16} color="#FFFFFF" />
+            <Text style={styles.addPlaceBtnText}>{text.addPlace}</Text>
+          </TouchableOpacity>
         )}
 
         <View style={styles.sectionHeaderRow}>
@@ -820,6 +822,10 @@ export default function VseDlyaDeteyScreen() {
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>{isEventsCategory ? text.eventsListTitle : text.allPlacesTitle}</Text>
             <Text style={styles.resultCount}>{isEventsCategory ? activeOffers.length : filteredPlaces.length}</Text>
+            <TouchableOpacity style={styles.addPlaceButton} activeOpacity={0.88} onPress={openBusinessForm}>
+              <MaterialCommunityIcons name="store-plus" size={14} color="#FFFFFF" />
+              <Text style={styles.addPlaceBtnText}>{text.addPlace}</Text>
+            </TouchableOpacity>
           </View>
 
           {isEventsCategory ? (
@@ -1283,5 +1289,19 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     color: SCREEN_THEME.enamelBlueDark,
+  },
+  addPlaceButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2E7D5B',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    gap: 6,
+  },
+  addPlaceBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
   },
 });

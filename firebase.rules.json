@@ -196,7 +196,7 @@
 
     "stats": {
       ".read": "auth != null",
-      ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous'"
+      ".write": "auth != null && root.child('user_roles').child(auth.uid).child('role').val() === 'admin'"
     },
 
     "diagnostics": {
@@ -483,8 +483,9 @@
     },
 
     "user_bonuses": {
-      ".read": "auth != null",
+      ".read": "auth != null && root.child('user_roles').child(auth.uid).child('role').val() === 'admin'",
       "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
         ".write": false
       }
     },

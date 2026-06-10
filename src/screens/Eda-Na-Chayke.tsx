@@ -819,18 +819,10 @@ export default function EdaNaChaykeScreen() {
     );
   };
 
-  const renderBusinessCard = () => (
-    <TouchableOpacity style={styles.businessCard} activeOpacity={0.88} onPress={handleOpenTopForm}>
-      <View style={styles.businessIcon}>
-        <MaterialCommunityIcons name="store-plus" size={26} color="#FFFFFF" />
-      </View>
-      <View style={styles.businessTextBlock}>
-        <Text style={styles.businessTitle}>{text.businessTitle}</Text>
-        <Text style={styles.businessDesc}>{text.businessDesc}</Text>
-      </View>
-      <View style={styles.businessAction}>
-        <Text style={styles.businessActionText}>{text.businessButton}</Text>
-      </View>
+  const renderAddPlaceButton = () => (
+    <TouchableOpacity style={styles.addPlaceButton} activeOpacity={0.88} onPress={handleOpenTopForm}>
+      <MaterialCommunityIcons name="store-plus" size={16} color="#FFFFFF" />
+      <Text style={styles.addPlaceBtnText}>{text.businessButton}</Text>
     </TouchableOpacity>
   );
 
@@ -1038,7 +1030,7 @@ export default function EdaNaChaykeScreen() {
             {renderCTA('pizza', text.eatNow, text.eatNowDesc, '#E07B39', handleEatNow)}
             {renderCTA('cart', text.shopping, text.shoppingDesc, SCREEN_THEME.enamelBlueDark, handleShopping)}
             {renderCTA('fire', text.offers, text.offersDesc, '#C0392B', handleOffersScroll)}
-            {renderBusinessCard()}
+            {renderAddPlaceButton()}
 
             {/* Recommended nearby */}
             {recommendedPlaces.length > 0 && (
@@ -1208,51 +1200,20 @@ const styles = StyleSheet.create({
     color: SCREEN_THEME.textSecondary,
     lineHeight: 17,
   },
-  businessCard: {
+  addPlaceButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5FBF8',
-    borderRadius: 20,
-    padding: 14,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#B7D8C4',
-    ...SCREEN_THEME.raisedShadow,
-  },
-  businessIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignSelf: 'flex-start',
     backgroundColor: '#2E7D5B',
-    marginRight: 12,
-  },
-  businessTextBlock: {
-    flex: 1,
-    paddingRight: 8,
-  },
-  businessTitle: {
-    fontSize: 16,
-    fontWeight: '900',
-    color: SCREEN_THEME.textPrimary,
-  },
-  businessDesc: {
-    marginTop: 3,
-    fontSize: 12,
-    lineHeight: 16,
-    fontWeight: '700',
-    color: SCREEN_THEME.textSecondary,
-  },
-  businessAction: {
     borderRadius: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    backgroundColor: '#2E7D5B',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginBottom: 16,
+    gap: 8,
   },
-  businessActionText: {
+  addPlaceBtnText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '900',
   },
 

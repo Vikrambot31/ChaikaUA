@@ -2504,22 +2504,46 @@ exports.createRequest = functionsV1.https.onCall(async (data, context) => {
   const uid = context.auth.uid;
   const db = admin.database();
 
-  // Проверяем timestamp последней заявки пользователя
-  const lastRequestSnap = await db.ref('requests')
-    .orderByChild('userId')
-    .equalTo(uid)
-    .limitToLast(1)
-    .once('value');
+  // Перевіряємо ліміт активних заявок за планом підписки
+  const REQUESTS_LIMIT_FREE = 3;
+  const REQUESTS_LIMIT_PREMIUM = 6;
+  const TERMINAL_STATUSES = ['closed', 'archived', 'rejected'];
 
-  if (lastRequestSnap.exists()) {
-    let lastAt = 0;
-    lastRequestSnap.forEach((child) => {
-      const createdAt = child.val()?.createdAt;
-      if (typeof createdAt === 'number' && createdAt > lastAt) {
-        lastAt = createdAt;
+  const [subSnap, allRequestsSnap] = await Promise.all([
+    db.ref(`user_subscription/${uid}`).once('value'),
+    db.ref('requests').orderByChild('userId').equalTo(uid).once('value'),
+  ]);
+
+  const subData = subSnap.val();
+  const subActive = subData?.status === 'active' || subData?.status === 'trial';
+  const userPlan = (subActive && subData?.plan) ? subData.plan : 'free';
+  const isPaidPlan = userPlan !== 'free';
+  const requestsLimit = isPaidPlan ? REQUESTS_LIMIT_PREMIUM : REQUESTS_LIMIT_FREE;
+
+  let activeCount = 0;
+  let lastCreatedAt = 0;
+  if (allRequestsSnap.exists()) {
+    allRequestsSnap.forEach((child) => {
+      const val = child.val();
+      if (!TERMINAL_STATUSES.includes(val?.status)) activeCount++;
+      if (typeof val?.createdAt === 'number' && val.createdAt > lastCreatedAt) {
+        lastCreatedAt = val.createdAt;
       }
     });
-    const elapsed = Date.now() - lastAt;
+  }
+
+  if (activeCount >= requestsLimit) {
+    throw new functionsV1.https.HttpsError(
+      'resource-exhausted',
+      isPaidPlan
+        ? `Досягнуто ліміт активних заявок для вашого плану (${requestsLimit})`
+        : `Безкоштовний план дозволяє лише ${requestsLimit} активних заявки. Оформіть Premium для більшого ліміту`,
+    );
+  }
+
+  // Перевіряємо 60с між створенням заявок
+  if (lastCreatedAt > 0) {
+    const elapsed = Date.now() - lastCreatedAt;
     if (elapsed < REQUEST_RATE_LIMIT_MS) {
       const remaining = Math.ceil((REQUEST_RATE_LIMIT_MS - elapsed) / 1000);
       throw new functionsV1.https.HttpsError(

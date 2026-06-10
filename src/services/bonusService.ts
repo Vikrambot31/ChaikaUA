@@ -20,6 +20,7 @@ export type UserBonuses = {
   earned: {
     total: number;
     weeklyTotal: number;
+    weeklyLimit: number;
     weekKey: string;
     weeklyByCategory: Record<string, number>;
   };
@@ -101,6 +102,7 @@ const EMPTY_BONUSES: UserBonuses = {
   earned: {
     total: 0,
     weeklyTotal: 0,
+    weeklyLimit: 250,
     weekKey: '',
     weeklyByCategory: {},
   },
@@ -156,6 +158,7 @@ const normalizeBonuses = (raw: unknown): UserBonuses => {
     earned: {
       total: earnedTotal,
       weeklyTotal: toSafeNumber(earnedRaw.weeklyTotal),
+      weeklyLimit: toSafeNumber(earnedRaw.weeklyLimit) || 250,
       weekKey: typeof earnedRaw.weekKey === 'string' ? earnedRaw.weekKey : '',
       weeklyByCategory: earnedRaw.weeklyByCategory && typeof earnedRaw.weeklyByCategory === 'object'
         ? Object.fromEntries(
