@@ -418,7 +418,9 @@ export interface ElectricityState {
 
 export type FeatureRating = {
   screenId: string;
-  rating: number;       // 1-5
+  rating: number;           // середнє (usability + usefulness) / 2
+  ratingUsability: number;  // Зручно — легко знайти що потрібно (1-5)
+  ratingUsefulness: number; // Корисно — для життя на Чайці (1-5)
   comment: string | null;
   platform: 'android' | 'ios';
   appVersion: string;
@@ -427,6 +429,8 @@ export type FeatureRating = {
 
 export type FeatureRatingSummary = {
   avgRating: number;
+  avgUsability: number;
+  avgUsefulness: number;
   totalVotes: number;
   monthlyAvg: number;
   monthlyVotes: number;

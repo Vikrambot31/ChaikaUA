@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-  Alert,
-  Platform,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -18,150 +18,174 @@ import { getScreenLabel } from '../utils/featureScreenMap';
 import type { FeatureScreenId } from '../utils/featureScreenMap';
 import type { RootState } from '../redux/store';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// ── Constants ──────────────────────────────────────────────────────────────────
 
 const VISIT_THRESHOLD = 3;
-const STORAGE_PREFIX_VISITS = '@chaika:screen_visits_';
-const STORAGE_PREFIX_RATED = '@chaika:screen_rated_';
+const STORAGE_VISITS = '@chaika:screen_visits_';
+const STORAGE_RATED  = '@chaika:screen_rated_';
 
 type Lang = 'ua' | 'ru' | 'en';
 
 const TEXTS: Record<Lang, {
-  rateTitle: string;
+  title: string;
+  usability: string;
+  usefulness: string;
   placeholder: string;
   submit: string;
   thanks: string;
   errorTitle: string;
   sendError: string;
+  pickBoth: string;
 }> = {
   ua: {
-    rateTitle: 'Оцініть цей розділ',
+    title:       'Оцініть цей розділ',
+    usability:   '🎯 Зручно — легко знайти що потрібно',
+    usefulness:  '💡 Корисно — для життя на Чайці',
     placeholder: 'Коментар (необов\'язково)',
-    submit: 'Відправити',
-    thanks: 'Дякуємо за оцінку!',
-    errorTitle: 'Помилка',
-    sendError: 'Не вдалося відправити оцінку. Спробуйте пізніше.',
+    submit:      'Відправити',
+    thanks:      'Дякуємо за оцінку!',
+    errorTitle:  'Помилка',
+    sendError:   'Не вдалося відправити оцінку. Спробуйте пізніше.',
+    pickBoth:    'Будь ласка, оцініть обидва пункти',
   },
   ru: {
-    rateTitle: 'Оцените этот раздел',
+    title:       'Оцените этот раздел',
+    usability:   '🎯 Удобно — легко найти что нужно',
+    usefulness:  '💡 Полезно — для жизни на Чайке',
     placeholder: 'Комментарий (необязательно)',
-    submit: 'Отправить',
-    thanks: 'Спасибо за оценку!',
-    errorTitle: 'Ошибка',
-    sendError: 'Не удалось отправить оценку. Попробуйте позже.',
+    submit:      'Отправить',
+    thanks:      'Спасибо за оценку!',
+    errorTitle:  'Ошибка',
+    sendError:   'Не удалось отправить оценку. Попробуйте позже.',
+    pickBoth:    'Пожалуйста, оцените оба пункта',
   },
   en: {
-    rateTitle: 'Rate this section',
+    title:       'Rate this section',
+    usability:   '🎯 Convenient — easy to find what you need',
+    usefulness:  '💡 Useful — for life on Chaika',
     placeholder: 'Comment (optional)',
-    submit: 'Submit',
-    thanks: 'Thanks for your rating!',
-    errorTitle: 'Error',
-    sendError: 'Could not submit rating. Please try again later.',
+    submit:      'Submit',
+    thanks:      'Thanks for your rating!',
+    errorTitle:  'Error',
+    sendError:   'Could not submit rating. Please try again later.',
+    pickBoth:    'Please rate both items',
   },
 };
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helpers ────────────────────────────────────────────────────────────────────
 
 const getMonthKey = (): string => {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 };
 
-// ─── Component ────────────────────────────────────────────────────────────────
+// ── Stars row sub-component ───────────────────────────────────────────────────
 
-type Props = {
-  screenId: FeatureScreenId;
-};
+function StarsRow({ label, value, onChange }: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <View style={styles.categoryRow}>
+      <Text style={styles.categoryLabel}>{label}</Text>
+      <View style={styles.starsRow}>
+        {[1, 2, 3, 4, 5].map((star) => (
+          <TouchableOpacity
+            key={star}
+            style={styles.starBtn}
+            onPress={() => onChange(star)}
+            activeOpacity={0.72}
+          >
+            <MaterialCommunityIcons
+              name={star <= value ? 'star' : 'star-outline'}
+              size={34}
+              color={star <= value ? '#FFA000' : '#CDBB9A'}
+            />
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+// ── Main component ─────────────────────────────────────────────────────────────
+
+type Props = { screenId: FeatureScreenId };
 
 export function FeatureRatingBanner({ screenId }: Props) {
   const lang = (useSelector((state: RootState) => state.language?.current) ?? 'ua') as Lang;
   const userId = useSelector((state: RootState) => state.auth.user?.id);
 
-  const [visible, setVisible] = useState(false);
-  const [selectedRating, setSelectedRating] = useState(0);
-  const [expanded, setExpanded] = useState(false);
-  const [comment, setComment] = useState('');
+  const [visible,    setVisible]    = useState(false);
+  const [usability,  setUsability]  = useState(0);
+  const [usefulness, setUsefulness] = useState(0);
+  const [expanded,   setExpanded]   = useState(false);
+  const [comment,    setComment]    = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [showThanks, setShowThanks] = useState(false);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const text = TEXTS[lang] || TEXTS.ua;
+  const text = TEXTS[lang] ?? TEXTS.ua;
 
   // Track visits & check eligibility
   useEffect(() => {
     if (!userId) return;
     let active = true;
-
     const check = async () => {
       try {
-        // Check if already rated this month
-        const ratedKey = `${STORAGE_PREFIX_RATED}${screenId}`;
-        const ratedMonth = await AsyncStorage.getItem(ratedKey);
+        const ratedMonth = await AsyncStorage.getItem(`${STORAGE_RATED}${screenId}`);
         if (ratedMonth === getMonthKey()) return;
 
-        // Increment visit count for this month
-        const visitKey = `${STORAGE_PREFIX_VISITS}${screenId}_${getMonthKey()}`;
-        const rawVisits = await AsyncStorage.getItem(visitKey);
-        const visits = (parseInt(rawVisits || '0', 10) || 0) + 1;
+        const visitKey = `${STORAGE_VISITS}${screenId}_${getMonthKey()}`;
+        const visits = (parseInt(await AsyncStorage.getItem(visitKey) ?? '0', 10) || 0) + 1;
         await AsyncStorage.setItem(visitKey, String(visits));
-
         if (visits < VISIT_THRESHOLD) return;
 
-        // Check Firebase: can rate?
         const result = await featureRatingAPI.canRate(screenId);
         if (!result.success || !result.data) return;
 
         if (active) {
           setVisible(true);
-          Animated.timing(fadeAnim, {
-            toValue: 1,
-            duration: 400,
-            useNativeDriver: true,
-          }).start();
+          Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
         }
-      } catch {
-        // Silent — don't block the screen
-      }
+      } catch { /* silent */ }
     };
-
     void check();
     return () => { active = false; };
   }, [screenId, userId, fadeAnim]);
 
-  const handleStarPress = useCallback((star: number) => {
-    setSelectedRating(star);
-    setExpanded(true);
-  }, []);
+  // Expand comment box when any star is tapped
+  const handleUsability  = useCallback((v: number) => { setUsability(v);  setExpanded(true); }, []);
+  const handleUsefulness = useCallback((v: number) => { setUsefulness(v); setExpanded(true); }, []);
 
   const handleSubmit = useCallback(async () => {
-    if (selectedRating < 1 || submitting) return;
+    if (submitting) return;
+    if (usability < 1 || usefulness < 1) {
+      Alert.alert(text.errorTitle, text.pickBoth);
+      return;
+    }
     setSubmitting(true);
-
     try {
-      const result = await featureRatingAPI.submitRating(screenId, selectedRating, comment || undefined);
-
+      const result = await featureRatingAPI.submitRating(
+        screenId, usability, usefulness, comment || undefined,
+      );
       if (!result.success) {
         Alert.alert(text.errorTitle, text.sendError);
         setSubmitting(false);
         return;
       }
-
-      // Mark as rated locally
-      await AsyncStorage.setItem(`${STORAGE_PREFIX_RATED}${screenId}`, getMonthKey());
-
+      await AsyncStorage.setItem(`${STORAGE_RATED}${screenId}`, getMonthKey());
       setShowThanks(true);
       setTimeout(() => {
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }).start(() => setVisible(false));
+        Animated.timing(fadeAnim, { toValue: 0, duration: 300, useNativeDriver: true })
+          .start(() => setVisible(false));
       }, 2000);
     } catch {
       Alert.alert(text.errorTitle, text.sendError);
       setSubmitting(false);
     }
-  }, [screenId, selectedRating, comment, submitting, fadeAnim, text]);
+  }, [submitting, usability, usefulness, screenId, comment, fadeAnim, text]);
 
   if (!visible || !userId) return null;
 
@@ -174,33 +198,16 @@ export function FeatureRatingBanner({ screenId }: Props) {
         </View>
       ) : (
         <>
-          <Text style={styles.title}>{text.rateTitle}</Text>
+          <Text style={styles.title}>{text.title}</Text>
           <Text style={styles.screenName}>{getScreenLabel(screenId, lang)}</Text>
 
-          <View style={styles.starsRow}>
-            {[1, 2, 3, 4, 5].map((star) => {
-              const active = star <= selectedRating;
-              return (
-                <TouchableOpacity
-                  key={star}
-                  style={styles.starBtn}
-                  onPress={() => handleStarPress(star)}
-                  activeOpacity={0.72}
-                >
-                  <MaterialCommunityIcons
-                    name={active ? 'star' : 'star-outline'}
-                    size={36}
-                    color={active ? '#FFA000' : '#CDBB9A'}
-                  />
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+          <StarsRow label={text.usability}  value={usability}  onChange={handleUsability}  />
+          <StarsRow label={text.usefulness} value={usefulness} onChange={handleUsefulness} />
 
           {expanded && (
             <View style={styles.expandedArea}>
               <TextInput
-                style={styles.commentInput}
+                style={styles.input}
                 placeholder={text.placeholder}
                 placeholderTextColor={SCREEN_THEME.textMuted}
                 value={comment}
@@ -210,14 +217,12 @@ export function FeatureRatingBanner({ screenId }: Props) {
                 editable={!submitting}
               />
               <TouchableOpacity
-                style={[styles.submitBtn, submitting && styles.submitBtnDisabled]}
+                style={[styles.submitBtn, submitting && styles.submitDisabled]}
                 onPress={handleSubmit}
                 activeOpacity={0.75}
                 disabled={submitting}
               >
-                <Text style={styles.submitText}>
-                  {submitting ? '...' : text.submit}
-                </Text>
+                <Text style={styles.submitText}>{submitting ? '...' : text.submit}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -227,7 +232,7 @@ export function FeatureRatingBanner({ screenId }: Props) {
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
+// ── Styles ─────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: {
@@ -239,7 +244,6 @@ const styles = StyleSheet.create({
     backgroundColor: SCREEN_THEME.paperStrong,
     paddingHorizontal: 16,
     paddingVertical: 16,
-    alignItems: 'center',
     shadowColor: '#000',
     shadowOpacity: 0.08,
     shadowRadius: 8,
@@ -256,26 +260,35 @@ const styles = StyleSheet.create({
     color: SCREEN_THEME.textSecondary,
     fontSize: 12,
     fontWeight: '600',
+    textAlign: 'center',
     marginTop: 2,
+    marginBottom: 12,
+  },
+  categoryRow: {
+    marginBottom: 8,
+  },
+  categoryLabel: {
+    color: SCREEN_THEME.textSecondary,
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 4,
   },
   starsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: 2,
-    marginTop: 12,
   },
   starBtn: {
-    minWidth: 44,
-    minHeight: 44,
+    minWidth: 40,
+    minHeight: 40,
     alignItems: 'center',
     justifyContent: 'center',
   },
   expandedArea: {
+    marginTop: 10,
     width: '100%',
-    marginTop: 12,
   },
-  commentInput: {
+  input: {
     borderWidth: 1,
     borderColor: SCREEN_THEME.borderSoft,
     borderRadius: 10,
@@ -284,7 +297,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     paddingHorizontal: 12,
     paddingVertical: Platform.OS === 'ios' ? 10 : 8,
-    minHeight: 60,
+    minHeight: 56,
     textAlignVertical: 'top',
   },
   submitBtn: {
@@ -295,7 +308,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     paddingVertical: 10,
   },
-  submitBtnDisabled: {
+  submitDisabled: {
     opacity: 0.5,
   },
   submitText: {
@@ -306,6 +319,7 @@ const styles = StyleSheet.create({
   thanksRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
     paddingVertical: 4,
   },

@@ -1964,66 +1964,67 @@ export const featureRatingAPI = {
   /** Submit a rating and atomically update the summary. */
   submitRating: async (
     screenId: string,
-    rating: number,
+    ratingUsability: number,
+    ratingUsefulness: number,
     comment?: string,
   ): Promise<ApiVoidResult> => {
     try {
-      if (rating < 1 || rating > 5 || !Number.isInteger(rating)) {
-        return { success: false, error: 'Rating must be an integer 1-5' };
+      const valid = (v: number) => Number.isInteger(v) && v >= 1 && v <= 5;
+      if (!valid(ratingUsability) || !valid(ratingUsefulness)) {
+        return { success: false, error: 'Ratings must be integers 1-5' };
       }
 
+      const rating = Math.round((ratingUsability + ratingUsefulness) / 2 * 10) / 10;
       const uid = await ensureFirebaseAuth();
 
-      // 1. Read existing user rating (to decide add vs replace)
+      // 1. Read existing entry (to decide add vs replace)
       const existingSnap = await get(ref(database, `feature_ratings/${screenId}/${uid}`));
-      const previousRating = existingSnap.exists()
-        ? (existingSnap.val() as { rating?: number })?.rating
-        : undefined;
+      const prev = existingSnap.exists()
+        ? (existingSnap.val() as { rating?: number; ratingUsability?: number; ratingUsefulness?: number; createdAt?: number })
+        : null;
 
       // 2. Read current summary
       const summarySnap = await get(ref(database, `feature_ratings_summary/${screenId}`));
-      const currentSummary: FeatureRatingSummary = summarySnap.exists()
+      const cur: FeatureRatingSummary = summarySnap.exists()
         ? (summarySnap.val() as FeatureRatingSummary)
-        : { avgRating: 0, totalVotes: 0, monthlyAvg: 0, monthlyVotes: 0, lastUpdated: 0 };
+        : { avgRating: 0, avgUsability: 0, avgUsefulness: 0, totalVotes: 0, monthlyAvg: 0, monthlyVotes: 0, lastUpdated: 0 };
 
       // 3. Recalculate summary
       const now = Date.now();
       const monthStart = getMonthStartTimestamp();
+      const isReplace = prev !== null;
+      const wasThisMonth = isReplace && typeof prev.createdAt === 'number' && prev.createdAt >= monthStart;
 
-      const totalAgg = previousRating && previousRating >= 1 && previousRating <= 5
-        ? replaceWeightedRating({ rating: currentSummary.avgRating, votes: currentSummary.totalVotes }, rating, previousRating)
-        : addWeightedRating({ rating: currentSummary.avgRating, votes: currentSummary.totalVotes }, rating);
+      const calcAgg = (curAvg: number, curVotes: number, newVal: number, prevVal?: number) =>
+        isReplace && prevVal && prevVal >= 1 && prevVal <= 5
+          ? replaceWeightedRating({ rating: curAvg, votes: curVotes }, newVal, prevVal)
+          : addWeightedRating({ rating: curAvg, votes: curVotes }, newVal);
 
-      // Monthly: if previous rating was this month, replace; otherwise add
-      const wasThisMonth = previousRating && typeof (existingSnap.val() as { createdAt?: number })?.createdAt === 'number'
-        && ((existingSnap.val() as { createdAt: number }).createdAt >= monthStart);
+      const totalAgg         = calcAgg(cur.avgRating,    cur.totalVotes,    rating,           prev?.rating);
+      const usabilityAgg     = calcAgg(cur.avgUsability,  cur.totalVotes,    ratingUsability,  prev?.ratingUsability);
+      const usefulnessAgg    = calcAgg(cur.avgUsefulness, cur.totalVotes,    ratingUsefulness, prev?.ratingUsefulness);
 
-      let monthlyAgg;
-      if (wasThisMonth) {
-        monthlyAgg = replaceWeightedRating(
-          { rating: currentSummary.monthlyAvg, votes: currentSummary.monthlyVotes },
-          rating,
-          previousRating,
-        );
-      } else {
-        monthlyAgg = addWeightedRating(
-          { rating: currentSummary.monthlyAvg, votes: currentSummary.monthlyVotes },
-          rating,
-        );
-      }
+      const monthlyAgg = wasThisMonth
+        ? replaceWeightedRating({ rating: cur.monthlyAvg, votes: cur.monthlyVotes }, rating, prev?.rating)
+        : addWeightedRating({ rating: cur.monthlyAvg, votes: cur.monthlyVotes }, rating);
 
+      const round2 = (v: number) => Math.round(v * 100) / 100;
       const newSummary: FeatureRatingSummary = {
-        avgRating: Math.round(totalAgg.rating * 100) / 100,
-        totalVotes: totalAgg.votes,
-        monthlyAvg: Math.round(monthlyAgg.rating * 100) / 100,
+        avgRating:    round2(totalAgg.rating),
+        avgUsability: round2(usabilityAgg.rating),
+        avgUsefulness: round2(usefulnessAgg.rating),
+        totalVotes:   totalAgg.votes,
+        monthlyAvg:   round2(monthlyAgg.rating),
         monthlyVotes: monthlyAgg.votes,
-        lastUpdated: now,
+        lastUpdated:  now,
       };
 
       // 4. Build rating record
       const ratingRecord: FeatureRating = {
         screenId,
         rating,
+        ratingUsability,
+        ratingUsefulness,
         comment: comment?.trim() || null,
         platform: Platform.OS === 'ios' ? 'ios' : 'android',
         appVersion: getCurrentAppVersion(),
