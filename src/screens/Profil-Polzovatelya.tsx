@@ -342,9 +342,13 @@ const ProfileScreen: React.FC = () => {
   }, [user?.id]);
 
   useEffect(() => {
+    if (!user?.id) {
+      setBonuses(null);
+      return;
+    }
     const unsub = subscribeMyBonuses(setBonuses);
     return unsub;
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     if (!user?.id) return;
