@@ -328,8 +328,10 @@ export default function SoulPhotosScreen() {
         const approvedPhotos: SoulPhoto[] = [];
         const pendingPhotos: SoulPhoto[] = [];
 
-        // Approved photos from public collection
-        const publicQuery = query(ref(database, 'community_photos_public'), orderByChild('sourceScreen'), equalTo(SCREEN_ID));
+        // Approved photos from community_photos (moderatePhoto only updates status here,
+        // it does NOT copy to community_photos_public — so we read from the source).
+        // Firebase rules have ".indexOn": ["status", "sourceScreen"] on community_photos.
+        const publicQuery = query(ref(database, 'community_photos'), orderByChild('sourceScreen'), equalTo(SCREEN_ID));
         unsubPublic = onValue(
           publicQuery,
           (snapshot) => {
@@ -338,6 +340,9 @@ export default function SoulPhotosScreen() {
               approvedPhotos.length = 0;
               if (value && typeof value === 'object' && !Array.isArray(value)) {
                 Object.entries(value as Record<string, unknown>).forEach(([id, raw]) => {
+                  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return;
+                  // Only show approved photos in the gallery
+                  if (clean((raw as RawPhoto).status) !== 'approved') return;
                   const photo = parsePhoto(id, raw, true);
                   if (photo) approvedPhotos.push(photo);
                 });

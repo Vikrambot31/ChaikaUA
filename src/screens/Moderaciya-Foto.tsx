@@ -11,7 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { get, ref } from 'firebase/database';
+import { get, onValue, ref } from 'firebase/database';
 import { useSelector } from 'react-redux';
 import MiniTabBar from '../components/MiniTabBar';
 import AppPhotoImage from '../components/AppPhotoImage';
@@ -155,6 +155,48 @@ const PhotoModerationScreen: React.FC = () => {
   const [osbbNews, setOsbbNews] = useState<ModerationOsbbNews[]>([]);
   const [previewPhoto, setPreviewPhoto] = useState<PreviewPhoto | null>(null);
 
+  // Real-time listener for community_photos — updates automatically when web admin panel approves/rejects
+  useEffect(() => {
+    const photosRef = ref(database, 'community_photos');
+    const unsubscribe = onValue(
+      photosRef,
+      (snapshot) => {
+        const value = snapshot.val() as Record<string, Record<string, unknown>> | null;
+        if (!value) {
+          setPhotos([]);
+          return;
+        }
+        const items: CommunityPhoto[] = Object.entries(value)
+          .map(([id, raw]) => {
+            if (!raw || typeof raw !== 'object') return null;
+            return {
+              id,
+              title: String(raw.title ?? ''),
+              description: String(raw.description ?? ''),
+              imageUri: String(raw.thumbnailUrl ?? raw.imageUri ?? raw.downloadUrl ?? ''),
+              storagePath: raw.storagePath ? String(raw.storagePath) : undefined,
+              uploadedBy: String(raw.uploadedBy ?? raw.userName ?? ''),
+              userId: raw.userId ? String(raw.userId) : undefined,
+              createdAt: typeof raw.createdAt === 'number' ? raw.createdAt : typeof raw.uploadedAt === 'number' ? raw.uploadedAt : 0,
+              status: (raw.status === 'approved' || raw.status === 'rejected') ? raw.status : 'pending',
+              target: raw.target === 'my_photos' ? 'my_photos' : 'gallery_public',
+              sourceScreen: raw.sourceScreen ? String(raw.sourceScreen) : undefined,
+              sourceScreenLabel: raw.sourceScreenLabel ? String(raw.sourceScreenLabel) : undefined,
+              sourceFeature: raw.sourceFeature ? String(raw.sourceFeature) : undefined,
+              likes: typeof raw.likes === 'number' ? raw.likes : 0,
+              locationLabel: raw.locationLabel ? String(raw.locationLabel) : undefined,
+            } as CommunityPhoto;
+          })
+          .filter((p): p is CommunityPhoto => p !== null && isPublicGalleryPhoto(p));
+        setPhotos(items);
+      },
+      (error) => {
+        void logClientError('ModeraciyaFoto.photosRealtime', error, { firebasePath: 'community_photos', stage: 'realtime_listener' });
+      },
+    );
+    return unsubscribe;
+  }, []);
+
   const loadAll = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -175,15 +217,6 @@ const PhotoModerationScreen: React.FC = () => {
           })));
         }
       })());
-
-      if (tab === 'photos' || tab === 'requests') {
-        loaders.push((async () => {
-          const photoRes = await photoAPI.getPhotosOnce();
-          if (photoRes.success && photoRes.data) {
-            setPhotos(photoRes.data.filter(isPublicGalleryPhoto));
-          }
-        })());
-      }
 
       if (tab === 'buysell') {
         loaders.push((async () => {
