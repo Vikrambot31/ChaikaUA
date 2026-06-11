@@ -36,6 +36,7 @@ import { getMapFocusPlaceParams } from '../utils/mapFocusParams';
 import AppPhotoImage from '../components/AppPhotoImage';
 import { FeatureRatingBanner } from '../components/FeatureRatingBanner';
 import PhotoUploadField, { type UploadedPhoto } from '../components/PhotoUploadField';
+import UploadedPhotosGrid from '../components/UploadedPhotosGrid';
 import { getDonePhotos, validateSubmissionRequirements } from '../utils/submissionRequirements';
 import { getLanguageValidationError } from '../utils/contentLanguageGuard';
 import { showUserError } from '../utils/userFacingErrors';
@@ -692,6 +693,7 @@ export default function EdaNaChaykeScreen() {
                     onPhotosChange={setTopPhotos}
                     metadata={{ sourceScreen: 'Eda-Na-Chayke', sourceScreenLabel: text.addTop }}
                   />
+                  <UploadedPhotosGrid />
                 </>
               ) : null}
 

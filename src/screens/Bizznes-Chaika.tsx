@@ -14,6 +14,7 @@ import { normalizePhoneText, sanitizeStoredText } from '../utils/textUtils';
 import { RootState } from '../redux/store';
 import { getModerationUserMessage, showUserError } from '../utils/userFacingErrors';
 import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField';
+import UploadedPhotosGrid from '../components/UploadedPhotosGrid';
 import { equalTo, get, limitToLast, onValue, orderByChild, push, query, ref, remove, update } from 'firebase/database';
 import { database } from '../firebase-config';
 import { useContactRequest } from '../hooks/useContactRequest';
@@ -1955,6 +1956,7 @@ const BiznesChaikaScreen: React.FC = () => {
                   onPhotosChange={setFormPhotos}
                   metadata={{ sourceScreen: 'BizznesChaikaScreen', sourceScreenLabel: 'Додати бізнес' }}
                 />
+                <UploadedPhotosGrid />
               ) : (
                 <Text style={styles.signInNote}>{text.authRequired}</Text>
               )}

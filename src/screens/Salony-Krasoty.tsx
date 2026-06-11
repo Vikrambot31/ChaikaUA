@@ -434,7 +434,12 @@ export default function SalonyKrasotyScreen() {
   };
 
   const openBusinessForm = () => {
-    navigation.navigate('BizznesChaikaScreen', {});
+    const prefill = language === 'ua'
+      ? 'Пропоную додати новий салон/майстра до розділу «Салони Краси»:\n\nНазва: \nАдреса: \nКатегорія: \nКонтакти: '
+      : language === 'ru'
+        ? 'Предлагаю добавить новый салон/мастера в раздел «Салоны Красоты»:\n\nНазвание: \nАдрес: \nКатегория: \nКонтакты: '
+        : 'I suggest adding a new salon/master to «Beauty Salons»:\n\nName: \nAddress: \nCategory: \nContacts: ';
+    navigation.navigate('SupportScreen', { prefillMessage: prefill });
   };
 
   const handleCategoryPress = (category: CategoryKey) => {

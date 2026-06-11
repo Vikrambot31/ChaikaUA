@@ -517,7 +517,12 @@ export default function VseDlyaDeteyScreen() {
   };
 
   const openBusinessForm = () => {
-    navigation.navigate('BizznesChaikaScreen', {});
+    const prefill = language === 'ua'
+      ? 'Пропоную додати нове місце до розділу «Все для дітей»:\n\nНазва: \nАдреса: \nКатегорія: \nКонтакти: '
+      : language === 'ru'
+        ? 'Предлагаю добавить новое место в раздел «Всё для детей»:\n\nНазвание: \nАдрес: \nКатегория: \nКонтакты: '
+        : 'I suggest adding a new place to «Everything for Kids»:\n\nName: \nAddress: \nCategory: \nContacts: ';
+    navigation.navigate('SupportScreen', { prefillMessage: prefill });
   };
 
   const handleCategoryPress = (category: CategoryKey) => {
@@ -822,11 +827,13 @@ export default function VseDlyaDeteyScreen() {
         >
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>{isEventsCategory ? text.eventsListTitle : text.allPlacesTitle}</Text>
-            <Text style={styles.resultCount}>{isEventsCategory ? activeOffers.length : filteredPlaces.length}</Text>
-            <TouchableOpacity style={styles.addPlaceButton} activeOpacity={0.88} onPress={openBusinessForm}>
-              <MaterialCommunityIcons name="store-plus" size={14} color="#FFFFFF" />
-              <Text style={styles.addPlaceBtnText}>{text.addPlace}</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={styles.resultCount}>{isEventsCategory ? activeOffers.length : filteredPlaces.length}</Text>
+              <TouchableOpacity style={styles.addPlaceButton} activeOpacity={0.88} onPress={openBusinessForm}>
+                <MaterialCommunityIcons name="store-plus" size={14} color="#FFFFFF" />
+                <Text style={styles.addPlaceBtnText}>{text.addPlace}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {isEventsCategory ? (
