@@ -360,7 +360,11 @@ export async function uploadPhotoWithEngine(
     userId: user.uid,
     uploadedBy: metadata?.uploadedBy ?? user.email ?? user.uid,
     target: metadata?.target ?? (collection === 'community_photos' ? 'gallery_public' : 'my_photos'),
-    ...(isRequestPhoto ? { sourceScreen: 'HelpNeighborsScreen', sourceScreenLabel: 'Помощь соседям' } : {}),
+    ...(isRequestPhoto
+      ? { sourceScreen: 'HelpNeighborsScreen', sourceScreenLabel: 'Допомога сусідам' }
+      : collection === 'community_photos'
+        ? { sourceScreen: 'PhotoUploadScreen', sourceScreenLabel: 'Додати фото' }
+        : {}),
     ...(metadata?.title ? { title: metadata.title } : {}),
     ...(metadata?.description ? { description: metadata.description } : {}),
     ...(metadata?.sourceScreen ? { sourceScreen: metadata.sourceScreen } : {}),
