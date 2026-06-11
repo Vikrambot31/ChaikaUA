@@ -443,6 +443,9 @@ export const translations = {
       errorSubscriptionExists: 'У вас вже є активна підписка для цього місця.',
       errorInvalidDuration: 'Невірний тип або тривалість просування.',
       errorSaveFailed: 'Помилка збереження. Кошти повернено на баланс. Спробуйте ще раз.',
+      showDetails: 'Детальніше',
+      hideDetails: 'Згорнути',
+      allHistory: 'Вся історія',
     },
     premium: {
       gateMessage: 'Ця функція доступна лише для Premium-учасників.',
@@ -944,6 +947,9 @@ export const translations = {
       errorSubscriptionExists: 'У вас уже есть активная подписка для этого места.',
       errorInvalidDuration: 'Неверный тип или длительность продвижения.',
       errorSaveFailed: 'Ошибка сохранения. Средства возвращены на баланс. Попробуйте ещё раз.',
+      showDetails: 'Подробнее',
+      hideDetails: 'Свернуть',
+      allHistory: 'Вся история',
     },
     premium: {
       gateMessage: 'Эта функция доступна только для Premium-участников.',
@@ -1445,6 +1451,9 @@ export const translations = {
       errorSubscriptionExists: 'You already have an active subscription for this slot.',
       errorInvalidDuration: 'Invalid promotion type or duration.',
       errorSaveFailed: 'Save failed. Funds have been returned to your balance. Try again.',
+      showDetails: 'Show details',
+      hideDetails: 'Hide details',
+      allHistory: 'All history',
     },
     premium: {
       gateMessage: 'This feature is only available for Premium members.',

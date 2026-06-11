@@ -195,14 +195,14 @@ const PoruchitelScreen: React.FC = () => {
     try {
       const [node, childrenResult, statusResult] = await Promise.all([
         getMyTrustNode(),
-        getMyInvitedChildren(),
+        getMyInvitedChildren().catch(() => [] as TrustTreeChild[]),
         getMyInviteRequestStatus().catch(() => null),
       ]);
       setTrustNode(node);
       setChildren(childrenResult);
       setInviteStatus(statusResult);
       if (node && node.rootPath.length > 0) {
-        const chainResult = await getMyTrustChain(node);
+        const chainResult = await getMyTrustChain(node).catch(() => [] as TrustChainLink[]);
         setChain(chainResult);
       } else {
         setChain([]);
@@ -220,13 +220,16 @@ const PoruchitelScreen: React.FC = () => {
 
   // Realtime: re-fetch when trust_tree or invite status changes
   useEffect(() => {
-    const unsubTrust = subscribeMyTrustNode((node) => {
-      setTrustNode(node);
-      if (node && node.rootPath.length > 0) {
-        void getMyTrustChain(node).then(setChain).catch(() => setChain([]));
-      }
-      void getMyInvitedChildren().then(setChildren).catch(() => setChildren([]));
-    });
+    const unsubTrust = subscribeMyTrustNode(
+      (node) => {
+        setTrustNode(node);
+        if (node && node.rootPath.length > 0) {
+          void getMyTrustChain(node).then(setChain).catch(() => setChain([]));
+        }
+        void getMyInvitedChildren().then(setChildren).catch(() => setChildren([]));
+      },
+      () => { setLoadError(text.loadError); },
+    );
     const unsubAccess = subscribeMyInviteAccessStatus(() => {
       void getMyInviteRequestStatus().then(setInviteStatus).catch(() => undefined);
     });
@@ -261,7 +264,10 @@ const PoruchitelScreen: React.FC = () => {
 
   // Realtime: reload confirmations when sponsor_confirmations changes for this user
   useEffect(() => {
-    const unsub = subscribeMyConfirmations(() => { void loadConfirmations(); });
+    const unsub = subscribeMyConfirmations(
+      () => { void loadConfirmations(); },
+      () => { setConfirmations([]); },
+    );
     return unsub;
   }, [loadConfirmations]);
 

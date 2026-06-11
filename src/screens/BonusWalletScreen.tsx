@@ -108,6 +108,8 @@ const BonusWalletScreen: React.FC = () => {
   const [transactions, setTransactions] = useState<BonusTransaction[]>([]);
   const [promotions, setPromotions] = useState<BonusPromotion[]>([]);
   const [ready, setReady] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
+  const [showAllHistory, setShowAllHistory] = useState(false);
 
   const BADGE_LABELS: Record<string, string> = {
     newcomer: t.bonus.newcomer,
@@ -136,7 +138,7 @@ const BonusWalletScreen: React.FC = () => {
     const markLoaded = (source: string) => {
       if (!active) return;
       loadedSources.add(source);
-      if (loadedSources.size >= 4) setReady(true);
+      if (loadedSources.size >= 2) setReady(true);
     };
 
     const unsubBonuses = subscribeMyBonuses((next) => {
@@ -156,8 +158,12 @@ const BonusWalletScreen: React.FC = () => {
       markLoaded('promotions');
     });
 
+    // Safety timeout: show UI even if some subscriptions never fire
+    const timeout = setTimeout(() => { if (active) setReady(true); }, 5000);
+
     return () => {
       active = false;
+      clearTimeout(timeout);
       unsubBonuses();
       unsubCredits();
       unsubTransactions();
@@ -175,7 +181,7 @@ const BonusWalletScreen: React.FC = () => {
     return promotions.filter((item) =>
       item.status === 'active' &&
       item.expiresAt > now &&
-      (item.moderationStatus === 'approved' || item.moderationStatus === 'pending')
+      item.moderationStatus === 'approved'
     );
   }, [promotions]);
 
@@ -250,38 +256,11 @@ const BonusWalletScreen: React.FC = () => {
               </View>
             </View>
 
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <MaterialCommunityIcons name="medal-outline" size={22} color={SCREEN_THEME.accentGold} />
-                <Text style={styles.cardTitle}>{BADGE_LABELS[bonuses?.badge || 'newcomer'] || t.bonus.newcomer}</Text>
-              </View>
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: `${totalProgress}%` }]} />
-              </View>
-              <View style={styles.progressMeta}>
-                <Text style={styles.metaText}>{bonuses?.total ?? 0} / {BONUS_CAPS.total}</Text>
-                <Text style={styles.metaText}>{t.bonus.spentLabel} {bonuses?.spent.total ?? 0}</Text>
-              </View>
-            </View>
-
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <MaterialCommunityIcons name="calendar-week" size={22} color={SCREEN_THEME.enamelBlue} />
-                <Text style={styles.cardTitle}>{t.bonus.weeklyLimit}</Text>
-              </View>
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFillBlue, { width: `${weeklyProgress}%` }]} />
-              </View>
-              <View style={styles.progressMeta}>
-                <Text style={styles.metaText}>{weeklyEarned} / {weeklyLimit}</Text>
-                <Text style={styles.metaText}>{bonuses?.earned.weekKey || t.bonus.currentWeek}</Text>
-              </View>
-              <View style={styles.breakdownGrid}>
-                <Breakdown label={t.bonus.help} value={bonuses?.help.points ?? 0} />
-                <Breakdown label={t.bonus.thanks} value={bonuses?.gratitude.points ?? 0} />
-                <Breakdown label={t.bonus.invites} value={bonuses?.invites.points ?? 0} />
-                <Breakdown label={t.bonus.likes} value={bonuses?.likes.points ?? 0} />
-              </View>
+            {/* Badge — compact single line */}
+            <View style={styles.badgeRow}>
+              <MaterialCommunityIcons name="medal-outline" size={20} color={SCREEN_THEME.accentGold} />
+              <Text style={styles.badgeLabel}>{BADGE_LABELS[bonuses?.badge || 'newcomer'] || t.bonus.newcomer}</Text>
+              <Text style={styles.badgeMeta}>{bonuses?.total ?? 0} / {BONUS_CAPS.total}</Text>
             </View>
 
             <View style={styles.actionGrid}>
@@ -300,43 +279,110 @@ const BonusWalletScreen: React.FC = () => {
               <MaterialCommunityIcons name="chevron-right" size={22} color="#FFF9EE" />
             </TouchableOpacity>
 
-            <Section title={t.bonus.activePromotions} icon="pin">
-              {activePromotions.length === 0 ? (
-                <EmptyLine text={t.bonus.noActivePromotions} />
-              ) : activePromotions.map((item) => (
-                <View key={item.id} style={styles.listItem}>
-                  <MaterialCommunityIcons name="bullhorn-outline" size={21} color={SCREEN_THEME.terracotta} />
-                  <View style={styles.listCopy}>
-                    <Text style={styles.listTitle}>{getPromotionTitle(item)}</Text>
-                    <Text style={styles.listMeta}>
-                      {item.pointsSpent} {item.currency} · {t.bonus.until} {formatDate(item.expiresAt, language)} · {getStatusLabel(item.moderationStatus, t.bonus)}
-                    </Text>
+            {activePromotions.length > 0 && (
+              <Section title={t.bonus.activePromotions} icon="pin">
+                {activePromotions.map((item) => (
+                  <View key={item.id} style={styles.listItem}>
+                    <MaterialCommunityIcons name="bullhorn-outline" size={21} color={SCREEN_THEME.terracotta} />
+                    <View style={styles.listCopy}>
+                      <Text style={styles.listTitle}>{getPromotionTitle(item)}</Text>
+                      <Text style={styles.listMeta}>
+                        {item.pointsSpent} {item.currency} · {t.bonus.until} {formatDate(item.expiresAt, language)} · {getStatusLabel(item.moderationStatus, t.bonus)}
+                      </Text>
+                    </View>
                   </View>
-                </View>
-              ))}
-            </Section>
+                ))}
+              </Section>
+            )}
 
-            <Section title={t.bonus.recentHistory} icon="history">
-              {transactions.length === 0 ? (
-                <EmptyLine text={t.bonus.emptyHistory} />
-              ) : transactions.slice(0, 12).map((item) => (
-                <View key={item.id} style={styles.listItem}>
-                  <MaterialCommunityIcons
-                    name={item.type === 'spend' ? 'arrow-up-circle' : item.type === 'topup' ? 'plus-circle' : 'arrow-down-circle'}
-                    size={21}
-                    color={item.type === 'spend' ? SCREEN_THEME.terracotta : SCREEN_THEME.woodGreen}
-                  />
-                  <View style={styles.listCopy}>
-                    <Text style={styles.listTitle}>{getTransactionTitle(item, t.bonus)}</Text>
-                    <Text style={styles.listMeta}>{formatDateTime(item.createdAt, language)} · {t.bonus.balanceAfter} {item.balanceAfter}</Text>
-                    {item.note ? <Text style={styles.listNote}>{item.note}</Text> : null}
+            {/* Collapsible details: badge progress, weekly limit, history */}
+            <TouchableOpacity
+              style={styles.detailsToggle}
+              onPress={() => setShowDetails((prev) => !prev)}
+              activeOpacity={0.82}
+            >
+              <MaterialCommunityIcons
+                name={showDetails ? 'chevron-up' : 'chevron-down'}
+                size={20}
+                color={SCREEN_THEME.textSecondary}
+              />
+              <Text style={styles.detailsToggleText}>
+                {showDetails ? t.bonus.hideDetails : t.bonus.showDetails}
+              </Text>
+            </TouchableOpacity>
+
+            {showDetails && (
+              <>
+                <View style={styles.card}>
+                  <View style={styles.cardHeader}>
+                    <MaterialCommunityIcons name="medal-outline" size={22} color={SCREEN_THEME.accentGold} />
+                    <Text style={styles.cardTitle}>{BADGE_LABELS[bonuses?.badge || 'newcomer'] || t.bonus.newcomer}</Text>
                   </View>
-                  <Text style={[styles.pointsDelta, item.type === 'spend' && styles.pointsDeltaSpend]}>
-                    {item.type === 'spend' ? '-' : '+'}{Math.abs(item.points)}
-                  </Text>
+                  <View style={styles.progressTrack}>
+                    <View style={[styles.progressFill, { width: `${totalProgress}%` }]} />
+                  </View>
+                  <View style={styles.progressMeta}>
+                    <Text style={styles.metaText}>{bonuses?.total ?? 0} / {BONUS_CAPS.total}</Text>
+                    <Text style={styles.metaText}>{t.bonus.spentLabel} {bonuses?.spent.total ?? 0}</Text>
+                  </View>
                 </View>
-              ))}
-            </Section>
+
+                <View style={styles.card}>
+                  <View style={styles.cardHeader}>
+                    <MaterialCommunityIcons name="calendar-week" size={22} color={SCREEN_THEME.enamelBlue} />
+                    <Text style={styles.cardTitle}>{t.bonus.weeklyLimit}</Text>
+                  </View>
+                  <View style={styles.progressTrack}>
+                    <View style={[styles.progressFillBlue, { width: `${weeklyProgress}%` }]} />
+                  </View>
+                  <View style={styles.progressMeta}>
+                    <Text style={styles.metaText}>{weeklyEarned} / {weeklyLimit}</Text>
+                    <Text style={styles.metaText}>{bonuses?.earned.weekKey || t.bonus.currentWeek}</Text>
+                  </View>
+                  <View style={styles.breakdownGrid}>
+                    <Breakdown label={t.bonus.help} value={bonuses?.help.points ?? 0} />
+                    <Breakdown label={t.bonus.thanks} value={bonuses?.gratitude.points ?? 0} />
+                    <Breakdown label={t.bonus.invites} value={bonuses?.invites.points ?? 0} />
+                    <Breakdown label={t.bonus.likes} value={bonuses?.likes.points ?? 0} />
+                  </View>
+                </View>
+
+                <Section title={t.bonus.recentHistory} icon="history">
+                  {transactions.length === 0 ? (
+                    <EmptyLine text={t.bonus.emptyHistory} />
+                  ) : (
+                    <>
+                      {transactions.slice(0, showAllHistory ? 30 : 3).map((item) => (
+                        <View key={item.id} style={styles.listItem}>
+                          <MaterialCommunityIcons
+                            name={item.type === 'spend' ? 'arrow-up-circle' : item.type === 'topup' ? 'plus-circle' : 'arrow-down-circle'}
+                            size={21}
+                            color={item.type === 'spend' ? SCREEN_THEME.terracotta : SCREEN_THEME.woodGreen}
+                          />
+                          <View style={styles.listCopy}>
+                            <Text style={styles.listTitle}>{getTransactionTitle(item, t.bonus)}</Text>
+                            <Text style={styles.listMeta}>{formatDateTime(item.createdAt, language)} · {t.bonus.balanceAfter} {item.balanceAfter}</Text>
+                            {item.note ? <Text style={styles.listNote}>{item.note}</Text> : null}
+                          </View>
+                          <Text style={[styles.pointsDelta, item.type === 'spend' && styles.pointsDeltaSpend]}>
+                            {item.type === 'spend' ? '-' : '+'}{Math.abs(item.points)}
+                          </Text>
+                        </View>
+                      ))}
+                      {transactions.length > 3 && !showAllHistory && (
+                        <TouchableOpacity
+                          style={styles.showAllButton}
+                          onPress={() => setShowAllHistory(true)}
+                          activeOpacity={0.82}
+                        >
+                          <Text style={styles.showAllText}>{t.bonus.allHistory} ({transactions.length})</Text>
+                        </TouchableOpacity>
+                      )}
+                    </>
+                  )}
+                </Section>
+              </>
+            )}
           </>
         )}
       </ScrollView>
@@ -674,6 +720,53 @@ const styles = StyleSheet.create({
     color: SCREEN_THEME.textSecondary,
     fontSize: 13,
     lineHeight: 18,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginTop: 12,
+    borderRadius: 8,
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderWidth: 1,
+    borderColor: SCREEN_THEME.borderSoft,
+  },
+  badgeLabel: {
+    flex: 1,
+    color: SCREEN_THEME.textPrimary,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  badgeMeta: {
+    color: SCREEN_THEME.textSecondary,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  detailsToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 14,
+    marginTop: 8,
+  },
+  detailsToggleText: {
+    color: SCREEN_THEME.textSecondary,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  showAllButton: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: SCREEN_THEME.borderSoft,
+  },
+  showAllText: {
+    color: SCREEN_THEME.enamelBlue,
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
 

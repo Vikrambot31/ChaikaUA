@@ -1948,15 +1948,17 @@ const BiznesChaikaScreen: React.FC = () => {
 
               <Text style={styles.formLabel}>{text.photoLabel}</Text>
               {user?.id ? (
-                <PhotoUploadField
-                  uid={user.id}
-                  userName={user?.name ?? ''}
-                  maxPhotos={5}
-                  storagePath={BIZ_PHOTO_STORAGE_PATH}
-                  onPhotosChange={setFormPhotos}
-                  metadata={{ sourceScreen: 'BizznesChaikaScreen', sourceScreenLabel: 'Додати бізнес' }}
-                />
-                <UploadedPhotosGrid />
+                <>
+                  <PhotoUploadField
+                    uid={user.id}
+                    userName={user?.name ?? ''}
+                    maxPhotos={5}
+                    storagePath={BIZ_PHOTO_STORAGE_PATH}
+                    onPhotosChange={setFormPhotos}
+                    metadata={{ sourceScreen: 'BizznesChaikaScreen', sourceScreenLabel: 'Додати бізнес' }}
+                  />
+                  <UploadedPhotosGrid />
+                </>
               ) : (
                 <Text style={styles.signInNote}>{text.authRequired}</Text>
               )}

@@ -353,15 +353,19 @@ export const getMyInvitedChildren = async (): Promise<TrustTreeChild[]> => {
   return result.data.children ?? [];
 };
 
-export const subscribeMyConfirmations = (onChanged: () => void): (() => void) => {
+export const subscribeMyConfirmations = (
+  onChanged: () => void,
+  onError?: (error: Error) => void,
+): (() => void) => {
   const uid = auth.currentUser?.uid;
   if (!uid) return () => {};
   const q = query(ref(database, 'sponsor_confirmations'), orderByChild('sponsorUid'), equalTo(uid));
-  return onValue(q, () => { void onChanged(); });
+  return onValue(q, () => { void onChanged(); }, onError);
 };
 
 export const subscribeMyTrustNode = (
   onChanged: (node: TrustTreeNode | null) => void,
+  onError?: (error: Error) => void,
 ): (() => void) => {
   const uid = auth.currentUser?.uid;
   if (!uid) {
@@ -370,5 +374,5 @@ export const subscribeMyTrustNode = (
   }
   return onValue(ref(database, `trust_tree/${uid}`), (snapshot) => {
     onChanged(normalizeTrustNode(snapshot.val()));
-  });
+  }, onError);
 };
