@@ -308,7 +308,7 @@ const PhotoUploadScreen: React.FC = () => {
             storagePath: photo.storagePath,
             target: 'gallery_public',
             sourceScreen: 'PhotoUploadScreen',
-            sourceScreenLabel: 'Добавить фото',
+            sourceScreenLabel: 'Додати фото',
             sourceFeature: 'gallery_full_form',
             locationLabel: selectedLocation?.label,
             locationType: selectedLocation?.type,
