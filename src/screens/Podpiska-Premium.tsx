@@ -26,31 +26,60 @@ import {
   callActivateTrialPremium,
 } from '../redux/slices/subscriptionSlice';
 
+type Plan = 'monthly' | 'yearly';
+
 const FEATURES_UA = [
-  'Люди Чайки — повний доступ',
-  'Більше оголошень (до 5)',
-  'Більше заявок (до 6)',
-  'Більше фото (до 10/день)',
-  'Бонуси x1.5',
+  'Люди Чайки — повний доступ до анкет',
+  'Більше оголошень — до 5 одночасно',
+  'Більше заявок — до 6 активних',
+  'Більше фото — до 10 завантажень на день',
+  'Бонуси x1.5 за активність',
   'Пріоритетна підтримка',
 ];
 
 const FEATURES_RU = [
-  'Люди Чайки — полный доступ',
-  'Больше объявлений (до 5)',
-  'Больше заявок (до 6)',
-  'Больше фото (до 10/день)',
-  'Бонусы x1.5',
+  'Люди Чайки — полный доступ к анкетам',
+  'Больше объявлений — до 5 одновременно',
+  'Больше заявок — до 6 активных',
+  'Больше фото — до 10 загрузок в день',
+  'Бонусы x1.5 за активность',
   'Приоритетная поддержка',
 ];
 
 const FEATURES_EN = [
-  'Chaika People — full access',
-  'More listings (up to 5)',
-  'More requests (up to 6)',
-  'More photos (up to 10/day)',
-  'Bonuses x1.5',
+  'Chaika People — full profile access',
+  'More listings — up to 5 at a time',
+  'More requests — up to 6 active',
+  'More photos — up to 10 uploads per day',
+  'Bonuses x1.5 for activity',
   'Priority support',
+];
+
+const BIZ_FEATURES_UA = [
+  'Сторінка закладу з меню та цінами',
+  'Акції та знижки — до 3 карток',
+  'Фотогалерея вашого бізнесу',
+  'Видимість для всіх користувачів Чайки',
+  'Значок "Бізнес+" на картці закладу',
+  'Модерація перед публікацією',
+];
+
+const BIZ_FEATURES_RU = [
+  'Страница заведения с меню и ценами',
+  'Акции и скидки — до 3 карточек',
+  'Фотогалерея вашего бизнеса',
+  'Видимость для всех пользователей Чайки',
+  'Значок "Бизнес+" на карточке заведения',
+  'Модерация перед публикацией',
+];
+
+const BIZ_FEATURES_EN = [
+  'Venue page with menu & prices',
+  'Promotions & discounts — up to 3 cards',
+  'Business photo gallery',
+  'Visible to all Chaika users',
+  '"Business+" badge on venue card',
+  'Moderator review before publishing',
 ];
 
 const formatDate = (iso: string | null): string => {
@@ -74,6 +103,7 @@ export default function SubscriptionScreen() {
   const trialUsed = useSelector(selectTrialUsed);
 
   const [loading, setLoading] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<Plan>('monthly');
   const isSubmitting = useRef(false);
 
   const text = useMemo(() => {
@@ -81,7 +111,12 @@ export default function SubscriptionScreen() {
       return {
         title: 'Premium Чайка Life',
         back: 'Назад',
-        price: '39 грн / місяць',
+        priceMonthly: '39 грн / місяць',
+        priceYearly: '390 грн / рік',
+        saveLabel: 'економія 78 грн',
+        planMonthly: 'Щомісяця',
+        planYearly: 'Щорічно',
+        sectionPlans: 'Оберіть план',
         activeTitle: 'Ваша підписка активна',
         activeExpiry: 'Дійсна до:',
         daysLeft: (n: number) => `Залишилось: ${n} ${n === 1 ? 'день' : n < 5 ? 'дні' : 'днів'}`,
@@ -103,13 +138,24 @@ export default function SubscriptionScreen() {
         trialBadge: 'Пробний',
         activeBadge: 'Активна',
         features: FEATURES_UA,
+        bizTitle: 'Маєте свій бізнес?',
+        bizSubtitle: 'Пакет Бізнес+ — для кафе, магазинів та послуг',
+        bizPrice: '49 грн / місяць',
+        bizPriceYear: '480 грн / рік',
+        bizButton: 'Детальніше про Бізнес+',
+        bizFeatures: BIZ_FEATURES_UA,
       };
     }
     if (language === 'ru') {
       return {
         title: 'Premium Чайка Life',
         back: 'Назад',
-        price: '39 грн / месяц',
+        priceMonthly: '39 грн / месяц',
+        priceYearly: '390 грн / год',
+        saveLabel: 'экономия 78 грн',
+        planMonthly: 'Ежемесячно',
+        planYearly: 'Ежегодно',
+        sectionPlans: 'Выберите план',
         activeTitle: 'Ваша подписка активна',
         activeExpiry: 'Действительна до:',
         daysLeft: (n: number) => `Осталось: ${n} ${n === 1 ? 'день' : n < 5 ? 'дня' : 'дней'}`,
@@ -131,12 +177,23 @@ export default function SubscriptionScreen() {
         trialBadge: 'Пробная',
         activeBadge: 'Активна',
         features: FEATURES_RU,
+        bizTitle: 'Есть свой бизнес?',
+        bizSubtitle: 'Пакет Бизнес+ — для кафе, магазинов и услуг',
+        bizPrice: '49 грн / месяц',
+        bizPriceYear: '480 грн / год',
+        bizButton: 'Подробнее о Бизнес+',
+        bizFeatures: BIZ_FEATURES_RU,
       };
     }
     return {
       title: 'Premium Chaika Life',
       back: 'Back',
-      price: '39 UAH / month',
+      priceMonthly: '39 UAH / month',
+      priceYearly: '390 UAH / year',
+      saveLabel: 'save 78 UAH',
+      planMonthly: 'Monthly',
+      planYearly: 'Yearly',
+      sectionPlans: 'Choose a plan',
       activeTitle: 'Your subscription is active',
       activeExpiry: 'Valid until:',
       daysLeft: (n: number) => `${n} ${n === 1 ? 'day' : 'days'} remaining`,
@@ -158,6 +215,12 @@ export default function SubscriptionScreen() {
       trialBadge: 'Trial',
       activeBadge: 'Active',
       features: FEATURES_EN,
+      bizTitle: 'Have your own business?',
+      bizSubtitle: 'Business+ package — for cafes, shops & services',
+      bizPrice: '49 UAH / month',
+      bizPriceYear: '480 UAH / year',
+      bizButton: 'Learn more about Business+',
+      bizFeatures: BIZ_FEATURES_EN,
     };
   }, [language]);
 
@@ -206,15 +269,19 @@ export default function SubscriptionScreen() {
   }, [text, dispatch]);
 
   const handlePayViaSupport = useCallback(() => {
+    const planLabel = selectedPlan === 'yearly'
+      ? (language === 'ua' ? '390 грн/рік' : language === 'ru' ? '390 грн/год' : '390 UAH/year')
+      : (language === 'ua' ? '39 грн/міс' : language === 'ru' ? '39 грн/мес' : '39 UAH/month');
+
     navigation.navigate('SupportScreen', {
       initialCategory: 'payment',
       initialMessage: language === 'ua'
-        ? 'Хочу оплатити Premium Чайка Life (39 грн/міс). Прошу надати реквізити.'
+        ? `Хочу оплатити Premium Чайка Life (${planLabel}). Прошу надати реквізити.`
         : language === 'ru'
-        ? 'Хочу оплатить Premium Чайка Life (39 грн/мес). Прошу предоставить реквизиты.'
-        : 'I would like to pay for Premium Chaika Life (39 UAH/month). Please provide payment details.',
+        ? `Хочу оплатить Premium Чайка Life (${planLabel}). Прошу предоставить реквизиты.`
+        : `I would like to pay for Premium Chaika Life (${planLabel}). Please provide payment details.`,
     } as any);
-  }, [navigation, language]);
+  }, [navigation, language, selectedPlan]);
 
   const statusBadgeStyle = isPremium
     ? styles.statusBadgeActive
@@ -227,6 +294,8 @@ export default function SubscriptionScreen() {
     : status === 'expired'
     ? styles.statusBadgeTextExpired
     : styles.statusBadgeTextFree;
+
+  const currentPrice = selectedPlan === 'yearly' ? text.priceYearly : text.priceMonthly;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -244,7 +313,7 @@ export default function SubscriptionScreen() {
         {/* Hero card */}
         <View style={styles.heroCard}>
           <TactileIcon icon="crown" size={58} iconSize={28} backgroundColor="#C79C47" />
-          <Text style={styles.price}>{text.price}</Text>
+          <Text style={styles.price}>{currentPrice}</Text>
 
           {isPremium && (
             <View style={[styles.statusBadge, statusBadgeStyle]}>
@@ -284,6 +353,45 @@ export default function SubscriptionScreen() {
           ))}
         </View>
 
+        {/* Plan selector — shown only when not active */}
+        {!isPremium && (
+          <>
+            <Text style={styles.sectionLabel}>{text.sectionPlans}</Text>
+            <View style={styles.planSelector}>
+              <TouchableOpacity
+                style={[styles.planOption, selectedPlan === 'monthly' && styles.planOptionActive]}
+                onPress={() => setSelectedPlan('monthly')}
+                activeOpacity={0.82}
+              >
+                <Text style={[styles.planLabel, selectedPlan === 'monthly' && styles.planLabelActive]}>
+                  {text.planMonthly}
+                </Text>
+                <Text style={[styles.planPrice, selectedPlan === 'monthly' && styles.planPriceActive]}>
+                  {text.priceMonthly}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.planOption, selectedPlan === 'yearly' && styles.planOptionActive]}
+                onPress={() => setSelectedPlan('yearly')}
+                activeOpacity={0.82}
+              >
+                <View style={styles.planYearlyTop}>
+                  <Text style={[styles.planLabel, selectedPlan === 'yearly' && styles.planLabelActive]}>
+                    {text.planYearly}
+                  </Text>
+                  <View style={styles.saveBadge}>
+                    <Text style={styles.saveBadgeText}>{text.saveLabel}</Text>
+                  </View>
+                </View>
+                <Text style={[styles.planPrice, selectedPlan === 'yearly' && styles.planPriceActive]}>
+                  {text.priceYearly}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+
         {/* Action buttons */}
         {!isPremium && !trialUsed && (
           <TouchableOpacity
@@ -314,6 +422,48 @@ export default function SubscriptionScreen() {
             <Text style={styles.payButtonHint}>{text.payHint}</Text>
           </View>
         </TouchableOpacity>
+
+        {/* Business+ promo block */}
+        <View style={styles.bizCard}>
+          <View style={styles.bizCardHeader}>
+            <View style={styles.bizIcon}>
+              <MaterialCommunityIcons name="storefront" size={22} color="#fff" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.bizTitle}>{text.bizTitle}</Text>
+              <Text style={styles.bizSubtitle}>{text.bizSubtitle}</Text>
+            </View>
+          </View>
+
+          <View style={styles.bizPriceRow}>
+            <View style={styles.bizPricePill}>
+              <MaterialCommunityIcons name="calendar-month-outline" size={13} color="#7A1E5C" />
+              <Text style={styles.bizPriceText}>{text.bizPrice}</Text>
+            </View>
+            <View style={styles.bizPricePill}>
+              <MaterialCommunityIcons name="calendar-star" size={13} color="#7A1E5C" />
+              <Text style={styles.bizPriceText}>{text.bizPriceYear}</Text>
+            </View>
+          </View>
+
+          <View style={styles.bizDivider} />
+
+          {text.bizFeatures.map((f, i) => (
+            <View key={i} style={styles.bizFeatureRow}>
+              <MaterialCommunityIcons name="check-circle-outline" size={16} color="#7A1E5C" />
+              <Text style={styles.bizFeatureText}>{f}</Text>
+            </View>
+          ))}
+
+          <TouchableOpacity
+            style={styles.bizButton}
+            activeOpacity={0.82}
+            onPress={() => navigation.navigate('BusinessPlusSubscriptionScreen', undefined as any)}
+          >
+            <Text style={styles.bizButtonText}>{text.bizButton}</Text>
+            <MaterialCommunityIcons name="arrow-right" size={16} color="#7A1E5C" />
+          </TouchableOpacity>
+        </View>
 
       </ScrollView>
       <MiniTabBar />
@@ -346,7 +496,7 @@ const styles = StyleSheet.create({
   back: { color: SCREEN_THEME.terracottaDark, fontSize: 14, fontWeight: '900' },
   title: { fontSize: 17, fontWeight: '900', color: SCREEN_THEME.textPrimary },
   headerSpacer: { width: 72 },
-  content: { padding: 16, paddingBottom: 108 },
+  content: { padding: 16, paddingBottom: 108, gap: 14 },
 
   heroCard: {
     backgroundColor: SCREEN_THEME.paperStrong,
@@ -355,7 +505,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#E4D0AB',
-    marginBottom: 14,
     ...SCREEN_THEME.raisedShadow,
   },
   price: {
@@ -410,11 +559,49 @@ const styles = StyleSheet.create({
     padding: 14,
     borderWidth: 1,
     borderColor: '#E4D0AB',
-    marginBottom: 14,
     gap: 8,
   },
   featureRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   featureText: { flex: 1, fontSize: 14, fontWeight: '700', color: SCREEN_THEME.textPrimary },
+
+  sectionLabel: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: SCREEN_THEME.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: -4,
+  },
+
+  planSelector: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  planOption: {
+    flex: 1,
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 2,
+    borderColor: '#E0D4C8',
+    gap: 4,
+  },
+  planOptionActive: {
+    borderColor: '#C79C47',
+    backgroundColor: '#FFFBF2',
+  },
+  planYearlyTop: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  planLabel: { fontSize: 13, fontWeight: '800', color: SCREEN_THEME.textSecondary },
+  planLabelActive: { color: '#A07830' },
+  planPrice: { fontSize: 15, fontWeight: '900', color: SCREEN_THEME.textPrimary },
+  planPriceActive: { color: '#C79C47' },
+  saveBadge: {
+    backgroundColor: '#2E7D32',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  saveBadgeText: { fontSize: 10, fontWeight: '900', color: '#fff' },
 
   trialButton: {
     backgroundColor: '#5C7A5C',
@@ -425,7 +612,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    marginBottom: 10,
     ...SCREEN_THEME.raisedShadow,
   },
   trialButtonText: {
@@ -447,9 +633,76 @@ const styles = StyleSheet.create({
     gap: 10,
     borderWidth: 1,
     borderColor: '#E4D0AB',
-    marginBottom: 10,
   },
   payButtonInner: { flex: 1 },
   payButtonText: { fontSize: 15, fontWeight: '900', color: SCREEN_THEME.terracottaDark },
   payButtonHint: { fontSize: 12, fontWeight: '700', color: SCREEN_THEME.textMuted, marginTop: 2 },
+
+  // Business+ promo card
+  bizCard: {
+    backgroundColor: '#FDF5FA',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: '#E8C0D8',
+    gap: 10,
+  },
+  bizCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  bizIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: '#7A1E5C',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bizTitle: { fontSize: 16, fontWeight: '900', color: '#7A1E5C' },
+  bizSubtitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: SCREEN_THEME.textSecondary,
+    marginTop: 2,
+    lineHeight: 17,
+  },
+  bizPriceRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  bizPricePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(122,30,92,0.08)',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(122,30,92,0.18)',
+  },
+  bizPriceText: { fontSize: 13, fontWeight: '900', color: '#7A1E5C' },
+  bizDivider: {
+    height: 1,
+    backgroundColor: '#E8C0D8',
+    marginVertical: 2,
+  },
+  bizFeatureRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  bizFeatureText: { flex: 1, fontSize: 13, fontWeight: '700', color: SCREEN_THEME.textPrimary, lineHeight: 18 },
+  bizButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 4,
+    paddingVertical: 11,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#7A1E5C',
+    backgroundColor: 'rgba(122,30,92,0.06)',
+  },
+  bizButtonText: { fontSize: 14, fontWeight: '900', color: '#7A1E5C' },
 });

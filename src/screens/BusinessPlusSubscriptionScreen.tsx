@@ -25,30 +25,33 @@ import { database } from '../firebase-core';
 type Plan = 'monthly' | 'yearly';
 
 const FEATURES_UA = [
-  'Редагувати меню та ціни (до 20 позицій)',
-  'Акції та знижки (до 3 карток)',
-  'Фото вашого закладу',
-  'Відображення для всіх користувачів',
-  'Перевірка модератором перед публікацією',
-  'Значок "Бізнес+" на картці закладу',
+  'Власна сторінка закладу — назва, опис, адреса, графік роботи',
+  'Меню та ціни — до 20 позицій з описом',
+  'Акції та знижки — до 3 активних карток одночасно',
+  'Фотогалерея закладу — показуйте атмосферу та страви',
+  'Видно всім користувачам Чайки — безкоштовна реклама всередині спільноти',
+  'Значок "Бізнес+" виділяє вас серед звичайних оголошень',
+  'Модерація адміністратором — якість і довіра гарантовані',
 ];
 
 const FEATURES_RU = [
-  'Редактировать меню и цены (до 20 позиций)',
-  'Акции и скидки (до 3 карточек)',
-  'Фото вашего заведения',
-  'Отображение для всех пользователей',
-  'Проверка модератором перед публикацией',
-  'Значок "Бизнес+" на карточке заведения',
+  'Собственная страница заведения — название, описание, адрес, часы работы',
+  'Меню и цены — до 20 позиций с описанием',
+  'Акции и скидки — до 3 активных карточек одновременно',
+  'Фотогалерея заведения — показывайте атмосферу и блюда',
+  'Видно всем пользователям Чайки — бесплатная реклама внутри сообщества',
+  'Значок "Бизнес+" выделяет вас среди обычных объявлений',
+  'Модерация администратором — качество и доверие гарантированы',
 ];
 
 const FEATURES_EN = [
-  'Edit menu & prices (up to 20 items)',
-  'Promotions & discounts (up to 3 cards)',
-  'Business photo',
-  'Visible to all app users',
-  'Moderator review before publishing',
-  'Business+ badge on your venue card',
+  'Your own venue page — name, description, address, working hours',
+  'Menu & prices — up to 20 items with description',
+  'Promotions & discounts — up to 3 active cards at a time',
+  'Photo gallery — showcase your atmosphere and dishes',
+  'Visible to all Chaika users — free advertising inside the community',
+  '"Business+" badge sets you apart from regular listings',
+  'Admin moderation — quality and trust guaranteed',
 ];
 
 const formatDate = (iso: string | null): string => {
