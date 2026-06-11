@@ -313,7 +313,6 @@ const PhotoUploadScreen: React.FC = () => {
             locationLabel: selectedLocation?.label,
             locationType: selectedLocation?.type,
             category: selectedCategory || undefined,
-            moderationDeferred: true,
           }),
         ),
       );
@@ -370,6 +369,12 @@ const PhotoUploadScreen: React.FC = () => {
               maxPhotos={5}
               storagePath="community_photos"
               onPhotosChange={setFormPhotos}
+              metadata={{
+                sourceScreen: 'PhotoUploadScreen',
+                sourceScreenLabel: 'Додати фото',
+                sourceFeature: 'gallery_full_form',
+                moderationDeferred: true,
+              }}
             />
           ) : (
             <Text style={styles.fieldHint}>{text.signInRequired}</Text>
