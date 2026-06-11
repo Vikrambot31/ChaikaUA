@@ -1,10 +1,11 @@
-import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
   ActivityIndicator,
   FlatList,
   Modal,
+  PanResponder,
   Pressable,
   SafeAreaView,
   StyleSheet,
@@ -16,7 +17,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { onValue, ref, update } from 'firebase/database';
+import { increment, onValue, ref, update } from 'firebase/database';
 import { useSelector } from 'react-redux';
 import GuestRegisterBanner from '../components/GuestRegisterBanner';
 import { useGuestGuard } from '../hooks/useGuestGuard';
@@ -53,6 +54,13 @@ const UI_TEXT = {
     approved: 'схвалено',
     empty: 'Поки немає фото району',
     loadError: 'Не вдалося завантажити фото',
+    swipeBtn: 'Листати',
+    swipeBack: '← Фото',
+    swipeDoneTitle: 'Усі фото переглянуто',
+    swipeDoneSub: (n: number) => `Вподобано: ${n}`,
+    swipeRestart: 'Почати знову',
+    swipeLikeLabel: 'ЛАЙК ♥',
+    swipePassLabel: 'ДАЛІ →',
   },
   ru: {
     title: 'Фото района',
@@ -67,6 +75,13 @@ const UI_TEXT = {
     approved: 'одобрено',
     empty: 'Пока нет фото района',
     loadError: 'Не удалось загрузить фото',
+    swipeBtn: 'Листать',
+    swipeBack: '← Фото',
+    swipeDoneTitle: 'Все фото просмотрены',
+    swipeDoneSub: (n: number) => `Понравилось: ${n}`,
+    swipeRestart: 'Начать снова',
+    swipeLikeLabel: 'ЛАЙК ♥',
+    swipePassLabel: 'ДАЛЬШЕ →',
   },
   en: {
     title: 'District Photos',
@@ -81,6 +96,13 @@ const UI_TEXT = {
     approved: 'approved',
     empty: 'No district photos yet',
     loadError: 'Could not load photos',
+    swipeBtn: 'Swipe',
+    swipeBack: '← Photos',
+    swipeDoneTitle: 'All photos viewed',
+    swipeDoneSub: (n: number) => `Liked: ${n}`,
+    swipeRestart: 'Start again',
+    swipeLikeLabel: 'LIKE ♥',
+    swipePassLabel: 'NEXT →',
   },
 } as const;
 
@@ -174,6 +196,11 @@ export default function FotoRayonaScreen() {
   const [previewPhoto, setPreviewPhoto] = useState<SoulPhoto | null>(null);
   const [submittedRtdbIds, setSubmittedRtdbIds] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
+  const [swipeMode, setSwipeMode] = useState(false);
+  const [swipeIndex, setSwipeIndex] = useState(0);
+  const [likedPhotoIds, setLikedPhotoIds] = useState<string[]>([]);
+  const everLikedRef = useRef<Set<string>>(new Set());
+  const swipePosition = useRef(new Animated.ValueXY()).current;
   const pulseAnim = useMemo(() => new Animated.Value(1), []);
   const pulseLoopRef = React.useRef<Animated.CompositeAnimation | null>(null);
 
@@ -313,6 +340,62 @@ export default function FotoRayonaScreen() {
     }
   }, [deferredPhotos, submitting, text.confirmError, user?.id]);
 
+  // ── Swipe mode ──────────────────────────────────────────────────────────────
+  const swipeItems = useMemo(() => data.filter((p) => p.status === 'approved' && !!p.uri), [data]);
+  const swipeItemsRef = useRef(swipeItems);
+  swipeItemsRef.current = swipeItems;
+  const swipeIndexRef = useRef(swipeIndex);
+  swipeIndexRef.current = swipeIndex;
+
+  const handleLikePhoto = useCallback(async (photoId: string) => {
+    if (everLikedRef.current.has(photoId)) return;
+    everLikedRef.current.add(photoId);
+    setLikedPhotoIds((prev) => [...prev, photoId]);
+    try {
+      await update(ref(database), { [`community_photos/${photoId}/likes`]: increment(1) });
+    } catch (e) {
+      void logClientError('FotoRayonaScreen.likePhoto', e);
+    }
+  }, []);
+
+  const advanceSwipe = useCallback(() => {
+    swipePosition.setValue({ x: 0, y: 0 });
+    setSwipeIndex((prev) => prev + 1);
+  }, [swipePosition]);
+
+  const handleSwipeRight = useCallback(() => {
+    const item = swipeItemsRef.current[swipeIndexRef.current];
+    if (!item) return;
+    void handleLikePhoto(item.id);
+    Animated.timing(swipePosition, { toValue: { x: 600, y: 0 }, duration: 260, useNativeDriver: false }).start(advanceSwipe);
+  }, [advanceSwipe, handleLikePhoto, swipePosition]);
+
+  const handleSwipeLeft = useCallback(() => {
+    Animated.timing(swipePosition, { toValue: { x: -600, y: 0 }, duration: 260, useNativeDriver: false }).start(advanceSwipe);
+  }, [advanceSwipe, swipePosition]);
+
+  const handleSwipeRightRef = useRef(handleSwipeRight);
+  handleSwipeRightRef.current = handleSwipeRight;
+  const handleSwipeLeftRef = useRef(handleSwipeLeft);
+  handleSwipeLeftRef.current = handleSwipeLeft;
+
+  const swipePanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderMove: Animated.event([null, { dx: swipePosition.x, dy: swipePosition.y }], { useNativeDriver: false }),
+      onPanResponderRelease: (_, { dx }) => {
+        if (dx > 100) {
+          handleSwipeRightRef.current();
+        } else if (dx < -100) {
+          handleSwipeLeftRef.current();
+        } else {
+          Animated.spring(swipePosition, { toValue: { x: 0, y: 0 }, useNativeDriver: false }).start();
+        }
+      },
+    }),
+  ).current;
+  // ────────────────────────────────────────────────────────────────────────────
+
   const renderItem = useCallback(
     ({ item }: { item: SoulPhoto }) => {
       const pendingLabel = item.status === 'saved' ? text.awaitConfirm : text.pending;
@@ -354,15 +437,25 @@ export default function FotoRayonaScreen() {
           </TouchableOpacity>
         </Animated.View>
       )}
-      <TouchableOpacity
-        style={styles.submitButton}
-        onPress={guestGuard(() => navigation.navigate('PhotoUploadScreen'))}
-        activeOpacity={0.86}
-        disabled={hasUnsubmitted}
-      >
-        <MaterialCommunityIcons name="camera-plus-outline" size={19} color="#fff" />
-        <Text style={styles.submitText}>{text.addPhoto}</Text>
-      </TouchableOpacity>
+      <View style={styles.uploadPanelRow}>
+        <TouchableOpacity
+          style={[styles.submitButton, styles.swipeBtn]}
+          onPress={() => { swipePosition.setValue({ x: 0, y: 0 }); setSwipeIndex(0); setLikedPhotoIds([]); setSwipeMode(true); }}
+          activeOpacity={0.86}
+        >
+          <MaterialCommunityIcons name="cards" size={19} color="#453321" />
+          <Text style={[styles.submitText, styles.swipeBtnText]}>{text.swipeBtn}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.submitButton, styles.addPhotoBtn]}
+          onPress={guestGuard(() => navigation.navigate('PhotoUploadScreen'))}
+          activeOpacity={0.86}
+          disabled={hasUnsubmitted}
+        >
+          <MaterialCommunityIcons name="camera-plus-outline" size={19} color="#fff" />
+          <Text style={styles.submitText}>{text.addPhoto}</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 
@@ -398,7 +491,72 @@ export default function FotoRayonaScreen() {
         showsVerticalScrollIndicator={false}
       />
       {uploadPanel}
-      <MiniTabBar />
+      {/* Photo swipe overlay */}
+      {swipeMode ? (() => {
+        const swipeCard = swipeItems[swipeIndex];
+        const swipeDone = swipeIndex >= swipeItems.length;
+        const swipeRotation = swipePosition.x.interpolate({ inputRange: [-200, 0, 200], outputRange: ['-10deg', '0deg', '10deg'] });
+        const likeOpacity = swipePosition.x.interpolate({ inputRange: [0, 80], outputRange: [0, 1], extrapolate: 'clamp' });
+        const passOpacity = swipePosition.x.interpolate({ inputRange: [-80, 0], outputRange: [1, 0], extrapolate: 'clamp' });
+        return (
+          <View style={photoSwipeStyles.overlay}>
+            <TouchableOpacity style={photoSwipeStyles.backBtn} onPress={() => setSwipeMode(false)} activeOpacity={0.85}>
+              <MaterialCommunityIcons name="arrow-left" size={20} color="#CA8A04" />
+              <Text style={photoSwipeStyles.backBtnText}>{text.swipeBack}</Text>
+            </TouchableOpacity>
+            {swipeDone ? (
+              <View style={photoSwipeStyles.doneBox}>
+                <Text style={photoSwipeStyles.doneTitle}>{text.swipeDoneTitle}</Text>
+                <Text style={photoSwipeStyles.doneSub}>{text.swipeDoneSub(likedPhotoIds.length)}</Text>
+                <TouchableOpacity style={photoSwipeStyles.restartBtn} onPress={() => { swipePosition.setValue({ x: 0, y: 0 }); setSwipeIndex(0); setLikedPhotoIds([]); }} activeOpacity={0.85}>
+                  <Text style={photoSwipeStyles.restartBtnText}>{text.swipeRestart}</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <>
+                {swipeItems[swipeIndex + 1] ? (
+                  <View style={[photoSwipeStyles.card, photoSwipeStyles.cardBack]} pointerEvents="none" />
+                ) : null}
+                <Animated.View
+                  style={[photoSwipeStyles.card, { transform: [{ translateX: swipePosition.x }, { translateY: swipePosition.y }, { rotate: swipeRotation }] }]}
+                  {...swipePanResponder.panHandlers}
+                >
+                  <AppPhotoImage
+                    uri={swipeCard?.uri}
+                    storagePath={swipeCard?.storagePath}
+                    style={photoSwipeStyles.photo}
+                    resizeMode="cover"
+                    debugLabel={`SwipePhoto:${swipeCard?.id}`}
+                    showDebugInfo={false}
+                  />
+                  <Animated.View style={[photoSwipeStyles.likeOverlay, { opacity: likeOpacity }]}>
+                    <Text style={photoSwipeStyles.likeText}>{text.swipeLikeLabel}</Text>
+                  </Animated.View>
+                  <Animated.View style={[photoSwipeStyles.passOverlay, { opacity: passOpacity }]}>
+                    <Text style={photoSwipeStyles.passText}>{text.swipePassLabel}</Text>
+                  </Animated.View>
+                  {swipeCard?.author ? (
+                    <View style={photoSwipeStyles.infoBar}>
+                      <Text style={photoSwipeStyles.authorText}>{swipeCard.author}</Text>
+                      {(swipeCard.likes ?? 0) > 0 ? <Text style={photoSwipeStyles.likesCount}>{`❤ ${swipeCard.likes}`}</Text> : null}
+                    </View>
+                  ) : null}
+                </Animated.View>
+                <View style={photoSwipeStyles.actions}>
+                  <TouchableOpacity style={photoSwipeStyles.passBtn} onPress={handleSwipeLeft} activeOpacity={0.85}>
+                    <MaterialCommunityIcons name="close" size={40} color="#1C1917" />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={photoSwipeStyles.likeBtn} onPress={handleSwipeRight} activeOpacity={0.85}>
+                    <MaterialCommunityIcons name="heart" size={48} color="#1C1917" />
+                  </TouchableOpacity>
+                </View>
+                <Text style={photoSwipeStyles.counter}>{swipeIndex + 1} / {swipeItems.length}</Text>
+              </>
+            )}
+          </View>
+        );
+      })() : null}
+      {!swipeMode && <MiniTabBar />}
       <GuestRegisterBanner visible={guestBannerVisible} onClose={hideGuestBanner} />
       <VideoLoadingOverlay visible={loading} />
       <Modal visible={!!previewPhoto} transparent animationType="fade" onRequestClose={() => setPreviewPhoto(null)}>
@@ -518,12 +676,28 @@ const styles = StyleSheet.create({
     borderTopColor: '#D8BF8B',
     backgroundColor: '#F6E9C9',
   },
+  uploadPanelRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
   submitButton: {
     minHeight: 52,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#8FA77A',
+    flexDirection: 'row',
+    gap: 6,
+  },
+  swipeBtn: {
+    flex: 1,
+    backgroundColor: '#F0D98A',
+  },
+  swipeBtnText: {
+    color: '#453321',
+  },
+  addPhotoBtn: {
+    flex: 1,
   },
   pulsingSubmitButton: {
     backgroundColor: '#E74C3C',
@@ -568,4 +742,128 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
   },
+});
+
+const photoSwipeStyles = StyleSheet.create({
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#0C0A09',
+    zIndex: 200,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: 110,
+  },
+  backBtn: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(28,25,23,0.85)',
+    borderWidth: 1,
+    borderColor: '#CA8A04',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    zIndex: 10,
+  },
+  backBtnText: { color: '#CA8A04', fontSize: 13, fontWeight: '800' },
+  card: {
+    width: 320,
+    height: 460,
+    borderRadius: 24,
+    backgroundColor: '#1C1917',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#CA8A04',
+    elevation: 12,
+    shadowColor: '#CA8A04',
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  cardBack: {
+    position: 'absolute',
+    transform: [{ scale: 0.95 }],
+    opacity: 0.6,
+  },
+  photo: { width: '100%', height: '100%', position: 'absolute' },
+  likeOverlay: {
+    position: 'absolute',
+    top: 32,
+    left: 24,
+    backgroundColor: 'rgba(202,138,4,0.9)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    transform: [{ rotate: '-12deg' }],
+  },
+  likeText: { color: '#1C1917', fontSize: 22, fontWeight: '900', letterSpacing: 1 },
+  passOverlay: {
+    position: 'absolute',
+    top: 32,
+    right: 24,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderWidth: 2,
+    borderColor: '#FAFAF9',
+    transform: [{ rotate: '12deg' }],
+  },
+  passText: { color: '#FAFAF9', fontSize: 20, fontWeight: '900', letterSpacing: 1 },
+  infoBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(12,10,9,0.75)',
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  authorText: { color: '#FAFAF9', fontSize: 14, fontWeight: '800', flex: 1 },
+  likesCount: { color: '#CA8A04', fontSize: 14, fontWeight: '800' },
+  actions: {
+    position: 'absolute',
+    bottom: -95,
+    flexDirection: 'row',
+    gap: 40,
+    alignSelf: 'center',
+    alignItems: 'center',
+  },
+  passBtn: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#FAFAF9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  likeBtn: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#CA8A04',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 6,
+    shadowColor: '#CA8A04',
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  counter: { position: 'absolute', top: 60, alignSelf: 'center', color: '#B5A990', fontSize: 12, fontWeight: '700', letterSpacing: 1 },
+  doneBox: { alignItems: 'center', gap: 12, padding: 32 },
+  doneTitle: { fontSize: 22, fontWeight: '900', color: '#FAFAF9', textAlign: 'center' },
+  doneSub: { fontSize: 16, color: '#CA8A04', fontWeight: '700' },
+  restartBtn: { backgroundColor: '#CA8A04', borderRadius: 16, paddingHorizontal: 28, paddingVertical: 14, marginTop: 8 },
+  restartBtnText: { color: '#1C1917', fontWeight: '900', fontSize: 15 },
 });

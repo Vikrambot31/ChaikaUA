@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, KeyboardAvoidingView, Linking, Modal, Platform, SafeAreaView, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, KeyboardAvoidingView, Linking, Modal, PanResponder, Platform, SafeAreaView, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { useSelector } from 'react-redux';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
@@ -198,6 +198,21 @@ const UI_TEXT = {
     editSuccessMsg: 'Анкету оновлено. Зміни надіслано на модерацію.',
     editCooldownMsg: 'Редагувати можна раз на 3 дні. Спробуйте пізніше.',
     editWhilePendingMsg: 'Анкета зараз на модерації. Дочекайтесь результату.',
+    swipeFilterTitle: 'Я шукаю',
+    swipeFilterGenderAll: 'Будь-кого',
+    swipeFilterGenderMale: 'Чоловіка',
+    swipeFilterGenderFemale: 'Жінку',
+    swipeFilterGenderFriends: 'Друзів',
+    swipeFilterAgeFrom: 'Вік від',
+    swipeFilterAgeTo: 'до',
+    swipeFilterStart: 'Почати листати',
+    swipeFilterSkip: 'Без фільтрів',
+    swipeBackBtn: '← Контакти',
+    swipeDoneTitle: 'Переглянуто всі анкети',
+    swipeDoneLiked: (n: number) => `Вподобано: ${n}`,
+    swipeRestartBtn: 'Почати знову',
+    swipeLikeLabel: 'ЛАЙК ♥',
+    swipePassLabel: 'ДАЛІ →',
   },
   ru: {
     title: 'Знакомства на кофе',
@@ -301,6 +316,21 @@ const UI_TEXT = {
     editSuccessMsg: 'Анкета обновлена. Изменения отправлены на модерацию.',
     editCooldownMsg: 'Редактировать можно раз в 3 дня. Попробуйте позже.',
     editWhilePendingMsg: 'Анкета на модерации. Дождитесь результата.',
+    swipeFilterTitle: 'Я ищу',
+    swipeFilterGenderAll: 'Кого угодно',
+    swipeFilterGenderMale: 'Мужчину',
+    swipeFilterGenderFemale: 'Женщину',
+    swipeFilterGenderFriends: 'Друзей',
+    swipeFilterAgeFrom: 'Возраст от',
+    swipeFilterAgeTo: 'до',
+    swipeFilterStart: 'Начать листать',
+    swipeFilterSkip: 'Без фильтров',
+    swipeBackBtn: '← Контакты',
+    swipeDoneTitle: 'Просмотрены все анкеты',
+    swipeDoneLiked: (n: number) => `Понравилось: ${n}`,
+    swipeRestartBtn: 'Начать заново',
+    swipeLikeLabel: 'ЛАЙК ♥',
+    swipePassLabel: 'ДАЛЬШЕ →',
   },
   en: {
     title: 'Coffee Meetups',
@@ -404,6 +434,21 @@ const UI_TEXT = {
     editSuccessMsg: 'Profile updated. Changes sent for moderation.',
     editCooldownMsg: 'You can edit once every 3 days. Try later.',
     editWhilePendingMsg: 'Profile is under moderation. Wait for the result.',
+    swipeFilterTitle: 'I am looking for',
+    swipeFilterGenderAll: 'Anyone',
+    swipeFilterGenderMale: 'A man',
+    swipeFilterGenderFemale: 'A woman',
+    swipeFilterGenderFriends: 'Friends',
+    swipeFilterAgeFrom: 'Age from',
+    swipeFilterAgeTo: 'to',
+    swipeFilterStart: 'Start swiping',
+    swipeFilterSkip: 'No filters',
+    swipeBackBtn: '← Contacts',
+    swipeDoneTitle: 'All profiles viewed',
+    swipeDoneLiked: (n: number) => `Liked: ${n}`,
+    swipeRestartBtn: 'Start again',
+    swipeLikeLabel: 'LIKE ♥',
+    swipePassLabel: 'NEXT →',
   },
 } as const;
 
@@ -457,6 +502,15 @@ const KontaktiChaikyScreen: React.FC = () => {
   const [editHdProfile, setEditHdProfile] = useState('');
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editSubmitAttempted, setEditSubmitAttempted] = useState(false);
+  // Swipe mode
+  const [swipeMode, setSwipeMode] = useState(false);
+  const [swipeIndex, setSwipeIndex] = useState(0);
+  const [likedIds, setLikedIds] = useState<string[]>([]);
+  const [swipeFilterVisible, setSwipeFilterVisible] = useState(false);
+  const [swipeGenderFilter, setSwipeGenderFilter] = useState<'all' | 'furniture' | 'appliances' | 'kids'>('all');
+  const [swipeAgeFrom, setSwipeAgeFrom] = useState('');
+  const [swipeAgeTo, setSwipeAgeTo] = useState('');
+  const swipePosition = useRef(new Animated.ValueXY()).current;
   const blinkAnim = useRef(new Animated.Value(1)).current;
   const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestDraftRef = useRef({ category, condition, price, description, phone, addFormVisible, isInterestingFormExpanded, zodiacSign, humanDesignType, humanDesignProfile });
@@ -967,6 +1021,67 @@ const KontaktiChaikyScreen: React.FC = () => {
     }
   };
 
+  // Swipe mode logic
+  const swipeItems = useMemo(() => {
+    let items = filteredListings.filter((i) => !i.isArchived);
+    if (swipeGenderFilter !== 'all') {
+      items = items.filter((i) => i.category === swipeGenderFilter);
+    }
+    const ageFromNum = swipeAgeFrom ? parseInt(swipeAgeFrom, 10) : null;
+    const ageToNum = swipeAgeTo ? parseInt(swipeAgeTo, 10) : null;
+    if (ageFromNum !== null || ageToNum !== null) {
+      items = items.filter((i) => {
+        const age = i.price ? parseInt(i.price, 10) : null;
+        if (age === null || isNaN(age)) return true;
+        if (ageFromNum !== null && age < ageFromNum) return false;
+        if (ageToNum !== null && age > ageToNum) return false;
+        return true;
+      });
+    }
+    return items;
+  }, [filteredListings, swipeGenderFilter, swipeAgeFrom, swipeAgeTo]);
+  const swipeItemsRef = useRef(swipeItems);
+  swipeItemsRef.current = swipeItems;
+  const swipeIndexRef = useRef(swipeIndex);
+  swipeIndexRef.current = swipeIndex;
+
+  const advanceSwipe = useCallback(() => {
+    swipePosition.setValue({ x: 0, y: 0 });
+    setSwipeIndex((prev) => prev + 1);
+  }, [swipePosition]);
+
+  const handleSwipeRight = useCallback(() => {
+    const item = swipeItemsRef.current[swipeIndexRef.current];
+    if (!item) return;
+    setLikedIds((prev) => [...prev, item.id]);
+    Animated.timing(swipePosition, { toValue: { x: 600, y: 0 }, duration: 280, useNativeDriver: false }).start(advanceSwipe);
+  }, [advanceSwipe, swipePosition]);
+
+  const handleSwipeLeft = useCallback(() => {
+    Animated.timing(swipePosition, { toValue: { x: -600, y: 0 }, duration: 280, useNativeDriver: false }).start(advanceSwipe);
+  }, [advanceSwipe, swipePosition]);
+
+  const handleSwipeRightRef = useRef(handleSwipeRight);
+  handleSwipeRightRef.current = handleSwipeRight;
+  const handleSwipeLeftRef = useRef(handleSwipeLeft);
+  handleSwipeLeftRef.current = handleSwipeLeft;
+
+  const swipePanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderMove: Animated.event([null, { dx: swipePosition.x, dy: swipePosition.y }], { useNativeDriver: false }),
+      onPanResponderRelease: (_, { dx }) => {
+        if (dx > 100) {
+          handleSwipeRightRef.current();
+        } else if (dx < -100) {
+          handleSwipeLeftRef.current();
+        } else {
+          Animated.spring(swipePosition, { toValue: { x: 0, y: 0 }, useNativeDriver: false }).start();
+        }
+      },
+    }),
+  ).current;
+
   const mapToDetailData = (item: ContactListing, ownerAvatarUri?: string): DetailItemData => {
     const categoryLabel = getCategoryLabel(item.category);
     const conditionLabel = text.conditionLabels[item.condition as keyof typeof text.conditionLabels] ?? item.condition;
@@ -1296,7 +1411,134 @@ const KontaktiChaikyScreen: React.FC = () => {
           </View>
         )}
       </ScrollView>
+
+      {/* Swipe filter modal */}
+      <Modal visible={swipeFilterVisible} transparent animationType="fade" onRequestClose={() => setSwipeFilterVisible(false)}>
+        <View style={styles.swipeFilterBackdrop}>
+          <View style={styles.swipeFilterSheet}>
+            <Text style={styles.swipeFilterTitle}>{text.swipeFilterTitle}</Text>
+            <View style={styles.swipeFilterPills}>
+              {(['all', 'furniture', 'appliances', 'kids'] as const).map((g) => {
+                const label = g === 'all' ? text.swipeFilterGenderAll : g === 'furniture' ? text.swipeFilterGenderMale : g === 'appliances' ? text.swipeFilterGenderFemale : text.swipeFilterGenderFriends;
+                return (
+                  <TouchableOpacity key={g} style={[styles.swipeFilterPill, swipeGenderFilter === g && styles.swipeFilterPillActive]} onPress={() => setSwipeGenderFilter(g)} activeOpacity={0.8}>
+                    <Text style={[styles.swipeFilterPillText, swipeGenderFilter === g && styles.swipeFilterPillTextActive]}>{label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <View style={styles.swipeFilterAgeRow}>
+              <Text style={styles.swipeFilterAgeLabel}>{text.swipeFilterAgeFrom}</Text>
+              <TextInput style={styles.swipeFilterAgeInput} value={swipeAgeFrom} onChangeText={setSwipeAgeFrom} keyboardType="numeric" placeholder="18" placeholderTextColor="#78716C" maxLength={3} />
+              <Text style={styles.swipeFilterAgeLabel}>{text.swipeFilterAgeTo}</Text>
+              <TextInput style={styles.swipeFilterAgeInput} value={swipeAgeTo} onChangeText={setSwipeAgeTo} keyboardType="numeric" placeholder="99" placeholderTextColor="#78716C" maxLength={3} />
+            </View>
+            <TouchableOpacity style={styles.swipeFilterStartBtn} onPress={() => { swipePosition.setValue({ x: 0, y: 0 }); setSwipeFilterVisible(false); setSwipeIndex(0); setLikedIds([]); setSwipeMode(true); }} activeOpacity={0.85}>
+              <Text style={styles.swipeFilterStartBtnText}>{text.swipeFilterStart}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.swipeFilterSkipBtn} onPress={() => { swipePosition.setValue({ x: 0, y: 0 }); setSwipeGenderFilter('all'); setSwipeAgeFrom(''); setSwipeAgeTo(''); setSwipeFilterVisible(false); setSwipeIndex(0); setLikedIds([]); setSwipeMode(true); }} activeOpacity={0.7}>
+              <Text style={styles.swipeFilterSkipText}>{text.swipeFilterSkip}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Swipe mode overlay */}
+      {swipeMode ? (() => {
+        const swipeCard = swipeItems[swipeIndex];
+        const swipeRotation = swipePosition.x.interpolate({ inputRange: [-200, 0, 200], outputRange: ['-12deg', '0deg', '12deg'] });
+        const likeOpacity = swipePosition.x.interpolate({ inputRange: [0, 80], outputRange: [0, 1], extrapolate: 'clamp' });
+        const passOpacity = swipePosition.x.interpolate({ inputRange: [-80, 0], outputRange: [1, 0], extrapolate: 'clamp' });
+        const swipeProfile = swipeCard && swipeCard.userId ? profileByUserId[swipeCard.userId] : undefined;
+
+        const swipeDisplayName = swipeProfile?.name || swipeCard?.itemName || '';
+        const swipeCategoryLabel = swipeCard ? getCategoryLabel(swipeCard.category) : '';
+        const swipeConditionLabel = swipeCard ? (text.conditionLabels[swipeCard.condition as keyof typeof text.conditionLabels] ?? swipeCard.condition) : '';
+        const swipeDone = swipeIndex >= swipeItems.length;
+        return (
+          <View style={styles.swipeOverlay}>
+            {/* Back button */}
+            <TouchableOpacity style={styles.swipeBackBtn} onPress={() => setSwipeMode(false)} activeOpacity={0.85}>
+              <MaterialCommunityIcons name="arrow-left" size={20} color="#CA8A04" />
+              <Text style={styles.swipeBackBtnText}>{text.swipeBackBtn}</Text>
+            </TouchableOpacity>
+            {swipeDone ? (
+              <View style={styles.swipeDoneBox}>
+                <Text style={styles.swipeDoneTitle}>{text.swipeDoneTitle}</Text>
+                <Text style={styles.swipeDoneSub}>{text.swipeDoneLiked(likedIds.length)}</Text>
+                <TouchableOpacity style={styles.swipeRestartBtn} onPress={() => { swipePosition.setValue({ x: 0, y: 0 }); setSwipeIndex(0); setLikedIds([]); }} activeOpacity={0.85}>
+                  <Text style={styles.swipeRestartBtnText}>{text.swipeRestartBtn}</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <>
+                {/* Next card (behind) */}
+                {swipeItems[swipeIndex + 1] ? (
+                  <View style={[styles.swipeCard, styles.swipeCardBack]} pointerEvents="none" />
+                ) : null}
+                {/* Current card */}
+                <Animated.View
+                  style={[styles.swipeCard, { transform: [{ translateX: swipePosition.x }, { translateY: swipePosition.y }, { rotate: swipeRotation }] }]}
+                  {...swipePanResponder.panHandlers}
+                >
+                  <AppPhotoImage
+                    uri={swipeCard?.photoUri}
+                    storagePath={swipeCard?.photoStoragePath}
+                    style={styles.swipePhoto}
+                    resizeMode="cover"
+                  />
+                  {/* Like overlay */}
+                  <Animated.View style={[styles.swipeLikeOverlay, { opacity: likeOpacity }]}>
+                    <Text style={styles.swipeLikeText}>{text.swipeLikeLabel}</Text>
+                  </Animated.View>
+                  {/* Pass overlay */}
+                  <Animated.View style={[styles.swipePassOverlay, { opacity: passOpacity }]}>
+                    <Text style={styles.swipePassText}>{text.swipePassLabel}</Text>
+                  </Animated.View>
+                  {/* Info bottom */}
+                  <View style={styles.swipeInfoBar}>
+                    <View style={styles.swipeNameRow}>
+                      <Text style={styles.swipeName}>{swipeDisplayName}</Text>
+                      {swipeCard?.price ? <Text style={styles.swipeAge}>{swipeCard.price}</Text> : null}
+                    </View>
+                    <View style={styles.swipeChips}>
+                      {swipeCategoryLabel ? <Text style={styles.swipeChip}>{swipeCategoryLabel}</Text> : null}
+                      {swipeConditionLabel ? <Text style={styles.swipeChip}>{swipeConditionLabel}</Text> : null}
+                    </View>
+                    {swipeCard?.description ? <Text style={styles.swipeDesc} numberOfLines={2}>{swipeCard.description}</Text> : null}
+                  </View>
+                </Animated.View>
+                {/* Action buttons */}
+                <View style={styles.swipeActions}>
+                  <TouchableOpacity style={styles.swipePassBtn} onPress={handleSwipeLeft} activeOpacity={0.85}>
+                    <MaterialCommunityIcons name="close" size={40} color="#1C1917" />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.swipeLikeBtn} onPress={handleSwipeRight} activeOpacity={0.85}>
+                    <MaterialCommunityIcons name="heart" size={48} color="#1C1917" />
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.swipeCounter}>{swipeIndex + 1} / {swipeItems.length}</Text>
+              </>
+            )}
+          </View>
+        );
+      })() : null}
+
       <View style={styles.addBar}>
+        <TouchableOpacity
+          style={styles.swipeModeBtn}
+          onPress={() => {
+            if (swipeMode) {
+              setSwipeMode(false);
+            } else {
+              setSwipeFilterVisible(true);
+            }
+          }}
+          activeOpacity={0.85}
+        >
+          <MaterialCommunityIcons name={swipeMode ? 'view-list' : 'cards'} size={18} color={swipeMode ? '#CA8A04' : '#FAFAF9'} />
+          <Text style={[styles.swipeModeBtnText, swipeMode && { color: '#CA8A04' }]}>{swipeMode ? 'Список' : 'Листати'}</Text>
+        </TouchableOpacity>
         <TouchableOpacity style={styles.addBarBtn} onPress={() => {
           if (!user?.id) {
             Alert.alert(text.errorTitle, text.authRequired);
@@ -1577,113 +1819,135 @@ const KontaktiChaikyScreen: React.FC = () => {
   );
 };
 
+// Elegant Luxury Design System — ChaikaUA Знайомства на каву
+// Colors: Primary #1C1917, Gold #CA8A04, Background #FAFAF9, Text #0C0A09
+// Style: Liquid Glass + Premium Black/Gold
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: SCREEN_THEME.appBg },
+  container: { flex: 1, backgroundColor: '#FAFAF9' },
   content: { padding: 16, paddingTop: 24, paddingBottom: 110 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(12,10,9,0.6)', justifyContent: 'flex-end' },
   modalSheet: {
-    backgroundColor: SCREEN_THEME.paperStrong,
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
     maxHeight: '84%',
     paddingBottom: 16,
+    borderTopWidth: 1,
+    borderColor: '#E8D9B5',
   },
-  modalHandle: { width: 42, height: 4, borderRadius: 99, backgroundColor: '#D9C69E', alignSelf: 'center', marginTop: 10, marginBottom: 4 },
+  modalHandle: { width: 42, height: 4, borderRadius: 99, backgroundColor: '#CA8A04', alignSelf: 'center', marginTop: 10, marginBottom: 4 },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#E8DDD3',
+    borderBottomColor: '#E8D9B5',
   },
-  modalTitle: { color: SCREEN_THEME.textPrimary, fontSize: 17, fontWeight: '900', flex: 1, paddingRight: 8 },
-  modalCloseBtn: { backgroundColor: SCREEN_THEME.enamelBlue, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
-  modalCloseText: { color: '#fff', fontWeight: '800', fontSize: 12 },
-  modalContent: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 20 },
+  modalTitle: { color: '#1C1917', fontSize: 17, fontWeight: '900', flex: 1, paddingRight: 8, letterSpacing: 0.3 },
+  modalCloseBtn: { backgroundColor: '#1C1917', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
+  modalCloseText: { color: '#CA8A04', fontWeight: '800', fontSize: 12 },
+  modalContent: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20 },
   modalActions: { flexDirection: 'row', gap: 10, marginTop: 10 },
   resetBtn: {
     flex: 1,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#D9C69E',
-    backgroundColor: '#F7F3EE',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#E8D9B5',
+    backgroundColor: '#FAFAF9',
     alignItems: 'center',
     paddingVertical: 12,
   },
-  resetBtnText: { color: SCREEN_THEME.textSecondary, fontWeight: '800', fontSize: 13 },
-  applyBtn: { flex: 1, borderRadius: 14, backgroundColor: SCREEN_THEME.woodGreen, alignItems: 'center', paddingVertical: 12 },
-  applyBtnText: { color: '#fff', fontWeight: '800', fontSize: 13 },
-  headerCard: { backgroundColor: '#E6F0E9', borderRadius: 28, padding: 18, marginBottom: 20, alignItems: 'center', borderWidth: 1.5, borderColor: '#B8D3BF' },
-  headerTitle: { fontSize: 28, fontWeight: '900', color: SCREEN_THEME.textPrimary, marginTop: 8 },
-  headerSubtitle: { marginTop: 6, color: SCREEN_THEME.textSecondary, textAlign: 'center' },
+  resetBtnText: { color: '#44403C', fontWeight: '700', fontSize: 13 },
+  applyBtn: { flex: 1, borderRadius: 16, backgroundColor: '#1C1917', alignItems: 'center', paddingVertical: 12 },
+  applyBtnText: { color: '#CA8A04', fontWeight: '800', fontSize: 13 },
+  headerCard: {
+    backgroundColor: '#1C1917',
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#CA8A04',
+  },
+  headerTitle: { fontSize: 26, fontWeight: '900', color: '#FAFAF9', marginTop: 8, letterSpacing: 0.5 },
+  headerSubtitle: { marginTop: 6, color: '#B5A990', textAlign: 'center', fontSize: 13 },
   liveLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', marginTop: 8 },
-  liveDot: { color: '#2D7E4D', fontSize: 12, fontWeight: '900', marginRight: 4 },
-  liveText: { color: '#2D7E4D', fontSize: 11, fontWeight: '900', marginRight: 6 },
-  liveCount: { color: SCREEN_THEME.textSecondary, fontSize: 11, fontWeight: '700', textAlign: 'center' },
-  formLabel: { fontWeight: '700', color: SCREEN_THEME.textPrimary, marginBottom: 8, marginTop: 8 },
-  signInNote: { color: SCREEN_THEME.textSecondary, fontSize: 13, fontWeight: '700', paddingVertical: 10, lineHeight: 18 },
-  input: { backgroundColor: '#F7F3EE', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, color: SCREEN_THEME.textPrimary, borderWidth: 1, borderColor: '#E8DDD3' },
+  liveDot: { color: '#CA8A04', fontSize: 12, fontWeight: '900', marginRight: 4 },
+  liveText: { color: '#CA8A04', fontSize: 11, fontWeight: '900', marginRight: 6 },
+  liveCount: { color: '#B5A990', fontSize: 11, fontWeight: '700', textAlign: 'center' },
+  formLabel: { fontWeight: '700', color: '#1C1917', marginBottom: 8, marginTop: 8, letterSpacing: 0.2 },
+  signInNote: { color: '#44403C', fontSize: 13, fontWeight: '700', paddingVertical: 10, lineHeight: 18 },
+  input: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    color: '#0C0A09',
+    borderWidth: 1.5,
+    borderColor: '#E8D9B5',
+    fontSize: 15,
+  },
   textarea: { minHeight: 80, textAlignVertical: 'top' },
-  pickerWrapper: { backgroundColor: '#F7F3EE', borderRadius: 16, borderWidth: 1, borderColor: '#E8DDD3', overflow: 'hidden' },
-  picker: { color: SCREEN_THEME.textPrimary, height: 50 },
-  submitBtn: { backgroundColor: SCREEN_THEME.terracotta, borderRadius: 16, paddingVertical: 14, alignItems: 'center', marginTop: 14 },
-  submitBtnText: { color: '#FFFFFF', fontWeight: '800' },
-  topAnketySection: { marginBottom: 16 },
-  topAnketyTitle: { fontSize: 14, fontWeight: '900', color: SCREEN_THEME.textPrimary, marginBottom: 8 },
-  topAnketyScroll: { paddingHorizontal: 4, gap: 12 },
+  pickerWrapper: { backgroundColor: '#FFFFFF', borderRadius: 14, borderWidth: 1.5, borderColor: '#E8D9B5', overflow: 'hidden' },
+  picker: { color: '#0C0A09', height: 50 },
+  submitBtn: { backgroundColor: '#CA8A04', borderRadius: 16, paddingVertical: 15, alignItems: 'center', marginTop: 16 },
+  submitBtnText: { color: '#1C1917', fontWeight: '900', fontSize: 15, letterSpacing: 0.5 },
+  topAnketySection: { marginBottom: 18 },
+  topAnketyTitle: { fontSize: 11, fontWeight: '800', color: '#44403C', marginBottom: 10, letterSpacing: 1.2, textTransform: 'uppercase' },
+  topAnketyScroll: { paddingHorizontal: 4, gap: 14 },
   topAnketyItem: { width: 72, alignItems: 'center' },
-  topAnketyPhoto: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#FFF3E0' },
-  topAnketyName: { fontSize: 11, fontWeight: '700', color: SCREEN_THEME.textPrimary, textAlign: 'center', width: 72, marginTop: 4 },
-  topAnketyAge: { fontSize: 10, fontWeight: '600', color: SCREEN_THEME.textSecondary, textAlign: 'center' },
+  topAnketyPhoto: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#F5EDD6', borderWidth: 2, borderColor: '#CA8A04' },
+  topAnketyName: { fontSize: 11, fontWeight: '700', color: '#1C1917', textAlign: 'center', width: 72, marginTop: 5 },
+  topAnketyAge: { fontSize: 10, fontWeight: '600', color: '#44403C', textAlign: 'center' },
   listingsSection: { marginBottom: 16 },
   listingsHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 8 },
-  listingsSectionTitle: { fontSize: 16, fontWeight: '900', color: SCREEN_THEME.textPrimary },
-  searchBtn: { backgroundColor: SCREEN_THEME.enamelBlue, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
-  searchBtnText: { color: '#fff', fontWeight: '800', fontSize: 12 },
+  listingsSectionTitle: { fontSize: 16, fontWeight: '900', color: '#1C1917', letterSpacing: 0.3 },
+  searchBtn: { backgroundColor: '#1C1917', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
+  searchBtnText: { color: '#CA8A04', fontWeight: '800', fontSize: 12 },
   clearSearchBtn: { alignSelf: 'flex-start', marginBottom: 10 },
-  clearSearchText: { color: SCREEN_THEME.terracottaDark, fontWeight: '800', fontSize: 12 },
+  clearSearchText: { color: '#CA8A04', fontWeight: '800', fontSize: 12 },
   emptyFiltered: {
-    backgroundColor: SCREEN_THEME.paperStrong,
+    backgroundColor: '#FFFFFF',
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#E4D0AB',
-    padding: 16,
+    borderColor: '#E8D9B5',
+    padding: 18,
     marginBottom: 8,
   },
-  emptyFilteredTitle: { color: SCREEN_THEME.textPrimary, fontWeight: '800', fontSize: 14 },
-  emptyFilteredSub: { color: SCREEN_THEME.textSecondary, marginTop: 4, fontSize: 12, lineHeight: 18 },
-  listingCard: { backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 20, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#E4D0AB' },
+  emptyFilteredTitle: { color: '#1C1917', fontWeight: '800', fontSize: 14 },
+  emptyFilteredSub: { color: '#44403C', marginTop: 4, fontSize: 12, lineHeight: 18 },
+  listingCard: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16, marginBottom: 10, borderWidth: 1, borderColor: '#E8D9B5' },
   listingHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  listingName: { fontWeight: '800', color: SCREEN_THEME.textPrimary, flex: 1, marginRight: 8 },
-  deleteText: { color: '#D05B4D', fontWeight: '700' },
+  listingName: { fontWeight: '800', color: '#1C1917', flex: 1, marginRight: 8 },
+  deleteText: { color: '#B91C1C', fontWeight: '700' },
   listingMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
-  listingBadgeText: { fontSize: 11, fontWeight: '700', color: '#7B1FA2' },
-  listingPrice: { fontSize: 15, fontWeight: '900', color: '#00897B' },
-  statusBadge: { fontSize: 11, fontWeight: '900', color: '#8A5A00', backgroundColor: '#FFF2C7', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
-  listingDescription: { color: SCREEN_THEME.textSecondary, lineHeight: 18, marginBottom: 8 },
-  listingPhoto: { width: '100%', height: 170, borderRadius: 16, marginBottom: 8, backgroundColor: '#FFF3E0' },
-  moderationInfo: { color: '#5F5043', backgroundColor: '#FFF8EA', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 8, fontSize: 12, lineHeight: 17, fontWeight: '700' },
-  // New card styles (incoming-style layout)
+  listingBadgeText: { fontSize: 11, fontWeight: '700', color: '#44403C' },
+  listingPrice: { fontSize: 15, fontWeight: '900', color: '#CA8A04' },
+  statusBadge: { fontSize: 11, fontWeight: '900', color: '#92400E', backgroundColor: '#FEF3C7', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
+  listingDescription: { color: '#44403C', lineHeight: 18, marginBottom: 8 },
+  listingPhoto: { width: '100%', height: 170, borderRadius: 16, marginBottom: 8, backgroundColor: '#F5EDD6' },
+  moderationInfo: { color: '#78350F', backgroundColor: '#FEF9C3', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 8, fontSize: 12, lineHeight: 17, fontWeight: '700' },
+  // Elegant Luxury card — premium black/gold palette
   kCard: {
-    backgroundColor: '#F7F3EE',
-    borderRadius: 14,
-    padding: 8,
-    marginBottom: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 12,
+    marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#E4D0AB',
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOpacity: 0.03,
-    shadowRadius: 2,
-    shadowOffset: { width: 0, height: 1 },
+    borderColor: '#E8D9B5',
+    elevation: 2,
+    shadowColor: '#CA8A04',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
   },
   kCardTop: {
     flexDirection: 'row',
-    gap: 9,
+    gap: 12,
     alignItems: 'flex-start',
-    marginBottom: 7,
+    marginBottom: 8,
   },
   kAvatar: {
     width: 56,
@@ -1692,19 +1956,20 @@ const styles = StyleSheet.create({
   },
   kInfo: {
     flex: 1,
-    gap: 5,
+    gap: 6,
   },
   kNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
     flexWrap: 'nowrap',
   },
   kName: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '800',
-    color: '#2D2520',
+    color: '#1C1917',
     flexShrink: 1,
+    letterSpacing: 0.2,
   },
   kMetaChips: {
     flexDirection: 'row',
@@ -1713,57 +1978,57 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   kCategoryBadge: {
-    backgroundColor: '#E6F0E9',
+    backgroundColor: '#FEF9C3',
     borderWidth: 1,
-    borderColor: '#B8D3BF',
+    borderColor: '#E8D9B5',
     borderRadius: 999,
-    paddingHorizontal: 7,
+    paddingHorizontal: 8,
     paddingVertical: 3,
     maxWidth: '52%',
   },
   kCategoryText: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#2D7E4D',
+    color: '#92400E',
   },
-  kArchiveBadge: { fontSize: 10, fontWeight: '700', color: '#fff', backgroundColor: '#8B7355', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 3, overflow: 'hidden', flexShrink: 0 },
+  kArchiveBadge: { fontSize: 10, fontWeight: '700', color: '#FAFAF9', backgroundColor: '#44403C', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 3, overflow: 'hidden', flexShrink: 0 },
   kConditionBadge: {
-    backgroundColor: '#F3E5F5',
+    backgroundColor: '#F5EDD6',
     borderWidth: 1,
-    borderColor: '#CE93D8',
+    borderColor: '#E8D9B5',
     borderRadius: 999,
-    paddingHorizontal: 7,
+    paddingHorizontal: 8,
     paddingVertical: 3,
     flexShrink: 0,
   },
   kConditionText: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#6A1B9A',
+    color: '#44403C',
   },
   kAgeBadge: {
-    backgroundColor: '#DDEAF0',
+    backgroundColor: '#1C1917',
     borderRadius: 999,
-    paddingHorizontal: 7,
+    paddingHorizontal: 8,
     paddingVertical: 3,
     marginLeft: 'auto' as const,
   },
   kAgeText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#3D5D87',
+    color: '#CA8A04',
   },
   kDescBox: {
-    borderRadius: 8,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    backgroundColor: '#7A1E5C',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: '#1C1917',
   },
   kDescText: {
     fontSize: 12,
-    color: '#fff',
+    color: '#FAFAF9',
     lineHeight: 17,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   kInterestingChips: {
     flexDirection: 'row',
@@ -1771,21 +2036,21 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   kInterestingChip: {
-    backgroundColor: '#FFF8EA',
+    backgroundColor: '#FEF9C3',
     borderWidth: 1,
-    borderColor: '#E4D0AB',
+    borderColor: '#E8D9B5',
     borderRadius: 999,
-    color: '#5F5043',
+    color: '#92400E',
     fontSize: 10,
     fontWeight: '800',
     overflow: 'hidden',
-    paddingHorizontal: 7,
+    paddingHorizontal: 8,
     paddingVertical: 3,
   },
   kModInfo: {
     fontSize: 11,
-    color: '#8A6200',
-    backgroundColor: '#FFF8EA',
+    color: '#78350F',
+    backgroundColor: '#FEF9C3',
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -1796,7 +2061,7 @@ const styles = StyleSheet.create({
     width: 92,
     height: 108,
     borderRadius: 14,
-    backgroundColor: '#FFF3E0',
+    backgroundColor: '#F5EDD6',
   },
   sectionDivider: {
     flexDirection: 'row' as const,
@@ -1805,35 +2070,35 @@ const styles = StyleSheet.create({
     marginTop: 18,
     marginBottom: 6,
   },
-  sectionDividerLine: { flex: 1, height: 1, backgroundColor: '#E8DDD3' },
-  sectionDividerText: { fontSize: 10, fontWeight: '900' as const, color: '#A0938D', textTransform: 'uppercase' as const, letterSpacing: 1 },
+  sectionDividerLine: { flex: 1, height: 1, backgroundColor: '#E8D9B5' },
+  sectionDividerText: { fontSize: 10, fontWeight: '900' as const, color: '#44403C', textTransform: 'uppercase' as const, letterSpacing: 1.5 },
   kOwnActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'center',
     gap: 12,
-    marginTop: 6,
+    marginTop: 8,
   },
   kEditLink: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
-  kEditLinkText: { color: '#2D7E4D', fontSize: 11, fontWeight: '800' },
+  kEditLinkText: { color: '#CA8A04', fontSize: 11, fontWeight: '800' },
   kDeleteLink: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
-  kDeleteLinkText: { color: '#C0392B', fontSize: 11, fontWeight: '800' },
+  kDeleteLinkText: { color: '#B91C1C', fontSize: 11, fontWeight: '800' },
   interestingBtn: {
     alignItems: 'center',
-    backgroundColor: '#F3E5F5',
-    borderColor: '#CE93D8',
+    backgroundColor: '#FEF9C3',
+    borderColor: '#E8D9B5',
     borderRadius: 16,
     borderWidth: 1,
     flexDirection: 'row',
@@ -1843,14 +2108,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
-  interestingBtnText: { color: '#7A1E5C', fontSize: 14, fontWeight: '900', textAlign: 'center' },
+  interestingBtnText: { color: '#92400E', fontSize: 14, fontWeight: '900', textAlign: 'center' },
   interestingSection: {
-    backgroundColor: '#FFF8EA',
-    borderColor: '#E4D0AB',
+    backgroundColor: '#FAFAF9',
+    borderColor: '#E8D9B5',
     borderRadius: 16,
     borderWidth: 1,
     marginTop: 10,
-    padding: 12,
+    padding: 14,
   },
   consultationLink: {
     alignItems: 'center',
@@ -1860,55 +2125,245 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingVertical: 8,
   },
-  consultationLinkText: { color: '#2D7E4D', flex: 1, fontSize: 13, fontWeight: '900', lineHeight: 18 },
+  consultationLinkText: { color: '#CA8A04', flex: 1, fontSize: 13, fontWeight: '900', lineHeight: 18 },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: 8,
-    backgroundColor: '#F7F3EE',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: '#E8DDD3',
+    paddingVertical: 10,
+    borderWidth: 1.5,
+    borderColor: '#E8D9B5',
   },
   addBar: {
-    paddingHorizontal: 16,
+    flexDirection: 'row',
+    paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: SCREEN_THEME.appBg,
+    gap: 10,
+    backgroundColor: '#FAFAF9',
     borderTopWidth: 1,
-    borderTopColor: '#E4D0AB',
+    borderTopColor: '#E8D9B5',
   },
   addBarBtn: {
-    backgroundColor: SCREEN_THEME.woodGreenDark,
+    flex: 1,
+    backgroundColor: '#1C1917',
     borderRadius: 16,
     paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#CA8A04',
   },
-  addBarBtnText: { color: '#fff', fontSize: 16, fontWeight: '900', letterSpacing: 0.3 },
+  addBarBtnText: { color: '#CA8A04', fontSize: 15, fontWeight: '900', letterSpacing: 0.5 },
+  swipeModeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#1C1917',
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderWidth: 1,
+    borderColor: '#44403C',
+  },
+  swipeModeBtnText: { color: '#FAFAF9', fontSize: 14, fontWeight: '900' },
+  // Swipe mode overlay
+  swipeOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#0C0A09',
+    zIndex: 100,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: 100,
+  },
+  swipeCard: {
+    width: 320,
+    height: 460,
+    borderRadius: 24,
+    backgroundColor: '#1C1917',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#CA8A04',
+    elevation: 12,
+    shadowColor: '#CA8A04',
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  swipeCardBack: {
+    position: 'absolute',
+    transform: [{ scale: 0.95 }],
+    opacity: 0.6,
+  },
+  swipePhoto: {
+    width: '100%',
+    height: '100%',
+    position: 'absolute',
+  },
+  swipeLikeOverlay: {
+    position: 'absolute',
+    top: 32,
+    left: 24,
+    backgroundColor: 'rgba(202,138,4,0.9)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    transform: [{ rotate: '-12deg' }],
+  },
+  swipeLikeText: { color: '#1C1917', fontSize: 22, fontWeight: '900', letterSpacing: 1 },
+  swipePassOverlay: {
+    position: 'absolute',
+    top: 32,
+    right: 24,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderWidth: 2,
+    borderColor: '#FAFAF9',
+    transform: [{ rotate: '12deg' }],
+  },
+  swipePassText: { color: '#FAFAF9', fontSize: 20, fontWeight: '900', letterSpacing: 1 },
+  swipeInfoBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(12,10,9,0.82)',
+    padding: 16,
+    gap: 6,
+  },
+  swipeNameRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  swipeName: { fontSize: 22, fontWeight: '900', color: '#FAFAF9', flex: 1 },
+  swipeAge: { fontSize: 18, fontWeight: '800', color: '#CA8A04' },
+  swipeChips: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
+  swipeChip: { backgroundColor: 'rgba(202,138,4,0.18)', borderWidth: 1, borderColor: '#CA8A04', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3, color: '#CA8A04', fontSize: 11, fontWeight: '800' },
+  swipeDesc: { color: '#B5A990', fontSize: 13, lineHeight: 18 },
+  swipeActions: {
+    position: 'absolute',
+    bottom: -90,
+    flexDirection: 'row',
+    gap: 40,
+    alignSelf: 'center',
+    alignItems: 'center',
+  },
+  swipePassBtn: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#FAFAF9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  swipeLikeBtn: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#CA8A04',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 6,
+    shadowColor: '#CA8A04',
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  swipeCounter: { position: 'absolute', top: 60, alignSelf: 'center', color: '#B5A990', fontSize: 12, fontWeight: '700', letterSpacing: 1 },
+  swipeBackBtn: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(28,25,23,0.85)',
+    borderWidth: 1,
+    borderColor: '#CA8A04',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    zIndex: 10,
+  },
+  swipeBackBtnText: { color: '#CA8A04', fontSize: 13, fontWeight: '800' },
+  swipeDoneBox: { alignItems: 'center', gap: 12, padding: 32 },
+  swipeDoneTitle: { fontSize: 22, fontWeight: '900', color: '#FAFAF9', textAlign: 'center' },
+  swipeDoneSub: { fontSize: 16, color: '#CA8A04', fontWeight: '700' },
+  swipeRestartBtn: { backgroundColor: '#CA8A04', borderRadius: 16, paddingHorizontal: 28, paddingVertical: 14, marginTop: 8 },
+  swipeRestartBtnText: { color: '#1C1917', fontWeight: '900', fontSize: 15 },
+  swipeFilterBackdrop: { flex: 1, backgroundColor: 'rgba(12,10,9,0.7)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  swipeFilterSheet: {
+    backgroundColor: '#1C1917',
+    borderRadius: 24,
+    padding: 28,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: '#44403C',
+    gap: 20,
+  },
+  swipeFilterTitle: { fontSize: 20, fontWeight: '900', color: '#FAFAF9', textAlign: 'center' },
+  swipeFilterPills: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' },
+  swipeFilterPill: {
+    borderWidth: 1,
+    borderColor: '#44403C',
+    borderRadius: 999,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    backgroundColor: '#292524',
+  },
+  swipeFilterPillActive: { borderColor: '#CA8A04', backgroundColor: 'rgba(202,138,4,0.15)' },
+  swipeFilterPillText: { color: '#B5A990', fontSize: 14, fontWeight: '700' },
+  swipeFilterPillTextActive: { color: '#CA8A04' },
+  swipeFilterAgeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, justifyContent: 'center' },
+  swipeFilterAgeLabel: { color: '#B5A990', fontSize: 14, fontWeight: '700' },
+  swipeFilterAgeInput: {
+    backgroundColor: '#292524',
+    borderWidth: 1,
+    borderColor: '#44403C',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    color: '#FAFAF9',
+    fontSize: 16,
+    fontWeight: '800',
+    width: 70,
+    textAlign: 'center',
+  },
+  swipeFilterStartBtn: { backgroundColor: '#CA8A04', borderRadius: 16, paddingVertical: 16, alignItems: 'center' },
+  swipeFilterStartBtnText: { color: '#1C1917', fontWeight: '900', fontSize: 16 },
+  swipeFilterSkipBtn: { alignItems: 'center', paddingVertical: 4 },
+  swipeFilterSkipText: { color: '#78716C', fontSize: 13, fontWeight: '700' },
   sheetOverlay: { flex: 1, justifyContent: 'flex-end' },
-  sheetBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
+  sheetBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(12,10,9,0.6)' },
   sheetWrapper: { justifyContent: 'flex-end' },
   sheet: {
-    backgroundColor: '#FFFAF4',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
     maxHeight: '92%',
     paddingBottom: 32,
-    shadowColor: '#000',
+    shadowColor: '#CA8A04',
     shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
     elevation: 20,
+    borderTopWidth: 1,
+    borderColor: '#E8D9B5',
   },
   sheetScroll: { flexGrow: 0 },
   sheetHandle: {
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#D4C0A8',
+    backgroundColor: '#CA8A04',
     alignSelf: 'center',
     marginTop: 10,
     marginBottom: 4,
@@ -1918,22 +2373,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#EDE3D5',
+    borderBottomColor: '#E8D9B5',
   },
-  sheetTitle: { fontSize: 17, fontWeight: '900', color: SCREEN_THEME.textPrimary },
+  sheetTitle: { fontSize: 17, fontWeight: '900', color: '#1C1917', letterSpacing: 0.3 },
   sheetCloseBtn: {
     width: 32,
     height: 32,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F4E8D8',
+    backgroundColor: '#1C1917',
     borderWidth: 1,
-    borderColor: '#E4D0AB',
+    borderColor: '#CA8A04',
   },
-  sheetCloseTxt: { fontSize: 16, color: '#7A6D64', fontWeight: '900' },
+  sheetCloseTxt: { fontSize: 16, color: '#CA8A04', fontWeight: '900' },
   sheetContent: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 28 },
 });
 
