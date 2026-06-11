@@ -535,6 +535,7 @@ const UI_TEXT = {
     contactNameLabel: 'Контактна особа',
     contactNamePlaceholder: 'Ім\'я людини для зв\'язку',
     photoLabel: 'Фото',
+    photoUploading: 'Дочекайтесь завершення завантаження фото.',
     addPhoto: 'Обрати з Моїх фотографій',
     removePhoto: 'Прибрати фото',
     descriptionLabel: 'Опис бізнесу',
@@ -651,6 +652,7 @@ const UI_TEXT = {
     contactNameLabel: 'Контактное лицо',
     contactNamePlaceholder: 'Имя человека для связи',
     photoLabel: 'Фото',
+    photoUploading: 'Дождитесь завершения загрузки фото.',
     addPhoto: 'Выбрать из Моих фотографий',
     removePhoto: 'Убрать фото',
     descriptionLabel: 'Описание бизнеса',
@@ -767,6 +769,7 @@ const UI_TEXT = {
     contactNameLabel: 'Contact person',
     contactNamePlaceholder: 'Name of the person to contact',
     photoLabel: 'Photo',
+    photoUploading: 'Wait until the photo upload finishes.',
     addPhoto: 'Choose from My photos',
     removePhoto: 'Remove photo',
     descriptionLabel: 'Business description',
@@ -1356,6 +1359,12 @@ const BiznesChaikaScreen: React.FC = () => {
     }
     trace('validate', 'success');
 
+    const hasUploadingPhotos = formPhotos.some((p) => p.status === 'uploading');
+    if (hasUploadingPhotos) {
+      toast.showWarning(text.errorTitle, text.photoUploading);
+      return;
+    }
+
     setSubmitting(true);
     try {
       trace('photo_check', 'start');
@@ -1944,6 +1953,7 @@ const BiznesChaikaScreen: React.FC = () => {
                   maxPhotos={5}
                   storagePath={BIZ_PHOTO_STORAGE_PATH}
                   onPhotosChange={setFormPhotos}
+                  metadata={{ sourceScreen: 'BizznesChaikaScreen', sourceScreenLabel: 'Додати бізнес' }}
                 />
               ) : (
                 <Text style={styles.signInNote}>{text.authRequired}</Text>
@@ -2039,7 +2049,7 @@ const BiznesChaikaScreen: React.FC = () => {
                 </View>
               ) : null}
 
-              <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} activeOpacity={0.85} disabled={submitting}>
+              <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} activeOpacity={0.85} disabled={submitting || formPhotos.some((p) => p.status === 'uploading')}>
                 {submitting ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
