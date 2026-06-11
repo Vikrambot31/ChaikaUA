@@ -209,29 +209,20 @@ export default function ProfileSetupScreen() {
 
   const handleQuickRegistrationPress = async () => {
     if (saving) return;
-
-    // Only proceed if all fields are filled to preserve data
-    if (!isNameDone || !isGenderDone || !isAgeDone || !isAvatarDone) {
-      const missing = getMissingMessages();
-      Toast.show({
-        type: 'error',
-        text1: text.missingTitle,
-        text2: missing.join('\n'),
-      });
-      return;
-    }
-
     setSaving(true);
     try {
-      if (selectedKey) await saveSelectedStartAvatar(selectedKey);
-      await saveTempProfileData({
-        name: trimmedName,
-        gender: gender!,
-        age: parsedAge,
-        startAvatarKey: selectedKey,
-        ...(customAvatarUri ? { customAvatarUri } : {}),
-      });
-      Toast.show({ type: 'success', text1: text.quickSavedTitle, text2: text.quickSavedMessage });
+      // Save partial data only when enough fields are valid to avoid type errors
+      if (isNameDone && isGenderDone && isAgeDone) {
+        const avatarKey = selectedKey || getDefaultAvatarKey(gender!, parsedAge);
+        if (avatarKey) await saveSelectedStartAvatar(avatarKey);
+        await saveTempProfileData({
+          name: trimmedName,
+          gender: gender!,
+          age: parsedAge,
+          startAvatarKey: avatarKey,
+          ...(customAvatarUri ? { customAvatarUri } : {}),
+        });
+      }
       navigation.navigate('LoginScreen');
     } catch {
       Toast.show({ type: 'error', text1: text.missingTitle, text2: text.saveError });
@@ -402,7 +393,7 @@ export default function ProfileSetupScreen() {
         <TouchableOpacity
           style={[styles.continueButton, (!canSubmit || saving) && styles.continueButtonDisabled]}
           onPress={handleContinuePress}
-          disabled={!canSubmit || saving}
+          disabled={saving}
           activeOpacity={0.86}
         >
           {saving

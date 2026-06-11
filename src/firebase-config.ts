@@ -1594,9 +1594,6 @@ const signInWithGoogleMobile = async (): Promise<FirebaseUser> => {
 
   try {
     await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-    if (GoogleSignin.signOut && (!GoogleSignin.hasPreviousSignIn || GoogleSignin.hasPreviousSignIn())) {
-      await GoogleSignin.signOut();
-    }
     const userInfo = await GoogleSignin.signIn();
     const idToken = userInfo?.idToken || userInfo?.data?.idToken;
     if (!idToken) {
