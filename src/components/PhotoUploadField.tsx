@@ -150,7 +150,7 @@ export default function PhotoUploadField({
   const [previewUri, setPreviewUri] = useState<string | null>(null);
   const [previewLoadFailed, setPreviewLoadFailed] = useState(false);
   const alertedErrorIdsRef = useRef<Set<string>>(new Set());
-  const limitReached = maxPhotos > 0 && selected.length >= maxPhotos;
+  const limitReached = maxPhotos === 0 || (maxPhotos > 0 && selected.length >= maxPhotos);
 
   const onPhotosChangeRef = useRef(onPhotosChange);
   onPhotosChangeRef.current = onPhotosChange;

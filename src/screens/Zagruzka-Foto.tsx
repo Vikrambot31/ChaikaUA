@@ -24,6 +24,7 @@ import UploadedPhotosGrid from '../components/UploadedPhotosGrid';
 import InlineFieldHint from '../components/InlineFieldHint';
 import { useSoftToast } from '../hooks/useSoftToast';
 import { useOperationTrace } from '../hooks/useOperationTrace';
+import { getUserCommunityPhotosForMonth, COMMUNITY_PHOTO_MONTHLY_REVIEW_LIMIT } from '../utils/communityPhotoLimits';
 
 const UI_TEXT = {
   ua: {
@@ -57,9 +58,12 @@ const UI_TEXT = {
     addTitleWarning: 'Додайте коротку назву фото.',
     waitUploadWarning: 'Дочекайтесь завершення завантаження фото.',
     fixPhotoWarning: 'Одне з фото не завантажилось. Видаліть його або спробуйте ще раз.',
+    fixPhotoLimitWarning: 'Ліміт фото вичерпано. Видаліть це фото і спробуйте наступного місяця.',
     saveError: 'Не вдалося надіслати фото. Перевірте інтернет і спробуйте ще раз.',
     photoUploading: 'Фото завантажується...',
     photoUploadError: 'Помилка завантаження фото',
+    limitUsed: (used: number, limit: number) => `Використано ${used} з ${limit} фото цього місяця`,
+    limitExhausted: (limit: number) => `Ліміт вичерпано: ${limit}/${limit} фото цього місяця`,
     categories: {
       building: 'Будинок',
       place: 'Місце',
@@ -100,9 +104,12 @@ const UI_TEXT = {
     addTitleWarning: 'Добавьте короткое название фото.',
     waitUploadWarning: 'Дождитесь завершения загрузки фото.',
     fixPhotoWarning: 'Одно из фото не загрузилось. Удалите его или попробуйте ещё раз.',
+    fixPhotoLimitWarning: 'Лимит фото исчерпан. Удалите это фото и попробуйте в следующем месяце.',
     saveError: 'Не удалось отправить фото. Проверьте интернет и попробуйте ещё раз.',
     photoUploading: 'Фото загружается...',
     photoUploadError: 'Ошибка загрузки фото',
+    limitUsed: (used: number, limit: number) => `Использовано ${used} из ${limit} фото в этом месяце`,
+    limitExhausted: (limit: number) => `Лимит исчерпан: ${limit}/${limit} фото в этом месяце`,
     categories: {
       building: 'Дом',
       place: 'Место',
@@ -143,9 +150,12 @@ const UI_TEXT = {
     addTitleWarning: 'Add a short photo title.',
     waitUploadWarning: 'Wait until photo upload is complete.',
     fixPhotoWarning: 'One photo failed to upload. Remove it or try again.',
+    fixPhotoLimitWarning: 'Monthly photo limit reached. Remove this photo and try again next month.',
     saveError: 'Failed to submit the photo. Check your internet connection and try again.',
     photoUploading: 'Photo is uploading...',
     photoUploadError: 'Photo upload error',
+    limitUsed: (used: number, limit: number) => `Used ${used} of ${limit} photos this month`,
+    limitExhausted: (limit: number) => `Limit reached: ${limit}/${limit} photos this month`,
     categories: {
       building: 'Building',
       place: 'Place',
@@ -204,6 +214,7 @@ const PhotoUploadScreen: React.FC = () => {
   const [selectedLocation, setSelectedLocation] = useState<PhotoLocation | null>(null);
   const [uploading, setUploading] = useState(false);
   const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
+  const [monthlyUsed, setMonthlyUsed] = useState<number | null>(null);
 
   useEffect(() => {
     ErrorHandler.setLanguage(language);
@@ -213,6 +224,12 @@ const PhotoUploadScreen: React.FC = () => {
     if (user?.name) setAuthor(normalizePersonName(user.name));
   }, [user?.name]);
 
+  useEffect(() => {
+    if (!user?.id) return;
+    void getUserCommunityPhotosForMonth(user.id).then((photos) => {
+      setMonthlyUsed(photos.length);
+    }).catch(() => {});
+  }, [user?.id]);
 
   useEffect(() => {
     // Restore draft if Android restarts activity while picker/camera is open.
@@ -248,6 +265,12 @@ const PhotoUploadScreen: React.FC = () => {
   const donePhotos = useMemo(() => formPhotos.filter((photo) => photo.status === 'done'), [formPhotos]);
   const hasUploadingPhotos = formPhotos.some((photo) => photo.status === 'uploading');
   const hasPhotoErrors = formPhotos.some((photo) => photo.status === 'error');
+  const hasLimitError = formPhotos.some(
+    (photo) =>
+      photo.status === 'error' &&
+      typeof photo.error === 'string' &&
+      (photo.error.toLowerCase().includes('ліміт') || photo.error.toLowerCase().includes('місяць')),
+  );
 
   // location is optional — title and completed photo required
   const canSubmit = useMemo(
@@ -339,6 +362,11 @@ const PhotoUploadScreen: React.FC = () => {
       setLocationSearch('');
       setSelectedLocation(null);
       setFormPhotos([]);
+      if (user?.id) {
+        void getUserCommunityPhotosForMonth(user.id).then((photos) => {
+          setMonthlyUsed(photos.length);
+        }).catch(() => {});
+      }
     } catch (error) {
       safeLogError('PhotoUploadScreen.submit.unexpected', error, {
         feature: 'gallery',
@@ -360,31 +388,6 @@ const PhotoUploadScreen: React.FC = () => {
           <Text style={styles.headerTitle}>{text.headerTitle}</Text>
           <Text style={styles.headerSub}>{text.headerSub}</Text>
         </View>
-
-        <View style={styles.previewWrapper}>
-          {user?.id ? (
-            <PhotoUploadField
-              uid={user.id}
-              userName={user?.name ?? ''}
-              maxPhotos={5}
-              storagePath="community_photos"
-              onPhotosChange={setFormPhotos}
-              metadata={{
-                sourceScreen: 'PhotoUploadScreen',
-                sourceScreenLabel: 'Додати фото',
-                sourceFeature: 'gallery_full_form',
-                moderationDeferred: true,
-              }}
-            />
-          ) : (
-            <Text style={styles.fieldHint}>{text.signInRequired}</Text>
-          )}
-          <UploadedPhotosGrid />
-        </View>
-        <Text style={styles.fieldHint}>{text.hintPhoto}</Text>
-        <InlineFieldHint message={text.addPhotoWarning} type="warning" visible={donePhotos.length === 0 && !hasUploadingPhotos} />
-        <InlineFieldHint message={text.waitUploadWarning} type="hint" visible={hasUploadingPhotos} />
-        <InlineFieldHint message={text.fixPhotoWarning} type="error" visible={hasPhotoErrors} />
 
         <View style={styles.card}>
           <TextInput
@@ -415,6 +418,47 @@ const PhotoUploadScreen: React.FC = () => {
             maxLength={300}
           />
           <Text style={styles.fieldHint}>{text.hintDesc}</Text>
+
+          {monthlyUsed !== null && (
+            <View style={[styles.limitBadge, monthlyUsed >= COMMUNITY_PHOTO_MONTHLY_REVIEW_LIMIT && styles.limitBadgeExhausted]}>
+              <MaterialCommunityIcons
+                name={monthlyUsed >= COMMUNITY_PHOTO_MONTHLY_REVIEW_LIMIT ? 'lock-outline' : 'calendar-month-outline'}
+                size={14}
+                color={monthlyUsed >= COMMUNITY_PHOTO_MONTHLY_REVIEW_LIMIT ? '#C0392B' : '#665A52'}
+              />
+              <Text style={[styles.limitBadgeText, monthlyUsed >= COMMUNITY_PHOTO_MONTHLY_REVIEW_LIMIT && styles.limitBadgeTextExhausted]}>
+                {monthlyUsed >= COMMUNITY_PHOTO_MONTHLY_REVIEW_LIMIT
+                  ? text.limitExhausted(COMMUNITY_PHOTO_MONTHLY_REVIEW_LIMIT)
+                  : text.limitUsed(monthlyUsed, COMMUNITY_PHOTO_MONTHLY_REVIEW_LIMIT)}
+              </Text>
+            </View>
+          )}
+
+          <View style={styles.previewWrapper}>
+            {user?.id ? (
+              <PhotoUploadField
+                uid={user.id}
+                userName={user?.name ?? ''}
+                maxPhotos={Math.max(0, COMMUNITY_PHOTO_MONTHLY_REVIEW_LIMIT - (monthlyUsed ?? 0))}
+                storagePath="community_photos"
+                onPhotosChange={setFormPhotos}
+                metadata={{
+                  sourceScreen: 'PhotoUploadScreen',
+                  sourceScreenLabel: 'Додати фото',
+                  sourceFeature: 'gallery_full_form',
+                  moderationDeferred: true,
+                }}
+              />
+            ) : (
+              <Text style={styles.fieldHint}>{text.signInRequired}</Text>
+            )}
+            <UploadedPhotosGrid />
+          </View>
+          <Text style={styles.fieldHint}>{text.hintPhoto}</Text>
+          <InlineFieldHint message={text.addPhotoWarning} type="warning" visible={donePhotos.length === 0 && !hasUploadingPhotos} />
+          <InlineFieldHint message={text.waitUploadWarning} type="hint" visible={hasUploadingPhotos} />
+          <InlineFieldHint message={text.fixPhotoLimitWarning} type="error" visible={hasPhotoErrors && hasLimitError} />
+          <InlineFieldHint message={text.fixPhotoWarning} type="error" visible={hasPhotoErrors && !hasLimitError} />
 
           {/* Location section */}
           <Text style={styles.locationTitle}>{text.addressTitle}</Text>
@@ -564,6 +608,31 @@ const styles = StyleSheet.create({
   buttonText: { color: '#fff', fontWeight: '800' },
   fieldHint: { color: '#8a8178', fontSize: 11, marginTop: -8, marginBottom: 12, paddingHorizontal: 4 },
   inputReadonly: { opacity: 0.7, color: '#665A52' },
+  limitBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#F3ECE4',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#E8DDD3',
+  },
+  limitBadgeExhausted: {
+    backgroundColor: '#FDE8E6',
+    borderColor: '#E8A09A',
+  },
+  limitBadgeText: {
+    color: '#665A52',
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
+  },
+  limitBadgeTextExhausted: {
+    color: '#C0392B',
+  },
 });
 
 export default PhotoUploadScreen;

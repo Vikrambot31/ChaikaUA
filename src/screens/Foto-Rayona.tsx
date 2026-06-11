@@ -50,6 +50,7 @@ const UI_TEXT = {
     confirmError: 'Не вдалося відправити. Спробуйте ще.',
     addPhoto: 'Додати фото',
     login: 'Увійдіть, щоб додати фото',
+    approved: 'схвалено',
     empty: 'Поки немає фото району',
     loadError: 'Не вдалося завантажити фото',
   },
@@ -63,6 +64,7 @@ const UI_TEXT = {
     confirmError: 'Не удалось отправить. Попробуйте ещё.',
     addPhoto: 'Добавить фото',
     login: 'Войдите, чтобы добавить фото',
+    approved: 'одобрено',
     empty: 'Пока нет фото района',
     loadError: 'Не удалось загрузить фото',
   },
@@ -76,6 +78,7 @@ const UI_TEXT = {
     confirmError: 'Could not submit. Try again.',
     addPhoto: 'Add photo',
     login: 'Sign in to add a photo',
+    approved: 'approved',
     empty: 'No district photos yet',
     loadError: 'Could not load photos',
   },
@@ -122,15 +125,19 @@ const SoulTile = memo(function SoulTile({
   item,
   size,
   pendingLabel,
+  approvedLabel,
 }: {
   item: SoulPhoto;
   size: number;
   pendingLabel: string;
+  approvedLabel: string;
 }) {
-  const pending = item.status === 'pending';
+  const isApproved = item.status === 'approved';
+  const showLabel = item.status === 'pending' || item.status === 'saved' || isApproved;
+  const label = isApproved ? approvedLabel : pendingLabel;
 
   return (
-    <View style={[styles.tile, pending ? styles.pendingTile : styles.approvedTile, { width: size, height: size }]}>
+    <View style={[styles.tile, isApproved ? styles.approvedTile : styles.pendingTile, { width: size, height: size }]}>
       {item.uri ? (
         <AppPhotoImage
           uri={item.uri}
@@ -144,9 +151,9 @@ const SoulTile = memo(function SoulTile({
         <View style={styles.grayExample} />
       )}
 
-      {pending ? (
-        <View style={styles.pendingLabel}>
-          <Text style={styles.pendingText}>{pendingLabel}</Text>
+      {showLabel ? (
+        <View style={[styles.pendingLabel, isApproved && styles.approvedLabel]}>
+          <Text style={[styles.pendingText, isApproved && styles.approvedText]}>{label}</Text>
         </View>
       ) : null}
     </View>
@@ -308,17 +315,17 @@ export default function FotoRayonaScreen() {
 
   const renderItem = useCallback(
     ({ item }: { item: SoulPhoto }) => {
+      const pendingLabel = item.status === 'saved' ? text.awaitConfirm : text.pending;
       if (item.status === 'approved' && item.uri) {
         return (
           <TouchableOpacity activeOpacity={0.85} onPress={() => setPreviewPhoto(item)}>
-            <SoulTile item={item} size={tileSize} pendingLabel={text.pending} />
+            <SoulTile item={item} size={tileSize} pendingLabel={pendingLabel} approvedLabel={text.approved} />
           </TouchableOpacity>
         );
       }
-      const pendingLabel = item.status === 'saved' ? text.awaitConfirm : text.pending;
-      return <SoulTile item={item} size={tileSize} pendingLabel={pendingLabel} />;
+      return <SoulTile item={item} size={tileSize} pendingLabel={pendingLabel} approvedLabel={text.approved} />;
     },
-    [text.awaitConfirm, text.pending, tileSize],
+    [text.approved, text.awaitConfirm, text.pending, tileSize],
   );
 
   const header = (
@@ -489,11 +496,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.92)',
   },
+  approvedLabel: {
+    backgroundColor: 'rgba(38, 95, 71, 0.88)',
+  },
   pendingText: {
     color: '#77746E',
     fontSize: 11,
     fontWeight: '900',
     textAlign: 'center',
+  },
+  approvedText: {
+    color: '#fff',
   },
   uploadPanel: {
     flexShrink: 0,

@@ -188,6 +188,22 @@ export const UploadQueue = {
     // committed) and hide it locally immediately.
     cancelledIds.add(photoId);
     await removeTask(photoId);
+
+    // If the photo was already fully uploaded, clean up the orphaned
+    // Storage file and RTDB record — otherwise they linger and consume
+    // the user's monthly quota.
+    const photos = await ImageStorage.getPhotos().catch(() => [] as import('./types').UserPhoto[]);
+    const photo = photos.find((p) => p.id === photoId);
+    if (photo && photo.status === 'uploaded' && photo.storagePath && photo.rtdbId && photo.userId) {
+      const collection = photo.storagePath.split('/')[0] ?? 'community_photos';
+      await deleteEngineUpload({
+        storagePath: photo.storagePath,
+        rtdbId: photo.rtdbId,
+        collection,
+        uid: photo.userId,
+      }).catch((err) => safeLogError('UploadQueue.remove.deleteUploaded', err, { photoId }));
+    }
+
     await ImageStorage.updatePhoto(photoId, { deleted: true }).catch(() => {});
   },
 
