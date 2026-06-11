@@ -18,6 +18,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { onValue, ref, update } from 'firebase/database';
@@ -37,6 +38,7 @@ import { getUserCommunityPhotosForMonth, COMMUNITY_PHOTO_MONTHLY_REVIEW_LIMIT } 
 
 const SCREEN_ID = 'SoulPhotosScreen';
 const STORAGE_PATH = 'community_photos';
+const SOUL_PHOTO_DRAFT_KEY = '@chaika:soul_photo_draft';
 const MAX_ITEMS = 60;
 const NUM_COLUMNS = 3;
 const GRID_GAP = 7;
@@ -75,6 +77,7 @@ const UI_TEXT = {
     title: 'Фото для душі',
     approvedNote: 'Схвалені модератором фото',
     pending: 'на модерації',
+    awaitConfirm: 'чекаю відправки',
     choose: 'Вибрати фото',
     send: 'Відправити на модерацію',
     sending: 'Фото вже на модерації',
@@ -100,6 +103,7 @@ const UI_TEXT = {
     title: 'Фото для Души',
     approvedNote: 'Одобренные модератором фото',
     pending: 'на модерации',
+    awaitConfirm: 'ждёт отправки',
     choose: 'Выбрать фото',
     send: 'Отправить на модерацию',
     sending: 'Фото уже на модерации',
@@ -125,6 +129,7 @@ const UI_TEXT = {
     title: 'Photos for the Soul',
     approvedNote: 'Photos approved by moderators',
     pending: 'in moderation',
+    awaitConfirm: 'awaiting submission',
     choose: 'Choose photo',
     send: 'Submit for moderation',
     sending: 'Photo is in moderation',
@@ -156,7 +161,7 @@ type SoulPhoto = {
   uri: string;
   storagePath: string;
   createdAt: number;
-  status: 'approved' | 'pending';
+  status: 'approved' | 'pending' | 'saved';
   category?: CategoryId;
   local?: boolean;
   uploading?: boolean;
@@ -230,10 +235,11 @@ const SoulTile = memo(function SoulTile({
 }) {
   const progress = clampProgress(item.progress ?? (item.uploading ? 0 : 100));
   const isApproved = item.status === 'approved';
-  const showLabel = (item.status === 'pending' || isApproved) && !item.uploading;
+  const isSaved = item.status === 'saved';
+  const showLabel = (item.status === 'pending' || isSaved || isApproved) && !item.uploading;
 
   return (
-    <View style={[styles.tile, isApproved ? styles.approvedTile : styles.pendingTile, { width: size, height: size }]}>
+    <View style={[styles.tile, isApproved ? styles.approvedTile : (isSaved ? styles.savedTile : styles.pendingTile), { width: size, height: size }]}>
       {item.uri ? (
         <AppPhotoImage
           uri={item.uri}
@@ -337,7 +343,7 @@ export default function SoulPhotosScreen() {
                     uri: clean(photo.thumbnailUrl) || clean(photo.imageUri),
                     storagePath: clean(photo.storagePath),
                     createdAt: timestamp(photo.createdAt) || timestamp(photo.uploadedAt),
-                    status: status === 'approved' ? 'approved' : 'pending',
+                    status: status === 'approved' ? 'approved' : (status === 'saved' ? 'saved' : 'pending'),
                     category,
                     ...(description ? { description } : {}),
                     ...(author ? { author } : {}),
@@ -389,6 +395,33 @@ export default function SoulPhotosScreen() {
     }).catch(() => {});
   }, [user?.id]);
 
+  // Restore draft after Android activity-kill
+  useEffect(() => {
+    void AsyncStorage.getItem(SOUL_PHOTO_DRAFT_KEY).then((raw) => {
+      if (!raw) return;
+      try {
+        const draft = JSON.parse(raw) as Partial<{
+          uploadCategory: CategoryId | null;
+          description: string;
+          address: string;
+        }>;
+        if (draft.uploadCategory) setUploadCategory(draft.uploadCategory);
+        if (draft.description) setDescription(draft.description);
+        if (draft.address) setAddress(draft.address);
+      } catch { /* ignore invalid */ }
+    }).catch(() => {});
+  }, []);
+
+  // Save draft when form fields change
+  useEffect(() => {
+    if (!uploadCategory && !description && !address) return;
+    const timer = setTimeout(() => {
+      const draft = { uploadCategory, description, address };
+      void AsyncStorage.setItem(SOUL_PHOTO_DRAFT_KEY, JSON.stringify(draft)).catch(() => {});
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [uploadCategory, description, address]);
+
   const handlePhotosChange = useCallback((photos: UploadedPhoto[]) => {
     setPickedPhotos((current) => {
       const next = { ...current };
@@ -403,16 +436,24 @@ export default function SoulPhotosScreen() {
     });
   }, []);
 
-  // Photos that finished uploading to Storage
+  // Photos that finished uploading to Storage (current session)
   const donePhotos = useMemo(
     () => Object.values(pickedPhotos).filter((p) => p.status === 'done'),
     [pickedPhotos],
   );
 
-  // True when at least one done photo hasn't been submitted to moderation yet
+  // Own photos from RTDB still in 'saved' status (survived remount / activity-kill)
+  const savedRemotePhotos = useMemo(
+    () => remotePhotos.filter((p) => p.status === 'saved' && !submittedRtdbIds.has(p.id)),
+    [remotePhotos, submittedRtdbIds],
+  );
+
+  // True when at least one photo (session OR RTDB) needs to be submitted
   const hasUnsubmitted = useMemo(
-    () => donePhotos.some((p) => p.rtdbId && !submittedRtdbIds.has(p.rtdbId)),
-    [donePhotos, submittedRtdbIds],
+    () =>
+      donePhotos.some((p) => p.rtdbId && !submittedRtdbIds.has(p.rtdbId)) ||
+      savedRemotePhotos.length > 0,
+    [donePhotos, submittedRtdbIds, savedRemotePhotos],
   );
 
   const isUploading = useMemo(
@@ -444,24 +485,30 @@ export default function SoulPhotosScreen() {
   // Submit the uploaded photos to moderation queue
   const submitToModeration = useCallback(async () => {
     if (submitting || !user?.id) return;
-    const toSubmit = donePhotos.filter((p) => p.rtdbId && !submittedRtdbIds.has(p.rtdbId));
-    if (toSubmit.length === 0) return;
+
+    // Collect IDs: current-session done photos + RTDB saved photos (survived remount)
+    const sessionIds = donePhotos
+      .filter((p) => p.rtdbId && !submittedRtdbIds.has(p.rtdbId))
+      .map((p) => p.rtdbId!);
+    const remoteIds = savedRemotePhotos.map((p) => p.id);
+    const allIds = [...new Set([...sessionIds, ...remoteIds])];
+    if (allIds.length === 0) return;
 
     setSubmitting(true);
     try {
       const batch: Record<string, unknown> = {};
       const now = Date.now();
-      for (const photo of toSubmit) {
-        batch[`community_photos/${photo.rtdbId}/status`] = 'pending';
-        batch[`community_photos/${photo.rtdbId}/moderationStatus`] = 'pending';
-        batch[`community_photos/${photo.rtdbId}/updatedAt`] = now;
-        // Update category/description/address at submit time so edits are captured
-        if (uploadCategory) batch[`community_photos/${photo.rtdbId}/category`] = uploadCategory;
-        if (description.trim()) batch[`community_photos/${photo.rtdbId}/description`] = description.trim();
-        if (address.trim()) batch[`community_photos/${photo.rtdbId}/locationLabel`] = address.trim();
+      for (const id of allIds) {
+        batch[`community_photos/${id}/status`] = 'pending';
+        batch[`community_photos/${id}/moderationStatus`] = 'pending';
+        batch[`community_photos/${id}/updatedAt`] = now;
+        if (uploadCategory) batch[`community_photos/${id}/category`] = uploadCategory;
+        if (description.trim()) batch[`community_photos/${id}/description`] = description.trim();
+        if (address.trim()) batch[`community_photos/${id}/locationLabel`] = address.trim();
       }
       await update(ref(database), batch);
-      setSubmittedRtdbIds((prev) => new Set([...prev, ...toSubmit.map((p) => p.rtdbId!)]));
+      setSubmittedRtdbIds((prev) => new Set([...prev, ...allIds]));
+      void AsyncStorage.removeItem(SOUL_PHOTO_DRAFT_KEY).catch(() => {});
       if (user?.id) {
         void getUserCommunityPhotosForMonth(user.id).then((photos) => {
           setMonthlyUsed(photos.length);
@@ -473,7 +520,7 @@ export default function SoulPhotosScreen() {
     } finally {
       setSubmitting(false);
     }
-  }, [submitting, user?.id, donePhotos, submittedRtdbIds, uploadCategory, description, address]);
+  }, [submitting, user?.id, donePhotos, savedRemotePhotos, submittedRtdbIds, uploadCategory, description, address]);
 
   const data = useMemo<SoulPhoto[]>(() => {
     const remotePaths = new Set(remotePhotos.map((photo) => photo.storagePath).filter(Boolean));
@@ -507,16 +554,17 @@ export default function SoulPhotosScreen() {
 
   const renderItem = useCallback(
     ({ item }: { item: SoulPhoto }) => {
+      const pendingLabel = item.status === 'saved' ? text.awaitConfirm : text.pending;
       if (!item.local && !item.uploading && item.uri) {
         return (
           <TouchableOpacity activeOpacity={0.85} onPress={() => setPreviewPhoto(item)}>
-            <SoulTile item={item} size={tileSize} pendingLabel={text.pending} approvedLabel={text.approved} uploadLabel={text.upload} />
+            <SoulTile item={item} size={tileSize} pendingLabel={pendingLabel} approvedLabel={text.approved} uploadLabel={text.upload} />
           </TouchableOpacity>
         );
       }
-      return <SoulTile item={item} size={tileSize} pendingLabel={text.pending} approvedLabel={text.approved} uploadLabel={text.upload} />;
+      return <SoulTile item={item} size={tileSize} pendingLabel={pendingLabel} approvedLabel={text.approved} uploadLabel={text.upload} />;
     },
-    [text.approved, text.pending, text.upload, tileSize],
+    [text.approved, text.awaitConfirm, text.pending, text.upload, tileSize],
   );
 
   // ---------------------------------------------------------------------------
@@ -896,6 +944,10 @@ const styles = StyleSheet.create({
   pendingTile: {
     borderWidth: 2,
     borderColor: '#22B14C',
+  },
+  savedTile: {
+    borderWidth: 2,
+    borderColor: '#E8A33D',
   },
   tileImage: { width: '100%', height: '100%' },
   grayExample: { width: '100%', height: '100%', backgroundColor: '#858584' },
