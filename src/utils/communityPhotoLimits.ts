@@ -13,8 +13,8 @@ export class CommunityPhotoMonthlyLimitError extends Error {
     const remaining = Math.max(0, limit - used);
     super(
       remaining > 0
-        ? `Можно предложить на рассмотрение не больше ${limit} фото в месяц. Осталось: ${remaining}, выбрано: ${requested}.`
-        : `Лимит фото на этот месяц исчерпан: можно предложить на рассмотрение не больше ${limit} фото в месяц.`,
+        ? `Можна надіслати на розгляд не більше ${limit} фото на місяць. Залишилось: ${remaining}, вибрано: ${requested}.`
+        : `Ліміт фото на цей місяць вичерпано: можна надіслати не більше ${limit} фото на місяць.`,
     );
     this.name = 'CommunityPhotoMonthlyLimitError';
     this.limit = limit;

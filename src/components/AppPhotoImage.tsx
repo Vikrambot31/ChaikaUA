@@ -359,7 +359,7 @@ const AppPhotoImage: React.FC<Props> = ({
         setResolvedImageUri('');
         setLocalImageUri('');
         onLoadFailed?.();
-        setFailureReason('Не удалось получить ссылку на фото. Проверьте интернет.');
+        setFailureReason('Не вдалося отримати посилання на фото. Перевірте інтернет.');
         await recordRuntimeTrace({
           screen: 'AppPhotoImage',
           action: 'photo_storage_path_resolve',

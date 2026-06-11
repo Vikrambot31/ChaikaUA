@@ -251,8 +251,8 @@ const PhotoUploadScreen: React.FC = () => {
 
   // location is optional — title and completed photo required
   const canSubmit = useMemo(
-    () => Boolean(title.trim()) && donePhotos.length > 0 && !hasUploadingPhotos && !hasPhotoErrors && !uploading,
-    [donePhotos.length, hasPhotoErrors, hasUploadingPhotos, title, uploading]
+    () => Boolean(title.trim()) && donePhotos.length > 0 && !hasUploadingPhotos && !uploading,
+    [donePhotos.length, hasUploadingPhotos, title, uploading]
   );
 
   const locationOptions = useMemo(() => {
