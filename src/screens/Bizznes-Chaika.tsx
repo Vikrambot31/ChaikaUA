@@ -1936,6 +1936,19 @@ const BiznesChaikaScreen: React.FC = () => {
 
               </View>
 
+              <Text style={styles.formLabel}>{text.photoLabel}</Text>
+              {user?.id ? (
+                <PhotoUploadField
+                  uid={user.id}
+                  userName={user?.name ?? ''}
+                  maxPhotos={5}
+                  storagePath={BIZ_PHOTO_STORAGE_PATH}
+                  onPhotosChange={setFormPhotos}
+                />
+              ) : (
+                <Text style={styles.signInNote}>{text.authRequired}</Text>
+              )}
+
               <TouchableOpacity
                 style={styles.interestingBtn}
                 onPress={() => setIsExtraExpanded((prev) => !prev)}
@@ -1958,19 +1971,6 @@ const BiznesChaikaScreen: React.FC = () => {
                     maxLength={60}
                   />
                   <InlineFieldHint message={text.contactNameHint} type={contactName.trim() ? 'success' : 'hint'} />
-
-                  <Text style={styles.formLabel}>{text.photoLabel}</Text>
-                  {user?.id ? (
-                    <PhotoUploadField
-                      uid={user.id}
-                      userName={user?.name ?? ''}
-                      maxPhotos={5}
-                      storagePath={BIZ_PHOTO_STORAGE_PATH}
-                      onPhotosChange={setFormPhotos}
-                    />
-                  ) : (
-                    <Text style={styles.signInNote}>{text.authRequired}</Text>
-                  )}
 
                   <View style={styles.toggleRow}>
                     <Text style={styles.formLabel}>{text.showPhoneToggle}</Text>

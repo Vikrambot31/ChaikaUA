@@ -56,6 +56,30 @@ service firebase.storage {
       allow write: if isOwner(uid) || isAdmin();
     }
 
+    // job_listings/{uid}/... — фото до резюме та вакансій
+    match /job_listings/{uid}/{allPaths=**} {
+      allow get, list: if signedIn();
+      allow write: if isOwner(uid) || isAdmin();
+    }
+
+    // buy_sell_listings/{uid}/... — фото оголошень купити/продати
+    match /buy_sell_listings/{uid}/{allPaths=**} {
+      allow get, list: if signedIn();
+      allow write: if isOwner(uid) || isAdmin();
+    }
+
+    // lost_found/{uid}/... — фото оголошень "хто загубив"
+    match /lost_found/{uid}/{allPaths=**} {
+      allow get, list: if signedIn();
+      allow write: if isOwner(uid) || isAdmin();
+    }
+
+    // biznes_chaika_listings/{uid}/... — фото оголошень Бізнес Чайка
+    match /biznes_chaika_listings/{uid}/{allPaths=**} {
+      allow get, list: if signedIn();
+      allow write: if isOwner(uid) || isAdmin();
+    }
+
     // Остальные пути — только чтение. Запись в неспецифичные пути запрещена;
     // все uploads должны идти через явно описанные match-блоки выше.
     match /{allPaths=**} {
