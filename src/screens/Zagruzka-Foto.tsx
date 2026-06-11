@@ -1,6 +1,7 @@
-import React, { useCallback, useMemo, useState, useEffect } from 'react';
+import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   ScrollView,
   StyleSheet,
   Text,
@@ -215,6 +216,8 @@ const PhotoUploadScreen: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
   const [monthlyUsed, setMonthlyUsed] = useState<number | null>(null);
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const pulseLoopRef = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
     ErrorHandler.setLanguage(language);
@@ -271,6 +274,23 @@ const PhotoUploadScreen: React.FC = () => {
       typeof photo.error === 'string' &&
       (photo.error.toLowerCase().includes('ліміт') || photo.error.toLowerCase().includes('місяць')),
   );
+
+  useEffect(() => {
+    if (donePhotos.length > 0 && !uploading) {
+      const loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, { toValue: 1.05, duration: 650, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 1, duration: 650, useNativeDriver: true }),
+        ]),
+      );
+      pulseLoopRef.current = loop;
+      loop.start();
+    } else {
+      pulseLoopRef.current?.stop();
+      pulseAnim.setValue(1);
+    }
+    return () => { pulseLoopRef.current?.stop(); };
+  }, [donePhotos.length, uploading, pulseAnim]);
 
   // location is optional — title and completed photo required
   const canSubmit = useMemo(
@@ -460,6 +480,17 @@ const PhotoUploadScreen: React.FC = () => {
           <InlineFieldHint message={text.fixPhotoLimitWarning} type="error" visible={hasPhotoErrors && hasLimitError} />
           <InlineFieldHint message={text.fixPhotoWarning} type="error" visible={hasPhotoErrors && !hasLimitError} />
 
+          <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+            <TouchableOpacity
+              style={[styles.button, !canSubmit && styles.buttonDisabled]}
+              onPress={() => void submit()}
+              disabled={!canSubmit}
+              activeOpacity={0.85}
+            >
+              {uploading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{hasUploadingPhotos ? text.photoUploading : hasPhotoErrors ? text.photoUploadError : text.send}</Text>}
+            </TouchableOpacity>
+          </Animated.View>
+
           {/* Location section */}
           <Text style={styles.locationTitle}>{text.addressTitle}</Text>
           <Text style={styles.locationHint}>{text.addressOptional}</Text>
@@ -528,15 +559,6 @@ const PhotoUploadScreen: React.FC = () => {
               <Text style={styles.selectedLocationText}>{selectedLocation.label}</Text>
             </View>
           )}
-
-          <TouchableOpacity
-            style={[styles.button, !canSubmit && styles.buttonDisabled]}
-            onPress={() => void submit()}
-            disabled={!canSubmit}
-            activeOpacity={0.85}
-          >
-            {uploading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{hasUploadingPhotos ? text.photoUploading : hasPhotoErrors ? text.photoUploadError : text.send}</Text>}
-          </TouchableOpacity>
         </View>
       </ScrollView>
 
@@ -602,7 +624,7 @@ const styles = StyleSheet.create({
   clearLocation: { color: '#7A1E5C', fontWeight: '900', fontSize: 12, marginLeft: 8 },
   button: {
     backgroundColor: '#5a2c2c', borderRadius: 16,
-    paddingVertical: 14, alignItems: 'center', marginTop: 8,
+    paddingVertical: 14, alignItems: 'center', marginTop: 4, marginBottom: 16,
   },
   buttonDisabled: { opacity: 0.5 },
   buttonText: { color: '#fff', fontWeight: '800' },
