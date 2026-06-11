@@ -33,7 +33,7 @@ import { query, ref, get, orderByChild, equalTo } from 'firebase/database';
 import { database } from '../firebase-config';
 import type { JobListing } from '../services/jobService';
 import MiniUserAvatar from '../components/MiniUserAvatar';
-import { getStartAvatarByKey, saveSelectedStartAvatar, START_AVATARS, START_AVATAR_URI_PREFIX } from '../utils/startAvatars';
+import { getStartAvatarByKey, START_AVATARS, START_AVATAR_URI_PREFIX } from '../utils/startAvatars';
 import { pickPhotoFromLibrary } from '../utils/photoPicker';
 import useSoftToast from '../hooks/useSoftToast';
 import { subscribeToUserTicket, hasUnreadAdminReply } from '../services/supportService';

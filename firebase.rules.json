@@ -389,7 +389,10 @@
     "user_roles": {
       "$uid": {
         ".read": "auth != null && (auth.uid === $uid || root.child('user_roles').child(auth.uid).child('role').val() === 'admin')",
-        ".write": false
+        ".write": false,
+        "fcmToken": {
+          ".write": "auth != null && auth.uid === $uid"
+        }
       }
     },
 
