@@ -40,6 +40,8 @@ const sanitizePayload = (payload) => {
   return payload;
 };
 
+const TELEGRAM_REQUEST_TIMEOUT_MS = 8000;
+
 const sendTelegramMessage = async (text, options = {}) => {
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
     throw new Error('Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID');
@@ -56,6 +58,7 @@ const sendTelegramMessage = async (text, options = {}) => {
       disable_web_page_preview: true,
       ...options,
     }),
+    signal: AbortSignal.timeout(TELEGRAM_REQUEST_TIMEOUT_MS),
   });
 
   if (!response.ok) {
@@ -171,7 +174,7 @@ const writeOpsError = async (functionName, error, payload = {}) => {
   }
 };
 
-const PRIMARY_SERVICE_EMAIL = 'vikramsave@ukr.net';
+const PRIMARY_SERVICE_EMAIL = process.env.PRIMARY_SERVICE_EMAIL || 'vikramsave@ukr.net';
 const ADMIN_BACKUP_UID = String(process.env.ADMIN_BACKUP_UID || '').trim();
 const EMERGENCY_ACCESS_PATH = 'security_config/emergency_access/current';
 const EMERGENCY_ADMIN_LOG_PATH = 'security_logs/admin_actions';
@@ -211,10 +214,24 @@ const isAdminRoleContext = async (context) => {
   return role === 'admin';
 };
 
+const ROLE_CACHE_TTL_MS = 5 * 60 * 1000; // 5 min
+const roleCache = new Map(); // uid → { role, expiresAt }
+
 const getRoleForUid = async (uid) => {
   if (!uid) return '';
+  const cached = roleCache.get(uid);
+  if (cached && Date.now() < cached.expiresAt) return cached.role;
   const snapshot = await admin.database().ref(`user_roles/${uid}/role`).once('value');
-  return String(snapshot.val() || '');
+  const role = String(snapshot.val() || '');
+  roleCache.set(uid, { role, expiresAt: Date.now() + ROLE_CACHE_TTL_MS });
+  // Evict stale entries when cache grows large
+  if (roleCache.size > 200) {
+    const now = Date.now();
+    for (const [key, entry] of roleCache) {
+      if (now >= entry.expiresAt) roleCache.delete(key);
+    }
+  }
+  return role;
 };
 
 const getVerifiedActorEmail = (context) => {
@@ -2259,6 +2276,7 @@ exports.onRoleChanged = functionsV1.database
     const isMod = role === 'admin' || role === 'moderator';
     try {
       await setCustomClaimMerged(uid, 'moderator', isMod);
+      await setCustomClaimMerged(uid, 'admin', role === 'admin');
     } catch (error) {
       console.error('[onRoleChanged] setCustomUserClaims failed', uid, error?.message);
     }

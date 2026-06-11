@@ -159,7 +159,14 @@ export const requireWriteSession = async (options?: {
   }
 
   try {
-    await user.getIdToken(true);
+    // Use cached token by default; only force-refresh if the cached attempt fails
+    // with an auth error (e.g. revoked token). This avoids a 200-500ms network
+    // round-trip to Firebase Auth on every single write operation.
+    try {
+      await user.getIdToken(false);
+    } catch {
+      await user.getIdToken(true);
+    }
   } catch (error) {
     throw new WriteSessionError('token_refresh_failed', {
       ...details,
