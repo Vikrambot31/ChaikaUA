@@ -112,21 +112,36 @@ const PromoCreditsAdminScreen: React.FC = () => {
       return;
     }
 
-    setBusyTicketId(ticket.ticketId);
-    try {
-      await requireWriteSession({ requireRealUser: true, operation: 'adminGrantPromoCredits', screen: 'PromoCreditsAdmin' });
-      const result = await adminGrantPromoCredits({
-        targetUid: ticket.userId,
-        amount: credits,
-        reason: `Promo credits top-up: ${credits} credits / ${ticket.expectedAmount || 0} ${ticket.currency || 'UAH'}`,
-        ticketId: ticket.ticketId,
-      });
-      Alert.alert(t.common.success, `${t.common.ok} ${credits}. ${t.bonus.balance}: ${result.newBalance}`);
-    } catch (error: any) {
-      Alert.alert(t.common.error, error?.message || '');
-    } finally {
-      setBusyTicketId(null);
-    }
+    const userName = ticket.userName || ticket.userId;
+    Alert.alert(
+      t.promoCredits.adminConfirmTitle,
+      t.promoCredits.adminConfirmMsg
+        .replace('{amount}', String(credits))
+        .replace('{name}', userName),
+      [
+        { text: t.common.cancel, style: 'cancel' },
+        {
+          text: t.common.ok,
+          onPress: async () => {
+            setBusyTicketId(ticket.ticketId);
+            try {
+              await requireWriteSession({ requireRealUser: true, operation: 'adminGrantPromoCredits', screen: 'PromoCreditsAdmin' });
+              const result = await adminGrantPromoCredits({
+                targetUid: ticket.userId,
+                amount: credits,
+                reason: `Promo credits top-up: ${credits} credits / ${ticket.expectedAmount || 0} ${ticket.currency || 'UAH'}`,
+                ticketId: ticket.ticketId,
+              });
+              Alert.alert(t.common.success, `${credits} credits. ${t.bonus.balance}: ${result.newBalance}`);
+            } catch (error: any) {
+              Alert.alert(t.common.error, error?.message || '');
+            } finally {
+              setBusyTicketId(null);
+            }
+          },
+        },
+      ],
+    );
   };
 
   const moderatePromotion = async (promotion: BonusPromotion, action: 'approve' | 'reject') => {
@@ -137,7 +152,7 @@ const PromoCreditsAdminScreen: React.FC = () => {
       await adminModeratePromotion({
         promotionId: promotion.id,
         action,
-        reason: action === 'reject' ? reason || t.common.error : undefined,
+        reason: action === 'reject' ? reason || t.promoCredits.adminRejectReason : undefined,
       });
       Alert.alert(t.common.success, action === 'approve' ? t.bonus.boostProfile : t.common.cancel);
       if (action === 'reject') {
@@ -184,7 +199,7 @@ const PromoCreditsAdminScreen: React.FC = () => {
           ) : (
             <>
               <MaterialCommunityIcons name="check-decagram-outline" size={19} color="#FFF9EE" />
-              <Text style={styles.grantButtonText}>{t.promoCredits.chatAdmin}</Text>
+              <Text style={styles.grantButtonText}>{t.promoCredits.adminGrantButton}</Text>
             </>
           )}
         </TouchableOpacity>
@@ -224,7 +239,7 @@ const PromoCreditsAdminScreen: React.FC = () => {
             <TextInput
               value={rejectReasons[item.id] || ''}
               onChangeText={(value) => setRejectReasons((prev) => ({ ...prev, [item.id]: value }))}
-              placeholder={t.common.error}
+              placeholder={t.promoCredits.adminRejectReason}
               placeholderTextColor={SCREEN_THEME.textMuted}
               style={styles.reasonInput}
               multiline
@@ -272,6 +287,11 @@ const PromoCreditsAdminScreen: React.FC = () => {
           <Text style={styles.headerTitle}>{t.promoCredits.title}</Text>
           <Text style={styles.headerSubtitle}>{t.promoCredits.topupTitle}</Text>
         </View>
+      </View>
+
+      <View style={styles.adminHint}>
+        <MaterialCommunityIcons name="information-outline" size={16} color={SCREEN_THEME.textSecondary} />
+        <Text style={styles.adminHintText}>{t.promoCredits.adminHint}</Text>
       </View>
 
       <View style={styles.tabRow}>
@@ -364,6 +384,23 @@ const styles = StyleSheet.create({
     color: SCREEN_THEME.textSecondary,
     fontSize: 12,
     marginTop: 2,
+  },
+  adminHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 16,
+    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#F1E1BC',
+    borderRadius: 8,
+  },
+  adminHintText: {
+    flex: 1,
+    color: SCREEN_THEME.textSecondary,
+    fontSize: 12,
+    fontWeight: '700',
   },
   tabRow: {
     flexDirection: 'row',
