@@ -35,7 +35,6 @@ import { logClientError } from '../utils/errorLogger';
 import { VideoLoadingOverlay } from '../components/VideoLoadingOverlay';
 
 const SCREEN_ID = 'SoulPhotosScreen';
-const PHOTO_UPLOAD_SCREEN_ID = 'PhotoUploadScreen';
 const STORAGE_PATH = 'community_photos';
 const MAX_ITEMS = 60;
 const NUM_COLUMNS = 3;
@@ -88,7 +87,7 @@ const UI_TEXT = {
     uploadError: 'Не вдалося завантажити фото. Спробуйте ще раз.',
     tabAll: 'Всі',
     categoryLabel: 'Категорія',
-    categoryRequired: 'Оберіть категорію для фото',
+    categoryRequired: 'Спочатку оберіть категорію вище \u2191',
     submitBtn: 'Відправити на модерацію',
     submitting: 'Надсилаємо...',
     uploadingLabel: 'Фото завантажується...',
@@ -110,7 +109,7 @@ const UI_TEXT = {
     uploadError: 'Не удалось загрузить фото. Попробуйте ещё раз.',
     tabAll: 'Все',
     categoryLabel: 'Категория',
-    categoryRequired: 'Выберите категорию для фото',
+    categoryRequired: 'Сначала выберите категорию выше \u2191',
     submitBtn: 'Отправить на модерацию',
     submitting: 'Отправляем...',
     uploadingLabel: 'Фото загружается...',
@@ -132,7 +131,7 @@ const UI_TEXT = {
     uploadError: 'Failed to upload photo. Please try again.',
     tabAll: 'All',
     categoryLabel: 'Category',
-    categoryRequired: 'Choose a category for this photo',
+    categoryRequired: 'First choose a category above \u2191',
     submitBtn: 'Submit for moderation',
     submitting: 'Submitting...',
     uploadingLabel: 'Photo is uploading...',
@@ -309,7 +308,7 @@ export default function SoulPhotosScreen() {
                   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return;
                   const photo = raw as RawPhoto;
                   const sourceScreen = clean(photo.sourceScreen);
-                  if (sourceScreen && sourceScreen !== SCREEN_ID && sourceScreen !== PHOTO_UPLOAD_SCREEN_ID) return;
+                  if (sourceScreen && sourceScreen !== SCREEN_ID) return;
 
                   const status = clean(photo.status);
                   const description = clean(photo.description);
@@ -615,7 +614,7 @@ export default function SoulPhotosScreen() {
         <View style={[styles.realPickerWrap, !uploadCategory && styles.pickerDisabled]}>
           {!uploadCategory && (
             <View style={styles.pickerBlocker}>
-              <MaterialCommunityIcons name="tag-outline" size={17} color="#75684F" />
+              <MaterialCommunityIcons name="arrow-up-circle-outline" size={20} color="#B8860B" />
               <Text style={styles.pickerBlockerText}>{text.categoryRequired}</Text>
             </View>
           )}
@@ -1006,8 +1005,8 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   pickerBlockerText: {
-    color: '#75684F',
-    fontSize: 13,
+    color: '#B8860B',
+    fontSize: 14,
     fontWeight: '700',
   },
 
