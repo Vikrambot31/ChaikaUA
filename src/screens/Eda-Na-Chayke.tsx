@@ -693,7 +693,7 @@ export default function EdaNaChaykeScreen() {
                     onPhotosChange={setTopPhotos}
                     metadata={{ sourceScreen: 'Eda-Na-Chayke', sourceScreenLabel: text.addTop }}
                   />
-                  <UploadedPhotosGrid storagePath="food_top_listings" />
+                  <UploadedPhotosGrid />
                 </>
               ) : null}
 

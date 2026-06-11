@@ -1059,7 +1059,7 @@ export default function VseDlyaDeteyScreen() {
                       onPhotosChange={setFormPhotos}
                       metadata={{ sourceScreen: 'Vse-Dlya-Detey', sourceScreenLabel: text.addPlaceFormTitle }}
                     />
-                    <UploadedPhotosGrid storagePath="children_top_listings" />
+                    <UploadedPhotosGrid />
                   </>
                 ) : null}
 

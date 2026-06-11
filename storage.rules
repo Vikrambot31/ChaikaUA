@@ -80,6 +80,30 @@ service firebase.storage {
       allow write: if isOwner(uid) || isAdmin();
     }
 
+    // food_top_listings/{uid}/... — фото оголошень Їжа на Чайці
+    match /food_top_listings/{uid}/{allPaths=**} {
+      allow get, list: if signedIn();
+      allow write: if isOwner(uid) || isAdmin();
+    }
+
+    // beauty_top_listings/{uid}/... — фото оголошень Салони Краси
+    match /beauty_top_listings/{uid}/{allPaths=**} {
+      allow get, list: if signedIn();
+      allow write: if isOwner(uid) || isAdmin();
+    }
+
+    // children_top_listings/{uid}/... — фото оголошень Все для дітей
+    match /children_top_listings/{uid}/{allPaths=**} {
+      allow get, list: if signedIn();
+      allow write: if isOwner(uid) || isAdmin();
+    }
+
+    // thumbnails/{namespace}/{uid}/... — мініатюри для всіх оголошень
+    match /thumbnails/{namespace}/{uid}/{allPaths=**} {
+      allow get, list: if signedIn();
+      allow write: if isOwner(uid) || isAdmin();
+    }
+
     // Остальные пути — только чтение. Запись в неспецифичные пути запрещена;
     // все uploads должны идти через явно описанные match-блоки выше.
     match /{allPaths=**} {

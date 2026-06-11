@@ -827,7 +827,7 @@ export default function SalonyKrasotyScreen() {
                       onPhotosChange={setFormPhotos}
                       metadata={{ sourceScreen: 'Salony-Krasoty', sourceScreenLabel: text.addPlaceFormTitle }}
                     />
-                    <UploadedPhotosGrid storagePath="beauty_top_listings" />
+                    <UploadedPhotosGrid />
                   </>
                 ) : null}
 
