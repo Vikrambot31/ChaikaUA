@@ -846,14 +846,14 @@ const OnlineChatScreen = () => {
 
                   <View style={styles.problemChatActionsRow}>
                     <View style={styles.problemChatActionsInner}>
-                      <MiniUserAvatar uri={avatarUri} name={item.name || ''} size={42} borderRadius={14} backgroundColor="#6A8BA5" />
+                      <MiniUserAvatar uri={avatarUri} name={item.name || ''} size={42} borderRadius={14} backgroundColor="#8B7355" />
                       <TouchableOpacity
                         style={[styles.problemChatActionPill, styles.problemChatProfilePill, !item.userId && styles.problemChatActionPillDisabled]}
                         onPress={(event) => { event.stopPropagation(); if (!item.userId || navLock.current || !requireAuthForDetails({ userId: currentUser?.id, navigation, language })) return; navLock.current = true; navigation.navigate('ViewUserProfile', { userId: item.userId }); setTimeout(() => { navLock.current = false; }, 800); }}
                         disabled={!item.userId}
                         activeOpacity={item.userId ? 0.78 : 1}
                       >
-                        <MaterialCommunityIcons name="badge-account-horizontal-outline" size={15} color="#7A1E5C" />
+                        <MaterialCommunityIcons name="badge-account-horizontal-outline" size={15} color="#8B5E3C" />
                         <Text style={styles.problemChatActionText} numberOfLines={1}>{language === 'en' ? 'Profile' : language === 'ru' ? 'Профиль' : 'Профіль'}</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
@@ -914,7 +914,7 @@ const OnlineChatScreen = () => {
 
                   <View style={styles.lostFoundBottomRow}>
                     <View style={styles.lostFoundPersonRow}>
-                      <MiniUserAvatar uri={avatarUri} name={item.name || ''} size={28} borderRadius={10} backgroundColor="#6A8BA5" />
+                      <MiniUserAvatar uri={avatarUri} name={item.name || ''} size={28} borderRadius={10} backgroundColor="#8B7355" />
                       <Text style={styles.lostFoundMeta} numberOfLines={1}>{item.name || 'Chaika'}</Text>
                     </View>
                     <FeedLikeButton
@@ -937,7 +937,7 @@ const OnlineChatScreen = () => {
                         }}
                         activeOpacity={0.75}
                       >
-                        <TactileIcon icon="account-arrow-right-outline" size={34} iconSize={14} backgroundColor="#7A1E5C" />
+                        <TactileIcon icon="account-arrow-right-outline" size={34} iconSize={14} backgroundColor="#8B5E3C" />
                       </TouchableOpacity>
                     ) : null}
                   </View>
@@ -1002,7 +1002,7 @@ const OnlineChatScreen = () => {
                       name={item.name}
                       size={56}
                       borderRadius={14}
-                      backgroundColor="#6A8BA5"
+                      backgroundColor="#8B7355"
                     />
                   ) : (
                     <View style={styles.botAvatar}>
@@ -1255,7 +1255,7 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(36,30,24,0.35)',
+    backgroundColor: 'rgba(58,40,22,0.38)',
     justifyContent: 'center',
     paddingHorizontal: 18,
   },
@@ -1330,13 +1330,13 @@ const styles = StyleSheet.create({
   },
   actionOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(58,40,22,0.45)',
     justifyContent: 'flex-end',
     paddingHorizontal: 16,
     paddingBottom: 20,
   },
   actionSheet: {
-    backgroundColor: '#fff',
+    backgroundColor: '#FFF9EE',
     borderRadius: 20,
     padding: 16,
     gap: 10,
@@ -1387,12 +1387,17 @@ const styles = StyleSheet.create({
   // ── Chat card (ProfileRequests-style) ──────────────────────────────────────
   problemChatCard: {
     backgroundColor: SCREEN_THEME.paperStrong,
-    borderRadius: 22,
+    borderRadius: 20,
     padding: 10,
     marginBottom: 10,
     flexDirection: 'column',
     borderWidth: 1,
     borderColor: '#E4D0AB',
+    elevation: 2,
+    shadowColor: '#7A5C3A',
+    shadowOpacity: 0.10,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
   },
   problemChatCardNoPhoto: { padding: 12 },
   problemChatTopRow: { flexDirection: 'row', gap: 8 },
@@ -1416,7 +1421,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 9,
     paddingVertical: 6,
-    backgroundColor: '#7A1E5C',
+    backgroundColor: '#8B5E3C',
     minHeight: 52,
     justifyContent: 'center',
   },
@@ -1473,12 +1478,12 @@ const styles = StyleSheet.create({
   problemChatContactPill: {
     flex: 0.9,
     minWidth: 0,
-    backgroundColor: '#8F1238',
-    borderColor: '#8F1238',
+    backgroundColor: '#7A3E22',
+    borderColor: '#7A3E22',
   },
   problemChatActionPillDisabled: { opacity: 0.45 },
   problemChatActionText: {
-    color: '#7A1E5C',
+    color: '#8B5E3C',
     fontSize: 11,
     fontWeight: '900',
     flexShrink: 1,
@@ -1488,12 +1493,17 @@ const styles = StyleSheet.create({
   lostFoundChatCard: {
     flexDirection: 'row',
     borderRadius: 20,
-    padding: 8,
+    padding: 10,
     marginBottom: 10,
     backgroundColor: SCREEN_THEME.paperStrong,
     borderWidth: 1,
     borderColor: '#E4D0AB',
     gap: 8,
+    elevation: 2,
+    shadowColor: '#7A5C3A',
+    shadowOpacity: 0.10,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
   },
   lostFoundChatCardNoPhoto: { flexDirection: 'column' },
   lostFoundVisualWrap: {
@@ -1544,8 +1554,8 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   lostFoundTitleBox: {
-    borderWidth: 1.5,
-    borderColor: '#1E1A17',
+    borderWidth: 1,
+    borderColor: '#8B5E3C',
     borderRadius: 16,
     backgroundColor: '#FFF8EA',
     paddingHorizontal: 9,
@@ -1562,10 +1572,10 @@ const styles = StyleSheet.create({
   lostFoundDescription: {
     fontSize: 12,
     lineHeight: 16,
-    color: '#fff',
+    color: '#FFF0DC',
     fontWeight: '800',
     marginTop: 4,
-    backgroundColor: '#7A1E5C',
+    backgroundColor: '#8B5E3C',
     borderRadius: 10,
     paddingHorizontal: 9,
     paddingVertical: 5,
@@ -1600,19 +1610,19 @@ const styles = StyleSheet.create({
   },
   chatCard: {
     backgroundColor: SCREEN_THEME.paperStrong,
-    borderRadius: 18,
+    borderRadius: 20,
     padding: 10,
     marginBottom: 10,
     borderWidth: 1,
     borderColor: '#E4D0AB',
     elevation: 2,
-    shadowColor: '#A08060',
-    shadowOpacity: 0.08,
+    shadowColor: '#7A5C3A',
+    shadowOpacity: 0.10,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
   },
   chatCardWithPhoto: {
-    padding: 8,
+    padding: 10,
   },
   chatCardTop: {
     flexDirection: 'row',
@@ -1644,9 +1654,9 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#6A8BA5',
+    backgroundColor: '#8B7355',
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.65)',
+    borderColor: 'rgba(255,248,220,0.70)',
   },
   chatCardRight: {
     flex: 1,
@@ -1667,9 +1677,9 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   chatCategoryBadge: {
-    backgroundColor: '#DCECCF',
+    backgroundColor: '#F2E5C0',
     borderWidth: 1,
-    borderColor: '#B8D69E',
+    borderColor: '#D8BF8B',
     borderRadius: 999,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -1679,10 +1689,10 @@ const styles = StyleSheet.create({
   chatCategoryText: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#466833',
+    color: '#7A5523',
   },
   chatDateBadge: {
-    backgroundColor: '#DDEAF0',
+    backgroundColor: '#EFE3C8',
     borderRadius: 999,
     paddingHorizontal: 7,
     paddingVertical: 3,
@@ -1692,13 +1702,13 @@ const styles = StyleSheet.create({
   chatDateText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#3D5D87',
+    color: '#6B4F2F',
   },
   chatDescBox: {
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    backgroundColor: '#7A1E5C',
+    backgroundColor: '#8B5E3C',
   },
   chatDescText: {
     fontSize: 13,
@@ -1737,7 +1747,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 7,
-    backgroundColor: '#7A1E5C',
+    backgroundColor: '#8B5E3C',
     flexShrink: 1,
   },
   chatActionBtnAccentText: {
