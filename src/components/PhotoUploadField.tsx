@@ -350,7 +350,7 @@ export default function PhotoUploadField({
                       <View style={[styles.uploadProgressFill, { width: `${Math.max(8, photo.progress ?? 0)}%` }]} />
                     </View>
                     <Text style={styles.uploadProgressText}>
-                      {(photo.progress ?? 0) > 0 ? `${photo.progress}%` : statusLabels[photo.status]}
+                      {statusLabels[photo.status]}
                     </Text>
                   </View>
                 ) : (
