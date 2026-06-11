@@ -110,6 +110,11 @@ const UI_TEXT = {
     deletingSelected: 'Видаляємо...',
     deleteSelectedTitle: 'Видалити обрані фото?',
     deleteSelectedText: 'Обрані фото зникнуть з вашої галереї.',
+    selectAll: 'Вибрати всі',
+    deselectAll: 'Скасувати',
+    clearErrors: 'Очистити кеш',
+    clearErrorsTitle: 'Видалити фото з помилками?',
+    clearErrorsText: 'Всі фото з помилками будуть видалені з пристрою.',
     requestPhotosTitle: 'Фото з ваших заявок',
     requestPhotosNote: 'Зберігаються до 15 днів або за умовами картки, потім видаляються.',
   },
@@ -151,6 +156,11 @@ const UI_TEXT = {
     deletingSelected: 'Удаляем...',
     deleteSelectedTitle: 'Удалить выбранные фото?',
     deleteSelectedText: 'Выбранные фото исчезнут из вашей галереи.',
+    selectAll: 'Выбрать все',
+    deselectAll: 'Отменить',
+    clearErrors: 'Очистить кэш',
+    clearErrorsTitle: 'Удалить фото с ошибками?',
+    clearErrorsText: 'Все фото с ошибками будут удалены с устройства.',
     requestPhotosTitle: 'Фото из ваших заявок',
     requestPhotosNote: 'Хранятся до 15 дней или по условиям карточки, потом удаляются.',
   },
@@ -192,6 +202,11 @@ const UI_TEXT = {
     deletingSelected: 'Deleting...',
     deleteSelectedTitle: 'Delete selected photos?',
     deleteSelectedText: 'Selected photos will be removed from your gallery.',
+    selectAll: 'Select all',
+    deselectAll: 'Deselect',
+    clearErrors: 'Clear cache',
+    clearErrorsTitle: 'Delete error photos?',
+    clearErrorsText: 'All error photos will be removed from the device.',
     requestPhotosTitle: 'Photos from your requests',
     requestPhotosNote: 'Stored for up to 15 days or by the card rules, then deleted.',
   },
@@ -400,6 +415,28 @@ const MyPhotosScreen: React.FC = () => {
               if (!active) return;
               setRtdbPhotos(photos);
               setRtdbLoading(false);
+
+              // ── Stale-cache cleanup ─────────────────────────────────────────
+              // If a local photo has an rtdbId that's no longer in RTDB, it means
+              // the upload succeeded at some point but the local status was never
+              // updated to 'uploaded' (e.g. app was killed mid-sync). Mark stale
+              // entries as deleted so they stop appearing in the error section.
+              const rtdbIdSet = new Set(photos.map((p) => p.id));
+              const localPhotos = await ImageStorage.getPhotos();
+              const staleLocal = localPhotos.filter(
+                (p) =>
+                  !p.deleted &&
+                  p.status !== 'uploaded' &&
+                  p.rtdbId &&
+                  !rtdbIdSet.has(p.rtdbId),
+              );
+              if (staleLocal.length > 0) {
+                await Promise.all(
+                  staleLocal.map((p) => ImageStorage.updatePhoto(p.id, { deleted: true })),
+                ).catch((err) => {
+                  safeLogError('MyPhotosScreen.staleLocalCleanup', err, { count: staleLocal.length });
+                });
+              }
             } catch (err) {
               safeLogError('MyPhotosScreen.onValue', err, { uid });
               if (active) setRtdbLoading(false);
@@ -550,6 +587,34 @@ const MyPhotosScreen: React.FC = () => {
       },
     ]);
   }, [deletingSelected, language, rtdbPhotos, selectedForReview, submittingReview, text, uid]);
+
+  const allRtdbSelected = rtdbPhotos.length > 0 && rtdbPhotos.every((p) => selectedForReview.includes(p.id));
+
+  const toggleSelectAll = useCallback(() => {
+    if (allRtdbSelected) {
+      setSelectedForReview([]);
+    } else {
+      setSelectedForReview(rtdbPhotos.map((p) => p.id));
+    }
+  }, [allRtdbSelected, rtdbPhotos]);
+
+  const clearAllErrorPhotos = useCallback(() => {
+    if (errorLocalPhotos.length === 0) return;
+    Alert.alert(text.clearErrorsTitle, text.clearErrorsText, [
+      { text: text.no, style: 'cancel' },
+      {
+        text: text.yes,
+        style: 'destructive',
+        onPress: () => {
+          void Promise.all(
+            errorLocalPhotos.map((p) => ImageStorage.updatePhoto(p.id, { deleted: true })),
+          ).catch((err) => {
+            safeLogError('MyPhotosScreen.clearAllErrorPhotos', err, { count: errorLocalPhotos.length });
+          });
+        },
+      },
+    ]);
+  }, [errorLocalPhotos, text]);
 
   const retryPhoto = useCallback(
     (photo: UserPhoto) => {
@@ -805,11 +870,27 @@ const MyPhotosScreen: React.FC = () => {
 
         {rtdbPhotos.length > 0 ? (
           <View style={styles.section}>
-            <SectionHeader
-              label={text.sectionAll}
-              count={rtdbPhotos.length}
-              color={SCREEN_THEME.enamelBlueDark}
-            />
+            <View style={styles.sectionHeaderRow}>
+              <SectionHeader
+                label={text.sectionAll}
+                count={rtdbPhotos.length}
+                color={SCREEN_THEME.enamelBlueDark}
+              />
+              <TouchableOpacity
+                style={styles.selectAllBtn}
+                onPress={toggleSelectAll}
+                activeOpacity={0.82}
+              >
+                <MaterialCommunityIcons
+                  name={allRtdbSelected ? 'checkbox-multiple-marked-outline' : 'checkbox-multiple-blank-outline'}
+                  size={16}
+                  color={SCREEN_THEME.enamelBlueDark}
+                />
+                <Text style={styles.selectAllText}>
+                  {allRtdbSelected ? text.deselectAll : text.selectAll}
+                </Text>
+              </TouchableOpacity>
+            </View>
             <Text style={styles.reviewHint}>{text.selectForReview}</Text>
             <View style={styles.grid}>
               {rtdbPhotos.map(renderRtdbPhoto)}
@@ -859,11 +940,23 @@ const MyPhotosScreen: React.FC = () => {
         {/* Section: Upload errors */}
         {errorLocalPhotos.length > 0 ? (
           <View style={styles.section}>
-            <SectionHeader
-              label={text.error}
-              count={errorLocalPhotos.length}
-              color={SCREEN_THEME.terracottaDark}
-            />
+            <View style={styles.sectionHeaderRow}>
+              <SectionHeader
+                label={text.error}
+                count={errorLocalPhotos.length}
+                color={SCREEN_THEME.terracottaDark}
+              />
+              <TouchableOpacity
+                style={styles.selectAllBtn}
+                onPress={clearAllErrorPhotos}
+                activeOpacity={0.82}
+              >
+                <MaterialCommunityIcons name="trash-can-outline" size={16} color={SCREEN_THEME.terracottaDark} />
+                <Text style={[styles.selectAllText, { color: SCREEN_THEME.terracottaDark }]}>
+                  {text.clearErrors}
+                </Text>
+              </TouchableOpacity>
+            </View>
             <FlatList
               data={errorLocalPhotos}
               keyExtractor={(item: UserPhoto) => item.id}
@@ -1036,6 +1129,27 @@ const styles = StyleSheet.create({
   scrollContent: { paddingHorizontal: 14, paddingBottom: 110 },
   loadingRow: { paddingVertical: 20, alignItems: 'center' },
   section: { marginBottom: 18 },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  selectAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderWidth: 1,
+    borderColor: '#E4D0AB',
+  },
+  selectAllText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: SCREEN_THEME.enamelBlueDark,
+  },
   reviewHint: {
     marginTop: -4,
     marginBottom: 10,
