@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-06-11",
+      "publishedAt": "2026-06-11T08:38:32.210Z",
+      "key": "https://bigkyiv.com.ua/rosiyany-vdaryly-po-zaliznychnomu-depo-v-konotopi-zagynula-praczivnyczya-chetvero-poranenyh/"
+    },
+    {
       "type": "places",
       "date": "2026-06-10",
       "publishedAt": "2026-06-10T11:29:16.836Z",
