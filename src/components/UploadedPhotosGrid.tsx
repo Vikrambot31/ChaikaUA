@@ -68,7 +68,7 @@ export default function UploadedPhotosGrid({ title, maxItems = 12, storagePath }
         !item.deleted &&
         item.status !== 'error' &&
         item.userId === userId &&
-        (!storagePath || item.storagePath === storagePath)
+        (!storagePath || (item.storagePath?.startsWith(storagePath) ?? false))
       ) : []);
     });
     return unsubscribe;
