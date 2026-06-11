@@ -220,7 +220,7 @@ export default function FotoRayonaScreen() {
                   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return;
                   const photo = raw as RawPhoto;
                   const sourceScreen = clean(photo.sourceScreen);
-                  if (sourceScreen !== SCREEN_ID && sourceScreen !== PHOTO_UPLOAD_SCREEN_ID) return;
+                  if (sourceScreen && sourceScreen !== SCREEN_ID && sourceScreen !== PHOTO_UPLOAD_SCREEN_ID) return;
 
                   const status = clean(photo.status);
                   const author = clean(photo.uploadedBy);
