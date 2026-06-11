@@ -33,6 +33,7 @@ import type { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { logClientError } from '../utils/errorLogger';
 import { VideoLoadingOverlay } from '../components/VideoLoadingOverlay';
+import { getUserCommunityPhotosForMonth, COMMUNITY_PHOTO_MONTHLY_REVIEW_LIMIT } from '../utils/communityPhotoLimits';
 
 const SCREEN_ID = 'SoulPhotosScreen';
 const STORAGE_PATH = 'community_photos';
@@ -91,6 +92,9 @@ const UI_TEXT = {
     submitBtn: 'Відправити на модерацію',
     submitting: 'Надсилаємо...',
     uploadingLabel: 'Фото завантажується...',
+    approved: 'схвалено',
+    limitUsed: (used: number, limit: number) => `Використано ${used} з ${limit} фото цього місяця`,
+    limitExhausted: (limit: number) => `Ліміт вичерпано: ${limit}/${limit} фото цього місяця`,
   },
   ru: {
     title: 'Фото для Души',
@@ -113,6 +117,9 @@ const UI_TEXT = {
     submitBtn: 'Отправить на модерацию',
     submitting: 'Отправляем...',
     uploadingLabel: 'Фото загружается...',
+    approved: 'одобрено',
+    limitUsed: (used: number, limit: number) => `Использовано ${used} из ${limit} фото в этом месяце`,
+    limitExhausted: (limit: number) => `Лимит исчерпан: ${limit}/${limit} фото в этом месяце`,
   },
   en: {
     title: 'Photos for the Soul',
@@ -135,6 +142,9 @@ const UI_TEXT = {
     submitBtn: 'Submit for moderation',
     submitting: 'Submitting...',
     uploadingLabel: 'Photo is uploading...',
+    approved: 'approved',
+    limitUsed: (used: number, limit: number) => `Used ${used} of ${limit} photos this month`,
+    limitExhausted: (limit: number) => `Limit reached: ${limit}/${limit} photos this month`,
   },
 } as const;
 
@@ -209,18 +219,21 @@ const SoulTile = memo(function SoulTile({
   item,
   size,
   pendingLabel,
+  approvedLabel,
   uploadLabel,
 }: {
   item: SoulPhoto;
   size: number;
   pendingLabel: string;
+  approvedLabel: string;
   uploadLabel: (p: number) => string;
 }) {
   const progress = clampProgress(item.progress ?? (item.uploading ? 0 : 100));
-  const pending = item.status === 'pending';
+  const isApproved = item.status === 'approved';
+  const showLabel = (item.status === 'pending' || isApproved) && !item.uploading;
 
   return (
-    <View style={[styles.tile, pending ? styles.pendingTile : styles.approvedTile, { width: size, height: size }]}>
+    <View style={[styles.tile, isApproved ? styles.approvedTile : styles.pendingTile, { width: size, height: size }]}>
       {item.uri ? (
         <AppPhotoImage
           uri={item.uri}
@@ -243,9 +256,11 @@ const SoulTile = memo(function SoulTile({
         </View>
       ) : null}
 
-      {pending && !item.uploading ? (
-        <View style={styles.pendingLabel}>
-          <Text style={styles.pendingText}>{pendingLabel}</Text>
+      {showLabel ? (
+        <View style={[styles.pendingLabel, isApproved && styles.approvedLabel]}>
+          <Text style={[styles.pendingText, isApproved && styles.approvedText]}>
+            {isApproved ? approvedLabel : pendingLabel}
+          </Text>
         </View>
       ) : null}
     </View>
@@ -279,6 +294,7 @@ export default function SoulPhotosScreen() {
   // Deferred moderation: track which rtdbIds have been submitted by the user
   const [submittedRtdbIds, setSubmittedRtdbIds] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
+  const [monthlyUsed, setMonthlyUsed] = useState<number | null>(null);
 
   // Pulsing animation for the submit button
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -366,6 +382,13 @@ export default function SoulPhotosScreen() {
     };
   }, [user?.id]);
 
+  useEffect(() => {
+    if (!user?.id) return;
+    void getUserCommunityPhotosForMonth(user.id).then((photos) => {
+      setMonthlyUsed(photos.length);
+    }).catch(() => {});
+  }, [user?.id]);
+
   const handlePhotosChange = useCallback((photos: UploadedPhoto[]) => {
     setPickedPhotos((current) => {
       const next = { ...current };
@@ -439,6 +462,11 @@ export default function SoulPhotosScreen() {
       }
       await update(ref(database), batch);
       setSubmittedRtdbIds((prev) => new Set([...prev, ...toSubmit.map((p) => p.rtdbId!)]));
+      if (user?.id) {
+        void getUserCommunityPhotosForMonth(user.id).then((photos) => {
+          setMonthlyUsed(photos.length);
+        }).catch(() => {});
+      }
     } catch (error) {
       void logClientError('SoulPhotosScreen.submitToModeration', error);
       Alert.alert('', text.uploadError);
@@ -482,13 +510,13 @@ export default function SoulPhotosScreen() {
       if (!item.local && !item.uploading && item.uri) {
         return (
           <TouchableOpacity activeOpacity={0.85} onPress={() => setPreviewPhoto(item)}>
-            <SoulTile item={item} size={tileSize} pendingLabel={text.pending} uploadLabel={text.upload} />
+            <SoulTile item={item} size={tileSize} pendingLabel={text.pending} approvedLabel={text.approved} uploadLabel={text.upload} />
           </TouchableOpacity>
         );
       }
-      return <SoulTile item={item} size={tileSize} pendingLabel={text.pending} uploadLabel={text.upload} />;
+      return <SoulTile item={item} size={tileSize} pendingLabel={text.pending} approvedLabel={text.approved} uploadLabel={text.upload} />;
     },
-    [text.pending, text.upload, tileSize],
+    [text.approved, text.pending, text.upload, tileSize],
   );
 
   // ---------------------------------------------------------------------------
@@ -610,6 +638,21 @@ export default function SoulPhotosScreen() {
         </View>
       </View>
 
+      {monthlyUsed !== null && (
+        <View style={[styles.limitBadge, monthlyUsed >= COMMUNITY_PHOTO_MONTHLY_REVIEW_LIMIT && styles.limitBadgeExhausted]}>
+          <MaterialCommunityIcons
+            name={monthlyUsed >= COMMUNITY_PHOTO_MONTHLY_REVIEW_LIMIT ? 'lock-outline' : 'calendar-month-outline'}
+            size={14}
+            color={monthlyUsed >= COMMUNITY_PHOTO_MONTHLY_REVIEW_LIMIT ? '#C0392B' : '#665A52'}
+          />
+          <Text style={[styles.limitBadgeText, monthlyUsed >= COMMUNITY_PHOTO_MONTHLY_REVIEW_LIMIT && styles.limitBadgeTextExhausted]}>
+            {monthlyUsed >= COMMUNITY_PHOTO_MONTHLY_REVIEW_LIMIT
+              ? text.limitExhausted(COMMUNITY_PHOTO_MONTHLY_REVIEW_LIMIT)
+              : text.limitUsed(monthlyUsed, COMMUNITY_PHOTO_MONTHLY_REVIEW_LIMIT)}
+          </Text>
+        </View>
+      )}
+
       {user ? (
         <View style={[styles.realPickerWrap, !uploadCategory && styles.pickerDisabled]}>
           {!uploadCategory && (
@@ -622,7 +665,7 @@ export default function SoulPhotosScreen() {
             <PhotoUploadField
               uid={user.id}
               userName={user.name ?? user.email ?? ''}
-              maxPhotos={1}
+              maxPhotos={Math.min(1, Math.max(0, COMMUNITY_PHOTO_MONTHLY_REVIEW_LIMIT - (monthlyUsed ?? 0)))}
               storagePath={STORAGE_PATH}
               onPhotosChange={handlePhotosChange}
               hideSelectedPreview
@@ -894,11 +937,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.92)',
   },
+  approvedLabel: {
+    backgroundColor: 'rgba(38, 95, 71, 0.88)',
+  },
   pendingText: {
     color: '#77746E',
     fontSize: 11,
     fontWeight: '900',
     textAlign: 'center',
+  },
+  approvedText: {
+    color: '#fff',
   },
 
   // Upload panel
@@ -1102,5 +1151,29 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     textAlign: 'center',
+  },
+  limitBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FFF8E9',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#E0C796',
+  },
+  limitBadgeExhausted: {
+    backgroundColor: '#FDE8E6',
+    borderColor: '#E8A09A',
+  },
+  limitBadgeText: {
+    color: '#665A52',
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
+  },
+  limitBadgeTextExhausted: {
+    color: '#C0392B',
   },
 });
