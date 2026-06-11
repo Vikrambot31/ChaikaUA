@@ -238,7 +238,7 @@ const HelpNeighborsScreen: React.FC = () => {
                   showDebugInfo={false}
                 />
               ) : null}
-              <Text style={[styles.requestDescription, item.isYesterday && styles.requestDescriptionYesterday]}>{item.description}</Text>
+              <Text style={styles.requestDescription}>{item.description}</Text>
               {item.moderationStatus === 'pending' && item.userId === user?.id && (
                 <View style={styles.pendingBadge}>
                   <Text style={styles.pendingBadgeText}>{text.awaitingModeration}</Text>
@@ -367,7 +367,6 @@ const styles = StyleSheet.create({
   timeText: { color: '#FFFFFF', fontWeight: '800', fontSize: 12 },
   requestPhoto: { width: '100%', height: 170, borderRadius: 14, marginBottom: 8, backgroundColor: '#E7D6B6' },
   requestDescription: { color: SCREEN_THEME.textPrimary, backgroundColor: 'rgba(199, 122, 93, 0.10)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 7, lineHeight: 20, marginBottom: 8, fontWeight: '600', overflow: 'hidden' },
-  requestDescriptionYesterday: { color: SCREEN_THEME.textSecondary, backgroundColor: 'rgba(199, 122, 93, 0.06)' },
   pendingBadge: { backgroundColor: '#FFF3CD', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, marginBottom: 8, alignSelf: 'flex-start', borderWidth: 1, borderColor: '#F0C96B' },
   pendingBadgeText: { color: '#7A5C00', fontWeight: '800', fontSize: 12 },
   emptyState: { alignItems: 'center', paddingVertical: 40 },
@@ -393,7 +392,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: '#E4D0AB',
-    opacity: 0.72,
   },
   yesterdaySeparator: {
     flexDirection: 'row',
