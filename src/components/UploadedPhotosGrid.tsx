@@ -14,6 +14,8 @@ type PreviewPhoto = { uri: string; storagePath?: string };
 type Props = {
   title?: string;
   maxItems?: number;
+  /** When set, only photos whose storagePath starts with this prefix are shown. */
+  storagePath?: string;
 };
 
 const UI_TEXT = {
@@ -51,7 +53,7 @@ const STATUS_COLOR: Record<UserPhoto['status'], string> = {
   error: SCREEN_THEME.terracottaDark,
 };
 
-export default function UploadedPhotosGrid({ title, maxItems = 12 }: Props) {
+export default function UploadedPhotosGrid({ title, maxItems = 12, storagePath }: Props) {
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
   const userId = useSelector((state: RootState) => state.auth.user?.id ?? state.auth.user?.email ?? '');
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
@@ -62,10 +64,15 @@ export default function UploadedPhotosGrid({ title, maxItems = 12 }: Props) {
     // Only show the current user's photos. While auth is still resolving
     // (userId empty) show nothing rather than every photo on the device.
     const unsubscribe = ImageStorage.subscribe((items) => {
-      setPhotos(userId ? items.filter((item) => !item.deleted && item.status !== 'error' && item.userId === userId) : []);
+      setPhotos(userId ? items.filter((item) =>
+        !item.deleted &&
+        item.status !== 'error' &&
+        item.userId === userId &&
+        (!storagePath || item.storagePath === storagePath)
+      ) : []);
     });
     return unsubscribe;
-  }, [userId]);
+  }, [userId, storagePath]);
 
   const visiblePhotos = useMemo(() => photos.slice(0, maxItems), [maxItems, photos]);
   const statusLabels = useMemo<Record<UserPhoto['status'], string>>(() => ({

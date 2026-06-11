@@ -1,7 +1,12 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   FlatList,
   Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -26,6 +31,12 @@ import { subscribeActiveBonusPromotions, subscribeBiznesPlusPlaces, type BonusPr
 import UserCardActionBar from '../components/UserCardActionBar';
 import { toggleFavorite, getFavorites, type FavoriteSource } from '../services/favoritesService';
 import { useSoftToast } from '../hooks/useSoftToast';
+import PhotoUploadField, { type UploadedPhoto } from '../components/PhotoUploadField';
+import UploadedPhotosGrid from '../components/UploadedPhotosGrid';
+import { getDonePhotos, validateSubmissionRequirements } from '../utils/submissionRequirements';
+import { getLanguageValidationError } from '../utils/contentLanguageGuard';
+import { showUserError } from '../utils/userFacingErrors';
+import { beautyTopService } from '../services/beautyTopService';
 
 type Lang = 'ua' | 'ru' | 'en';
 type AppNavigation = NavigationProp<Record<string, object | undefined>>;
@@ -66,6 +77,21 @@ const UI_TEXT = {
     hasSlots: 'є вільні вікна',
     favoriteAdded: 'Додано в обране',
     favoriteRemoved: 'Видалено з обраного',
+    addPlaceFormTitle: 'Додати салон / майстра',
+    formNameLabel: 'Назва',
+    formNamePlaceholder: 'Назва салону або імʼя майстра',
+    formDescriptionLabel: 'Опис',
+    formDescriptionPlaceholder: 'Коротко опишіть послуги, графік, контакти',
+    formPhotoLabel: 'Фото',
+    formSubmit: 'Надіслати на модерацію',
+    formSuccessTitle: 'Готово',
+    formSuccessMsg: 'Заявку надіслано на модерацію. Після перевірки місце зʼявиться у списку.',
+    formFillError: 'Додайте назву, опис і фото.',
+    formPhotoUploading: 'Дочекайтесь завершення завантаження фото.',
+    formPhotoError: 'Фото не завантажилось. Видаліть його або спробуйте ще раз.',
+    formPhotoRequired: 'Додайте фото.',
+    errorTitle: 'Помилка',
+    ok: 'OK',
     categories: {
       all: 'Всі',
       hair: 'Перукарні',
@@ -131,6 +157,21 @@ const UI_TEXT = {
     hasSlots: 'есть свободные окна',
     favoriteAdded: 'Добавлено в избранное',
     favoriteRemoved: 'Удалено из избранного',
+    addPlaceFormTitle: 'Добавить салон / мастера',
+    formNameLabel: 'Название',
+    formNamePlaceholder: 'Название салона или имя мастера',
+    formDescriptionLabel: 'Описание',
+    formDescriptionPlaceholder: 'Кратко опишите услуги, график, контакты',
+    formPhotoLabel: 'Фото',
+    formSubmit: 'Отправить на модерацию',
+    formSuccessTitle: 'Готово',
+    formSuccessMsg: 'Заявка отправлена на модерацию. После проверки место появится в списке.',
+    formFillError: 'Добавьте название, описание и фото.',
+    formPhotoUploading: 'Дождитесь завершения загрузки фото.',
+    formPhotoError: 'Фото не загрузилось. Удалите его или попробуйте ещё раз.',
+    formPhotoRequired: 'Добавьте фото.',
+    errorTitle: 'Ошибка',
+    ok: 'OK',
     categories: {
       all: 'Все',
       hair: 'Парикмахерские',
@@ -196,6 +237,21 @@ const UI_TEXT = {
     hasSlots: 'slots available',
     favoriteAdded: 'Added to favorites',
     favoriteRemoved: 'Removed from favorites',
+    addPlaceFormTitle: 'Add salon / master',
+    formNameLabel: 'Name',
+    formNamePlaceholder: 'Salon name or master name',
+    formDescriptionLabel: 'Description',
+    formDescriptionPlaceholder: 'Briefly describe services, schedule, contacts',
+    formPhotoLabel: 'Photo',
+    formSubmit: 'Send to moderation',
+    formSuccessTitle: 'Done',
+    formSuccessMsg: 'The request was sent to moderation. After review the place will appear in the list.',
+    formFillError: 'Add a name, description, and photo.',
+    formPhotoUploading: 'Wait until the photo upload finishes.',
+    formPhotoError: 'The photo did not upload. Remove it or try again.',
+    formPhotoRequired: 'Add a photo.',
+    errorTitle: 'Error',
+    ok: 'OK',
     categories: {
       all: 'All',
       hair: 'Hair salons',
@@ -299,8 +355,9 @@ const getCategoryIcon = (category: BeautyCategory): React.ComponentProps<typeof 
 export default function SalonyKrasotyScreen() {
   const navigation = useNavigation<AppNavigation>();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as Lang;
-  const currentUserEmail = useSelector((state: RootState) => state.auth.user?.email);
-  const currentUserId = useSelector((state: RootState) => state.auth.user?.id);
+  const user = useSelector((state: RootState) => state.auth.user);
+  const currentUserEmail = user?.email;
+  const currentUserId = user?.id;
   const isAdmin = currentUserEmail === 'vikramsave@ukr.net';
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
   const [activeCategory, setActiveCategory] = useState<CategoryKey>('all');
@@ -312,6 +369,15 @@ export default function SalonyKrasotyScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const resultsAnchorY = useRef(0);
   const { showSuccess } = useSoftToast();
+
+  // --- Add-place form state ---
+  const [addFormVisible, setAddFormVisible] = useState(false);
+  const [formTitle, setFormTitle] = useState('');
+  const [formDescription, setFormDescription] = useState('');
+  const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
+  const [formSubmitting, setFormSubmitting] = useState(false);
+  const hasFormUploadingPhotos = formPhotos.some((p) => p.status === 'uploading');
+  const hasFormPhotoErrors = formPhotos.some((p) => p.status === 'error');
 
   useEffect(() => {
     return subscribeActiveBonusPromotions('beauty', setActivePromotions);
@@ -433,14 +499,87 @@ export default function SalonyKrasotyScreen() {
     navigation.navigate('DetalPredlozheniyaSalonaScreen', { offer });
   };
 
-  const openBusinessForm = () => {
-    const prefill = language === 'ua'
-      ? 'Пропоную додати новий салон/майстра до розділу «Салони Краси»:\n\nНазва: \nАдреса: \nКатегорія: \nКонтакти: '
-      : language === 'ru'
-        ? 'Предлагаю добавить новый салон/мастера в раздел «Салоны Красоты»:\n\nНазвание: \nАдрес: \nКатегория: \nКонтакты: '
-        : 'I suggest adding a new salon/master to «Beauty Salons»:\n\nName: \nAddress: \nCategory: \nContacts: ';
-    navigation.navigate('SupportScreen', { prefillMessage: prefill });
-  };
+  const resetAddForm = useCallback(() => {
+    setFormTitle('');
+    setFormDescription('');
+    setFormPhotos([]);
+  }, []);
+
+  const openBusinessForm = useCallback(() => {
+    if (!validateSubmissionRequirements({ language, userId: user?.id, navigation })) return;
+    setAddFormVisible(true);
+  }, [language, navigation, user?.id]);
+
+  const handleSubmitPlace = useCallback(async () => {
+    if (!validateSubmissionRequirements({ language, userId: user?.id, navigation })) return;
+    const trimmedTitle = formTitle.trim();
+    const trimmedDescription = formDescription.trim();
+    if (!trimmedTitle || !trimmedDescription) {
+      Alert.alert(text.errorTitle, text.formFillError);
+      return;
+    }
+    const langError = getLanguageValidationError(`${trimmedTitle} ${trimmedDescription}`, language);
+    if (langError) {
+      Alert.alert(text.errorTitle, langError);
+      return;
+    }
+    if (hasFormUploadingPhotos) {
+      Alert.alert(text.errorTitle, text.formPhotoUploading);
+      return;
+    }
+    if (hasFormPhotoErrors) {
+      Alert.alert(text.errorTitle, text.formPhotoError);
+      return;
+    }
+    const donePhotos = getDonePhotos(formPhotos);
+    if (donePhotos.length === 0) {
+      Alert.alert(text.errorTitle, text.formPhotoRequired);
+      return;
+    }
+
+    setFormSubmitting(true);
+    try {
+      const firstPhoto = donePhotos[0];
+      const createdAt = new Date().toISOString();
+      await beautyTopService.add({
+        title: trimmedTitle,
+        description: trimmedDescription,
+        photoUri: firstPhoto.downloadUrl,
+        photoStoragePath: firstPhoto.storagePath,
+        photoId: firstPhoto.photoId,
+        moderationStatus: 'pending',
+        submittedForModerationAt: createdAt,
+        createdAt,
+        userId: user?.id || '',
+        language,
+      });
+      Alert.alert(text.formSuccessTitle, text.formSuccessMsg, [
+        { text: text.ok, onPress: () => { resetAddForm(); setAddFormVisible(false); } },
+      ]);
+    } catch (error) {
+      showUserError(language, 'send', error);
+    } finally {
+      setFormSubmitting(false);
+    }
+  }, [
+    hasFormPhotoErrors,
+    hasFormUploadingPhotos,
+    language,
+    navigation,
+    resetAddForm,
+    text.errorTitle,
+    text.ok,
+    text.formFillError,
+    text.formPhotoError,
+    text.formPhotoRequired,
+    text.formPhotoUploading,
+    text.formSuccessMsg,
+    text.formSuccessTitle,
+    formDescription,
+    formPhotos,
+    formTitle,
+    user?.id,
+  ]);
 
   const handleCategoryPress = (category: CategoryKey) => {
     setActiveCategory(category);
@@ -637,6 +776,78 @@ export default function SalonyKrasotyScreen() {
           />
         </View>
       </ScrollView>
+
+      <Modal visible={addFormVisible} transparent animationType="slide" onRequestClose={() => setAddFormVisible(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.sheetOverlay}>
+          <TouchableOpacity style={styles.sheetBackdrop} activeOpacity={1} onPress={() => setAddFormVisible(false)} />
+          <View style={styles.sheetWrapper}>
+            <View style={styles.sheet}>
+              <View style={styles.sheetHandle} />
+              <View style={styles.sheetHeader}>
+                <Text style={styles.sheetTitle}>{text.addPlaceFormTitle}</Text>
+                <TouchableOpacity onPress={() => setAddFormVisible(false)} style={styles.sheetCloseBtn} activeOpacity={0.75}>
+                  <MaterialCommunityIcons name="close" size={18} color={SCREEN_THEME.textSecondary} />
+                </TouchableOpacity>
+              </View>
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={styles.sheetContent}
+                style={styles.sheetScroll}
+              >
+                <Text style={styles.formLabel}>{text.formNameLabel}</Text>
+                <TextInput
+                  value={formTitle}
+                  onChangeText={setFormTitle}
+                  placeholder={text.formNamePlaceholder}
+                  placeholderTextColor="#A0938D"
+                  style={styles.input}
+                  maxLength={70}
+                />
+
+                <Text style={styles.formLabel}>{text.formDescriptionLabel}</Text>
+                <TextInput
+                  value={formDescription}
+                  onChangeText={setFormDescription}
+                  placeholder={text.formDescriptionPlaceholder}
+                  placeholderTextColor="#A0938D"
+                  style={[styles.input, styles.textarea]}
+                  multiline
+                  maxLength={220}
+                />
+
+                {user?.id ? (
+                  <>
+                    <Text style={styles.formLabel}>{text.formPhotoLabel}</Text>
+                    <PhotoUploadField
+                      uid={user.id}
+                      userName={user.name || user.email || user.id}
+                      maxPhotos={1}
+                      storagePath="beauty_top_listings"
+                      onPhotosChange={setFormPhotos}
+                      metadata={{ sourceScreen: 'Salony-Krasoty', sourceScreenLabel: text.addPlaceFormTitle }}
+                    />
+                    <UploadedPhotosGrid storagePath="beauty_top_listings" />
+                  </>
+                ) : null}
+
+                <TouchableOpacity
+                  style={[styles.submitBtn, (formSubmitting || hasFormUploadingPhotos) && styles.submitBtnDisabled]}
+                  onPress={handleSubmitPlace}
+                  activeOpacity={0.86}
+                  disabled={formSubmitting || hasFormUploadingPhotos}
+                >
+                  {formSubmitting ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.submitBtnText}>{hasFormUploadingPhotos ? text.formPhotoUploading : text.formSubmit}</Text>
+                  )}
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1045,4 +1256,29 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
   },
+  // --- Add-place form sheet styles ---
+  sheetOverlay: { flex: 1, justifyContent: 'flex-end' },
+  sheetBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
+  sheetWrapper: { justifyContent: 'flex-end' },
+  sheet: {
+    maxHeight: '88%',
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    paddingTop: 10,
+    borderWidth: 1,
+    borderColor: SCREEN_THEME.borderSoft,
+  },
+  sheetScroll: { flexGrow: 0 },
+  sheetHandle: { width: 42, height: 5, borderRadius: 999, backgroundColor: '#D9C69E', alignSelf: 'center', marginBottom: 10 },
+  sheetHeader: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, paddingHorizontal: 16, paddingBottom: 8 },
+  sheetTitle: { fontSize: 17, fontWeight: '900' as const, color: SCREEN_THEME.textPrimary },
+  sheetCloseBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center' as const, justifyContent: 'center' as const, backgroundColor: SCREEN_THEME.accentCream },
+  sheetContent: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 28 },
+  formLabel: { fontWeight: '800' as const, color: SCREEN_THEME.textPrimary, marginBottom: 8, marginTop: 8 },
+  input: { backgroundColor: '#F7F3EE', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, color: SCREEN_THEME.textPrimary, borderWidth: 1, borderColor: '#E8DDD3', fontWeight: '700' as const },
+  textarea: { minHeight: 86, textAlignVertical: 'top' as const },
+  submitBtn: { backgroundColor: '#E07B39', borderRadius: 16, paddingVertical: 14, alignItems: 'center' as const, marginTop: 14 },
+  submitBtnDisabled: { opacity: 0.65 },
+  submitBtnText: { color: '#FFFFFF', fontWeight: '900' as const },
 });

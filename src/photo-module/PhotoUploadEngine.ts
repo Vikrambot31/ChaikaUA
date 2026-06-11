@@ -127,9 +127,12 @@ const deleteUploadedStorageQuietly = async (storagePath: string, context: Record
 
 /** Maps an upload collection to its RTDB node path (single source of truth). */
 const rtdbCollectionFor = (collection: string, uid: string): string =>
-  collection === 'community_photos' ? 'community_photos' :
-  collection === 'requests'         ? `request_photos/${uid}` :
-                                      `user_photos/${uid}`;
+  collection === 'community_photos'      ? 'community_photos' :
+  collection === 'requests'              ? `request_photos/${uid}` :
+  collection === 'food_top_listings'     ? 'food_top_listings' :
+  collection === 'beauty_top_listings'   ? 'beauty_top_listings' :
+  collection === 'children_top_listings' ? 'children_top_listings' :
+                                           `user_photos/${uid}`;
 
 /**
  * Removes a completed upload (Storage object + RTDB record). Used when a photo
