@@ -24,7 +24,7 @@ export const usePhotoPendingCount = (): number => {
       if (!snap.exists()) { userPhotosCount = 0; publish(); return; }
       const val = snap.val() as Record<string, Record<string, { status?: string; moderationStatus?: string }>>;
       userPhotosCount = Object.values(val).reduce((total, photos) => (
-        total + Object.values(photos || {}).filter((p) => (p.moderationStatus || p.status) === 'pending').length
+        total + Object.values(photos || {}).filter((p) => (p.moderationStatus || p.status || 'pending') === 'pending').length
       ), 0);
       publish();
     });
@@ -33,7 +33,7 @@ export const usePhotoPendingCount = (): number => {
       if (!snap.exists()) { requestPhotosCount = 0; publish(); return; }
       const val = snap.val() as Record<string, Record<string, { status?: string; moderationStatus?: string }>>;
       requestPhotosCount = Object.values(val).reduce((total, photos) => (
-        total + Object.values(photos || {}).filter((p) => (p.moderationStatus || p.status) === 'pending').length
+        total + Object.values(photos || {}).filter((p) => (p.moderationStatus || p.status || 'pending') === 'pending').length
       ), 0);
       publish();
     });

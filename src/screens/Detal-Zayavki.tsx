@@ -209,7 +209,7 @@ const parseFunctionError = (error: unknown, fallback: string, language: Lang): s
   return FUNCTION_ERROR_MESSAGES[language]?.[msg] || fallback;
 };
 
-const AVATAR_COLORS = ['#C77A5D', '#D8AF59', '#7E9D69', '#5F84B4', '#A56B55'];
+const AVATAR_COLORS = ['#C77A5D', '#D88DB5', '#7E9D69', '#5F84B4', '#A56B55'];
 const toSafeRtdbKey = (value: string): string =>
   (value ?? '').replace(/[.#$[\]/]/g, (c) => `_${c.charCodeAt(0).toString(16).toUpperCase()}_`).trim();
 
@@ -414,7 +414,7 @@ const RequestDetailScreen = ({
     if (!request.id) return;
     const statusRef = ref(database, `requests/${request.id}/status`);
     const unsubStatus = onValue(statusRef, (snapshot) => {
-      if (snapshot.val() === 'closed') setRequestSolved(true);
+      setRequestSolved(snapshot.val() === 'closed');
     }, () => {});
     return unsubStatus;
   }, [request.id]);
@@ -904,7 +904,7 @@ const RequestDetailScreen = ({
                       activeOpacity={0.82}
                     >
                       {isBusy ? (
-                        <ActivityIndicator size="small" color="#FFF9EE" />
+                        <ActivityIndicator size="small" color="#FBF8FD" />
                       ) : (
                         <Text style={styles.confirmHelperButtonText}>{helpText.confirmHelp} +20</Text>
                       )}
@@ -934,13 +934,13 @@ const RequestDetailScreen = ({
             activeOpacity={0.82}
           >
             {helpStatus === 'sending' ? (
-              <ActivityIndicator color="#FFF9EE" />
+              <ActivityIndicator color="#FBF8FD" />
             ) : (
               <>
                 <MaterialCommunityIcons
                   name={helpStatus === 'helped' || helpStatus === 'already' ? 'check-circle' : 'handshake'}
                   size={18}
-                  color="#FFF9EE"
+                  color="#FBF8FD"
                 />
                 <Text style={styles.helpButtonText}>
                   {helpStatus === 'helped' || helpStatus === 'already' ? helpText.responded : helpText.respond}
@@ -960,10 +960,10 @@ const RequestDetailScreen = ({
             activeOpacity={0.84}
           >
             {closingRequest ? (
-              <ActivityIndicator color="#FFF9EE" />
+              <ActivityIndicator color="#FBF8FD" />
             ) : (
               <>
-                <MaterialCommunityIcons name={requestSolved ? 'check-circle' : 'check-decagram-outline'} size={18} color="#FFF9EE" />
+                <MaterialCommunityIcons name={requestSolved ? 'check-circle' : 'check-decagram-outline'} size={18} color="#FBF8FD" />
                 <Text style={styles.closeSolvedButtonText}>{requestSolved ? helpText.closed : `${helpText.closeSolved} +2`}</Text>
               </>
             )}
@@ -973,10 +973,10 @@ const RequestDetailScreen = ({
         {isOwnRequest ? (
           <TouchableOpacity style={[styles.deleteButton, deleting && styles.deleteButtonDisabled]} onPress={handleDelete} disabled={deleting}>
             {deleting ? (
-              <ActivityIndicator color="#FFF9EE" />
+              <ActivityIndicator color="#FBF8FD" />
             ) : (
               <>
-                <MaterialCommunityIcons name="trash-can-outline" size={18} color="#FFF9EE" />
+                <MaterialCommunityIcons name="trash-can-outline" size={18} color="#FBF8FD" />
                 <Text style={styles.deleteButtonText}>{text.delete}</Text>
               </>
             )}
@@ -1076,7 +1076,7 @@ const styles = StyleSheet.create({
   helpPanelCount: {
     minWidth: 28,
     textAlign: 'center',
-    color: '#FFF9EE',
+    color: '#FBF8FD',
     backgroundColor: SCREEN_THEME.woodGreenDark,
     borderRadius: 999,
     overflow: 'hidden',
@@ -1096,7 +1096,7 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingVertical: 10,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(123, 86, 56, 0.12)',
+    borderTopColor: 'rgba(128, 76, 110, 0.12)',
   },
   helperInfo: {
     flex: 1,
@@ -1125,7 +1125,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   confirmHelperButtonText: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
     fontSize: 12,
     fontWeight: '900',
   },
@@ -1162,7 +1162,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 9,
     paddingVertical: 5,
-    backgroundColor: '#FFF3CE',
+    backgroundColor: '#F5EEF9',
     borderWidth: 1,
     borderColor: '#E8C66F',
   },
@@ -1184,7 +1184,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   deleteButtonDisabled: { opacity: 0.72 },
-  deleteButtonText: { color: '#FFF9EE', fontSize: 15, fontWeight: '900' },
+  deleteButtonText: { color: '#FBF8FD', fontSize: 15, fontWeight: '900' },
   helpButton: {
     backgroundColor: '#2196F3',
     borderRadius: 18,
@@ -1202,7 +1202,7 @@ const styles = StyleSheet.create({
     borderColor: '#4CAF50',
   },
   helpButtonText: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
     fontSize: 15,
     fontWeight: '900',
   },
@@ -1224,7 +1224,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   closeSolvedButtonText: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
     fontSize: 15,
     fontWeight: '900',
   },
