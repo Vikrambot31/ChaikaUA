@@ -964,6 +964,9 @@ const ADMIN_MODERATION_SECTIONS = {
   osbbVotes: { path: 'osbb_votes', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected', nested: true },
   osbbHouseTopics: { path: 'osbb_house_topics', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected', nested: true },
   osbbCollections: { path: 'osbb_collections', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected', nested: true },
+  foodTopListings: { path: 'food_top_listings', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
+  beautyTopListings: { path: 'beauty_top_listings', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
+  childrenTopListings: { path: 'children_top_listings', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
 };
 
 const ADMIN_MODERATION_RESTORE_TTL_MS = {

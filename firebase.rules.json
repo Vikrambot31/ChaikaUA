@@ -372,7 +372,7 @@
     },
 
     "feature_flags": {
-      ".read": "auth != null && (auth.token.admin === true || auth.token.moderator === true)",
+      ".read": "auth != null",
       ".write": "auth != null && auth.token.admin === true"
     },
 
