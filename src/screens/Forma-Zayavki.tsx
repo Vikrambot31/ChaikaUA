@@ -28,6 +28,7 @@ import { normalizeUkrainianPhoneStrict, validateName, validatePhone } from '../u
 import { useOperationTrace } from '../hooks/useOperationTrace';
 import { useTrainingMode } from '../hooks/useTrainingMode';
 import TrainingHint from '../components/TrainingHint';
+import HintBadge, { HINT_BADGE_LABELS } from '../components/HintBadge';
 
 type Lang = 'ua' | 'ru' | 'en';
 type RequestMode = 'need_help' | 'offer_help' | 'business';
@@ -747,6 +748,14 @@ const RequestFormScreen: React.FC = () => {
           <View style={styles.heroCard}>
             <Text style={styles.title}>{t.title}</Text>
             <Text style={styles.subtitle}>{t.subtitle}</Text>
+            <View style={{ position: 'absolute', top: 12, right: 12, zIndex: 10 }}>
+              <HintBadge
+                visible={training.isVisible}
+                onTap={training.openHint}
+                onDismiss={training.dismiss}
+                label={HINT_BADGE_LABELS[language]}
+              />
+            </View>
           </View>
 
           {submitError ? (
@@ -887,8 +896,8 @@ const RequestFormScreen: React.FC = () => {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-      {training.isVisible && (
-        <TrainingHint text={TRAINING_HINT[language]} onDismiss={training.dismiss} />
+      {training.showHint && (
+        <TrainingHint text={TRAINING_HINT[language]} onDismiss={training.closeHint} />
       )}
     </SafeAreaView>
   );
@@ -1043,7 +1052,7 @@ const styles = StyleSheet.create({
     marginTop: 18,
     minHeight: 52,
     borderRadius: 16,
-    backgroundColor: SCREEN_THEME.terracotta,
+    backgroundColor: '#7d0e59',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

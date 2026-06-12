@@ -85,6 +85,7 @@ import PromoCreditsTopupScreen from '../screens/PromoCreditsTopupScreen';
 import PromoCreditsAdminScreen from '../screens/PromoCreditsAdminScreen';
 import BonusPromotionPurchaseScreen from '../screens/BonusPromotionPurchaseScreen';
 import FavoritesScreen from '../screens/FavoritesScreen';
+import EditContactListingScreen from '../screens/EditContactListingScreen';
 import CrashDiagnosticsScreen from '../screens/CrashDiagnosticsScreen';
 import AppMonitorScreen from '../screens/AppMonitorScreen';
 import type { Request, Place } from '../types/app';
@@ -227,6 +228,7 @@ export type RootStackParamList = {
   PromoCreditsAdminScreen: undefined;
   BonusPromotionPurchaseScreen: { initialPromoType?: string; initialTargetId?: string } | undefined;
   FavoritesScreen: undefined;
+  EditContactListingScreen: { itemId: string; initialData: import('../utils/detailViewTypes').DetailItemData };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -918,6 +920,7 @@ function AuthNavigation() {
         <Stack.Screen name="PromoCreditsAdminScreen" component={withGuard(PromoCreditsAdminScreen, 'admin')} />
         <Stack.Screen name="BonusPromotionPurchaseScreen" component={withGuard(BonusPromotionPurchaseScreen, 'auth')} />
         <Stack.Screen name="FavoritesScreen" component={FavoritesScreen} />
+        <Stack.Screen name="EditContactListingScreen" component={withGuard(EditContactListingScreen, 'auth')} />
         <Stack.Screen name="BusinessClaimScreen" component={withGuard(BusinessClaimScreen, 'auth')} />
         <Stack.Screen name="BusinessPlusSubscriptionScreen" component={withGuard(BusinessPlusSubscriptionScreen, 'auth')} />
         <Stack.Screen name="BusinessMenuEditorScreen" component={withGuard(BusinessMenuEditorScreen, 'auth')} />

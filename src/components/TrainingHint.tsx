@@ -12,13 +12,11 @@ import { SCREEN_THEME } from '../utils/screenTheme';
 type TrainingHintProps = {
   text: string;
   onDismiss: () => void;
-  /** Auto-hide after N ms. Pass 0 to disable. Default 12 000. */
-  autoHideMs?: number;
 };
 
 const ACCENT = '#2F7D50';
 
-export default function TrainingHint({ text, onDismiss, autoHideMs = 12_000 }: TrainingHintProps) {
+export default function TrainingHint({ text, onDismiss }: TrainingHintProps) {
   const slideY = useRef(new Animated.Value(80)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
@@ -27,15 +25,7 @@ export default function TrainingHint({ text, onDismiss, autoHideMs = 12_000 }: T
       Animated.spring(slideY, { toValue: 0, useNativeDriver: true, tension: 68, friction: 9 }),
       Animated.timing(opacity, { toValue: 1, duration: 260, useNativeDriver: true }),
     ]).start();
-
-    if (autoHideMs > 0) {
-      const timer = setTimeout(() => {
-        Animated.timing(opacity, { toValue: 0, duration: 220, useNativeDriver: true }).start(onDismiss);
-      }, autoHideMs);
-      return () => clearTimeout(timer);
-    }
-    return undefined;
-  }, [autoHideMs, onDismiss, opacity, slideY]);
+  }, [opacity, slideY]);
 
   return (
     <Animated.View style={[styles.wrapper, { transform: [{ translateY: slideY }], opacity }]}>

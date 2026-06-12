@@ -46,6 +46,7 @@ import { useSoftToast } from '../hooks/useSoftToast';
 import { selectUserId } from '../redux/selectors';
 import { useTrainingMode } from '../hooks/useTrainingMode';
 import TrainingHint from '../components/TrainingHint';
+import HintBadge, { HINT_BADGE_LABELS } from '../components/HintBadge';
 
 type Lang = 'ua' | 'ru' | 'en';
 type AppNavigation = NavigationProp<Record<string, object | undefined>>;
@@ -1026,6 +1027,14 @@ export default function EdaNaChaykeScreen() {
             <Text style={styles.title}>{text.title}</Text>
             <Text style={styles.subtitle}>{text.subtitle}</Text>
           </View>
+          <View style={{ position: 'absolute', top: 12, right: 12, zIndex: 10 }}>
+            <HintBadge
+              visible={training.isVisible}
+              onTap={training.openHint}
+              onDismiss={training.dismiss}
+              label={HINT_BADGE_LABELS[language]}
+            />
+          </View>
         </View>
 
         {/* Search */}
@@ -1117,8 +1126,8 @@ export default function EdaNaChaykeScreen() {
 
         <FeatureRatingBanner screenId="eda" />
       </ScrollView>
-      {training.isVisible && (
-        <TrainingHint text={TRAINING_HINT[language]} onDismiss={training.dismiss} />
+      {training.showHint && (
+        <TrainingHint text={TRAINING_HINT[language]} onDismiss={training.closeHint} />
       )}
     </SafeAreaView>
   );

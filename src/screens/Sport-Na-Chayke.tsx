@@ -8,6 +8,7 @@ import type { RootState } from '../redux/store';
 import { sportsService, SportKey, SportTodayEntry } from '../services/sportsService';
 import { useTrainingMode } from '../hooks/useTrainingMode';
 import TrainingHint from '../components/TrainingHint';
+import HintBadge, { HINT_BADGE_LABELS } from '../components/HintBadge';
 
 type Lang = 'ua' | 'ru' | 'en';
 
@@ -200,6 +201,13 @@ const SportNaChaykeScreen: React.FC = () => {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
+          <HintBadge
+            visible={training.isVisible}
+            onTap={training.openHint}
+            onDismiss={training.dismiss}
+            label={HINT_BADGE_LABELS[language]}
+            style={{ position: 'absolute', top: 12, right: 12, zIndex: 10 }}
+          />
           <View style={styles.heroImageWrap}>
             <Image source={require('../../assets/WEBP-version/Sport.webp')} style={styles.heroImage} resizeMode="contain" />
           </View>
@@ -270,8 +278,8 @@ const SportNaChaykeScreen: React.FC = () => {
           ))}
         </View>
       </ScrollView>
-      {training.isVisible && (
-        <TrainingHint text={TRAINING_HINT[language]} onDismiss={training.dismiss} />
+      {training.showHint && (
+        <TrainingHint text={TRAINING_HINT[language]} onDismiss={training.closeHint} />
       )}
     </SafeAreaView>
   );

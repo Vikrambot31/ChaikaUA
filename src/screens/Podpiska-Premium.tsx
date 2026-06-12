@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback, useRef } from 'react';
+import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import {
   SafeAreaView,
   ScrollView,
@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSelector, useDispatch } from 'react-redux';
@@ -27,6 +28,10 @@ import {
 } from '../redux/slices/subscriptionSlice';
 import { useTrainingMode } from '../hooks/useTrainingMode';
 import TrainingHint from '../components/TrainingHint';
+import HintBadge, { HINT_BADGE_LABELS } from '../components/HintBadge';
+import BetaAgreementModal from '../components/BetaAgreementModal';
+
+const BETA_AGREEMENT_KEY = '@chaika:beta_agreement_accepted_v1';
 
 type Plan = 'monthly' | 'yearly';
 
@@ -114,6 +119,20 @@ export default function SubscriptionScreen() {
   const [loading, setLoading] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<Plan>('monthly');
   const isSubmitting = useRef(false);
+  const [agreementVisible, setAgreementVisible] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem(BETA_AGREEMENT_KEY).then((value) => {
+      if (value !== 'true') {
+        setAgreementVisible(true);
+      }
+    });
+  }, []);
+
+  const handleAgreementAccept = useCallback(() => {
+    AsyncStorage.setItem(BETA_AGREEMENT_KEY, 'true');
+    setAgreementVisible(false);
+  }, []);
 
   const text = useMemo(() => {
     if (language === 'ua') {
@@ -314,7 +333,12 @@ export default function SubscriptionScreen() {
           <Text style={styles.back}>{text.back}</Text>
         </TouchableOpacity>
         <Text style={styles.title}>{text.title}</Text>
-        <View style={styles.headerSpacer} />
+        <HintBadge
+          visible={training.isVisible}
+          onTap={training.openHint}
+          onDismiss={training.dismiss}
+          label={HINT_BADGE_LABELS[language]}
+        />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -476,9 +500,14 @@ export default function SubscriptionScreen() {
 
       </ScrollView>
       <MiniTabBar />
-      {training.isVisible && (
-        <TrainingHint text={TRAINING_HINT[language] ?? TRAINING_HINT.ua} onDismiss={training.dismiss} />
+      {training.showHint && (
+        <TrainingHint text={TRAINING_HINT[language] ?? TRAINING_HINT.ua} onDismiss={training.closeHint} />
       )}
+      <BetaAgreementModal
+        visible={agreementVisible}
+        language={language as 'ua' | 'ru' | 'en'}
+        onAccept={handleAgreementAccept}
+      />
     </SafeAreaView>
   );
 }

@@ -32,6 +32,7 @@ import type { SupportTicket, SupportMessage, SupportCategory } from '../types/su
 import { ensureFirebaseAuth } from '../firebase-auth-session';
 import { useTrainingMode } from '../hooks/useTrainingMode';
 import TrainingHint from '../components/TrainingHint';
+import HintBadge, { HINT_BADGE_LABELS } from '../components/HintBadge';
 
 const UI_TEXT = {
   ua: {
@@ -267,7 +268,12 @@ const SupportScreen: React.FC = () => {
           <MaterialCommunityIcons name="arrow-left" size={22} color={SCREEN_THEME.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{text.title}</Text>
-        <View style={{ width: 42 }} />
+        <HintBadge
+          visible={training.isVisible}
+          onTap={training.openHint}
+          onDismiss={training.dismiss}
+          label={HINT_BADGE_LABELS[language]}
+        />
       </View>
 
       {!user && (
@@ -379,8 +385,8 @@ const SupportScreen: React.FC = () => {
           {text.chars}: {messageText.length}/{MAX_MESSAGE_LENGTH}
         </Text>
       </View>
-      {training.isVisible && (
-        <TrainingHint text={TRAINING_HINT[language] ?? TRAINING_HINT.ua} onDismiss={training.dismiss} />
+      {training.showHint && (
+        <TrainingHint text={TRAINING_HINT[language] ?? TRAINING_HINT.ua} onDismiss={training.closeHint} />
       )}
     </SafeAreaView>
   );

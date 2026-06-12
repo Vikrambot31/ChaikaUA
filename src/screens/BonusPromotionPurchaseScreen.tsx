@@ -20,6 +20,8 @@ import { SCREEN_THEME } from '../utils/screenTheme';
 import { purchaseBonusPromotion, subscribeMyBonuses, subscribeMyPromoCredits, type PromoCredits, type UserBonuses } from '../services/bonusService';
 import { useTranslation } from '../i18n/useTranslation';
 import ScreenTooltip from '../components/ScreenTooltip';
+import HintBadge, { HINT_BADGE_LABELS } from '../components/HintBadge';
+import { useTrainingMode } from '../hooks/useTrainingMode';
 import { BONUS_PROMOTION_PURCHASE_TOOLTIP } from '../utils/screenTooltips';
 
 type AppNav = NavigationProp<Record<string, object | undefined>>;
@@ -156,6 +158,7 @@ const BonusPromotionPurchaseScreen: React.FC = () => {
   const navigation = useNavigation<AppNav>();
   const route = useRoute<RouteProp<RouteParams, 'BonusPromotionPurchaseScreen'>>();
   const { t, language } = useTranslation();
+  const training = useTrainingMode('bonus_promotion_purchase');
   const user = useSelector(selectUser);
   const initialPromoType = route.params?.initialPromoType || 'contacts_top';
   const initialTargetId = route.params?.initialTargetId || '';
@@ -276,6 +279,8 @@ const BonusPromotionPurchaseScreen: React.FC = () => {
         items={BONUS_PROMOTION_PURCHASE_TOOLTIP.items}
         language={language}
         accentColor={SCREEN_THEME.woodGreen}
+        forceVisible={training.showHint}
+        onClose={training.closeHint}
       />
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.8}>
@@ -285,6 +290,12 @@ const BonusPromotionPurchaseScreen: React.FC = () => {
           <Text style={styles.headerTitle}>{t.bonus.activePromotions}</Text>
           <Text style={styles.headerSubtitle}>{t.promoCredits.topupDesc}</Text>
         </View>
+        <HintBadge
+          visible={training.isVisible}
+          onTap={training.openHint}
+          onDismiss={training.dismiss}
+          label={HINT_BADGE_LABELS[language]}
+        />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>

@@ -32,6 +32,8 @@ import { database } from '../firebase-config';
 import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
 import UserCardActionBar from '../components/UserCardActionBar';
 import ScreenTooltip from '../components/ScreenTooltip';
+import HintBadge, { HINT_BADGE_LABELS } from '../components/HintBadge';
+import { useTrainingMode } from '../hooks/useTrainingMode';
 import { PROFILE_REQUESTS_TOOLTIP } from '../utils/screenTooltips';
 import useSoftToast from '../hooks/useSoftToast';
 import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
@@ -341,6 +343,7 @@ export default function ProfileRequestsScreen() {
   const navLock = useRef(false);
   const user = useSelector(selectUser);
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
+  const training = useTrainingMode('profile_requests');
   const toast = useSoftToast();
   const t = UI[language];
   const [sessionUserId, setSessionUserId] = useState(user?.id ?? '');
@@ -690,6 +693,8 @@ export default function ProfileRequestsScreen() {
         items={PROFILE_REQUESTS_TOOLTIP.items}
         language={language}
         accentColor={ACCENT}
+        forceVisible={training.showHint}
+        onClose={training.closeHint}
       />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back}>
@@ -697,6 +702,12 @@ export default function ProfileRequestsScreen() {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t.title}</Text>
         <View style={{ width: 40 }} />
+        <HintBadge
+          visible={training.isVisible}
+          onTap={training.openHint}
+          onDismiss={training.dismiss}
+          label={HINT_BADGE_LABELS[language]}
+        />
       </View>
 
       <View style={styles.tabsRow}>

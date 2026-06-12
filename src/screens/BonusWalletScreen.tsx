@@ -25,6 +25,8 @@ import {
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { useTranslation } from '../i18n/useTranslation';
 import ScreenTooltip from '../components/ScreenTooltip';
+import HintBadge, { HINT_BADGE_LABELS } from '../components/HintBadge';
+import { useTrainingMode } from '../hooks/useTrainingMode';
 import { BONUS_WALLET_TOOLTIP } from '../utils/screenTooltips';
 
 type AppNav = NavigationProp<Record<string, object | undefined>>;
@@ -103,6 +105,7 @@ const getTransactionTitle = (item: BonusTransaction, bonusText: BonusText) => {
 const BonusWalletScreen: React.FC = () => {
   const navigation = useNavigation<AppNav>();
   const { t, language } = useTranslation();
+  const training = useTrainingMode('bonus_wallet');
   const [bonuses, setBonuses] = useState<UserBonuses | null>(null);
   const [promoCredits, setPromoCredits] = useState<PromoCredits>(EMPTY_PROMO_CREDITS);
   const [transactions, setTransactions] = useState<BonusTransaction[]>([]);
@@ -217,6 +220,8 @@ const BonusWalletScreen: React.FC = () => {
         items={BONUS_WALLET_TOOLTIP.items}
         language={language}
         accentColor={SCREEN_THEME.woodGreen}
+        forceVisible={training.showHint}
+        onClose={training.closeHint}
       />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.headerRow}>
@@ -230,6 +235,14 @@ const BonusWalletScreen: React.FC = () => {
           <TouchableOpacity onPress={openSupport} style={styles.iconButton} activeOpacity={0.82}>
             <MaterialCommunityIcons name="headset" size={23} color={SCREEN_THEME.textPrimary} />
           </TouchableOpacity>
+          <View style={{ position: 'absolute', top: 12, right: 12, zIndex: 10 }}>
+            <HintBadge
+              visible={training.isVisible}
+              onTap={training.openHint}
+              onDismiss={training.dismiss}
+              label={HINT_BADGE_LABELS[language]}
+            />
+          </View>
         </View>
 
         {!ready ? (

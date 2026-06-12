@@ -53,6 +53,15 @@ const UI_TEXT = {
     showMore: 'Показати більше',
     hide: 'Сховати',
     businessSectionTitle: 'Для власників бізнесу',
+    anketaStatusApproved: 'Схвалено',
+    anketaStatusPending: 'На модерації',
+    anketaStatusRejected: 'Відхилено',
+    anketaStatusExpired: 'Термін дії закінчився',
+    anketaEditBtn: 'Редагувати анкету',
+    anketaFixBtn: 'Виправити та надіслати',
+    anketaRenewBtn: 'Оновити анкету',
+    anketaPendingHint: 'Зміни перевіряються. Зазвичай до 24 годин.',
+    anketaCooldownHint: (date: string) => `Редагувати можна з ${date}`,
   },
   ru: {
     headerTitle: 'Детали',
@@ -73,6 +82,15 @@ const UI_TEXT = {
     showMore: 'Показать больше',
     hide: 'Скрыть',
     businessSectionTitle: 'Для владельцев бизнеса',
+    anketaStatusApproved: 'Одобрено',
+    anketaStatusPending: 'На модерации',
+    anketaStatusRejected: 'Отклонено',
+    anketaStatusExpired: 'Срок действия истёк',
+    anketaEditBtn: 'Редактировать анкету',
+    anketaFixBtn: 'Исправить и отправить',
+    anketaRenewBtn: 'Обновить анкету',
+    anketaPendingHint: 'Изменения проверяются. Обычно до 24 часов.',
+    anketaCooldownHint: (date: string) => `Редактировать можно с ${date}`,
   },
   en: {
     headerTitle: 'Details',
@@ -93,6 +111,15 @@ const UI_TEXT = {
     showMore: 'Show more',
     hide: 'Hide',
     businessSectionTitle: 'For business owners',
+    anketaStatusApproved: 'Approved',
+    anketaStatusPending: 'Pending moderation',
+    anketaStatusRejected: 'Rejected',
+    anketaStatusExpired: 'Expired',
+    anketaEditBtn: 'Edit profile',
+    anketaFixBtn: 'Fix and resubmit',
+    anketaRenewBtn: 'Renew profile',
+    anketaPendingHint: 'Changes are being reviewed. Usually within 24 hours.',
+    anketaCooldownHint: (date: string) => `You can edit from ${date}`,
   },
 } as const;
 
@@ -159,6 +186,17 @@ export default function ItemDetailScreen({
   const editPromosLabel = language === 'ua' ? 'Редагувати акції' : language === 'ru' ? 'Редактировать акции' : 'Edit promotions';
   const editPhotoLabel = language === 'ua' ? 'Змінити фото закладу' : language === 'ru' ? 'Изменить фото заведения' : 'Change business photo';
   const pendingModerationLabel = language === 'ua' ? 'На модерації — зміни незабаром з\'являться' : language === 'ru' ? 'На модерации — изменения скоро появятся' : 'Pending review — changes will appear soon';
+
+  // ── Contacts listing (anketa) edit section ──
+  const isContactListing = item.sourceType === 'lyudi';
+  const isOwnContact = isContactListing && isOwnItem;
+  const anketaStatus = item.moderationStatus;
+  const EDIT_COOLDOWN_MS = 3 * 24 * 60 * 60 * 1000;
+  const lastEditedTime = item.lastEditedAt ? new Date(item.lastEditedAt).getTime() : 0;
+  const cooldownEnd = lastEditedTime ? lastEditedTime + EDIT_COOLDOWN_MS : 0;
+  const isOnCooldown = cooldownEnd > Date.now();
+  const cooldownDateStr = cooldownEnd ? `${String(new Date(cooldownEnd).getDate()).padStart(2, '0')}.${String(new Date(cooldownEnd).getMonth() + 1).padStart(2, '0')}` : '';
+  const canEditAnketa = isOwnContact && anketaStatus !== 'pending' && !isOnCooldown;
 
   const isMyApprovedPlace = isPlaceType && claimStatus === 'approved';
   const isApprovedCard = businessCard?.moderationStatus === 'approved';
@@ -717,6 +755,76 @@ export default function ItemDetailScreen({
           )
         ) : null}
 
+        {/* ── Contacts anketa owner section ── */}
+        {isOwnContact ? (
+          <View style={styles.anketaSection}>
+            {/* Status badge */}
+            <View style={[
+              styles.anketaStatusBadge,
+              anketaStatus === 'approved' && styles.anketaStatusApproved,
+              anketaStatus === 'pending' && styles.anketaStatusPending,
+              anketaStatus === 'rejected' && styles.anketaStatusRejected,
+            ]}>
+              <MaterialCommunityIcons
+                name={
+                  anketaStatus === 'approved' ? 'check-circle-outline' :
+                  anketaStatus === 'pending' ? 'clock-outline' :
+                  anketaStatus === 'rejected' ? 'close-circle-outline' :
+                  'timer-sand'
+                }
+                size={16}
+                color={
+                  anketaStatus === 'approved' ? '#2E7D32' :
+                  anketaStatus === 'pending' ? '#8A7A5A' :
+                  anketaStatus === 'rejected' ? '#C62828' :
+                  '#78716C'
+                }
+              />
+              <Text style={[
+                styles.anketaStatusText,
+                anketaStatus === 'approved' && { color: '#2E7D32' },
+                anketaStatus === 'rejected' && { color: '#C62828' },
+              ]}>
+                {anketaStatus === 'approved' ? text.anketaStatusApproved :
+                 anketaStatus === 'pending' ? text.anketaStatusPending :
+                 anketaStatus === 'rejected' ? text.anketaStatusRejected :
+                 text.anketaStatusExpired}
+              </Text>
+            </View>
+
+            {/* Pending hint */}
+            {anketaStatus === 'pending' ? (
+              <Text style={styles.anketaHint}>{text.anketaPendingHint}</Text>
+            ) : null}
+
+            {/* Cooldown hint */}
+            {isOnCooldown && anketaStatus !== 'pending' ? (
+              <Text style={styles.anketaHint}>{text.anketaCooldownHint(cooldownDateStr)}</Text>
+            ) : null}
+
+            {/* Edit button */}
+            {anketaStatus !== 'pending' ? (
+              <TouchableOpacity
+                style={[styles.anketaEditBtn, (isOnCooldown) && styles.anketaEditBtnDisabled]}
+                onPress={() => { if (canEditAnketa) navigation.navigate('EditContactListingScreen' as any, { itemId: item.sourceId, initialData: item }); }}
+                disabled={!canEditAnketa}
+                activeOpacity={0.86}
+              >
+                <MaterialCommunityIcons
+                  name={anketaStatus === 'rejected' ? 'pencil-plus-outline' : anketaStatus === 'expired' ? 'refresh' : 'pencil-outline'}
+                  size={18}
+                  color={canEditAnketa ? '#7A1E5C' : '#A0938D'}
+                />
+                <Text style={[styles.anketaEditBtnText, !canEditAnketa && { color: '#A0938D' }]}>
+                  {anketaStatus === 'rejected' ? text.anketaFixBtn :
+                   anketaStatus === 'expired' ? text.anketaRenewBtn :
+                   text.anketaEditBtn}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        ) : null}
+
         <TouchableOpacity
           style={[styles.contactBtn, !canContact && styles.disabledAction]}
           onPress={handleContact}
@@ -1076,6 +1184,60 @@ const styles = StyleSheet.create({
   },
   adminBiznesPlusBtnActive: {
     backgroundColor: '#1565C0',
+  },
+  // Contacts anketa section
+  anketaSection: {
+    backgroundColor: '#FBF7F2',
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E8DDD3',
+    gap: 10,
+  },
+  anketaStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F5F0EA',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    alignSelf: 'flex-start',
+  },
+  anketaStatusApproved: { backgroundColor: '#F1F8F1', borderWidth: 1, borderColor: '#A5D6A7' },
+  anketaStatusPending: { backgroundColor: '#FFF8E1', borderWidth: 1, borderColor: '#F2D9A0' },
+  anketaStatusRejected: { backgroundColor: '#FFF0F0', borderWidth: 1, borderColor: '#FFCDD2' },
+  anketaStatusText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#78716C',
+  },
+  anketaHint: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#8A7A5A',
+    lineHeight: 17,
+  },
+  anketaEditBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FDF5FA',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1.5,
+    borderColor: '#E8C4DC',
+  },
+  anketaEditBtnDisabled: {
+    backgroundColor: '#F5F0EA',
+    borderColor: '#E1D7CF',
+  },
+  anketaEditBtnText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#7A1E5C',
   },
   // Owner edit controls
   ownerControls: {

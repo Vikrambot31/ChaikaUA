@@ -31,6 +31,8 @@ import {
 import { subscribeMyPromoCredits, type PromoCredits } from '../services/bonusService';
 import type { AdMessage, AdTicket } from '../types/ad';
 import ScreenTooltip from '../components/ScreenTooltip';
+import HintBadge, { HINT_BADGE_LABELS } from '../components/HintBadge';
+import { useTrainingMode } from '../hooks/useTrainingMode';
 import { PROMO_CREDITS_TOPUP_TOOLTIP } from '../utils/screenTooltips';
 
 type AppNav = NavigationProp<Record<string, object | undefined>>;
@@ -66,6 +68,7 @@ const buildTopupMessage = (pack: typeof PACKAGES[number], pc: { topupRequestTitl
 const PromoCreditsTopupScreen: React.FC = () => {
   const navigation = useNavigation<AppNav>();
   const { t, language } = useTranslation();
+  const training = useTrainingMode('promo_credits_topup');
   const user = useSelector(selectUser);
   const isOnline = useSelector(selectIsOnline);
   const [authUid, setAuthUid] = useState<string | null>(null);
@@ -205,6 +208,8 @@ const PromoCreditsTopupScreen: React.FC = () => {
         items={PROMO_CREDITS_TOPUP_TOOLTIP.items}
         language={language}
         accentColor={SCREEN_THEME.terracotta}
+        forceVisible={training.showHint}
+        onClose={training.closeHint}
       />
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.8}>
@@ -214,6 +219,12 @@ const PromoCreditsTopupScreen: React.FC = () => {
           <Text style={styles.headerTitle}>{t.promoCredits.topupTitle}</Text>
           <Text style={styles.headerSubtitle}>{t.promoCredits.topupDesc}</Text>
         </View>
+        <HintBadge
+          visible={training.isVisible}
+          onTap={training.openHint}
+          onDismiss={training.dismiss}
+          label={HINT_BADGE_LABELS[language]}
+        />
       </View>
 
       <View style={styles.balanceCard}>

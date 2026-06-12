@@ -22,6 +22,10 @@ type ScreenTooltipProps = {
   items: Record<Language, string[]>;
   language: Language;
   accentColor?: string;
+  /** When provided, controls visibility externally (ignores AsyncStorage auto-open). */
+  forceVisible?: boolean;
+  /** Called when user closes the tooltip (only used with forceVisible). */
+  onClose?: () => void;
 };
 
 const DONE_VALUE = '1';
@@ -42,27 +46,37 @@ export default function ScreenTooltip({
   items,
   language,
   accentColor = SCREEN_THEME.terracotta,
+  forceVisible,
+  onClose,
 }: ScreenTooltipProps) {
-  const [visible, setVisible] = useState(false);
+  const controlled = forceVisible !== undefined;
+  const [autoVisible, setAutoVisible] = useState(false);
 
   useEffect(() => {
+    if (controlled) return;
     let active = true;
     void AsyncStorage.getItem(storageKey)
       .then((value) => {
-        if (active && value !== DONE_VALUE) setVisible(true);
+        if (active && value !== DONE_VALUE) setAutoVisible(true);
       })
       .catch(() => {
-        if (active) setVisible(true);
+        if (active) setAutoVisible(true);
       });
     return () => {
       active = false;
     };
-  }, [storageKey]);
+  }, [storageKey, controlled]);
+
+  const visible = controlled ? forceVisible : autoVisible;
 
   const close = useCallback(() => {
-    setVisible(false);
-    void AsyncStorage.setItem(storageKey, DONE_VALUE).catch(() => undefined);
-  }, [storageKey]);
+    if (controlled) {
+      onClose?.();
+    } else {
+      setAutoVisible(false);
+      void AsyncStorage.setItem(storageKey, DONE_VALUE).catch(() => undefined);
+    }
+  }, [storageKey, controlled, onClose]);
 
   const localizedTitle = title[language];
   const localizedItems = items[language];

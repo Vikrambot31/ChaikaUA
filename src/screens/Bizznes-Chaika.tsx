@@ -38,6 +38,8 @@ import { ensureFirebaseAuth, requireWriteSession } from '../firebase-auth-sessio
 import { getBuildingsByStreet, getStreets } from '../data/buildings';
 import { subscribeActiveBonusPromotions, subscribeBiznesPlusPlaces, type BonusPromotion } from '../services/bonusService';
 import ScreenTooltip from '../components/ScreenTooltip';
+import HintBadge, { HINT_BADGE_LABELS } from '../components/HintBadge';
+import { useTrainingMode } from '../hooks/useTrainingMode';
 import { BUSINESS_CHAIKA_TOOLTIP } from '../utils/screenTooltips';
 
 const BIZ_LISTING_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -878,6 +880,7 @@ const BiznesChaikaScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const navLock = useRef(false);
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
+  const training = useTrainingMode('business_chaika');
   const user = useSelector((state: RootState) => state.auth.user);
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const text = UI_TEXT[language];
@@ -1539,6 +1542,8 @@ const BiznesChaikaScreen: React.FC = () => {
         items={BUSINESS_CHAIKA_TOOLTIP.items}
         language={language}
         accentColor={SCREEN_THEME.woodGreen}
+        forceVisible={training.showHint}
+        onClose={training.closeHint}
       />
       <Modal visible={searchModalVisible} animationType="slide" transparent onRequestClose={() => setSearchModalVisible(false)}>
         <View style={styles.modalOverlay}>
@@ -1633,6 +1638,14 @@ const BiznesChaikaScreen: React.FC = () => {
       </Modal>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.headerCard}>
+          <View style={{ position: 'absolute', top: 12, right: 12, zIndex: 10 }}>
+            <HintBadge
+              visible={training.isVisible}
+              onTap={training.openHint}
+              onDismiss={training.dismiss}
+              label={HINT_BADGE_LABELS[language]}
+            />
+          </View>
           <Text style={styles.headerTitle}>{text.title}</Text>
           <Text style={styles.headerSubtitle}>{text.subtitle}</Text>
           <View style={styles.liveLine}>
@@ -2266,7 +2279,7 @@ const styles = StyleSheet.create({
   textarea: { minHeight: 80, textAlignVertical: 'top' },
   pickerWrapper: { backgroundColor: '#F7F3EE', borderRadius: 16, borderWidth: 1, borderColor: '#E8DDD3', overflow: 'hidden' },
   picker: { color: SCREEN_THEME.textPrimary, height: 50 },
-  submitBtn: { backgroundColor: SCREEN_THEME.terracotta, borderRadius: 16, paddingVertical: 14, alignItems: 'center', marginTop: 14 },
+  submitBtn: { backgroundColor: '#7d0e59', borderRadius: 16, paddingVertical: 14, alignItems: 'center', marginTop: 14 },
   submitBtnText: { color: '#FFFFFF', fontWeight: '800' },
   topAnketySection: { marginBottom: 16 },
   topAnketyTitle: { fontSize: 14, fontWeight: '900', color: SCREEN_THEME.textPrimary, marginBottom: 8 },
@@ -2541,7 +2554,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#E4D0AB',
   },
   addBarBtn: {
-    backgroundColor: SCREEN_THEME.woodGreenDark,
+    backgroundColor: '#7d0e59',
     borderRadius: 16,
     paddingVertical: 14,
     alignItems: 'center',

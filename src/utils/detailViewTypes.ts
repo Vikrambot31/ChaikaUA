@@ -28,6 +28,18 @@ export type DetailItemData = {
   createdAt?: string;
   sourceType: string;
   sourceId: string;
+  // Contacts listing fields (only for sourceType 'lyudi')
+  moderationStatus?: 'pending' | 'approved' | 'rejected' | 'expired';
+  photoUris?: string[];
+  photoStoragePaths?: string[];
+  rawCondition?: string;
+  zodiacSign?: string;
+  humanDesignType?: string;
+  humanDesignProfile?: string;
+  lookingForGender?: string;
+  showPhone?: boolean;
+  lastEditedAt?: string;
+  rawPhone?: string;
   // Business+ fields (only for sourceType 'place' / 'food_top')
   businessPlusOwnerId?: string;
   businessPlusModerationStatus?: 'pending' | 'approved' | 'rejected';

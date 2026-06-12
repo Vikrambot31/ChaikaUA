@@ -113,6 +113,12 @@ const getString = (value: unknown): string => typeof value === 'string' ? value 
 
 const getNumber = (value: unknown): number => Number.isFinite(value) ? Number(value) : 0;
 
+const getTimestampFromIso = (value: unknown): number | undefined => {
+  if (typeof value !== 'string' || !value) return undefined;
+  const ts = Date.parse(value);
+  return Number.isFinite(ts) && ts > 0 ? ts : undefined;
+};
+
 const getStatus = (config: SectionConfig, value: Record<string, unknown>): ModerationStatus => {
   const raw = value[config.statusField];
   if (raw === 'approved' || raw === 'active') return 'approved';
@@ -245,7 +251,7 @@ const normalizeItem = (
     mediaUrls: [],
     ...priority,
     raw: value,
-    editedAt: getNumber(value.editedAt) || undefined,
+    editedAt: getNumber(value.editedAt) || getTimestampFromIso(value.lastEditedAt) || undefined,
     editedBy: getString(value.editedBy) || undefined,
     editHistory: Array.isArray(value.editHistory) ? value.editHistory as EditHistoryEntry[] : undefined,
   };

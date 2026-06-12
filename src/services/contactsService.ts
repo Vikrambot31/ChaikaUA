@@ -31,6 +31,7 @@ export interface ContactListing {
   humanDesignProfile?: string;
   lookingForGender?: string;
   photoUris?: string[];
+  photoStoragePaths?: string[];
   isArchived?: boolean;
   language?: AppLang;
   lastEditedAt?: string;
@@ -83,7 +84,9 @@ const mapContactItem = (id: string, data: any, isArchived?: boolean): ContactLis
   humanDesignProfile: data.humanDesignProfile || '',
   lookingForGender: data.lookingForGender || '',
   photoUris: normalizeRtdbArray(data.photoUris),
+  photoStoragePaths: normalizeRtdbArray(data.photoStoragePaths),
   isArchived,
+  lastEditedAt: data.lastEditedAt || '',
 });
 
 export const contactsService = {
@@ -367,6 +370,14 @@ export const contactsService = {
       if (fields.photoStoragePath !== undefined) {
         patch.photoStoragePath = fields.photoStoragePath;
         patch.photoUri = '';
+      }
+      if (fields.photoUris !== undefined) patch.photoUris = fields.photoUris;
+      if (fields.photoStoragePaths !== undefined) {
+        patch.photoStoragePaths = fields.photoStoragePaths;
+        if (fields.photoStoragePaths.length > 0) {
+          patch.photoStoragePath = fields.photoStoragePaths[0];
+          patch.photoUri = '';
+        }
       }
       if (fields.language !== undefined) patch.language = normalizeAppLang(fields.language, 'ua');
       const descText = (patch.description as string) ?? existing.description ?? '';

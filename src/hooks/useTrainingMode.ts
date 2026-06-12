@@ -46,5 +46,11 @@ export function useTrainingMode(screenKey: string) {
     void AsyncStorage.setItem(GLOBAL_KEY, on ? 'on' : 'off').catch(() => undefined);
   }, []);
 
-  return { isVisible, dismiss, globalOn, setGlobal };
+  /* ── hint content visibility (tap badge → open, close → hide) ── */
+  const [showHint, setShowHint] = useState(false);
+
+  const openHint = useCallback(() => setShowHint(true), []);
+  const closeHint = useCallback(() => setShowHint(false), []);
+
+  return { isVisible, dismiss, showHint, openHint, closeHint, globalOn, setGlobal };
 }

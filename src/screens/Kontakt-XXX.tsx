@@ -38,6 +38,8 @@ import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 import { useOperationTrace } from '../hooks/useOperationTrace';
 import { subscribeActiveBonusPromotions, type BonusPromotion } from '../services/bonusService';
 import ScreenTooltip from '../components/ScreenTooltip';
+import HintBadge, { HINT_BADGE_LABELS } from '../components/HintBadge';
+import { useTrainingMode } from '../hooks/useTrainingMode';
 import { CONTACTS_CHAIKA_TOOLTIP } from '../utils/screenTooltips';
 import { VideoLoadingOverlay } from '../components/VideoLoadingOverlay';
 
@@ -503,6 +505,7 @@ const KontaktiChaikyScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const navLock = useRef(false);
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
+  const training = useTrainingMode('contacts_chaika');
   const user = useSelector((state: RootState) => state.auth.user);
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const text = UI_TEXT[language];
@@ -1264,6 +1267,7 @@ const KontaktiChaikyScreen: React.FC = () => {
       title: item.itemName,
       description: item.description,
       phone: item.showPhone !== false ? item.phone : undefined,
+      rawPhone: item.phone,
       photoUri: item.photoUri,
       photoStoragePath: item.photoStoragePath,
       category: categoryLabel || conditionLabel,
@@ -1275,6 +1279,16 @@ const KontaktiChaikyScreen: React.FC = () => {
       createdAt: item.createdAt,
       sourceType: 'lyudi',
       sourceId: item.id,
+      moderationStatus: item.moderationStatus,
+      photoUris: item.photoUris ?? (item.photoUri ? [item.photoUri] : []),
+      photoStoragePaths: item.photoStoragePaths ?? (item.photoStoragePath ? [item.photoStoragePath] : []),
+      rawCondition: item.condition,
+      zodiacSign: item.zodiacSign,
+      humanDesignType: item.humanDesignType,
+      humanDesignProfile: item.humanDesignProfile,
+      lookingForGender: item.lookingForGender,
+      showPhone: item.showPhone,
+      lastEditedAt: item.lastEditedAt,
     };
   };
 
@@ -1305,6 +1319,8 @@ const KontaktiChaikyScreen: React.FC = () => {
         items={CONTACTS_CHAIKA_TOOLTIP.items}
         language={language}
         accentColor={SCREEN_THEME.woodGreen}
+        forceVisible={training.showHint}
+        onClose={training.closeHint}
       />
       <Modal visible={searchModalVisible} animationType="slide" transparent onRequestClose={() => setSearchModalVisible(false)}>
         <View style={styles.modalOverlay}>
@@ -1399,6 +1415,14 @@ const KontaktiChaikyScreen: React.FC = () => {
       </Modal>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={400} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#CA8A04" colors={['#CA8A04']} />}>
         <View style={styles.headerCard}>
+          <View style={{ position: 'absolute', top: 12, right: 12, zIndex: 10 }}>
+            <HintBadge
+              visible={training.isVisible}
+              onTap={training.openHint}
+              onDismiss={training.dismiss}
+              label={HINT_BADGE_LABELS[language]}
+            />
+          </View>
           <Text style={styles.headerTitle}>{text.title}</Text>
           <Text style={styles.headerSubtitle}>{text.subtitle}</Text>
           <View style={styles.liveLine}>
@@ -2214,8 +2238,8 @@ const styles = StyleSheet.create({
   textarea: { minHeight: 80, textAlignVertical: 'top' },
   pickerWrapper: { backgroundColor: '#FFFFFF', borderRadius: 14, borderWidth: 1.5, borderColor: '#E8D9B5', overflow: 'hidden' },
   picker: { color: '#612e51', height: 50 },
-  submitBtn: { backgroundColor: '#CA8A04', borderRadius: 16, paddingVertical: 15, alignItems: 'center', marginTop: 16 },
-  submitBtnText: { color: '#612e51', fontWeight: '900', fontSize: 15, letterSpacing: 0.5 },
+  submitBtn: { backgroundColor: '#7d0e59', borderRadius: 16, paddingVertical: 15, alignItems: 'center', marginTop: 16 },
+  submitBtnText: { color: '#fff', fontWeight: '900', fontSize: 15, letterSpacing: 0.5 },
   topAnketySection: { marginBottom: 18 },
   topAnketyTitle: { fontSize: 11, fontWeight: '800', color: '#44403C', marginBottom: 10, letterSpacing: 1.2, textTransform: 'uppercase' },
   topAnketyScroll: { paddingHorizontal: 4, gap: 14 },
@@ -2471,7 +2495,7 @@ const styles = StyleSheet.create({
   },
   addBarBtn: {
     flex: 1,
-    backgroundColor: '#612e51',
+    backgroundColor: '#7d0e59',
     borderRadius: 16,
     paddingVertical: 14,
     alignItems: 'center',
@@ -2479,13 +2503,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#CA8A04',
   },
-  addBarBtnText: { color: '#CA8A04', fontSize: 15, fontWeight: '900', letterSpacing: 0.5 },
+  addBarBtnText: { color: '#fff', fontSize: 15, fontWeight: '900', letterSpacing: 0.5 },
   swipeModeBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#612e51',
+    backgroundColor: '#7d0e59',
     borderRadius: 16,
     paddingVertical: 14,
     paddingHorizontal: 18,
@@ -2631,7 +2655,7 @@ const styles = StyleSheet.create({
     borderColor: '#44403C',
     gap: 20,
   },
-  swipeFilterTitle: { fontSize: 20, fontWeight: '900', color: '#FAFAF9', textAlign: 'center' },
+  swipeFilterTitle: { fontSize: 20, fontWeight: '900', color: '#FFFFFF', textAlign: 'center' },
   swipeFilterPills: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' },
   swipeFilterPill: {
     borderWidth: 1,
@@ -2642,10 +2666,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#612e51',
   },
   swipeFilterPillActive: { borderColor: '#CA8A04', backgroundColor: 'rgba(202,138,4,0.15)' },
-  swipeFilterPillText: { color: '#B5A990', fontSize: 14, fontWeight: '700' },
+  swipeFilterPillText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
   swipeFilterPillTextActive: { color: '#CA8A04' },
   swipeFilterAgeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, justifyContent: 'center' },
-  swipeFilterAgeLabel: { color: '#B5A990', fontSize: 14, fontWeight: '700' },
+  swipeFilterAgeLabel: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
   swipeFilterAgeInput: {
     backgroundColor: '#612e51',
     borderWidth: 1,
@@ -2662,7 +2686,7 @@ const styles = StyleSheet.create({
   swipeFilterStartBtn: { backgroundColor: '#CA8A04', borderRadius: 16, paddingVertical: 16, alignItems: 'center' },
   swipeFilterStartBtnText: { color: '#612e51', fontWeight: '900', fontSize: 16 },
   swipeFilterSkipBtn: { alignItems: 'center', paddingVertical: 4 },
-  swipeFilterSkipText: { color: '#78716C', fontSize: 13, fontWeight: '700' },
+  swipeFilterSkipText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
   sheetOverlay: { flex: 1, justifyContent: 'flex-end' },
   sheetBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(97,46,81,0.6)' },
   sheetWrapper: { justifyContent: 'flex-end' },

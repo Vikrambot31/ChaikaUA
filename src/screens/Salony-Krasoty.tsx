@@ -39,6 +39,7 @@ import { showUserError } from '../utils/userFacingErrors';
 import { beautyTopService } from '../services/beautyTopService';
 import { useTrainingMode } from '../hooks/useTrainingMode';
 import TrainingHint from '../components/TrainingHint';
+import HintBadge, { HINT_BADGE_LABELS } from '../components/HintBadge';
 
 type Lang = 'ua' | 'ru' | 'en';
 type AppNavigation = NavigationProp<Record<string, object | undefined>>;
@@ -695,6 +696,14 @@ export default function SalonyKrasotyScreen() {
             <Text style={styles.title}>{text.title}</Text>
             <Text style={styles.subtitle}>{text.subtitle}</Text>
           </View>
+          <View style={{ position: 'absolute', top: 12, right: 12, zIndex: 10 }}>
+            <HintBadge
+              visible={training.isVisible}
+              onTap={training.openHint}
+              onDismiss={training.dismiss}
+              label={HINT_BADGE_LABELS[language]}
+            />
+          </View>
         </View>
 
         <View style={styles.searchBox}>
@@ -874,8 +883,8 @@ export default function SalonyKrasotyScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-      {training.isVisible && (
-        <TrainingHint text={TRAINING_HINT[language]} onDismiss={training.dismiss} />
+      {training.showHint && (
+        <TrainingHint text={TRAINING_HINT[language]} onDismiss={training.closeHint} />
       )}
     </SafeAreaView>
   );
