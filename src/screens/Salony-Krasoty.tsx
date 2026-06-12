@@ -61,6 +61,7 @@ const UI_TEXT = {
     actualEmptyText: 'Салони зможуть показувати свої акції, нових майстрів та вільні вікна для мешканців району.',
     addOffer: 'Додати акцію',
     addPlace: 'Додати місце',
+    showMore: 'Більше',
     businessOwner: 'Ви власник салону?',
     categoriesTitle: 'Категорії',
     allPlacesTitle: 'Всі салони',
@@ -141,6 +142,7 @@ const UI_TEXT = {
     actualEmptyText: 'Салоны смогут показывать свои акции, новых мастеров и свободные окна для жителей района.',
     addOffer: 'Добавить акцию',
     addPlace: 'Добавить место',
+    showMore: 'Больше',
     businessOwner: 'Вы владелец салона?',
     categoriesTitle: 'Категории',
     allPlacesTitle: 'Все салоны',
@@ -221,6 +223,7 @@ const UI_TEXT = {
     actualEmptyText: 'Salons will be able to show their promotions, new masters and available slots for local residents.',
     addOffer: 'Add promotion',
     addPlace: 'Add place',
+    showMore: 'More',
     businessOwner: 'Salon owner?',
     categoriesTitle: 'Categories',
     allPlacesTitle: 'All salons',
@@ -369,6 +372,7 @@ export default function SalonyKrasotyScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const resultsAnchorY = useRef(0);
   const { showSuccess } = useSoftToast();
+  const [showAllPlaces, setShowAllPlaces] = useState(false);
 
   // --- Add-place form state ---
   const [addFormVisible, setAddFormVisible] = useState(false);
@@ -583,6 +587,7 @@ export default function SalonyKrasotyScreen() {
 
   const handleCategoryPress = (category: CategoryKey) => {
     setActiveCategory(category);
+    setShowAllPlaces(false);
     setTimeout(() => {
       scrollRef.current?.scrollTo({
         y: Math.max(resultsAnchorY.current - 10, 0),
@@ -752,7 +757,7 @@ export default function SalonyKrasotyScreen() {
         >
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>{text.allPlacesTitle}</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 }}>
               <Text style={styles.resultCount}>{filteredPlaces.length}</Text>
               <TouchableOpacity style={styles.addPlaceButton} activeOpacity={0.88} onPress={openBusinessForm}>
                 <MaterialCommunityIcons name="store-plus" size={14} color="#FFFFFF" />
@@ -761,19 +766,31 @@ export default function SalonyKrasotyScreen() {
             </View>
           </View>
 
-          <FlatList
-            scrollEnabled={false}
-            data={filteredPlaces}
-            keyExtractor={(item) => item.place.id}
-            renderItem={({ item }) => renderPlaceCard(item)}
-            contentContainerStyle={filteredPlaces.length > 0 ? styles.cardList : undefined}
-            ListEmptyComponent={
-              <View style={styles.emptyState}>
-                <MaterialCommunityIcons name="magnify-close" size={34} color={SCREEN_THEME.textMuted} />
-                <Text style={styles.emptyText}>{text.noResults}</Text>
-              </View>
-            }
-          />
+          <>
+            <FlatList
+              scrollEnabled={false}
+              data={showAllPlaces ? filteredPlaces : filteredPlaces.slice(0, 4)}
+              keyExtractor={(item) => item.place.id}
+              renderItem={({ item }) => renderPlaceCard(item)}
+              contentContainerStyle={filteredPlaces.length > 0 ? styles.cardList : undefined}
+              ListEmptyComponent={
+                <View style={styles.emptyState}>
+                  <MaterialCommunityIcons name="magnify-close" size={34} color={SCREEN_THEME.textMuted} />
+                  <Text style={styles.emptyText}>{text.noResults}</Text>
+                </View>
+              }
+            />
+            {!showAllPlaces && filteredPlaces.length > 4 ? (
+              <TouchableOpacity
+                style={styles.showMoreButton}
+                activeOpacity={0.82}
+                onPress={() => setShowAllPlaces(true)}
+              >
+                <Text style={styles.showMoreText}>{text.showMore}</Text>
+                <MaterialCommunityIcons name="chevron-down" size={18} color={SCREEN_THEME.terracottaDark} />
+              </TouchableOpacity>
+            ) : null}
+          </>
         </View>
       </ScrollView>
 
@@ -922,9 +939,12 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   sectionTitle: {
+    flex: 1,
+    flexShrink: 1,
     fontSize: 18,
     fontWeight: '900',
     color: SCREEN_THEME.textPrimary,
+    marginRight: 8,
   },
   resultCount: {
     minWidth: 30,
@@ -983,10 +1003,14 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   categoryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: TILE_GAP,
     marginBottom: 6,
   },
   categoryTile: {
+    flex: 1,
+    flexBasis: '47%',
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 18,
@@ -1241,6 +1265,23 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     color: SCREEN_THEME.enamelBlueDark,
+  },
+  showMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderRadius: 18,
+    paddingVertical: 13,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: SCREEN_THEME.borderSoft,
+  },
+  showMoreText: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: SCREEN_THEME.terracottaDark,
   },
   addPlaceButton: {
     flexDirection: 'row',

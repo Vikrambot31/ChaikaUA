@@ -101,6 +101,7 @@ const UI_TEXT = {
     share: 'Поділитися',
     favoriteAdded: 'Додано в обране',
     favoriteRemoved: 'Видалено з обраного',
+    showMore: 'Більше',
     errorTitle: 'Помилка',
     ok: 'OK',
     filters: {
@@ -160,6 +161,7 @@ const UI_TEXT = {
     share: 'Поделиться',
     favoriteAdded: 'Добавлено в избранное',
     favoriteRemoved: 'Удалено из избранного',
+    showMore: 'Больше',
     errorTitle: 'Ошибка',
     ok: 'OK',
     filters: {
@@ -219,6 +221,7 @@ const UI_TEXT = {
     share: 'Share',
     favoriteAdded: 'Added to favorites',
     favoriteRemoved: 'Removed from favorites',
+    showMore: 'More',
     errorTitle: 'Error',
     ok: 'OK',
     filters: {
@@ -323,6 +326,7 @@ export default function EdaNaChaykeScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const offersSectionY = useRef(0);
   const { showSuccess } = useSoftToast();
+  const [showAllEatPlaces, setShowAllEatPlaces] = useState(false);
 
   useEffect(() => {
     logFoodEvent('food_open_screen');
@@ -934,6 +938,7 @@ export default function EdaNaChaykeScreen() {
                   onPress={() => {
                     logFoodEvent('food_select_category', { category: filter.key });
                     setEatFilter(filter.key);
+                    setShowAllEatPlaces(false);
                   }}
                   activeOpacity={0.84}
                 >
@@ -962,19 +967,31 @@ export default function EdaNaChaykeScreen() {
           ) : null}
 
           {/* Place list */}
-          <FlatList
-            scrollEnabled={false}
-            data={eatPlaces}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => renderPlaceCard(item)}
-            contentContainerStyle={eatPlaces.length > 0 ? styles.cardList : undefined}
-            ListEmptyComponent={
-              <View style={styles.emptyState}>
-                <MaterialCommunityIcons name="magnify-close" size={34} color={SCREEN_THEME.textMuted} />
-                <Text style={styles.emptyText}>{text.noPlaces}</Text>
-              </View>
-            }
-          />
+          <>
+            <FlatList
+              scrollEnabled={false}
+              data={showAllEatPlaces ? eatPlaces : eatPlaces.slice(0, 4)}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => renderPlaceCard(item)}
+              contentContainerStyle={eatPlaces.length > 0 ? styles.cardList : undefined}
+              ListEmptyComponent={
+                <View style={styles.emptyState}>
+                  <MaterialCommunityIcons name="magnify-close" size={34} color={SCREEN_THEME.textMuted} />
+                  <Text style={styles.emptyText}>{text.noPlaces}</Text>
+                </View>
+              }
+            />
+            {!showAllEatPlaces && eatPlaces.length > 4 ? (
+              <TouchableOpacity
+                style={styles.showMoreButton}
+                activeOpacity={0.82}
+                onPress={() => setShowAllEatPlaces(true)}
+              >
+                <Text style={styles.showMoreText}>{text.showMore}</Text>
+                <MaterialCommunityIcons name="chevron-down" size={18} color={SCREEN_THEME.terracottaDark} />
+              </TouchableOpacity>
+            ) : null}
+          </>
         </ScrollView>
         <View style={styles.addTopBar}>
           <TouchableOpacity style={styles.addTopButton} onPress={handleOpenTopForm} activeOpacity={0.88}>
@@ -1650,6 +1667,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 8,
+  },
+
+  showMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderRadius: 18,
+    paddingVertical: 13,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: SCREEN_THEME.borderSoft,
+  },
+  showMoreText: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: SCREEN_THEME.terracottaDark,
   },
 
   // Empty state

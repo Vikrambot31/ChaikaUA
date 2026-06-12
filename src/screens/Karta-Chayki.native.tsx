@@ -47,6 +47,7 @@ const UI_TEXT = {
     loadError: 'Не вдалося завантажити місця',
     retry: 'Спробувати ще раз',
     support: 'Якщо проблема зберігається: support_chaika_ua@ukr.net',
+    showMore: 'Більше',
   },
   ru: {
     all: 'Все',
@@ -59,6 +60,7 @@ const UI_TEXT = {
     loadError: 'Не удалось загрузить места',
     retry: 'Попробовать снова',
     support: 'Если проблема сохраняется: support_chaika_ua@ukr.net',
+    showMore: 'Больше',
   },
   en: {
     all: 'All',
@@ -71,6 +73,7 @@ const UI_TEXT = {
     loadError: 'Failed to load places',
     retry: 'Try again',
     support: 'If the issue persists: support_chaika_ua@ukr.net',
+    showMore: 'More',
   },
 } as const;
 
@@ -176,6 +179,7 @@ const MapScreen: React.FC = () => {
   const error = useSelector((state: RootState) => state.places.error);
   const selectedTypes = useSelector((state: RootState) => state.places.selectedTypes);
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
+  const [showAllMapPlaces, setShowAllMapPlaces] = useState(false);
   const [detailsPanelVisible, setDetailsPanelVisible] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [typeSearchText, setTypeSearchText] = useState('');
@@ -375,6 +379,10 @@ const MapScreen: React.FC = () => {
       { edgePadding: { top: 45, right: 45, bottom: 45, left: 45 }, animated: true }
     );
   }, [activePlaces]);
+
+  useEffect(() => {
+    setShowAllMapPlaces(false);
+  }, [searchText, typeSearchText, selectedTypes]);
 
   const focusPlace = useCallback((place: Place) => {
     setSelectedPlaceId(place.id);
@@ -633,12 +641,20 @@ const MapScreen: React.FC = () => {
 
       <FlatList
         ref={listRef}
-        data={activePlaces}
+        data={showAllMapPlaces ? activePlaces : activePlaces.slice(0, 4)}
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
         keyboardShouldPersistTaps="handled"
         ListHeaderComponent={listHeader}
+        ListFooterComponent={
+          !showAllMapPlaces && activePlaces.length > 4 ? (
+            <TouchableOpacity style={styles.showMoreButton} activeOpacity={0.82} onPress={() => setShowAllMapPlaces(true)}>
+              <Text style={styles.showMoreText}>{text.showMore}</Text>
+              <MaterialCommunityIcons name="chevron-down" size={18} color={SCREEN_THEME.terracottaDark} />
+            </TouchableOpacity>
+          ) : null
+        }
         ListEmptyComponent={renderEmpty}
         initialNumToRender={8}
         maxToRenderPerBatch={8}
@@ -968,6 +984,24 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#4285F4',
     fontWeight: '600',
+  },
+  showMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderRadius: 18,
+    paddingVertical: 13,
+    marginHorizontal: 16,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#E4D0AB',
+  },
+  showMoreText: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: SCREEN_THEME.terracottaDark,
   },
   emptyContainer: {
     height: 300,

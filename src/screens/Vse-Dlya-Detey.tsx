@@ -62,6 +62,7 @@ const UI_TEXT = {
     actualEmptyTitle: 'Тут зʼявляться відкриті дні та акції',
     actualEmptyText: 'Садочки, школи та гуртки зможуть показувати набори, пробні заняття й події для мешканців району.',
     addPlace: 'Додати місце',
+    showMore: 'Більше',
     addPlaceFormTitle: 'Додати дитяче місце',
     formNameLabel: 'Назва',
     formNamePlaceholder: 'Назва закладу або гуртка',
@@ -157,6 +158,7 @@ const UI_TEXT = {
     actualEmptyTitle: 'Здесь появятся открытые дни и акции',
     actualEmptyText: 'Садики, школы и кружки смогут показывать наборы, пробные занятия и события для жителей района.',
     addPlace: 'Добавить место',
+    showMore: 'Больше',
     addPlaceFormTitle: 'Добавить детское место',
     formNameLabel: 'Название',
     formNamePlaceholder: 'Название заведения или кружка',
@@ -252,6 +254,7 @@ const UI_TEXT = {
     actualEmptyTitle: 'Open days and offers will appear here',
     actualEmptyText: 'Kindergartens, schools and clubs will be able to show enrollments, trial lessons and local events.',
     addPlace: 'Add place',
+    showMore: 'More',
     addPlaceFormTitle: 'Add kids place',
     formNameLabel: 'Name',
     formNamePlaceholder: 'Place or club name',
@@ -455,6 +458,7 @@ export default function VseDlyaDeteyScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const resultsAnchorY = useRef(0);
   const { showSuccess } = useSoftToast();
+  const [showAllPlaces, setShowAllPlaces] = useState(false);
 
   // --- Add-place form state ---
   const [addFormVisible, setAddFormVisible] = useState(false);
@@ -666,6 +670,7 @@ export default function VseDlyaDeteyScreen() {
 
   const handleCategoryPress = (category: CategoryKey) => {
     setActiveCategory(category);
+    setShowAllPlaces(false);
     setTimeout(() => {
       scrollRef.current?.scrollTo({
         y: Math.max(resultsAnchorY.current - 10, 0),
@@ -966,7 +971,7 @@ export default function VseDlyaDeteyScreen() {
         >
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>{isEventsCategory ? text.eventsListTitle : text.allPlacesTitle}</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 }}>
               <Text style={styles.resultCount}>{isEventsCategory ? activeOffers.length : filteredPlaces.length}</Text>
               <TouchableOpacity style={styles.addPlaceButton} activeOpacity={0.88} onPress={openBusinessForm}>
                 <MaterialCommunityIcons name="store-plus" size={14} color="#FFFFFF" />
@@ -990,19 +995,31 @@ export default function VseDlyaDeteyScreen() {
               }
             />
           ) : (
-            <FlatList
-              scrollEnabled={false}
-              data={filteredPlaces}
-              keyExtractor={(item) => item.place.id}
-              renderItem={({ item }) => renderPlaceCard(item)}
-              contentContainerStyle={filteredPlaces.length > 0 ? styles.cardList : undefined}
-              ListEmptyComponent={
-                <View style={styles.emptyState}>
-                  <MaterialCommunityIcons name="magnify-close" size={34} color={SCREEN_THEME.textMuted} />
-                  <Text style={styles.emptyText}>{text.noResults}</Text>
-                </View>
-              }
-            />
+            <>
+              <FlatList
+                scrollEnabled={false}
+                data={showAllPlaces ? filteredPlaces : filteredPlaces.slice(0, 4)}
+                keyExtractor={(item) => item.place.id}
+                renderItem={({ item }) => renderPlaceCard(item)}
+                contentContainerStyle={filteredPlaces.length > 0 ? styles.cardList : undefined}
+                ListEmptyComponent={
+                  <View style={styles.emptyState}>
+                    <MaterialCommunityIcons name="magnify-close" size={34} color={SCREEN_THEME.textMuted} />
+                    <Text style={styles.emptyText}>{text.noResults}</Text>
+                  </View>
+                }
+              />
+              {!showAllPlaces && filteredPlaces.length > 4 ? (
+                <TouchableOpacity
+                  style={styles.showMoreButton}
+                  activeOpacity={0.82}
+                  onPress={() => setShowAllPlaces(true)}
+                >
+                  <Text style={styles.showMoreText}>{text.showMore}</Text>
+                  <MaterialCommunityIcons name="chevron-down" size={18} color={SCREEN_THEME.terracottaDark} />
+                </TouchableOpacity>
+              ) : null}
+            </>
           )}
         </View>
 
@@ -1188,9 +1205,12 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   sectionTitle: {
+    flex: 1,
+    flexShrink: 1,
     fontSize: 18,
     fontWeight: '900',
     color: SCREEN_THEME.textPrimary,
+    marginRight: 8,
   },
   resultCount: {
     minWidth: 30,
@@ -1237,10 +1257,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   categoryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: TILE_GAP,
     marginBottom: 6,
   },
   categoryTile: {
+    flex: 1,
+    flexBasis: '47%',
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 18,
@@ -1516,6 +1540,23 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     color: SCREEN_THEME.enamelBlueDark,
+  },
+  showMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderRadius: 18,
+    paddingVertical: 13,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: SCREEN_THEME.borderSoft,
+  },
+  showMoreText: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: SCREEN_THEME.terracottaDark,
   },
   addPlaceButton: {
     flexDirection: 'row',

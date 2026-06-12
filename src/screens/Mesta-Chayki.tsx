@@ -112,6 +112,7 @@ const UI_TEXT = {
     ratingLimitTitle: 'Ліміт',
     ratingLimitText: 'Завтра зможете поставити ще.',
     share: 'Поділитися',
+    showMore: 'Більше',
     favoriteAdded: 'Додано в обране',
     favoriteRemoved: 'Видалено з обраного',
     typeLabels: {
@@ -161,6 +162,7 @@ const UI_TEXT = {
     ratingLimitTitle: 'Лимит',
     ratingLimitText: 'Завтра сможете поставить еще.',
     share: 'Поделиться',
+    showMore: 'Больше',
     favoriteAdded: 'Добавлено в избранное',
     favoriteRemoved: 'Удалено из избранного',
     typeLabels: {
@@ -210,6 +212,7 @@ const UI_TEXT = {
     ratingLimitTitle: 'Limit',
     ratingLimitText: 'You can add more ratings tomorrow.',
     share: 'Share',
+    showMore: 'More',
     favoriteAdded: 'Added to favorites',
     favoriteRemoved: 'Removed from favorites',
     typeLabels: {
@@ -355,6 +358,7 @@ const PlacesScreen: React.FC = () => {
   const currentUserId = useSelector(selectUserId);
   const text = UI_TEXT[language];
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+  const [showAllItems, setShowAllItems] = useState(false);
   const { showSuccess } = useSoftToast();
 
   const defaultSection: SectionKey = route.params?.section ?? mapLegacyTabToSection(route.params?.tab) ?? 'restaurants';
@@ -557,6 +561,7 @@ const PlacesScreen: React.FC = () => {
 
   const setSection = (section: SectionKey) => {
     setActiveSection(section);
+    setShowAllItems(false);
     void AsyncStorage.setItem(ACTIVE_SECTION_KEY, section);
   };
 
@@ -687,25 +692,33 @@ const PlacesScreen: React.FC = () => {
             <Text style={styles.emptyText}>{text.noData}</Text>
           </View>
         ) : (
-          items.map((place, idx) => (
-            <PlaceRow
-              key={place.id}
-              place={place}
-              idx={idx}
-              section={activeSection}
-              ratings={ratings}
-              onRatePress={setRatingTarget}
-              typeLabel={text.typeLabels[place.type]}
-              navigation={navigation}
-              votesLabel={text.votes}
-              navLock={navLock}
-              currentUserId={currentUserId}
-              isFav={favoriteIds.has(place.id)}
-              onShare={handleSharePlace}
-              onToggleFavorite={handleToggleFavorite}
-              shareLabel={text.share}
-            />
-          ))
+          <>
+            {(showAllItems ? items : items.slice(0, 4)).map((place, idx) => (
+              <PlaceRow
+                key={place.id}
+                place={place}
+                idx={idx}
+                section={activeSection}
+                ratings={ratings}
+                onRatePress={setRatingTarget}
+                typeLabel={text.typeLabels[place.type]}
+                navigation={navigation}
+                votesLabel={text.votes}
+                navLock={navLock}
+                currentUserId={currentUserId}
+                isFav={favoriteIds.has(place.id)}
+                onShare={handleSharePlace}
+                onToggleFavorite={handleToggleFavorite}
+                shareLabel={text.share}
+              />
+            ))}
+            {!showAllItems && items.length > 4 ? (
+              <TouchableOpacity style={styles.showMoreButton} activeOpacity={0.82} onPress={() => setShowAllItems(true)}>
+                <Text style={styles.showMoreText}>{text.showMore}</Text>
+                <MaterialCommunityIcons name="chevron-down" size={18} color={SCREEN_THEME.terracottaDark} />
+              </TouchableOpacity>
+            ) : null}
+          </>
         )}
       </ScrollView>
 
@@ -849,6 +862,23 @@ const styles = StyleSheet.create({
   residentTitle: { flex: 1, fontSize: 14, fontWeight: '800', color: SCREEN_THEME.textPrimary },
   residentMeta: { fontSize: 11, fontWeight: '700', color: SCREEN_THEME.textSecondary },
   residentDesc: { fontSize: 12, color: SCREEN_THEME.textSecondary, lineHeight: 16 },
+  showMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderRadius: 18,
+    paddingVertical: 13,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#E4D0AB',
+  },
+  showMoreText: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: SCREEN_THEME.terracottaDark,
+  },
   emptyCard: {
     backgroundColor: SCREEN_THEME.paperStrong,
     borderRadius: 16,

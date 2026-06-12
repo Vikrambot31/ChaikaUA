@@ -83,6 +83,7 @@ const RATING_SYNC_NOTICE = {
 
 const RATING_UI_TEXT = {
   ua: {
+    showMore: 'Більше',
     loading: 'Завантажуємо спільний рейтинг...',
     sharedInfo: 'Рейтинг спільний для всіх користувачів. Один користувач може оновити свою оцінку одного будинку один раз на день.',
     authInline: 'Оцінювати можуть тільки зареєстровані користувачі.',
@@ -92,6 +93,7 @@ const RATING_UI_TEXT = {
     updated: 'Оцінку оновлено. Дякуємо!',
   },
   ru: {
+    showMore: 'Больше',
     loading: 'Загружаем общий рейтинг...',
     sharedInfo: 'Рейтинг общий для всех пользователей. Один пользователь может обновить свою оценку одного дома один раз в день.',
     authInline: 'Оценивать могут только зарегистрированные пользователи.',
@@ -101,6 +103,7 @@ const RATING_UI_TEXT = {
     updated: 'Оценка обновлена. Спасибо!',
   },
   en: {
+    showMore: 'More',
     loading: 'Loading shared rating...',
     sharedInfo: 'The rating is shared for all users. One user can update their building rating once per day.',
     authInline: 'Only registered users can rate buildings.',
@@ -155,6 +158,7 @@ export default function RatingScreen() {
   const explanation = RATING_EXPLANATION[language];
   const uiText = RATING_UI_TEXT[language];
   const [tab, setTab] = useState<'top20' | 'vote'>('top20');
+  const [showAllBuildings, setShowAllBuildings] = useState(false);
   const [ratings, setRatings] = useState<Record<string, number>>(getEmptyRatingInput);
   const [selectedBuildingId, setSelectedBuildingId] = useState(BUILDINGS[0]?.id ?? '');
   const [buildingPickerOpen, setBuildingPickerOpen] = useState(false);
@@ -296,7 +300,7 @@ export default function RatingScreen() {
       <>
           {tab === 'top20' ? (
             <FlatList
-              data={buildingList}
+              data={showAllBuildings ? buildingList : buildingList.slice(0, 4)}
               keyExtractor={(item) => item.id}
               contentContainerStyle={styles.list}
               ListHeaderComponent={(
@@ -373,6 +377,14 @@ export default function RatingScreen() {
                 </TouchableOpacity>
                 </TouchableOpacity>
               )}
+              ListFooterComponent={
+                !showAllBuildings && buildingList.length > 4 ? (
+                  <TouchableOpacity style={styles.showMoreButton} activeOpacity={0.82} onPress={() => setShowAllBuildings(true)}>
+                    <Text style={styles.showMoreText}>{uiText.showMore}</Text>
+                    <MaterialCommunityIcons name="chevron-down" size={18} color={SCREEN_THEME.terracottaDark} />
+                  </TouchableOpacity>
+                ) : null
+              }
             />
           ) : (
             <ScrollView contentContainerStyle={styles.voteScroll}>
@@ -779,4 +791,6 @@ const styles = StyleSheet.create({
   detailVotesText: { color: SCREEN_THEME.woodGreenDark, fontWeight: '900', fontSize: 14 },
   detailCard: { backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 22, padding: 16, marginTop: 14, marginBottom: 14, borderWidth: 1, borderColor: '#E4D0AB' },
   detailStatRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#EFE0C1' },
+  showMoreButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 18, paddingVertical: 13, marginHorizontal: 16, marginBottom: 10, borderWidth: 1, borderColor: '#E4D0AB' },
+  showMoreText: { fontSize: 15, fontWeight: '900', color: SCREEN_THEME.terracottaDark },
 });

@@ -22,6 +22,7 @@ import { useGuestGuard } from '../hooks/useGuestGuard';
 import { requireAuthForDetails } from '../utils/authGuard';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { VideoLoadingOverlay } from '../components/VideoLoadingOverlay';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 export const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000;
 
@@ -121,6 +122,7 @@ export const UI_TEXT = {
     ok: 'OK',
     loginBtn: 'Увійти',
     authRequired: 'Увійдіть в акаунт, щоб додати оголошення.',
+    showMore: 'Більше',
   },
   ru: {
     title: 'Куплю / Продам',
@@ -281,6 +283,7 @@ export const UI_TEXT = {
     ok: 'OK',
     loginBtn: 'Sign in',
     authRequired: 'Sign in to add a listing.',
+    showMore: 'More',
   },
 } as const;
 
@@ -306,6 +309,7 @@ const BuySellScreen: React.FC = () => {
   const [searchPriceTo, setSearchPriceTo] = useState('');
   const [searchContact, setSearchContact] = useState('');
   const [searchDescription, setSearchDescription] = useState('');
+  const [showAllListings, setShowAllListings] = useState(false);
   const blinkAnim = useRef(new Animated.Value(1)).current;
   const avatarByUserId = useUserAvatarMap(listings.map((item) => item.userId));
 
@@ -393,6 +397,10 @@ const BuySellScreen: React.FC = () => {
       searchPriceTo,
     ],
   );
+
+  useEffect(() => {
+    setShowAllListings(false);
+  }, [selectedFilterCategory, selectedFilterListingType, searchItemName, searchCategory, searchListingType, searchCondition, searchPriceFrom, searchPriceTo, searchContact, searchDescription]);
 
   const resetSearch = () => {
     setSearchItemName('');
@@ -559,7 +567,7 @@ const BuySellScreen: React.FC = () => {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
-        data={listings.length > 0 ? filteredListings : []}
+        data={listings.length > 0 ? (showAllListings ? filteredListings : filteredListings.slice(0, 4)) : []}
         keyExtractor={(item) => item.id}
         initialNumToRender={8}
         windowSize={5}
@@ -684,6 +692,14 @@ const BuySellScreen: React.FC = () => {
             </TouchableOpacity>
           );
         }}
+        ListFooterComponent={
+          !showAllListings && filteredListings.length > 4 ? (
+            <TouchableOpacity style={styles.showMoreButton} activeOpacity={0.82} onPress={() => setShowAllListings(true)}>
+              <Text style={styles.showMoreText}>{text.showMore}</Text>
+              <MaterialCommunityIcons name="chevron-down" size={18} color={SCREEN_THEME.terracottaDark} />
+            </TouchableOpacity>
+          ) : null
+        }
         ListEmptyComponent={
           !listingsReady ? (
             <View style={styles.emptyFiltered}>
@@ -822,6 +838,8 @@ const styles = StyleSheet.create({
   listingDescriptionCompact: { backgroundColor: '#F7F3EE', color: SCREEN_THEME.textPrimary, borderWidth: 1, borderColor: '#E8DDD3', marginBottom: 6 },
   listingPhoto: { width: '100%', height: 220, borderRadius: 16, marginBottom: 8, backgroundColor: '#F0EDE8' },
   moderationInfo: { color: '#5F5043', backgroundColor: '#FFF8EA', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 8, fontSize: 12, lineHeight: 17, fontWeight: '700' },
+  showMoreButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 18, paddingVertical: 13, marginBottom: 10, borderWidth: 1, borderColor: '#E4D0AB' },
+  showMoreText: { fontSize: 15, fontWeight: '900', color: SCREEN_THEME.terracottaDark },
   addBar: {
     paddingHorizontal: 16,
     paddingVertical: 10,

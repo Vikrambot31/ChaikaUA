@@ -167,6 +167,7 @@ const UI_TEXT = {
     viewProfile: 'Переглянути профіль',
     contactUser: "Зв'язатися",
     authRequired: 'Увійдіть в акаунт, щоб опублікувати оголошення.',
+    showMore: 'Більше',
     ready: 'Готово',
     nameHint: "Вкажіть ім'я або контактну особу.",
     nameEmpty: "Напишіть ім'я.",
@@ -273,6 +274,7 @@ const UI_TEXT = {
     viewProfile: 'Просмотреть профиль',
     contactUser: 'Связаться',
     authRequired: 'Войдите в аккаунт, чтобы опубликовать объявление.',
+    showMore: 'Больше',
     ready: 'Готово',
     nameHint: 'Укажите имя или контактное лицо.',
     nameEmpty: 'Напишите имя.',
@@ -379,6 +381,7 @@ const UI_TEXT = {
     viewProfile: 'View profile',
     contactUser: 'Contact',
     authRequired: 'Sign in to publish a listing.',
+    showMore: 'More',
     ready: 'Ready',
     nameHint: 'Enter your name or contact person.',
     nameEmpty: 'Enter a name.',
@@ -448,6 +451,7 @@ const JobSearchScreen: React.FC = () => {
   const [searchWorkType, setSearchWorkType] = useState('');
   const [searchAbout, setSearchAbout] = useState('');
   const [actionModal, setActionModal] = useState<{ visible: boolean; userId: string; userName: string }>({ visible: false, userId: '', userName: '' });
+  const [showAllListings, setShowAllListings] = useState(false);
   const blinkAnim = useRef(new Animated.Value(1)).current;
   const avatarByUserId = useUserAvatarMap(listings.map((item) => item.userId));
 
@@ -630,6 +634,10 @@ const JobSearchScreen: React.FC = () => {
       return true;
     });
   }, [listings, searchAge, searchAbout, searchContact, searchName, searchWorkType, selectedFilter]);
+
+  useEffect(() => {
+    setShowAllListings(false);
+  }, [selectedFilter, searchName, searchContact, searchAge, searchWorkType, searchAbout]);
 
   const resetSearch = () => {
     setSearchName('');
@@ -852,7 +860,7 @@ const JobSearchScreen: React.FC = () => {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
-        data={listings.length > 0 ? filteredListings : []}
+        data={listings.length > 0 ? (showAllListings ? filteredListings : filteredListings.slice(0, 4)) : []}
         keyExtractor={(item) => item.id}
         initialNumToRender={8}
         windowSize={5}
@@ -1082,6 +1090,14 @@ const JobSearchScreen: React.FC = () => {
             />
           </TouchableOpacity>
         )}
+        ListFooterComponent={
+          !showAllListings && filteredListings.length > 4 ? (
+            <TouchableOpacity style={styles.showMoreButton} activeOpacity={0.82} onPress={() => setShowAllListings(true)}>
+              <Text style={styles.showMoreText}>{text.showMore}</Text>
+              <MaterialCommunityIcons name="chevron-down" size={18} color={SCREEN_THEME.terracottaDark} />
+            </TouchableOpacity>
+          ) : null
+        }
         ListEmptyComponent={
           !listingsReady ? (
             <View style={styles.emptyState}>
@@ -1341,6 +1357,8 @@ const styles = StyleSheet.create({
   badge: { color: SCREEN_THEME.enamelBlueDark, backgroundColor: '#E8F0F3', borderRadius: 999, paddingHorizontal: 9, paddingVertical: 5, fontSize: 11, fontWeight: '900' },
   moderationBadge: { color: '#8A5A00', backgroundColor: '#FFF2C7', borderRadius: 999, paddingHorizontal: 9, paddingVertical: 5, fontSize: 11, fontWeight: '900' },
   listingAbout: { color: '#fff', backgroundColor: '#7A1E5C', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 7, lineHeight: 18, marginBottom: 8, fontWeight: '800', overflow: 'hidden' },
+  showMoreButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 18, paddingVertical: 13, marginBottom: 10, borderWidth: 1, borderColor: '#E4D0AB' },
+  showMoreText: { fontSize: 15, fontWeight: '900', color: SCREEN_THEME.terracottaDark },
   emptyState: { alignItems: 'center', paddingVertical: 32 },
   emptyTitle: { fontSize: 18, fontWeight: '800', color: SCREEN_THEME.textPrimary, marginTop: 14 },
   emptySub: { color: SCREEN_THEME.textSecondary, marginTop: 6, textAlign: 'center' },

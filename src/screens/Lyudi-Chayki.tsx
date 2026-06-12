@@ -64,6 +64,7 @@ const UI_TEXT = {
     userProfile: 'Профіль користувача',
     errorTitle: 'Помилка',
     requestFailed: 'Не вдалося надіслати запит',
+    showMore: 'Більше',
     fillProfileTitle: 'Додайте фото — сусіди побачать вас!',
     fillProfileBody: 'Заповніть профіль, щоб інші мешканці могли вас знайти.',
   },
@@ -91,6 +92,7 @@ const UI_TEXT = {
     userProfile: 'Профиль пользователя',
     errorTitle: 'Ошибка',
     requestFailed: 'Не удалось отправить запрос',
+    showMore: 'Больше',
     fillProfileTitle: 'Добавьте фото — соседи увидят вас!',
     fillProfileBody: 'Заполните профиль, чтобы другие жители могли вас найти.',
   },
@@ -118,6 +120,7 @@ const UI_TEXT = {
     userProfile: 'User profile',
     errorTitle: 'Error',
     requestFailed: 'Failed to send request',
+    showMore: 'More',
     fillProfileTitle: 'Add a photo — neighbors will see you!',
     fillProfileBody: 'Complete your profile so other residents can find you.',
   },
@@ -234,6 +237,7 @@ export default function TopGirlsBoysScreen() {
   const [loading, setLoading] = useState(true);
   const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
   const [statusFilter, setStatusFilter] = useState<PersonStatusFilter>('all');
+  const [visibleCount, setVisibleCount] = useState(4);
   const [bonusByUserId, setBonusByUserId] = useState<Record<string, number>>({});
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const [permModal, setPermModal] = useState<{
@@ -482,7 +486,7 @@ export default function TopGirlsBoysScreen() {
       </View>
 
       <FlatList<Person>
-        data={loading ? [] : filteredRanked}
+        data={loading ? [] : filteredRanked.slice(0, visibleCount)}
         keyExtractor={(item) => item.id}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.scroll}
@@ -494,16 +498,16 @@ export default function TopGirlsBoysScreen() {
               <View style={styles.filterBlock}>
                 <Text style={styles.filterTitle}>{text.statusLabel}</Text>
                 <View style={styles.filterRow}>
-                  <TouchableOpacity style={[styles.filterChip, statusFilter === 'all' && styles.filterChipActive]} onPress={() => setStatusFilter('all')} activeOpacity={0.82}>
+                  <TouchableOpacity style={[styles.filterChip, statusFilter === 'all' && styles.filterChipActive]} onPress={() => { setStatusFilter('all'); setVisibleCount(4); }} activeOpacity={0.82}>
                     <Text style={[styles.filterChipText, statusFilter === 'all' && styles.filterChipTextActive]}>{text.statusAll}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={[styles.filterChip, statusFilter === 'new' && styles.filterChipActive]} onPress={() => setStatusFilter('new')} activeOpacity={0.82}>
+                  <TouchableOpacity style={[styles.filterChip, statusFilter === 'new' && styles.filterChipActive]} onPress={() => { setStatusFilter('new'); setVisibleCount(4); }} activeOpacity={0.82}>
                     <Text style={[styles.filterChipText, statusFilter === 'new' && styles.filterChipTextActive]}>{text.statusNew}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={[styles.filterChip, statusFilter === 'active' && styles.filterChipActive]} onPress={() => setStatusFilter('active')} activeOpacity={0.82}>
+                  <TouchableOpacity style={[styles.filterChip, statusFilter === 'active' && styles.filterChipActive]} onPress={() => { setStatusFilter('active'); setVisibleCount(4); }} activeOpacity={0.82}>
                     <Text style={[styles.filterChipText, statusFilter === 'active' && styles.filterChipTextActive]}>{text.statusActive}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={[styles.filterChip, statusFilter === 'pro' && styles.filterChipActive]} onPress={() => setStatusFilter('pro')} activeOpacity={0.82}>
+                  <TouchableOpacity style={[styles.filterChip, statusFilter === 'pro' && styles.filterChipActive]} onPress={() => { setStatusFilter('pro'); setVisibleCount(4); }} activeOpacity={0.82}>
                     <Text style={[styles.filterChipText, statusFilter === 'pro' && styles.filterChipTextActive]}>{text.statusPro}</Text>
                   </TouchableOpacity>
                 </View>
@@ -529,6 +533,20 @@ export default function TopGirlsBoysScreen() {
               </TouchableOpacity>
             ) : null}
           </>
+        }
+        ListFooterComponent={
+          !loading && visibleCount < filteredRanked.length ? (
+            <TouchableOpacity style={styles.showMoreButton} activeOpacity={0.82} onPress={() => {
+              setVisibleCount((prev) => {
+                if (prev <= 4) return 8;
+                if (prev <= 8) return 10;
+                return prev + 10;
+              });
+            }}>
+              <Text style={styles.showMoreText}>{text.showMore} ({filteredRanked.length - visibleCount})</Text>
+              <MaterialCommunityIcons name="chevron-down" size={18} color={PRIMARY} />
+            </TouchableOpacity>
+          ) : null
         }
         ListEmptyComponent={
           loading ? (
@@ -749,4 +767,22 @@ const styles = StyleSheet.create({
   fillProfileCopy: { flex: 1 },
   fillProfileTitle: { color: '#5B5048', fontSize: 13, fontWeight: '900' },
   fillProfileBody: { color: '#7A6D64', fontSize: 11, fontWeight: '700', marginTop: 2 },
+  showMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    paddingVertical: 13,
+    marginTop: 4,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#E4D0AB',
+  },
+  showMoreText: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: PRIMARY,
+  },
 });
