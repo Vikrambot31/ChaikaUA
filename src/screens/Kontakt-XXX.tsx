@@ -15,6 +15,7 @@ import { contactsService, ContactListing, PAGE_SIZE } from '../services/contacts
 import WhoLikedMeList from '../components/WhoLikedMeList';
 import { getModerationUserMessage, showUserError } from '../utils/userFacingErrors';
 import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField';
+import UploadedPhotosGrid from '../components/UploadedPhotosGrid';
 import { get, ref } from 'firebase/database';
 import { database } from '../firebase-config';
 import { useContactRequest } from '../hooks/useContactRequest';
@@ -112,6 +113,7 @@ const UI_TEXT = {
     priceError: 'Вкажіть коректний вік.',
     phoneLabel: 'Контактний телефон',
     photoLabel: 'Фото',
+    photoUploading: 'Дочекайтесь завершення завантаження фото.',
     addPhoto: 'Обрати з Моїх фотографій',
     removePhoto: 'Прибрати фото',
     descriptionLabel: 'Про себе',
@@ -242,6 +244,7 @@ const UI_TEXT = {
     priceError: 'Укажите корректный возраст.',
     phoneLabel: 'Контактный телефон',
     photoLabel: 'Фото',
+    photoUploading: 'Дождитесь завершения загрузки фото.',
     addPhoto: 'Выбрать из Моих фотографий',
     removePhoto: 'Убрать фото',
     descriptionLabel: 'О себе',
@@ -372,6 +375,7 @@ const UI_TEXT = {
     priceError: 'Enter a valid age.',
     phoneLabel: 'Phone',
     photoLabel: 'Photo',
+    photoUploading: 'Wait until the photo upload finishes.',
     addPhoto: 'Choose from My photos',
     removePhoto: 'Remove photo',
     descriptionLabel: 'About me',
@@ -1012,6 +1016,12 @@ const KontaktiChaikyScreen: React.FC = () => {
       return;
     }
     trace('validate', 'success');
+
+    const hasUploadingPhotos = formPhotos.some((p) => p.status === 'uploading' || p.status === 'queued');
+    if (hasUploadingPhotos) {
+      toast.showWarning(text.errorTitle, text.photoUploading);
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -1957,13 +1967,16 @@ const KontaktiChaikyScreen: React.FC = () => {
 
               <Text style={styles.formLabel}>{text.photoLabel}</Text>
               {user?.id ? (
-                <PhotoUploadField
-                  uid={user.id}
-                  userName={user?.name ?? ''}
-                  maxPhotos={5}
-                  storagePath="contacts_listings"
-                  onPhotosChange={setFormPhotos}
-                />
+                <>
+                  <PhotoUploadField
+                    uid={user.id}
+                    userName={user?.name ?? ''}
+                    maxPhotos={5}
+                    storagePath="contacts_listings"
+                    onPhotosChange={setFormPhotos}
+                  />
+                  <UploadedPhotosGrid />
+                </>
               ) : (
                 <Text style={styles.signInNote}>{text.authRequired}</Text>
               )}

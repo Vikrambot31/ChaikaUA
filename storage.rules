@@ -80,6 +80,12 @@ service firebase.storage {
       allow write: if isOwner(uid) || isAdmin();
     }
 
+    // contacts_listings/{uid}/... — фото анкет знайомств
+    match /contacts_listings/{uid}/{allPaths=**} {
+      allow get, list: if signedIn();
+      allow write: if isOwner(uid) || isAdmin();
+    }
+
     // food_top_listings/{uid}/... — фото оголошень Їжа на Чайці
     match /food_top_listings/{uid}/{allPaths=**} {
       allow get, list: if signedIn();
