@@ -11,7 +11,8 @@ import AppPhotoImage from '../components/AppPhotoImage';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { normalizePhoneText } from '../utils/textUtils';
 import { RootState } from '../redux/store';
-import { contactsService, ContactListing } from '../services/contactsService';
+import { contactsService, ContactListing, PAGE_SIZE } from '../services/contactsService';
+import WhoLikedMeList from '../components/WhoLikedMeList';
 import { getModerationUserMessage, showUserError } from '../utils/userFacingErrors';
 import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField';
 import { get, ref } from 'firebase/database';
@@ -228,6 +229,9 @@ const UI_TEXT = {
     emptyCta: 'Створити анкету',
     noProfileBanner: 'Створiть анкету, щоб вас знайшли!',
     noProfileCta: 'Створити',
+    whoLikedMeBtn: 'Хто лайкнув',
+    undoBtn: 'Повернути',
+    loadingMore: 'Завантаження...',
   },
   ru: {
     title: 'Знакомства на кофе',
@@ -355,6 +359,9 @@ const UI_TEXT = {
     emptyCta: 'Создать анкету',
     noProfileBanner: 'Создайте анкету, чтобы вас нашли!',
     noProfileCta: 'Создать',
+    whoLikedMeBtn: 'Кто лайкнул',
+    undoBtn: 'Вернуть',
+    loadingMore: 'Загрузка...',
   },
   en: {
     title: 'Coffee Meetups',
@@ -482,6 +489,9 @@ const UI_TEXT = {
     emptyCta: 'Create profile',
     noProfileBanner: 'Create a profile so people can find you!',
     noProfileCta: 'Create',
+    whoLikedMeBtn: 'Who liked',
+    undoBtn: 'Undo',
+    loadingMore: 'Loading...',
   },
 } as const;
 
@@ -544,6 +554,12 @@ const KontaktiChaikyScreen: React.FC = () => {
   // Pull-to-refresh
   const [refreshing, setRefreshing] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  // Who Liked Me
+  const [whoLikedMeVisible, setWhoLikedMeVisible] = useState(false);
+  // Pagination
+  const [paginationCursor, setPaginationCursor] = useState<string | null>(null);
+  const [hasMorePages, setHasMorePages] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   // Swipe mode
   const [swipeMode, setSwipeMode] = useState(false);
   const [swipeIndex, setSwipeIndex] = useState(0);
@@ -552,6 +568,7 @@ const KontaktiChaikyScreen: React.FC = () => {
   const [swipeGenderFilter, setSwipeGenderFilter] = useState<'all' | 'furniture' | 'appliances' | 'kids'>('all');
   const [swipeAgeFrom, setSwipeAgeFrom] = useState('');
   const [swipeAgeTo, setSwipeAgeTo] = useState('');
+  const [lastDismissedDirection, setLastDismissedDirection] = useState<'left' | 'right' | null>(null);
   const swipePosition = useRef(new Animated.ValueXY()).current;
   const blinkAnim = useRef(new Animated.Value(1)).current;
   const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -599,10 +616,26 @@ const KontaktiChaikyScreen: React.FC = () => {
   useEffect(() => {
     setListingsReady(false);
     setListingsLoadError(false);
+    // Reset pagination on refresh
+    if (refreshKey > 0) {
+      setPaginationCursor(null);
+      setHasMorePages(true);
+    }
     const unsubscribe = contactsService.subscribe((items) => {
       setListingsReady(true);
       setListingsLoadError(false);
-      setListings(items);
+      // ID-based merge: preserve paginated pages when real-time updates arrive
+      setListings((prev) => {
+        const liveIds = new Set(items.map((i) => i.id));
+        const pagedOnly = prev.filter((p) => !liveIds.has(p.id));
+        return [...items, ...pagedOnly];
+      });
+      // Set initial pagination cursor from oldest item
+      if (items.length > 0) {
+        const oldestCreatedAt = items[items.length - 1].createdAt;
+        setPaginationCursor(oldestCreatedAt || null);
+        setHasMorePages(items.length >= PAGE_SIZE);
+      }
       if (refreshing) setRefreshing(false);
     }, user?.id, () => {
       setListingsReady(true);
@@ -797,6 +830,8 @@ const KontaktiChaikyScreen: React.FC = () => {
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
+    setPaginationCursor(null);
+    setHasMorePages(true);
     setRefreshKey((k) => k + 1);
   }, []);
 
@@ -809,6 +844,26 @@ const KontaktiChaikyScreen: React.FC = () => {
   }, []);
 
   const hasOwnListing = useMemo(() => listings.some((l) => l.userId === user?.id), [listings, user?.id]);
+  const ownListing = useMemo(() => listings.find((l) => l.userId === user?.id && l.moderationStatus === 'approved'), [listings, user?.id]);
+
+  const handleLoadMore = useCallback(async () => {
+    if (!hasMorePages || loadingMore || !paginationCursor) return;
+    setLoadingMore(true);
+    try {
+      const { items, nextCursor, hasMore } = await contactsService.fetchNextPage(paginationCursor);
+      setListings((prev) => {
+        const ids = new Set(prev.map((p) => p.id));
+        const newItems = items.filter((i) => !ids.has(i.id));
+        return [...prev, ...newItems];
+      });
+      setPaginationCursor(nextCursor);
+      setHasMorePages(hasMore);
+    } catch (e) {
+      console.warn('[Kontakt-XXX] pagination error:', e);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [hasMorePages, loadingMore, paginationCursor]);
 
   const filteredListings = useMemo(() => {
     const queryItemName = searchItemName.trim().toLowerCase();
@@ -1144,12 +1199,21 @@ const KontaktiChaikyScreen: React.FC = () => {
     const item = swipeItemsRef.current[swipeIndexRef.current];
     if (!item) return;
     setLikedIds((prev) => [...prev, item.id]);
+    setLastDismissedDirection('right');
     Animated.timing(swipePosition, { toValue: { x: 600, y: 0 }, duration: 280, useNativeDriver: false }).start(advanceSwipe);
   }, [advanceSwipe, swipePosition]);
 
   const handleSwipeLeft = useCallback(() => {
+    setLastDismissedDirection('left');
     Animated.timing(swipePosition, { toValue: { x: -600, y: 0 }, duration: 280, useNativeDriver: false }).start(advanceSwipe);
   }, [advanceSwipe, swipePosition]);
+
+  const handleUndo = useCallback(() => {
+    if (lastDismissedDirection !== 'left') return;
+    swipePosition.setValue({ x: 0, y: 0 });
+    setSwipeIndex((prev) => Math.max(0, prev - 1));
+    setLastDismissedDirection(null);
+  }, [lastDismissedDirection, swipePosition]);
 
   const handleSwipeRightRef = useRef(handleSwipeRight);
   handleSwipeRightRef.current = handleSwipeRight;
@@ -1194,6 +1258,25 @@ const KontaktiChaikyScreen: React.FC = () => {
       sourceId: item.id,
     };
   };
+
+  // Scroll-near-bottom detection for pagination
+  const handleScroll = useCallback((event: { nativeEvent: { layoutMeasurement: { height: number }; contentOffset: { y: number }; contentSize: { height: number } } }) => {
+    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+    const paddingToBottom = 200;
+    if (layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom) {
+      void handleLoadMore();
+    }
+  }, [handleLoadMore]);
+
+  // Swipe mode pre-fetch: when 5 cards remain
+  useEffect(() => {
+    if (!swipeMode) return;
+    const remaining = swipeItems.length - swipeIndex;
+    if (remaining <= 5 && hasMorePages && !loadingMore) {
+      void handleLoadMore();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [swipeIndex, swipeMode]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -1295,7 +1378,7 @@ const KontaktiChaikyScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#CA8A04" colors={['#CA8A04']} />}>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={400} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#CA8A04" colors={['#CA8A04']} />}>
         <View style={styles.headerCard}>
           <Text style={styles.headerTitle}>{text.title}</Text>
           <Text style={styles.headerSubtitle}>{text.subtitle}</Text>
@@ -1537,6 +1620,12 @@ const KontaktiChaikyScreen: React.FC = () => {
                     />
                     {isOwn ? (
                       <View style={styles.kOwnActions}>
+                        {item.moderationStatus === 'approved' ? (
+                          <TouchableOpacity style={styles.kEditLink} onPress={() => setWhoLikedMeVisible(true)} activeOpacity={0.8}>
+                            <MaterialCommunityIcons name="heart-outline" size={14} color="#CA8A04" />
+                            <Text style={styles.kEditLinkText}>{text.whoLikedMeBtn}</Text>
+                          </TouchableOpacity>
+                        ) : null}
                         <TouchableOpacity style={styles.kEditLink} onPress={() => openEditForm(item)} activeOpacity={0.8}>
                           <MaterialCommunityIcons name="pencil-outline" size={14} color="#2D7E4D" />
                           <Text style={styles.kEditLinkText}>{text.editBtn}</Text>
@@ -1551,6 +1640,12 @@ const KontaktiChaikyScreen: React.FC = () => {
                 );
               })
             )}
+            {loadingMore ? (
+              <View style={styles.loadingMoreBox}>
+                <ActivityIndicator size="small" color="#CA8A04" />
+                <Text style={styles.loadingMoreText}>{text.loadingMore}</Text>
+              </View>
+            ) : null}
           </View>
         )}
       </ScrollView>
@@ -1576,10 +1671,10 @@ const KontaktiChaikyScreen: React.FC = () => {
               <Text style={styles.swipeFilterAgeLabel}>{text.swipeFilterAgeTo}</Text>
               <TextInput style={styles.swipeFilterAgeInput} value={swipeAgeTo} onChangeText={setSwipeAgeTo} keyboardType="numeric" placeholder="99" placeholderTextColor="#78716C" maxLength={3} />
             </View>
-            <TouchableOpacity style={styles.swipeFilterStartBtn} onPress={() => { swipePosition.setValue({ x: 0, y: 0 }); setSwipeFilterVisible(false); setSwipeIndex(0); setLikedIds([]); setSwipeMode(true); }} activeOpacity={0.85}>
+            <TouchableOpacity style={styles.swipeFilterStartBtn} onPress={() => { swipePosition.setValue({ x: 0, y: 0 }); setSwipeFilterVisible(false); setSwipeIndex(0); setLikedIds([]); setLastDismissedDirection(null); setSwipeMode(true); }} activeOpacity={0.85}>
               <Text style={styles.swipeFilterStartBtnText}>{text.swipeFilterStart}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.swipeFilterSkipBtn} onPress={() => { swipePosition.setValue({ x: 0, y: 0 }); setSwipeGenderFilter('all'); setSwipeAgeFrom(''); setSwipeAgeTo(''); setSwipeFilterVisible(false); setSwipeIndex(0); setLikedIds([]); setSwipeMode(true); }} activeOpacity={0.7}>
+            <TouchableOpacity style={styles.swipeFilterSkipBtn} onPress={() => { swipePosition.setValue({ x: 0, y: 0 }); setSwipeGenderFilter('all'); setSwipeAgeFrom(''); setSwipeAgeTo(''); setSwipeFilterVisible(false); setSwipeIndex(0); setLikedIds([]); setLastDismissedDirection(null); setSwipeMode(true); }} activeOpacity={0.7}>
               <Text style={styles.swipeFilterSkipText}>{text.swipeFilterSkip}</Text>
             </TouchableOpacity>
           </View>
@@ -1609,7 +1704,7 @@ const KontaktiChaikyScreen: React.FC = () => {
               <View style={styles.swipeDoneBox}>
                 <Text style={styles.swipeDoneTitle}>{text.swipeDoneTitle}</Text>
                 <Text style={styles.swipeDoneSub}>{text.swipeDoneLiked(likedIds.length)}</Text>
-                <TouchableOpacity style={styles.swipeRestartBtn} onPress={() => { swipePosition.setValue({ x: 0, y: 0 }); setSwipeIndex(0); setLikedIds([]); }} activeOpacity={0.85}>
+                <TouchableOpacity style={styles.swipeRestartBtn} onPress={() => { swipePosition.setValue({ x: 0, y: 0 }); setSwipeIndex(0); setLikedIds([]); setLastDismissedDirection(null); }} activeOpacity={0.85}>
                   <Text style={styles.swipeRestartBtnText}>{text.swipeRestartBtn}</Text>
                 </TouchableOpacity>
               </View>
@@ -1663,6 +1758,14 @@ const KontaktiChaikyScreen: React.FC = () => {
                 </Animated.View>
                 {/* Action buttons */}
                 <View style={styles.swipeActions}>
+                  <TouchableOpacity
+                    style={[styles.swipeUndoBtn, lastDismissedDirection !== 'left' && styles.swipeBtnDisabled]}
+                    onPress={handleUndo}
+                    disabled={lastDismissedDirection !== 'left'}
+                    activeOpacity={0.85}
+                  >
+                    <MaterialCommunityIcons name="undo" size={24} color={lastDismissedDirection === 'left' ? '#612e51' : '#A0938D'} />
+                  </TouchableOpacity>
                   <TouchableOpacity style={styles.swipePassBtn} onPress={handleSwipeLeft} activeOpacity={0.85}>
                     <MaterialCommunityIcons name="close" size={40} color="#612e51" />
                   </TouchableOpacity>
@@ -1995,6 +2098,21 @@ const KontaktiChaikyScreen: React.FC = () => {
         currentUserId={user?.id || ''}
         language={language}
         onBlock={handleBlockUser}
+      />
+      <WhoLikedMeList
+        visible={whoLikedMeVisible}
+        listingId={ownListing?.id || ''}
+        currentUserId={user?.id || ''}
+        blockedUserIds={blockedUserIds}
+        language={language}
+        onViewProfile={(userId) => {
+          setWhoLikedMeVisible(false);
+          if (navLock.current) return;
+          navLock.current = true;
+          navigation.navigate('ViewUserProfile', { userId });
+          setTimeout(() => { navLock.current = false; }, 800);
+        }}
+        onClose={() => setWhoLikedMeVisible(false)}
       />
       <VideoLoadingOverlay visible={!listingsReady} />
     </SafeAreaView>
@@ -2635,6 +2753,36 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '900',
     color: '#CA8A04',
+  },
+  // Undo swipe button
+  swipeUndoBtn: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FAFAF9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 3,
+    shadowColor: '#612e51',
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  swipeBtnDisabled: {
+    opacity: 0.4,
+  },
+  // Loading more indicator
+  loadingMoreBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 16,
+  },
+  loadingMoreText: {
+    color: '#78716C',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });
 

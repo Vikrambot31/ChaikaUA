@@ -1,4 +1,4 @@
-import { ref, push, update, onValue, remove, query, orderByChild, equalTo, get, limitToLast } from 'firebase/database';
+import { ref, push, update, onValue, remove, query, orderByChild, equalTo, get, limitToLast, endBefore } from 'firebase/database';
 import { database } from '../firebase-core';
 import { createPendingModeration, ModerationStatus } from '../utils/moderation';
 import { sanitizeStoredText } from '../utils/textUtils';
@@ -45,7 +45,7 @@ const normalizeRtdbArray = (val: unknown): string[] => {
 
 const PATH = 'contacts_listings';
 const CONTACT_LISTING_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-const ACTIVE_LIMIT = 100;
+const PAGE_SIZE = 30;
 const ACTIVE_LIMIT_BUFFER = 20;
 const FEED_MINIMUM = 10;
 const ARCHIVED_FALLBACK_LIMIT = 20;
@@ -170,7 +170,7 @@ export const contactsService = {
     void ensureFirebaseAuth().then(() => {
       if (disposed) return;
 
-      const listRef = query(ref(database, PATH), orderByChild('moderationStatus'), equalTo('approved'), limitToLast(ACTIVE_LIMIT + ACTIVE_LIMIT_BUFFER));
+      const listRef = query(ref(database, PATH), orderByChild('moderationStatus'), equalTo('approved'), limitToLast(PAGE_SIZE + ACTIVE_LIMIT_BUFFER));
 
       unsubscribeApproved = onValue(listRef, (snapshot) => {
         if (disposed) return;
@@ -186,7 +186,6 @@ export const contactsService = {
                 return item.moderationStatus === 'approved' && !expired;
               })
               .reverse()
-              .slice(0, ACTIVE_LIMIT)
           : [];
 
         if (active.length >= FEED_MINIMUM) {
@@ -412,4 +411,45 @@ export const contactsService = {
     }
   },
 
+  async fetchNextPage(cursor: string, pageSize: number = PAGE_SIZE): Promise<{ items: ContactListing[]; nextCursor: string | null; hasMore: boolean }> {
+    try {
+      await ensureFirebaseAuth();
+      const pageQuery = query(
+        ref(database, PATH),
+        orderByChild('createdAt'),
+        endBefore(cursor),
+        limitToLast(pageSize + 1),
+      );
+      const snap = await get(pageQuery);
+      const raw = snap.val();
+      if (!raw) return { items: [], nextCursor: null, hasMore: false };
+
+      const rawEntries = Object.entries(raw as Record<string, any>);
+      // hasMore based on PRE-filter count (RTDB returned more than pageSize items)
+      const hasMore = rawEntries.length > pageSize;
+
+      const now = Date.now();
+      const all = rawEntries
+        .map(([id, data]) => mapContactItem(id, data))
+        .filter((i) => i.moderationStatus === 'approved' && (!i.expiresAt || new Date(i.expiresAt).getTime() >= now))
+        .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+
+      const items = all.slice(0, pageSize);
+
+      // Cursor from oldest raw entry's createdAt (not filtered), to ensure no gaps
+      const oldestRawCreatedAt = rawEntries
+        .map(([, data]) => (data as any).createdAt || '')
+        .filter(Boolean)
+        .sort()[0];
+      const nextCursor = hasMore ? (oldestRawCreatedAt || null) : null;
+
+      return { items, nextCursor, hasMore };
+    } catch (error) {
+      console.warn('[contactsService] fetchNextPage failed:', error);
+      return { items: [], nextCursor: null, hasMore: false };
+    }
+  },
+
 };
+
+export { PAGE_SIZE };
