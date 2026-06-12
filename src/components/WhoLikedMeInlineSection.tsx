@@ -210,7 +210,15 @@ export default function WhoLikedMeInlineSection({
           return;
         }
 
-        // Limit to LIKERS_LIMIT most relevant
+        // Sort by timestamp (newest first) BEFORE slicing so we fetch the most recent likers
+        userIds.sort((a, b) => {
+          const ta = timestamps[a] ?? 0;
+          const tb = timestamps[b] ?? 0;
+          if (ta === 0 && tb === 0) return 0;
+          if (ta === 0) return 1;
+          if (tb === 0) return -1;
+          return tb - ta;
+        });
         const limited = userIds.slice(0, LIKERS_LIMIT);
         const profiles = await fetchLikerRows(limited, timestamps);
         if (cancelled) return;
