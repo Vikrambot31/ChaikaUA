@@ -438,7 +438,7 @@
       ".read": "auth != null && (auth.token.admin === true || auth.token.moderator === true)",
       ".indexOn": ["reporterId", "reportedUserId", "status", "source"],
       "$reportId": {
-        ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && !data.exists() && newData.child('reporterId').val() === auth.uid"
+        ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && ((!data.exists() && newData.child('reporterId').val() === auth.uid) || (auth.token.admin === true || auth.token.moderator === true))"
       }
     },
 
