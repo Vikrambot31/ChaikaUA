@@ -203,6 +203,7 @@ export const UI_TEXT = {
     ok: 'OK',
     loginBtn: 'Войти',
     authRequired: 'Войдите в аккаунт, чтобы добавить объявление.',
+    showMore: 'Больше',
   },
   en: {
     title: 'Buy / Sell',
