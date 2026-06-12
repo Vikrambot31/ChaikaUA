@@ -488,7 +488,7 @@ const styles = StyleSheet.create({
   selectButton: {
     minHeight: 48,
     borderRadius: 14,
-    backgroundColor: SCREEN_THEME.terracotta,
+    backgroundColor: '#7d0e59',
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',

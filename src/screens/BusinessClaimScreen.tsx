@@ -325,13 +325,13 @@ const styles = StyleSheet.create({
   charCount: { textAlign: 'right', fontSize: 11, color: '#B0A49A', fontWeight: '700' },
   submitBtn: {
     marginTop: 8,
-    backgroundColor: SCREEN_THEME.terracotta,
+    backgroundColor: '#7d0e59',
     borderRadius: 16,
     paddingVertical: 15,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 52,
   },
-  submitBtnDisabled: { backgroundColor: '#C4B5A8' },
+  submitBtnDisabled: { backgroundColor: '#7d0e59', opacity: 0.55 },
   submitBtnText: { color: '#fff', fontSize: 16, fontWeight: '900' },
 });

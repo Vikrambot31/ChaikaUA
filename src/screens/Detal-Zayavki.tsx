@@ -971,7 +971,7 @@ const styles = StyleSheet.create({
   smallActionAltText: { color: '#403933', fontSize: 12, fontWeight: '900' },
   disabledContactAction: { backgroundColor: '#E1D7CF' },
   disabledContactText: { color: '#9F958E' },
-  contactBtn: { alignItems: 'center', backgroundColor: '#7A1E5C', borderRadius: 16, paddingVertical: 14, marginBottom: 12 },
+  contactBtn: { alignItems: 'center', backgroundColor: '#7d0e59', borderRadius: 16, paddingVertical: 14, marginBottom: 12 },
   contactBtnText: { color: '#fff', fontSize: 15, fontWeight: '900' },
   actionButtonDisabled: { opacity: 0.7 },
   connectStatusText: { marginBottom: 10, textAlign: 'center', color: SCREEN_THEME.textSecondary, fontSize: 13, fontWeight: '700' },

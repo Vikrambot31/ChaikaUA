@@ -1300,7 +1300,7 @@ const styles = StyleSheet.create({
   workTypeChipActive: { backgroundColor: '#DDEAF0', borderColor: SCREEN_THEME.enamelBlueDark },
   workTypeText: { color: SCREEN_THEME.textSecondary, fontSize: 12, fontWeight: '800' },
   workTypeTextActive: { color: SCREEN_THEME.enamelBlueDark },
-  submitBtn: { backgroundColor: SCREEN_THEME.terracotta, borderRadius: 16, paddingVertical: 14, paddingHorizontal: 16, alignItems: 'center', marginTop: 14, flexDirection: 'row', justifyContent: 'center', gap: 8 },
+  submitBtn: { backgroundColor: '#7d0e59', borderRadius: 16, paddingVertical: 14, paddingHorizontal: 16, alignItems: 'center', marginTop: 14, flexDirection: 'row', justifyContent: 'center', gap: 8 },
   submitBtnText: { color: '#FFFFFF', fontWeight: '800' },
   inputError: { borderColor: '#B84A3A', backgroundColor: '#FFF7F5' },
   inputValid: { borderColor: '#2F7D50', backgroundColor: '#FBFFFC' },

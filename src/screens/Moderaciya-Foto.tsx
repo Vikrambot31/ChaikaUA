@@ -785,7 +785,7 @@ const styles = StyleSheet.create({
   tabScroll: { flexGrow: 0, marginBottom: 8 },
   tabRow: { paddingHorizontal: 14, gap: 8 },
   tabBtn: { borderRadius: 14, paddingVertical: 9, paddingHorizontal: 14, backgroundColor: '#EFE6DC' },
-  tabBtnActive: { backgroundColor: '#7A1E5C' },
+  tabBtnActive: { backgroundColor: '#7d0e59' },
   tabBtnText: { color: '#5a2c2c', fontWeight: '800', fontSize: 13 },
   tabBtnTextActive: { color: '#fff' },
   content: { flex: 1 },

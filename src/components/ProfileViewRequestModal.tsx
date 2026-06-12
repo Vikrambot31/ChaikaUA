@@ -219,7 +219,7 @@ const styles = StyleSheet.create({
   },
   bold: { fontWeight: '800', color: '#2D2520' },
   btnPrimary: {
-    backgroundColor: ACCENT,
+    backgroundColor: '#7d0e59',
     borderRadius: 14,
     paddingVertical: 14,
     paddingHorizontal: 24,

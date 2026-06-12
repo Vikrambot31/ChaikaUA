@@ -652,13 +652,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#7A1E5C',
+    backgroundColor: '#7d0e59',
     borderRadius: 16,
     paddingVertical: 15,
     marginTop: 12,
   },
   submitBtnDisabled: {
-    backgroundColor: '#A0938D',
+    backgroundColor: '#7d0e59',
+    opacity: 0.55,
   },
   submitBtnText: {
     color: '#fff',

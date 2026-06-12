@@ -527,7 +527,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#E0D5C5',
   },
   addBarBtn: {
-    backgroundColor: ACCENT,
+    backgroundColor: '#7d0e59',
     borderRadius: 16,
     paddingVertical: 14,
     alignItems: 'center',
@@ -599,7 +599,7 @@ const styles = StyleSheet.create({
   },
   infoText: { color: '#7A6A58', lineHeight: 19, fontWeight: '600', fontSize: 13 },
   doneBtn: {
-    backgroundColor: ACCENT,
+    backgroundColor: '#7d0e59',
     borderRadius: 16,
     minHeight: 52,
     alignItems: 'center',

@@ -15,10 +15,10 @@ type TactileButtonProps = {
 
 const VARIANTS = {
   primary: {
-    bg: SCREEN_THEME.terracotta,
-    border: SCREEN_THEME.terracottaDark,
+    bg: '#7d0e59',
+    border: '#7d0e59',
     text: '#FFFFFF',
-    shadowColor: 'rgba(157, 94, 69, 0.40)',
+    shadowColor: 'rgba(125, 14, 89, 0.40)',
   },
   secondary: {
     bg: SCREEN_THEME.cardCream,

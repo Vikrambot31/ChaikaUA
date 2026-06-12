@@ -402,7 +402,7 @@ const styles = StyleSheet.create({
   addBtnTextDisabled: { color: '#C0A898' },
 
   saveBtn: {
-    backgroundColor: '#7A1E5C',
+    backgroundColor: '#7d0e59',
     borderRadius: 16,
     paddingVertical: 15,
     alignItems: 'center',

@@ -416,7 +416,7 @@ const styles = StyleSheet.create({
   photoLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   requiredMark: { fontSize: 11, fontWeight: '700', color: SCREEN_THEME.terracottaDark, marginBottom: 8, marginTop: 12 },
   signInNote: { color: SCREEN_THEME.textSecondary, fontSize: 13, fontWeight: '700', paddingVertical: 10, lineHeight: 18 },
-  submitBtn: { backgroundColor: SCREEN_THEME.terracotta, borderRadius: 16, paddingVertical: 14, alignItems: 'center', marginTop: 18 },
+  submitBtn: { backgroundColor: '#7d0e59', borderRadius: 16, paddingVertical: 14, alignItems: 'center', marginTop: 18 },
   submitBtnDisabled: { opacity: 0.65 },
   submitBtnText: { color: '#FFFFFF', fontWeight: '800', textAlign: 'center', paddingHorizontal: 10 },
 });

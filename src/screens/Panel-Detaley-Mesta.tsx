@@ -172,13 +172,13 @@ const styles = StyleSheet.create({
   },
   ghostButton: {
     flex: 1,
-    backgroundColor: '#8D7AB8',
+    backgroundColor: '#7d0e59',
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',
   },
   mainText: { color: '#fff', fontWeight: '800' },
-  ghostText: { color: SCREEN_THEME.terracottaDark, fontWeight: '700' },
+  ghostText: { color: '#FFFFFF', fontWeight: '700' },
 });
 
 export default PlaceDetailsPanel;

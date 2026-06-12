@@ -458,7 +458,7 @@ const styles = StyleSheet.create({
   photoButton: {
     minHeight: 50,
     borderRadius: 14,
-    backgroundColor: SCREEN_THEME.woodGreenDark,
+    backgroundColor: '#7d0e59',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

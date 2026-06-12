@@ -452,13 +452,13 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   modBtnApprove: {
-    backgroundColor: '#2A7B41',
+    backgroundColor: '#7d0e59',
   },
   modBtnReject: {
-    backgroundColor: '#C77A2B',
+    backgroundColor: '#7d0e59',
   },
   modBtnDelete: {
-    backgroundColor: '#C0392B',
+    backgroundColor: '#7d0e59',
   },
   modBtnText: {
     fontSize: 12,

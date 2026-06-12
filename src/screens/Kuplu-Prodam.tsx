@@ -803,7 +803,7 @@ const styles = StyleSheet.create({
   typeToggleInactive: { backgroundColor: '#ECE7E1', borderWidth: 1, borderColor: '#D9CFC4' },
   typeToggleText: { color: SCREEN_THEME.textPrimary, fontWeight: '900', fontSize: 13, textAlign: 'center' },
   typeToggleTextActive: { color: '#fff' },
-  submitBtn: { backgroundColor: SCREEN_THEME.terracotta, borderRadius: 16, paddingVertical: 14, alignItems: 'center', marginTop: 14 },
+  submitBtn: { backgroundColor: '#7d0e59', borderRadius: 16, paddingVertical: 14, alignItems: 'center', marginTop: 14 },
   submitBtnDisabled: { opacity: 0.65 },
   submitBtnText: { color: '#FFFFFF', fontWeight: '800' },
   listingsSection: { marginBottom: 16 },
@@ -849,7 +849,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#E4D0AB',
   },
   addBarBtn: {
-    backgroundColor: SCREEN_THEME.woodGreenDark,
+    backgroundColor: '#7d0e59',
     borderRadius: 16,
     paddingVertical: 14,
     alignItems: 'center',
