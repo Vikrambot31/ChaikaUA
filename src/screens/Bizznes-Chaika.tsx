@@ -1233,7 +1233,7 @@ const BiznesChaikaScreen: React.FC = () => {
         .map((promotion, index) => [promotion.targetId, index]),
     );
     return [...listings]
-      .filter((item) => !item.isArchived && (item.photoUri || item.photoStoragePath || promotedByListingId.has(item.id) || biznesPlusIds.includes(item.id)))
+      .filter((item) => item.moderationStatus === 'approved' && !item.isArchived && (item.photoUri || item.photoStoragePath || promotedByListingId.has(item.id) || biznesPlusIds.includes(item.id)))
       .sort((a, b) => {
         const aPlus = biznesPlusIds.indexOf(a.id);
         const bPlus = biznesPlusIds.indexOf(b.id);

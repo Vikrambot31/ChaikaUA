@@ -3,7 +3,7 @@ const functionsV1 = require('firebase-functions/v1');
 const admin = require('firebase-admin');
 const crypto = require('crypto');
 const { createInviteAccessFunctions, BONUS_LIKE_POINTS, BONUS_LIKE_CAP, BONUS_TOTAL_CAP, resolveBadge, USER_BONUSES_PATH } = require('./inviteAccess');
-const { createBonusFunctions } = require('./bonusFunctions');
+const { createBonusFunctions, grantPromoCredits } = require('./bonusFunctions');
 const { createPromotionFunctions } = require('./promotionFunctions');
 
 admin.initializeApp();
@@ -3690,7 +3690,11 @@ exports.activateBusinessPlusManual = functionsV1.https.onCall(async (data, conte
       actorUid: actor.uid,
     });
 
-    return { ok: true, expiresAt, months };
+    // Grant 1000 promo credits per month of Business+ subscription
+    const promoCreditsAmount = months * 1000;
+    await grantPromoCredits(db, uid, promoCreditsAmount, actor.uid, `Business+ activated (${months} mo)`, 'business_plus_activation', nowMs);
+
+    return { ok: true, expiresAt, months, promoCreditsGranted: promoCreditsAmount };
   } catch (error) {
     if (error instanceof functionsV1.https.HttpsError) throw error;
     console.error('[activateBusinessPlusManual] error:', error?.message);

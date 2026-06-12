@@ -1048,4 +1048,5 @@ module.exports = {
   BONUS_BADGES,
   getWeekKey,
   getDayKey,
+  grantPromoCredits,
 };

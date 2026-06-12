@@ -49,7 +49,7 @@ const TRUST_PROMO_PRICES = {
 
 // Pricing for promo credits (commercial promotions)
 const PROMO_CREDIT_PRICES = {
-  business_top: { '24h': 120, '3d': 300, '7d': 650, '30d': 2200 },
+  business_top: { '30d': 500 },
   beauty_salon_top: { '24h': 120, '7d': 650 },
   beauty_master_top: { '24h': 90, '7d': 480 },
   beauty_promo_top: { '24h': 100, '7d': 550 },

@@ -225,7 +225,7 @@ export type RootStackParamList = {
   BonusWalletScreen: undefined;
   PromoCreditsTopupScreen: undefined;
   PromoCreditsAdminScreen: undefined;
-  BonusPromotionPurchaseScreen: { initialPromoType?: string } | undefined;
+  BonusPromotionPurchaseScreen: { initialPromoType?: string; initialTargetId?: string } | undefined;
   FavoritesScreen: undefined;
 };
 

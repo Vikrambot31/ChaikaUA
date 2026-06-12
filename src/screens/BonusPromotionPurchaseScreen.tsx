@@ -26,6 +26,7 @@ type AppNav = NavigationProp<Record<string, object | undefined>>;
 type RouteParams = {
   BonusPromotionPurchaseScreen: {
     initialPromoType?: string;
+    initialTargetId?: string;
   } | undefined;
 };
 
@@ -63,7 +64,7 @@ const buildOptions = (t: any): PromotionOption[] => [
     title: t.bonus.businessTop,
     subtitle: t.bonus.boostBusiness,
     currency: 'promo',
-    durations: { '24h': 120, '3d': 300, '7d': 650, '30d': 2200 },
+    durations: { '30d': 500 },
   },
   {
     promoType: 'beauty_salon_top',
@@ -157,8 +158,9 @@ const BonusPromotionPurchaseScreen: React.FC = () => {
   const { t, language } = useTranslation();
   const user = useSelector(selectUser);
   const initialPromoType = route.params?.initialPromoType || 'contacts_top';
+  const initialTargetId = route.params?.initialTargetId || '';
   const [selectedPromoType, setSelectedPromoType] = useState(initialPromoType);
-  const [selectedTargetId, setSelectedTargetId] = useState('');
+  const [selectedTargetId, setSelectedTargetId] = useState(initialTargetId);
   const [selectedDuration, setSelectedDuration] = useState('24h');
   const [promotionTargets, setPromotionTargets] = useState<PromotionTarget[]>([]);
   const [targetsLoading, setTargetsLoading] = useState(false);

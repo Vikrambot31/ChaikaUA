@@ -684,7 +684,7 @@ export default function ItemDetailScreen({
                     <MaterialCommunityIcons name="check-circle-outline" size={16} color="#2E7D32" />
                     <Text style={[styles.claimStatusText, styles.claimStatusApprovedText]}>{claimApprovedLabel}</Text>
                   </View>
-                  {!isBusinessPlus && (
+                  {!isBusinessPlus ? (
                     <TouchableOpacity
                       style={styles.activateBusinessBtn}
                       onPress={() => navigation.navigate('BusinessPlusSubscriptionScreen')}
@@ -692,6 +692,15 @@ export default function ItemDetailScreen({
                     >
                       <MaterialCommunityIcons name="storefront" size={16} color="#fff" />
                       <Text style={styles.activateBusinessBtnText}>{activateBusinessPlusLabel}</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.activateBusinessBtn, { backgroundColor: '#D4A017' }]}
+                      onPress={() => navigation.navigate('BonusPromotionPurchaseScreen', { initialPromoType: 'business_top', initialTargetId: item.sourceId })}
+                      activeOpacity={0.86}
+                    >
+                      <MaterialCommunityIcons name="rocket-launch-outline" size={16} color="#fff" />
+                      <Text style={styles.activateBusinessBtnText}>{language === 'ua' ? 'Розмістити в топ (500 кредитів)' : language === 'ru' ? 'Разместить в топ (500 кредитов)' : 'Promote to top (500 credits)'}</Text>
                     </TouchableOpacity>
                   )}
                 </View>

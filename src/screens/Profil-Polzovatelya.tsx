@@ -791,6 +791,18 @@ const ProfileScreen: React.FC = () => {
             <MaterialCommunityIcons name={settingsExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={SCREEN_THEME.accentGold} />
           </TouchableOpacity>
 
+          {plan === 'business_plus' ? (
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => navigation.navigate('BonusWalletScreen')}
+              activeOpacity={0.84}
+            >
+              <TactileIcon icon="wallet-outline" size={40} iconSize={18} backgroundColor="#D4A017" />
+              <Text style={styles.menuLabel}>{language === 'ua' ? 'Мої промо-кредити' : language === 'ru' ? 'Мои промо-кредиты' : 'My promo credits'}</Text>
+              <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
+            </TouchableOpacity>
+          ) : null}
+
           {isAdmin ? (
             <>
               <TouchableOpacity
