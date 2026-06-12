@@ -398,13 +398,23 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
           }
         }
       }
-      setItems((current) => current.filter((candidate) => candidate.path !== item.path));
+      // delete — удаляем; approve/reject — обновляем статус, фильтр скроет сам
+      if (action === 'delete') {
+        setItems((current) => current.filter((candidate) => candidate.path !== item.path));
+      } else {
+        setItems((current) =>
+          current.map((candidate) =>
+            candidate.path === item.path ? { ...candidate, status: action } : candidate,
+          ),
+        );
+      }
       setSelectedPaths((current) => {
         const next = new Set(current);
         next.delete(item.path);
         return next;
       });
     } catch (error) {
+      // При ошибке сервера — НЕ удаляем карточку из UI, показываем ошибку
       setMessage(error instanceof Error ? error.message : 'Не удалось выполнить действие модерации.');
     } finally {
       setBusyActions((prev) => { const next = new Set(prev); next.delete(actionId); return next; });
