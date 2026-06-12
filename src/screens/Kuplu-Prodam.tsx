@@ -696,7 +696,7 @@ const BuySellScreen: React.FC = () => {
           !showAllListings && filteredListings.length > 4 ? (
             <TouchableOpacity style={styles.showMoreButton} activeOpacity={0.82} onPress={() => setShowAllListings(true)}>
               <Text style={styles.showMoreText}>{text.showMore}</Text>
-              <MaterialCommunityIcons name="chevron-down" size={18} color={SCREEN_THEME.terracottaDark} />
+              <MaterialCommunityIcons name="chevron-down" size={18} color={SCREEN_THEME.textSecondary} />
             </TouchableOpacity>
           ) : null
         }
@@ -839,7 +839,7 @@ const styles = StyleSheet.create({
   listingPhoto: { width: '100%', height: 220, borderRadius: 16, marginBottom: 8, backgroundColor: '#F0EDE8' },
   moderationInfo: { color: '#5F5043', backgroundColor: '#FFF8EA', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 8, fontSize: 12, lineHeight: 17, fontWeight: '700' },
   showMoreButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 18, paddingVertical: 13, marginBottom: 10, borderWidth: 1, borderColor: '#E4D0AB' },
-  showMoreText: { fontSize: 15, fontWeight: '900', color: SCREEN_THEME.terracottaDark },
+  showMoreText: { fontSize: 15, fontWeight: '900', color: SCREEN_THEME.textSecondary },
   addBar: {
     paddingHorizontal: 16,
     paddingVertical: 10,

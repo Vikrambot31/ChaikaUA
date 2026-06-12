@@ -381,7 +381,7 @@ export default function RatingScreen() {
                 !showAllBuildings && buildingList.length > 4 ? (
                   <TouchableOpacity style={styles.showMoreButton} activeOpacity={0.82} onPress={() => setShowAllBuildings(true)}>
                     <Text style={styles.showMoreText}>{uiText.showMore}</Text>
-                    <MaterialCommunityIcons name="chevron-down" size={18} color={SCREEN_THEME.terracottaDark} />
+                    <MaterialCommunityIcons name="chevron-down" size={18} color={SCREEN_THEME.textSecondary} />
                   </TouchableOpacity>
                 ) : null
               }
@@ -792,5 +792,5 @@ const styles = StyleSheet.create({
   detailCard: { backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 22, padding: 16, marginTop: 14, marginBottom: 14, borderWidth: 1, borderColor: '#E4D0AB' },
   detailStatRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#EFE0C1' },
   showMoreButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 18, paddingVertical: 13, marginHorizontal: 16, marginBottom: 10, borderWidth: 1, borderColor: '#E4D0AB' },
-  showMoreText: { fontSize: 15, fontWeight: '900', color: SCREEN_THEME.terracottaDark },
+  showMoreText: { fontSize: 15, fontWeight: '900', color: SCREEN_THEME.textSecondary },
 });

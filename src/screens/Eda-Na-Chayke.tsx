@@ -988,7 +988,7 @@ export default function EdaNaChaykeScreen() {
                 onPress={() => setShowAllEatPlaces(true)}
               >
                 <Text style={styles.showMoreText}>{text.showMore}</Text>
-                <MaterialCommunityIcons name="chevron-down" size={18} color={SCREEN_THEME.terracottaDark} />
+                <MaterialCommunityIcons name="chevron-down" size={18} color={SCREEN_THEME.textSecondary} />
               </TouchableOpacity>
             ) : null}
           </>
@@ -1684,7 +1684,7 @@ const styles = StyleSheet.create({
   showMoreText: {
     fontSize: 15,
     fontWeight: '900',
-    color: SCREEN_THEME.terracottaDark,
+    color: SCREEN_THEME.textSecondary,
   },
 
   // Empty state

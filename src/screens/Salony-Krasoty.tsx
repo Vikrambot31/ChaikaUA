@@ -787,7 +787,7 @@ export default function SalonyKrasotyScreen() {
                 onPress={() => setShowAllPlaces(true)}
               >
                 <Text style={styles.showMoreText}>{text.showMore}</Text>
-                <MaterialCommunityIcons name="chevron-down" size={18} color={SCREEN_THEME.terracottaDark} />
+                <MaterialCommunityIcons name="chevron-down" size={18} color={SCREEN_THEME.textSecondary} />
               </TouchableOpacity>
             ) : null}
           </>
@@ -1258,7 +1258,7 @@ const styles = StyleSheet.create({
     marginTop: 7,
     fontSize: 12,
     fontWeight: '900',
-    color: SCREEN_THEME.terracottaDark,
+    color: SCREEN_THEME.textSecondary,
   },
   offerPlaceName: {
     marginBottom: 3,
@@ -1281,7 +1281,7 @@ const styles = StyleSheet.create({
   showMoreText: {
     fontSize: 15,
     fontWeight: '900',
-    color: SCREEN_THEME.terracottaDark,
+    color: SCREEN_THEME.textSecondary,
   },
   addPlaceButton: {
     flexDirection: 'row',

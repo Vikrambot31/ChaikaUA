@@ -588,7 +588,7 @@ const PlacesScreen: React.FC = () => {
 
         {residentDataLoading ? (
           <View style={styles.emptyCard}>
-            <ActivityIndicator size="small" color={SCREEN_THEME.terracottaDark} />
+            <ActivityIndicator size="small" color={SCREEN_THEME.textSecondary} />
             <Text style={styles.emptyText}>{text.loading}</Text>
           </View>
         ) : residentItems.length === 0 ? (
@@ -715,7 +715,7 @@ const PlacesScreen: React.FC = () => {
             {!showAllItems && items.length > 4 ? (
               <TouchableOpacity style={styles.showMoreButton} activeOpacity={0.82} onPress={() => setShowAllItems(true)}>
                 <Text style={styles.showMoreText}>{text.showMore}</Text>
-                <MaterialCommunityIcons name="chevron-down" size={18} color={SCREEN_THEME.terracottaDark} />
+                <MaterialCommunityIcons name="chevron-down" size={18} color={SCREEN_THEME.textSecondary} />
               </TouchableOpacity>
             ) : null}
           </>
@@ -877,7 +877,7 @@ const styles = StyleSheet.create({
   showMoreText: {
     fontSize: 15,
     fontWeight: '900',
-    color: SCREEN_THEME.terracottaDark,
+    color: SCREEN_THEME.textSecondary,
   },
   emptyCard: {
     backgroundColor: SCREEN_THEME.paperStrong,

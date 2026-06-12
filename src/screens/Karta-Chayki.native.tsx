@@ -597,7 +597,7 @@ const MapScreen: React.FC = () => {
             onPress={() => setFiltersVisible((value) => !value)}
             activeOpacity={0.8}
           >
-            <MaterialCommunityIcons name="tune-variant" color={SCREEN_THEME.terracottaDark} size={20} />
+            <MaterialCommunityIcons name="tune-variant" color={SCREEN_THEME.textSecondary} size={20} />
           </TouchableOpacity>
         </View>
 
@@ -651,7 +651,7 @@ const MapScreen: React.FC = () => {
           !showAllMapPlaces && activePlaces.length > 4 ? (
             <TouchableOpacity style={styles.showMoreButton} activeOpacity={0.82} onPress={() => setShowAllMapPlaces(true)}>
               <Text style={styles.showMoreText}>{text.showMore}</Text>
-              <MaterialCommunityIcons name="chevron-down" size={18} color={SCREEN_THEME.terracottaDark} />
+              <MaterialCommunityIcons name="chevron-down" size={18} color={SCREEN_THEME.textSecondary} />
             </TouchableOpacity>
           ) : null
         }
@@ -1001,7 +1001,7 @@ const styles = StyleSheet.create({
   showMoreText: {
     fontSize: 15,
     fontWeight: '900',
-    color: SCREEN_THEME.terracottaDark,
+    color: SCREEN_THEME.textSecondary,
   },
   emptyContainer: {
     height: 300,

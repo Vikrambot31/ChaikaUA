@@ -16,6 +16,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import MiniTabBar from '../components/MiniTabBar';
 import AppPhotoImage from '../components/AppPhotoImage';
+import { SCREEN_THEME } from '../utils/screenTheme';
 import { communityUsersAPI } from '../firebase-config';
 import { selectUser } from '../redux/slices/authSlice';
 import type { RootState } from '../redux/store';
@@ -544,7 +545,7 @@ export default function TopGirlsBoysScreen() {
               });
             }}>
               <Text style={styles.showMoreText}>{text.showMore} ({filteredRanked.length - visibleCount})</Text>
-              <MaterialCommunityIcons name="chevron-down" size={18} color={PRIMARY} />
+              <MaterialCommunityIcons name="chevron-down" size={18} color={SCREEN_THEME.textSecondary} />
             </TouchableOpacity>
           ) : null
         }
@@ -783,6 +784,6 @@ const styles = StyleSheet.create({
   showMoreText: {
     fontSize: 15,
     fontWeight: '900',
-    color: PRIMARY,
+    color: SCREEN_THEME.textSecondary,
   },
 });
