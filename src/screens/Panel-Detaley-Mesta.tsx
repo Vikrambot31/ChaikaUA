@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
   },
   ghostButton: {
     flex: 1,
-    backgroundColor: '#d93da7',
+    backgroundColor: '#8D7AB8',
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',

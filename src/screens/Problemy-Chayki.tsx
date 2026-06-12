@@ -1066,7 +1066,7 @@ const styles = StyleSheet.create({
   },
   counterItem: {
     flex: 1,
-    backgroundColor: '#d93da7',
+    backgroundColor: '#8D7AB8',
     borderRadius: 12,
     paddingVertical: 10,
     paddingHorizontal: 12,
@@ -1103,7 +1103,7 @@ const styles = StyleSheet.create({
   formTitle: { fontSize: 14, fontWeight: '800', color: SCREEN_THEME.textPrimary, marginBottom: 8 },
   fieldLabel: { marginTop: 10, marginBottom: 4, color: SCREEN_THEME.textSecondary, fontSize: 12, fontWeight: '700' },
   input: {
-    backgroundColor: '#d93da7',
+    backgroundColor: '#8D7AB8',
     borderRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 12,
@@ -1121,7 +1121,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   pickerWrapper: {
-    backgroundColor: '#d93da7',
+    backgroundColor: '#8D7AB8',
     borderRadius: 14,
     borderWidth: 2,
     borderColor: '#1E1A17',
@@ -1129,7 +1129,7 @@ const styles = StyleSheet.create({
   },
   picker: { color: SCREEN_THEME.textPrimary, height: 50 },
   filters: { gap: 8, paddingVertical: 10 },
-  filter: { borderRadius: 999, backgroundColor: '#d93da7', paddingHorizontal: 12, paddingVertical: 8 },
+  filter: { borderRadius: 999, backgroundColor: '#8D7AB8', paddingHorizontal: 12, paddingVertical: 8 },
   filterActive: { backgroundColor: SCREEN_THEME.terracotta },
   filterText: { color: SCREEN_THEME.terracottaDark, fontWeight: '700', fontSize: 12 },
   filterTextActive: { color: '#FFFFFF' },
@@ -1356,7 +1356,7 @@ const styles = StyleSheet.create({
     gap: 5,
     paddingVertical: 8,
     borderRadius: 999,
-    backgroundColor: '#d93da7',
+    backgroundColor: '#8D7AB8',
     borderWidth: 1,
     borderColor: '#E4D0AB',
   },
@@ -1381,7 +1381,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: '#E4D0AB',
-    backgroundColor: '#d93da7',
+    backgroundColor: '#8D7AB8',
   },
   guestPhotoBtnText: {
     fontSize: 14,
