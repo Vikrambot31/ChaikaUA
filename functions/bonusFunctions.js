@@ -837,9 +837,27 @@ const createBonusFunctions = ({ functions, admin, writeOpsEvent, writeOpsError, 
     if (!amount || amount <= 0 || amount > 100000) throw new functions.https.HttpsError('invalid-argument', 'invalid_amount');
     if (!reason) throw new functions.https.HttpsError('invalid-argument', 'reason_required');
 
+    // Idempotency: reject if this ticket was already paid
+    if (ticketId) {
+      const ticketSnap = await db.ref(`ad_tickets/${ticketId}`).once('value');
+      const ticket = ticketSnap.val();
+      if (!ticket) throw new functions.https.HttpsError('not-found', 'ticket_not_found');
+      if (ticket.status === 'paid') throw new functions.https.HttpsError('already-exists', 'ticket_already_paid');
+    }
+
     const now = Date.now();
 
     const result = await grantPromoCredits(db, targetUid, amount, context.auth.uid, reason, ticketId, now);
+
+    // Mark ticket as paid so admin cannot double-grant
+    if (ticketId) {
+      await db.ref(`ad_tickets/${ticketId}`).update({
+        status: 'paid',
+        paidAt: now,
+        paidByAdminUid: context.auth.uid,
+        updatedAt: now,
+      });
+    }
 
     await writeOpsEvent('promo_credits_granted', {
       adminUid: context.auth.uid,

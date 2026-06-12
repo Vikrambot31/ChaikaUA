@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, SafeAreaView, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, SafeAreaView, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import type { NavigationProp, RouteProp } from '@react-navigation/native';
@@ -9,6 +9,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { database } from '../firebase-core';
 
 import AppPhotoImage from '../components/AppPhotoImage';
+import PhotoCarousel from '../components/PhotoCarousel';
 import ContactReasonModal from '../components/ContactReasonModal';
 import MiniTabBar from '../components/MiniTabBar';
 import MiniUserAvatar from '../components/MiniUserAvatar';
@@ -144,6 +145,7 @@ export default function ItemDetailScreen({
   route: RouteProp<ItemDetailParams, 'ItemDetailScreen'>;
 }) {
   const dispatch = useDispatch();
+  const { width: windowWidth } = useWindowDimensions();
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
   const currentUser = useSelector((state: RootState) => state.auth.user);
   const isBusinessPlus = useSelector(selectIsBusinessPlus);
@@ -170,7 +172,7 @@ export default function ItemDetailScreen({
   const canRequestContact = Boolean(item.userId && item.userId !== currentUser?.id);
   const canOpenProfile = Boolean(item.userId && item.userId !== currentUser?.id);
   const canContact = canRequestContact || hasPhone;
-  const hasPhoto = Boolean(item.photoUri || item.photoStoragePath);
+  const hasPhoto = Boolean(item.photoUri || item.photoStoragePath || (item.photoStoragePaths && item.photoStoragePaths.length > 0));
   const hasOwnerAvatar = Boolean(item.ownerAvatarUri);
   const categoryLabel = item.category ? getRequestTopicLabel({ category: item.category }, language) : '';
   const profileLabel = language === 'ua' ? 'Профіль' : language === 'ru' ? 'Профиль' : 'Profile';
@@ -476,13 +478,23 @@ export default function ItemDetailScreen({
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {hasPhoto ? (
-          <AppPhotoImage
-            uri={item.photoUri}
-            storagePath={item.photoStoragePath}
-            style={styles.photo}
-            resizeMode="contain"
-            debugLabel={`ItemDetail:${item.sourceType}:${item.sourceId}`}
-          />
+          item.photoStoragePaths && item.photoStoragePaths.length > 1 ? (
+            <PhotoCarousel
+              photoUris={item.photoUris ?? []}
+              storagePaths={item.photoStoragePaths}
+              width={windowWidth - 32}
+              height={300}
+              borderRadius={22}
+            />
+          ) : (
+            <AppPhotoImage
+              uri={item.photoUri}
+              storagePath={item.photoStoragePath}
+              style={styles.photo}
+              resizeMode="contain"
+              debugLabel={`ItemDetail:${item.sourceType}:${item.sourceId}`}
+            />
+          )
         ) : hasOwnerAvatar ? (
           <AppPhotoImage
             uri={item.ownerAvatarUri}

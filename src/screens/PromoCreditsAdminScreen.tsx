@@ -167,6 +167,7 @@ const PromoCreditsAdminScreen: React.FC = () => {
 
   const renderTicket = ({ item }: { item: AdTicket }) => {
     const isBusy = busyTicketId === item.ticketId;
+    const isPaid = item.status === 'paid';
     return (
       <View style={styles.ticketCard}>
         <View style={styles.ticketTop}>
@@ -188,21 +189,28 @@ const PromoCreditsAdminScreen: React.FC = () => {
           <Text style={styles.detailText}>Пакет: {item.packageId || '-'}</Text>
         </View>
 
-        <TouchableOpacity
-          style={[styles.grantButton, isBusy && styles.disabledButton]}
-          onPress={() => void grantCredits(item)}
-          disabled={isBusy}
-          activeOpacity={0.86}
-        >
-          {isBusy ? (
-            <ActivityIndicator color="#FFF9EE" />
-          ) : (
-            <>
-              <MaterialCommunityIcons name="check-decagram-outline" size={19} color="#FFF9EE" />
-              <Text style={styles.grantButtonText}>{t.promoCredits.adminGrantButton}</Text>
-            </>
-          )}
-        </TouchableOpacity>
+        {isPaid ? (
+          <View style={styles.paidBadge}>
+            <MaterialCommunityIcons name="check-decagram" size={18} color="#2E6B38" />
+            <Text style={styles.paidBadgeText}>Оплачено</Text>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={[styles.grantButton, isBusy && styles.disabledButton]}
+            onPress={() => void grantCredits(item)}
+            disabled={isBusy}
+            activeOpacity={0.86}
+          >
+            {isBusy ? (
+              <ActivityIndicator color="#FFF9EE" />
+            ) : (
+              <>
+                <MaterialCommunityIcons name="check-decagram-outline" size={19} color="#FFF9EE" />
+                <Text style={styles.grantButtonText}>{t.promoCredits.adminGrantButton}</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
       </View>
     );
   };
@@ -508,6 +516,21 @@ const styles = StyleSheet.create({
     color: SCREEN_THEME.textSecondary,
     fontSize: 12,
     fontWeight: '700',
+  },
+  paidBadge: {
+    minHeight: 42,
+    borderRadius: 8,
+    backgroundColor: '#E3F2E5',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 14,
+  },
+  paidBadgeText: {
+    color: '#2E6B38',
+    fontSize: 14,
+    fontWeight: '900',
   },
   grantButton: {
     minHeight: 46,

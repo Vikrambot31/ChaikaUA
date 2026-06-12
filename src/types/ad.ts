@@ -5,7 +5,7 @@ export interface AdTicket {
   userId: string;
   userName: string;
   category: AdTicketCategory;
-  status: 'open' | 'closed';
+  status: 'open' | 'closed' | 'paid';
   createdAt: number;
   updatedAt: number;
   lastAdminMessage: number;
