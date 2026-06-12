@@ -28,8 +28,7 @@ import { useOsbbMembership } from '../hooks/useOsbbMembership';
 import InlineFieldHint from '../components/InlineFieldHint';
 import { useSoftToast } from '../hooks/useSoftToast';
 import ScreenTooltip from '../components/ScreenTooltip';
-import HintBadge, { HINT_BADGE_LABELS } from '../components/HintBadge';
-import { useTrainingMode } from '../hooks/useTrainingMode';
+// HintBadge + useTrainingMode removed — unused after header refactor
 import { OSBB_FINANCE_TOOLTIP } from '../utils/screenTooltips';
 
 // ---------------------------------------------------------------------------

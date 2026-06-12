@@ -41,6 +41,7 @@ import { safeLogError } from '../utils/errorLogger';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { showUserError } from '../utils/userFacingErrors';
 import ScreenTooltip from '../components/ScreenTooltip';
+// HintBadge + useTrainingMode removed — unused after header refactor
 import { MY_PHOTOS_TOOLTIP } from '../utils/screenTooltips';
 import { getBestPhotoUri, getPhotoThumbnailUri, ImageStorage } from './ImageStorage';
 import { deleteEngineUpload } from './PhotoUploadEngine';
@@ -1305,7 +1306,7 @@ const styles = StyleSheet.create({
     bottom: 22,
     minHeight: 56,
     borderRadius: 16,
-    backgroundColor: SCREEN_THEME.terracotta,
+    backgroundColor: '#7d0e59',
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
@@ -1345,10 +1346,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   deleteSelectedButton: {
-    backgroundColor: '#8E2E24',
+    backgroundColor: '#7d0e59',
   },
   reviewSelectedButton: {
-    backgroundColor: SCREEN_THEME.enamelBlueDark,
+    backgroundColor: '#7d0e59',
   },
   selectedActionText: {
     flexShrink: 1,

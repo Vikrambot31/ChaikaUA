@@ -4,7 +4,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  type ViewStyle,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
@@ -21,6 +21,7 @@ type HintBadgeProps = {
   onTap: () => void;
   onDismiss: () => void;
   label?: string;
+  style?: ViewStyle;
 };
 
 export default function HintBadge({
@@ -28,6 +29,7 @@ export default function HintBadge({
   onTap,
   onDismiss,
   label = 'Нужна помощь?',
+  style,
 }: HintBadgeProps) {
   const opacity = useRef(new Animated.Value(0)).current;
 
@@ -42,7 +44,7 @@ export default function HintBadge({
   if (!visible) return null;
 
   return (
-    <Animated.View style={[styles.wrapper, { opacity }]}>
+    <Animated.View style={[styles.wrapper, { opacity }, style]}>
       <TouchableOpacity
         style={styles.pill}
         onPress={onTap}

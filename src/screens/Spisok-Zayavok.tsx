@@ -1441,7 +1441,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   createButton: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: '#7d0e59',
     borderRadius: 16,
     paddingVertical: 14,
     flexDirection: 'row',
@@ -1454,12 +1454,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 3,
   },
-  secondaryHeaderButton: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E8DDD3',
-  },
   createButtonText: { color: '#FFFFFF', fontWeight: '800', fontSize: SIZES.fontRegular },
+  secondaryHeaderButton: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: COLORS.primary },
   secondaryHeaderButtonText: { color: COLORS.primary },
   listContent: { paddingHorizontal: 16, paddingVertical: 12, paddingBottom: 18 },
   loadingContainer: { marginVertical: 16 },

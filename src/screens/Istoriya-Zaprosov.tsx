@@ -5,8 +5,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
 import MiniTabBar from '../components/MiniTabBar';
 import ScreenTooltip from '../components/ScreenTooltip';
-import HintBadge, { HINT_BADGE_LABELS } from '../components/HintBadge';
-import { useTrainingMode } from '../hooks/useTrainingMode';
+// HintBadge + useTrainingMode removed — unused after header refactor
 import { HELP_HISTORY_TOOLTIP } from '../utils/screenTooltips';
 import { COLORS, SIZES } from '../utils/constants';
 import { removeHelpRequest, selectAllHelpRequests, syncFromRequests } from '../redux/slices/helpRequestsSlice';
