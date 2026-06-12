@@ -523,12 +523,13 @@ export const confirmHelperForRequest = async (
 
 export const closeRequestWithBonus = async (
   requestId: string,
+  helperUids?: string[],
 ): Promise<{ ok: boolean; status: string; points?: number }> => {
-  const callable = httpsCallable<{ requestId: string }, { ok: boolean; status: string; points?: number }>(
+  const callable = httpsCallable<{ requestId: string; helperUids?: string[] }, { ok: boolean; status: string; points?: number }>(
     functions,
     'closeRequestWithBonus',
   );
-  const result = await callable({ requestId });
+  const result = await callable({ requestId, helperUids });
   return result.data;
 };
 

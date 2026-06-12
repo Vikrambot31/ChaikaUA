@@ -6,9 +6,11 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationProp, ParamListBase, RouteProp } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { onValue, ref } from 'firebase/database';
+import { onAuthStateChanged } from 'firebase/auth';
+import type { User } from 'firebase/auth';
 import { auth, database, firebaseChatAPI } from '../firebase-config';
 import type { RootState } from '../redux/store';
-import type { Request } from '../types/app';
+import type { HelperOption, Request } from '../types/app';
 import AppPhotoImage from '../components/AppPhotoImage';
 import MiniUserAvatar from '../components/MiniUserAvatar';
 import { LIGHT_ORBS, SCREEN_THEME } from '../utils/screenTheme';
@@ -32,6 +34,9 @@ import {
 } from '../services/bonusService';
 import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
 import ContactReasonModal from '../components/ContactReasonModal';
+import CommentSection from '../components/CommentSection';
+import HelperSelectionModal from '../components/HelperSelectionModal';
+import { getCommentersForRequest } from '../services/commentService';
 import { useContactRequest } from '../hooks/useContactRequest';
 
 type RequestDetailParams = {
@@ -240,7 +245,7 @@ const HELP_FLOW_TEXT = {
     closeSolved: 'Закрити як вирішену',
     closed: 'Заявку закрито',
     alreadyClosed: 'Заявку вже закрито раніше.',
-    closeSuccess: 'Заявку закрито. +5 бонусів, якщо ліміти дозволяють.',
+    closeSuccess: 'Заявку закрито. +2 бонуси, якщо ліміти дозволяють.',
     helpersTitle: 'Помічники',
     helpersEmpty: 'Поки ніхто не відгукнувся.',
     flagged: 'Перевірка',
@@ -260,7 +265,7 @@ const HELP_FLOW_TEXT = {
     closeSolved: 'Закрыть как решенную',
     closed: 'Заявка закрыта',
     alreadyClosed: 'Заявка уже была закрыта ранее.',
-    closeSuccess: 'Заявка закрыта. +5 бонусов, если лимиты позволяют.',
+    closeSuccess: 'Заявка закрыта. +2 бонуса, если лимиты позволяют.',
     helpersTitle: 'Помощники',
     helpersEmpty: 'Пока никто не откликнулся.',
     flagged: 'Проверка',
@@ -280,7 +285,7 @@ const HELP_FLOW_TEXT = {
     closeSolved: 'Close as solved',
     closed: 'Request closed',
     alreadyClosed: 'Request was already closed.',
-    closeSuccess: 'Request closed. +5 bonuses if limits allow.',
+    closeSuccess: 'Request closed. +2 bonuses if limits allow.',
     helpersTitle: 'Helpers',
     helpersEmpty: 'No helpers have responded yet.',
     flagged: 'Review',
@@ -317,6 +322,8 @@ const RequestDetailScreen = ({
   const [thankedHelpers, setThankedHelpers] = useState<Record<string, boolean>>({});
   const [closingRequest, setClosingRequest] = useState(false);
   const [requestSolved, setRequestSolved] = useState(request.status === 'closed');
+  const [helperSelectionVisible, setHelperSelectionVisible] = useState(false);
+  const [helperOptions, setHelperOptions] = useState<HelperOption[]>([]);
   const helperIds = useMemo(() => helpResponses.map((item) => item.helperUid).filter(Boolean), [helpResponses]);
   const avatarByUserId = useUserAvatarMap([request.userId, ...helperIds].filter(Boolean));
   const resolvedAvatarUri = (request.userId && avatarByUserId[request.userId]) || pickUserAvatarUri({ userPhotoURL: request.userPhotoURL, startAvatarKey: request.startAvatarKey }) || pickUserAvatarUri(request);
@@ -596,10 +603,72 @@ const RequestDetailScreen = ({
 
   const handleCloseSolved = async () => {
     if (!request.id || closingRequest || requestSolved) return;
-    if (!auth.currentUser || auth.currentUser.isAnonymous) {
-      Alert.alert(text.ok, FUNCTION_ERROR_MESSAGES[language].auth_required);
-      return;
+    const user = auth.currentUser;
+    if (!user || user.isAnonymous) {
+      const freshUser = await new Promise<User | null>((resolve) => {
+        const unsub = onAuthStateChanged(auth, (u) => {
+          unsub();
+          resolve(u);
+        });
+        setTimeout(() => resolve(null), 3000);
+      });
+      if (!freshUser || freshUser.isAnonymous) {
+        Alert.alert(text.ok, FUNCTION_ERROR_MESSAGES[language].auth_required);
+        return;
+      }
     }
+
+    const allCommenters = await getCommentersForRequest(request.id);
+    const commenters = allCommenters.filter((c) => c.uid !== request.userId);
+    if (commenters.length === 0) {
+      setClosingRequest(true);
+      try {
+        const result = await closeRequestWithBonus(request.id);
+        setRequestSolved(true);
+        if (result.status === 'already_closed') {
+          Alert.alert(text.ok, helpText.alreadyClosed);
+        } else {
+          Alert.alert(text.ok, result.ok ? helpText.closeSuccess : helpText.closed);
+        }
+      } catch (error) {
+        Alert.alert(text.ok, parseFunctionError(error, helpText.bonusError, language));
+      } finally {
+        setClosingRequest(false);
+      }
+    } else {
+      setHelperOptions(
+        commenters.map((c) => ({
+          uid: c.uid,
+          name: c.name,
+          avatarKey: c.avatarKey,
+          commentPreview: c.text,
+          selected: false,
+        })),
+      );
+      setHelperSelectionVisible(true);
+    }
+  };
+
+  const handleCloseWithHelpers = async (helperUids: string[]) => {
+    setHelperSelectionVisible(false);
+    setClosingRequest(true);
+    try {
+      const result = await closeRequestWithBonus(request.id, helperUids);
+      setRequestSolved(true);
+      if (result.status === 'already_closed') {
+        Alert.alert(text.ok, helpText.alreadyClosed);
+      } else {
+        Alert.alert(text.ok, result.ok ? helpText.closeSuccess : helpText.closed);
+      }
+    } catch (error) {
+      Alert.alert(text.ok, parseFunctionError(error, helpText.bonusError, language));
+    } finally {
+      setClosingRequest(false);
+    }
+  };
+
+  const handleCloseNobody = async () => {
+    setHelperSelectionVisible(false);
     setClosingRequest(true);
     try {
       const result = await closeRequestWithBonus(request.id);
@@ -847,6 +916,12 @@ const RequestDetailScreen = ({
           </View>
         ) : null}
 
+        <CommentSection
+          requestId={request.id}
+          requestAuthorUid={request.userId || ''}
+          isRequestClosed={requestSolved || request.status === 'closed'}
+        />
+
         {!isOwnRequest && currentUser?.id ? (
           <TouchableOpacity
             style={[
@@ -889,7 +964,7 @@ const RequestDetailScreen = ({
             ) : (
               <>
                 <MaterialCommunityIcons name={requestSolved ? 'check-circle' : 'check-decagram-outline'} size={18} color="#FFF9EE" />
-                <Text style={styles.closeSolvedButtonText}>{requestSolved ? helpText.closed : `${helpText.closeSolved} +5`}</Text>
+                <Text style={styles.closeSolvedButtonText}>{requestSolved ? helpText.closed : `${helpText.closeSolved} +2`}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -919,6 +994,13 @@ const RequestDetailScreen = ({
         target={currentTarget}
         onSelect={(reason) => void handleSendContactRequest(reason)}
         onClose={closeModal}
+      />
+      <HelperSelectionModal
+        visible={helperSelectionVisible}
+        helpers={helperOptions}
+        onConfirm={handleCloseWithHelpers}
+        onNobodyHelped={handleCloseNobody}
+        onCancel={() => setHelperSelectionVisible(false)}
       />
     </SafeAreaView>
   );

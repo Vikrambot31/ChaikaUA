@@ -446,3 +446,39 @@ export interface OsbbState {
   isSetupDone: boolean;
   viewMode: 'extended' | 'simple';
 }
+
+export type ModerationVerdict = 'approve' | 'review' | 'suspicious';
+
+export interface CommentModeration {
+  verdict: ModerationVerdict;
+  confidence: number;
+  flags: string[];
+  provider: string;
+  model: string;
+}
+
+export type CommentStatus = 'visible' | 'hidden' | 'pending';
+
+export interface Comment {
+  id: string;
+  uid: string;
+  name: string;
+  text: string;
+  createdAt: number;
+  status: CommentStatus;
+  avatarKey?: string;
+  aiModeration?: CommentModeration | null;
+}
+
+export interface HelperOption {
+  uid: string;
+  name: string;
+  avatarKey?: string;
+  commentPreview: string;
+  selected: boolean;
+}
+
+export interface CloseRequestPayload {
+  requestId: string;
+  helperUids: string[];
+}
