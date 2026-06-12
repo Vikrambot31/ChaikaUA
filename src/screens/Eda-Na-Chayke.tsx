@@ -1060,6 +1060,18 @@ export default function EdaNaChaykeScreen() {
           </>
         ) : (
           <>
+            {/* Top food feed — same as in eat mode */}
+            {!topListingsReady ? (
+              <ActivityIndicator size="small" color={SCREEN_THEME.accentGold} style={{ marginVertical: 8 }} />
+            ) : visibleTopListings.length > 0 ? (
+              <View style={styles.topFoodSection}>
+                <Text style={styles.topFoodTitle}>{text.topFoodTitle}</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.topFoodScroll}>
+                  {visibleTopListings.map((item) => renderTopFoodCard(item))}
+                </ScrollView>
+              </View>
+            ) : null}
+
             {/* CTA buttons */}
             <View style={styles.sectionHeaderRow}>
               <Text style={styles.sectionTitle}>{text.whatNeeded}</Text>
