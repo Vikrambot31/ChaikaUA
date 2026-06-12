@@ -2426,11 +2426,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 9,
     paddingVertical: 5,
-    backgroundColor: '#7A1E5C',
+    backgroundColor: 'rgba(141, 122, 184, 0.20)',
   },
   kDescText: {
     fontSize: 12,
-    color: '#fff',
+    color: SCREEN_THEME.textPrimary,
     lineHeight: 17,
     fontWeight: '800',
   },

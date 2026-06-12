@@ -366,7 +366,7 @@ const styles = StyleSheet.create({
   timeBadge: { backgroundColor: SCREEN_THEME.terracotta, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
   timeText: { color: '#FFFFFF', fontWeight: '800', fontSize: 12 },
   requestPhoto: { width: '100%', height: 170, borderRadius: 14, marginBottom: 8, backgroundColor: '#E7D6B6' },
-  requestDescription: { color: SCREEN_THEME.textPrimary, backgroundColor: 'rgba(199, 122, 93, 0.10)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 7, lineHeight: 20, marginBottom: 8, fontWeight: '600', overflow: 'hidden' },
+  requestDescription: { color: SCREEN_THEME.textPrimary, backgroundColor: 'rgba(141, 122, 184, 0.20)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 7, lineHeight: 20, marginBottom: 8, fontWeight: '600', overflow: 'hidden' },
   pendingBadge: { backgroundColor: '#FFF3CD', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, marginBottom: 8, alignSelf: 'flex-start', borderWidth: 1, borderColor: '#F0C96B' },
   pendingBadgeText: { color: '#7A5C00', fontWeight: '800', fontSize: 12 },
   emptyState: { alignItems: 'center', paddingVertical: 40 },

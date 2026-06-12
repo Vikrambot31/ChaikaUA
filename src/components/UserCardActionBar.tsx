@@ -191,9 +191,9 @@ export default function UserCardActionBar({
       ) : null}
 
       {showContact ? (
-        <TouchableOpacity style={[styles.outlined, resolvedContactDisabled && styles.disabled]} onPress={(event) => { event.stopPropagation(); if (requireRegisteredUser()) onContact?.(); }} disabled={resolvedContactDisabled} activeOpacity={0.8}>
-          <MaterialCommunityIcons name="message-text-outline" size={13} color={resolvedContactDisabled ? '#B0A090' : '#7A1E5C'} />
-          <Text style={[styles.outlinedText, resolvedContactDisabled && styles.disabledText]}>{contactLabel ?? t.contact}</Text>
+        <TouchableOpacity style={[styles.outlined, styles.contactOutlined, resolvedContactDisabled && styles.disabled]} onPress={(event) => { event.stopPropagation(); if (requireRegisteredUser()) onContact?.(); }} disabled={resolvedContactDisabled} activeOpacity={0.8}>
+          <MaterialCommunityIcons name="message-text-outline" size={13} color={resolvedContactDisabled ? '#B0A090' : '#6B5BA8'} />
+          <Text style={[styles.outlinedText, styles.contactOutlinedText, resolvedContactDisabled && styles.disabledText]}>{contactLabel ?? t.contact}</Text>
         </TouchableOpacity>
       ) : null}
 
@@ -281,6 +281,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   outlinedText: { fontSize: 11, fontWeight: '800', color: '#7A1E5C' },
+  contactOutlined: {
+    backgroundColor: 'rgba(141, 122, 184, 0.20)',
+    borderColor: 'rgba(141, 122, 184, 0.35)',
+  },
+  contactOutlinedText: { color: '#6B5BA8' },
   like: {
     flexDirection: 'row',
     alignItems: 'center',

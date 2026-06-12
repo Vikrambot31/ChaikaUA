@@ -870,7 +870,7 @@ const OnlineChatScreen = () => {
                         disabled={!item.userId && !item.phone}
                         activeOpacity={item.userId || item.phone ? 0.78 : 1}
                       >
-                        <MaterialCommunityIcons name="message-text-outline" size={15} color="#FFFFFF" />
+                        <MaterialCommunityIcons name="message-text-outline" size={15} color="#6B5BA8" />
                         <Text style={[styles.problemChatActionText, styles.problemChatContactText]} numberOfLines={1}>{language === 'en' ? 'Contact' : language === 'ru' ? 'Связаться' : "Зв'язатися"}</Text>
                       </TouchableOpacity>
                       <FeedLikeButton
@@ -937,7 +937,7 @@ const OnlineChatScreen = () => {
                         }}
                         activeOpacity={0.75}
                       >
-                        <TactileIcon icon="account-arrow-right-outline" size={34} iconSize={14} backgroundColor="#8B5E3C" />
+                        <TactileIcon icon="account-arrow-right-outline" size={34} iconSize={14} backgroundColor="rgba(141, 122, 184, 0.30)" tint="#6B5BA8" borderColor="rgba(141, 122, 184, 0.40)" />
                       </TouchableOpacity>
                     ) : null}
                   </View>
@@ -1061,7 +1061,7 @@ const OnlineChatScreen = () => {
                       onPress={(event) => { event.stopPropagation(); openContactModal({ userId: item.userId as string, name: item.name ?? 'Unknown', sourceType: 'help', sourceId: item.id, sourceTitle: (item.text ?? '').slice(0, 60) }); }}
                       activeOpacity={0.8}
                     >
-                      <MaterialCommunityIcons name="arrow-right-circle-outline" size={13} color="#fff" />
+                      <MaterialCommunityIcons name="arrow-right-circle-outline" size={13} color="#6B5BA8" />
                       <Text style={styles.chatActionBtnAccentText} numberOfLines={1}>
                         {language === 'ua' ? "Зв'язатись" : language === 'ru' ? 'Связаться' : 'Contact'}
                       </Text>
@@ -1478,8 +1478,8 @@ const styles = StyleSheet.create({
   problemChatContactPill: {
     flex: 0.9,
     minWidth: 0,
-    backgroundColor: '#7A3E22',
-    borderColor: '#7A3E22',
+    backgroundColor: 'rgba(141, 122, 184, 0.20)',
+    borderColor: 'rgba(141, 122, 184, 0.40)',
   },
   problemChatActionPillDisabled: { opacity: 0.45 },
   problemChatActionText: {
@@ -1488,7 +1488,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     flexShrink: 1,
   },
-  problemChatContactText: { color: '#FFFFFF' },
+  problemChatContactText: { color: '#6B5BA8' },
   problemChatLikeBtn: { minWidth: 54, minHeight: 36, flexShrink: 0 },
   lostFoundChatCard: {
     flexDirection: 'row',
@@ -1572,10 +1572,10 @@ const styles = StyleSheet.create({
   lostFoundDescription: {
     fontSize: 12,
     lineHeight: 16,
-    color: '#FFF0DC',
+    color: SCREEN_THEME.textPrimary,
     fontWeight: '800',
     marginTop: 4,
-    backgroundColor: '#8B5E3C',
+    backgroundColor: 'rgba(141, 122, 184, 0.20)',
     borderRadius: 10,
     paddingHorizontal: 9,
     paddingVertical: 5,
@@ -1708,11 +1708,11 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    backgroundColor: '#8B5E3C',
+    backgroundColor: 'rgba(141, 122, 184, 0.20)',
   },
   chatDescText: {
     fontSize: 13,
-    color: '#fff',
+    color: SCREEN_THEME.textPrimary,
     lineHeight: 18,
     fontWeight: '800',
   },
@@ -1747,13 +1747,15 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 7,
-    backgroundColor: '#8B5E3C',
+    backgroundColor: 'rgba(141, 122, 184, 0.20)',
+    borderWidth: 1,
+    borderColor: 'rgba(141, 122, 184, 0.35)',
     flexShrink: 1,
   },
   chatActionBtnAccentText: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#fff',
+    color: '#6B5BA8',
     flexShrink: 1,
   },
   chatActionBtnDelete: {

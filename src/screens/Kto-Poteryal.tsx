@@ -951,7 +951,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   itemTitle: { fontSize: 20, lineHeight: 24, fontWeight: '900', color: SCREEN_THEME.textPrimary },
-  itemDescription: { fontSize: 12, lineHeight: 16, color: '#fff', fontWeight: '800', marginTop: 4, backgroundColor: '#7A1E5C', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, overflow: 'hidden' },
+  itemDescription: { fontSize: 12, lineHeight: 16, color: SCREEN_THEME.textPrimary, fontWeight: '800', marginTop: 4, backgroundColor: 'rgba(141, 122, 184, 0.20)', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, overflow: 'hidden' },
   itemLocation: { fontSize: 12, lineHeight: 16, color: SCREEN_THEME.woodGreenDark, fontWeight: '900', marginTop: 5 },
   bottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6, gap: 5 },
   personRow: { flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1, minWidth: 42 },
