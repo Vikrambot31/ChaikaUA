@@ -29,10 +29,19 @@ export interface ContactListing {
   zodiacSign?: string;
   humanDesignType?: string;
   humanDesignProfile?: string;
+  lookingForGender?: string;
+  photoUris?: string[];
   isArchived?: boolean;
   language?: AppLang;
   lastEditedAt?: string;
 }
+
+const normalizeRtdbArray = (val: unknown): string[] => {
+  if (!val) return [];
+  if (Array.isArray(val)) return (val as unknown[]).filter((v): v is string => typeof v === 'string' && Boolean(v));
+  if (typeof val === 'object') return Object.values(val as Record<string, unknown>).filter((v): v is string => typeof v === 'string' && Boolean(v));
+  return [];
+};
 
 const PATH = 'contacts_listings';
 const CONTACT_LISTING_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -72,6 +81,8 @@ const mapContactItem = (id: string, data: any, isArchived?: boolean): ContactLis
   zodiacSign: data.zodiacSign || '',
   humanDesignType: data.humanDesignType || '',
   humanDesignProfile: data.humanDesignProfile || '',
+  lookingForGender: data.lookingForGender || '',
+  photoUris: normalizeRtdbArray(data.photoUris),
   isArchived,
 });
 
@@ -92,11 +103,16 @@ export const contactsService = {
 
     const resolvePhotosInBackground = (items: ContactListing[], currentRequestId: number): void => {
       const resolvedPhotoUris = new Map<string, string>();
+      const resolvedPhotoUrisArrays = new Map<string, string[]>();
       const publishResolvedPhotos = () => {
         if (disposed || currentRequestId !== requestId) return;
         callback(items.map((item) => {
           const photoUri = resolvedPhotoUris.get(item.id);
-          return photoUri ? { ...item, photoUri } : item;
+          const photoUrisArr = resolvedPhotoUrisArrays.get(item.id);
+          const updates: Partial<ContactListing> = {};
+          if (photoUri) updates.photoUri = photoUri;
+          if (photoUrisArr) updates.photoUris = photoUrisArr;
+          return (photoUri || photoUrisArr) ? { ...item, ...updates } : item;
         }));
       };
 
@@ -114,6 +130,30 @@ export const contactsService = {
             resolvedPhotoUris.set(item.id, item.photoUri);
           }
         });
+        // Resolve multi-photo photoUris arrays
+        for (const item of chunk) {
+          if (disposed || currentRequestId !== requestId) return;
+          const storagePaths = item.photoUris || [];
+          if (storagePaths.length <= 1) continue;
+          try {
+            type Wrapper = { id: string; path: string };
+            const wrappers: Wrapper[] = storagePaths.map((p, i) => ({ id: `${item.id}_${i}`, path: p }));
+            const resolvedArr = await resolveMediaAccessUrls(
+              wrappers,
+              'contacts_listings',
+              (w) => w.path,
+              (w, url) => ({ ...w, path: url }),
+              { profile: 'list' },
+            );
+            if (disposed || currentRequestId !== requestId) return;
+            const urls = resolvedArr.map((w) => w.path).filter(Boolean);
+            if (urls.length > 0) {
+              resolvedPhotoUrisArrays.set(item.id, urls);
+            }
+          } catch {
+            // skip multi-photo resolve errors silently
+          }
+        }
         publishResolvedPhotos();
       };
 
@@ -241,6 +281,8 @@ export const contactsService = {
         zodiacSign: sanitizeStoredText(item.zodiacSign || ''),
         humanDesignType: sanitizeStoredText(item.humanDesignType || ''),
         humanDesignProfile: sanitizeStoredText(item.humanDesignProfile || ''),
+        lookingForGender: sanitizeStoredText(item.lookingForGender || ''),
+        photoUris: (item.photoUris || []).map((p) => sanitizeStoredText(p)),
         userId: user.uid,
         photoStoragePath,
         photoUri: '',
@@ -321,6 +363,7 @@ export const contactsService = {
       if (fields.zodiacSign !== undefined) patch.zodiacSign = sanitizeStoredText(fields.zodiacSign);
       if (fields.humanDesignType !== undefined) patch.humanDesignType = sanitizeStoredText(fields.humanDesignType);
       if (fields.humanDesignProfile !== undefined) patch.humanDesignProfile = sanitizeStoredText(fields.humanDesignProfile);
+      if (fields.lookingForGender !== undefined) patch.lookingForGender = sanitizeStoredText(fields.lookingForGender);
       if (fields.showPhone !== undefined) patch.showPhone = fields.showPhone;
       if (fields.photoStoragePath !== undefined) {
         patch.photoStoragePath = fields.photoStoragePath;
