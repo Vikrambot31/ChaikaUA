@@ -308,7 +308,7 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 26, fontWeight: '900', color: SCREEN_THEME.textPrimary, marginTop: 10 },
   headerSubtitle: { marginTop: 6, color: SCREEN_THEME.textSecondary, textAlign: 'center' },
   logoCard: { backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 20, padding: 14, marginBottom: 14, borderWidth: 1, borderColor: '#E4D0AB' },
-  logoFrame: { borderRadius: 16, backgroundColor: '#F3ECE4', alignItems: 'center', justifyContent: 'center', minHeight: 170, padding: 18 },
+  logoFrame: { borderRadius: 16, backgroundColor: '#d93da7', alignItems: 'center', justifyContent: 'center', minHeight: 170, padding: 18 },
   logo: { width: '88%', height: 140 },
   card: { backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 20, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: '#E4D0AB' },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },

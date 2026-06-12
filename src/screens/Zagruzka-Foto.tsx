@@ -589,7 +589,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 }, elevation: 3,
   },
   input: {
-    backgroundColor: '#F3ECE4', borderRadius: 14,
+    backgroundColor: '#d93da7', borderRadius: 14,
     paddingHorizontal: 14, paddingVertical: 12,
     color: '#302621', marginBottom: 12, fontWeight: '600',
   },
@@ -599,7 +599,7 @@ const styles = StyleSheet.create({
   categoryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
   categoryChip: {
     flexDirection: 'row', alignItems: 'center',
-    borderRadius: 999, backgroundColor: '#F3ECE4',
+    borderRadius: 999, backgroundColor: '#d93da7',
     borderWidth: 1, borderColor: '#E8DDD3',
     paddingHorizontal: 12, paddingVertical: 8,
   },
@@ -609,7 +609,7 @@ const styles = StyleSheet.create({
   locationBlock: { marginBottom: 8 },
   locationList: { gap: 6, maxHeight: 260 },
   locationChip: {
-    borderRadius: 14, backgroundColor: '#F3ECE4',
+    borderRadius: 14, backgroundColor: '#d93da7',
     borderWidth: 1, borderColor: '#E8DDD3',
     paddingHorizontal: 12, paddingVertical: 10,
   },
@@ -634,7 +634,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#F3ECE4',
+    backgroundColor: '#d93da7',
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,

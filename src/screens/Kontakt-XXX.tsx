@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, KeyboardAvoidingView, Linking, Modal, PanResponder, Platform, SafeAreaView, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, KeyboardAvoidingView, Linking, Modal, PanResponder, Platform, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { useSelector } from 'react-redux';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
@@ -28,6 +28,10 @@ import { getDonePhotos, validateSubmissionRequirements } from '../utils/submissi
 import { checkYellowList } from '../utils/yellowListCheck';
 import { getLanguageValidationError } from '../utils/contentLanguageGuard';
 import UserCardActionBar from '../components/UserCardActionBar';
+import ReportBlockMenu from '../components/ReportBlockMenu';
+import PhotoCarousel from '../components/PhotoCarousel';
+import ProfileCompletenessBadge from '../components/ProfileCompletenessBadge';
+import { reportBlockService } from '../services/reportBlockService';
 import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 import { useOperationTrace } from '../hooks/useOperationTrace';
 import { subscribeActiveBonusPromotions, type BonusPromotion } from '../services/bonusService';
@@ -79,6 +83,7 @@ const ITEM_CONDITION_VALUES = ['new', 'like_new', 'good', 'fair'] as const;
 const ZODIAC_VALUES = ['aries', 'taurus', 'gemini', 'cancer', 'leo', 'virgo', 'libra', 'scorpio', 'sagittarius', 'capricorn', 'aquarius', 'pisces'] as const;
 const HUMAN_DESIGN_TYPE_VALUES = ['generator', 'projector', 'manifestor', 'reflector'] as const;
 const HUMAN_DESIGN_PROFILE_VALUES = ['1/3', '1/4', '2/4', '2/5', '3/5', '3/6', '4/1', '4/6', '5/1', '5/2', '6/2', '6/3'] as const;
+const LOOKING_FOR_GENDER_VALUES = ['male', 'female', 'any', 'couple'] as const;
 const HUMAN_DESIGN_TELEGRAM_URL = 'https://t.me/Vikram_2027';
 const HUMAN_DESIGN_TELEGRAM_MESSAGE = 'Добрый день. Я с приложения Чайка Life - хочу бесплатно узнать про ДЧ свой тип';
 
@@ -93,6 +98,7 @@ type ContactsDraft = Partial<{
   zodiacSign: string;
   humanDesignType: string;
   humanDesignProfile: string;
+  lookingForGender: string;
 }>;
 
 const UI_TEXT = {
@@ -213,6 +219,15 @@ const UI_TEXT = {
     swipeRestartBtn: 'Почати знову',
     swipeLikeLabel: 'ЛАЙК ♥',
     swipePassLabel: 'ДАЛІ →',
+    reportMenuLabel: 'Ще',
+    lookingForLabel: 'Кого шукаю',
+    lookingForValues: { male: 'Чоловiка', female: 'Жiнку', any: 'Будь-кого', couple: 'Пару' },
+    selectLookingFor: 'Оберiть...',
+    completenessHint: 'Заповнiть профiль для бiльшої видимостi',
+    emptyTitle: 'Ще немає анкет',
+    emptyCta: 'Створити анкету',
+    noProfileBanner: 'Створiть анкету, щоб вас знайшли!',
+    noProfileCta: 'Створити',
   },
   ru: {
     title: 'Знакомства на кофе',
@@ -331,6 +346,15 @@ const UI_TEXT = {
     swipeRestartBtn: 'Начать заново',
     swipeLikeLabel: 'ЛАЙК ♥',
     swipePassLabel: 'ДАЛЬШЕ →',
+    reportMenuLabel: 'Ещё',
+    lookingForLabel: 'Кого ищу',
+    lookingForValues: { male: 'Мужчину', female: 'Женщину', any: 'Кого угодно', couple: 'Пару' },
+    selectLookingFor: 'Выберите...',
+    completenessHint: 'Заполните профиль для большей видимости',
+    emptyTitle: 'Анкет пока нет',
+    emptyCta: 'Создать анкету',
+    noProfileBanner: 'Создайте анкету, чтобы вас нашли!',
+    noProfileCta: 'Создать',
   },
   en: {
     title: 'Coffee Meetups',
@@ -449,6 +473,15 @@ const UI_TEXT = {
     swipeRestartBtn: 'Start again',
     swipeLikeLabel: 'LIKE ♥',
     swipePassLabel: 'NEXT →',
+    reportMenuLabel: 'More',
+    lookingForLabel: 'Looking for',
+    lookingForValues: { male: 'A man', female: 'A woman', any: 'Anyone', couple: 'A couple' },
+    selectLookingFor: 'Select...',
+    completenessHint: 'Complete your profile for more visibility',
+    emptyTitle: 'No profiles yet',
+    emptyCta: 'Create profile',
+    noProfileBanner: 'Create a profile so people can find you!',
+    noProfileCta: 'Create',
   },
 } as const;
 
@@ -470,6 +503,7 @@ const KontaktiChaikyScreen: React.FC = () => {
   const [zodiacSign, setZodiacSign] = useState('');
   const [humanDesignType, setHumanDesignType] = useState('');
   const [humanDesignProfile, setHumanDesignProfile] = useState('');
+  const [lookingForGender, setLookingForGender] = useState('');
   const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
   const [showPhoneOnCard, setShowPhoneOnCard] = useState(true);
   const [listings, setListings] = useState<ContactListing[]>([]);
@@ -500,8 +534,16 @@ const KontaktiChaikyScreen: React.FC = () => {
   const [editZodiac, setEditZodiac] = useState('');
   const [editHdType, setEditHdType] = useState('');
   const [editHdProfile, setEditHdProfile] = useState('');
+  const [editLookingForGender, setEditLookingForGender] = useState('');
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editSubmitAttempted, setEditSubmitAttempted] = useState(false);
+  // Report/Block
+  const [blockedUserIds, setBlockedUserIds] = useState<Set<string>>(new Set());
+  const [reportMenuVisible, setReportMenuVisible] = useState(false);
+  const [reportTargetListing, setReportTargetListing] = useState<ContactListing | null>(null);
+  // Pull-to-refresh
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   // Swipe mode
   const [swipeMode, setSwipeMode] = useState(false);
   const [swipeIndex, setSwipeIndex] = useState(0);
@@ -513,7 +555,7 @@ const KontaktiChaikyScreen: React.FC = () => {
   const swipePosition = useRef(new Animated.ValueXY()).current;
   const blinkAnim = useRef(new Animated.Value(1)).current;
   const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const latestDraftRef = useRef({ category, condition, price, description, phone, addFormVisible, isInterestingFormExpanded, zodiacSign, humanDesignType, humanDesignProfile });
+  const latestDraftRef = useRef({ category, condition, price, description, phone, addFormVisible, isInterestingFormExpanded, zodiacSign, humanDesignType, humanDesignProfile, lookingForGender });
   const avatarByUserId = useUserAvatarMap(listings.map((item) => item.userId));
   const previousAddFormVisibleRef = useRef(addFormVisible);
   const skipNextDraftFlushRef = useRef(false);
@@ -534,6 +576,7 @@ const KontaktiChaikyScreen: React.FC = () => {
       zodiacSign !== '' ||
       humanDesignType !== '' ||
       humanDesignProfile !== '' ||
+      lookingForGender !== '' ||
       formPhotos.length > 0 ||
       !showPhoneOnCard;
     if (!isDirty) {
@@ -550,21 +593,37 @@ const KontaktiChaikyScreen: React.FC = () => {
         { text: 'Так', onPress: () => setAddFormVisible(false) },
       ],
     );
-  }, [category, condition, description, formPhotos.length, humanDesignProfile, humanDesignType, phone, price, showPhoneOnCard, user?.phone, zodiacSign]);
+  }, [category, condition, description, formPhotos.length, humanDesignProfile, humanDesignType, lookingForGender, phone, price, showPhoneOnCard, user?.phone, zodiacSign]);
 
+  // Subscription useEffect: depends on user?.id and refreshKey
   useEffect(() => {
-    let isMounted = true;
     setListingsReady(false);
     setListingsLoadError(false);
     const unsubscribe = contactsService.subscribe((items) => {
       setListingsReady(true);
       setListingsLoadError(false);
       setListings(items);
+      if (refreshing) setRefreshing(false);
     }, user?.id, () => {
       setListingsReady(true);
       setListingsLoadError(true);
+      if (refreshing) setRefreshing(false);
     });
-    // Restore draft if Android restarted the activity while picker was open
+    // Timeout for offline: stop spinner after 10s
+    let refreshTimeout: ReturnType<typeof setTimeout> | undefined;
+    if (refreshing) {
+      refreshTimeout = setTimeout(() => setRefreshing(false), 10_000);
+    }
+    return () => {
+      unsubscribe();
+      if (refreshTimeout) clearTimeout(refreshTimeout);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, refreshKey]);
+
+  // Draft restore useEffect: mount only
+  useEffect(() => {
+    let isMounted = true;
     (async () => {
       try {
         const raw = await AsyncStorage.getItem(CONTACTS_DRAFT_KEY);
@@ -579,14 +638,22 @@ const KontaktiChaikyScreen: React.FC = () => {
         if (draft.zodiacSign) setZodiacSign(draft.zodiacSign);
         if (draft.humanDesignType) setHumanDesignType(draft.humanDesignType);
         if (draft.humanDesignProfile) setHumanDesignProfile(draft.humanDesignProfile);
+        if (draft.lookingForGender) setLookingForGender(draft.lookingForGender);
         if (draft.addFormVisible) setAddFormVisible(true);
         await AsyncStorage.removeItem(CONTACTS_DRAFT_KEY);
       } catch { /* ignore */ }
     })();
-    return () => {
-      isMounted = false;
-      unsubscribe();
-    };
+    return () => { isMounted = false; };
+  }, []);
+
+  // Load blocked users on mount (separate from subscription)
+  useEffect(() => {
+    if (!user?.id) return;
+    reportBlockService.loadBlockedUsers(user.id).then((set) => {
+      setBlockedUserIds(set);
+    }).catch((err) => {
+      console.warn('[Kontakt-XXX] loadBlockedUsers failed:', err);
+    });
   }, [user?.id]);
 
   useEffect(() => {
@@ -594,15 +661,15 @@ const KontaktiChaikyScreen: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    latestDraftRef.current = { category, condition, price, description, phone, addFormVisible, isInterestingFormExpanded, zodiacSign, humanDesignType, humanDesignProfile };
-  }, [addFormVisible, category, condition, description, humanDesignProfile, humanDesignType, isInterestingFormExpanded, phone, price, zodiacSign]);
+    latestDraftRef.current = { category, condition, price, description, phone, addFormVisible, isInterestingFormExpanded, zodiacSign, humanDesignType, humanDesignProfile, lookingForGender };
+  }, [addFormVisible, category, condition, description, humanDesignProfile, humanDesignType, isInterestingFormExpanded, lookingForGender, phone, price, zodiacSign]);
 
   const saveDraftNow = useCallback((visible = latestDraftRef.current.addFormVisible) => {
     if (!visible) return;
-    const { category: draftCategory, condition: draftCondition, price: draftPrice, description: draftDescription, phone: draftPhone, isInterestingFormExpanded: draftInteresting, zodiacSign: draftZodiac, humanDesignType: draftDesignType, humanDesignProfile: draftDesignProfile } = latestDraftRef.current;
+    const { category: draftCategory, condition: draftCondition, price: draftPrice, description: draftDescription, phone: draftPhone, isInterestingFormExpanded: draftInteresting, zodiacSign: draftZodiac, humanDesignType: draftDesignType, humanDesignProfile: draftDesignProfile, lookingForGender: draftLookingFor } = latestDraftRef.current;
     void AsyncStorage.setItem(
       CONTACTS_DRAFT_KEY,
-      JSON.stringify({ category: draftCategory, condition: draftCondition, price: draftPrice, description: draftDescription, phone: draftPhone, addFormVisible: true, isInterestingFormExpanded: draftInteresting, zodiacSign: draftZodiac, humanDesignType: draftDesignType, humanDesignProfile: draftDesignProfile }),
+      JSON.stringify({ category: draftCategory, condition: draftCondition, price: draftPrice, description: draftDescription, phone: draftPhone, addFormVisible: true, isInterestingFormExpanded: draftInteresting, zodiacSign: draftZodiac, humanDesignType: draftDesignType, humanDesignProfile: draftDesignProfile, lookingForGender: draftLookingFor }),
     ).catch(() => {});
   }, []);
 
@@ -633,7 +700,7 @@ const KontaktiChaikyScreen: React.FC = () => {
         draftSaveTimerRef.current = null;
       }
     };
-  }, [addFormVisible, category, condition, description, humanDesignProfile, humanDesignType, isInterestingFormExpanded, phone, price, saveDraftNow, zodiacSign]);
+  }, [addFormVisible, category, condition, description, humanDesignProfile, humanDesignType, isInterestingFormExpanded, lookingForGender, phone, price, saveDraftNow, zodiacSign]);
 
   useEffect(() => () => {
     if (draftSaveTimerRef.current) {
@@ -728,6 +795,21 @@ const KontaktiChaikyScreen: React.FC = () => {
     void safeOpenViber(phoneRaw, language);
   };
 
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true);
+    setRefreshKey((k) => k + 1);
+  }, []);
+
+  const handleBlockUser = useCallback((userId: string) => {
+    setBlockedUserIds((prev) => {
+      const next = new Set(prev);
+      next.add(userId);
+      return next;
+    });
+  }, []);
+
+  const hasOwnListing = useMemo(() => listings.some((l) => l.userId === user?.id), [listings, user?.id]);
+
   const filteredListings = useMemo(() => {
     const queryItemName = searchItemName.trim().toLowerCase();
     const queryContact = searchContact.trim().toLowerCase();
@@ -736,6 +818,7 @@ const KontaktiChaikyScreen: React.FC = () => {
     const priceTo = searchPriceTo ? Number(searchPriceTo) : null;
 
     return listings.filter((item) => {
+      if (blockedUserIds.size > 0 && item.userId && blockedUserIds.has(item.userId)) return false;
       const numericPrice = Number(String(item.price).replace(',', '.').replace(/[^\d.]/g, ''));
 
       if (selectedFilterCategory && item.category !== selectedFilterCategory) return false;
@@ -750,6 +833,7 @@ const KontaktiChaikyScreen: React.FC = () => {
     });
   }, [
     listings,
+    blockedUserIds,
     searchCategory,
     searchCondition,
     searchContact,
@@ -828,6 +912,7 @@ const KontaktiChaikyScreen: React.FC = () => {
     setZodiacSign('');
     setHumanDesignType('');
     setHumanDesignProfile('');
+    setLookingForGender('');
     setFormPhotos([]);
     setSubmitAttempted(false);
     void AsyncStorage.removeItem(CONTACTS_DRAFT_KEY).catch(() => {});
@@ -879,6 +964,7 @@ const KontaktiChaikyScreen: React.FC = () => {
       const donePhotos = getDonePhotos(formPhotos);
       const resolvedPhotoUri = donePhotos[0]?.downloadUrl ?? '';
       const resolvedStoragePath = donePhotos[0]?.storagePath ?? '';
+      const allPhotoStoragePaths = donePhotos.map((p) => p.storagePath).filter(Boolean);
       trace('photo_check', 'success');
 
       const itemName = user?.name?.trim() || getCategoryLabel(category);
@@ -906,6 +992,8 @@ const KontaktiChaikyScreen: React.FC = () => {
         zodiacSign: isInterestingFormExpanded ? zodiacSign : '',
         humanDesignType: isInterestingFormExpanded ? humanDesignType : '',
         humanDesignProfile: isInterestingFormExpanded ? humanDesignProfile : '',
+        lookingForGender,
+        photoUris: allPhotoStoragePaths,
         language,
       });
       trace('api_call', 'success');
@@ -963,6 +1051,7 @@ const KontaktiChaikyScreen: React.FC = () => {
     setEditZodiac(item.zodiacSign || '');
     setEditHdType(item.humanDesignType || '');
     setEditHdProfile(item.humanDesignProfile || '');
+    setEditLookingForGender(item.lookingForGender || '');
     setEditSubmitAttempted(false);
     setEditFormVisible(true);
   };
@@ -1003,6 +1092,7 @@ const KontaktiChaikyScreen: React.FC = () => {
         zodiacSign: editZodiac,
         humanDesignType: editHdType,
         humanDesignProfile: editHdProfile,
+        lookingForGender: editLookingForGender,
         language,
       });
       toast.showSuccess(text.editSuccessTitle, text.editSuccessMsg);
@@ -1205,7 +1295,7 @@ const KontaktiChaikyScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#CA8A04" colors={['#CA8A04']} />}>
         <View style={styles.headerCard}>
           <Text style={styles.headerTitle}>{text.title}</Text>
           <Text style={styles.headerSubtitle}>{text.subtitle}</Text>
@@ -1265,6 +1355,26 @@ const KontaktiChaikyScreen: React.FC = () => {
           </View>
         )}
 
+        {listingsReady && !listingsLoadError && listings.length === 0 && (
+          <View style={styles.emptyStateBox}>
+            <MaterialCommunityIcons name="account-search-outline" size={64} color="#CA8A04" />
+            <Text style={styles.emptyStateTitle}>{text.emptyTitle}</Text>
+            <TouchableOpacity
+              style={styles.emptyStateCta}
+              onPress={() => {
+                if (!user?.id) {
+                  Alert.alert(text.errorTitle, text.authRequired);
+                  return;
+                }
+                setAddFormVisible(true);
+              }}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.emptyStateCtaText}>{text.emptyCta}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {!listingsLoadError && listings.length > 0 && (
           <View style={styles.listingsSection}>
             <Text style={styles.formLabel}>{text.filterLabel}</Text>
@@ -1286,6 +1396,12 @@ const KontaktiChaikyScreen: React.FC = () => {
             {hasAdvancedSearch ? (
               <TouchableOpacity style={styles.clearSearchBtn} onPress={resetSearch} activeOpacity={0.82}>
                 <Text style={styles.clearSearchText}>{text.clearSearch}</Text>
+              </TouchableOpacity>
+            ) : null}
+            {!hasOwnListing && listings.length > 0 && user?.id ? (
+              <TouchableOpacity style={styles.noProfileBanner} onPress={() => setAddFormVisible(true)} activeOpacity={0.85}>
+                <Text style={styles.noProfileBannerText}>{text.noProfileBanner}</Text>
+                <Text style={styles.noProfileBannerCta}>{text.noProfileCta}</Text>
               </TouchableOpacity>
             ) : null}
             {filteredListings.length === 0 ? (
@@ -1315,12 +1431,29 @@ const KontaktiChaikyScreen: React.FC = () => {
                     key={item.id}
                     style={styles.kCard}
                   >
+                    {!isOwn && item.userId ? (
+                      <TouchableOpacity
+                        style={styles.kReportBtn}
+                        onPress={() => { setReportTargetListing(item); setReportMenuVisible(true); }}
+                        activeOpacity={0.7}
+                        accessibilityLabel={text.reportMenuLabel}
+                      >
+                        <MaterialCommunityIcons name="dots-vertical" size={18} color="#78716C" />
+                      </TouchableOpacity>
+                    ) : null}
                     <TouchableOpacity
                       style={styles.kCardTop}
                       onPress={() => { if (navLock.current) return; navLock.current = true; navigation.navigate('ItemDetailScreen', { item: mapToDetailData(item, avatarUri || undefined) }); setTimeout(() => { navLock.current = false; }, 800); }}
                       activeOpacity={0.86}
                     >
-                      {Boolean(item.photoUri || item.photoStoragePath) ? (
+                      {item.photoUris && item.photoUris.length > 1 ? (
+                        <PhotoCarousel
+                          photoUris={item.photoUris}
+                          width={92}
+                          height={108}
+                          borderRadius={14}
+                        />
+                      ) : Boolean(item.photoUri || item.photoStoragePath) ? (
                         <AppPhotoImage
                           uri={item.photoUri}
                           storagePath={item.photoStoragePath}
@@ -1348,6 +1481,11 @@ const KontaktiChaikyScreen: React.FC = () => {
                               <Text style={styles.kAgeText}>{ageText}</Text>
                             </View>
                           ) : null}
+                          <ProfileCompletenessBadge
+                            listing={item}
+                            isOwn={isOwn}
+                            hintText={isOwn ? text.completenessHint : undefined}
+                          />
                         </View>
 
                         <View style={styles.kMetaChips}>
@@ -1357,6 +1495,11 @@ const KontaktiChaikyScreen: React.FC = () => {
                           <View style={styles.kConditionBadge}>
                             <Text style={styles.kConditionText} numberOfLines={1}>{conditionLabel}</Text>
                           </View>
+                          {item.lookingForGender && item.lookingForGender !== 'any' ? (
+                            <View style={styles.kConditionBadge}>
+                              <Text style={styles.kConditionText} numberOfLines={1}>{text.lookingForValues[item.lookingForGender as keyof typeof text.lookingForValues] ?? item.lookingForGender}</Text>
+                            </View>
+                          ) : null}
                         </View>
 
                         {zodiacLabel || designTypeLabel || designProfileLabel ? (
@@ -1481,12 +1624,22 @@ const KontaktiChaikyScreen: React.FC = () => {
                   style={[styles.swipeCard, { transform: [{ translateX: swipePosition.x }, { translateY: swipePosition.y }, { rotate: swipeRotation }] }]}
                   {...swipePanResponder.panHandlers}
                 >
-                  <AppPhotoImage
-                    uri={swipeCard?.photoUri}
-                    storagePath={swipeCard?.photoStoragePath}
-                    style={styles.swipePhoto}
-                    resizeMode="cover"
-                  />
+                  {swipeCard?.photoUris && swipeCard.photoUris.length > 1 ? (
+                    <PhotoCarousel
+                      photoUris={swipeCard.photoUris}
+                      width={320}
+                      height={460}
+                      borderRadius={0}
+                      style={styles.swipePhoto}
+                    />
+                  ) : (
+                    <AppPhotoImage
+                      uri={swipeCard?.photoUri}
+                      storagePath={swipeCard?.photoStoragePath}
+                      style={styles.swipePhoto}
+                      resizeMode="cover"
+                    />
+                  )}
                   {/* Like overlay */}
                   <Animated.View style={[styles.swipeLikeOverlay, { opacity: likeOpacity }]}>
                     <Text style={styles.swipeLikeText}>{text.swipeLikeLabel}</Text>
@@ -1511,10 +1664,10 @@ const KontaktiChaikyScreen: React.FC = () => {
                 {/* Action buttons */}
                 <View style={styles.swipeActions}>
                   <TouchableOpacity style={styles.swipePassBtn} onPress={handleSwipeLeft} activeOpacity={0.85}>
-                    <MaterialCommunityIcons name="close" size={40} color="#1C1917" />
+                    <MaterialCommunityIcons name="close" size={40} color="#612e51" />
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.swipeLikeBtn} onPress={handleSwipeRight} activeOpacity={0.85}>
-                    <MaterialCommunityIcons name="heart" size={48} color="#1C1917" />
+                    <MaterialCommunityIcons name="heart" size={48} color="#612e51" />
                   </TouchableOpacity>
                 </View>
                 <Text style={styles.swipeCounter}>{swipeIndex + 1} / {swipeItems.length}</Text>
@@ -1595,6 +1748,16 @@ const KontaktiChaikyScreen: React.FC = () => {
               </View>
               <InlineFieldHint message={text.conditionHint} type={condition ? 'success' : 'hint'} />
               <FormFieldError error={!condition && submitAttempted ? text.errorFill : undefined} />
+
+              <Text style={styles.formLabel}>{text.lookingForLabel}</Text>
+              <View style={styles.pickerWrapper}>
+                <Picker selectedValue={lookingForGender} onValueChange={setLookingForGender} style={styles.picker}>
+                  <Picker.Item label={text.selectLookingFor} value="" />
+                  {LOOKING_FOR_GENDER_VALUES.map((value) => (
+                    <Picker.Item key={`lfg-${value}`} label={text.lookingForValues[value]} value={value} />
+                  ))}
+                </Picker>
+              </View>
 
               <Text style={styles.formLabel}>{text.priceLabel}</Text>
               <TextInput
@@ -1751,6 +1914,16 @@ const KontaktiChaikyScreen: React.FC = () => {
                 </View>
                 <FormFieldError error={!editCondition && editSubmitAttempted ? text.errorFill : undefined} />
 
+                <Text style={styles.formLabel}>{text.lookingForLabel}</Text>
+                <View style={styles.pickerWrapper}>
+                  <Picker selectedValue={editLookingForGender} onValueChange={setEditLookingForGender} style={styles.picker}>
+                    <Picker.Item label={text.selectLookingFor} value="" />
+                    {LOOKING_FOR_GENDER_VALUES.map((value) => (
+                      <Picker.Item key={`edit-lfg-${value}`} label={text.lookingForValues[value]} value={value} />
+                    ))}
+                  </Picker>
+                </View>
+
                 <Text style={styles.formLabel}>{text.priceLabel}</Text>
                 <TextInput placeholder="0" value={editPrice} onChangeText={(v) => setEditPrice(v.replace(',', '.').replace(/[^\d.]/g, ''))} keyboardType="decimal-pad" style={styles.input} placeholderTextColor="#A0938D" />
                 <FormFieldError error={editSubmitAttempted && (!editPrice.trim() || Number(editPrice) <= 0) ? text.priceError : undefined} />
@@ -1814,18 +1987,27 @@ const KontaktiChaikyScreen: React.FC = () => {
         onSelect={(reason) => void sendContactRequest(reason)}
         onClose={closeContactModal}
       />
+      <ReportBlockMenu
+        visible={reportMenuVisible}
+        onClose={() => { setReportMenuVisible(false); setReportTargetListing(null); }}
+        listingId={reportTargetListing?.id || ''}
+        reportedUserId={reportTargetListing?.userId || ''}
+        currentUserId={user?.id || ''}
+        language={language}
+        onBlock={handleBlockUser}
+      />
       <VideoLoadingOverlay visible={!listingsReady} />
     </SafeAreaView>
   );
 };
 
 // Elegant Luxury Design System — ChaikaUA Знайомства на каву
-// Colors: Primary #1C1917, Gold #CA8A04, Background #FAFAF9, Text #0C0A09
+// Colors: Primary #612e51, Gold #CA8A04, Background #FAFAF9, Text #612e51
 // Style: Liquid Glass + Premium Black/Gold
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FAFAF9' },
   content: { padding: 16, paddingTop: 24, paddingBottom: 110 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(12,10,9,0.6)', justifyContent: 'flex-end' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(97,46,81,0.6)', justifyContent: 'flex-end' },
   modalSheet: {
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 32,
@@ -1845,8 +2027,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E8D9B5',
   },
-  modalTitle: { color: '#1C1917', fontSize: 17, fontWeight: '900', flex: 1, paddingRight: 8, letterSpacing: 0.3 },
-  modalCloseBtn: { backgroundColor: '#1C1917', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
+  modalTitle: { color: '#612e51', fontSize: 17, fontWeight: '900', flex: 1, paddingRight: 8, letterSpacing: 0.3 },
+  modalCloseBtn: { backgroundColor: '#612e51', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
   modalCloseText: { color: '#CA8A04', fontWeight: '800', fontSize: 12 },
   modalContent: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20 },
   modalActions: { flexDirection: 'row', gap: 10, marginTop: 10 },
@@ -1860,10 +2042,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   resetBtnText: { color: '#44403C', fontWeight: '700', fontSize: 13 },
-  applyBtn: { flex: 1, borderRadius: 16, backgroundColor: '#1C1917', alignItems: 'center', paddingVertical: 12 },
+  applyBtn: { flex: 1, borderRadius: 16, backgroundColor: '#612e51', alignItems: 'center', paddingVertical: 12 },
   applyBtnText: { color: '#CA8A04', fontWeight: '800', fontSize: 13 },
   headerCard: {
-    backgroundColor: '#1C1917',
+    backgroundColor: '#612e51',
     borderRadius: 24,
     padding: 20,
     marginBottom: 20,
@@ -1877,34 +2059,34 @@ const styles = StyleSheet.create({
   liveDot: { color: '#CA8A04', fontSize: 12, fontWeight: '900', marginRight: 4 },
   liveText: { color: '#CA8A04', fontSize: 11, fontWeight: '900', marginRight: 6 },
   liveCount: { color: '#B5A990', fontSize: 11, fontWeight: '700', textAlign: 'center' },
-  formLabel: { fontWeight: '700', color: '#1C1917', marginBottom: 8, marginTop: 8, letterSpacing: 0.2 },
+  formLabel: { fontWeight: '700', color: '#612e51', marginBottom: 8, marginTop: 8, letterSpacing: 0.2 },
   signInNote: { color: '#44403C', fontSize: 13, fontWeight: '700', paddingVertical: 10, lineHeight: 18 },
   input: {
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    color: '#0C0A09',
+    color: '#612e51',
     borderWidth: 1.5,
     borderColor: '#E8D9B5',
     fontSize: 15,
   },
   textarea: { minHeight: 80, textAlignVertical: 'top' },
   pickerWrapper: { backgroundColor: '#FFFFFF', borderRadius: 14, borderWidth: 1.5, borderColor: '#E8D9B5', overflow: 'hidden' },
-  picker: { color: '#0C0A09', height: 50 },
+  picker: { color: '#612e51', height: 50 },
   submitBtn: { backgroundColor: '#CA8A04', borderRadius: 16, paddingVertical: 15, alignItems: 'center', marginTop: 16 },
-  submitBtnText: { color: '#1C1917', fontWeight: '900', fontSize: 15, letterSpacing: 0.5 },
+  submitBtnText: { color: '#612e51', fontWeight: '900', fontSize: 15, letterSpacing: 0.5 },
   topAnketySection: { marginBottom: 18 },
   topAnketyTitle: { fontSize: 11, fontWeight: '800', color: '#44403C', marginBottom: 10, letterSpacing: 1.2, textTransform: 'uppercase' },
   topAnketyScroll: { paddingHorizontal: 4, gap: 14 },
   topAnketyItem: { width: 72, alignItems: 'center' },
   topAnketyPhoto: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#F5EDD6', borderWidth: 2, borderColor: '#CA8A04' },
-  topAnketyName: { fontSize: 11, fontWeight: '700', color: '#1C1917', textAlign: 'center', width: 72, marginTop: 5 },
+  topAnketyName: { fontSize: 11, fontWeight: '700', color: '#612e51', textAlign: 'center', width: 72, marginTop: 5 },
   topAnketyAge: { fontSize: 10, fontWeight: '600', color: '#44403C', textAlign: 'center' },
   listingsSection: { marginBottom: 16 },
   listingsHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 8 },
-  listingsSectionTitle: { fontSize: 16, fontWeight: '900', color: '#1C1917', letterSpacing: 0.3 },
-  searchBtn: { backgroundColor: '#1C1917', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
+  listingsSectionTitle: { fontSize: 16, fontWeight: '900', color: '#612e51', letterSpacing: 0.3 },
+  searchBtn: { backgroundColor: '#612e51', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
   searchBtnText: { color: '#CA8A04', fontWeight: '800', fontSize: 12 },
   clearSearchBtn: { alignSelf: 'flex-start', marginBottom: 10 },
   clearSearchText: { color: '#CA8A04', fontWeight: '800', fontSize: 12 },
@@ -1916,11 +2098,11 @@ const styles = StyleSheet.create({
     padding: 18,
     marginBottom: 8,
   },
-  emptyFilteredTitle: { color: '#1C1917', fontWeight: '800', fontSize: 14 },
+  emptyFilteredTitle: { color: '#612e51', fontWeight: '800', fontSize: 14 },
   emptyFilteredSub: { color: '#44403C', marginTop: 4, fontSize: 12, lineHeight: 18 },
   listingCard: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16, marginBottom: 10, borderWidth: 1, borderColor: '#E8D9B5' },
   listingHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  listingName: { fontWeight: '800', color: '#1C1917', flex: 1, marginRight: 8 },
+  listingName: { fontWeight: '800', color: '#612e51', flex: 1, marginRight: 8 },
   deleteText: { color: '#B91C1C', fontWeight: '700' },
   listingMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
   listingBadgeText: { fontSize: 11, fontWeight: '700', color: '#44403C' },
@@ -1967,7 +2149,7 @@ const styles = StyleSheet.create({
   kName: {
     fontSize: 16,
     fontWeight: '800',
-    color: '#1C1917',
+    color: '#612e51',
     flexShrink: 1,
     letterSpacing: 0.2,
   },
@@ -2007,7 +2189,7 @@ const styles = StyleSheet.create({
     color: '#44403C',
   },
   kAgeBadge: {
-    backgroundColor: '#1C1917',
+    backgroundColor: '#612e51',
     borderRadius: 999,
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -2022,7 +2204,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    backgroundColor: '#1C1917',
+    backgroundColor: '#612e51',
   },
   kDescText: {
     fontSize: 12,
@@ -2149,7 +2331,7 @@ const styles = StyleSheet.create({
   },
   addBarBtn: {
     flex: 1,
-    backgroundColor: '#1C1917',
+    backgroundColor: '#612e51',
     borderRadius: 16,
     paddingVertical: 14,
     alignItems: 'center',
@@ -2163,7 +2345,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#1C1917',
+    backgroundColor: '#612e51',
     borderRadius: 16,
     paddingVertical: 14,
     paddingHorizontal: 18,
@@ -2174,7 +2356,7 @@ const styles = StyleSheet.create({
   // Swipe mode overlay
   swipeOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#0C0A09',
+    backgroundColor: '#612e51',
     zIndex: 100,
     alignItems: 'center',
     justifyContent: 'center',
@@ -2184,7 +2366,7 @@ const styles = StyleSheet.create({
     width: 320,
     height: 460,
     borderRadius: 24,
-    backgroundColor: '#1C1917',
+    backgroundColor: '#612e51',
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#CA8A04',
@@ -2214,7 +2396,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     transform: [{ rotate: '-12deg' }],
   },
-  swipeLikeText: { color: '#1C1917', fontSize: 22, fontWeight: '900', letterSpacing: 1 },
+  swipeLikeText: { color: '#612e51', fontSize: 22, fontWeight: '900', letterSpacing: 1 },
   swipePassOverlay: {
     position: 'absolute',
     top: 32,
@@ -2233,7 +2415,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(12,10,9,0.82)',
+    backgroundColor: 'rgba(97,46,81,0.82)',
     padding: 16,
     gap: 6,
   },
@@ -2259,7 +2441,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 4,
-    shadowColor: '#000',
+    shadowColor: '#612e51',
     shadowOpacity: 0.15,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
@@ -2285,7 +2467,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(28,25,23,0.85)',
+    backgroundColor: 'rgba(97,46,81,0.85)',
     borderWidth: 1,
     borderColor: '#CA8A04',
     borderRadius: 20,
@@ -2298,10 +2480,10 @@ const styles = StyleSheet.create({
   swipeDoneTitle: { fontSize: 22, fontWeight: '900', color: '#FAFAF9', textAlign: 'center' },
   swipeDoneSub: { fontSize: 16, color: '#CA8A04', fontWeight: '700' },
   swipeRestartBtn: { backgroundColor: '#CA8A04', borderRadius: 16, paddingHorizontal: 28, paddingVertical: 14, marginTop: 8 },
-  swipeRestartBtnText: { color: '#1C1917', fontWeight: '900', fontSize: 15 },
-  swipeFilterBackdrop: { flex: 1, backgroundColor: 'rgba(12,10,9,0.7)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  swipeRestartBtnText: { color: '#612e51', fontWeight: '900', fontSize: 15 },
+  swipeFilterBackdrop: { flex: 1, backgroundColor: 'rgba(97,46,81,0.7)', justifyContent: 'center', alignItems: 'center', padding: 24 },
   swipeFilterSheet: {
-    backgroundColor: '#1C1917',
+    backgroundColor: '#612e51',
     borderRadius: 24,
     padding: 28,
     width: '100%',
@@ -2317,7 +2499,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 18,
     paddingVertical: 10,
-    backgroundColor: '#292524',
+    backgroundColor: '#612e51',
   },
   swipeFilterPillActive: { borderColor: '#CA8A04', backgroundColor: 'rgba(202,138,4,0.15)' },
   swipeFilterPillText: { color: '#B5A990', fontSize: 14, fontWeight: '700' },
@@ -2325,7 +2507,7 @@ const styles = StyleSheet.create({
   swipeFilterAgeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, justifyContent: 'center' },
   swipeFilterAgeLabel: { color: '#B5A990', fontSize: 14, fontWeight: '700' },
   swipeFilterAgeInput: {
-    backgroundColor: '#292524',
+    backgroundColor: '#612e51',
     borderWidth: 1,
     borderColor: '#44403C',
     borderRadius: 12,
@@ -2338,11 +2520,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   swipeFilterStartBtn: { backgroundColor: '#CA8A04', borderRadius: 16, paddingVertical: 16, alignItems: 'center' },
-  swipeFilterStartBtnText: { color: '#1C1917', fontWeight: '900', fontSize: 16 },
+  swipeFilterStartBtnText: { color: '#612e51', fontWeight: '900', fontSize: 16 },
   swipeFilterSkipBtn: { alignItems: 'center', paddingVertical: 4 },
   swipeFilterSkipText: { color: '#78716C', fontSize: 13, fontWeight: '700' },
   sheetOverlay: { flex: 1, justifyContent: 'flex-end' },
-  sheetBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(12,10,9,0.6)' },
+  sheetBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(97,46,81,0.6)' },
   sheetWrapper: { justifyContent: 'flex-end' },
   sheet: {
     backgroundColor: '#FFFFFF',
@@ -2377,19 +2559,83 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E8D9B5',
   },
-  sheetTitle: { fontSize: 17, fontWeight: '900', color: '#1C1917', letterSpacing: 0.3 },
+  sheetTitle: { fontSize: 17, fontWeight: '900', color: '#612e51', letterSpacing: 0.3 },
   sheetCloseBtn: {
     width: 32,
     height: 32,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#1C1917',
+    backgroundColor: '#612e51',
     borderWidth: 1,
     borderColor: '#CA8A04',
   },
   sheetCloseTxt: { fontSize: 16, color: '#CA8A04', fontWeight: '900' },
   sheetContent: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 28 },
+  // Report/Block three-dot button
+  kReportBtn: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    zIndex: 5,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(250,250,249,0.85)',
+  },
+  // Empty state
+  emptyStateBox: {
+    alignItems: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 24,
+    gap: 12,
+  },
+  emptyStateTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#612e51',
+    textAlign: 'center',
+  },
+  emptyStateCta: {
+    backgroundColor: '#CA8A04',
+    borderRadius: 16,
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    marginTop: 4,
+  },
+  emptyStateCtaText: {
+    color: '#612e51',
+    fontWeight: '900',
+    fontSize: 15,
+    letterSpacing: 0.5,
+  },
+  // No-profile banner
+  noProfileBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(202,138,4,0.08)',
+    borderWidth: 1,
+    borderColor: '#CA8A04',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 12,
+  },
+  noProfileBannerText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#44403C',
+    marginRight: 8,
+  },
+  noProfileBannerCta: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#CA8A04',
+  },
 });
 
 export default KontaktiChaikyScreen;
