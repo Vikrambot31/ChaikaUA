@@ -1167,10 +1167,19 @@ const KontaktiChaikyScreen: React.FC = () => {
   };
 
   // Swipe mode logic
+  const myCategory = ownListing?.category || '';
   const swipeItems = useMemo(() => {
     let items = filteredListings.filter((i) => !i.isArchived);
     if (swipeGenderFilter !== 'all') {
       items = items.filter((i) => i.category === swipeGenderFilter);
+    }
+    // Filter by lookingForGender: show only cards whose lookingForGender matches my category (or is 'any'/empty)
+    if (myCategory) {
+      items = items.filter((i) => {
+        const lfg = i.lookingForGender;
+        if (!lfg || lfg === 'any' || lfg === '') return true;
+        return lfg === myCategory;
+      });
     }
     const ageFromNum = swipeAgeFrom ? parseInt(swipeAgeFrom, 10) : null;
     const ageToNum = swipeAgeTo ? parseInt(swipeAgeTo, 10) : null;
@@ -1184,7 +1193,7 @@ const KontaktiChaikyScreen: React.FC = () => {
       });
     }
     return items;
-  }, [filteredListings, swipeGenderFilter, swipeAgeFrom, swipeAgeTo]);
+  }, [filteredListings, swipeGenderFilter, swipeAgeFrom, swipeAgeTo, myCategory]);
   const swipeItemsRef = useRef(swipeItems);
   swipeItemsRef.current = swipeItems;
   const swipeIndexRef = useRef(swipeIndex);
