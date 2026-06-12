@@ -26,6 +26,7 @@ const initialState: DashboardState = {
     rulesEnforcementLevel: 'UNKNOWN',
     rulesOpenPaths: [],
     rulesCheckedAt: 0,
+    pendingReports: 0,
   },
 };
 

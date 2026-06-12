@@ -21,13 +21,15 @@ import { AdChatPage } from './pages/AdChatPage';
 import { PremiumPage } from './pages/PremiumPage';
 import { BusinessPlusModerationPage } from './pages/BusinessPlusModerationPage';
 import { FeatureRatingsPage } from './pages/FeatureRatingsPage';
+import { TopListingsModerationPage } from './pages/TopListingsModerationPage';
+import { ReportsModerationPage } from './pages/ReportsModerationPage';
 import { ViewModeProvider } from './contexts/ViewModeContext';
 import { DashboardProvider } from './contexts/DashboardContext';
 
 const AppRulesPage = lazy(() => import('./pages/AppRulesPage'));
 
 const VALID_PAGES = new Set<AdminPageKey>([
-  'dashboard', 'moderation', 'archive', 'invite_access', 'guarantor_tree', 'access_control', 'security', 'errors', 'photo_approval', 'releases', 'ai_diagnostics', 'app_rules', 'support', 'bonus_credits', 'ad_chat', 'premium', 'business_plus', 'feature_ratings',
+  'dashboard', 'moderation', 'archive', 'invite_access', 'guarantor_tree', 'access_control', 'security', 'errors', 'photo_approval', 'releases', 'ai_diagnostics', 'app_rules', 'support', 'bonus_credits', 'ad_chat', 'premium', 'business_plus', 'feature_ratings', 'top_listings', 'reports',
 ]);
 
 const getPageFromHash = (): AdminPageKey => {
@@ -82,6 +84,8 @@ export const App = () => {
     premium: 'Premium підписки',
     business_plus: 'Бізнес+ картки',
     feature_ratings: 'Оцінка функцій',
+    top_listings: 'Місця від юзерів',
+    reports: 'Скарги',
   };
 
   const renderPage = () => {
@@ -101,6 +105,8 @@ export const App = () => {
     if (activePage === 'premium') return <PremiumPage />;
     if (activePage === 'business_plus') return <BusinessPlusModerationPage />;
     if (activePage === 'feature_ratings') return <FeatureRatingsPage />;
+    if (activePage === 'top_listings') return <TopListingsModerationPage />;
+    if (activePage === 'reports') return <ReportsModerationPage />;
     if (activePage === 'app_rules') {
       return (
         <Suspense fallback={<div className="loadingScreen">Завантаження серверних правил...</div>}>

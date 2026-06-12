@@ -10,7 +10,7 @@ import { useViewMode, type ViewMode } from '../contexts/ViewModeContext';
 import { useDashboardContext } from '../contexts/DashboardContext';
 import type { DashboardStats } from '../services/dashboardService';
 
-export type AdminPageKey = 'dashboard' | 'moderation' | 'archive' | 'invite_access' | 'guarantor_tree' | 'access_control' | 'security' | 'errors' | 'photo_approval' | 'releases' | 'ai_diagnostics' | 'app_rules' | 'support' | 'bonus_credits' | 'ad_chat' | 'premium' | 'business_plus' | 'feature_ratings';
+export type AdminPageKey = 'dashboard' | 'moderation' | 'archive' | 'invite_access' | 'guarantor_tree' | 'access_control' | 'security' | 'errors' | 'photo_approval' | 'releases' | 'ai_diagnostics' | 'app_rules' | 'support' | 'bonus_credits' | 'ad_chat' | 'premium' | 'business_plus' | 'feature_ratings' | 'top_listings' | 'reports';
 
 type AppShellProps = {
   children: ReactNode;
@@ -112,6 +112,16 @@ const navItems: Array<{ key: AdminPageKey; label: string; hint: string }> = [
     label: 'Оцінка функцій',
     hint: 'Оцінки та коментарі користувачів по розділах додатку: середній рейтинг, тренди, зворотний зв\'язок.',
   },
+  {
+    key: 'top_listings',
+    label: 'Місця від юзерів',
+    hint: 'Модерація пропозицій "додати місце" з екранів Їжа на Чайці, Салони Краси, Все для Дітей. Записи зберігаються у food_top_listings, beauty_top_listings, children_top_listings.',
+  },
+  {
+    key: 'reports',
+    label: 'Скарги',
+    hint: 'Жалоби користувачів Kontakt-XXX: спам, фейки, неприйнятний контент. Паттерни блокувань та бан порушників.',
+  },
 ];
 
 const navItemIcons: Record<AdminPageKey, string> = {
@@ -133,6 +143,8 @@ const navItemIcons: Record<AdminPageKey, string> = {
   premium: '\u2B50',
   business_plus: '🏪',
   feature_ratings: '\u2B50',
+  top_listings: '📍',
+  reports: '\u{1F6A9}',
 };
 
 type AttentionLevel = 'low' | 'medium' | 'high';
@@ -195,10 +207,17 @@ const getAttentionMeter = (page: AdminPageKey, stats: DashboardStats): Attention
 
   if (page === 'dashboard') {
     const critical = stats.blockedDevices + (stats.rulesEnforcementLevel === 'OPEN' ? 1 : 0);
-    const warning = stats.pending + stats.pendingInviteRequests + stats.pendingPhotos + stats.permissionDenied24h;
+    const warning = stats.pending + stats.pendingInviteRequests + stats.pendingPhotos + stats.permissionDenied24h + (stats.pendingReports ?? 0);
     if (critical > 0) return attentionMeter('high', 3, 1, 0, `${critical} критических факторов`);
     if (warning > 0) return attentionMeter('medium', 1, 2, 1, `${warning} факторов внимания`);
     return attentionMeter('low', 0, 0, 4, 'Сводка без срочных факторов');
+  }
+
+  if (page === 'reports') {
+    const pr = stats.pendingReports ?? 0;
+    if (pr > 10) return attentionMeter('high', 3, 1, 0, `${pr} жалоб ожидают рассмотрения`);
+    if (pr > 0) return attentionMeter('medium', 1, 2, 1, `${pr} жалоб ожидают рассмотрения`);
+    return attentionMeter('low', 0, 0, 4, 'Нет жалоб для рассмотрения');
   }
 
   return attentionMeter('low', 0, 0, 4, 'Нет срочных факторов');
