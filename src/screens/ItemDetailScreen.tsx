@@ -26,6 +26,7 @@ import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
 import type { DetailItemData, BusinessMenuItem, BusinessPromotion } from '../utils/detailViewTypes';
 import { requireAuthForDetails } from '../utils/authGuard';
 import { SCREEN_THEME } from '../utils/screenTheme';
+import WhoLikedMeInlineSection from '../components/WhoLikedMeInlineSection';
 
 type Lang = 'ua' | 'ru' | 'en';
 
@@ -833,6 +834,18 @@ export default function ItemDetailScreen({
         >
           <Text style={[styles.contactBtnText, !canContact && styles.disabledText]}>{text.contact}</Text>
         </TouchableOpacity>
+
+        {/* ── Who Liked Me (owner only, approved anketa) ── */}
+        {isOwnContact && anketaStatus === 'approved' && item.sourceId ? (
+          <WhoLikedMeInlineSection
+            listingId={item.sourceId}
+            currentUserId={currentUser?.id ?? ''}
+            language={language}
+            onViewProfile={(uid) => {
+              navigation.navigate('ViewUserProfile' as any, { userId: uid });
+            }}
+          />
+        ) : null}
       </ScrollView>
 
       <MiniTabBar />
@@ -942,7 +955,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   smallActionAltText: { color: '#403933', fontSize: 12, fontWeight: '900' },
-  contactBtn: { alignItems: 'center', backgroundColor: '#7A1E5C', borderRadius: 16, paddingVertical: 14 },
+  contactBtn: { alignItems: 'center', backgroundColor: '#7d0e59', borderRadius: 16, paddingVertical: 14 },
   contactBtnText: { color: '#fff', fontSize: 15, fontWeight: '900' },
   disabledAction: { backgroundColor: '#E1D7CF' },
   disabledText: { color: '#9F958E' },

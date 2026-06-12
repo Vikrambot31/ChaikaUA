@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { get, query, ref, limitToFirst } from 'firebase/database';
+import { get, query, ref, limitToFirst, orderByChild, equalTo } from 'firebase/database';
 import { database } from '../firebase-config';
 import { ensureFirebaseAuth } from '../firebase-auth-session';
 import MiniUserAvatar from './MiniUserAvatar';
 import { pickUserAvatarUri } from '../utils/userAvatar';
+import { parseLikeEntry } from '../utils/likeUtils';
 
 type Lang = 'ua' | 'ru' | 'en';
 
@@ -13,6 +14,8 @@ type LikerProfile = {
   userId: string;
   name: string;
   avatarUri: string;
+  age: string;
+  likedAt: number;
 };
 
 type Props = {
@@ -31,25 +34,74 @@ const UI_TEXT = {
     title: 'Хто мене лайкнув',
     empty: 'Ще немає лайкiв. Тримайте анкету активною!',
     close: 'Закрити',
+    years: 'р.',
+    justNow: 'щойно',
+    minutesAgo: (n: number) => `${n} хв тому`,
+    hoursAgo: (n: number) => `${n} год тому`,
+    daysAgo: (n: number) => `${n} дн тому`,
+    monthsAgo: (n: number) => `${n} міс тому`,
   },
   ru: {
     title: 'Кто меня лайкнул',
     empty: 'Пока нет лайков. Держите анкету активной!',
     close: 'Закрыть',
+    years: 'л.',
+    justNow: 'только что',
+    minutesAgo: (n: number) => `${n} мин назад`,
+    hoursAgo: (n: number) => `${n} ч назад`,
+    daysAgo: (n: number) => `${n} дн назад`,
+    monthsAgo: (n: number) => `${n} мес назад`,
   },
   en: {
     title: 'Who Liked Me',
     empty: 'No likes yet. Keep your profile active!',
     close: 'Close',
+    years: 'y.o.',
+    justNow: 'just now',
+    minutesAgo: (n: number) => `${n}m ago`,
+    hoursAgo: (n: number) => `${n}h ago`,
+    daysAgo: (n: number) => `${n}d ago`,
+    monthsAgo: (n: number) => `${n}mo ago`,
   },
-} as const;
+};
+
+type UITextBlock = {
+  justNow: string;
+  minutesAgo: (n: number) => string;
+  hoursAgo: (n: number) => string;
+  daysAgo: (n: number) => string;
+  monthsAgo: (n: number) => string;
+};
+
+function formatLikeTime(t: number, txt: UITextBlock): string | null {
+  if (t <= 0) return null;
+  const diff = Date.now() - t;
+  if (diff < 60_000) return txt.justNow;
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 60) return txt.minutesAgo(mins);
+  const hours = Math.floor(diff / 3_600_000);
+  if (hours < 24) return txt.hoursAgo(hours);
+  const days = Math.floor(diff / 86_400_000);
+  if (days < 30) return txt.daysAgo(days);
+  return txt.monthsAgo(Math.floor(days / 30));
+}
 
 const LIKERS_LIMIT = 50;
 const PROFILE_BATCH_SIZE = 10;
 const PROFILE_FETCH_TIMEOUT_MS = 5_000;
 
+async function fetchWithTimeout<T>(promise: Promise<T>): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('profile-timeout')), PROFILE_FETCH_TIMEOUT_MS),
+    ),
+  ]);
+}
+
 async function fetchLikerProfiles(
   userIds: string[],
+  timestamps: Record<string, number>,
   profileCache?: Map<string, { name?: string; avatarUri?: string }>,
 ): Promise<LikerProfile[]> {
   const results: LikerProfile[] = [];
@@ -58,7 +110,7 @@ async function fetchLikerProfiles(
   for (const uid of userIds) {
     const cached = profileCache?.get(uid);
     if (cached) {
-      results.push({ userId: uid, name: cached.name || '', avatarUri: cached.avatarUri || '' });
+      results.push({ userId: uid, name: cached.name || '', avatarUri: cached.avatarUri || '', age: '', likedAt: timestamps[uid] ?? 0 });
     } else {
       unknownIds.push(uid);
     }
@@ -69,16 +121,33 @@ async function fetchLikerProfiles(
     const chunk = unknownIds.slice(i, i + PROFILE_BATCH_SIZE);
     const settled = await Promise.allSettled(
       chunk.map(async (uid) => {
-        const snap = await Promise.race([
-          get(ref(database, `users/${uid}`)),
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('profile-timeout')), PROFILE_FETCH_TIMEOUT_MS),
-          ),
-        ]);
+        const snap = await fetchWithTimeout(get(ref(database, `users/${uid}`)));
         const data = snap.val() as Record<string, unknown> | null;
         const name = typeof data?.name === 'string' ? data.name.trim() : '';
-        const avatarUri = pickUserAvatarUri(data);
-        return { userId: uid, name, avatarUri: avatarUri || '' } satisfies LikerProfile;
+        const avatarUri = pickUserAvatarUri(data) || '';
+
+        // Fetch age from the user's own contacts_listing
+        let age = '';
+        try {
+          const listingQuery = query(
+            ref(database, 'contacts_listings'),
+            orderByChild('userId'),
+            equalTo(uid),
+            limitToFirst(1),
+          );
+          const listingSnap = await fetchWithTimeout(get(listingQuery));
+          if (listingSnap.exists()) {
+            const entries = listingSnap.val() as Record<string, Record<string, unknown>>;
+            const first = Object.values(entries)[0];
+            if (first && typeof first.price === 'string' && first.price.trim()) {
+              age = first.price.trim();
+            }
+          }
+        } catch {
+          // age stays empty — non-critical
+        }
+
+        return { userId: uid, name, avatarUri, age, likedAt: timestamps[uid] ?? 0 } satisfies LikerProfile;
       }),
     );
     for (const result of settled) {
@@ -87,6 +156,14 @@ async function fetchLikerProfiles(
       }
     }
   }
+
+  // Sort by likedAt descending (newest first); legacy (t=0) at end
+  results.sort((a, b) => {
+    if (a.likedAt === 0 && b.likedAt === 0) return 0;
+    if (a.likedAt === 0) return 1;
+    if (b.likedAt === 0) return -1;
+    return b.likedAt - a.likedAt;
+  });
 
   return results;
 }
@@ -132,9 +209,15 @@ export default function WhoLikedMeList({
           return;
         }
 
-        const allUserIds = Object.keys(rawData).filter(
-          (uid) => uid !== currentUserId && !blockedUserIds.has(uid),
-        );
+        const allUserIds: string[] = [];
+        const timestamps: Record<string, number> = {};
+        for (const [uid, val] of Object.entries(rawData as Record<string, unknown>)) {
+          if (uid === currentUserId || blockedUserIds.has(uid)) continue;
+          const entry = parseLikeEntry(val);
+          if (!entry.liked) continue;
+          allUserIds.push(uid);
+          if (entry.t > 0) timestamps[uid] = entry.t;
+        }
 
         if (allUserIds.length === 0) {
           setLikers([]);
@@ -142,7 +225,7 @@ export default function WhoLikedMeList({
           return;
         }
 
-        const profiles = await fetchLikerProfiles(allUserIds, profileCache);
+        const profiles = await fetchLikerProfiles(allUserIds, timestamps, profileCache);
         if (cancelled) return;
         setLikers(profiles);
         setFetched(true);
@@ -161,23 +244,32 @@ export default function WhoLikedMeList({
     return () => { cancelled = true; };
   }, [visible, listingId, currentUserId, blockedUserIds, profileCache]);
 
-  const renderItem = useCallback(({ item }: { item: LikerProfile }) => (
-    <TouchableOpacity
-      style={styles.row}
-      onPress={() => onViewProfile(item.userId)}
-      activeOpacity={0.82}
-    >
-      <MiniUserAvatar
-        uri={item.avatarUri}
-        name={item.name}
-        size={44}
-        borderRadius={14}
-        backgroundColor="#6A8BA5"
-      />
-      <Text style={styles.rowName} numberOfLines={1}>{item.name || item.userId.slice(0, 8)}</Text>
-      <MaterialCommunityIcons name="chevron-right" size={20} color="#78716C" />
-    </TouchableOpacity>
-  ), [onViewProfile]);
+  const renderItem = useCallback(({ item }: { item: LikerProfile }) => {
+    const timeLabel = formatLikeTime(item.likedAt, text);
+    return (
+      <TouchableOpacity
+        style={styles.row}
+        onPress={() => onViewProfile(item.userId)}
+        activeOpacity={0.82}
+      >
+        <MiniUserAvatar
+          uri={item.avatarUri}
+          name={item.name}
+          size={44}
+          borderRadius={14}
+          backgroundColor="#6A8BA5"
+        />
+        <View style={styles.rowInfo}>
+          <Text style={styles.rowName} numberOfLines={1}>
+            {item.name || item.userId.slice(0, 8)}
+            {item.age ? <Text style={styles.rowAge}> · {item.age} {text.years}</Text> : null}
+          </Text>
+          {timeLabel ? <Text style={styles.rowTime}>{timeLabel}</Text> : null}
+        </View>
+        <MaterialCommunityIcons name="chevron-right" size={20} color="#78716C" />
+      </TouchableOpacity>
+    );
+  }, [onViewProfile, text]);
 
   const keyExtractor = useCallback((item: LikerProfile) => item.userId, []);
 
@@ -300,10 +392,23 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F5EDD6',
   },
-  rowName: {
+  rowInfo: {
     flex: 1,
+  },
+  rowName: {
     fontSize: 15,
     fontWeight: '700',
     color: '#612e51',
+  },
+  rowAge: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#78716C',
+  },
+  rowTime: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#9E8E80',
+    marginTop: 2,
   },
 });

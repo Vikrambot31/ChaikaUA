@@ -6,6 +6,7 @@ import { database } from '../firebase-config';
 import MiniUserAvatar from './MiniUserAvatar';
 import { useSoftToast } from '../hooks/useSoftToast';
 import { resolveUserAvatarMap } from '../utils/userAvatar';
+import { normaliseLikesSnapshot } from '../utils/likeUtils';
 
 const RTDB_FORBIDDEN_KEY_CHARS = /[.#$[\]/]/g;
 const toSafeRtdbKey = (value: string): string => (value ?? '').replace(RTDB_FORBIDDEN_KEY_CHARS, '_').trim();
@@ -94,8 +95,8 @@ export default function UserCardActionBar({
   useEffect(() => {
     if (!likePath || !safeLikeId || liked !== undefined || likeCount !== undefined) return;
     const unsubscribe = onValue(ref(database, `${likePath}/${safeLikeId}`), (snapshot) => {
-      const value = snapshot.val();
-      setLocalLikes(value && typeof value === 'object' ? value : {});
+      const { likeFlags } = normaliseLikesSnapshot(snapshot.val());
+      setLocalLikes(likeFlags);
     });
     return unsubscribe;
   }, [likeCount, safeLikeId, likePath, liked]);
@@ -139,13 +140,13 @@ export default function UserCardActionBar({
     if (nextLikes[currentUserId]) {
       delete nextLikes[currentUserId];
     } else {
-      nextLikes[currentUserId] = true;
+      nextLikes[currentUserId] = true; // optimistic flag; RTDB writes { t } via transaction
     }
 
     setLocalLikes(nextLikes);
     setLocalBusy(true);
     try {
-      await runTransaction(ref(database, `${likePath}/${safeLikeId}/${currentUserId}`), (current) => (current ? null : true));
+      await runTransaction(ref(database, `${likePath}/${safeLikeId}/${currentUserId}`), (current) => (current ? null : { t: Date.now() }));
     } catch {
       setLocalLikes(previousLikes);
       showError(t.saveFailed, t.retry);
