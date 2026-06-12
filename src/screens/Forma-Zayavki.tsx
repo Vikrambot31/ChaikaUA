@@ -26,6 +26,8 @@ import { checkYellowList } from '../utils/yellowListCheck';
 import { normalizePersonName, sanitizeStoredText } from '../utils/textUtils';
 import { normalizeUkrainianPhoneStrict, validateName, validatePhone } from '../utils/validators';
 import { useOperationTrace } from '../hooks/useOperationTrace';
+import { useTrainingMode } from '../hooks/useTrainingMode';
+import TrainingHint from '../components/TrainingHint';
 
 type Lang = 'ua' | 'ru' | 'en';
 type RequestMode = 'need_help' | 'offer_help' | 'business';
@@ -272,6 +274,12 @@ const TEXT_BY_LANG = {
   },
 } as const;
 
+const TRAINING_HINT: Record<Lang, string> = {
+  ua: 'Заповни імʼя та телефон, вибери тип допомоги, опиши ситуацію і натисни Надіслати.',
+  ru: 'Заполни имя и телефон, выбери тип помощи, опиши ситуацию и нажми Отправить.',
+  en: 'Fill in your name and phone, pick a help type, describe the situation and tap Send.',
+};
+
 const toneIcon: Record<FieldTone, IconName> = {
   idle: 'circle-outline',
   valid: 'check-circle',
@@ -432,6 +440,7 @@ const RequestFormScreen: React.FC = () => {
   const language = useSelector((state: RootState) => normalizeLanguage(state.language?.current)) as Lang;
   const user = useSelector((state: RootState) => state.auth.user);
   const { startOperation, trace } = useOperationTrace('Forma-Zayavki');
+  const training = useTrainingMode('forma_zayavki');
   const [requestMode, setRequestMode] = useState<RequestMode>('need_help');
   const [name, setName] = useState(user?.name ?? '');
   const [phone, setPhone] = useState(() => formatPhoneInput(user?.phone || '+38'));
@@ -878,6 +887,9 @@ const RequestFormScreen: React.FC = () => {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      {training.isVisible && (
+        <TrainingHint text={TRAINING_HINT[language]} onDismiss={training.dismiss} />
+      )}
     </SafeAreaView>
   );
 };

@@ -37,6 +37,8 @@ import { getDonePhotos, validateSubmissionRequirements } from '../utils/submissi
 import { getLanguageValidationError } from '../utils/contentLanguageGuard';
 import { showUserError } from '../utils/userFacingErrors';
 import { beautyTopService } from '../services/beautyTopService';
+import { useTrainingMode } from '../hooks/useTrainingMode';
+import TrainingHint from '../components/TrainingHint';
 
 type Lang = 'ua' | 'ru' | 'en';
 type AppNavigation = NavigationProp<Record<string, object | undefined>>;
@@ -355,6 +357,12 @@ const getCategoryIcon = (category: BeautyCategory): React.ComponentProps<typeof 
   return map[category];
 };
 
+const TRAINING_HINT: Record<Lang, string> = {
+  ua: 'Обери категорію послуг. Щоб додати свій салон — натисни + внизу списку.',
+  ru: 'Выбери категорию услуг. Чтобы добавить свой салон — нажми + внизу списка.',
+  en: 'Pick a service category. To add your salon — tap + at the bottom of the list.',
+};
+
 export default function SalonyKrasotyScreen() {
   const navigation = useNavigation<AppNavigation>();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as Lang;
@@ -363,6 +371,7 @@ export default function SalonyKrasotyScreen() {
   const currentUserId = user?.id;
   const isAdmin = currentUserEmail === 'vikramsave@ukr.net';
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
+  const training = useTrainingMode('salony_krasoty');
   const [activeCategory, setActiveCategory] = useState<CategoryKey>('all');
   const [claimPlaceIds, setClaimPlaceIds] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
@@ -865,6 +874,9 @@ export default function SalonyKrasotyScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+      {training.isVisible && (
+        <TrainingHint text={TRAINING_HINT[language]} onDismiss={training.dismiss} />
+      )}
     </SafeAreaView>
   );
 }

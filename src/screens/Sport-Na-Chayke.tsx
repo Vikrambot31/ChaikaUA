@@ -6,6 +6,8 @@ import { useSelector } from 'react-redux';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import type { RootState } from '../redux/store';
 import { sportsService, SportKey, SportTodayEntry } from '../services/sportsService';
+import { useTrainingMode } from '../hooks/useTrainingMode';
+import TrainingHint from '../components/TrainingHint';
 
 type Lang = 'ua' | 'ru' | 'en';
 
@@ -124,10 +126,17 @@ const SPORT_FEED_TEXT: Record<Lang, {
   },
 };
 
+const TRAINING_HINT: Record<Lang, string> = {
+  ua: 'Обери вид спорту і натисни Обрати. Побачиш, хто вже грає сьогодні.',
+  ru: 'Выбери вид спорта и нажми Выбрать. Увидишь, кто уже играет сегодня.',
+  en: 'Pick a sport and tap Choose. You will see who is playing today.',
+};
+
 const SportNaChaykeScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as Lang;
   const text = UI_TEXT[language];
+  const training = useTrainingMode('sport_na_chayke');
   const feedText = SPORT_FEED_TEXT[language];
   const blinkAnim = useRef(new Animated.Value(1)).current;
   const [todayEntriesBySport, setTodayEntriesBySport] = useState<Record<SportKey, SportTodayEntry[]>>({
@@ -261,6 +270,9 @@ const SportNaChaykeScreen: React.FC = () => {
           ))}
         </View>
       </ScrollView>
+      {training.isVisible && (
+        <TrainingHint text={TRAINING_HINT[language]} onDismiss={training.dismiss} />
+      )}
     </SafeAreaView>
   );
 };

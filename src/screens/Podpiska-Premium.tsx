@@ -25,6 +25,8 @@ import {
   hydrateSubscription,
   callActivateTrialPremium,
 } from '../redux/slices/subscriptionSlice';
+import { useTrainingMode } from '../hooks/useTrainingMode';
+import TrainingHint from '../components/TrainingHint';
 
 type Plan = 'monthly' | 'yearly';
 
@@ -91,10 +93,17 @@ const formatDate = (iso: string | null): string => {
   return `${dd}.${mm}.${yyyy}`;
 };
 
+const TRAINING_HINT: Record<string, string> = {
+  ua: 'Обери тариф: місяць або рік. Натисни Активувати для пробного періоду.',
+  ru: 'Выбери тариф: месяц или год. Нажми Активировать для пробного периода.',
+  en: 'Pick a plan: monthly or yearly. Tap Activate to start a free trial.',
+};
+
 export default function SubscriptionScreen() {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const dispatch = useDispatch();
   const { language } = useTranslation();
+  const training = useTrainingMode('podpiska_premium');
 
   const isPremium = useSelector(selectIsPremium);
   const status = useSelector(selectSubscriptionStatus);
@@ -467,6 +476,9 @@ export default function SubscriptionScreen() {
 
       </ScrollView>
       <MiniTabBar />
+      {training.isVisible && (
+        <TrainingHint text={TRAINING_HINT[language] ?? TRAINING_HINT.ua} onDismiss={training.dismiss} />
+      )}
     </SafeAreaView>
   );
 }

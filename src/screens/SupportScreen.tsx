@@ -30,6 +30,8 @@ import {
 } from '../services/supportService';
 import type { SupportTicket, SupportMessage, SupportCategory } from '../types/support';
 import { ensureFirebaseAuth } from '../firebase-auth-session';
+import { useTrainingMode } from '../hooks/useTrainingMode';
+import TrainingHint from '../components/TrainingHint';
 
 const UI_TEXT = {
   ua: {
@@ -115,6 +117,12 @@ const CATEGORY_LABELS: Record<string, Record<SupportCategory, string>> = {
   },
 };
 
+const TRAINING_HINT: Record<string, string> = {
+  ua: 'Обери тему звернення, напиши повідомлення і натисни Відправити.',
+  ru: 'Выбери тему обращения, напиши сообщение и нажми Отправить.',
+  en: 'Pick a topic, write your message and tap Send.',
+};
+
 const SupportScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, 'SupportScreen'>>();
@@ -122,6 +130,7 @@ const SupportScreen: React.FC = () => {
   const isOnline = useSelector(selectIsOnline);
   const { language } = useTranslation();
   const text = UI_TEXT[language] || UI_TEXT.ua;
+  const training = useTrainingMode('support');
   const catLabels = CATEGORY_LABELS[language] || CATEGORY_LABELS.ua;
 
   const [ticket, setTicket] = useState<SupportTicket | null>(null);
@@ -370,6 +379,9 @@ const SupportScreen: React.FC = () => {
           {text.chars}: {messageText.length}/{MAX_MESSAGE_LENGTH}
         </Text>
       </View>
+      {training.isVisible && (
+        <TrainingHint text={TRAINING_HINT[language] ?? TRAINING_HINT.ua} onDismiss={training.dismiss} />
+      )}
     </SafeAreaView>
   );
 };

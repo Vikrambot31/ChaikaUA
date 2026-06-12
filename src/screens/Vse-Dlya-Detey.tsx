@@ -41,6 +41,8 @@ import { getDonePhotos, validateSubmissionRequirements } from '../utils/submissi
 import { getLanguageValidationError } from '../utils/contentLanguageGuard';
 import { showUserError } from '../utils/userFacingErrors';
 import { childrenTopService } from '../services/childrenTopService';
+import { useTrainingMode } from '../hooks/useTrainingMode';
+import TrainingHint from '../components/TrainingHint';
 
 type Lang = 'ua' | 'ru' | 'en';
 type AppNavigation = NavigationProp<Record<string, object | undefined>>;
@@ -438,10 +440,17 @@ const matchesAgeRange = (place: Place, range: { from: number; to: number }): boo
   return placeAgeTo >= range.from && ageFrom <= range.to;
 };
 
+const TRAINING_HINT: Record<Lang, string> = {
+  ua: 'Фільтруй за віком дитини або категорією. Натисни на картку, щоб побачити деталі.',
+  ru: 'Фильтруй по возрасту ребёнка или категории. Нажми на карточку, чтобы увидеть детали.',
+  en: 'Filter by child age or category. Tap a card to see details.',
+};
+
 export default function VseDlyaDeteyScreen() {
   const navigation = useNavigation<AppNavigation>();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as Lang;
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
+  const training = useTrainingMode('vse_dlya_detey');
   const user = useSelector((state: RootState) => state.auth.user);
   const currentUserId = useSelector(selectUserId);
   const currentUserEmail = user?.email;
@@ -1097,6 +1106,9 @@ export default function VseDlyaDeteyScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+      {training.isVisible && (
+        <TrainingHint text={TRAINING_HINT[language]} onDismiss={training.dismiss} />
+      )}
     </SafeAreaView>
   );
 }

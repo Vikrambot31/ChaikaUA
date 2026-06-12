@@ -44,6 +44,8 @@ import FeedLikeButton from '../components/FeedLikeButton';
 import { toggleFavorite, getFavorites, type FavoriteSource } from '../services/favoritesService';
 import { useSoftToast } from '../hooks/useSoftToast';
 import { selectUserId } from '../redux/selectors';
+import { useTrainingMode } from '../hooks/useTrainingMode';
+import TrainingHint from '../components/TrainingHint';
 
 type Lang = 'ua' | 'ru' | 'en';
 type AppNavigation = NavigationProp<Record<string, object | undefined>>;
@@ -242,6 +244,12 @@ const EAT_FILTERS: { key: EatFilter; icon: React.ComponentProps<typeof MaterialC
   { key: 'restaurant', icon: 'silverware-fork-knife' },
 ];
 
+const TRAINING_HINT: Record<Lang, string> = {
+  ua: 'Шукай заклади через пошук або обери категорію. Натисни на картку, щоб побачити деталі.',
+  ru: 'Ищи заведения через поиск или выбери категорию. Нажми на карточку, чтобы увидеть детали.',
+  en: 'Search places or pick a category. Tap a card to see details.',
+};
+
 // --- Helpers ---
 
 /** Parse "09:00-22:00" format. Returns { isOpen, closingTime } or null if unparseable. */
@@ -308,6 +316,7 @@ export default function EdaNaChaykeScreen() {
   const user = useSelector((state: RootState) => state.auth.user);
   const isAdmin = user?.email === 'vikramsave@ukr.net';
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
+  const training = useTrainingMode('eda_na_chayke');
 
   const currentUserId = useSelector(selectUserId);
   const [mode, setMode] = useState<ScreenMode>('home');
@@ -1096,6 +1105,9 @@ export default function EdaNaChaykeScreen() {
 
         <FeatureRatingBanner screenId="eda" />
       </ScrollView>
+      {training.isVisible && (
+        <TrainingHint text={TRAINING_HINT[language]} onDismiss={training.dismiss} />
+      )}
     </SafeAreaView>
   );
 }
