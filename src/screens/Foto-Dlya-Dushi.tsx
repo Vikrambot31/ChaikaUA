@@ -323,6 +323,7 @@ export default function SoulPhotosScreen() {
   const [submittedRtdbIds, setSubmittedRtdbIds] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
   const [monthlyUsed, setMonthlyUsed] = useState<number | null>(null);
+  const [uploadFormVisible, setUploadFormVisible] = useState(false);
 
   // Swipe mode
   const [swipeMode, setSwipeMode] = useState(false);
@@ -437,6 +438,7 @@ export default function SoulPhotosScreen() {
         if (draft.uploadCategory) setUploadCategory(draft.uploadCategory);
         if (draft.description) setDescription(draft.description);
         if (draft.address) setAddress(draft.address);
+        if (draft.uploadCategory || draft.address) setUploadFormVisible(true);
       } catch { /* ignore invalid */ }
     }).catch(() => {});
   }, []);
@@ -476,6 +478,13 @@ export default function SoulPhotosScreen() {
     () => remotePhotos.filter((p) => p.status === 'saved' && !submittedRtdbIds.has(p.id)),
     [remotePhotos, submittedRtdbIds],
   );
+
+  // Show upload form once user has photos in session or saved remotely
+  useEffect(() => {
+    if (Object.values(pickedPhotos).length > 0 || savedRemotePhotos.length > 0) {
+      setUploadFormVisible(true);
+    }
+  }, [pickedPhotos, savedRemotePhotos]);
 
   // True when at least one photo (session OR RTDB) needs to be submitted
   const hasUnsubmitted = useMemo(
@@ -752,32 +761,62 @@ export default function SoulPhotosScreen() {
         <MaterialCommunityIcons name="cards" size={18} color="#453321" />
         <Text style={dushiSwipeStyles.swipeEntryBtnText}>{text.swipeBtn}</Text>
       </TouchableOpacity>
-      {categoryPicker}
 
-      <View style={styles.descriptionRow}>
-        <View style={styles.descriptionIcon}>
-          <MaterialCommunityIcons name="map-marker-outline" size={18} color="#fff" />
-        </View>
-        <View style={styles.descriptionFields}>
-          <Text style={styles.descriptionTitle}>{text.descTitle}</Text>
-          <TextInput
-            value={address}
-            onChangeText={setAddress}
-            placeholder={text.addressPlaceholder}
-            placeholderTextColor="#9B9183"
-            style={styles.input}
-            maxLength={80}
+      {/* Photo upload button — always visible */}
+      {user ? (
+        <View style={styles.realPickerWrap}>
+          <PhotoUploadField
+            uid={user.id}
+            userName={user.name ?? user.email ?? ''}
+            maxPhotos={Math.min(1, Math.max(0, COMMUNITY_PHOTO_MONTHLY_REVIEW_LIMIT - (monthlyUsed ?? 0)))}
+            storagePath={STORAGE_PATH}
+            onPhotosChange={handlePhotosChange}
+            hideSelectedPreview
+            metadata={{
+              title: text.title,
+              description: description.trim(),
+              sourceScreen: SCREEN_ID,
+              sourceScreenLabel: text.title,
+              sourceFeature: 'soul_photos_upload',
+              locationLabel: address.trim(),
+              locationType: address.trim() ? 'place' : undefined,
+              category: uploadCategory ?? undefined,
+              moderationDeferred: true,
+            }}
           />
-          <TextInput
-            value={description}
-            onChangeText={(value) => setDescription(limitWords(value, 5))}
-            placeholder={text.descPlaceholder}
-            placeholderTextColor="#9B9183"
-            style={styles.input}
-            maxLength={60}
-          />
         </View>
-      </View>
+      ) : (
+        <TouchableOpacity
+          style={styles.loginButton}
+          onPress={guestGuard(() => {})}
+          activeOpacity={0.82}
+        >
+          <MaterialCommunityIcons name="login" size={19} color="#fff" />
+          <Text style={styles.actionText}>{text.login}</Text>
+        </TouchableOpacity>
+      )}
+
+      {/* Category + address form — appears after photo is loaded into grid */}
+      {uploadFormVisible && (
+        <>
+          {categoryPicker}
+          <View style={styles.descriptionRow}>
+            <View style={styles.descriptionIcon}>
+              <MaterialCommunityIcons name="map-marker-outline" size={18} color="#fff" />
+            </View>
+            <View style={styles.descriptionFields}>
+              <TextInput
+                value={address}
+                onChangeText={setAddress}
+                placeholder={text.addressPlaceholder}
+                placeholderTextColor="#9B9183"
+                style={styles.input}
+                maxLength={80}
+              />
+            </View>
+          </View>
+        </>
+      )}
 
       {monthlyUsed !== null && (
         <View style={[styles.limitBadge, monthlyUsed >= COMMUNITY_PHOTO_MONTHLY_REVIEW_LIMIT && styles.limitBadgeExhausted]}>
@@ -792,47 +831,6 @@ export default function SoulPhotosScreen() {
               : text.limitUsed(monthlyUsed, COMMUNITY_PHOTO_MONTHLY_REVIEW_LIMIT)}
           </Text>
         </View>
-      )}
-
-      {user ? (
-        <View style={[styles.realPickerWrap, !uploadCategory && styles.pickerDisabled]}>
-          {!uploadCategory && (
-            <View style={styles.pickerBlocker}>
-              <MaterialCommunityIcons name="arrow-up-circle-outline" size={20} color="#B8860B" />
-              <Text style={styles.pickerBlockerText}>{text.categoryRequired}</Text>
-            </View>
-          )}
-          {uploadCategory && (
-            <PhotoUploadField
-              uid={user.id}
-              userName={user.name ?? user.email ?? ''}
-              maxPhotos={Math.min(1, Math.max(0, COMMUNITY_PHOTO_MONTHLY_REVIEW_LIMIT - (monthlyUsed ?? 0)))}
-              storagePath={STORAGE_PATH}
-              onPhotosChange={handlePhotosChange}
-              hideSelectedPreview
-              metadata={{
-                title: text.title,
-                description: description.trim(),
-                sourceScreen: SCREEN_ID,
-                sourceScreenLabel: text.title,
-                sourceFeature: 'soul_photos_upload',
-                locationLabel: address.trim(),
-                locationType: address.trim() ? 'place' : undefined,
-                category: uploadCategory,
-                moderationDeferred: true,
-              }}
-            />
-          )}
-        </View>
-      ) : (
-        <TouchableOpacity
-          style={styles.loginButton}
-          onPress={guestGuard(() => {})}
-          activeOpacity={0.82}
-        >
-          <MaterialCommunityIcons name="login" size={19} color="#fff" />
-          <Text style={styles.actionText}>{text.login}</Text>
-        </TouchableOpacity>
       )}
 
       {/* Uploading indicator */}
