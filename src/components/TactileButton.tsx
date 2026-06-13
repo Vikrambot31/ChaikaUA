@@ -23,7 +23,7 @@ const VARIANTS = {
   secondary: {
     bg: SCREEN_THEME.cardCream,
     border: SCREEN_THEME.accentPrimary,
-    text: '#FFFFFF',
+    text: SCREEN_THEME.textPrimary,
     shadowColor: 'rgba(122, 37, 81, 0.30)',
   },
   social: {
