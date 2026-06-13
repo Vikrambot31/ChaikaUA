@@ -16,6 +16,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from '../i18n/useTranslation';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { requireWriteSession } from '../firebase-auth-session';
+import { auth } from '../firebase-core';
 import { subscribeToAllAdTickets } from '../services/adService';
 import {
   adminGrantPromoCredits,
@@ -126,6 +127,7 @@ const PromoCreditsAdminScreen: React.FC = () => {
             setBusyTicketId(ticket.ticketId);
             try {
               await requireWriteSession({ requireRealUser: true, operation: 'adminGrantPromoCredits', screen: 'PromoCreditsAdmin' });
+              await auth.currentUser?.getIdToken(true);
               const result = await adminGrantPromoCredits({
                 targetUid: ticket.userId,
                 amount: credits,
@@ -149,6 +151,7 @@ const PromoCreditsAdminScreen: React.FC = () => {
     setBusyPromotionId(promotion.id);
     try {
       await requireWriteSession({ requireRealUser: true, operation: 'adminModeratePromotion', screen: 'PromoCreditsAdmin' });
+      await auth.currentUser?.getIdToken(true);
       await adminModeratePromotion({
         promotionId: promotion.id,
         action,
