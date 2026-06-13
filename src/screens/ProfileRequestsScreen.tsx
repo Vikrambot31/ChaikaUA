@@ -865,14 +865,6 @@ export default function ProfileRequestsScreen() {
                       <Text style={styles.requestMetaLabel}>{t.topicLabel}</Text>
                       <Text style={styles.requestMetaValue}>{topicText}</Text>
                     </View>
-                    <View style={styles.requestMetaRow}>
-                      <Text style={styles.requestMetaLabel}>{t.foundContactLabel}</Text>
-                      <Text style={styles.requestMetaValue}>{foundContactText}</Text>
-                    </View>
-                    <View style={styles.requestMetaRow}>
-                      <Text style={styles.requestMetaLabel}>{t.transitionScreenLabel}</Text>
-                      <Text style={styles.requestMetaValue}>{transitionScreenText}</Text>
-                    </View>
                   </View>
 
                   {item.status === 'pending' ? (
@@ -918,9 +910,6 @@ export default function ProfileRequestsScreen() {
                           {item.status === 'approved' ? t.contactOpened : t.requestDenied}
                         </Text>
                       </View>
-                      <Text style={styles.responseStatusTopic}>
-                        {item.status === 'approved' ? t.contactOpenedByTopic : t.topicLabel} {topicText}
-                      </Text>
                       {item.status === 'denied' ? (
                         <Text style={styles.responseStatusHint}>{t.approveAgainBody}</Text>
                       ) : null}
@@ -1060,14 +1049,6 @@ export default function ProfileRequestsScreen() {
                     <Text style={styles.requestMetaLabel}>{t.topicLabel}</Text>
                     <Text style={styles.requestMetaValue}>{topicText}</Text>
                   </View>
-                  <View style={styles.requestMetaRow}>
-                    <Text style={styles.requestMetaLabel}>{t.foundContactLabel}</Text>
-                    <Text style={styles.requestMetaValue}>{foundContactText}</Text>
-                  </View>
-                  <View style={styles.requestMetaRow}>
-                    <Text style={styles.requestMetaLabel}>{t.transitionScreenLabel}</Text>
-                    <Text style={styles.requestMetaValue}>{transitionScreenText}</Text>
-                  </View>
                 </View>
 
                 <View style={[
@@ -1088,9 +1069,6 @@ export default function ProfileRequestsScreen() {
                       {outgoingStatusLabel}
                     </Text>
                   </View>
-                  <Text style={styles.responseStatusTopic}>
-                    {item.status === 'approved' ? t.contactOpenedByTopic : t.topicLabel} {topicText}
-                  </Text>
                   {item.status === 'pending' ? (
                     <Text style={styles.responseStatusHint}>
                       {isViewedByTarget ? viewedLabel.seen : viewedLabel.notSeen}
@@ -1409,17 +1387,16 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   requestMetaLabel: {
-    fontSize: 11,
+    fontSize: 22,
     fontWeight: '900',
     color: '#4A3D37',
-    minWidth: 104,
   },
   requestMetaValue: {
     flex: 1,
-    fontSize: 11,
+    fontSize: 22,
     fontWeight: '700',
     color: '#7A6D64',
-    lineHeight: 15,
+    lineHeight: 28,
   },
   responseActionsRow: {
     flexDirection: 'row',
