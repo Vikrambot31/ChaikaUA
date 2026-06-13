@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-06-13",
+      "publishedAt": "2026-06-13T07:41:08.947Z",
+      "key": "https://bigkyiv.com.ua/sogodni-na-kyyivshhyni-bude-minlyva-hmarnist-bez-opadiv/"
+    },
+    {
       "type": "places",
       "date": "2026-06-12",
       "publishedAt": "2026-06-12T11:33:02.472Z",
