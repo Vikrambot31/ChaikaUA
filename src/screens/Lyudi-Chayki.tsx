@@ -568,7 +568,7 @@ export default function TopGirlsBoysScreen() {
           const isCurrentUser = person.id === user?.id;
           const isNavigating = navigatingId === person.id;
           return (
-            <TouchableOpacity style={[styles.personCard, isCurrentUser && styles.personCardCurrent]} onPress={() => openPersonDetails(person)} activeOpacity={0.88} disabled={isCurrentUser || isNavigating}>
+            <TouchableOpacity style={[styles.personCard, isCurrentUser && styles.personCardCurrent]} onPress={() => openPersonDetails(person)} activeOpacity={0.88} disabled={isNavigating}>
               <View style={styles.personCardMain}>
                 <View style={styles.rankBox}>
                   {isNavigating ? (
@@ -608,7 +608,7 @@ export default function TopGirlsBoysScreen() {
                   userId={person.id}
                   currentUserId={user?.id}
                   language={language}
-                  onProfile={!isCurrentUser ? () => navigation.navigate('ViewUserProfile', { userId: person.id }) : undefined}
+                  onProfile={() => navigation.navigate('ViewUserProfile', { userId: person.id })}
                   onContact={!isCurrentUser ? () => openContactModal({ userId: person.id, name: person.name, photoURL: person.photoURL, sourceType: 'lyudi', sourceId: person.id, sourceTitle: person.name }) : undefined}
                   contactDisabled={isCurrentUser}
                   likePath="feed_likes/people"
