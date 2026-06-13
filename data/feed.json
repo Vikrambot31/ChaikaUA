@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-06-13",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Кав'ярня-кондитерська \"Гамак\" — вулиця Валерія Лобановського ☕ BALCONE COFFEE — вулиця Валерія Лобановського, 26 к2 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-06-13T10:19:41.326Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/sogodni-na-kyyivshhyni-bude-minlyva-hmarnist-bez-opadiv/",
     "title": "Сьогодні на Київщині буде мінлива хмарність без опадів",
     "shortText": "Сьогодні в Ірпені мінлива хмарність без опадів, температура 19–24°. Ідеальний день для прогулянок біля Бучанського водосховища й облаштування придомової території. #ЖКЧайка #Ірпінь #КиївськаОбласть #Погода",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Fora-Кав'ярня-кондитерська \"Гамак\"-2026-04-24",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ 1) Fora — вулиця Грушевського, 12 🍽️ 2) Кав'ярня-кондитерська \"Гамак\" — вулиця Валерія Лобановського ✨ Коротко: сьогодні радимо звернути увагу на ці два місця поруч із домом.",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-04-24T07:49:16.139Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
