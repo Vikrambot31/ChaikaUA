@@ -29,6 +29,8 @@ import type { DetailItemData, BusinessMenuItem, BusinessPromotion } from '../uti
 import { requireAuthForDetails } from '../utils/authGuard';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import WhoLikedMeInlineSection from '../components/WhoLikedMeInlineSection';
+import CommentSection from '../components/CommentSection';
+import { CONTACT_COMMENTS_PATH } from '../services/commentService';
 
 type Lang = 'ua' | 'ru' | 'en';
 
@@ -902,6 +904,16 @@ export default function ItemDetailScreen({
             onViewProfile={(uid) => {
               navigation.navigate('ViewUserProfile' as any, { userId: uid });
             }}
+          />
+        ) : null}
+
+        {/* ── Comments (lyudi dating profiles only) ── */}
+        {isLudiType && item.sourceId ? (
+          <CommentSection
+            requestId={item.sourceId}
+            requestAuthorUid={item.userId || ''}
+            isRequestClosed={false}
+            collectionPath={CONTACT_COMMENTS_PATH}
           />
         ) : null}
       </ScrollView>

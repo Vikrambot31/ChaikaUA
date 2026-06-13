@@ -12,7 +12,7 @@ import { useSelector } from 'react-redux';
 import type { RootState } from '../redux/store';
 import { auth } from '../firebase-config';
 import { useTranslation } from '../i18n/useTranslation';
-import { subscribeComments, submitComment } from '../services/commentService';
+import { COMMENTS_PATH, subscribeComments, submitComment } from '../services/commentService';
 import type { Comment } from '../types/app';
 import { pickUserAvatarUri } from '../utils/userAvatar';
 import MiniUserAvatar from './MiniUserAvatar';
@@ -21,6 +21,7 @@ interface Props {
   requestId: string;
   requestAuthorUid: string;
   isRequestClosed: boolean;
+  collectionPath?: string;
 }
 
 const ACCENT = '#7A1E5C';
@@ -28,7 +29,7 @@ const MAX_COMMENT_LENGTH = 500;
 const MIN_COMMENT_LENGTH = 3;
 const COOLDOWN_MS = 30000;
 
-const CommentSection: React.FC<Props> = ({ requestId, requestAuthorUid, isRequestClosed }) => {
+const CommentSection: React.FC<Props> = ({ requestId, requestAuthorUid, isRequestClosed, collectionPath = COMMENTS_PATH }) => {
   const { t } = useTranslation();
   const currentUser = useSelector((state: RootState) => state.auth.user);
   const firebaseUser = auth.currentUser;
@@ -50,9 +51,9 @@ const CommentSection: React.FC<Props> = ({ requestId, requestAuthorUid, isReques
         (c) => c.uid === currentUser?.id && c.status === 'pending',
       );
       setHasPending(ownPending);
-    });
+    }, collectionPath);
     return unsubscribe;
-  }, [requestId, currentUser?.id]);
+  }, [requestId, currentUser?.id, collectionPath]);
 
   const charCount = inputText.length;
   const isOverLimit = charCount > MAX_COMMENT_LENGTH;
@@ -84,6 +85,7 @@ const CommentSection: React.FC<Props> = ({ requestId, requestAuthorUid, isReques
         inputText.trim(),
         currentUser.name || 'Unknown',
         currentUser.startAvatarKey,
+        collectionPath,
       );
       setInputText('');
       lastSubmitRef.current = Date.now();

@@ -6,13 +6,15 @@ import type { Comment } from '../types/app';
 const functions = getFunctions(firebaseApp);
 
 export const COMMENTS_PATH = 'request_comments';
+export const CONTACT_COMMENTS_PATH = 'contact_comments';
 
 export function subscribeComments(
   requestId: string,
   onComments: (comments: Comment[]) => void,
+  collectionPath: string = COMMENTS_PATH,
 ): () => void {
   const commentsQuery = query(
-    ref(database, `${COMMENTS_PATH}/${requestId}`),
+    ref(database, `${collectionPath}/${requestId}`),
     limitToLast(50),
   );
 
@@ -51,13 +53,14 @@ export async function submitComment(
   text: string,
   name: string,
   avatarKey?: string,
+  collectionPath: string = COMMENTS_PATH,
 ): Promise<{ commentId: string }> {
   const user = auth.currentUser;
   if (!user || user.isAnonymous) {
     throw new Error('auth_required');
   }
 
-  const commentsRef = ref(database, `${COMMENTS_PATH}/${requestId}`);
+  const commentsRef = ref(database, `${collectionPath}/${requestId}`);
   const newCommentRef = push(commentsRef);
   const commentId = newCommentRef.key!;
 
@@ -82,7 +85,7 @@ export async function submitComment(
     await callable({ requestId, commentId });
   } catch {
     // fail-open: if AI moderation is unavailable, make comment visible immediately
-    await update(ref(database, `${COMMENTS_PATH}/${requestId}/${commentId}`), {
+    await update(ref(database, `${collectionPath}/${requestId}/${commentId}`), {
       status: 'visible',
       aiModeration: null,
     });
