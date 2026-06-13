@@ -8,7 +8,7 @@ import AlertHelper from '../utils/alertHelper';
 import ErrorHandler from '../utils/errorHandler';
 import { LIGHT_ORBS, SCREEN_THEME } from '../utils/screenTheme';
 import { RootState } from '../redux/store';
-import { selectIsAuthenticated, selectUser } from '../redux/selectors';
+import { selectAuthBootstrapped, selectIsAuthenticated, selectUser } from '../redux/selectors';
 import { BUILDINGS, getFullAddress } from '../data/buildings';
 import { useTranslation } from '../i18n/useTranslation';
 import { useOperationTrace } from '../hooks/useOperationTrace';
@@ -152,6 +152,7 @@ export default function RatingScreen() {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const isAuthenticated = useSelector(selectIsAuthenticated);
+  const isBootstrapped = useSelector(selectAuthBootstrapped);
   const currentUser = useSelector(selectUser);
   const { t } = useTranslation();
   const { startOperation, trace } = useOperationTrace('Reyting-Domov', 'rating');
@@ -222,6 +223,7 @@ export default function RatingScreen() {
   }, [canRateToday, currentUserId, selectedBuildingId, userRating?.ratedAt]);
 
   const handleVote = (category: RatingCategoryKey, value: number) => {
+    if (!isBootstrapped) return;
     if (!isAuthenticated) {
       showRatingAuthNotice();
       return;
@@ -244,6 +246,10 @@ export default function RatingScreen() {
   const handleSubmitVote = async () => {
     startOperation();
     trace('validate', 'start');
+    if (!isBootstrapped) {
+      trace('validate', 'fail', { reason: 'not_bootstrapped' });
+      return;
+    }
     if (!isAuthenticated) {
       trace('validate', 'fail', { reason: 'auth_required' });
       showRatingAuthNotice();
@@ -478,6 +484,7 @@ export function BuildingRatingDetailScreen() {
   const route = useRoute<RouteProp<{ BuildingRatingDetailScreen: { buildingId: string } }, 'BuildingRatingDetailScreen'>>();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const isAuthenticated = useSelector(selectIsAuthenticated);
+  const isBootstrapped = useSelector(selectAuthBootstrapped);
   const currentUser = useSelector(selectUser);
   const { t } = useTranslation();
   const uiText = RATING_UI_TEXT[language];
@@ -526,6 +533,7 @@ export function BuildingRatingDetailScreen() {
   }, [building.id, canRateToday, currentUserId, userRating?.ratedAt]);
 
   const handleVote = (category: RatingCategoryKey, value: number) => {
+    if (!isBootstrapped) return;
     if (!isAuthenticated) {
       showRatingAuthNotice();
       return;
@@ -546,6 +554,7 @@ export function BuildingRatingDetailScreen() {
   };
 
   const handleSubmitVote = async () => {
+    if (!isBootstrapped) return;
     if (!isAuthenticated) {
       showRatingAuthNotice();
       return;

@@ -1,6 +1,7 @@
 import { Alert } from 'react-native';
 import type { NavigationProp, ParamListBase } from '@react-navigation/native';
 import type { UploadedPhoto } from '../components/PhotoUploadField';
+import { auth } from '../firebase-config';
 
 type AppLanguage = 'ua' | 'ru' | 'en';
 
@@ -80,7 +81,8 @@ export const validateSubmissionRequirements = ({
 }): boolean => {
   const text = TEXT[normalizeLanguage(language)];
 
-  if (userId) return true;
+  const resolvedId = userId ?? (auth.currentUser && !auth.currentUser.isAnonymous ? auth.currentUser.uid : undefined);
+  if (resolvedId) return true;
 
   const nav = navigation as NavigationProp<ParamListBase> | undefined;
 

@@ -530,9 +530,19 @@ const RequestDetailScreen = ({
     return () => { cancelled = true; };
   }, [currentUser?.id, request.id, isOwnRequest]);
 
+  const getAuthUserWithRetry = (): Promise<User | null> => {
+    const current = auth.currentUser;
+    if (current && !current.isAnonymous) return Promise.resolve(current);
+    return new Promise<User | null>((resolve) => {
+      const unsub = onAuthStateChanged(auth, (u) => { unsub(); resolve(u); });
+      setTimeout(() => resolve(null), 3000);
+    });
+  };
+
   const handleHelp = async () => {
     if (!request.id || helpStatus !== 'idle') return;
-    if (!auth.currentUser || auth.currentUser.isAnonymous) {
+    const authUser = await getAuthUserWithRetry();
+    if (!authUser || authUser.isAnonymous) {
       Alert.alert(text.ok, FUNCTION_ERROR_MESSAGES[language].auth_required);
       return;
     }
@@ -563,7 +573,8 @@ const RequestDetailScreen = ({
 
   const handleConfirmHelper = async (helperUid: string) => {
     if (!request.id || busyHelperUid) return;
-    if (!auth.currentUser || auth.currentUser.isAnonymous) {
+    const authUser = await getAuthUserWithRetry();
+    if (!authUser || authUser.isAnonymous) {
       Alert.alert(text.ok, FUNCTION_ERROR_MESSAGES[language].auth_required);
       return;
     }
@@ -585,7 +596,8 @@ const RequestDetailScreen = ({
 
   const handleThankHelper = async (helperUid: string) => {
     if (!request.id || busyHelperUid) return;
-    if (!auth.currentUser || auth.currentUser.isAnonymous) {
+    const authUser = await getAuthUserWithRetry();
+    if (!authUser || authUser.isAnonymous) {
       Alert.alert(text.ok, FUNCTION_ERROR_MESSAGES[language].auth_required);
       return;
     }
