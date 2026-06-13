@@ -81,6 +81,24 @@ export const SCREEN_THEME = {
   embossDark: 'rgba(82, 58, 73, 0.22)',
 };
 
+export const DARK_THEME_COLORS = {
+  appBg: '#420837',
+  navBarBg: '#420837',
+  navBarBorder: '#6B1050',
+  navTabDefault: '#5C0D42',
+  navTabActive: '#7A1558',
+  uiBorder: '#6B1050',
+  textPrimary: '#F5E8F0',
+  textSecondary: '#D4A8C4',
+  textMuted: '#B98DAA',
+  placeholder: '#D4A8C4',
+  paper: '#4A0A3A',
+  cardBg: '#3A0630',
+  inputBg: '#F8F2F6',
+  inputDisabledBg: '#5A1647',
+  accentText: '#FFB1D6',
+};
+
 export const LIGHT_ORBS = [
   { top: -30, left: -50, size: 180, color: 'rgba(195, 145, 180, 0.14)' },
   { top: 180, right: -60, size: 160, color: 'rgba(113, 146, 99, 0.12)' },

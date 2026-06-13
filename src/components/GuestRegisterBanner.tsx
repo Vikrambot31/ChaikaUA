@@ -9,6 +9,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { COLORS } from '../utils/constants';
 import { useTranslation } from '../i18n/useTranslation';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 type Props = {
   visible: boolean;
@@ -25,6 +26,7 @@ type Props = {
 export default function GuestRegisterBanner({ visible, onClose, message }: Props) {
   const navigation = useNavigation<any>();
   const { t } = useTranslation();
+  const { colors, isDark } = useAppTheme();
   const copy = t.guestBanner;
 
   const handleLogin = () => {
@@ -46,21 +48,21 @@ export default function GuestRegisterBanner({ visible, onClose, message }: Props
       onRequestClose={onClose}
     >
       <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
-      <View style={styles.sheet}>
-        <View style={styles.handle} />
-        <Text style={styles.title}>{copy.title}</Text>
-        <Text style={styles.body}>{message ?? copy.body}</Text>
+      <View style={[styles.sheet, { backgroundColor: colors.paper, borderColor: colors.uiBorder }]}>
+        <View style={[styles.handle, { backgroundColor: colors.uiBorder }]} />
+        <Text style={[styles.title, { color: colors.textPrimary }]}>{copy.title}</Text>
+        <Text style={[styles.body, { color: colors.textSecondary }]}>{message ?? copy.body}</Text>
 
         <TouchableOpacity style={styles.btnPrimary} onPress={handleLogin} activeOpacity={0.85}>
           <Text style={styles.btnPrimaryText}>{copy.login}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.btnSecondary} onPress={handleRegister} activeOpacity={0.85}>
-          <Text style={styles.btnSecondaryText}>{copy.register}</Text>
+          <Text style={[styles.btnSecondaryText, { color: isDark ? colors.textPrimary : COLORS.primary }]}>{copy.register}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.btnBack} onPress={onClose} activeOpacity={0.7}>
-          <Text style={styles.btnBackText}>{copy.later}</Text>
+          <Text style={[styles.btnBackText, { color: colors.textMuted }]}>{copy.later}</Text>
         </TouchableOpacity>
       </View>
     </Modal>

@@ -37,6 +37,7 @@ import ProfileCompletenessBadge from '../components/ProfileCompletenessBadge';
 import { reportBlockService } from '../services/reportBlockService';
 import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 import { useOperationTrace } from '../hooks/useOperationTrace';
+import { useAppTheme } from '../hooks/useAppTheme';
 import { subscribeActiveBonusPromotions, type BonusPromotion } from '../services/bonusService';
 import ScreenTooltip from '../components/ScreenTooltip';
 import HintBadge, { HINT_BADGE_LABELS } from '../components/HintBadge';
@@ -485,6 +486,7 @@ const KontaktiChaikyScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const navLock = useRef(false);
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
+  const { colors, isDark } = useAppTheme();
   const training = useTrainingMode('contacts_chaika');
   const user = useSelector((state: RootState) => state.auth.user);
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
@@ -1234,7 +1236,7 @@ const KontaktiChaikyScreen: React.FC = () => {
                 value={searchItemName}
                 onChangeText={setSearchItemName}
                 placeholder={text.searchPlaceholderName}
-                placeholderTextColor="#A0938D"
+                placeholderTextColor={colors.placeholder}
               />
 
               <Text style={styles.formLabel}>{text.searchCategory}</Text>
@@ -1263,7 +1265,7 @@ const KontaktiChaikyScreen: React.FC = () => {
                 value={searchPriceFrom}
                 onChangeText={(value) => setSearchPriceFrom(value.replace(/[^0-9.,]/g, ''))}
                 placeholder="0"
-                placeholderTextColor="#A0938D"
+                placeholderTextColor={colors.placeholder}
                 keyboardType="decimal-pad"
               />
 
@@ -1273,7 +1275,7 @@ const KontaktiChaikyScreen: React.FC = () => {
                 value={searchPriceTo}
                 onChangeText={(value) => setSearchPriceTo(value.replace(/[^0-9.,]/g, ''))}
                 placeholder="0"
-                placeholderTextColor="#A0938D"
+                placeholderTextColor={colors.placeholder}
                 keyboardType="decimal-pad"
               />
 
@@ -1283,7 +1285,7 @@ const KontaktiChaikyScreen: React.FC = () => {
                 value={searchContact}
                 onChangeText={setSearchContact}
                 placeholder={text.searchPlaceholderContact}
-                placeholderTextColor="#A0938D"
+                placeholderTextColor={colors.placeholder}
               />
 
               <Text style={styles.formLabel}>{text.searchDescription}</Text>
@@ -1292,7 +1294,7 @@ const KontaktiChaikyScreen: React.FC = () => {
                 value={searchDescription}
                 onChangeText={setSearchDescription}
                 placeholder={text.searchPlaceholderDescription}
-                placeholderTextColor="#A0938D"
+                placeholderTextColor={colors.placeholder}
                 multiline
                 maxLength={260}
               />
@@ -1588,23 +1590,33 @@ const KontaktiChaikyScreen: React.FC = () => {
       {/* Swipe filter modal */}
       <Modal visible={swipeFilterVisible} transparent animationType="fade" onRequestClose={() => setSwipeFilterVisible(false)}>
         <View style={styles.swipeFilterBackdrop}>
-          <View style={styles.swipeFilterSheet}>
-            <Text style={styles.swipeFilterTitle}>{text.swipeFilterTitle}</Text>
+          <View style={[styles.swipeFilterSheet, { backgroundColor: isDark ? colors.paper : '#612e51', borderColor: colors.uiBorder }]}>
+            <Text style={[styles.swipeFilterTitle, { color: isDark ? colors.textPrimary : '#FFFFFF' }]}>{text.swipeFilterTitle}</Text>
             <View style={styles.swipeFilterPills}>
               {(['all', 'furniture', 'appliances', 'kids'] as const).map((g) => {
                 const label = g === 'all' ? text.swipeFilterGenderAll : g === 'furniture' ? text.swipeFilterGenderMale : g === 'appliances' ? text.swipeFilterGenderFemale : text.swipeFilterGenderFriends;
+                const active = swipeGenderFilter === g;
                 return (
-                  <TouchableOpacity key={g} style={[styles.swipeFilterPill, swipeGenderFilter === g && styles.swipeFilterPillActive]} onPress={() => setSwipeGenderFilter(g)} activeOpacity={0.8}>
-                    <Text style={[styles.swipeFilterPillText, swipeGenderFilter === g && styles.swipeFilterPillTextActive]}>{label}</Text>
+                  <TouchableOpacity
+                    key={g}
+                    style={[
+                      styles.swipeFilterPill,
+                      { backgroundColor: isDark ? colors.cardBg : '#612e51', borderColor: colors.uiBorder },
+                      active && { backgroundColor: isDark ? colors.navTabActive : '#F8F2F6', borderColor: isDark ? colors.textPrimary : '#7A2551' },
+                    ]}
+                    onPress={() => setSwipeGenderFilter(g)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.swipeFilterPillText, { color: active ? (isDark ? '#FFFFFF' : '#7A2551') : (isDark ? colors.textPrimary : '#FFFFFF') }]}>{label}</Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
             <View style={styles.swipeFilterAgeRow}>
-              <Text style={styles.swipeFilterAgeLabel}>{text.swipeFilterAgeFrom}</Text>
-              <TextInput style={styles.swipeFilterAgeInput} value={swipeAgeFrom} onChangeText={setSwipeAgeFrom} keyboardType="numeric" placeholder="18" placeholderTextColor="#78716C" maxLength={3} />
-              <Text style={styles.swipeFilterAgeLabel}>{text.swipeFilterAgeTo}</Text>
-              <TextInput style={styles.swipeFilterAgeInput} value={swipeAgeTo} onChangeText={setSwipeAgeTo} keyboardType="numeric" placeholder="99" placeholderTextColor="#78716C" maxLength={3} />
+              <Text style={[styles.swipeFilterAgeLabel, { color: isDark ? colors.textPrimary : '#FFFFFF' }]}>{text.swipeFilterAgeFrom}</Text>
+              <TextInput style={[styles.swipeFilterAgeInput, { backgroundColor: colors.inputBg, borderColor: colors.uiBorder, color: isDark ? '#2B1A24' : colors.textPrimary }]} value={swipeAgeFrom} onChangeText={setSwipeAgeFrom} keyboardType="numeric" placeholder="18" placeholderTextColor={colors.placeholder} maxLength={3} />
+              <Text style={[styles.swipeFilterAgeLabel, { color: isDark ? colors.textPrimary : '#FFFFFF' }]}>{text.swipeFilterAgeTo}</Text>
+              <TextInput style={[styles.swipeFilterAgeInput, { backgroundColor: colors.inputBg, borderColor: colors.uiBorder, color: isDark ? '#2B1A24' : colors.textPrimary }]} value={swipeAgeTo} onChangeText={setSwipeAgeTo} keyboardType="numeric" placeholder="99" placeholderTextColor={colors.placeholder} maxLength={3} />
             </View>
             <TactileButton
               title={text.swipeFilterStart}
@@ -1613,7 +1625,7 @@ const KontaktiChaikyScreen: React.FC = () => {
               style={styles.swipeFilterStartBtn}
             />
             <TouchableOpacity style={styles.swipeFilterSkipBtn} onPress={() => { swipePosition.setValue({ x: 0, y: 0 }); setSwipeGenderFilter('all'); setSwipeAgeFrom(''); setSwipeAgeTo(''); setSwipeFilterVisible(false); setSwipeIndex(0); setLikedIds([]); setLastDismissedDirection(null); setSwipeMode(true); }} activeOpacity={0.7}>
-              <Text style={styles.swipeFilterSkipText}>{text.swipeFilterSkip}</Text>
+              <Text style={[styles.swipeFilterSkipText, { color: isDark ? colors.textPrimary : '#FFFFFF' }]}>{text.swipeFilterSkip}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1810,7 +1822,7 @@ const KontaktiChaikyScreen: React.FC = () => {
                 onChangeText={(value) => setPrice(value.replace(',', '.').replace(/[^\d.]/g, ''))}
                 keyboardType="decimal-pad"
                 style={styles.input}
-                placeholderTextColor="#A0938D"
+                placeholderTextColor={colors.placeholder}
               />
               <InlineFieldHint message={text.ageHint} type={price.trim() ? 'success' : 'hint'} />
               <FormFieldError error={submitAttempted && (!price.trim() || Number(price) <= 0) ? text.priceError : undefined} />
@@ -1821,7 +1833,7 @@ const KontaktiChaikyScreen: React.FC = () => {
                 value={description}
                 onChangeText={setDescription}
                 style={[styles.input, styles.textarea]}
-                placeholderTextColor="#A0938D"
+                placeholderTextColor={colors.placeholder}
                 multiline
                 maxLength={260}
               />
@@ -1829,7 +1841,7 @@ const KontaktiChaikyScreen: React.FC = () => {
               <FormFieldError error={submitAttempted && !description.trim() ? text.descriptionRequired : undefined} />
 
               <Text style={styles.formLabel}>{text.phoneLabel}</Text>
-              <TextInput placeholder="+380..." value={phone} onChangeText={(value) => setPhone(normalizePhoneText(value))} keyboardType="phone-pad" style={styles.input} placeholderTextColor="#A0938D" />
+              <TextInput placeholder="+380..." value={phone} onChangeText={(value) => setPhone(normalizePhoneText(value))} keyboardType="phone-pad" style={styles.input} placeholderTextColor={colors.placeholder} />
               <InlineFieldHint message={text.phoneHint} type={phone.replace(/\D/g, '').length >= 7 ? 'success' : 'hint'} />
               <FormFieldError error={submitAttempted && phone.replace(/\D/g, '').length < 7 ? text.errorPhone : undefined} />
 

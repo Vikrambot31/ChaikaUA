@@ -35,6 +35,7 @@ import type { Request as AppRequest } from '../types/app';
 import { logClientError } from '../utils/errorLogger';
 import { pickUserAvatarUri } from '../utils/userAvatar';
 import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 const ONBOARDING_KEY = '@chaika:onboarding_done';
 const INTRO_VIDEO_KEY = '@chaika:intro_video_shown';
@@ -524,6 +525,7 @@ const getFeedBadge = (params: {
 
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
+  const { colors, isDark } = useAppTheme();
   const [menuVisible, setMenuVisible] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showIntroVideo, setShowIntroVideo] = useState(false);
@@ -734,8 +736,8 @@ const HomeScreen: React.FC = () => {
   const panelBodyHeight = Math.max(videoNaturalH, 190);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={SCREEN_THEME.appBg} />
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.appBg} />
       {showOnboarding && <OnboardingSlides language={language} onDone={handleOnboardingDone} />}
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -749,9 +751,9 @@ const HomeScreen: React.FC = () => {
           </TouchableOpacity>
 
           <View style={styles.headerCenter}>
-            <Text style={styles.brandTitle}>{t.mainScreen.brandTitle}</Text>
-            <Text style={styles.brandBeta}>(beta версія)</Text>
-            <Text style={styles.brandSubtitle}>{t.mainScreen.brandSubtitle}</Text>
+            <Text style={[styles.brandTitle, { color: colors.textPrimary }]}>{t.mainScreen.brandTitle}</Text>
+            <Text style={[styles.brandBeta, { color: colors.textSecondary }]}>(beta версія)</Text>
+            <Text style={[styles.brandSubtitle, { color: colors.textSecondary }]}>{t.mainScreen.brandSubtitle}</Text>
           </View>
 
           <View style={styles.logoWrap}>
@@ -764,7 +766,7 @@ const HomeScreen: React.FC = () => {
           onPress={() => navigation.navigate('MainTabs', { screen: 'ProfileTab' })}
           activeOpacity={0.78}
         >
-          <Text style={styles.homeLevelText}>
+          <Text style={[styles.homeLevelText, { color: colors.textSecondary }]}>
             {t.mainScreen.yourLevel} {activity.currentLevel.level} ({getLevelName(activity.currentLevel, language).toLowerCase()})
           </Text>
           <View style={styles.homeLevelTrack}>
@@ -783,7 +785,7 @@ const HomeScreen: React.FC = () => {
               <View style={[styles.btnShadow, { width: BTN_W, height: BTN_H }]}>
                 <Image source={cfg.artwork} style={{ width: BTN_W, height: BTN_H }} resizeMode="contain" />
               </View>
-              <Text style={styles.gridBtnLabel} numberOfLines={2}>{t.mainScreen[cfg.labelKey]}</Text>
+              <Text style={[styles.gridBtnLabel, { color: isDark ? '#FFFFFF' : '#241A11' }]} numberOfLines={2}>{t.mainScreen[cfg.labelKey]}</Text>
             </TouchableOpacity>
           ))}
         </View>

@@ -6,6 +6,7 @@ import { safeNavigate } from '../utils/safeNavigation';
 import TactileIcon from './TactileIcon';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { useTranslation } from '../i18n/useTranslation';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 const PRIMARY = SCREEN_THEME.woodGreenDark;
 
@@ -18,6 +19,7 @@ type TabItem = {
 export default function MiniTabBar() {
   const navigation = useNavigation<NavigationProp<{ MainTabs: { screen: string } }>>();
   const { t } = useTranslation();
+  const { colors, isDark } = useAppTheme();
 
   const tabs: TabItem[] = [
     { label: t.menu.home, icon: 'home', tab: 'HomeTab' },
@@ -39,8 +41,8 @@ export default function MiniTabBar() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.barBevelTop} />
+    <View style={[styles.container, { backgroundColor: colors.paper, borderTopColor: colors.uiBorder }]}>
+      <View style={[styles.barBevelTop, { backgroundColor: isDark ? colors.uiBorder : SCREEN_THEME.woodGrainLight }]} />
       <View style={styles.barBevelBottom} />
       {tabs.map((item) => (
         <TouchableOpacity
@@ -49,8 +51,8 @@ export default function MiniTabBar() {
           onPress={() => handlePress(item)}
           activeOpacity={0.72}
         >
-          <TactileIcon icon={item.icon} size={36} iconSize={18} backgroundColor={SCREEN_THEME.cardCream} tint={PRIMARY} />
-          <Text style={styles.label} numberOfLines={1}>{item.label}</Text>
+          <TactileIcon icon={item.icon} size={36} iconSize={18} backgroundColor={isDark ? colors.navTabActive : SCREEN_THEME.cardCream} tint={isDark ? colors.textPrimary : PRIMARY} />
+          <Text style={[styles.label, { color: isDark ? colors.textPrimary : PRIMARY }]} numberOfLines={1}>{item.label}</Text>
         </TouchableOpacity>
       ))}
     </View>

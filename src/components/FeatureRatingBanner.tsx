@@ -17,6 +17,7 @@ import { featureRatingAPI } from '../firebase-config';
 import { getScreenLabel } from '../utils/featureScreenMap';
 import type { FeatureScreenId } from '../utils/featureScreenMap';
 import type { RootState } from '../redux/store';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -81,14 +82,15 @@ const getMonthKey = (): string => {
 
 // ── Stars row sub-component ───────────────────────────────────────────────────
 
-function StarsRow({ label, value, onChange }: {
+function StarsRow({ label, value, onChange, labelColor }: {
   label: string;
   value: number;
   onChange: (v: number) => void;
+  labelColor?: string;
 }) {
   return (
     <View style={styles.categoryRow}>
-      <Text style={styles.categoryLabel}>{label}</Text>
+      <Text style={[styles.categoryLabel, labelColor ? { color: labelColor } : null]}>{label}</Text>
       <View style={styles.starsRow}>
         {[1, 2, 3, 4, 5].map((star) => (
           <TouchableOpacity
@@ -116,6 +118,7 @@ type Props = { screenId: FeatureScreenId };
 export function FeatureRatingBanner({ screenId }: Props) {
   const lang = (useSelector((state: RootState) => state.language?.current) ?? 'ua') as Lang;
   const userId = useSelector((state: RootState) => state.auth.user?.id);
+  const { colors } = useAppTheme();
 
   const [visible,    setVisible]    = useState(false);
   const [usability,  setUsability]  = useState(0);
@@ -190,7 +193,7 @@ export function FeatureRatingBanner({ screenId }: Props) {
   if (!visible || !userId) return null;
 
   return (
-    <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
+    <Animated.View style={[styles.container, { opacity: fadeAnim, backgroundColor: colors.cardBg, borderColor: colors.uiBorder }]}>
       {showThanks ? (
         <View style={styles.thanksRow}>
           <MaterialCommunityIcons name="check-circle" size={22} color="#388E3C" />
@@ -198,18 +201,18 @@ export function FeatureRatingBanner({ screenId }: Props) {
         </View>
       ) : (
         <>
-          <Text style={styles.title}>{text.title}</Text>
-          <Text style={styles.screenName}>{getScreenLabel(screenId, lang)}</Text>
+          <Text style={[styles.title, { color: colors.textPrimary }]}>{text.title}</Text>
+          <Text style={[styles.screenName, { color: colors.textSecondary }]}>{getScreenLabel(screenId, lang)}</Text>
 
-          <StarsRow label={text.usability}  value={usability}  onChange={handleUsability}  />
-          <StarsRow label={text.usefulness} value={usefulness} onChange={handleUsefulness} />
+          <StarsRow label={text.usability}  value={usability}  onChange={handleUsability} labelColor={colors.textSecondary} />
+          <StarsRow label={text.usefulness} value={usefulness} onChange={handleUsefulness} labelColor={colors.textSecondary} />
 
           {expanded && (
             <View style={styles.expandedArea}>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.uiBorder, color: colors.textPrimary }]}
                 placeholder={text.placeholder}
-                placeholderTextColor={SCREEN_THEME.textMuted}
+                placeholderTextColor={colors.placeholder}
                 value={comment}
                 onChangeText={setComment}
                 multiline

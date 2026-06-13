@@ -7,6 +7,7 @@ import { ensureFirebaseAuth } from '../firebase-auth-session';
 import { parseLikeEntry } from '../utils/likeUtils';
 import { pickUserAvatarUri } from '../utils/userAvatar';
 import MiniUserAvatar from './MiniUserAvatar';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 type Lang = 'ua' | 'ru' | 'en';
 
@@ -168,6 +169,7 @@ export default function WhoLikedMeInlineSection({
   blockedUserIds,
   onViewProfile,
 }: Props) {
+  const { colors, isDark } = useAppTheme();
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<LikerRow[]>([]);
@@ -249,11 +251,11 @@ export default function WhoLikedMeInlineSection({
   if (!fetched && !loading) return null;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.cardBg, borderColor: colors.uiBorder }]}>
       {/* Header */}
       <View style={styles.header}>
-        <MaterialCommunityIcons name="heart" size={18} color="#7A2551" />
-        <Text style={styles.title}>
+        <MaterialCommunityIcons name="heart" size={18} color={colors.accentText} />
+        <Text style={[styles.title, { color: colors.textPrimary }]}>
           {text.title}
           {fetched && rows.length > 0 ? ` (${rows.length})` : ''}
         </Text>
@@ -262,13 +264,13 @@ export default function WhoLikedMeInlineSection({
       {/* Loading */}
       {loading ? (
         <View style={styles.loadingBox}>
-          <ActivityIndicator size="large" color="#7A2551" />
+          <ActivityIndicator size="large" color={colors.accentText} />
         </View>
       ) : fetched && rows.length === 0 ? (
         /* Empty */
         <View style={styles.emptyBox}>
-          <MaterialCommunityIcons name="heart-outline" size={36} color="#7A2551" />
-          <Text style={styles.emptyText}>{text.empty}</Text>
+          <MaterialCommunityIcons name="heart-outline" size={36} color={colors.accentText} />
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{text.empty}</Text>
         </View>
       ) : (
         /* List */
@@ -278,7 +280,7 @@ export default function WhoLikedMeInlineSection({
             return (
               <TouchableOpacity
                 key={item.userId}
-                style={styles.row}
+                style={[styles.row, { borderBottomColor: colors.uiBorder }]}
                 onPress={() => onViewProfile(item.userId)}
                 activeOpacity={0.82}
               >
@@ -290,17 +292,17 @@ export default function WhoLikedMeInlineSection({
                   backgroundColor="#6A8BA5"
                 />
                 <View style={styles.rowInfo}>
-                  <Text style={styles.rowName} numberOfLines={1}>
+                  <Text style={[styles.rowName, { color: colors.textPrimary }]} numberOfLines={1}>
                     {item.name || item.userId.slice(0, 8)}
                     {item.age ? (
-                      <Text style={styles.rowAge}> · {item.age} {text.years}</Text>
+                      <Text style={[styles.rowAge, { color: colors.textMuted }]}> · {item.age} {text.years}</Text>
                     ) : null}
                   </Text>
                   {timeLabel ? (
-                    <Text style={styles.rowTime}>{timeLabel}</Text>
+                    <Text style={[styles.rowTime, { color: colors.textMuted }]}>{timeLabel}</Text>
                   ) : null}
                 </View>
-                <MaterialCommunityIcons name="chevron-right" size={20} color="#78716C" />
+                <MaterialCommunityIcons name="chevron-right" size={20} color={colors.textMuted} />
               </TouchableOpacity>
             );
           })}
@@ -308,7 +310,7 @@ export default function WhoLikedMeInlineSection({
           {/* Show more */}
           {remaining > 0 ? (
             <TouchableOpacity style={styles.showMoreBtn} onPress={handleShowMore} activeOpacity={0.8}>
-              <Text style={styles.showMoreText}>{text.showMore(Math.min(remaining, PAGE_SIZE))}</Text>
+              <Text style={[styles.showMoreText, { color: isDark ? colors.textPrimary : '#7A2551' }]}>{text.showMore(Math.min(remaining, PAGE_SIZE))}</Text>
             </TouchableOpacity>
           ) : null}
         </>
@@ -393,7 +395,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   showMoreText: {
-    color: '#7A2551',
+    color: '#21041B',
     fontSize: 13,
     fontWeight: '800',
   },

@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 interface BottomNavigationProps {
   activeTab: string;
@@ -17,13 +18,14 @@ const TAB_IDS = ['Map', 'List', 'Requests', 'Profile', 'Help'];
 
 const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, onTabChange, language = 'ua' }) => {
   const labels = TAB_LABELS[language] ?? TAB_LABELS.ua;
+  const { colors, isDark } = useAppTheme();
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.paper, borderTopColor: colors.uiBorder }]}>
       {TAB_IDS.map((id) => {
         const isActive = activeTab === id;
         return (
           <TouchableOpacity key={id} style={styles.tab} onPress={() => onTabChange(id)} activeOpacity={0.75}>
-            <Text style={[styles.label, { color: isActive ? '#7A1E5C' : '#999999' }]}>{labels[id]}</Text>
+            <Text style={[styles.label, { color: isActive ? (isDark ? colors.textPrimary : '#7A1E5C') : colors.textMuted }]}>{labels[id]}</Text>
           </TouchableOpacity>
         );
       })}

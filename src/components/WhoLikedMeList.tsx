@@ -7,6 +7,7 @@ import { ensureFirebaseAuth } from '../firebase-auth-session';
 import MiniUserAvatar from './MiniUserAvatar';
 import { pickUserAvatarUri } from '../utils/userAvatar';
 import { parseLikeEntry } from '../utils/likeUtils';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 type Lang = 'ua' | 'ru' | 'en';
 
@@ -178,6 +179,7 @@ export default function WhoLikedMeList({
   onViewProfile,
   profileCache,
 }: Props) {
+  const { colors, isDark } = useAppTheme();
   const text = UI_TEXT[language];
   const [loading, setLoading] = useState(false);
   const [likers, setLikers] = useState<LikerProfile[]>([]);
@@ -248,7 +250,7 @@ export default function WhoLikedMeList({
     const timeLabel = formatLikeTime(item.likedAt, text);
     return (
       <TouchableOpacity
-        style={styles.row}
+        style={[styles.row, { borderBottomColor: colors.uiBorder }]}
         onPress={() => onViewProfile(item.userId)}
         activeOpacity={0.82}
       >
@@ -260,13 +262,13 @@ export default function WhoLikedMeList({
           backgroundColor="#6A8BA5"
         />
         <View style={styles.rowInfo}>
-          <Text style={styles.rowName} numberOfLines={1}>
+          <Text style={[styles.rowName, { color: colors.textPrimary }]} numberOfLines={1}>
             {item.name || item.userId.slice(0, 8)}
             {item.age ? <Text style={styles.rowAge}> · {item.age} {text.years}</Text> : null}
           </Text>
-          {timeLabel ? <Text style={styles.rowTime}>{timeLabel}</Text> : null}
+          {timeLabel ? <Text style={[styles.rowTime, { color: colors.textMuted }]}>{timeLabel}</Text> : null}
         </View>
-        <MaterialCommunityIcons name="chevron-right" size={20} color="#78716C" />
+        <MaterialCommunityIcons name="chevron-right" size={20} color={colors.textMuted} />
       </TouchableOpacity>
     );
   }, [onViewProfile, text]);
@@ -276,23 +278,23 @@ export default function WhoLikedMeList({
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, { backgroundColor: colors.paper, borderColor: colors.uiBorder }]}>
           <View style={styles.handle} />
           <View style={styles.header}>
-            <Text style={styles.title}>{text.title}</Text>
+            <Text style={[styles.title, { color: colors.textPrimary }]}>{text.title}</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.75}>
-              <Text style={styles.closeText}>{text.close}</Text>
+              <Text style={[styles.closeText, { color: isDark ? colors.textPrimary : '#7A2551' }]}>{text.close}</Text>
             </TouchableOpacity>
           </View>
 
           {loading ? (
             <View style={styles.loadingBox}>
-              <ActivityIndicator size="large" color="#7A2551" />
+              <ActivityIndicator size="large" color={colors.accentText} />
             </View>
           ) : fetched && likers.length === 0 ? (
             <View style={styles.emptyBox}>
-              <MaterialCommunityIcons name="heart-outline" size={48} color="#7A2551" />
-              <Text style={styles.emptyText}>{text.empty}</Text>
+              <MaterialCommunityIcons name="heart-outline" size={48} color={colors.accentText} />
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{text.empty}</Text>
             </View>
           ) : (
             <FlatList
@@ -403,7 +405,6 @@ const styles = StyleSheet.create({
   rowAge: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#78716C',
   },
   rowTime: {
     fontSize: 12,

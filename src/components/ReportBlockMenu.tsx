@@ -12,6 +12,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { reportBlockService, type ReportReason } from '../services/reportBlockService';
 import TactileButton from './TactileButton';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 type Lang = 'ua' | 'ru' | 'en';
 
@@ -125,6 +126,7 @@ export default function ReportBlockMenu({
   language,
   onBlock,
 }: Props) {
+  const { colors, isDark } = useAppTheme();
   const t = UI_TEXT[language];
   const [mode, setMode] = useState<'menu' | 'report'>('menu');
   const [reason, setReason] = useState<ReportReason>('spam');
@@ -189,21 +191,21 @@ export default function ReportBlockMenu({
       statusBarTranslucent
     >
       <Pressable style={styles.overlay} onPress={resetAndClose}>
-        <Pressable style={styles.sheet} onPress={() => undefined}>
-          <View style={styles.handle} />
+        <Pressable style={[styles.sheet, { backgroundColor: colors.paper }]} onPress={() => undefined}>
+          <View style={[styles.handle, { backgroundColor: colors.uiBorder }]} />
 
           {mode === 'menu' ? (
             <>
-              <Text style={styles.title}>{t.menuTitle}</Text>
+              <Text style={[styles.title, { color: colors.textPrimary }]}>{t.menuTitle}</Text>
               <View style={styles.options}>
                 <TouchableOpacity
                   style={styles.optionBtn}
                   onPress={() => setMode('report')}
                   activeOpacity={0.8}
                 >
-                  <MaterialCommunityIcons name="flag-outline" size={20} color="#7A2551" style={styles.optionIcon} />
-                  <Text style={styles.optionLabel}>{t.reportOption}</Text>
-                  <MaterialCommunityIcons name="chevron-right" size={18} color="#C0A898" />
+                  <MaterialCommunityIcons name="flag-outline" size={20} color={colors.accentText} style={styles.optionIcon} />
+                  <Text style={[styles.optionLabel, { color: colors.textPrimary }]}>{t.reportOption}</Text>
+                  <MaterialCommunityIcons name="chevron-right" size={18} color={colors.textMuted} />
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.optionBtn}
@@ -212,13 +214,13 @@ export default function ReportBlockMenu({
                 >
                   <MaterialCommunityIcons name="block-helper" size={20} color="#B91C1C" style={styles.optionIcon} />
                   <Text style={[styles.optionLabel, { color: '#B91C1C' }]}>{t.blockOption}</Text>
-                  <MaterialCommunityIcons name="chevron-right" size={18} color="#C0A898" />
+                  <MaterialCommunityIcons name="chevron-right" size={18} color={colors.textMuted} />
                 </TouchableOpacity>
               </View>
             </>
           ) : (
             <>
-              <Text style={styles.title}>{t.reportTitle}</Text>
+              <Text style={[styles.title, { color: colors.textPrimary }]}>{t.reportTitle}</Text>
               <View style={styles.options}>
                 {REPORT_REASONS.map((r) => (
                   <TouchableOpacity
@@ -227,16 +229,16 @@ export default function ReportBlockMenu({
                     onPress={() => setReason(r)}
                     activeOpacity={0.8}
                   >
-                    <Text style={[styles.reasonLabel, reason === r && styles.reasonLabelActive]}>{t.reasons[r]}</Text>
+                    <Text style={[styles.reasonLabel, { color: colors.textPrimary }, reason === r && styles.reasonLabelActive]}>{t.reasons[r]}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
               <TextInput
-                style={styles.descInput}
+                style={[styles.descInput, { backgroundColor: colors.inputBg, borderColor: colors.uiBorder, color: colors.textPrimary }]}
                 value={description}
                 onChangeText={setDescription}
                 placeholder={t.descriptionPlaceholder}
-                placeholderTextColor="#A0938D"
+                placeholderTextColor={colors.placeholder}
                 multiline
                 maxLength={500}
               />
@@ -252,7 +254,7 @@ export default function ReportBlockMenu({
           )}
 
           <TouchableOpacity style={styles.cancelBtn} onPress={resetAndClose} activeOpacity={0.8}>
-            <Text style={styles.cancelText}>{t.cancelBtn}</Text>
+            <Text style={[styles.cancelText, { color: isDark ? colors.textPrimary : '#7A2551' }]}>{t.cancelBtn}</Text>
           </TouchableOpacity>
         </Pressable>
       </Pressable>

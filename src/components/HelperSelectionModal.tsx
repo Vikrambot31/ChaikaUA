@@ -12,6 +12,7 @@ import { useTranslation } from '../i18n/useTranslation';
 import type { HelperOption } from '../types/app';
 import { pickUserAvatarUri } from '../utils/userAvatar';
 import MiniUserAvatar from './MiniUserAvatar';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 interface Props {
   visible: boolean;
@@ -25,6 +26,7 @@ const ACCENT = '#7A1E5C';
 
 const HelperSelectionModal: React.FC<Props> = ({ visible, helpers, onConfirm, onNobodyHelped, onCancel }) => {
   const { t } = useTranslation();
+  const { colors, isDark } = useAppTheme();
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const toggleHelper = (uid: string) => {
@@ -62,7 +64,7 @@ const HelperSelectionModal: React.FC<Props> = ({ visible, helpers, onConfirm, on
         onPress={() => toggleHelper(item.uid)}
         activeOpacity={0.8}
       >
-        <View style={[styles.checkbox, isChecked && styles.checkboxChecked]}>
+        <View style={[styles.checkbox, { borderColor: colors.uiBorder }, isChecked && styles.checkboxChecked]}>
           {isChecked && <Text style={styles.checkmark}>✓</Text>}
         </View>
         <MiniUserAvatar
@@ -72,8 +74,8 @@ const HelperSelectionModal: React.FC<Props> = ({ visible, helpers, onConfirm, on
           backgroundColor="#4B7F9E"
         />
         <View style={styles.helperInfo}>
-          <Text style={styles.helperName}>{item.name}</Text>
-          <Text style={styles.helperPreview} numberOfLines={1}>
+          <Text style={[styles.helperName, { color: colors.textPrimary }]}>{item.name}</Text>
+          <Text style={[styles.helperPreview, { color: colors.textMuted }]} numberOfLines={1}>
             {item.commentPreview}
           </Text>
         </View>
@@ -90,13 +92,13 @@ const HelperSelectionModal: React.FC<Props> = ({ visible, helpers, onConfirm, on
       statusBarTranslucent
     >
       <Pressable style={styles.overlay} onPress={handleCancel}>
-        <Pressable style={styles.sheet} onPress={() => undefined}>
-          <View style={styles.handle} />
+        <Pressable style={[styles.sheet, { backgroundColor: colors.paper }]} onPress={() => undefined}>
+          <View style={[styles.handle, { backgroundColor: colors.uiBorder }]} />
 
-          <Text style={styles.title}>{t.comments.modalTitle}</Text>
+          <Text style={[styles.title, { color: colors.textPrimary }]}>{t.comments.modalTitle}</Text>
 
           {helpers.length === 0 ? (
-            <Text style={styles.emptyText}>{t.comments.empty}</Text>
+            <Text style={[styles.emptyText, { color: colors.textMuted }]}>{t.comments.empty}</Text>
           ) : (
             <FlatList
               data={helpers}
@@ -108,15 +110,15 @@ const HelperSelectionModal: React.FC<Props> = ({ visible, helpers, onConfirm, on
 
           <View style={styles.actions}>
             <TouchableOpacity
-              style={styles.nobodyButton}
+              style={[styles.nobodyButton, { borderColor: colors.uiBorder }]}
               onPress={handleNobodyHelped}
               activeOpacity={0.8}
             >
-              <Text style={styles.nobodyButtonText}>{t.comments.nobodyHelped}</Text>
+              <Text style={[styles.nobodyButtonText, { color: colors.textSecondary }]}>{t.comments.nobodyHelped}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.confirmButton, selected.size === 0 && styles.confirmButtonDisabled]}
+              style={[styles.confirmButton, selected.size === 0 && styles.confirmButtonDisabled, selected.size === 0 && isDark && { backgroundColor: colors.inputDisabledBg }]}
               onPress={handleConfirm}
               disabled={selected.size === 0}
               activeOpacity={0.84}

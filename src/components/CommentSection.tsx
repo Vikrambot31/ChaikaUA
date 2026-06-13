@@ -20,6 +20,7 @@ import { pickUserAvatarUri, resolveUserAvatarMap } from '../utils/userAvatar';
 import MiniUserAvatar from './MiniUserAvatar';
 import ContactReasonModal from './ContactReasonModal';
 import { useContactRequest } from '../hooks/useContactRequest';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 interface Props {
   requestId: string;
@@ -36,6 +37,7 @@ const COOLDOWN_MS = 30000;
 
 const CommentSection: React.FC<Props> = ({ requestId, requestAuthorUid, isRequestClosed, collectionPath = COMMENTS_PATH, contactSourceType = 'help' }) => {
   const { t } = useTranslation();
+  const { colors, isDark } = useAppTheme();
   const currentUser = useSelector((state: RootState) => state.auth.user);
   const firebaseUser = auth.currentUser;
   const isAuthenticated = !!firebaseUser && !firebaseUser.isAnonymous;
@@ -150,30 +152,30 @@ const CommentSection: React.FC<Props> = ({ requestId, requestAuthorUid, isReques
             <MiniUserAvatar uri={avatarUri} name={item.name} size={52} backgroundColor="#4B7F9E" />
           </TouchableOpacity>
         )}
-        <View style={styles.commentBody}>
+        <View style={[styles.commentBody, { backgroundColor: colors.cardBg, borderColor: colors.uiBorder }]}>
           <View style={styles.commentHeader}>
-            <Text style={styles.commentName}>{item.name}</Text>
+            <Text style={[styles.commentName, { color: colors.textPrimary }]}>{item.name}</Text>
             {isAuthor && (
               <View style={styles.authorBadge}>
                 <Text style={styles.authorBadgeText}>{t.comments.authorBadge}</Text>
               </View>
             )}
-            <Text style={styles.commentTime}>
+            <Text style={[styles.commentTime, { color: colors.textMuted }]}>
               {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </Text>
             {!isOwn && (
               <TouchableOpacity onPress={handleContact} style={styles.replyBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <MaterialCommunityIcons name="reply-outline" size={16} color={ACCENT} />
+                <MaterialCommunityIcons name="reply-outline" size={16} color={colors.accentText} />
               </TouchableOpacity>
             )}
           </View>
           {isPending && isOwn ? (
             <View style={styles.pendingRow}>
-              <ActivityIndicator size="small" color={ACCENT} />
-              <Text style={styles.pendingText}>{t.comments.pendingLabel}</Text>
+              <ActivityIndicator size="small" color={colors.accentText} />
+              <Text style={[styles.pendingText, { color: colors.textMuted }]}>{t.comments.pendingLabel}</Text>
             </View>
           ) : (
-            <Text style={styles.commentText}>{item.text}</Text>
+            <Text style={[styles.commentText, { color: colors.textPrimary }]}>{item.text}</Text>
           )}
         </View>
       </View>
@@ -181,7 +183,7 @@ const CommentSection: React.FC<Props> = ({ requestId, requestAuthorUid, isReques
   };
 
   const renderEmpty = () => (
-    <Text style={styles.emptyText}>{t.comments.empty}</Text>
+    <Text style={[styles.emptyText, { color: colors.textMuted }]}>{t.comments.empty}</Text>
   );
 
   const getInputPlaceholder = () => {
@@ -193,8 +195,8 @@ const CommentSection: React.FC<Props> = ({ requestId, requestAuthorUid, isReques
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>
+    <View style={[styles.container, { borderTopColor: colors.uiBorder }]}>
+      <Text style={[styles.title, { color: colors.textPrimary }]}>
         {t.comments.title} ({comments.length})
       </Text>
 
@@ -211,12 +213,21 @@ const CommentSection: React.FC<Props> = ({ requestId, requestAuthorUid, isReques
           <TextInput
             style={[
               styles.input,
+              {
+                backgroundColor: colors.inputBg,
+                borderColor: colors.uiBorder,
+                color: isDark ? '#2B1A24' : colors.textPrimary,
+              },
               (!isAuthenticated || isRequestClosed || cooldownActive || hasPending) && styles.inputDisabled,
+              (!isAuthenticated || isRequestClosed || cooldownActive || hasPending) && {
+                backgroundColor: colors.inputDisabledBg,
+                color: colors.textMuted,
+              },
             ]}
             value={inputText}
             onChangeText={setInputText}
             placeholder={getInputPlaceholder()}
-            placeholderTextColor="#999"
+            placeholderTextColor={colors.placeholder}
             editable={isAuthenticated && !isRequestClosed && !cooldownActive && !hasPending && !sending}
             multiline
             maxLength={MAX_COMMENT_LENGTH}
@@ -236,7 +247,7 @@ const CommentSection: React.FC<Props> = ({ requestId, requestAuthorUid, isReques
       )}
 
       {showCounter && (
-        <Text style={[styles.counter, isOverLimit && styles.counterError]}>
+        <Text style={[styles.counter, { color: colors.textMuted }, isOverLimit && styles.counterError]}>
           {charCount}/{MAX_COMMENT_LENGTH}
         </Text>
       )}
@@ -279,6 +290,7 @@ const styles = StyleSheet.create({
   commentBody: {
     flex: 1,
     backgroundColor: '#F5F5F5',
+    borderWidth: 1,
     borderRadius: 10,
     padding: 8,
   },
@@ -352,7 +364,6 @@ const styles = StyleSheet.create({
   },
   inputDisabled: {
     backgroundColor: '#F0F0F0',
-    color: '#999',
   },
   sendButton: {
     backgroundColor: ACCENT,
