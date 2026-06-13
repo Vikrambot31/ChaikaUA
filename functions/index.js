@@ -3,7 +3,7 @@ const functionsV1 = require('firebase-functions/v1');
 const admin = require('firebase-admin');
 const crypto = require('crypto');
 const { createInviteAccessFunctions, BONUS_LIKE_POINTS, BONUS_LIKE_CAP, BONUS_TOTAL_CAP, resolveBadge, USER_BONUSES_PATH } = require('./inviteAccess');
-const { createBonusFunctions, grantPromoCredits } = require('./bonusFunctions');
+const { createBonusFunctions, awardTrustBonus, grantPromoCredits, BONUS_AUTHOR_CLOSED } = require('./bonusFunctions');
 const { createPromotionFunctions } = require('./promotionFunctions');
 
 admin.initializeApp();
@@ -309,6 +309,58 @@ Object.assign(exports, createPromotionFunctions({
   writeOpsError,
   getRoleForUid,
 }));
+
+// ─── Async bonus processing via RTDB (same pattern as likes - no auth wait) ──
+
+exports.processCloseRequest = functionsV1.database
+  .ref('/pending_actions/{userId}/close_request/{requestId}')
+  .onCreate(async (snapshot, context) => {
+    const { userId, requestId } = context.params;
+    const data = snapshot.val();
+    if (!data || data.status !== 'pending') return null;
+
+    const db = admin.database();
+    const now = Date.now();
+
+    try {
+      const reqSnap = await db.ref(`requests/${requestId}`).once('value');
+      const reqVal = reqSnap.val();
+      if (!reqVal || reqVal.userId !== userId) {
+        await snapshot.ref.update({ status: 'failed', error: 'request_not_found', processedAt: now });
+        return null;
+      }
+      if (reqVal.status === 'closed') {
+        await snapshot.ref.update({ status: 'completed', originalStatus: 'already_closed', points: 0, processedAt: now });
+        return null;
+      }
+
+      await db.ref(`requests/${requestId}/status`).set('closed');
+
+      const accessSnap = await db.ref(`trust_tree/${userId}/status`).once('value');
+      const isNewcomer = accessSnap.val() !== 'active';
+      const subSnap = await db.ref(`user_subscription/${userId}`).once('value');
+      const userPlan = subSnap.val()?.plan || 'free';
+
+      const result = await awardTrustBonus(
+        db, userId, 'help', BONUS_AUTHOR_CLOSED,
+        `request_closed_${requestId}`,
+        { sourceId: requestId, sourceType: 'request', note: 'Author closed request' },
+        now, isNewcomer, userPlan,
+      );
+
+      await snapshot.ref.update({
+        status: 'completed',
+        awarded: result.awarded,
+        points: result.awarded ? BONUS_AUTHOR_CLOSED : 0,
+        processedAt: now,
+      });
+    } catch (error) {
+      console.error(`[processCloseRequest] ${requestId}:`, error?.message || error);
+      await snapshot.ref.update({ status: 'failed', error: error?.message || 'unknown', processedAt: Date.now() });
+    }
+
+    return null;
+  });
 
 const userHasBuildingAccess = async (uid, buildingId) => {
   if (!uid || !buildingId) return false;

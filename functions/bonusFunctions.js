@@ -1054,7 +1054,8 @@ const createBonusFunctions = ({ functions, admin, writeOpsEvent, writeOpsError, 
 
 module.exports = {
   createBonusFunctions,
-  // Re-export utilities for use by promotionFunctions.js
+  // Re-export utilities for use by promotionFunctions.js and index.js triggers
+  awardTrustBonus,
   spendPromoCredits,
   spendTrustBonuses,
   writeBonusTransaction,
@@ -1064,6 +1065,9 @@ module.exports = {
   BONUS_TX_PATH,
   WEEKLY_LIMITS,
   BONUS_BADGES,
+  BONUS_AUTHOR_CLOSED,
+  BONUS_HELP_CONFIRMED,
+  BONUS_GRATITUDE,
   getWeekKey,
   getDayKey,
   grantPromoCredits,

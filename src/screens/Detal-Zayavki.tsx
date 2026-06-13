@@ -25,6 +25,7 @@ import {
   awardHelpRespondBonus,
   awardMilestoneBonus,
   checkIfHelped,
+  closeRequestViaDB,
   closeRequestWithBonus,
   confirmHelperForRequest,
   subscribeHelpConfirmations,
@@ -32,6 +33,7 @@ import {
   type HelpConfirmation,
   type HelpResponse,
 } from '../services/bonusService';
+import { tryBonusOrEnqueue } from '../services/bonusQueue';
 import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
 import ContactReasonModal from '../components/ContactReasonModal';
 import CommentSection from '../components/CommentSection';
@@ -539,12 +541,12 @@ const RequestDetailScreen = ({
       let settled = false;
       const timer = setTimeout(() => {
         if (!settled) { settled = true; unsub(); resolve(null); }
-      }, 5000);
+      }, 10000);
       const unsub = onAuthStateChanged(auth, (u) => {
-        if (u && !u.isAnonymous) {
+        if (!u) return;
+        if (!u.isAnonymous) {
           if (!settled) { settled = true; clearTimeout(timer); unsub(); resolve(u); }
         }
-        // null or anonymous → keep waiting
       });
     });
   };
@@ -625,20 +627,21 @@ const RequestDetailScreen = ({
 
   const handleCloseSolved = async () => {
     if (!request.id || closingRequest || requestSolved) return;
-    const authUser = await getAuthUserWithRetry();
-    if (!authUser || authUser.isAnonymous) {
-      Alert.alert(text.ok, FUNCTION_ERROR_MESSAGES[language].auth_required);
+    if (!currentUser?.id) {
+      tryBonusOrEnqueue(
+        { type: 'close_request', payload: { requestId: request.id } },
+        () => closeRequestWithBonus(request.id),
+      ).catch(() => {});
+      Alert.alert(text.ok, 'Дія буде виконана після відновлення сесії.');
       return;
     }
-    // Force token refresh so httpsCallable sends a valid Authorization header
-    try { await authUser.getIdToken(true); } catch {}
 
     const allCommenters = await getCommentersForRequest(request.id);
     const commenters = allCommenters.filter((c) => c.uid !== request.userId);
     if (commenters.length === 0) {
       setClosingRequest(true);
       try {
-        const result = await closeRequestWithBonus(request.id);
+        const result = await closeRequestViaDB(request.id, currentUser.id);
         setRequestSolved(true);
         if (result.status === 'already_closed') {
           Alert.alert(text.ok, helpText.alreadyClosed);
@@ -665,10 +668,11 @@ const RequestDetailScreen = ({
   };
 
   const handleCloseWithHelpers = async (helperUids: string[]) => {
+    if (!currentUser?.id) return;
     setHelperSelectionVisible(false);
     setClosingRequest(true);
     try {
-      const result = await closeRequestWithBonus(request.id, helperUids);
+      const result = await closeRequestViaDB(request.id, currentUser.id, helperUids);
       setRequestSolved(true);
       if (result.status === 'already_closed') {
         Alert.alert(text.ok, helpText.alreadyClosed);
@@ -683,10 +687,11 @@ const RequestDetailScreen = ({
   };
 
   const handleCloseNobody = async () => {
+    if (!currentUser?.id) return;
     setHelperSelectionVisible(false);
     setClosingRequest(true);
     try {
-      const result = await closeRequestWithBonus(request.id);
+      const result = await closeRequestViaDB(request.id, currentUser.id);
       setRequestSolved(true);
       if (result.status === 'already_closed') {
         Alert.alert(text.ok, helpText.alreadyClosed);

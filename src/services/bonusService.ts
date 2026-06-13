@@ -1,4 +1,4 @@
-import { equalTo, get, limitToLast, onValue, orderByChild, query, ref } from 'firebase/database';
+import { equalTo, get, limitToLast, onValue, orderByChild, query, ref, set } from 'firebase/database';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { auth, database, firebaseApp } from '../firebase-core';
 
@@ -531,6 +531,44 @@ export const closeRequestWithBonus = async (
   );
   const result = await callable({ requestId, helperUids });
   return result.data;
+};
+
+/**
+ * Async close via RTDB write + server trigger.
+ * Same pattern as likes — no auth.currentUser wait, Firebase SDK queues internally.
+ * @param uid — pass currentUser.id from Redux, not auth.currentUser.uid
+ */
+export const closeRequestViaDB = (
+  requestId: string,
+  uid: string,
+  helperUids?: string[],
+): Promise<{ ok: boolean; status: string; points?: number }> => {
+  const actionRef = ref(database, `pending_actions/${uid}/close_request/${requestId}`);
+
+  return set(actionRef, {
+    requestId,
+    timestamp: Date.now(),
+    status: 'pending',
+    ...(helperUids?.length ? { helperUids } : {}),
+  }).then(() => new Promise<{ ok: boolean; status: string; points?: number }>((resolve, reject) => {
+    const unsub = onValue(actionRef, (snapshot) => {
+      const data = snapshot.val();
+      if (!data || data.status === 'pending') return;
+      unsub();
+      if (data.status === 'completed') {
+        resolve({
+          ok: true,
+          status: data.originalStatus === 'already_closed' ? 'already_closed' : 'closed',
+          points: data.points || 0,
+        });
+      } else {
+        reject(new Error(data.error || 'unknown'));
+      }
+    }, (err) => {
+      unsub();
+      reject(err);
+    });
+  }));
 };
 
 export const awardGratitudeBonus = async (
