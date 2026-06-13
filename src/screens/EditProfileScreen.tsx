@@ -274,7 +274,9 @@ const EditProfileScreen: React.FC<{ navigation: { goBack: () => void; navigate: 
     setAbout(savedSnapshot.about);
   };
 
-  const currentAvatarUri = startAvatarKey ? `${START_AVATAR_URI_PREFIX}${startAvatarKey}` : photoURL;
+  // Real photos take precedence over temporary avatars
+  const hasRealPhoto = photoURL && !photoURL.startsWith(START_AVATAR_URI_PREFIX);
+  const currentAvatarUri = hasRealPhoto ? photoURL : (startAvatarKey ? `${START_AVATAR_URI_PREFIX}${startAvatarKey}` : photoURL);
   const currentStartAvatar = startAvatarKey ? getStartAvatarByKey(startAvatarKey) : undefined;
 
   const showCurrentAvatarHint = () => {

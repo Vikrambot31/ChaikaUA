@@ -460,7 +460,7 @@ export default function SubscriptionScreen() {
         <View style={styles.bizCard}>
           <View style={styles.bizCardHeader}>
             <View style={styles.bizIcon}>
-              <MaterialCommunityIcons name="storefront" size={22} color="#fff" />
+              <MaterialCommunityIcons name="storefront" size={22} color="#7A1E5C" />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.bizTitle}>{text.bizTitle}</Text>
@@ -470,11 +470,11 @@ export default function SubscriptionScreen() {
 
           <View style={styles.bizPriceRow}>
             <View style={styles.bizPricePill}>
-              <MaterialCommunityIcons name="calendar-month-outline" size={13} color="#7A1E5C" />
+              <MaterialCommunityIcons name="calendar-month-outline" size={13} color="#FBF8FD" />
               <Text style={styles.bizPriceText}>{text.bizPrice}</Text>
             </View>
             <View style={styles.bizPricePill}>
-              <MaterialCommunityIcons name="calendar-star" size={13} color="#7A1E5C" />
+              <MaterialCommunityIcons name="calendar-star" size={13} color="#FBF8FD" />
               <Text style={styles.bizPriceText}>{text.bizPriceYear}</Text>
             </View>
           </View>
@@ -483,7 +483,7 @@ export default function SubscriptionScreen() {
 
           {text.bizFeatures.map((f, i) => (
             <View key={i} style={styles.bizFeatureRow}>
-              <MaterialCommunityIcons name="check-circle-outline" size={16} color="#7A1E5C" />
+              <MaterialCommunityIcons name="check-circle-outline" size={16} color="#FBF8FD" />
               <Text style={styles.bizFeatureText}>{f}</Text>
             </View>
           ))}
@@ -494,7 +494,7 @@ export default function SubscriptionScreen() {
             onPress={() => navigation.navigate('BusinessPlusSubscriptionScreen', undefined as any)}
           >
             <Text style={styles.bizButtonText}>{text.bizButton}</Text>
-            <MaterialCommunityIcons name="arrow-right" size={16} color="#7A1E5C" />
+            <MaterialCommunityIcons name="arrow-right" size={16} color="#FBF8FD" />
           </TouchableOpacity>
         </View>
 
@@ -681,11 +681,11 @@ const styles = StyleSheet.create({
 
   // Business+ promo card
   bizCard: {
-    backgroundColor: '#FDF5FA',
+    backgroundColor: '#7A1E5C',
     borderRadius: 20,
     padding: 16,
     borderWidth: 1.5,
-    borderColor: '#E8C0D8',
+    borderColor: '#6A1A4E',
     gap: 10,
   },
   bizCardHeader: {
@@ -697,15 +697,15 @@ const styles = StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: 14,
-    backgroundColor: '#7A1E5C',
+    backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  bizTitle: { fontSize: 16, fontWeight: '900', color: '#7A1E5C' },
+  bizTitle: { fontSize: 16, fontWeight: '900', color: '#FBF8FD' },
   bizSubtitle: {
     fontSize: 12,
     fontWeight: '700',
-    color: SCREEN_THEME.textSecondary,
+    color: 'rgba(255,255,255,0.7)',
     marginTop: 2,
     lineHeight: 17,
   },
@@ -718,21 +718,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(122,30,92,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.12)',
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderWidth: 1,
-    borderColor: 'rgba(122,30,92,0.18)',
+    borderColor: 'rgba(255,255,255,0.2)',
   },
-  bizPriceText: { fontSize: 13, fontWeight: '900', color: '#7A1E5C' },
+  bizPriceText: { fontSize: 13, fontWeight: '900', color: '#FBF8FD' },
   bizDivider: {
     height: 1,
-    backgroundColor: '#E8C0D8',
+    backgroundColor: 'rgba(255,255,255,0.15)',
     marginVertical: 2,
   },
   bizFeatureRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  bizFeatureText: { flex: 1, fontSize: 13, fontWeight: '700', color: SCREEN_THEME.textPrimary, lineHeight: 18 },
+  bizFeatureText: { flex: 1, fontSize: 13, fontWeight: '700', color: 'rgba(255,255,255,0.85)', lineHeight: 18 },
   bizButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -742,8 +742,8 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: '#7A1E5C',
-    backgroundColor: 'rgba(122,30,92,0.06)',
+    borderColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
-  bizButtonText: { fontSize: 14, fontWeight: '900', color: '#7A1E5C' },
+  bizButtonText: { fontSize: 14, fontWeight: '900', color: '#FBF8FD' },
 });

@@ -109,8 +109,12 @@ export const mapFirebaseUserToAppUser = (
   const startAvatarUri = normalizedProfile.startAvatarKey
     ? `${START_AVATAR_URI_PREFIX}${normalizedProfile.startAvatarKey}`
     : '';
-  const primaryPhotoUrl = startAvatarUri || photoURLs[0] || normalizedProfile.photoURL || firebaseUser.photoURL || undefined;
-  const resolvedPhotoURLs = startAvatarUri ? [startAvatarUri] : photoURLs;
+  // Real photos always take precedence over temporary avatars
+  const hasRealPhotos = photoURLs.length > 0 || Boolean(firebaseUser.photoURL);
+  const primaryPhotoUrl = hasRealPhotos
+    ? (photoURLs[0] || normalizedProfile.photoURL || firebaseUser.photoURL || undefined)
+    : (startAvatarUri || undefined);
+  const resolvedPhotoURLs = hasRealPhotos ? photoURLs : (startAvatarUri ? [startAvatarUri] : []);
 
   return {
     id: firebaseUser.uid,

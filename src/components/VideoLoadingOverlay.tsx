@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   Easing,
 } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
+import Svg, { Circle } from 'react-native-svg';
 import { SCREEN_W } from '../utils/webDimensions';
 
 interface VideoLoadingOverlayProps {
@@ -20,41 +21,28 @@ interface VideoLoadingOverlayProps {
 
 const CIRCLE_SIZE = SCREEN_W * 0.55;
 const FADE_DURATION = 250;
-
-const CHAIKA_PHRASES = [
-  'Цікаво, з ким тут можна познайомитися за кавою? ☕🕊️',
-  'Усе ж таки моя улюблена крамниця — Зелена Лавка. 🕊️🌿',
-  'Як же дістали ці мотоцикли. Вас теж? 🕊️🏍️😅',
-  'І коли вже буде нормальна погода на Чайці? 🌦️🕊️😅',
-  'Треба вже нарешті розповісти про свій бізнес у Чайка Life. 😏🕊️',
-  'Досі не розумію, як ми жили без Чайка Life. 🕊️💙',
-  'Хтось бачив, де тут найкраща кава? ☕🕊️',
-  'Може, сьогодні познайомлюся з новими сусідами! 🏘️🕊️',
-  'Цікаво, що нового у стрічці... 📱🕊️',
-  'Чайка Life — це як сусідський чат, тільки краще! 🕊️✨',
-];
-
-function getRandomPhrase(): string {
-  return CHAIKA_PHRASES[Math.floor(Math.random() * CHAIKA_PHRASES.length)];
-}
+const SNAKE_BORDER = 5;
+const SVG_PAD = 6; // extra space so the stroke doesn't clip
+const SVG_SIZE = CIRCLE_SIZE + (SNAKE_BORDER + SVG_PAD) * 2;
+const CX = SVG_SIZE / 2;
+const CY = SVG_SIZE / 2;
+const RING_R = CIRCLE_SIZE / 2 + SVG_PAD;
+const CIRCUMFERENCE = 2 * Math.PI * RING_R;
+const SNAKE_ARC = CIRCUMFERENCE * 0.28; // 28% arc length
 
 export const VideoLoadingOverlay: React.FC<VideoLoadingOverlayProps> = ({
   visible,
-  text = 'Завантаження екрану...',
+  text = 'Завантаження\nекрану',
   showDelay = 300,
   minDuration = 1500,
 }) => {
-  // shouldRender: actual DOM presence (controls video playback)
   const [shouldRender, setShouldRender] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const spinAnim = useRef(new Animated.Value(0)).current;
 
-  // Timestamps for min-duration logic
   const shownAtRef = useRef<number | null>(null);
   const showTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const phrase = useMemo(() => getRandomPhrase(), []); // one phrase per mount
 
   const fadeIn = useCallback(() => {
     setShouldRender(true);
@@ -78,22 +66,18 @@ export const VideoLoadingOverlay: React.FC<VideoLoadingOverlayProps> = ({
 
   useEffect(() => {
     if (visible) {
-      // Cancel any pending hide
       if (hideTimerRef.current) {
         clearTimeout(hideTimerRef.current);
         hideTimerRef.current = null;
       }
-      // Delay before showing — prevents flash on fast loads
       showTimerRef.current = setTimeout(() => {
         fadeIn();
       }, showDelay);
     } else {
-      // Cancel pending show
       if (showTimerRef.current) {
         clearTimeout(showTimerRef.current);
         showTimerRef.current = null;
       }
-      // If already visible, respect min duration
       if (shownAtRef.current !== null) {
         const elapsed = Date.now() - shownAtRef.current;
         const remaining = minDuration - elapsed;
@@ -115,13 +99,13 @@ export const VideoLoadingOverlay: React.FC<VideoLoadingOverlayProps> = ({
     };
   }, [visible, showDelay, minDuration, fadeIn, fadeOut]);
 
-  // Spinner animation — runs while rendered
+  // Spinning snake animation
   useEffect(() => {
     if (!shouldRender) return;
     const spin = Animated.loop(
       Animated.timing(spinAnim, {
         toValue: 1,
-        duration: 1200,
+        duration: 1100,
         easing: Easing.linear,
         useNativeDriver: true,
       })
@@ -140,31 +124,47 @@ export const VideoLoadingOverlay: React.FC<VideoLoadingOverlayProps> = ({
   return (
     <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
       <View style={styles.content}>
-        {/* Speech bubble */}
-        <View style={styles.bubble}>
-          <Text style={styles.bubbleText}>{phrase}</Text>
-          <View style={styles.bubbleTail} />
+
+        {/* Video circle + rotating snake border */}
+        <View style={styles.videoWrapper}>
+          <View style={styles.videoContainer}>
+            <Video
+              source={require('../../assets/Download.mp4')}
+              style={styles.video}
+              resizeMode={ResizeMode.COVER}
+              shouldPlay
+              isLooping
+              isMuted
+            />
+          </View>
+
+          {/* Snake arc rotating around the circle */}
+          <Animated.View
+            style={[styles.snakeWrapper, { transform: [{ rotate: spinInterpolation }] }]}
+            pointerEvents="none"
+          >
+            <Svg width={SVG_SIZE} height={SVG_SIZE}>
+              <Circle
+                cx={CX}
+                cy={CY}
+                r={RING_R}
+                stroke="#7d0e59"
+                strokeWidth={SNAKE_BORDER}
+                strokeDasharray={`${SNAKE_ARC} ${CIRCUMFERENCE - SNAKE_ARC}`}
+                strokeLinecap="round"
+                fill="none"
+                rotation={-90}
+                origin={`${CX}, ${CY}`}
+              />
+            </Svg>
+          </Animated.View>
         </View>
 
-        {/* Circular video */}
-        <View style={styles.videoContainer}>
-          <Video
-            source={require('../../assets/Download.mp4')}
-            style={styles.video}
-            resizeMode={ResizeMode.COVER}
-            shouldPlay
-            isLooping
-            isMuted
-          />
+        {/* Loading text badge */}
+        <View style={styles.textBadge}>
+          <Text style={styles.text}>{text}</Text>
         </View>
 
-        {/* Loading text */}
-        <Text style={styles.text}>{text}</Text>
-
-        {/* Spinner */}
-        <Animated.View style={[styles.spinner, { transform: [{ rotate: spinInterpolation }] }]}>
-          <View style={styles.spinnerArc} />
-        </Animated.View>
       </View>
     </Animated.View>
   );
@@ -181,41 +181,13 @@ const styles = StyleSheet.create({
   content: {
     alignItems: 'center',
   },
-  bubble: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    maxWidth: CIRCLE_SIZE + 40,
-    marginBottom: 12,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    borderWidth: 1,
-    borderColor: '#E8E8E8',
-  },
-  bubbleText: {
-    fontSize: 14,
-    color: '#333',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  bubbleTail: {
-    position: 'absolute',
-    bottom: -8,
-    alignSelf: 'center',
-    left: '50%',
-    marginLeft: -8,
-    width: 0,
-    height: 0,
-    borderLeftWidth: 8,
-    borderRightWidth: 8,
-    borderTopWidth: 8,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderTopColor: '#FFFFFF',
+  videoWrapper: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+    width: SVG_SIZE,
+    height: SVG_SIZE,
   },
   videoContainer: {
     width: CIRCLE_SIZE,
@@ -233,25 +205,24 @@ const styles = StyleSheet.create({
     width: CIRCLE_SIZE,
     height: CIRCLE_SIZE,
   },
+  snakeWrapper: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+  },
+  textBadge: {
+    backgroundColor: '#7d0e59',
+    borderRadius: 18,
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
   text: {
-    marginTop: 24,
-    fontSize: 16,
-    color: '#555',
-    fontWeight: '500',
-  },
-  spinner: {
-    marginTop: 16,
-    width: 32,
-    height: 32,
-  },
-  spinnerArc: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 3,
-    borderColor: 'transparent',
-    borderTopColor: '#4A90D9',
-    borderRightColor: '#4A90D9',
+    fontSize: 32,
+    color: '#FFFFFF',
+    fontWeight: '800',
+    textAlign: 'center',
+    lineHeight: 40,
   },
 });
 

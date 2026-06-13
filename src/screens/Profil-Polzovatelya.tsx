@@ -31,7 +31,7 @@ import {
   selectHasSupportReply,
   selectHasSubscriptionChanged,
 } from '../redux/slices/notificationSlice';
-import { useTrainingMode } from '../hooks/useTrainingMode';
+
 
 type AppNavigation = import('@react-navigation/native').NavigationProp<Record<string, object | undefined>>;
 
@@ -107,7 +107,6 @@ const UI_TEXT = {
     bonusMaxBadge: 'Максимальний статус',
     seeMore: 'Більше',
     seeLess: 'Згорнути',
-    trainingMode: 'Підказки для новачків',
   },
   ru: {
     guest: 'Гость',
@@ -180,7 +179,6 @@ const UI_TEXT = {
     bonusMaxBadge: 'Максимальный статус',
     seeMore: 'Больше',
     seeLess: 'Свернуть',
-    trainingMode: 'Подсказки для новичков',
   },
   en: {
     guest: 'Guest',
@@ -253,7 +251,6 @@ const UI_TEXT = {
     bonusMaxBadge: 'Maximum status',
     seeMore: 'More',
     seeLess: 'Less',
-    trainingMode: 'Hints for beginners',
   },
 } as const;
 
@@ -280,7 +277,6 @@ const ProfileScreen: React.FC = () => {
   const helpRequests = useSelector((state: RootState) => state.helpRequests?.items ?? []);
   const [levelsOpen, setLevelsOpen] = useState(false);
   const [settingsExpanded, setSettingsExpanded] = useState(false);
-  const training = useTrainingMode('_global');
   const [moderationPinVisible, setModerationPinVisible] = useState(false);
   const [moderationPin, setModerationPin] = useState('');
   const [moderationPinError, setModerationPinError] = useState('');
@@ -773,18 +769,6 @@ const ProfileScreen: React.FC = () => {
               </TouchableOpacity>
             </>
           )}
-
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => training.setGlobal(!training.globalOn)}
-            activeOpacity={0.84}
-          >
-            <TactileIcon icon="school-outline" size={40} iconSize={18} backgroundColor="#2F7D50" />
-            <Text style={[styles.menuLabel, { flex: 1 }]}>{text.trainingMode}</Text>
-            <View style={[styles.trainingToggle, training.globalOn && styles.trainingToggleOn]}>
-              <Text style={styles.trainingToggleText}>{training.globalOn ? 'ON' : 'OFF'}</Text>
-            </View>
-          </TouchableOpacity>
 
           <TouchableOpacity style={styles.settingsSeeMoreBtn} onPress={() => setSettingsExpanded(v => !v)} activeOpacity={0.8}>
             <Text style={styles.settingsSeeMoreText}>{settingsExpanded ? text.seeLess : text.seeMore}</Text>
@@ -1413,23 +1397,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 11,
     fontWeight: '900',
-  },
-  trainingToggle: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    backgroundColor: SCREEN_THEME.cardCream,
-    borderWidth: 1,
-    borderColor: SCREEN_THEME.borderSoft,
-  },
-  trainingToggleOn: {
-    backgroundColor: '#D9F5E3',
-    borderColor: '#A8D5B7',
-  },
-  trainingToggleText: {
-    fontSize: 12,
-    fontWeight: '900',
-    color: SCREEN_THEME.textPrimary,
   },
   settingsSeeMoreBtn: {
     flexDirection: 'row',
