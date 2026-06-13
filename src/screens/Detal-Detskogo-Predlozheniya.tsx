@@ -17,6 +17,8 @@ import { safeCallPhone, safeOpenExternalUrl } from '../utils/communicationAction
 import { chaykaPlaces } from '../services/chaykaPlacesData';
 import { childInfoSeed } from '../services/childrenSeed';
 import { openInGoogleMaps } from '../utils/googleMapsLink';
+import CommentSection from '../components/CommentSection';
+import { COMMENTS_PATH } from '../services/commentService';
 
 type Lang = 'ua' | 'ru' | 'en';
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
@@ -250,6 +252,13 @@ export default function DetalDetskogoPredlozheniyaScreen() {
             </TouchableOpacity>
           ) : null}
         </View>
+
+        <CommentSection
+          requestId={`childoffer_${offer.id}`}
+          requestAuthorUid={''}
+          isRequestClosed={false}
+          collectionPath={COMMENTS_PATH}
+        />
 
       </ScrollView>
     </SafeAreaView>

@@ -20,6 +20,26 @@
       }
     },
 
+    "request_comments": {
+      "$requestId": {
+        ".read": "auth != null",
+        "$commentId": {
+          ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && ((auth.token.admin === true || auth.token.moderator === true) || (!data.exists() && newData.child('uid').val() === auth.uid && !(root.child('yellow_list').child(auth.uid).child('active').val() === true && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now)))",
+          ".validate": "!newData.exists() || (newData.hasChildren(['uid', 'name', 'text', 'createdAt', 'status']) && newData.child('uid').isString() && newData.child('text').isString() && newData.child('text').val().length >= 1 && newData.child('text').val().length <= 500)"
+        }
+      }
+    },
+
+    "contact_comments": {
+      "$requestId": {
+        ".read": "auth != null",
+        "$commentId": {
+          ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && ((auth.token.admin === true || auth.token.moderator === true) || (!data.exists() && newData.child('uid').val() === auth.uid && !(root.child('yellow_list').child(auth.uid).child('active').val() === true && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now)))",
+          ".validate": "!newData.exists() || (newData.hasChildren(['uid', 'name', 'text', 'createdAt', 'status']) && newData.child('uid').isString() && newData.child('text').isString() && newData.child('text').val().length >= 1 && newData.child('text').val().length <= 500)"
+        }
+      }
+    },
+
     "community_photos": {
       ".read": "auth != null",
       ".indexOn": ["status", "sourceScreen", "userId"],

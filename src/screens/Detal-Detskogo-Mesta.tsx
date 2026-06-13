@@ -24,6 +24,8 @@ import {
   normalizeServerSubscription,
 } from '../redux/slices/subscriptionSlice';
 import { getMapFocusPlaceParams } from '../utils/mapFocusParams';
+import CommentSection from '../components/CommentSection';
+import { COMMENTS_PATH } from '../services/commentService';
 import type { DetailItemData } from '../utils/detailViewTypes';
 
 type Lang = 'ua' | 'ru' | 'en';
@@ -749,6 +751,13 @@ export default function DetalDetskogoMestaScreen() {
             <Text style={styles.showMoreBtnText}>{text.showMore}</Text>
           </TouchableOpacity>
         )}
+
+        <CommentSection
+          requestId={`childplace_${place.id}`}
+          requestAuthorUid={''}
+          isRequestClosed={false}
+          collectionPath={COMMENTS_PATH}
+        />
 
       </ScrollView>
     </SafeAreaView>

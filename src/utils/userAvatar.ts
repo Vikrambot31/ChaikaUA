@@ -36,6 +36,12 @@ export const pickUserAvatarUri = (...sources: unknown[]): string => {
       if (typeof first === 'string' && first.trim().length > 0) return first.trim();
     }
 
+    // Fall back to Firebase Storage path if no direct URL
+    const photoStoragePath = record.photoStoragePath;
+    if (typeof photoStoragePath === 'string' && photoStoragePath.trim().length > 0) {
+      return photoStoragePath.trim();
+    }
+
     // Fall back to temporary avatar ONLY if no real photos exist
     const startAvatarKey = record.startAvatarKey;
     if (typeof startAvatarKey === 'string' && startAvatarKey.trim().length > 0) {

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -11,10 +11,11 @@ import {
 import { useSelector } from 'react-redux';
 import type { RootState } from '../redux/store';
 import { auth } from '../firebase-config';
+import { database } from '../firebase-core';
 import { useTranslation } from '../i18n/useTranslation';
 import { COMMENTS_PATH, subscribeComments, submitComment } from '../services/commentService';
 import type { Comment } from '../types/app';
-import { pickUserAvatarUri } from '../utils/userAvatar';
+import { pickUserAvatarUri, resolveUserAvatarMap } from '../utils/userAvatar';
 import MiniUserAvatar from './MiniUserAvatar';
 
 interface Props {
@@ -40,6 +41,17 @@ const CommentSection: React.FC<Props> = ({ requestId, requestAuthorUid, isReques
   const [sending, setSending] = useState(false);
   const [cooldownActive, setCooldownActive] = useState(false);
   const [hasPending, setHasPending] = useState(false);
+  const [avatarMap, setAvatarMap] = useState<Record<string, string>>({});
+
+  const commentUids = useMemo(
+    () => [...new Set(comments.map((c) => c.uid))].sort().join(','),
+    [comments],
+  );
+
+  useEffect(() => {
+    if (!commentUids) return;
+    resolveUserAvatarMap(database, commentUids.split(',')).then(setAvatarMap);
+  }, [commentUids]);
 
   const cooldownRef = useRef<ReturnType<typeof setTimeout>>();
   const lastSubmitRef = useRef(0);
@@ -114,9 +126,9 @@ const CommentSection: React.FC<Props> = ({ requestId, requestAuthorUid, isReques
     return (
       <View style={styles.commentRow}>
         <MiniUserAvatar
-          uri={pickUserAvatarUri({ startAvatarKey: item.avatarKey })}
+          uri={isOwn ? pickUserAvatarUri(currentUser) : (avatarMap[item.uid] || '')}
           name={item.name}
-          size={28}
+          size={52}
           backgroundColor="#4B7F9E"
         />
         <View style={styles.commentBody}>

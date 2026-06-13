@@ -17,6 +17,8 @@ import { safeCallPhone, safeOpenExternalUrl } from '../utils/communicationAction
 import { chaykaPlaces } from '../services/chaykaPlacesData';
 import { beautyInfoSeed } from '../services/beautySeed';
 import { openInGoogleMaps } from '../utils/googleMapsLink';
+import CommentSection from '../components/CommentSection';
+import { COMMENTS_PATH } from '../services/commentService';
 
 type Lang = 'ua' | 'ru' | 'en';
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
@@ -253,6 +255,13 @@ export default function DetalPredlozheniyaSalonaScreen() {
             </TouchableOpacity>
           ) : null}
         </View>
+
+        <CommentSection
+          requestId={`beautyoffer_${offer.id}`}
+          requestAuthorUid={''}
+          isRequestClosed={false}
+          collectionPath={COMMENTS_PATH}
+        />
 
       </ScrollView>
     </SafeAreaView>

@@ -533,9 +533,19 @@ const RequestDetailScreen = ({
   const getAuthUserWithRetry = (): Promise<User | null> => {
     const current = auth.currentUser;
     if (current && !current.isAnonymous) return Promise.resolve(current);
+    // Firebase may fire onAuthStateChanged with null while restoring from AsyncStorage.
+    // Keep the listener active until a real (non-anonymous) user arrives or timeout.
     return new Promise<User | null>((resolve) => {
-      const unsub = onAuthStateChanged(auth, (u) => { unsub(); resolve(u); });
-      setTimeout(() => resolve(null), 3000);
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (!settled) { settled = true; unsub(); resolve(null); }
+      }, 5000);
+      const unsub = onAuthStateChanged(auth, (u) => {
+        if (u && !u.isAnonymous) {
+          if (!settled) { settled = true; clearTimeout(timer); unsub(); resolve(u); }
+        }
+        // null or anonymous → keep waiting
+      });
     });
   };
 
@@ -615,20 +625,13 @@ const RequestDetailScreen = ({
 
   const handleCloseSolved = async () => {
     if (!request.id || closingRequest || requestSolved) return;
-    const user = auth.currentUser;
-    if (!user || user.isAnonymous) {
-      const freshUser = await new Promise<User | null>((resolve) => {
-        const unsub = onAuthStateChanged(auth, (u) => {
-          unsub();
-          resolve(u);
-        });
-        setTimeout(() => resolve(null), 3000);
-      });
-      if (!freshUser || freshUser.isAnonymous) {
-        Alert.alert(text.ok, FUNCTION_ERROR_MESSAGES[language].auth_required);
-        return;
-      }
+    const authUser = await getAuthUserWithRetry();
+    if (!authUser || authUser.isAnonymous) {
+      Alert.alert(text.ok, FUNCTION_ERROR_MESSAGES[language].auth_required);
+      return;
     }
+    // Force token refresh so httpsCallable sends a valid Authorization header
+    try { await authUser.getIdToken(true); } catch {}
 
     const allCommenters = await getCommentersForRequest(request.id);
     const commenters = allCommenters.filter((c) => c.uid !== request.userId);
