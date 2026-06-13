@@ -230,11 +230,6 @@ const clampProgress = (value: unknown): number => {
   return Math.min(100, Math.max(0, Math.round(numeric)));
 };
 
-const limitWords = (value: string, maxWords: number): string => {
-  const words = value.split(/\s+/).filter(Boolean);
-  if (words.length <= maxWords) return value;
-  return words.slice(0, maxWords).join(' ');
-};
 
 const isValidCategoryId = (val: string): val is CategoryId =>
   CATEGORIES.some((c) => c.id === val);

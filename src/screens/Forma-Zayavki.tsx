@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   SafeAreaView,
   ScrollView,
@@ -57,6 +58,15 @@ const HELP_TYPES = [
   { value: 'transport', icon: 'car-outline', label: { ua: 'Транспорт', ru: 'Транспорт', en: 'Transport' } },
   { value: 'shopping', icon: 'cart-outline', label: { ua: 'Покупки', ru: 'Покупки', en: 'Shopping' } },
   { value: 'documents', icon: 'file-document-outline', label: { ua: 'Документи', ru: 'Документы', en: 'Documents' } },
+  { value: 'education', icon: 'school-outline', label: { ua: 'Освіта', ru: 'Образование', en: 'Education' } },
+  { value: 'legal', icon: 'gavel', label: { ua: 'Правова допомога', ru: 'Правовая помощь', en: 'Legal help' } },
+  { value: 'it', icon: 'laptop', label: { ua: 'IT підтримка', ru: 'IT поддержка', en: 'IT support' } },
+  { value: 'childcare', icon: 'baby-carriage', label: { ua: 'Догляд за дітьми', ru: 'Уход за детьми', en: 'Childcare' } },
+  { value: 'pet', icon: 'paw', label: { ua: 'Опіка за тваринами', ru: 'Уход за животными', en: 'Pet care' } },
+  { value: 'cooking', icon: 'chef-hat', label: { ua: 'Готування', ru: 'Готовка', en: 'Cooking' } },
+  { value: 'moving', icon: 'truck', label: { ua: 'Переїзд', ru: 'Переезд', en: 'Moving' } },
+  { value: 'garden', icon: 'flower-outline', label: { ua: 'Садівництво', ru: 'Садоводство', en: 'Gardening' } },
+  { value: 'cleaning', icon: 'spray-bottle', label: { ua: 'Прибирання', ru: 'Уборка', en: 'Cleaning' } },
   { value: 'other', icon: 'dots-horizontal-circle-outline', label: { ua: 'Інше', ru: 'Другое', en: 'Other' } },
 ] as const;
 
@@ -446,6 +456,7 @@ const RequestFormScreen: React.FC = () => {
   const [phone, setPhone] = useState(() => formatPhoneInput(user?.phone || '+38'));
   const [helpType, setHelpType] = useState('');
   const [description, setDescription] = useState('');
+  const [helpTypeMenuVisible, setHelpTypeMenuVisible] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submittedOnce, setSubmittedOnce] = useState(false);
@@ -744,7 +755,6 @@ const RequestFormScreen: React.FC = () => {
 
           <View style={styles.heroCard}>
             <Text style={styles.title}>{t.title}</Text>
-            <Text style={styles.subtitle}>{t.subtitle}</Text>
             <View style={{ position: 'absolute', top: 12, right: 12, zIndex: 10 }}>
               <HintBadge
                 visible={training.isVisible}
@@ -814,37 +824,83 @@ const RequestFormScreen: React.FC = () => {
             <FieldMessage state={fieldStates.phone} visible={activeIssueKey === 'phone'} />
 
             <FieldHeader label={t.helpType} state={fieldStates.helpType} />
-            <View style={styles.helpTypeGrid}>
-              {HELP_TYPES.map((item) => {
-                const active = helpType === item.value;
-                return (
-                  <TouchableOpacity
-                    key={item.value}
-                    style={[
-                      styles.helpTypeChip,
-                      fieldStates.helpType.tone === 'error' && !helpType && styles.inputError,
-                      active && styles.helpTypeChipActive,
-                    ]}
-                    activeOpacity={0.86}
-                    disabled={submitting}
-                    onPress={() => {
-                      setHelpType(item.value);
-                      markTouched('helpType');
-                    }}
-                  >
-                    <MaterialCommunityIcons
-                      name={item.icon}
-                      size={17}
-                      color={active ? '#FFFFFF' : SCREEN_THEME.terracotta}
-                    />
-                    <Text style={[styles.helpTypeChipText, active && styles.helpTypeChipTextActive]} numberOfLines={1}>
-                      {item.label[language]}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+            <TouchableOpacity
+              style={[
+                styles.input,
+                styles.helpTypeSelector,
+                fieldStates.helpType.tone === 'error' && !helpType && styles.inputError,
+                !!helpType && styles.inputValid,
+              ]}
+              activeOpacity={0.86}
+              disabled={submitting}
+              onPress={() => {
+                markTouched('helpType');
+                setHelpTypeMenuVisible(true);
+              }}
+            >
+              {helpType ? (
+                <>
+                  <MaterialCommunityIcons
+                    name={HELP_TYPES.find((item) => item.value === helpType)?.icon ?? 'help-circle-outline'}
+                    size={18}
+                    color={SCREEN_THEME.terracotta}
+                  />
+                  <Text style={styles.helpTypeSelectorText}>
+                    {HELP_TYPES.find((item) => item.value === helpType)?.label[language] ?? ''}
+                  </Text>
+                </>
+              ) : (
+                <Text style={styles.helpTypeSelectorPlaceholder}>{t.chooseType}</Text>
+              )}
+              <MaterialCommunityIcons name="chevron-down" size={20} color={SCREEN_THEME.textSecondary} style={styles.helpTypeSelectorChevron} />
+            </TouchableOpacity>
             <FieldMessage state={fieldStates.helpType} visible={activeIssueKey === 'helpType'} />
+
+            <Modal
+              visible={helpTypeMenuVisible}
+              transparent
+              animationType="fade"
+              onRequestClose={() => setHelpTypeMenuVisible(false)}
+            >
+              <TouchableOpacity
+                style={styles.helpTypeOverlay}
+                activeOpacity={1}
+                onPress={() => setHelpTypeMenuVisible(false)}
+              >
+                <View style={styles.helpTypeModal}>
+                  {HELP_TYPES.map((item, index) => {
+                    const active = helpType === item.value;
+                    return (
+                      <TouchableOpacity
+                        key={item.value}
+                        style={[
+                          styles.helpTypeModalItem,
+                          index < HELP_TYPES.length - 1 && styles.helpTypeModalItemBorder,
+                          active && styles.helpTypeModalItemActive,
+                        ]}
+                        activeOpacity={0.86}
+                        onPress={() => {
+                          setHelpType(item.value);
+                          setHelpTypeMenuVisible(false);
+                        }}
+                      >
+                        <MaterialCommunityIcons
+                          name={item.icon}
+                          size={20}
+                          color={active ? '#FFFFFF' : SCREEN_THEME.terracotta}
+                        />
+                        <Text style={[styles.helpTypeModalItemText, active && styles.helpTypeModalItemTextActive]}>
+                          {item.label[language]}
+                        </Text>
+                        {active && (
+                          <MaterialCommunityIcons name="check" size={18} color="#FFFFFF" style={{ marginLeft: 'auto' }} />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </TouchableOpacity>
+            </Modal>
 
             <FieldHeader label={t.description} state={fieldStates.description} />
             <TextInput
@@ -1006,35 +1062,63 @@ const styles = StyleSheet.create({
   inputError: { borderColor: '#B84A3A', backgroundColor: '#FFF7F5' },
   inputValid: { borderColor: '#2F7D50', backgroundColor: '#FBFFFC' },
   textArea: { minHeight: 118, paddingTop: 12, lineHeight: 21 },
-  helpTypeGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  helpTypeChip: {
-    minHeight: 42,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#D9BF91',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 10,
-    paddingVertical: 9,
+  helpTypeSelector: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    maxWidth: '48%',
+    gap: 8,
+    paddingVertical: 0,
   },
-  helpTypeChipActive: {
-    backgroundColor: SCREEN_THEME.terracotta,
-    borderColor: SCREEN_THEME.terracotta,
-  },
-  helpTypeChipText: {
+  helpTypeSelectorText: {
+    flex: 1,
     color: SCREEN_THEME.textPrimary,
-    fontSize: 13,
-    lineHeight: 16,
-    fontWeight: '900',
+    fontSize: 15,
+    fontWeight: '700',
   },
-  helpTypeChipTextActive: { color: '#FFFFFF' },
+  helpTypeSelectorPlaceholder: {
+    flex: 1,
+    color: SCREEN_THEME.textSecondary,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  helpTypeSelectorChevron: {
+    marginLeft: 'auto',
+  },
+  helpTypeOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  helpTypeModal: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E4D0AB',
+  },
+  helpTypeModalItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    backgroundColor: '#FFFFFF',
+  },
+  helpTypeModalItemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0E5CF',
+  },
+  helpTypeModalItemActive: {
+    backgroundColor: SCREEN_THEME.terracotta,
+  },
+  helpTypeModalItemText: {
+    color: SCREEN_THEME.textPrimary,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  helpTypeModalItemTextActive: {
+    color: '#FFFFFF',
+  },
   counterRow: {
     marginTop: 6,
     flexDirection: 'row',

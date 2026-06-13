@@ -813,7 +813,6 @@ export default function ProfileRequestsScreen() {
               const sourceTitleText = item.sourceTitle?.trim();
               const descriptionText = reasonText || sourceTitleText || transitionScreenText;
               const topicText = reasonText || sourceTitleText || transitionScreenText;
-              const foundContactText = sourceTitleText || getProfileRequestContextLabel(item.context, language) || t.notSpecified;
               const votesLabel = language === 'en' ? 'votes' : language === 'ru' ? 'голосов' : 'голосів';
               return (
                 <TouchableOpacity
@@ -966,7 +965,6 @@ export default function ProfileRequestsScreen() {
             const sourceTitleText = item.sourceTitle?.trim();
             const descText: string | null = reasonText || sourceTitleText || transitionScreenText;
             const topicText = reasonText || sourceTitleText || transitionScreenText;
-            const foundContactText = sourceTitleText || getProfileRequestContextLabel(item.context, language) || t.notSpecified;
             const statusIcon = item.status === 'approved'
               ? 'check-circle'
               : item.status === 'denied'
