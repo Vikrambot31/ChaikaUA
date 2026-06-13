@@ -509,7 +509,7 @@ const PhotoUploadScreen: React.FC = () => {
                   <MaterialCommunityIcons
                     name={CATEGORY_ICONS[cat]}
                     size={16}
-                    color={active ? '#fff' : '#665A52'}
+                    color={active ? '#fff' : '#FFD54F'}
                     style={{ marginRight: 4 }}
                   />
                   <Text style={[styles.categoryChipText, active && styles.categoryChipTextActive]}>
