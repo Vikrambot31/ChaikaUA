@@ -190,8 +190,8 @@ const ScrollableTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, nav
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: 'rgba(248, 240, 221, 0.98)',
-    borderTopColor: '#E1CFAB',
+    backgroundColor: SCREEN_THEME.navBarBg,
+    borderTopColor: SCREEN_THEME.navBarBorder,
     borderTopWidth: 1,
     minHeight: 84,
     paddingBottom: 6,
@@ -211,13 +211,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 20,
-    backgroundColor: '#EFE6F6',
+    backgroundColor: SCREEN_THEME.navTabDefault,
     borderWidth: 1,
-    borderColor: '#D8C7A0',
+    borderColor: SCREEN_THEME.navBarBorder,
     overflow: 'hidden',
   },
   tabActive: {
-    backgroundColor: '#FFFCEF',
+    backgroundColor: SCREEN_THEME.navTabActive,
     borderWidth: 1,
     ...SCREEN_THEME.raisedShadow,
   },

@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../redux/store';
 import { auth } from '../firebase-config';
@@ -17,12 +18,15 @@ import { COMMENTS_PATH, subscribeComments, submitComment } from '../services/com
 import type { Comment } from '../types/app';
 import { pickUserAvatarUri, resolveUserAvatarMap } from '../utils/userAvatar';
 import MiniUserAvatar from './MiniUserAvatar';
+import ContactReasonModal from './ContactReasonModal';
+import { useContactRequest } from '../hooks/useContactRequest';
 
 interface Props {
   requestId: string;
   requestAuthorUid: string;
   isRequestClosed: boolean;
   collectionPath?: string;
+  contactSourceType?: string;
 }
 
 const ACCENT = '#7A1E5C';
@@ -30,7 +34,7 @@ const MAX_COMMENT_LENGTH = 500;
 const MIN_COMMENT_LENGTH = 3;
 const COOLDOWN_MS = 30000;
 
-const CommentSection: React.FC<Props> = ({ requestId, requestAuthorUid, isRequestClosed, collectionPath = COMMENTS_PATH }) => {
+const CommentSection: React.FC<Props> = ({ requestId, requestAuthorUid, isRequestClosed, collectionPath = COMMENTS_PATH, contactSourceType = 'help' }) => {
   const { t } = useTranslation();
   const currentUser = useSelector((state: RootState) => state.auth.user);
   const firebaseUser = auth.currentUser;
@@ -42,6 +46,7 @@ const CommentSection: React.FC<Props> = ({ requestId, requestAuthorUid, isReques
   const [cooldownActive, setCooldownActive] = useState(false);
   const [hasPending, setHasPending] = useState(false);
   const [avatarMap, setAvatarMap] = useState<Record<string, string>>({});
+  const { modalVisible, pending, currentTarget, openModal, closeModal, sendRequest } = useContactRequest();
 
   const commentUids = useMemo(
     () => [...new Set(comments.map((c) => c.uid))].sort().join(','),
@@ -122,15 +127,29 @@ const CommentSection: React.FC<Props> = ({ requestId, requestAuthorUid, isReques
     const isAuthor = item.uid === requestAuthorUid;
     const isOwn = item.uid === currentUser?.id;
     const isPending = item.status === 'pending';
+    const avatarUri = isOwn ? pickUserAvatarUri(currentUser) : (avatarMap[item.uid] || '');
+
+    const handleContact = () => {
+      if (isOwn || !item.uid) return;
+      openModal({
+        userId: item.uid,
+        name: item.name,
+        photoURL: avatarUri || undefined,
+        sourceType: contactSourceType as any,
+        sourceId: requestId,
+        sourceTitle: item.text.slice(0, 60),
+      });
+    };
 
     return (
       <View style={styles.commentRow}>
-        <MiniUserAvatar
-          uri={isOwn ? pickUserAvatarUri(currentUser) : (avatarMap[item.uid] || '')}
-          name={item.name}
-          size={52}
-          backgroundColor="#4B7F9E"
-        />
+        {isOwn ? (
+          <MiniUserAvatar uri={avatarUri} name={item.name} size={52} backgroundColor="#4B7F9E" />
+        ) : (
+          <TouchableOpacity onPress={handleContact} activeOpacity={0.7}>
+            <MiniUserAvatar uri={avatarUri} name={item.name} size={52} backgroundColor="#4B7F9E" />
+          </TouchableOpacity>
+        )}
         <View style={styles.commentBody}>
           <View style={styles.commentHeader}>
             <Text style={styles.commentName}>{item.name}</Text>
@@ -142,6 +161,11 @@ const CommentSection: React.FC<Props> = ({ requestId, requestAuthorUid, isReques
             <Text style={styles.commentTime}>
               {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </Text>
+            {!isOwn && (
+              <TouchableOpacity onPress={handleContact} style={styles.replyBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <MaterialCommunityIcons name="reply-outline" size={16} color={ACCENT} />
+              </TouchableOpacity>
+            )}
           </View>
           {isPending && isOwn ? (
             <View style={styles.pendingRow}>
@@ -220,6 +244,14 @@ const CommentSection: React.FC<Props> = ({ requestId, requestAuthorUid, isReques
       {isTooShort && (
         <Text style={styles.hint}>{t.comments.minLength}</Text>
       )}
+
+      <ContactReasonModal
+        visible={modalVisible}
+        pending={pending}
+        target={currentTarget}
+        onSelect={sendRequest}
+        onClose={closeModal}
+      />
     </View>
   );
 };
@@ -275,7 +307,10 @@ const styles = StyleSheet.create({
   commentTime: {
     fontSize: 11,
     color: '#999',
-    marginLeft: 'auto',
+  },
+  replyBtn: {
+    marginLeft: 4,
+    padding: 2,
   },
   commentText: {
     fontSize: 14,

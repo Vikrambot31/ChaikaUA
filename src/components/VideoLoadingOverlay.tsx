@@ -1,7 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   Animated,
   Easing,
@@ -12,7 +11,6 @@ import { SCREEN_W } from '../utils/webDimensions';
 
 interface VideoLoadingOverlayProps {
   visible: boolean;
-  text?: string;
   /** Delay before showing (ms). If loading ends before this, overlay never appears. Default: 300 */
   showDelay?: number;
   /** Minimum time to stay visible once shown (ms). Prevents flash. Default: 1500 */
@@ -32,7 +30,6 @@ const SNAKE_ARC = CIRCUMFERENCE * 0.28; // 28% arc length
 
 export const VideoLoadingOverlay: React.FC<VideoLoadingOverlayProps> = ({
   visible,
-  text = 'Завантаження\nекрану',
   showDelay = 300,
   minDuration = 1500,
 }) => {
@@ -160,11 +157,6 @@ export const VideoLoadingOverlay: React.FC<VideoLoadingOverlayProps> = ({
           </Animated.View>
         </View>
 
-        {/* Loading text badge */}
-        <View style={styles.textBadge}>
-          <Text style={styles.text}>{text}</Text>
-        </View>
-
       </View>
     </Animated.View>
   );
@@ -209,20 +201,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     left: 0,
-  },
-  textBadge: {
-    backgroundColor: '#7d0e59',
-    borderRadius: 18,
-    paddingHorizontal: 28,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  text: {
-    fontSize: 32,
-    color: '#FFFFFF',
-    fontWeight: '800',
-    textAlign: 'center',
-    lineHeight: 40,
   },
 });
 

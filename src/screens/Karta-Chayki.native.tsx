@@ -699,7 +699,7 @@ const styles = StyleSheet.create({
   searchCard: {
     backgroundColor: SCREEN_THEME.paperStrong,
     borderWidth: 1,
-    borderColor: '#E4D0AB',
+    borderColor: SCREEN_THEME.uiBorder,
     paddingHorizontal: 16,
     paddingVertical: 14,
     marginHorizontal: 16,
@@ -720,7 +720,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E1CFAB',
+    borderColor: SCREEN_THEME.uiBorder,
   },
   searchInput: {
     flex: 1,
@@ -738,7 +738,7 @@ const styles = StyleSheet.create({
     color: SCREEN_THEME.textPrimary,
     fontSize: SIZES.fontRegular,
     borderWidth: 1,
-    borderColor: '#E1CFAB',
+    borderColor: SCREEN_THEME.uiBorder,
   },
   filterButton: {
     width: 36,
@@ -757,7 +757,7 @@ const styles = StyleSheet.create({
   filterChip: {
     backgroundColor: '#F5ECD7',
     borderWidth: 1,
-    borderColor: '#E0CFAC',
+    borderColor: SCREEN_THEME.uiBorder,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 999,
@@ -782,7 +782,7 @@ const styles = StyleSheet.create({
     backgroundColor: SCREEN_THEME.paperStrong,
     height: 340,
     borderWidth: 1,
-    borderColor: '#E4D0AB',
+    borderColor: SCREEN_THEME.uiBorder,
     shadowColor: '#6E573B',
     shadowOpacity: 0.12,
     shadowRadius: 16,
@@ -835,7 +835,7 @@ const styles = StyleSheet.create({
   quickFilterChip: {
     backgroundColor: '#FBF8FD',
     borderWidth: 1,
-    borderColor: '#E0CFAC',
+    borderColor: SCREEN_THEME.uiBorder,
     paddingHorizontal: 12,
     paddingVertical: 9,
     borderRadius: 999,
@@ -944,7 +944,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#E4D0AB',
+    borderColor: SCREEN_THEME.uiBorder,
     shadowColor: '#6E573B',
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -996,7 +996,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#E4D0AB',
+    borderColor: SCREEN_THEME.uiBorder,
   },
   showMoreText: {
     fontSize: 15,

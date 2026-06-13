@@ -310,14 +310,20 @@ Object.assign(exports, createPromotionFunctions({
   getRoleForUid,
 }));
 
-// ─── Async bonus processing via RTDB (same pattern as likes - no auth wait) ──
+// ─── Fire-and-forget bonus triggers (client writes RTDB instantly, server processes async) ──
 
-exports.processCloseRequest = functionsV1.database
-  .ref('/pending_actions/{userId}/close_request/{requestId}')
+exports.processCloseBonusTrigger = functionsV1.database
+  .ref('/bonus_triggers/close_request/{requestId}')
   .onCreate(async (snapshot, context) => {
-    const { userId, requestId } = context.params;
+    const { requestId } = context.params;
     const data = snapshot.val();
-    if (!data || data.status !== 'pending') return null;
+    if (!data) return null;
+
+    const { uid } = data;
+    if (!uid) {
+      await snapshot.ref.remove();
+      return null;
+    }
 
     const db = admin.database();
     const now = Date.now();
@@ -325,41 +331,30 @@ exports.processCloseRequest = functionsV1.database
     try {
       const reqSnap = await db.ref(`requests/${requestId}`).once('value');
       const reqVal = reqSnap.val();
-      if (!reqVal || reqVal.userId !== userId) {
-        await snapshot.ref.update({ status: 'failed', error: 'request_not_found', processedAt: now });
-        return null;
-      }
-      if (reqVal.status === 'closed') {
-        await snapshot.ref.update({ status: 'completed', originalStatus: 'already_closed', points: 0, processedAt: now });
+      if (!reqVal || reqVal.userId !== uid) {
+        await snapshot.ref.remove();
         return null;
       }
 
-      await db.ref(`requests/${requestId}/status`).set('closed');
-
-      const accessSnap = await db.ref(`trust_tree/${userId}/status`).once('value');
+      const accessSnap = await db.ref(`trust_tree/${uid}/status`).once('value');
       const isNewcomer = accessSnap.val() !== 'active';
-      const subSnap = await db.ref(`user_subscription/${userId}`).once('value');
+      const subSnap = await db.ref(`user_subscription/${uid}`).once('value');
       const userPlan = subSnap.val()?.plan || 'free';
 
-      const result = await awardTrustBonus(
-        db, userId, 'help', BONUS_AUTHOR_CLOSED,
+      const reqCategory = reqVal?.category || '';
+      const note = reqCategory ? `request_closed:${reqCategory}` : 'request_closed';
+      await awardTrustBonus(
+        db, uid, 'help', BONUS_AUTHOR_CLOSED,
         `request_closed_${requestId}`,
-        { sourceId: requestId, sourceType: 'request', note: 'Author closed request' },
+        { sourceId: requestId, sourceType: 'request', note },
         now, isNewcomer, userPlan,
       );
-
-      await snapshot.ref.update({
-        status: 'completed',
-        awarded: result.awarded,
-        points: result.awarded ? BONUS_AUTHOR_CLOSED : 0,
-        processedAt: now,
-      });
     } catch (error) {
-      console.error(`[processCloseRequest] ${requestId}:`, error?.message || error);
-      await snapshot.ref.update({ status: 'failed', error: error?.message || 'unknown', processedAt: Date.now() });
+      console.error(`[processCloseBonusTrigger] ${requestId}:`, error?.message || error);
+    } finally {
+      // Cleanup: trigger node has served its purpose
+      await snapshot.ref.remove().catch(() => {});
     }
-
-    return null;
   });
 
 const userHasBuildingAccess = async (uid, buildingId) => {

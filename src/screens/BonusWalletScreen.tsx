@@ -28,6 +28,7 @@ import ScreenTooltip from '../components/ScreenTooltip';
 import HintBadge, { HINT_BADGE_LABELS } from '../components/HintBadge';
 import { useTrainingMode } from '../hooks/useTrainingMode';
 import { BONUS_WALLET_TOOLTIP } from '../utils/screenTooltips';
+import { getRequestTopicLabel } from '../data/categories';
 
 type AppNav = NavigationProp<Record<string, object | undefined>>;
 
@@ -80,9 +81,32 @@ const formatDate = (timestamp: number, language: AppLanguage) => {
   return new Date(timestamp).toLocaleDateString(DATE_LOCALES[language]);
 };
 
-const formatDateTime = (timestamp: number, language: AppLanguage) => {
-  if (!timestamp) return '-';
-  return new Date(timestamp).toLocaleString(DATE_LOCALES[language]);
+const timeAgo = (timestamp: number): string => {
+  if (!timestamp) return '';
+  const diff = Date.now() - timestamp;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'тільки що';
+  if (mins < 60) return `${mins} хв тому`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} год тому`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days} дн тому`;
+  return formatDate(timestamp, 'ua');
+};
+
+const CATEGORY_SOURCE_KEYS = ['request_closed', 'request_respond', 'confirm_helper', 'gratitude'] as const;
+
+const getTransactionSource = (item: BonusTransaction, bonusText: BonusText, language: string): string => {
+  for (const prefix of CATEGORY_SOURCE_KEYS) {
+    if (item.note?.startsWith(`${prefix}:`)) {
+      const cat = item.note.slice(prefix.length + 1);
+      if (cat) return getRequestTopicLabel({ category: cat }, language as 'ua' | 'ru' | 'en');
+    }
+  }
+  const catLabelKey = item.category as keyof typeof bonusText;
+  const catLabel = bonusText[catLabelKey];
+  if (typeof catLabel === 'string' && catLabel) return catLabel;
+  return item.note || getTransactionTitle(item, bonusText);
 };
 
 const getStatusLabel = (status: string, bonusText: BonusText) => {
@@ -359,43 +383,41 @@ const BonusWalletScreen: React.FC = () => {
                     <Breakdown label={t.bonus.likes} value={bonuses?.likes.points ?? 0} />
                   </View>
                 </View>
-
-                <Section title={t.bonus.recentHistory} icon="history">
-                  {transactions.length === 0 ? (
-                    <EmptyLine text={t.bonus.emptyHistory} />
-                  ) : (
-                    <>
-                      {transactions.slice(0, showAllHistory ? 30 : 3).map((item) => (
-                        <View key={item.id} style={styles.listItem}>
-                          <MaterialCommunityIcons
-                            name={item.type === 'spend' ? 'arrow-up-circle' : item.type === 'topup' ? 'plus-circle' : 'arrow-down-circle'}
-                            size={21}
-                            color={item.type === 'spend' ? SCREEN_THEME.terracotta : SCREEN_THEME.woodGreen}
-                          />
-                          <View style={styles.listCopy}>
-                            <Text style={styles.listTitle}>{getTransactionTitle(item, t.bonus)}</Text>
-                            <Text style={styles.listMeta}>{formatDateTime(item.createdAt, language)} · {t.bonus.balanceAfter} {item.balanceAfter}</Text>
-                            {item.note ? <Text style={styles.listNote}>{item.note}</Text> : null}
-                          </View>
-                          <Text style={[styles.pointsDelta, item.type === 'spend' && styles.pointsDeltaSpend]}>
-                            {item.type === 'spend' ? '-' : '+'}{Math.abs(item.points)}
-                          </Text>
-                        </View>
-                      ))}
-                      {transactions.length > 3 && !showAllHistory && (
-                        <TouchableOpacity
-                          style={styles.showAllButton}
-                          onPress={() => setShowAllHistory(true)}
-                          activeOpacity={0.82}
-                        >
-                          <Text style={styles.showAllText}>{t.bonus.allHistory} ({transactions.length})</Text>
-                        </TouchableOpacity>
-                      )}
-                    </>
-                  )}
-                </Section>
               </>
             )}
+
+            <Section title={t.bonus.recentHistory} icon="history">
+              {transactions.length === 0 ? (
+                <EmptyLine text={t.bonus.emptyHistory} />
+              ) : (
+                <>
+                  {transactions.slice(0, showAllHistory ? 30 : 3).map((item) => (
+                    <View key={item.id} style={styles.historyItem}>
+                      <View style={styles.historyMain}>
+                        <Text style={[styles.historyDelta, item.type === 'spend' && styles.historyDeltaSpend]}>
+                          {item.type === 'spend' ? '-' : '+'}{Math.abs(item.points)}
+                        </Text>
+                        <View style={styles.historyCopy}>
+                          <Text style={styles.historySource} numberOfLines={1}>
+                            {getTransactionSource(item, t.bonus, language)}
+                          </Text>
+                          <Text style={styles.historyTime}>{timeAgo(item.createdAt)}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  ))}
+                  {transactions.length > 3 && !showAllHistory && (
+                    <TouchableOpacity
+                      style={styles.showAllButton}
+                      onPress={() => setShowAllHistory(true)}
+                      activeOpacity={0.82}
+                    >
+                      <Text style={styles.showAllText}>{t.bonus.allHistory} ({transactions.length})</Text>
+                    </TouchableOpacity>
+                  )}
+                </>
+              )}
+            </Section>
           </>
         )}
       </ScrollView>
@@ -721,6 +743,42 @@ const styles = StyleSheet.create({
   },
   pointsDeltaSpend: {
     color: SCREEN_THEME.terracottaDark,
+  },
+  historyItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: SCREEN_THEME.borderSoft,
+  },
+  historyMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 12,
+  },
+  historyDelta: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: SCREEN_THEME.woodGreenDark,
+    minWidth: 48,
+  },
+  historyDeltaSpend: {
+    color: SCREEN_THEME.terracottaDark,
+  },
+  historyCopy: {
+    flex: 1,
+  },
+  historySource: {
+    color: SCREEN_THEME.textPrimary,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  historyTime: {
+    color: SCREEN_THEME.textMuted,
+    fontSize: 12,
+    marginTop: 2,
   },
   emptyLine: {
     flexDirection: 'row',

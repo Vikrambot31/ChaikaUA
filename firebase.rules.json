@@ -590,14 +590,11 @@
       ".indexOn": ["at", "type"]
     },
 
-    "pending_actions": {
-      "$userId": {
-        ".read": "auth != null && auth.uid === $userId",
-        "close_request": {
-          "$requestId": {
-            ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && auth.uid === $userId && !data.exists()",
-            ".validate": "newData.hasChildren(['requestId', 'timestamp', 'status']) && newData.child('status').val() === 'pending' && newData.child('requestId').val() === $requestId"
-          }
+    "bonus_triggers": {
+      "close_request": {
+        "$requestId": {
+          ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && !data.exists()",
+          ".validate": "newData.hasChildren(['uid', 'requestId', 'timestamp']) && newData.child('requestId').val() === $requestId"
         }
       }
     },

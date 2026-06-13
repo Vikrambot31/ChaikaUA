@@ -5,7 +5,7 @@ import * as Clipboard from 'expo-clipboard';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationProp, ParamListBase, RouteProp } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
-import { onValue, ref } from 'firebase/database';
+import { onValue, ref, set } from 'firebase/database';
 import { onAuthStateChanged } from 'firebase/auth';
 import type { User } from 'firebase/auth';
 import { auth, database, firebaseChatAPI } from '../firebase-config';
@@ -25,7 +25,6 @@ import {
   awardHelpRespondBonus,
   awardMilestoneBonus,
   checkIfHelped,
-  closeRequestViaDB,
   closeRequestWithBonus,
   confirmHelperForRequest,
   subscribeHelpConfirmations,
@@ -625,6 +624,27 @@ const RequestDetailScreen = ({
     }
   };
 
+  const closeRequestFireForget = async (helperUids?: string[]) => {
+    const uid = currentUser?.id;
+    if (!request.id || !uid) return;
+    setClosingRequest(true);
+    try {
+      await set(ref(database, `requests/${request.id}/status`), 'closed');
+      await set(ref(database, `bonus_triggers/close_request/${request.id}`), {
+        uid,
+        requestId: request.id,
+        timestamp: Date.now(),
+        ...(helperUids?.length ? { helperUids } : {}),
+      });
+      setRequestSolved(true);
+      Alert.alert(text.ok, helpText.closeSuccess);
+    } catch (error) {
+      Alert.alert(text.ok, parseFunctionError(error, helpText.bonusError, language));
+    } finally {
+      setClosingRequest(false);
+    }
+  };
+
   const handleCloseSolved = async () => {
     if (!request.id || closingRequest || requestSolved) return;
     if (!currentUser?.id) {
@@ -639,20 +659,7 @@ const RequestDetailScreen = ({
     const allCommenters = await getCommentersForRequest(request.id);
     const commenters = allCommenters.filter((c) => c.uid !== request.userId);
     if (commenters.length === 0) {
-      setClosingRequest(true);
-      try {
-        const result = await closeRequestViaDB(request.id, currentUser.id);
-        setRequestSolved(true);
-        if (result.status === 'already_closed') {
-          Alert.alert(text.ok, helpText.alreadyClosed);
-        } else {
-          Alert.alert(text.ok, result.ok ? helpText.closeSuccess : helpText.closed);
-        }
-      } catch (error) {
-        Alert.alert(text.ok, parseFunctionError(error, helpText.bonusError, language));
-      } finally {
-        setClosingRequest(false);
-      }
+      closeRequestFireForget();
     } else {
       setHelperOptions(
         commenters.map((c) => ({
@@ -668,41 +675,13 @@ const RequestDetailScreen = ({
   };
 
   const handleCloseWithHelpers = async (helperUids: string[]) => {
-    if (!currentUser?.id) return;
     setHelperSelectionVisible(false);
-    setClosingRequest(true);
-    try {
-      const result = await closeRequestViaDB(request.id, currentUser.id, helperUids);
-      setRequestSolved(true);
-      if (result.status === 'already_closed') {
-        Alert.alert(text.ok, helpText.alreadyClosed);
-      } else {
-        Alert.alert(text.ok, result.ok ? helpText.closeSuccess : helpText.closed);
-      }
-    } catch (error) {
-      Alert.alert(text.ok, parseFunctionError(error, helpText.bonusError, language));
-    } finally {
-      setClosingRequest(false);
-    }
+    closeRequestFireForget(helperUids);
   };
 
   const handleCloseNobody = async () => {
-    if (!currentUser?.id) return;
     setHelperSelectionVisible(false);
-    setClosingRequest(true);
-    try {
-      const result = await closeRequestViaDB(request.id, currentUser.id);
-      setRequestSolved(true);
-      if (result.status === 'already_closed') {
-        Alert.alert(text.ok, helpText.alreadyClosed);
-      } else {
-        Alert.alert(text.ok, result.ok ? helpText.closeSuccess : helpText.closed);
-      }
-    } catch (error) {
-      Alert.alert(text.ok, parseFunctionError(error, helpText.bonusError, language));
-    } finally {
-      setClosingRequest(false);
-    }
+    closeRequestFireForget();
   };
 
   const handleDelete = () => {

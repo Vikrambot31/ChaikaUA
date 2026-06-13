@@ -403,7 +403,7 @@ const styles = StyleSheet.create({
     color: SCREEN_THEME.textPrimary,
     fontSize: SIZES.fontRegular,
     borderWidth: 1,
-    borderColor: '#E1CFAB',
+    borderColor: SCREEN_THEME.uiBorder,
   },
   typeSearchInput: {
     marginTop: 10,
@@ -469,7 +469,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#E1CFAB',
+    borderColor: SCREEN_THEME.uiBorder,
   },
   emptyActionText: {
     color: SCREEN_THEME.terracottaDark,

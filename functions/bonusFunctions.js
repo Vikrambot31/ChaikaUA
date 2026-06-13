@@ -550,11 +550,11 @@ const createBonusFunctions = ({ functions, admin, writeOpsEvent, writeOpsError, 
     const subSnap = await db.ref(`user_subscription/${helperUid}`).once('value');
     const userPlan = subSnap.val()?.plan || 'free';
 
-    // Award bonus
+    const helpRespCategory = reqVal.category || reqVal.subcategory || '';
     const result = await awardTrustBonus(
       db, helperUid, 'help', BONUS_HELP_RESPOND,
       `help_respond_${requestId}`,
-      { sourceId: requestId, sourceType: 'request', note: 'Responded to help request' },
+      { sourceId: requestId, sourceType: 'request', note: `request_respond:${helpRespCategory}` },
       now, isNewcomer, userPlan,
     );
 
@@ -621,11 +621,11 @@ const createBonusFunctions = ({ functions, admin, writeOpsEvent, writeOpsError, 
     const subSnap = await db.ref(`user_subscription/${helperUid}`).once('value');
     const userPlan = subSnap.val()?.plan || 'free';
 
-    // Award to helper
+    const confirmCategory = reqVal.category || reqVal.subcategory || '';
     const result = await awardTrustBonus(
       db, helperUid, 'help', BONUS_HELP_CONFIRMED,
       `help_confirmed_${requestId}_${helperUid}`,
-      { sourceId: requestId, sourceType: 'request', note: `Confirmed by ${authorUid}` },
+      { sourceId: requestId, sourceType: 'request', note: `confirm_helper:${confirmCategory}` },
       now, isNewcomer, userPlan,
     );
 
@@ -713,10 +713,11 @@ const createBonusFunctions = ({ functions, admin, writeOpsEvent, writeOpsError, 
     const subSnap = await db.ref(`user_subscription/${helperUid}`).once('value');
     const userPlan = subSnap.val()?.plan || 'free';
 
+    const gratCategory = reqVal.category || reqVal.subcategory || '';
     const result = await awardTrustBonus(
       db, helperUid, 'gratitude', BONUS_GRATITUDE,
       `gratitude_${requestId}_${authorUid}`,
-      { sourceId: requestId, sourceType: 'request', note: `Thanks from ${authorUid}` },
+      { sourceId: requestId, sourceType: 'request', note: `gratitude:${gratCategory}` },
       now, isNewcomer, userPlan,
     );
 
