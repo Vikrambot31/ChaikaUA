@@ -476,9 +476,6 @@ const EditProfileScreen: React.FC<{ navigation: { goBack: () => void; navigate: 
                 backgroundColor="#6A8BA5"
               />
             )}
-            <View style={styles.heroAvatarBadge}>
-              <MaterialCommunityIcons name="information-outline" size={16} color="#FBF8FD" />
-            </View>
           </TouchableOpacity>
           <Text style={styles.title}>{t.profile.editProfile}</Text>
           <Text style={styles.subtitle}>{text.subtitle}</Text>
@@ -805,19 +802,6 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 5 },
     elevation: 5,
-  },
-  heroAvatarBadge: {
-    position: 'absolute',
-    right: 2,
-    bottom: 2,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#7d0e59',
-    borderWidth: 2,
-    borderColor: '#FFFDF6',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   title: {
     fontSize: 26,

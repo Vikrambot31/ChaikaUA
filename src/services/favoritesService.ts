@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const STORAGE_KEY = '@chaika_favorites';
 
-export type FavoriteSource = 'kids' | 'food' | 'beauty' | 'sport' | 'places' | 'jobs';
+export type FavoriteSource = 'lyudi' | 'kids' | 'food' | 'beauty' | 'sport' | 'places' | 'jobs';
 
 export interface FavoriteItem {
   id: string;

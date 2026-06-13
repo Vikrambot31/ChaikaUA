@@ -16,6 +16,9 @@ import { chaykaPlaces } from '../services/chaykaPlacesData';
 import { getFavorites, removeFavorite, invalidateFavoritesCache, type FavoriteItem, type FavoriteSource } from '../services/favoritesService';
 import { useSoftToast } from '../hooks/useSoftToast';
 import { Place } from '../types/app';
+import { database } from '../firebase-core';
+import { ref, get } from 'firebase/database';
+import type { User } from '../types/app';
 
 type Lang = 'ua' | 'ru' | 'en';
 type AppNavigation = NavigationProp<Record<string, object | undefined>>;
@@ -31,6 +34,7 @@ const UI_TEXT = {
     removeFailed: 'Не вдалося видалити. Спробуйте ще раз.',
     openMissing: 'Місце не знайдено. Його можна видалити з обраного.',
     sources: {
+      lyudi: 'Люди',
       kids: 'Для дітей',
       food: 'Їжа',
       beauty: 'Краса',
@@ -49,6 +53,7 @@ const UI_TEXT = {
     removeFailed: 'Не удалось удалить. Попробуйте еще раз.',
     openMissing: 'Место не найдено. Его можно удалить из избранного.',
     sources: {
+      lyudi: 'Люди',
       kids: 'Для детей',
       food: 'Еда',
       beauty: 'Красота',
@@ -67,6 +72,7 @@ const UI_TEXT = {
     removeFailed: 'Could not remove it. Try again.',
     openMissing: 'This place was not found. You can remove it from favorites.',
     sources: {
+      lyudi: 'People',
       kids: 'For kids',
       food: 'Food',
       beauty: 'Beauty',
@@ -78,6 +84,7 @@ const UI_TEXT = {
 } as const;
 
 const SOURCE_ICONS: Record<FavoriteSource, React.ComponentProps<typeof MaterialCommunityIcons>['name']> = {
+  lyudi: 'account-outline',
   kids: 'baby-face-outline',
   food: 'silverware-fork-knife',
   beauty: 'content-cut',
@@ -87,6 +94,7 @@ const SOURCE_ICONS: Record<FavoriteSource, React.ComponentProps<typeof MaterialC
 };
 
 const SOURCE_COLORS: Record<FavoriteSource, string> = {
+  lyudi: '#C0533E',
   kids: '#C77A5D',
   food: '#E8A44A',
   beauty: '#D87B8C',
@@ -95,7 +103,7 @@ const SOURCE_COLORS: Record<FavoriteSource, string> = {
   jobs: '#8D7AB8',
 };
 
-type ResolvedFavorite = FavoriteItem & { place?: Place };
+type ResolvedFavorite = FavoriteItem & { place?: Place; user?: User };
 
 export default function FavoritesScreen() {
   const navigation = useNavigation<AppNavigation>();
@@ -107,11 +115,61 @@ export default function FavoritesScreen() {
   useFocusEffect(
     useCallback(() => {
       invalidateFavoritesCache();
-      getFavorites().then((favs) => {
+      getFavorites().then(async (favs) => {
         const placesMap = new Map(chaykaPlaces.map((p) => [p.id, p]));
+        
+        // Fetch user profiles for lyudi favorites
+        const lyudiFavs = favs.filter((f) => f.source === 'lyudi');
+        const userIds = Array.from(new Set(lyudiFavs.map((f) => f.id)));
+        const userMap = new Map<string, User>();
+        
+        if (userIds.length > 0) {
+          try {
+            const userSnapshots = await Promise.all(
+              userIds.map((uid) => get(ref(database, `users/${uid}`)))
+            );
+            userSnapshots.forEach((snap, index) => {
+              if (snap.exists()) {
+                const data = snap.val() as Record<string, unknown>;
+                const user: User = {
+                  id: userIds[index],
+                  email: (data.email as string) ?? '',
+                  phone: (data.phone as string) ?? '',
+                  name: (data.name as string) ?? '',
+                  registeredAt: (data.registeredAt as string) ?? '',
+                  daysUsed: (data.daysUsed as number) ?? 0,
+                  isActive: (data.isActive as boolean) ?? true,
+                  city: (data.city as string) ?? '',
+                  houseNumber: data.houseNumber as string | undefined,
+                  profession: data.profession as string | undefined,
+                  about: data.about as string | undefined,
+                  registrationStatus: (data.registrationStatus as 'partial' | 'complete') ?? 'partial',
+                  photoURL: data.photoURL as string | undefined,
+                  photoURLs: data.photoURLs as string[] | undefined,
+                  startAvatarKey: data.startAvatarKey as string | undefined,
+                  gender: data.gender as 'male' | 'female' | undefined,
+                  age: data.age as number | undefined,
+                  provider: data.provider as 'google' | 'facebook' | 'apple' | 'email' | undefined,
+                  providerId: data.providerId as string | undefined,
+                  referrerPhone: data.referrerPhone as string | undefined,
+                  fcmToken: data.fcmToken as string | undefined,
+                };
+                userMap.set(userIds[index], user);
+              }
+            });
+          } catch {
+            // silent - user profiles are optional
+          }
+        }
+        
         setItems(
           favs
-            .map((fav) => ({ ...fav, place: placesMap.get(fav.id) }))
+            .map((fav) => {
+              if (fav.source === 'lyudi') {
+                return { ...fav, user: userMap.get(fav.id) };
+              }
+              return { ...fav, place: placesMap.get(fav.id) };
+            })
             .sort((a, b) => b.addedAt - a.addedAt),
         );
       });
@@ -129,6 +187,27 @@ export default function FavoritesScreen() {
   };
 
   const handleOpen = (item: ResolvedFavorite) => {
+    if (item.source === 'lyudi') {
+      if (!item.user) {
+        showError(text.openMissing);
+        return;
+      }
+      // Build DetailItemData for navigation
+      const detailItem = {
+        id: item.id,
+        title: item.user.name || (language === 'ua' ? 'Анкета' : language === 'ru' ? 'Анкета' : 'Profile'),
+        description: item.user.about,
+        photoUri: item.user.photoURL,
+        category: item.user.profession,
+        sourceType: 'lyudi' as const,
+        sourceId: item.id,
+        userId: item.id,
+        ownerAvatarUri: item.user.photoURL,
+      };
+      navigation.navigate('ItemDetailScreen', { item: detailItem });
+      return;
+    }
+    
     if (!item.place) {
       showError(text.openMissing);
       return;
@@ -170,6 +249,7 @@ export default function FavoritesScreen() {
               const sourceLabel = text.sources[item.source] ?? item.source;
               const iconName = SOURCE_ICONS[item.source] ?? 'map-marker-outline';
               const iconColor = SOURCE_COLORS[item.source] ?? SCREEN_THEME.enamelBlueDark;
+              const isLyudi = item.source === 'lyudi';
 
               return (
                 <TouchableOpacity
@@ -182,13 +262,32 @@ export default function FavoritesScreen() {
                     <MaterialCommunityIcons name={iconName} size={22} color={iconColor} />
                   </View>
                   <View style={styles.cardContent}>
-                    <Text style={styles.cardTitle} numberOfLines={2}>
-                      {item.place?.name ?? item.id}
-                    </Text>
-                    {item.place?.address ? (
-                      <Text style={styles.cardAddress} numberOfLines={1}>{item.place.address}</Text>
-                    ) : null}
-                    <Text style={styles.cardSource}>{sourceLabel}</Text>
+                    {isLyudi && item.user ? (
+                      <>
+                        <Text style={styles.cardTitle} numberOfLines={2}>
+                          {item.user.name || item.id}
+                        </Text>
+                        {item.user.age ? (
+                          <Text style={styles.cardAddress} numberOfLines={1}>
+                            {item.user.age} {language === 'ua' ? 'р.' : language === 'ru' ? 'г.' : 'yr.'}
+                          </Text>
+                        ) : null}
+                        {item.user.profession ? (
+                          <Text style={styles.cardAddress} numberOfLines={1}>{item.user.profession}</Text>
+                        ) : null}
+                        <Text style={styles.cardSource}>{sourceLabel}</Text>
+                      </>
+                    ) : (
+                      <>
+                        <Text style={styles.cardTitle} numberOfLines={2}>
+                          {item.place?.name ?? item.id}
+                        </Text>
+                        {item.place?.address ? (
+                          <Text style={styles.cardAddress} numberOfLines={1}>{item.place.address}</Text>
+                        ) : null}
+                        <Text style={styles.cardSource}>{sourceLabel}</Text>
+                      </>
+                    )}
                   </View>
                   <TouchableOpacity
                     style={styles.removeButton}

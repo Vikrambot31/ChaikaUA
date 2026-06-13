@@ -22,6 +22,7 @@ import {
   normalizeServerSubscription,
 } from '../redux/slices/subscriptionSlice';
 import { profilePermissionService, type ViewRequestContext } from '../services/profilePermissionService';
+import { isFavorite, toggleFavorite } from '../services/favoritesService';
 import { getRequestTopicLabel } from '../data/categories';
 import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
 import type { DetailItemData, BusinessMenuItem, BusinessPromotion } from '../utils/detailViewTypes';
@@ -38,6 +39,7 @@ type ItemDetailParams = {
 const UI_TEXT = {
   ua: {
     headerTitle: 'Деталі',
+    headerTitleLudi: 'Анкета знайомств',
     back: 'Назад',
     description: 'Опис',
     price: 'Ціна',
@@ -67,6 +69,7 @@ const UI_TEXT = {
   },
   ru: {
     headerTitle: 'Детали',
+    headerTitleLudi: 'Анкета знакомств',
     back: 'Назад',
     description: 'Описание',
     price: 'Цена',
@@ -96,6 +99,7 @@ const UI_TEXT = {
   },
   en: {
     headerTitle: 'Details',
+    headerTitleLudi: 'Dating profile',
     back: 'Back',
     description: 'Description',
     price: 'Price',
@@ -165,8 +169,10 @@ export default function ItemDetailScreen({
     photoUri?: string;
     photoStoragePath?: string;
   } | null>(null);
+  const [isFav, setIsFav] = useState(false);
   const isOwnItem = Boolean(item.userId && currentUser?.id && item.userId === currentUser.id);
   const isPlaceType = item.sourceType === 'place';
+  const isLudiType = item.sourceType === 'lyudi';
   const phoneVisible = isOwnItem || contactApproved;
   const hasPhone = phoneVisible && Boolean(item.phone?.trim());
   const canRequestContact = Boolean(item.userId && item.userId !== currentUser?.id);
@@ -315,6 +321,21 @@ export default function ItemDetailScreen({
     return () => { cancelled = true; };
   }, [item.sourceId]);
 
+  // Check favorite status for lyudi profiles
+  useEffect(() => {
+    if (!isLudiType || !item.id || !currentUser?.id) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const fav = await isFavorite(item.id, 'lyudi');
+        if (!cancelled) setIsFav(fav);
+      } catch {
+        if (!cancelled) setIsFav(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isLudiType, item.id, currentUser?.id]);
+
   const handleAdminToggleBiznesPlus = () => {
     const screen = isPlaceType ? (feedScreen ?? 'food') : 'business';
     void (async () => {
@@ -332,6 +353,21 @@ export default function ItemDetailScreen({
         }
       } catch {
         Alert.alert('Помилка', 'Не вдалося змінити Бізнес+ статус.');
+      }
+    })();
+  };
+
+  const handleToggleFavorite = () => {
+    if (!isLudiType || !item.id) return;
+    void (async () => {
+      try {
+        const newFav = await toggleFavorite(item.id, 'lyudi');
+        setIsFav(newFav);
+        if (newFav) {
+          navigation.navigate('FavoritesScreen');
+        }
+      } catch {
+        // silent
       }
     })();
   };
@@ -436,7 +472,7 @@ export default function ItemDetailScreen({
             <MaterialCommunityIcons name="chevron-left" size={22} color="#403933" />
             <Text style={styles.backText}>{text.back}</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{text.headerTitle}</Text>
+          <Text style={styles.headerTitle}>{isLudiType ? text.headerTitleLudi : text.headerTitle}</Text>
           <View style={styles.headerSpacer} />
         </View>
         <View style={styles.authGate}>
@@ -462,7 +498,7 @@ export default function ItemDetailScreen({
           <MaterialCommunityIcons name="chevron-left" size={22} color="#403933" />
           <Text style={styles.backText}>{text.back}</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{text.headerTitle}</Text>
+        <Text style={styles.headerTitle}>{isLudiType ? text.headerTitleLudi : text.headerTitle}</Text>
         {currentUser?.id ? (
           <TouchableOpacity
             style={styles.headerAvatar}
@@ -659,6 +695,16 @@ export default function ItemDetailScreen({
                   </TouchableOpacity>
                 ) : null}
               </>
+            ) : null}
+            {isLudiType ? (
+              <TouchableOpacity style={styles.smallActionAlt} onPress={handleToggleFavorite} activeOpacity={0.82}>
+                <MaterialCommunityIcons
+                  name={isFav ? 'bookmark' : 'bookmark-outline'}
+                  size={16}
+                  color={isFav ? '#C0533E' : '#403933'}
+                />
+                <Text style={styles.smallActionAltText}>{isFav ? (language === 'ua' ? 'Видалити' : language === 'ru' ? 'Удалить' : 'Remove') : (language === 'ua' ? 'Зберегти' : language === 'ru' ? 'Сохранить' : 'Save')}</Text>
+              </TouchableOpacity>
             ) : null}
           </View>
         </View>
