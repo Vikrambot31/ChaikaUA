@@ -31,7 +31,7 @@ import TrainingHint from '../components/TrainingHint';
 import HintBadge, { HINT_BADGE_LABELS } from '../components/HintBadge';
 
 type Lang = 'ua' | 'ru' | 'en';
-type RequestMode = 'need_help' | 'offer_help' | 'business';
+type RequestMode = 'need_help' | 'offer_help';
 type FieldKey = 'name' | 'phone' | 'helpType' | 'description';
 type FieldTone = 'idle' | 'valid' | 'error' | 'warning';
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
@@ -44,7 +44,6 @@ type FieldState = {
 const REQUEST_MODES = [
   { value: 'need_help', icon: 'hand-heart-outline', label: { ua: 'Прошу допомоги', ru: 'Прошу помощи', en: 'Need help' } },
   { value: 'offer_help', icon: 'account-heart-outline', label: { ua: 'Пропоную допомогу', ru: 'Предлагаю помощь', en: 'Offer help' } },
-  { value: 'business', icon: 'storefront-outline', label: { ua: 'Мій бізнес', ru: 'Мой бизнес', en: 'My business' } },
 ] as const satisfies ReadonlyArray<{
   value: RequestMode;
   icon: IconName;
@@ -526,11 +525,9 @@ const RequestFormScreen: React.FC = () => {
   const helpTypeReady = Boolean(helpType);
   const descriptionReady = Boolean(cleanDescription && cleanDescription.length >= MIN_DESCRIPTION_LENGTH);
   const formReady = nameReady && phoneReady && helpTypeReady && descriptionReady;
-  const descriptionPlaceholder = requestMode === 'business'
-    ? t.businessPlaceholder
-    : requestMode === 'offer_help'
-      ? t.offerPlaceholder
-      : t.descriptionPlaceholder;
+  const descriptionPlaceholder = requestMode === 'offer_help'
+    ? t.offerPlaceholder
+    : t.descriptionPlaceholder;
   const submitCategory = requestMode === 'need_help' ? helpType : requestMode;
   const submitSubcategory = requestMode === 'need_help' ? helpType : `${requestMode}:${helpType}`;
   const modeLabel = REQUEST_MODES.find((mode) => mode.value === requestMode)?.label[language] ?? '';
