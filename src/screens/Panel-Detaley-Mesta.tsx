@@ -124,7 +124,6 @@ const PlaceDetailsPanel: React.FC<PlaceDetailsPanelProps> = ({ place, visible, o
             </View>
           </View>
           <Text style={styles.address} numberOfLines={2}>{resolvedPlace.address}</Text>
-          <Text style={styles.question}>{text.chooseAction}</Text>
           <View style={styles.actions}>
             <TouchableOpacity style={styles.ghostButton} onPress={handleOpenInApp} activeOpacity={0.85}>
               <Text style={styles.ghostText}>{text.openInApp}</Text>
@@ -161,7 +160,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 18, fontWeight: '900', color: SCREEN_THEME.textPrimary },
   type: { marginTop: 2, color: SCREEN_THEME.textSecondary, fontSize: 12, fontWeight: '800' },
   address: { marginTop: 8, color: SCREEN_THEME.textSecondary, lineHeight: 18 },
-  question: { marginTop: 10, color: SCREEN_THEME.textSecondary, fontSize: 13 },
   actions: { marginTop: 12, flexDirection: 'row', gap: 10 },
   mainButton: {
     flex: 1,
