@@ -608,7 +608,7 @@ const HelpRequestScreen: React.FC = () => {
 
           <TouchableOpacity style={[styles.submitBtn, (!canSubmit || submitting) && styles.submitBtnDisabled]} onPress={handleSubmit} activeOpacity={0.88} disabled={!canSubmit || submitting}>
             {submitting ? (
-              <ActivityIndicator color="#FFF9EE" size="small" />
+              <ActivityIndicator color="#FBF8FD" size="small" />
             ) : (
               <Text style={styles.submitBtnText}>{text.submitBtn}</Text>
             )}

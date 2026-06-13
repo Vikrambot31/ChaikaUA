@@ -921,7 +921,7 @@ const styles = StyleSheet.create({
     backgroundColor: SCREEN_THEME.terracotta,
   },
   authGateButtonText: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
     fontSize: 15,
     fontWeight: '900',
   },

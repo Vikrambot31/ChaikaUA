@@ -1006,7 +1006,7 @@ const OnlineChatScreen = () => {
                     />
                   ) : (
                     <View style={styles.botAvatar}>
-                      <MaterialCommunityIcons name="robot-outline" size={28} color="#FFF9EE" />
+                      <MaterialCommunityIcons name="robot-outline" size={28} color="#FBF8FD" />
                     </View>
                   )}
                   <View style={styles.chatCardRight}>
@@ -1336,7 +1336,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   actionSheet: {
-    backgroundColor: '#FFF9EE',
+    backgroundColor: '#FBF8FD',
     borderRadius: 20,
     padding: 16,
     gap: 10,

@@ -23,6 +23,7 @@ import GuestRegisterBanner from '../components/GuestRegisterBanner';
 import { useGuestGuard } from '../hooks/useGuestGuard';
 
 import AppPhotoImage from '../components/AppPhotoImage';
+import TactileButton from '../components/TactileButton';
 import MiniTabBar from '../components/MiniTabBar';
 import { database } from '../firebase-core';
 import { ensureFirebaseAuth } from '../firebase-auth-session';
@@ -501,16 +502,19 @@ export default function FotoRayonaScreen() {
         return (
           <View style={photoSwipeStyles.overlay}>
             <TouchableOpacity style={photoSwipeStyles.backBtn} onPress={() => setSwipeMode(false)} activeOpacity={0.85}>
-              <MaterialCommunityIcons name="arrow-left" size={20} color="#CA8A04" />
+              <MaterialCommunityIcons name="arrow-left" size={20} color="#7A2551" />
               <Text style={photoSwipeStyles.backBtnText}>{text.swipeBack}</Text>
             </TouchableOpacity>
             {swipeDone ? (
               <View style={photoSwipeStyles.doneBox}>
                 <Text style={photoSwipeStyles.doneTitle}>{text.swipeDoneTitle}</Text>
                 <Text style={photoSwipeStyles.doneSub}>{text.swipeDoneSub(likedPhotoIds.length)}</Text>
-                <TouchableOpacity style={photoSwipeStyles.restartBtn} onPress={() => { swipePosition.setValue({ x: 0, y: 0 }); setSwipeIndex(0); setLikedPhotoIds([]); }} activeOpacity={0.85}>
-                  <Text style={photoSwipeStyles.restartBtnText}>{text.swipeRestart}</Text>
-                </TouchableOpacity>
+                <TactileButton
+                  title={text.swipeRestart}
+                  onPress={() => { swipePosition.setValue({ x: 0, y: 0 }); setSwipeIndex(0); setLikedPhotoIds([]); }}
+                  variant="primary"
+                  style={photoSwipeStyles.restartBtn}
+                />
               </View>
             ) : (
               <>
@@ -543,12 +547,20 @@ export default function FotoRayonaScreen() {
                   ) : null}
                 </Animated.View>
                 <View style={photoSwipeStyles.actions}>
-                  <TouchableOpacity style={photoSwipeStyles.passBtn} onPress={handleSwipeLeft} activeOpacity={0.85}>
-                    <MaterialCommunityIcons name="close" size={40} color="#1C1917" />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={photoSwipeStyles.likeBtn} onPress={handleSwipeRight} activeOpacity={0.85}>
-                    <MaterialCommunityIcons name="heart" size={48} color="#1C1917" />
-                  </TouchableOpacity>
+                  <TactileButton
+                    title=""
+                    icon={<MaterialCommunityIcons name="close" size={40} color="#FFFFFF" />}
+                    onPress={handleSwipeLeft}
+                    variant="secondary"
+                    style={photoSwipeStyles.passBtn}
+                  />
+                  <TactileButton
+                    title=""
+                    icon={<MaterialCommunityIcons name="heart" size={48} color="#FFFFFF" />}
+                    onPress={handleSwipeRight}
+                    variant="primary"
+                    style={photoSwipeStyles.likeBtn}
+                  />
                 </View>
                 <Text style={photoSwipeStyles.counter}>{swipeIndex + 1} / {swipeItems.length}</Text>
               </>
@@ -762,13 +774,13 @@ const photoSwipeStyles = StyleSheet.create({
     gap: 6,
     backgroundColor: 'rgba(28,25,23,0.85)',
     borderWidth: 1,
-    borderColor: '#CA8A04',
+    borderColor: '#7A2551',
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 8,
     zIndex: 10,
   },
-  backBtnText: { color: '#CA8A04', fontSize: 13, fontWeight: '800' },
+  backBtnText: { color: '#7A2551', fontSize: 13, fontWeight: '800' },
   card: {
     width: 320,
     height: 460,
@@ -776,9 +788,9 @@ const photoSwipeStyles = StyleSheet.create({
     backgroundColor: '#1C1917',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#CA8A04',
+    borderColor: '#7A2551',
     elevation: 12,
-    shadowColor: '#CA8A04',
+    shadowColor: '#7A2551',
     shadowOpacity: 0.25,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 4 },
@@ -793,7 +805,7 @@ const photoSwipeStyles = StyleSheet.create({
     position: 'absolute',
     top: 32,
     left: 24,
-    backgroundColor: 'rgba(202,138,4,0.9)',
+    backgroundColor: 'rgba(122,37,81,0.9)',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -825,7 +837,7 @@ const photoSwipeStyles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   authorText: { color: '#FAFAF9', fontSize: 14, fontWeight: '800', flex: 1 },
-  likesCount: { color: '#CA8A04', fontSize: 14, fontWeight: '800' },
+  likesCount: { color: '#7A2551', fontSize: 14, fontWeight: '800' },
   actions: {
     position: 'absolute',
     bottom: -95,
@@ -851,11 +863,11 @@ const photoSwipeStyles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: '#CA8A04',
+    backgroundColor: '#7A2551',
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 6,
-    shadowColor: '#CA8A04',
+    shadowColor: '#7A2551',
     shadowOpacity: 0.4,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
@@ -863,7 +875,7 @@ const photoSwipeStyles = StyleSheet.create({
   counter: { position: 'absolute', top: 60, alignSelf: 'center', color: '#B5A990', fontSize: 12, fontWeight: '700', letterSpacing: 1 },
   doneBox: { alignItems: 'center', gap: 12, padding: 32 },
   doneTitle: { fontSize: 22, fontWeight: '900', color: '#FAFAF9', textAlign: 'center' },
-  doneSub: { fontSize: 16, color: '#CA8A04', fontWeight: '700' },
-  restartBtn: { backgroundColor: '#CA8A04', borderRadius: 16, paddingHorizontal: 28, paddingVertical: 14, marginTop: 8 },
+  doneSub: { fontSize: 16, color: '#7A2551', fontWeight: '700' },
+  restartBtn: { backgroundColor: '#7A2551', borderRadius: 16, paddingHorizontal: 28, paddingVertical: 14, marginTop: 8 },
   restartBtnText: { color: '#1C1917', fontWeight: '900', fontSize: 15 },
 });

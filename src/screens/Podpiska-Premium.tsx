@@ -434,10 +434,10 @@ export default function SubscriptionScreen() {
             disabled={loading}
           >
             {loading ? (
-              <ActivityIndicator color="#FFF9EE" size="small" />
+              <ActivityIndicator color="#FBF8FD" size="small" />
             ) : (
               <>
-                <MaterialCommunityIcons name="gift-outline" size={20} color="#FFF9EE" />
+                <MaterialCommunityIcons name="gift-outline" size={20} color="#FBF8FD" />
                 <Text style={styles.trialButtonText}>{text.trialButton}</Text>
               </>
             )}
@@ -656,7 +656,7 @@ const styles = StyleSheet.create({
     ...SCREEN_THEME.raisedShadow,
   },
   trialButtonText: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
     fontSize: 15,
     fontWeight: '900',
     textAlign: 'center',

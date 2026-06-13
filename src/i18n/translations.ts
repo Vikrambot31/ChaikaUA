@@ -486,6 +486,7 @@ export const translations = {
       adminConfirmTitle: 'Підтвердити зачислення?',
       adminConfirmMsg: 'Зачислити {amount} кредитів користувачу {name}?',
       adminRejectReason: 'Причина відхилення',
+      adminLabel: 'Адмін',
     },
     adChat: {
       title: 'Рекламний чат',
@@ -1010,6 +1011,7 @@ export const translations = {
       adminConfirmTitle: 'Подтвердить зачисление?',
       adminConfirmMsg: 'Зачислить {amount} кредитов пользователю {name}?',
       adminRejectReason: 'Причина отклонения',
+      adminLabel: 'Админ',
     },
     adChat: {
       title: 'Чат по рекламе',
@@ -1534,6 +1536,7 @@ export const translations = {
       adminConfirmTitle: 'Confirm grant?',
       adminConfirmMsg: 'Grant {amount} credits to {name}?',
       adminRejectReason: 'Rejection reason',
+      adminLabel: 'Admin',
     },
     adChat: {
       title: 'Advertising chat',

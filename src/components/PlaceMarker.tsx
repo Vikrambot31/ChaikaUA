@@ -36,7 +36,7 @@ const PlaceMarker: React.FC<PlaceMarkerProps> = ({ place, selected }) => {
   const size = selected ? 44 : 34;
   const radius = size / 2;
   return (
-    <View style={[styles.container, { backgroundColor: TYPE_COLORS[place.type], width: size, height: size, borderRadius: radius, borderWidth: selected ? 3 : 2, borderColor: selected ? '#FFFFFF' : '#FFF9EE' }]}>
+    <View style={[styles.container, { backgroundColor: TYPE_COLORS[place.type], width: size, height: size, borderRadius: radius, borderWidth: selected ? 3 : 2, borderColor: selected ? '#FFFFFF' : '#FBF8FD' }]}>
       <View style={styles.gloss} />
       <Text style={[styles.label, selected && styles.labelSelected]}>{TYPE_LABELS[place.type]}</Text>
     </View>
@@ -51,7 +51,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#FFF9EE',
+    borderColor: '#FBF8FD',
     shadowColor: '#000',
     shadowOpacity: 0.18,
     shadowRadius: 6,

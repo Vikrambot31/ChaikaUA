@@ -252,7 +252,7 @@ export default function WhoLikedMeInlineSection({
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <MaterialCommunityIcons name="heart" size={18} color="#CA8A04" />
+        <MaterialCommunityIcons name="heart" size={18} color="#7A2551" />
         <Text style={styles.title}>
           {text.title}
           {fetched && rows.length > 0 ? ` (${rows.length})` : ''}
@@ -262,12 +262,12 @@ export default function WhoLikedMeInlineSection({
       {/* Loading */}
       {loading ? (
         <View style={styles.loadingBox}>
-          <ActivityIndicator size="large" color="#CA8A04" />
+          <ActivityIndicator size="large" color="#7A2551" />
         </View>
       ) : fetched && rows.length === 0 ? (
         /* Empty */
         <View style={styles.emptyBox}>
-          <MaterialCommunityIcons name="heart-outline" size={36} color="#CA8A04" />
+          <MaterialCommunityIcons name="heart-outline" size={36} color="#7A2551" />
           <Text style={styles.emptyText}>{text.empty}</Text>
         </View>
       ) : (
@@ -393,7 +393,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   showMoreText: {
-    color: '#CA8A04',
+    color: '#7A2551',
     fontSize: 13,
     fontWeight: '800',
   },

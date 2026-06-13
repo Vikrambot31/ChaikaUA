@@ -1295,6 +1295,48 @@ td small {
   overflow: auto;
 }
 
+.feedBadge {
+  background: #e53935;
+  color: #fff;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.6;
+}
+
+.feedList {
+  display: grid;
+  gap: 8px;
+}
+
+.feedItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid #d6e2f4;
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+.feedItemHigh {
+  background: #fff8f0;
+  border-color: #f5cba0;
+}
+
+.feedIcon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.feedLabel {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 700;
+  color: #25324a;
+}
+
 .logItem {
   display: grid;
   gap: 4px;

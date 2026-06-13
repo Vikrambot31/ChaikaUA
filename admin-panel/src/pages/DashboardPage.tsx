@@ -10,6 +10,8 @@ import { computeAccessStats, getModeDescription } from '../services/accessContro
 import { useViewMode } from '../contexts/ViewModeContext';
 import { probeRulesLevel, type RulesProbeResult } from '../services/rulesProbeService';
 import { fetchPermissionDeniedDetails, type PermissionDeniedEntry } from '../services/dashboardService';
+import { NotificationFeed } from '../components/NotificationFeed';
+import { useNotificationFeed } from '../hooks/useNotificationFeed';
 
 type AccessSummary = {
   enabled: boolean;
@@ -42,6 +44,7 @@ export const DashboardPage = ({ user, onNavigate }: DashboardPageProps) => {
   const [probing, setProbing] = useState(false);
   const [permDetails, setPermDetails] = useState<PermissionDeniedEntry[] | null>(null);
   const [permDetailsLoading, setPermDetailsLoading] = useState(false);
+  const { items: feedItems, totalCount: feedTotal, loading: feedLoading } = useNotificationFeed();
   const [probeBannerExpanded, setProbeBannerExpanded] = useState(false);
   const [showExtraMetrics, setShowExtraMetrics] = useState(false);
 
@@ -235,6 +238,8 @@ export const DashboardPage = ({ user, onNavigate }: DashboardPageProps) => {
           </div>
         );
       })()}
+
+      <NotificationFeed items={feedItems} totalCount={feedTotal} loading={feedLoading} onNavigate={onNavigate} />
 
       <div className="statsGrid">
         <article className="metric metric-success"><span>Активні сьогодні</span><strong>{stats.activeUsersToday}</strong></article>

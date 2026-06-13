@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
   },
   cafeCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 18, padding: 16, marginBottom: 10, borderWidth: 1, borderColor: '#E4D0AB' },
   rank: { width: 44, height: 44, borderRadius: 16, backgroundColor: SCREEN_THEME.terracotta, alignItems: 'center', justifyContent: 'center', marginRight: 12, borderWidth: 1, borderColor: SCREEN_THEME.terracottaDark },
-  rankText: { color: '#FFF9EE', fontWeight: '900', fontSize: 16 },
+  rankText: { color: '#FBF8FD', fontWeight: '900', fontSize: 16 },
   info: { flex: 1 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
   cafeName: { fontSize: 16, fontWeight: '900', color: SCREEN_THEME.textPrimary, flex: 1 },

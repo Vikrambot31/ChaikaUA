@@ -287,11 +287,11 @@ export default function WhoLikedMeList({
 
           {loading ? (
             <View style={styles.loadingBox}>
-              <ActivityIndicator size="large" color="#CA8A04" />
+              <ActivityIndicator size="large" color="#7A2551" />
             </View>
           ) : fetched && likers.length === 0 ? (
             <View style={styles.emptyBox}>
-              <MaterialCommunityIcons name="heart-outline" size={48} color="#CA8A04" />
+              <MaterialCommunityIcons name="heart-outline" size={48} color="#7A2551" />
               <Text style={styles.emptyText}>{text.empty}</Text>
             </View>
           ) : (
@@ -328,7 +328,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 4,
     borderRadius: 99,
-    backgroundColor: '#CA8A04',
+    backgroundColor: '#7A2551',
     alignSelf: 'center',
     marginTop: 10,
     marginBottom: 4,
@@ -357,7 +357,7 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   closeText: {
-    color: '#CA8A04',
+    color: '#7A2551',
     fontWeight: '800',
     fontSize: 12,
   },

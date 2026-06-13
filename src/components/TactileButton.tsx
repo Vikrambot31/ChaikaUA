@@ -15,16 +15,16 @@ type TactileButtonProps = {
 
 const VARIANTS = {
   primary: {
-    bg: '#7d0e59',
-    border: '#7d0e59',
+    bg: '#7A2551',
+    border: '#7A2551',
     text: '#FFFFFF',
-    shadowColor: 'rgba(125, 14, 89, 0.40)',
+    shadowColor: 'rgba(122, 37, 81, 0.40)',
   },
   secondary: {
     bg: SCREEN_THEME.cardCream,
-    border: '#D5C8A8',
-    text: SCREEN_THEME.textPrimary,
-    shadowColor: 'rgba(128, 105, 69, 0.25)',
+    border: SCREEN_THEME.accentPrimary,
+    text: '#FFFFFF',
+    shadowColor: 'rgba(122, 37, 81, 0.30)',
   },
   social: {
     bg: SCREEN_THEME.linenOlive,

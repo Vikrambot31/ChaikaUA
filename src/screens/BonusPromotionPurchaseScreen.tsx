@@ -391,10 +391,10 @@ const BonusPromotionPurchaseScreen: React.FC = () => {
           activeOpacity={0.86}
         >
           {buying ? (
-            <ActivityIndicator color="#FFF9EE" />
+            <ActivityIndicator color="#FBF8FD" />
           ) : (
             <>
-              <MaterialCommunityIcons name="bullhorn-outline" size={21} color="#FFF9EE" />
+              <MaterialCommunityIcons name="bullhorn-outline" size={21} color="#FBF8FD" />
               <Text style={styles.buyButtonText}>{t.adChat.promotion}</Text>
             </>
           )}
@@ -519,7 +519,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   optionTextActive: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
   },
   currencyPill: {
     color: SCREEN_THEME.textSecondary,
@@ -528,7 +528,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   currencyPillActive: {
-    color: '#FFF3CE',
+    color: '#F5EEF9',
   },
   optionSubtitle: {
     color: SCREEN_THEME.textSecondary,
@@ -536,7 +536,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   optionSubActive: {
-    color: 'rgba(255,249,238,0.82)',
+    color: 'rgba(247,241,251,0.82)',
   },
   targetList: {
     gap: 8,
@@ -605,7 +605,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   durationTextActive: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
   },
   durationPrice: {
     color: SCREEN_THEME.textSecondary,
@@ -614,7 +614,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   durationPriceActive: {
-    color: '#FFF3CE',
+    color: '#F5EEF9',
   },
   summaryCard: {
     borderRadius: 8,
@@ -661,7 +661,7 @@ const styles = StyleSheet.create({
     opacity: 0.58,
   },
   buyButtonText: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
     fontSize: 15,
     fontWeight: '900',
   },

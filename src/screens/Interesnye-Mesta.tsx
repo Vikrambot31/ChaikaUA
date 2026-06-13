@@ -147,7 +147,7 @@ export default function InterestingPlacesScreen() {
               onPress={() => navigation.navigate('MainTabs', { screen: 'MapTab', params: getMapFocusPlaceParams(place) })}
             >
               <View style={styles.itemCardContent}>
-                <TactileIcon icon="map-marker-outline" size={50} iconSize={22} backgroundColor={SCREEN_THEME.terracottaDark} tint="#FFF3CE" />
+                <TactileIcon icon="map-marker-outline" size={50} iconSize={22} backgroundColor={SCREEN_THEME.terracottaDark} tint="#F5EEF9" />
                 <View style={styles.info}>
                   <Text style={styles.name}>{place.name}</Text>
                   <Text style={styles.desc}>{text.typeLabels[place.type]} · {place.address}</Text>

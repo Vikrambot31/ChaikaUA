@@ -76,7 +76,7 @@ const ModerationPhotoCard: React.FC<ModerationPhotoCardProps> = ({
     <TactileCard onPress={onPress} style={styles.card}>
       <View style={styles.topRow}>
         <View style={styles.iconBadge}>
-          <MaterialCommunityIcons name="image-multiple-outline" size={20} color="#FFF9EE" />
+          <MaterialCommunityIcons name="image-multiple-outline" size={20} color="#FBF8FD" />
         </View>
         <View style={styles.infoCol}>
           <View style={styles.nameRow}>

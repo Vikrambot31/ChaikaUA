@@ -477,7 +477,7 @@ const EditProfileScreen: React.FC<{ navigation: { goBack: () => void; navigate: 
               />
             )}
             <View style={styles.heroAvatarBadge}>
-              <MaterialCommunityIcons name="information-outline" size={16} color="#FFF9EE" />
+              <MaterialCommunityIcons name="information-outline" size={16} color="#FBF8FD" />
             </View>
           </TouchableOpacity>
           <Text style={styles.title}>{t.profile.editProfile}</Text>
@@ -542,7 +542,7 @@ const EditProfileScreen: React.FC<{ navigation: { goBack: () => void; navigate: 
             activeOpacity={0.88}
           >
             {loading ? (
-              <ActivityIndicator color="#FFF9EE" />
+              <ActivityIndicator color="#FBF8FD" />
             ) : (
               <>
                 <TactileIcon
@@ -550,7 +550,7 @@ const EditProfileScreen: React.FC<{ navigation: { goBack: () => void; navigate: 
                   size={42}
                   iconSize={18}
                   backgroundColor="#7A4B36"
-                  tint="#FFF3CE"
+                  tint="#F5EEF9"
                   style={styles.saveIcon}
                 />
                 <Text style={styles.saveButtonText}>{t.profile.save}</Text>
@@ -605,7 +605,7 @@ const EditProfileScreen: React.FC<{ navigation: { goBack: () => void; navigate: 
             activeOpacity={0.88}
           >
             {loading ? (
-              <ActivityIndicator color="#FFF9EE" />
+              <ActivityIndicator color="#FBF8FD" />
             ) : (
               <>
                 <TactileIcon
@@ -613,7 +613,7 @@ const EditProfileScreen: React.FC<{ navigation: { goBack: () => void; navigate: 
                   size={42}
                   iconSize={18}
                   backgroundColor="#7A4B36"
-                  tint="#FFF3CE"
+                  tint="#F5EEF9"
                   style={styles.saveIcon}
                 />
                 <Text style={styles.saveButtonText}>{t.profile.save}</Text>
@@ -667,7 +667,7 @@ const EditProfileScreen: React.FC<{ navigation: { goBack: () => void; navigate: 
             disabled={avatarSaving}
             activeOpacity={0.88}
           >
-            <MaterialCommunityIcons name="camera-plus-outline" size={20} color="#FFF9EE" />
+            <MaterialCommunityIcons name="camera-plus-outline" size={20} color="#FBF8FD" />
             <Text style={styles.avatarActionText}>{text.uploadAvatar}</Text>
           </TouchableOpacity>
 
@@ -923,7 +923,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
   },
   saveButtonText: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
     fontSize: 16,
     fontWeight: '900',
   },
@@ -988,7 +988,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   avatarActionText: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
     fontSize: 15,
     fontWeight: '900',
   },

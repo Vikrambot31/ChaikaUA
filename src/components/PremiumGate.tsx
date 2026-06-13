@@ -66,7 +66,7 @@ export const PremiumGate: React.FC<PremiumGateProps> = ({
           activeOpacity={0.82}
           onPress={handleUpgrade}
         >
-          <MaterialCommunityIcons name="crown" size={16} color="#FFF9EE" />
+          <MaterialCommunityIcons name="crown" size={16} color="#FBF8FD" />
           <Text style={styles.upgradeButtonText}>{t.premium.upgradeButton}</Text>
         </TouchableOpacity>
       </View>
@@ -121,7 +121,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   upgradeButtonText: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
     fontSize: 14,
     fontWeight: '900',
   },

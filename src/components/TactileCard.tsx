@@ -21,7 +21,7 @@ export default function TactileCard({
   const [elevationNum, setElevationNum] = useState(elevated ? 6 : 3);
 
   const staticShadow = {
-    shadowColor: '#5C3A1E',
+    shadowColor: '#6B3A5A',
     shadowOpacity: elevated ? 0.28 : 0.14,
     shadowRadius: elevated ? 6 : 3,
     shadowOffset: { width: 2, height: elevated ? 5 : 3 },

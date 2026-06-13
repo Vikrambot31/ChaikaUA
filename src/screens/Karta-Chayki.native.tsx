@@ -798,7 +798,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 22,
-    backgroundColor: '#FFF9EE',
+    backgroundColor: '#FBF8FD',
   },
   mapFallbackTitle: {
     marginTop: 10,
@@ -833,7 +833,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   quickFilterChip: {
-    backgroundColor: '#FFF9EE',
+    backgroundColor: '#FBF8FD',
     borderWidth: 1,
     borderColor: '#E0CFAC',
     paddingHorizontal: 12,

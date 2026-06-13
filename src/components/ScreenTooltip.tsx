@@ -89,7 +89,7 @@ export default function ScreenTooltip({
         <Pressable style={styles.card}>
           <View style={styles.topRow}>
             <View style={[styles.iconBubble, { backgroundColor: accentColor }]}>
-              <MaterialCommunityIcons name="lightbulb-on-outline" size={24} color="#FFF9EE" />
+              <MaterialCommunityIcons name="lightbulb-on-outline" size={24} color="#FBF8FD" />
             </View>
             <View style={styles.titleWrap}>
               <Text style={styles.kicker}>{quickReadLabel}</Text>
@@ -115,7 +115,7 @@ export default function ScreenTooltip({
 
           <TouchableOpacity style={[styles.actionButton, { backgroundColor: accentColor }]} onPress={close} activeOpacity={0.86}>
             <Text style={styles.actionText}>{doneLabel}</Text>
-            <MaterialCommunityIcons name="check" size={18} color="#FFF9EE" />
+            <MaterialCommunityIcons name="check" size={18} color="#FBF8FD" />
           </TouchableOpacity>
         </Pressable>
       </Pressable>
@@ -207,7 +207,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFF9EE',
+    backgroundColor: '#FBF8FD',
   },
   stepNumberText: {
     fontSize: 14,
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionText: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
     fontSize: 16,
     fontWeight: '900',
   },

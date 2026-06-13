@@ -180,7 +180,7 @@ const PromoCreditsTopupScreen: React.FC = () => {
     return (
       <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleAdmin]}>
         <Text style={[styles.bubbleSender, isUser ? styles.bubbleSenderUser : styles.bubbleSenderAdmin]}>
-          {isUser ? t.common.profile : 'Адмін'}
+          {isUser ? t.common.profile : t.promoCredits.adminLabel}
         </Text>
         <Text style={[styles.bubbleText, isUser ? styles.bubbleTextUser : styles.bubbleTextAdmin]}>
           {item.text}
@@ -270,10 +270,10 @@ const PromoCreditsTopupScreen: React.FC = () => {
             activeOpacity={0.86}
           >
             {creating ? (
-              <ActivityIndicator color="#FFF9EE" />
+              <ActivityIndicator color="#FBF8FD" />
             ) : (
               <>
-                <MaterialCommunityIcons name="file-document-outline" size={21} color="#FFF9EE" />
+                <MaterialCommunityIcons name="file-document-outline" size={21} color="#FBF8FD" />
                 <Text style={styles.createButtonText}>{t.promoCredits.chatAdmin}</Text>
               </>
             )}
@@ -437,7 +437,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   packageCreditsActive: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
   },
   packageLabel: {
     color: SCREEN_THEME.textSecondary,
@@ -445,7 +445,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   packageLabelActive: {
-    color: 'rgba(255,249,238,0.82)',
+    color: 'rgba(247,241,251,0.82)',
   },
   packageAmount: {
     color: SCREEN_THEME.terracottaDark,
@@ -454,7 +454,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   packageAmountActive: {
-    color: '#FFF3CE',
+    color: '#F5EEF9',
   },
   noticeCard: {
     flexDirection: 'row',
@@ -485,7 +485,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   createButtonText: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
     fontSize: 15,
     fontWeight: '900',
   },

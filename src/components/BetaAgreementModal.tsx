@@ -227,7 +227,7 @@ export default function BetaAgreementModal({ visible, language, onAccept }: Beta
             <MaterialCommunityIcons
               name="check-circle-outline"
               size={20}
-              color="#FFF9EE"
+              color="#FBF8FD"
             />
             <Text style={styles.acceptButtonText}>{content.buttonLabel}</Text>
           </TouchableOpacity>
@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   betaBadgeText: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
     fontSize: 11,
     fontWeight: '900',
     letterSpacing: 1,
@@ -361,7 +361,7 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
   acceptButtonText: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
     fontSize: 15,
     fontWeight: '900',
   },

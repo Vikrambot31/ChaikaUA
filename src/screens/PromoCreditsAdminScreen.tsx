@@ -172,7 +172,7 @@ const PromoCreditsAdminScreen: React.FC = () => {
       <View style={styles.ticketCard}>
         <View style={styles.ticketTop}>
           <View style={styles.ticketIcon}>
-            <MaterialCommunityIcons name="credit-card-plus-outline" size={22} color="#FFF9EE" />
+            <MaterialCommunityIcons name="credit-card-plus-outline" size={22} color="#FBF8FD" />
           </View>
           <View style={styles.ticketCopy}>
             <Text style={styles.ticketTitle}>{item.userName || item.userId}</Text>
@@ -202,10 +202,10 @@ const PromoCreditsAdminScreen: React.FC = () => {
             activeOpacity={0.86}
           >
             {isBusy ? (
-              <ActivityIndicator color="#FFF9EE" />
+              <ActivityIndicator color="#FBF8FD" />
             ) : (
               <>
-                <MaterialCommunityIcons name="check-decagram-outline" size={19} color="#FFF9EE" />
+                <MaterialCommunityIcons name="check-decagram-outline" size={19} color="#FBF8FD" />
                 <Text style={styles.grantButtonText}>{t.promoCredits.adminGrantButton}</Text>
               </>
             )}
@@ -224,7 +224,7 @@ const PromoCreditsAdminScreen: React.FC = () => {
       <View style={styles.ticketCard}>
         <View style={styles.ticketTop}>
           <View style={[styles.ticketIcon, styles.promotionIcon]}>
-            <MaterialCommunityIcons name="bullhorn-outline" size={22} color="#FFF9EE" />
+            <MaterialCommunityIcons name="bullhorn-outline" size={22} color="#FBF8FD" />
           </View>
           <View style={styles.ticketCopy}>
             <Text style={styles.ticketTitle}>{getPromotionTargetTitle(item)}</Text>
@@ -260,7 +260,7 @@ const PromoCreditsAdminScreen: React.FC = () => {
                 disabled={isBusy}
                 activeOpacity={0.86}
               >
-                <MaterialCommunityIcons name="close-circle-outline" size={18} color="#FFF9EE" />
+                <MaterialCommunityIcons name="close-circle-outline" size={18} color="#FBF8FD" />
                 <Text style={styles.grantButtonText}>{t.common.cancel}</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -270,10 +270,10 @@ const PromoCreditsAdminScreen: React.FC = () => {
                 activeOpacity={0.86}
               >
                 {isBusy ? (
-                  <ActivityIndicator color="#FFF9EE" />
+                  <ActivityIndicator color="#FBF8FD" />
                 ) : (
                   <>
-                    <MaterialCommunityIcons name="check-decagram-outline" size={18} color="#FFF9EE" />
+                    <MaterialCommunityIcons name="check-decagram-outline" size={18} color="#FBF8FD" />
                     <Text style={styles.grantButtonText}>{t.common.ok}</Text>
                   </>
                 )}
@@ -439,7 +439,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   tabTextActive: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
   },
   tabCount: {
     color: SCREEN_THEME.textMuted,
@@ -551,7 +551,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#E4D0AB',
-    backgroundColor: '#FFF9EE',
+    backgroundColor: '#FBF8FD',
     paddingHorizontal: 10,
     paddingVertical: 8,
     color: SCREEN_THEME.textPrimary,
@@ -585,7 +585,7 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   grantButtonText: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
     fontSize: 14,
     fontWeight: '900',
   },

@@ -33,7 +33,7 @@ export default function ProfileCompletenessBadge({ listing, isOwn, hintText, sty
   if (percent >= 80) {
     badgeColor = '#16A34A'; // green > 80%
   } else if (percent >= 50) {
-    badgeColor = '#CA8A04'; // yellow 50-80%
+    badgeColor = '#7A2551'; // yellow 50-80%
   }
 
   return (

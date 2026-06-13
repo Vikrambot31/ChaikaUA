@@ -287,7 +287,7 @@ const styles = StyleSheet.create({
     padding: 12,
     borderWidth: 1,
     borderColor: SCREEN_THEME.borderSoft,
-    shadowColor: '#5C3A1E',
+    shadowColor: '#6B3A5A',
     shadowOpacity: 0.1,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },

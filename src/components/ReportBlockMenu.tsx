@@ -8,10 +8,10 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  ActivityIndicator,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { reportBlockService, type ReportReason } from '../services/reportBlockService';
+import TactileButton from './TactileButton';
 
 type Lang = 'ua' | 'ru' | 'en';
 
@@ -201,7 +201,7 @@ export default function ReportBlockMenu({
                   onPress={() => setMode('report')}
                   activeOpacity={0.8}
                 >
-                  <MaterialCommunityIcons name="flag-outline" size={20} color="#CA8A04" style={styles.optionIcon} />
+                  <MaterialCommunityIcons name="flag-outline" size={20} color="#7A2551" style={styles.optionIcon} />
                   <Text style={styles.optionLabel}>{t.reportOption}</Text>
                   <MaterialCommunityIcons name="chevron-right" size={18} color="#C0A898" />
                 </TouchableOpacity>
@@ -240,18 +240,14 @@ export default function ReportBlockMenu({
                 multiline
                 maxLength={500}
               />
-              <TouchableOpacity
-                style={styles.submitBtn}
+              <TactileButton
+                title={t.submitBtn}
                 onPress={handleReport}
-                activeOpacity={0.85}
+                variant="primary"
                 disabled={submitting}
-              >
-                {submitting ? (
-                  <ActivityIndicator color="#1C1917" />
-                ) : (
-                  <Text style={styles.submitBtnText}>{t.submitBtn}</Text>
-                )}
-              </TouchableOpacity>
+                loading={submitting}
+                style={styles.submitBtn}
+              />
             </>
           )}
 
@@ -325,8 +321,8 @@ const styles = StyleSheet.create({
     borderColor: '#E4D0AB',
   },
   reasonBtnActive: {
-    borderColor: '#CA8A04',
-    backgroundColor: 'rgba(202,138,4,0.1)',
+    borderColor: '#7A2551',
+    backgroundColor: 'rgba(122,37,81,0.1)',
   },
   reasonLabel: {
     fontSize: 14,
@@ -334,7 +330,7 @@ const styles = StyleSheet.create({
     color: '#2D2520',
   },
   reasonLabelActive: {
-    color: '#CA8A04',
+    color: '#7A2551',
   },
   descInput: {
     backgroundColor: '#FFFFFF',
@@ -350,7 +346,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   submitBtn: {
-    backgroundColor: '#CA8A04',
+    backgroundColor: '#7A2551',
     borderRadius: 16,
     paddingVertical: 14,
     alignItems: 'center',

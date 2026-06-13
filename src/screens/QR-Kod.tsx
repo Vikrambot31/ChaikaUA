@@ -77,7 +77,7 @@ export default function QRCodeScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.button} onPress={onShare} activeOpacity={0.88}>
-            <TactileIcon icon="share-variant-outline" size={42} iconSize={18} backgroundColor="#7A4B36" tint="#FFF3CE" />
+            <TactileIcon icon="share-variant-outline" size={42} iconSize={18} backgroundColor="#7A4B36" tint="#F5EEF9" />
             <Text style={styles.buttonText}>{copy.share}</Text>
           </TouchableOpacity>
 
@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
   },
-  buttonText: { color: '#FFF9EE', fontWeight: '900', fontSize: 16 },
+  buttonText: { color: '#FBF8FD', fontWeight: '900', fontSize: 16 },
   ghost: { marginTop: 14, paddingVertical: 8, paddingHorizontal: 16 },
   ghostText: { color: SCREEN_THEME.textSecondary, fontWeight: '800' },
   qrFallback: { alignItems: 'center', justifyContent: 'center', padding: 16, gap: 10 },

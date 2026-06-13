@@ -8,6 +8,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import MiniTabBar from '../components/MiniTabBar';
 import MiniUserAvatar from '../components/MiniUserAvatar';
 import AppPhotoImage from '../components/AppPhotoImage';
+import TactileButton from '../components/TactileButton';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { normalizePhoneText } from '../utils/textUtils';
 import { RootState } from '../redux/store';
@@ -1307,7 +1308,7 @@ const KontaktiChaikyScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={400} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#CA8A04" colors={['#CA8A04']} />}>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={400} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#7A2551" colors={['#7A2551']} />}>
         <View style={styles.headerCard}>
           <View style={{ position: 'absolute', top: 12, right: 12, zIndex: 10 }}>
             <HintBadge
@@ -1377,10 +1378,10 @@ const KontaktiChaikyScreen: React.FC = () => {
 
         {listingsReady && !listingsLoadError && listings.length === 0 && (
           <View style={styles.emptyStateBox}>
-            <MaterialCommunityIcons name="account-search-outline" size={64} color="#CA8A04" />
+            <MaterialCommunityIcons name="account-search-outline" size={64} color="#7A2551" />
             <Text style={styles.emptyStateTitle}>{text.emptyTitle}</Text>
-            <TouchableOpacity
-              style={styles.emptyStateCta}
+            <TactileButton
+              title={text.emptyCta}
               onPress={() => {
                 if (!user?.id) {
                   Alert.alert(text.errorTitle, text.authRequired);
@@ -1388,10 +1389,9 @@ const KontaktiChaikyScreen: React.FC = () => {
                 }
                 setAddFormVisible(true);
               }}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.emptyStateCtaText}>{text.emptyCta}</Text>
-            </TouchableOpacity>
+              variant="primary"
+              style={styles.emptyStateCta}
+            />
           </View>
         )}
 
@@ -1419,10 +1419,12 @@ const KontaktiChaikyScreen: React.FC = () => {
               </TouchableOpacity>
             ) : null}
             {!hasOwnListing && listings.length > 0 && user?.id ? (
-              <TouchableOpacity style={styles.noProfileBanner} onPress={() => setAddFormVisible(true)} activeOpacity={0.85}>
-                <Text style={styles.noProfileBannerText}>{text.noProfileBanner}</Text>
-                <Text style={styles.noProfileBannerCta}>{text.noProfileCta}</Text>
-              </TouchableOpacity>
+              <TactileButton
+                title={text.noProfileCta}
+                onPress={() => setAddFormVisible(true)}
+                variant="primary"
+                style={styles.noProfileBanner}
+              />
             ) : null}
             {filteredListings.length === 0 ? (
               <View style={styles.emptyFiltered}>
@@ -1559,7 +1561,7 @@ const KontaktiChaikyScreen: React.FC = () => {
                       <View style={styles.kOwnActions}>
                         {item.moderationStatus === 'approved' ? (
                           <TouchableOpacity style={styles.kEditLink} onPress={() => setWhoLikedMeVisible(true)} activeOpacity={0.8}>
-                            <MaterialCommunityIcons name="heart-outline" size={14} color="#CA8A04" />
+                            <MaterialCommunityIcons name="heart-outline" size={14} color="#7A2551" />
                             <Text style={styles.kEditLinkText}>{text.whoLikedMeBtn}</Text>
                           </TouchableOpacity>
                         ) : null}
@@ -1575,7 +1577,7 @@ const KontaktiChaikyScreen: React.FC = () => {
             )}
             {loadingMore ? (
               <View style={styles.loadingMoreBox}>
-                <ActivityIndicator size="small" color="#CA8A04" />
+                <ActivityIndicator size="small" color="#7A2551" />
                 <Text style={styles.loadingMoreText}>{text.loadingMore}</Text>
               </View>
             ) : null}
@@ -1604,9 +1606,12 @@ const KontaktiChaikyScreen: React.FC = () => {
               <Text style={styles.swipeFilterAgeLabel}>{text.swipeFilterAgeTo}</Text>
               <TextInput style={styles.swipeFilterAgeInput} value={swipeAgeTo} onChangeText={setSwipeAgeTo} keyboardType="numeric" placeholder="99" placeholderTextColor="#78716C" maxLength={3} />
             </View>
-            <TouchableOpacity style={styles.swipeFilterStartBtn} onPress={() => { swipePosition.setValue({ x: 0, y: 0 }); setSwipeFilterVisible(false); setSwipeIndex(0); setLikedIds([]); setLastDismissedDirection(null); setSwipeMode(true); }} activeOpacity={0.85}>
-              <Text style={styles.swipeFilterStartBtnText}>{text.swipeFilterStart}</Text>
-            </TouchableOpacity>
+            <TactileButton
+              title={text.swipeFilterStart}
+              onPress={() => { swipePosition.setValue({ x: 0, y: 0 }); setSwipeFilterVisible(false); setSwipeIndex(0); setLikedIds([]); setLastDismissedDirection(null); setSwipeMode(true); }}
+              variant="primary"
+              style={styles.swipeFilterStartBtn}
+            />
             <TouchableOpacity style={styles.swipeFilterSkipBtn} onPress={() => { swipePosition.setValue({ x: 0, y: 0 }); setSwipeGenderFilter('all'); setSwipeAgeFrom(''); setSwipeAgeTo(''); setSwipeFilterVisible(false); setSwipeIndex(0); setLikedIds([]); setLastDismissedDirection(null); setSwipeMode(true); }} activeOpacity={0.7}>
               <Text style={styles.swipeFilterSkipText}>{text.swipeFilterSkip}</Text>
             </TouchableOpacity>
@@ -1630,16 +1635,19 @@ const KontaktiChaikyScreen: React.FC = () => {
           <View style={styles.swipeOverlay}>
             {/* Back button */}
             <TouchableOpacity style={styles.swipeBackBtn} onPress={() => setSwipeMode(false)} activeOpacity={0.85}>
-              <MaterialCommunityIcons name="arrow-left" size={20} color="#CA8A04" />
+              <MaterialCommunityIcons name="arrow-left" size={20} color="#7A2551" />
               <Text style={styles.swipeBackBtnText}>{text.swipeBackBtn}</Text>
             </TouchableOpacity>
             {swipeDone ? (
               <View style={styles.swipeDoneBox}>
                 <Text style={styles.swipeDoneTitle}>{text.swipeDoneTitle}</Text>
                 <Text style={styles.swipeDoneSub}>{text.swipeDoneLiked(likedIds.length)}</Text>
-                <TouchableOpacity style={styles.swipeRestartBtn} onPress={() => { swipePosition.setValue({ x: 0, y: 0 }); setSwipeIndex(0); setLikedIds([]); setLastDismissedDirection(null); }} activeOpacity={0.85}>
-                  <Text style={styles.swipeRestartBtnText}>{text.swipeRestartBtn}</Text>
-                </TouchableOpacity>
+                <TactileButton
+                  title={text.swipeRestartBtn}
+                  onPress={() => { swipePosition.setValue({ x: 0, y: 0 }); setSwipeIndex(0); setLikedIds([]); setLastDismissedDirection(null); }}
+                  variant="primary"
+                  style={styles.swipeRestartBtn}
+                />
               </View>
             ) : (
               <>
@@ -1725,8 +1733,8 @@ const KontaktiChaikyScreen: React.FC = () => {
           }}
           activeOpacity={0.85}
         >
-          <MaterialCommunityIcons name={swipeMode ? 'view-list' : 'cards'} size={18} color={swipeMode ? '#CA8A04' : '#FAFAF9'} />
-          <Text style={[styles.swipeModeBtnText, swipeMode && { color: '#CA8A04' }]}>{swipeMode ? 'Список' : 'Листати'}</Text>
+          <MaterialCommunityIcons name={swipeMode ? 'view-list' : 'cards'} size={18} color={swipeMode ? '#7A2551' : '#FAFAF9'} />
+          <Text style={[styles.swipeModeBtnText, swipeMode && { color: '#7A2551' }]}>{swipeMode ? 'Список' : 'Листати'}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.addBarBtn} onPress={() => {
           if (!user?.id) {
@@ -1905,13 +1913,14 @@ const KontaktiChaikyScreen: React.FC = () => {
                 />
               </View>
 
-              <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} activeOpacity={0.85} disabled={submitting}>
-                {submitting ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.submitBtnText}>{text.submitBtn}</Text>
-                )}
-              </TouchableOpacity>
+              <TactileButton
+                title={text.submitBtn}
+                onPress={handleSubmit}
+                variant="primary"
+                disabled={submitting}
+                loading={submitting}
+                style={styles.submitBtn}
+              />
             </ScrollView>
             </View>
           </View>
@@ -1955,7 +1964,7 @@ const KontaktiChaikyScreen: React.FC = () => {
 };
 
 // Elegant Luxury Design System — ChaikaUA Знайомства на каву
-// Colors: Primary #612e51, Gold #CA8A04, Background #FAFAF9, Text #612e51
+// Colors: Primary #612e51, Accent #7A2551, Background #FAFAF9, Text #612e51
 // Style: Liquid Glass + Premium Black/Gold
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FAFAF9' },
@@ -1970,7 +1979,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderColor: '#E8D9B5',
   },
-  modalHandle: { width: 42, height: 4, borderRadius: 99, backgroundColor: '#CA8A04', alignSelf: 'center', marginTop: 10, marginBottom: 4 },
+  modalHandle: { width: 42, height: 4, borderRadius: 99, backgroundColor: '#7A2551', alignSelf: 'center', marginTop: 10, marginBottom: 4 },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1982,7 +1991,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: { color: '#612e51', fontSize: 17, fontWeight: '900', flex: 1, paddingRight: 8, letterSpacing: 0.3 },
   modalCloseBtn: { backgroundColor: '#612e51', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
-  modalCloseText: { color: '#CA8A04', fontWeight: '800', fontSize: 12 },
+  modalCloseText: { color: '#7A2551', fontWeight: '800', fontSize: 12 },
   modalContent: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20 },
   modalActions: { flexDirection: 'row', gap: 10, marginTop: 10 },
   resetBtn: {
@@ -1996,7 +2005,7 @@ const styles = StyleSheet.create({
   },
   resetBtnText: { color: '#44403C', fontWeight: '700', fontSize: 13 },
   applyBtn: { flex: 1, borderRadius: 16, backgroundColor: '#612e51', alignItems: 'center', paddingVertical: 12 },
-  applyBtnText: { color: '#CA8A04', fontWeight: '800', fontSize: 13 },
+  applyBtnText: { color: '#7A2551', fontWeight: '800', fontSize: 13 },
   headerCard: {
     backgroundColor: '#612e51',
     borderRadius: 24,
@@ -2004,13 +2013,13 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#CA8A04',
+    borderColor: '#7A2551',
   },
   headerTitle: { fontSize: 26, fontWeight: '900', color: '#FAFAF9', marginTop: 8, letterSpacing: 0.5 },
   headerSubtitle: { marginTop: 6, color: '#B5A990', textAlign: 'center', fontSize: 13 },
   liveLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', marginTop: 8 },
-  liveDot: { color: '#CA8A04', fontSize: 12, fontWeight: '900', marginRight: 4 },
-  liveText: { color: '#CA8A04', fontSize: 11, fontWeight: '900', marginRight: 6 },
+  liveDot: { color: '#7A2551', fontSize: 12, fontWeight: '900', marginRight: 4 },
+  liveText: { color: '#7A2551', fontSize: 11, fontWeight: '900', marginRight: 6 },
   liveCount: { color: '#B5A990', fontSize: 11, fontWeight: '700', textAlign: 'center' },
   formLabel: { fontWeight: '700', color: '#612e51', marginBottom: 8, marginTop: 8, letterSpacing: 0.2 },
   signInNote: { color: '#44403C', fontSize: 13, fontWeight: '700', paddingVertical: 10, lineHeight: 18 },
@@ -2033,16 +2042,16 @@ const styles = StyleSheet.create({
   topAnketyTitle: { fontSize: 11, fontWeight: '800', color: '#44403C', marginBottom: 10, letterSpacing: 1.2, textTransform: 'uppercase' },
   topAnketyScroll: { paddingHorizontal: 4, gap: 14 },
   topAnketyItem: { width: 72, alignItems: 'center' },
-  topAnketyPhoto: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#F5EDD6', borderWidth: 2, borderColor: '#CA8A04' },
+  topAnketyPhoto: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#F5EDD6', borderWidth: 2, borderColor: '#7A2551' },
   topAnketyName: { fontSize: 11, fontWeight: '700', color: '#612e51', textAlign: 'center', width: 72, marginTop: 5 },
   topAnketyAge: { fontSize: 10, fontWeight: '600', color: '#44403C', textAlign: 'center' },
   listingsSection: { marginBottom: 16 },
   listingsHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 8 },
   listingsSectionTitle: { fontSize: 16, fontWeight: '900', color: '#612e51', letterSpacing: 0.3 },
   searchBtn: { backgroundColor: '#612e51', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
-  searchBtnText: { color: '#CA8A04', fontWeight: '800', fontSize: 12 },
+  searchBtnText: { color: '#7A2551', fontWeight: '800', fontSize: 12 },
   clearSearchBtn: { alignSelf: 'flex-start', marginBottom: 10 },
-  clearSearchText: { color: '#CA8A04', fontWeight: '800', fontSize: 12 },
+  clearSearchText: { color: '#7A2551', fontWeight: '800', fontSize: 12 },
   emptyFiltered: {
     backgroundColor: '#FFFFFF',
     borderRadius: 18,
@@ -2059,7 +2068,7 @@ const styles = StyleSheet.create({
   deleteText: { color: '#B91C1C', fontWeight: '700' },
   listingMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
   listingBadgeText: { fontSize: 11, fontWeight: '700', color: '#44403C' },
-  listingPrice: { fontSize: 15, fontWeight: '900', color: '#CA8A04' },
+  listingPrice: { fontSize: 15, fontWeight: '900', color: '#7A2551' },
   statusBadge: { fontSize: 11, fontWeight: '900', color: '#92400E', backgroundColor: '#FEF3C7', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
   listingDescription: { color: '#44403C', lineHeight: 18, marginBottom: 8 },
   listingPhoto: { width: '100%', height: 170, borderRadius: 16, marginBottom: 8, backgroundColor: '#F5EDD6' },
@@ -2073,7 +2082,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E8D9B5',
     elevation: 2,
-    shadowColor: '#CA8A04',
+    shadowColor: '#7A2551',
     shadowOpacity: 0.08,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
@@ -2151,7 +2160,7 @@ const styles = StyleSheet.create({
   kAgeText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#CA8A04',
+    color: '#7A2551',
   },
   kDescBox: {
     borderRadius: 10,
@@ -2221,7 +2230,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
-  kEditLinkText: { color: '#CA8A04', fontSize: 11, fontWeight: '800' },
+  kEditLinkText: { color: '#7A2551', fontSize: 11, fontWeight: '800' },
   kDeleteLink: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2260,7 +2269,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingVertical: 8,
   },
-  consultationLinkText: { color: '#CA8A04', flex: 1, fontSize: 13, fontWeight: '900', lineHeight: 18 },
+  consultationLinkText: { color: '#7A2551', flex: 1, fontSize: 13, fontWeight: '900', lineHeight: 18 },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2290,7 +2299,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#CA8A04',
+    borderColor: '#7A2551',
   },
   addBarBtnText: { color: '#fff', fontSize: 15, fontWeight: '900', letterSpacing: 0.5 },
   swipeModeBtn: {
@@ -2322,9 +2331,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#612e51',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#CA8A04',
+    borderColor: '#7A2551',
     elevation: 12,
-    shadowColor: '#CA8A04',
+    shadowColor: '#7A2551',
     shadowOpacity: 0.25,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 4 },
@@ -2343,7 +2352,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 32,
     left: 24,
-    backgroundColor: 'rgba(202,138,4,0.9)',
+    backgroundColor: 'rgba(122,37,81,0.9)',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -2374,9 +2383,9 @@ const styles = StyleSheet.create({
   },
   swipeNameRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   swipeName: { fontSize: 22, fontWeight: '900', color: '#FAFAF9', flex: 1 },
-  swipeAge: { fontSize: 18, fontWeight: '800', color: '#CA8A04' },
+  swipeAge: { fontSize: 18, fontWeight: '800', color: '#7A2551' },
   swipeChips: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
-  swipeChip: { backgroundColor: 'rgba(202,138,4,0.18)', borderWidth: 1, borderColor: '#CA8A04', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3, color: '#CA8A04', fontSize: 11, fontWeight: '800' },
+  swipeChip: { backgroundColor: 'rgba(122,37,81,0.18)', borderWidth: 1, borderColor: '#7A2551', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3, color: '#7A2551', fontSize: 11, fontWeight: '800' },
   swipeDesc: { color: '#B5A990', fontSize: 13, lineHeight: 18 },
   swipeActions: {
     position: 'absolute',
@@ -2403,11 +2412,11 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: '#CA8A04',
+    backgroundColor: '#7A2551',
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 6,
-    shadowColor: '#CA8A04',
+    shadowColor: '#7A2551',
     shadowOpacity: 0.4,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
@@ -2422,17 +2431,17 @@ const styles = StyleSheet.create({
     gap: 6,
     backgroundColor: 'rgba(97,46,81,0.85)',
     borderWidth: 1,
-    borderColor: '#CA8A04',
+    borderColor: '#7A2551',
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 8,
     zIndex: 10,
   },
-  swipeBackBtnText: { color: '#CA8A04', fontSize: 13, fontWeight: '800' },
+  swipeBackBtnText: { color: '#7A2551', fontSize: 13, fontWeight: '800' },
   swipeDoneBox: { alignItems: 'center', gap: 12, padding: 32 },
   swipeDoneTitle: { fontSize: 22, fontWeight: '900', color: '#FAFAF9', textAlign: 'center' },
-  swipeDoneSub: { fontSize: 16, color: '#CA8A04', fontWeight: '700' },
-  swipeRestartBtn: { backgroundColor: '#CA8A04', borderRadius: 16, paddingHorizontal: 28, paddingVertical: 14, marginTop: 8 },
+  swipeDoneSub: { fontSize: 16, color: '#7A2551', fontWeight: '700' },
+  swipeRestartBtn: { backgroundColor: '#7A2551', borderRadius: 16, paddingHorizontal: 28, paddingVertical: 14, marginTop: 8 },
   swipeRestartBtnText: { color: '#612e51', fontWeight: '900', fontSize: 15 },
   swipeFilterBackdrop: { flex: 1, backgroundColor: 'rgba(97,46,81,0.7)', justifyContent: 'center', alignItems: 'center', padding: 24 },
   swipeFilterSheet: {
@@ -2454,9 +2463,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     backgroundColor: '#612e51',
   },
-  swipeFilterPillActive: { borderColor: '#CA8A04', backgroundColor: 'rgba(202,138,4,0.15)' },
+  swipeFilterPillActive: { borderColor: '#7A2551', backgroundColor: 'rgba(122,37,81,0.15)' },
   swipeFilterPillText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
-  swipeFilterPillTextActive: { color: '#CA8A04' },
+  swipeFilterPillTextActive: { color: '#7A2551' },
   swipeFilterAgeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, justifyContent: 'center' },
   swipeFilterAgeLabel: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
   swipeFilterAgeInput: {
@@ -2472,7 +2481,7 @@ const styles = StyleSheet.create({
     width: 70,
     textAlign: 'center',
   },
-  swipeFilterStartBtn: { backgroundColor: '#CA8A04', borderRadius: 16, paddingVertical: 16, alignItems: 'center' },
+  swipeFilterStartBtn: { backgroundColor: '#7A2551', borderRadius: 16, paddingVertical: 16, alignItems: 'center' },
   swipeFilterStartBtnText: { color: '#612e51', fontWeight: '900', fontSize: 16 },
   swipeFilterSkipBtn: { alignItems: 'center', paddingVertical: 4 },
   swipeFilterSkipText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
@@ -2485,7 +2494,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 32,
     maxHeight: '92%',
     paddingBottom: 32,
-    shadowColor: '#CA8A04',
+    shadowColor: '#7A2551',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.1,
     shadowRadius: 20,
@@ -2498,7 +2507,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#CA8A04',
+    backgroundColor: '#7A2551',
     alignSelf: 'center',
     marginTop: 10,
     marginBottom: 4,
@@ -2521,9 +2530,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#612e51',
     borderWidth: 1,
-    borderColor: '#CA8A04',
+    borderColor: '#7A2551',
   },
-  sheetCloseTxt: { fontSize: 16, color: '#CA8A04', fontWeight: '900' },
+  sheetCloseTxt: { fontSize: 16, color: '#7A2551', fontWeight: '900' },
   sheetContent: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 28 },
   // Report/Block three-dot button
   kReportBtn: {
@@ -2552,7 +2561,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   emptyStateCta: {
-    backgroundColor: '#CA8A04',
+    backgroundColor: '#7A2551',
     borderRadius: 16,
     paddingHorizontal: 28,
     paddingVertical: 14,
@@ -2569,9 +2578,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'rgba(202,138,4,0.08)',
+    backgroundColor: 'rgba(122,37,81,0.08)',
     borderWidth: 1,
-    borderColor: '#CA8A04',
+    borderColor: '#7A2551',
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -2587,7 +2596,7 @@ const styles = StyleSheet.create({
   noProfileBannerCta: {
     fontSize: 13,
     fontWeight: '900',
-    color: '#CA8A04',
+    color: '#7A2551',
   },
   // Undo swipe button
   swipeUndoBtn: {

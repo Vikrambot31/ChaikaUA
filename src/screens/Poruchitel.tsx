@@ -716,7 +716,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#E4D0AB',
-    backgroundColor: '#FFF9EE',
+    backgroundColor: '#FBF8FD',
     paddingHorizontal: 10,
   },
   denyButtonText: {

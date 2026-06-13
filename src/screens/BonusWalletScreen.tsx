@@ -252,7 +252,7 @@ const BonusWalletScreen: React.FC = () => {
             <View style={styles.balanceGrid}>
               <View style={[styles.balancePanel, styles.trustPanel]}>
                 <View style={styles.panelIconRow}>
-                  <MaterialCommunityIcons name="hand-heart" size={22} color="#FFF9EE" />
+                  <MaterialCommunityIcons name="hand-heart" size={22} color="#FBF8FD" />
                   <Text style={styles.panelLabelLight}>{t.bonus.trustBonuses}</Text>
                 </View>
                 <Text style={styles.panelValueLight}>{trustAvailable}</Text>
@@ -284,12 +284,12 @@ const BonusWalletScreen: React.FC = () => {
             </View>
 
             <TouchableOpacity style={styles.topupButton} onPress={openTopup} activeOpacity={0.86}>
-              <MaterialCommunityIcons name="credit-card-plus-outline" size={22} color="#FFF9EE" />
+              <MaterialCommunityIcons name="credit-card-plus-outline" size={22} color="#FBF8FD" />
               <View style={styles.topupCopy}>
                 <Text style={styles.topupTitle}>{t.promoCredits.topupTitle}</Text>
                 <Text style={styles.topupHint}>{t.promoCredits.topupDesc}</Text>
               </View>
-              <MaterialCommunityIcons name="chevron-right" size={22} color="#FFF9EE" />
+              <MaterialCommunityIcons name="chevron-right" size={22} color="#FBF8FD" />
             </TouchableOpacity>
 
             {activePromotions.length > 0 && (
@@ -524,7 +524,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   panelLabelLight: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
     fontSize: 12,
     fontWeight: '700',
   },
@@ -534,7 +534,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   panelValueLight: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
     fontSize: 38,
     fontWeight: '900',
   },
@@ -571,7 +571,7 @@ const styles = StyleSheet.create({
     height: 9,
     borderRadius: 5,
     overflow: 'hidden',
-    backgroundColor: 'rgba(123, 86, 56, 0.12)',
+    backgroundColor: 'rgba(128, 76, 110, 0.12)',
   },
   progressFill: {
     height: '100%',
@@ -656,7 +656,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   topupTitle: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
     fontSize: 15,
     fontWeight: '900',
   },
