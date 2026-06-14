@@ -34,7 +34,7 @@ const ACCENT = '#7A1E5C';
 const MAX_COMMENT_LENGTH = 250;
 const MIN_COMMENT_LENGTH = 3;
 const COMMENT_COUNTER_THRESHOLD = 200;
-const COOLDOWN_MS = 30000;
+const COOLDOWN_MS = 15000;
 const MAX_USER_COMMENTS_WHEN_OTHERS_EXIST = 2;
 
 const CommentSection: React.FC<Props> = ({ requestId, requestAuthorUid, isRequestClosed, collectionPath = COMMENTS_PATH, contactSourceType = 'help' }) => {
