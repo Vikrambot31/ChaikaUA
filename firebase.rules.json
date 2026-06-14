@@ -241,7 +241,13 @@
 
     "diagnostics": {
       ".read": "auth != null",
-      ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous'"
+      ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous'",
+      "runtime": {
+        ".indexOn": ["at"]
+      },
+      "runtime_moderation": {
+        ".indexOn": ["at"]
+      }
     },
 
     "security_config": {
@@ -492,7 +498,8 @@
 
     "moderation_analysis_cache": {
       ".read": "auth != null && (auth.token.admin === true || auth.token.moderator === true)",
-      ".write": false
+      ".write": false,
+      ".indexOn": ["cachedAt"]
     },
 
     "ops": {
@@ -767,6 +774,25 @@
       ".read": "auth != null",
       "$screenId": {
         ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous'"
+      }
+    },
+
+    "ai_config": {
+      ".read": "auth != null && auth.token.admin === true",
+      ".write": "auth != null && auth.token.admin === true"
+    },
+
+    "ai_queue": {
+      ".read": "auth != null && (auth.token.admin === true || auth.token.moderator === true)",
+      ".write": "auth != null && auth.token.admin === true",
+      "log": {
+        ".write": false
+      },
+      "last_run": {
+        ".write": false
+      },
+      "photo_last_run": {
+        ".write": false
       }
     },
 

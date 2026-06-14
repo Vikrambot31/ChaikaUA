@@ -55,12 +55,14 @@ export const AiControlCenterPage = ({ user }: Props) => {
   const [escalationFilter, setEscalationFilter] = useState<'all' | 'content' | 'support' | 'reports'>('all');
 
   useEffect(() => {
+    const timer = setTimeout(() => setLoading(false), 5000);
     const unsub = subscribeToAiConfig((cfg) => {
+      clearTimeout(timer);
       setConfig(cfg);
       setSavedConfig(cfg);
       setLoading(false);
     });
-    return unsub;
+    return () => { unsub(); clearTimeout(timer); };
   }, []);
 
   useEffect(() => {
