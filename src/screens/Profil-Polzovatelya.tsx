@@ -406,15 +406,21 @@ const ProfileScreen: React.FC = () => {
   }, [subGlowAnim]);
 
   useEffect(() => {
-    if (!hasUnreadPendingRequests) return;
+    if (!hasUnreadPendingRequests) {
+      pulseAnim.setValue(1);
+      return;
+    }
     const pulse = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 0.4, duration: 600, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1.04, duration: 600, useNativeDriver: true }),
         Animated.timing(pulseAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
       ])
     );
     pulse.start();
-    return () => pulse.stop();
+    return () => {
+      pulse.stop();
+      pulseAnim.setValue(1);
+    };
   }, [hasUnreadPendingRequests, pulseAnim]);
 
   useFocusEffect(
@@ -729,26 +735,37 @@ const ProfileScreen: React.FC = () => {
             </TouchableOpacity>
           )}
 
+          <Animated.View style={hasUnreadPendingRequests ? { transform: [{ scale: pulseAnim }] } : undefined}>
           <TouchableOpacity
-            style={styles.menuItem}
+            style={[styles.menuItem, hasUnreadPendingRequests && styles.contactRequestAlert]}
             onPress={() => {
               markPendingRequestsSeen();
               navigation.navigate('ProfileRequestsScreen');
             }}
             activeOpacity={0.84}
           >
-            <TactileIcon icon="account-arrow-left-outline" size={40} iconSize={18} backgroundColor="#7A1E5C" />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.menuLabel}>{text.contactRequests}</Text>
-            </View>
             {hasUnreadPendingRequests ? (
-              <Animated.View style={[styles.requestsBadge, { opacity: pulseAnim }]}>
-                <Text style={styles.requestsBadgeText}>{pendingRequestsCount} {text.contactRequestsHint}</Text>
-              </Animated.View>
+              <>
+                <View style={styles.contactRequestGloss} />
+                <TactileIcon icon="account-arrow-left-outline" size={40} iconSize={18} backgroundColor="#C85A8F" />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.menuLabel, styles.contactRequestLabel]}>{text.contactRequests}</Text>
+                </View>
+                <View style={styles.requestsBadge}>
+                  <Text style={styles.requestsBadgeText}>{pendingRequestsCount} {text.contactRequestsHint}</Text>
+                </View>
+              </>
             ) : (
-              <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
+              <>
+                <TactileIcon icon="account-arrow-left-outline" size={40} iconSize={18} backgroundColor="#7A1E5C" />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.menuLabel}>{text.contactRequests}</Text>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
+              </>
             )}
           </TouchableOpacity>
+          </Animated.View>
 
           {settingsExpanded && (
             <>
@@ -1399,6 +1416,32 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 11,
     fontWeight: '900',
+  },
+  contactRequestAlert: {
+    backgroundColor: '#7A2551',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#7A2551',
+    marginHorizontal: 16,
+    marginVertical: 4,
+    shadowColor: '#7A2551',
+    shadowOpacity: 0.45,
+    shadowRadius: 6,
+    shadowOffset: { width: 1, height: 5 },
+    overflow: 'hidden',
+  },
+  contactRequestGloss: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '45%',
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+  },
+  contactRequestLabel: {
+    color: '#FFFFFF',
   },
   settingsSeeMoreBtn: {
     flexDirection: 'row',
