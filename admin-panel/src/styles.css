@@ -13,7 +13,8 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background: #eef3fb;
+  background: #1a1a2a;
+  color: #e0e0e0;
 }
 
 button {
