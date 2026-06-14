@@ -664,6 +664,14 @@ export default function ProfileRequestsScreen() {
     });
   }, [currentUserId, navigation]);
 
+  const openOutgoingContactCardChat = useCallback((item: ProfileViewRequest) => {
+    if (!currentUserId || !item.targetUserId) return;
+    void markSeen(`${item.requesterId}_${item.targetUserId}_${item.requestedAt}`);
+    navigation.navigate('ContactCardChatScreen', {
+      request: { ...item, targetUserId: item.targetUserId },
+    });
+  }, [currentUserId, navigation, markSeen]);
+
   const handleCall = async (phoneRaw?: string) => {
     await safeCallPhone(phoneRaw, language);
   };
@@ -1015,8 +1023,14 @@ export default function ProfileRequestsScreen() {
                 : '#8A6D2A';
 
             const callLabel = language === 'en' ? 'Call' : language === 'ru' ? 'Позвонить' : 'Подзвонити';
+            const isChatEnabled = isOutgoing && item.status === 'approved';
             return (
-              <View style={[styles.card, !isOutgoing && item.status === 'denied' && styles.cardDimmed]}>
+              <TouchableOpacity
+                style={[styles.card, !isOutgoing && item.status === 'denied' && styles.cardDimmed]}
+                onPress={isChatEnabled ? () => openOutgoingContactCardChat(item) : undefined}
+                activeOpacity={isChatEnabled ? 0.86 : 1}
+                disabled={!isChatEnabled}
+              >
                 {/* Top: avatar + info */}
                 <View style={styles.cardIncoming}>
                   {photo ? (
@@ -1105,6 +1119,23 @@ export default function ProfileRequestsScreen() {
                   ) : null}
                 </View>
 
+                {isChatEnabled ? (
+                  <TouchableOpacity
+                    style={styles.chatOpenRow}
+                    onPress={() => openOutgoingContactCardChat(item)}
+                    activeOpacity={0.85}
+                  >
+                    <MaterialCommunityIcons name="message-text-outline" size={16} color={ACCENT} />
+                    <Text style={styles.chatOpenText}>
+                      {language === 'en'
+                        ? 'Open card chat'
+                        : language === 'ru'
+                          ? '\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u0447\u0430\u0442 \u043f\u043e \u0442\u0435\u043c\u0435'
+                          : '\u0412\u0456\u0434\u043a\u0440\u0438\u0442\u0438 \u0447\u0430\u0442 \u043f\u043e \u0442\u0435\u043c\u0456'}
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+
                 <UserCardActionBar
                   avatarUri={photo || ''}
                   name={displayName}
@@ -1128,7 +1159,7 @@ export default function ProfileRequestsScreen() {
                   likePath="feed_likes/profile_requests"
                   likeId={`${displayId}_${sanitizeFirebaseKey(item.requestedAt)}`}
                 />
-              </View>
+              </TouchableOpacity>
             );
           }}
         />

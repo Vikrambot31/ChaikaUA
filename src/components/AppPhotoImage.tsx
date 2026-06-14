@@ -588,7 +588,7 @@ const AppPhotoImage: React.FC<Props> = ({
       <View style={[styles.container, style]}>
         <Image
           source={startAvatar.source}
-          style={StyleSheet.absoluteFill}
+          style={{ width: '100%', height: '100%' }}
           resizeMode={resizeMode}
           onError={(event) => {
             if (preferredPath) invalidateCachedUrl(preferredPath);
