@@ -208,6 +208,19 @@ const isPrimaryServiceOwnerContext = (context) =>
     context?.auth?.token?.email_verified === true),
   );
 
+const assertRealAuthenticatedUser = (context) => {
+  if (!context.auth?.uid) {
+    throw new functionsV1.https.HttpsError('unauthenticated', 'Authentication required');
+  }
+
+  const provider = String(context.auth.token?.firebase?.sign_in_provider || '');
+  if (provider === 'anonymous') {
+    throw new functionsV1.https.HttpsError('permission-denied', 'Registered account required');
+  }
+
+  return context.auth.uid;
+};
+
 const isAdminRoleContext = async (context) => {
   if (!context?.auth?.uid) return false;
   const role = await getRoleForUid(context.auth.uid);
@@ -1986,11 +1999,9 @@ exports.closeExpiredOsbbVotes = functionsV1.pubsub
 
 exports.getUserSubscription = functionsV1.https.onCall(async (_data, context) => {
   try {
-    if (!context.auth?.uid) {
-      throw new functionsV1.https.HttpsError('unauthenticated', 'Authentication required');
-    }
+    const uid = assertRealAuthenticatedUser(context);
 
-    const snapshot = await admin.database().ref(`user_subscription/${context.auth.uid}`).once('value');
+    const snapshot = await admin.database().ref(`user_subscription/${uid}`).once('value');
     const normalized = normalizeSubscriptionRecord(snapshot.val());
 
     if (!normalized.isActive && snapshot.exists()) {
@@ -2013,9 +2024,7 @@ exports.getUserSubscription = functionsV1.https.onCall(async (_data, context) =>
 
 exports.activatePromoPremium = functionsV1.https.onCall(async (data, context) => {
   try {
-    if (!context.auth?.uid) {
-      throw new functionsV1.https.HttpsError('unauthenticated', 'Authentication required');
-    }
+    const uid = assertRealAuthenticatedUser(context);
 
     const plan = PREMIUM_PLANS.has(data?.plan) ? data.plan : null;
     if (!plan) {
@@ -2023,7 +2032,7 @@ exports.activatePromoPremium = functionsV1.https.onCall(async (data, context) =>
     }
 
     const db = admin.database();
-    const subscriptionRef = db.ref(`user_subscription/${context.auth.uid}`);
+    const subscriptionRef = db.ref(`user_subscription/${uid}`);
     const existingSnapshot = await subscriptionRef.once('value');
     const existing = normalizeSubscriptionRecord(existingSnapshot.val());
     if (existing.isActive) {
@@ -2091,11 +2100,9 @@ exports.activatePromoPremium = functionsV1.https.onCall(async (data, context) =>
 
 exports.cancelUserSubscription = functionsV1.https.onCall(async (_data, context) => {
   try {
-    if (!context.auth?.uid) {
-      throw new functionsV1.https.HttpsError('unauthenticated', 'Authentication required');
-    }
+    const uid = assertRealAuthenticatedUser(context);
 
-    await admin.database().ref(`user_subscription/${context.auth.uid}`).update({
+    await admin.database().ref(`user_subscription/${uid}`).update({
       plan: 'free',
       status: 'free',
       activatedAt: null,
@@ -5073,10 +5080,7 @@ exports.activatePremiumManual = functionsV1.https.onCall(async (data, context) =
 
 exports.activateTrialPremium = functionsV1.https.onCall(async (_data, context) => {
   try {
-    if (!context.auth?.uid) {
-      throw new functionsV1.https.HttpsError('unauthenticated', 'Authentication required');
-    }
-    const uid = context.auth.uid;
+    const uid = assertRealAuthenticatedUser(context);
     const db = admin.database();
     const subRef = db.ref(`user_subscription/${uid}`);
 

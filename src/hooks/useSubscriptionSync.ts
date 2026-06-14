@@ -4,6 +4,7 @@ import { onValue, ref } from 'firebase/database';
 import {
   hydrateSubscription,
   checkExpiry,
+  resetSubscription,
   normalizeServerSubscription,
   type ServerSubscriptionPayload,
 } from '../redux/slices/subscriptionSlice';
@@ -33,7 +34,12 @@ export function useSubscriptionSync(userId: string | null | undefined): {
 
   useEffect(() => {
     // Never subscribe in local-dev mode — no real Firebase
-    if (!userId || LOCAL_MODE) return undefined;
+    if (!userId || LOCAL_MODE) {
+      if (!LOCAL_MODE) {
+        dispatch(resetSubscription());
+      }
+      return undefined;
+    }
 
     // Reset per-user flags when the uid changes (login / account switch)
     firstLoadDoneRef.current = false;

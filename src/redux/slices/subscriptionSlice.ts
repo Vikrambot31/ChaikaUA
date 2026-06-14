@@ -117,6 +117,14 @@ const subscriptionSlice = createSlice({
       state.expiresAt = null;
       state.activatedAt = null;
     },
+    resetSubscription(state) {
+      state.plan = 'free';
+      state.status = 'free';
+      state.expiresAt = null;
+      state.activatedAt = null;
+      state.trialUsed = false;
+      state.paymentMethod = null;
+    },
     checkExpiry(state) {
       if (state.expiresAt && new Date() > new Date(state.expiresAt)) {
         // Preserve plan and expiresAt so UI can show "Your <Plan> has expired"
@@ -126,7 +134,7 @@ const subscriptionSlice = createSlice({
   },
 });
 
-export const { hydrateSubscription, cancelPlan, checkExpiry } = subscriptionSlice.actions;
+export const { hydrateSubscription, cancelPlan, resetSubscription, checkExpiry } = subscriptionSlice.actions;
 export default subscriptionSlice.reducer;
 
 // ── Selectors ──
@@ -139,7 +147,8 @@ export const selectSubscriptionStatus = (state: { subscription: SubscriptionStat
 
 /** True if user has active or trial premium AND it has not expired locally.
  * business_plus inherits all premium limits. */
-export const selectIsPremium = (state: { subscription: SubscriptionState }): boolean => {
+export const selectIsPremium = (state: { subscription: SubscriptionState; auth?: { isAuthenticated?: boolean; user?: { id?: string } | null } }): boolean => {
+  if (!state.auth?.isAuthenticated || !state.auth.user?.id) return false;
   const { plan, status, expiresAt } = state.subscription;
   if (plan !== 'premium' && plan !== 'premium_plus' && plan !== 'business_plus') return false;
   if (status !== 'active' && status !== 'trial') return false;
@@ -147,11 +156,12 @@ export const selectIsPremium = (state: { subscription: SubscriptionState }): boo
   return new Date() < new Date(expiresAt);
 };
 
-export const selectIsPremiumPlus = (state: { subscription: SubscriptionState }) =>
-  state.subscription.plan === 'premium_plus';
+export const selectIsPremiumPlus = (state: { subscription: SubscriptionState; auth?: { isAuthenticated?: boolean; user?: { id?: string } | null } }) =>
+  Boolean(state.auth?.isAuthenticated && state.auth.user?.id && state.subscription.plan === 'premium_plus');
 
 /** True if user has active business_plus subscription */
-export const selectIsBusinessPlus = (state: { subscription: SubscriptionState }): boolean => {
+export const selectIsBusinessPlus = (state: { subscription: SubscriptionState; auth?: { isAuthenticated?: boolean; user?: { id?: string } | null } }): boolean => {
+  if (!state.auth?.isAuthenticated || !state.auth.user?.id) return false;
   const { plan, status, expiresAt } = state.subscription;
   if (plan !== 'business_plus') return false;
   if (status !== 'active' && status !== 'trial') return false;

@@ -14,7 +14,7 @@ import {
   resetAuthBootstrap,
 } from './src/firebase-auth-session';
 import { setUser, logout, selectAuthBootstrapped, selectUser, setAuthBootstrapped } from './src/redux/slices/authSlice';
-import { checkExpiry } from './src/redux/slices/subscriptionSlice';
+import { checkExpiry, resetSubscription } from './src/redux/slices/subscriptionSlice';
 import { selectIsOnline } from './src/redux/slices/networkSlice';
 import { useFCMToken } from './src/hooks/useFCMToken';
 import { useNetworkMonitor } from './src/hooks/useNetworkMonitor';
@@ -399,12 +399,14 @@ function AppWithAuthSync({ remoteConfigSnapshot, onRemoteConfigSnapshot }: AppWi
 
       if (!user) {
         identifyCrashUser(null);
+        dispatch(resetSubscription());
         dispatch(logout());
         return;
       }
 
       if (isAnonymousFirebaseUser(user)) {
         identifyCrashUser(null);
+        dispatch(resetSubscription());
         dispatch(logout());
         return;
       }
@@ -448,6 +450,7 @@ function AppWithAuthSync({ remoteConfigSnapshot, onRemoteConfigSnapshot }: AppWi
               void fcmAPI.removeTokenForUser(user.uid).catch((e: unknown) => logClientError('fcm.removeToken.tokenExpired', e));
               clearBonusQueueForUser(user.uid).catch(() => {});
               await signOutPrimarySession().catch((e: unknown) => logClientError('auth.signOut.tokenExpired', e));
+              dispatch(resetSubscription());
               dispatch(logout());
               identifyCrashUser(null);
               void persistor.purge();
@@ -555,6 +558,7 @@ function AppWithAuthSync({ remoteConfigSnapshot, onRemoteConfigSnapshot }: AppWi
         onContinue={() => setResumeDecisionMade(true)}
         onSwitch={async () => {
           await signOutPrimarySession({ resumeAnonymous: true }).catch((e: unknown) => logClientError('auth.signOut.switchAccount', e));
+          dispatch(resetSubscription());
           dispatch(logout());
           await persistor.purge().catch(() => undefined);
           setResumeDecisionMade(true);
