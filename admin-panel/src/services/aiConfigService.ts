@@ -129,8 +129,8 @@ export function maskApiKey(key: string): string {
 
 // ---- Escalations ----
 
-import type { EscalationItem, AiQueueLastRun } from '../types/ai-config';
-export type { EscalationItem, AiQueueLastRun };
+import type { EscalationItem, AiQueueLastRun, SupportEscalationItem, ReportEscalationItem } from '../types/ai-config';
+export type { EscalationItem, AiQueueLastRun, SupportEscalationItem, ReportEscalationItem };
 
 const AI_ESCALATIONS_PATH = 'ai_queue/escalations';
 const AI_QUEUE_LAST_RUN_PATH = 'ai_queue/last_run';
@@ -192,4 +192,61 @@ export async function loadQueueLastRun(): Promise<AiQueueLastRun | null> {
   const db = getDatabase(firebaseApp);
   const snap = await get(ref(db, AI_QUEUE_LAST_RUN_PATH));
   return snap.exists() ? (snap.val() as AiQueueLastRun) : null;
+}
+
+// ---- Support Escalations ----
+
+const AI_SUPPORT_ESC_PATH = 'ai_queue/support_escalations';
+const AI_REPORT_ESC_PATH = 'ai_queue/report_escalations';
+
+export function subscribeToSupportEscalations(callback: (items: SupportEscalationItem[]) => void): () => void {
+  if (LOCAL_MODE) { callback([]); return () => {}; }
+  const db = getDatabase(firebaseApp);
+  const r = ref(db, AI_SUPPORT_ESC_PATH);
+  const listener = onValue(r, (snap) => {
+    if (!snap.exists()) { callback([]); return; }
+    const items: SupportEscalationItem[] = [];
+    snap.forEach((child) => {
+      const val = child.val() as SupportEscalationItem;
+      if (val.status === 'pending') items.push({ ...val, id: child.key! });
+    });
+    const urgencyScore: Record<string, number> = { high: 3, medium: 2, low: 1 };
+    items.sort((a, b) => (urgencyScore[b.urgency] || 0) - (urgencyScore[a.urgency] || 0) || b.createdAt - a.createdAt);
+    callback(items);
+  });
+  return () => off(r, 'value', listener);
+}
+
+export async function resolveSupportEscalation(escalationId: string): Promise<void> {
+  if (LOCAL_MODE) return;
+  const db = getDatabase(firebaseApp);
+  await set(ref(db, `${AI_SUPPORT_ESC_PATH}/${escalationId}/status`), 'resolved');
+  await set(ref(db, `${AI_SUPPORT_ESC_PATH}/${escalationId}/resolvedAt`), Date.now());
+}
+
+// ---- Report Escalations ----
+
+export function subscribeToReportEscalations(callback: (items: ReportEscalationItem[]) => void): () => void {
+  if (LOCAL_MODE) { callback([]); return () => {}; }
+  const db = getDatabase(firebaseApp);
+  const r = ref(db, AI_REPORT_ESC_PATH);
+  const listener = onValue(r, (snap) => {
+    if (!snap.exists()) { callback([]); return; }
+    const items: ReportEscalationItem[] = [];
+    snap.forEach((child) => {
+      const val = child.val() as ReportEscalationItem;
+      if (val.status === 'pending') items.push({ ...val, id: child.key! });
+    });
+    const pScore: Record<string, number> = { high: 3, medium: 2, low: 1 };
+    items.sort((a, b) => (pScore[b.aiPriority] || 0) - (pScore[a.aiPriority] || 0) || b.createdAt - a.createdAt);
+    callback(items);
+  });
+  return () => off(r, 'value', listener);
+}
+
+export async function resolveReportEscalation(escalationId: string): Promise<void> {
+  if (LOCAL_MODE) return;
+  const db = getDatabase(firebaseApp);
+  await set(ref(db, `${AI_REPORT_ESC_PATH}/${escalationId}/status`), 'resolved');
+  await set(ref(db, `${AI_REPORT_ESC_PATH}/${escalationId}/resolvedAt`), Date.now());
 }

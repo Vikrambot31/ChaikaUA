@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { User } from 'firebase/auth';
-import type { AiConfig, AiProvider, AiLogEntry, EscalationItem, AiQueueLastRun } from '../types/ai-config';
+import type { AiConfig, AiProvider, AiLogEntry, EscalationItem, AiQueueLastRun, SupportEscalationItem, ReportEscalationItem } from '../types/ai-config';
 import { AI_PROVIDER_LABELS, AI_PROVIDER_DEFAULT_MODELS, DEFAULT_AI_CONFIG } from '../types/ai-config';
 import type { AiUsageStats } from '../services/aiConfigService';
 import {
@@ -13,6 +13,10 @@ import {
   subscribeToEscalations,
   resolveEscalation,
   loadQueueLastRun,
+  subscribeToSupportEscalations,
+  subscribeToReportEscalations,
+  resolveSupportEscalation,
+  resolveReportEscalation,
 } from '../services/aiConfigService';
 
 type Tab = 'model' | 'autonomous' | 'escalations' | 'log' | 'stats';
@@ -46,6 +50,9 @@ export const AiControlCenterPage = ({ user }: Props) => {
   const [escalations, setEscalations] = useState<EscalationItem[]>([]);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
   const [lastRun, setLastRun] = useState<AiQueueLastRun | null>(null);
+  const [supportEscalations, setSupportEscalations] = useState<SupportEscalationItem[]>([]);
+  const [reportEscalations, setReportEscalations] = useState<ReportEscalationItem[]>([]);
+  const [escalationFilter, setEscalationFilter] = useState<'all' | 'content' | 'support' | 'reports'>('all');
 
   useEffect(() => {
     const unsub = subscribeToAiConfig((cfg) => {
@@ -60,6 +67,12 @@ export const AiControlCenterPage = ({ user }: Props) => {
     const unsub = subscribeToEscalations(setEscalations);
     void loadQueueLastRun().then(setLastRun);
     return unsub;
+  }, []);
+
+  useEffect(() => {
+    const u1 = subscribeToSupportEscalations(setSupportEscalations);
+    const u2 = subscribeToReportEscalations(setReportEscalations);
+    return () => { u1(); u2(); };
   }, []);
 
   const hasChanges = JSON.stringify(config) !== JSON.stringify(savedConfig);
@@ -389,105 +402,140 @@ export const AiControlCenterPage = ({ user }: Props) => {
       biznesChaikaListings: 'Бизнес', jobs: 'Работа', lostFound: 'Потеряно/Найдено',
       appSuggestions: 'Предложения',
     };
+    const URGENCY_COLORS: Record<string, string> = { high: '#f44336', medium: '#ff9800', low: '#4caf50' };
+    const REPORT_VERDICT_LABELS: Record<string, string> = { legitimate: 'Реальная', serious: 'Серьёзная', spam: 'Спам', revenge: 'Месть' };
+
+    const totalAll = escalations.length + supportEscalations.length + reportEscalations.length;
+    const showContent = escalationFilter === 'all' || escalationFilter === 'content';
+    const showSupport = escalationFilter === 'all' || escalationFilter === 'support';
+    const showReports = escalationFilter === 'all' || escalationFilter === 'reports';
+    const filterBtns: Array<{ key: typeof escalationFilter; label: string; count: number }> = [
+      { key: 'all', label: 'Все', count: totalAll },
+      { key: 'content', label: 'Контент', count: escalations.length },
+      { key: 'support', label: 'Поддержка', count: supportEscalations.length },
+      { key: 'reports', label: 'Жалобы', count: reportEscalations.length },
+    ];
 
     return (
       <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
           <div>
-            <h3 style={{ margin: 0, marginBottom: 6 }}>Очередь эскалаций</h3>
-            <p style={{ color: '#888', fontSize: 12, margin: 0 }}>
-              Контент, где AI не уверен — требует вашего решения
-            </p>
+            <h3 style={{ margin: 0, marginBottom: 4 }}>Очередь эскалаций</h3>
+            <p style={{ color: '#888', fontSize: 12, margin: 0 }}>Контент и тикеты, требующие вашего решения</p>
           </div>
           {lastRun && (
-            <div style={{ fontSize: 12, color: '#666', textAlign: 'right' }}>
-              <div>Последний прогон: {formatDate(lastRun.timestamp)}</div>
-              <div>Обработано: {lastRun.totalProcessed} | \u2713 {lastRun.totalApproved} | \u2717 {lastRun.totalRejected} | \u26a1 {lastRun.totalEscalated}</div>
+            <div style={{ fontSize: 11, color: '#666', textAlign: 'right' }}>
+              <div>Прогон: {formatDate(lastRun.timestamp)}</div>
+              <div>{'\u2713'}{lastRun.totalApproved} {'\u2717'}{lastRun.totalRejected} {'\u26a1'}{lastRun.totalEscalated}</div>
             </div>
           )}
         </div>
 
-        {escalations.length === 0 ? (
-          <div style={{
-            padding: '40px 20px', textAlign: 'center',
-            background: '#1a1a2a', borderRadius: 10, border: '1px solid #2a2a3a',
-            color: '#666', fontSize: 14,
-          }}>
-            \u2713 Очередь пуста — нет элементов, требующих вашего внимания
+        <div style={{ display: 'flex', gap: 6, marginBottom: 20 }}>
+          {filterBtns.map(({ key, label, count }) => (
+            <button key={key} type="button" onClick={() => setEscalationFilter(key)}
+              style={{ padding: '6px 14px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 13,
+                background: escalationFilter === key ? '#2a2a4a' : '#1a1a2a',
+                color: escalationFilter === key ? '#a0b4ff' : '#666',
+                fontWeight: escalationFilter === key ? 700 : 400 }}>
+              {label} {count > 0 && <span style={{ background: '#f44336', color: '#fff', borderRadius: 8, padding: '1px 6px', fontSize: 10, marginLeft: 4 }}>{count}</span>}
+            </button>
+          ))}
+        </div>
+
+        {totalAll === 0 && (
+          <div style={{ padding: '40px 20px', textAlign: 'center', background: '#1a1a2a', borderRadius: 10, border: '1px solid #2a2a3a', color: '#666', fontSize: 14 }}>
+            {'\u2713'} Очередь пуста
           </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {escalations.map((esc) => (
-              <div key={esc.id} style={{
-                padding: '16px 20px', background: '#1a1a2a', borderRadius: 10,
-                border: `1px solid ${esc.ai_verdict === 'suspicious' ? '#f4433644' : '#ff980044'}`,
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <span style={{
-                      padding: '2px 10px', borderRadius: 4, fontSize: 11, fontWeight: 700,
-                      background: '#2a2a4a', color: '#a0b4ff',
-                    }}>{SECTION_LABELS[esc.section] || esc.section}</span>
-                    <span style={{
-                      padding: '2px 10px', borderRadius: 4, fontSize: 11, fontWeight: 700,
-                      background: (VERDICT_COLORS[esc.ai_verdict] || '#888') + '33',
-                      color: VERDICT_COLORS[esc.ai_verdict] || '#888',
-                    }}>{esc.ai_verdict} {Math.round(esc.ai_confidence * 100)}%</span>
-                    {esc.ai_flags?.map((f) => (
-                      <span key={f} style={{ padding: '2px 8px', borderRadius: 4, fontSize: 10, background: '#3a2a2a', color: '#ef9a9a' }}>{f}</span>
-                    ))}
+        )}
+
+        {/* Content escalations */}
+        {showContent && escalations.length > 0 && (
+          <div style={{ marginBottom: 24 }}>
+            {escalationFilter === 'all' && <div style={{ fontSize: 11, fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>Модерация контента</div>}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {escalations.map((esc) => (
+                <div key={esc.id} style={{ padding: '14px 18px', background: '#1a1a2a', borderRadius: 10, border: `1px solid ${esc.ai_verdict === 'suspicious' ? '#f4433644' : '#ff980044'}` }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700, background: '#2a2a4a', color: '#a0b4ff' }}>{SECTION_LABELS[esc.section] || esc.section}</span>
+                      <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700, background: (VERDICT_COLORS[esc.ai_verdict] || '#888') + '33', color: VERDICT_COLORS[esc.ai_verdict] || '#888' }}>{esc.ai_verdict} {Math.round(esc.ai_confidence * 100)}%</span>
+                    </div>
+                    <span style={{ fontSize: 11, color: '#555' }}>{formatDate(esc.createdAt)}</span>
                   </div>
-                  <span style={{ fontSize: 11, color: '#666', flexShrink: 0 }}>{formatDate(esc.createdAt)}</span>
+                  <p style={{ margin: '0 0 6px', fontSize: 13, color: '#ccc', background: '#12121e', padding: '8px 12px', borderRadius: 6, borderLeft: '3px solid #333', fontStyle: 'italic' }}>{esc.textPreview}</p>
+                  {esc.ai_explanation && <p style={{ margin: '0 0 10px', fontSize: 12, color: '#888' }}>{'\ud83d\udcac'} {esc.ai_explanation}</p>}
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button type="button" disabled={resolvingId === esc.id} onClick={() => void handleResolve(esc.id, 'approve')}
+                      style={{ padding: '6px 16px', borderRadius: 6, border: 'none', background: resolvingId === esc.id ? '#555' : '#2e7d32', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>{'\u2713'} Одобрить</button>
+                    <button type="button" disabled={resolvingId === esc.id} onClick={() => void handleResolve(esc.id, 'reject')}
+                      style={{ padding: '6px 16px', borderRadius: 6, border: 'none', background: resolvingId === esc.id ? '#555' : '#c62828', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>{'\u2717'} Отклонить</button>
+                  </div>
                 </div>
+              ))}
+            </div>
+          </div>
+        )}
 
-                <p style={{
-                  margin: '0 0 8px', fontSize: 13, color: '#ccc', lineHeight: 1.5,
-                  background: '#12121e', padding: '10px 14px', borderRadius: 6,
-                  fontStyle: 'italic', borderLeft: '3px solid #333',
-                }}>
-                  {esc.textPreview || '(текст недоступен)'}
-                </p>
-
-                {esc.ai_explanation && (
-                  <p style={{ margin: '0 0 12px', fontSize: 12, color: '#888' }}>
-                    \ud83d\udcac AI: {esc.ai_explanation}
-                  </p>
-                )}
-
-                <div style={{ display: 'flex', gap: 10 }}>
-                  <button
-                    type="button"
-                    disabled={resolvingId === esc.id}
-                    onClick={() => void handleResolve(esc.id, 'approve')}
-                    style={{
-                      padding: '8px 20px', borderRadius: 6, border: 'none',
-                      background: resolvingId === esc.id ? '#555' : '#2e7d32',
-                      color: '#fff', fontWeight: 700, fontSize: 13, cursor: resolvingId === esc.id ? 'default' : 'pointer',
-                    }}
-                  >
-                    \u2713 Одобрить
-                  </button>
-                  <button
-                    type="button"
-                    disabled={resolvingId === esc.id}
-                    onClick={() => void handleResolve(esc.id, 'reject')}
-                    style={{
-                      padding: '8px 20px', borderRadius: 6, border: 'none',
-                      background: resolvingId === esc.id ? '#555' : '#c62828',
-                      color: '#fff', fontWeight: 700, fontSize: 13, cursor: resolvingId === esc.id ? 'default' : 'pointer',
-                    }}
-                  >
-                    \u2717 Отклонить
-                  </button>
-                  <a
-                    href="#moderation"
-                    style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid #555', color: '#aaa', fontSize: 13, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
-                  >
-                    Открыть в модерации
-                  </a>
+        {/* Support escalations */}
+        {showSupport && supportEscalations.length > 0 && (
+          <div style={{ marginBottom: 24 }}>
+            {escalationFilter === 'all' && <div style={{ fontSize: 11, fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>Поддержка</div>}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {supportEscalations.map((esc) => (
+                <div key={esc.id} style={{ padding: '14px 18px', background: '#1a1a2a', borderRadius: 10, border: `1px solid ${esc.urgency === 'high' ? '#f4433655' : '#ff980033'}` }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                      <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700, background: '#2a2a4a', color: '#a0b4ff' }}>{esc.category}</span>
+                      <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700, background: (URGENCY_COLORS[esc.urgency] || '#888') + '33', color: URGENCY_COLORS[esc.urgency] || '#888' }}>{esc.urgency}</span>
+                      {esc.requiresHuman && <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 10, background: '#f4433633', color: '#f44336' }}>Требует человека</span>}
+                      <span style={{ fontSize: 12, color: '#888' }}>{esc.userName}</span>
+                    </div>
+                    <span style={{ fontSize: 11, color: '#555' }}>{formatDate(esc.createdAt)}</span>
+                  </div>
+                  <p style={{ margin: '0 0 8px', fontSize: 13, color: '#ccc', background: '#12121e', padding: '8px 12px', borderRadius: 6, borderLeft: '3px solid #1976d2', fontStyle: 'italic' }}>{esc.userMessage}</p>
+                  {esc.aiDraftReply && (
+                    <div style={{ margin: '0 0 10px', padding: '8px 12px', background: '#0a1a0a', borderRadius: 6, borderLeft: '3px solid #4caf50' }}>
+                      <div style={{ fontSize: 10, color: '#4caf50', marginBottom: 4, fontWeight: 700 }}>AI черновик:</div>
+                      <p style={{ margin: 0, fontSize: 12, color: '#9e9e9e' }}>{esc.aiDraftReply.slice(0, 300)}</p>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <a href="#support" style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #1976d2', color: '#90caf9', fontSize: 12, textDecoration: 'none' }}>Открыть тикет</a>
+                    <button type="button" onClick={() => void resolveSupportEscalation(esc.id)}
+                      style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #555', background: 'transparent', color: '#888', fontSize: 12, cursor: 'pointer' }}>Закрыть</button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Report escalations */}
+        {showReports && reportEscalations.length > 0 && (
+          <div style={{ marginBottom: 24 }}>
+            {escalationFilter === 'all' && <div style={{ fontSize: 11, fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>Жалобы</div>}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {reportEscalations.map((esc) => (
+                <div key={esc.id} style={{ padding: '14px 18px', background: '#1a1a2a', borderRadius: 10, border: `1px solid ${esc.aiVerdict === 'serious' ? '#f4433666' : '#55555544'}` }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                      <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700, background: '#3a2a2a', color: '#ef9a9a' }}>{esc.reason}</span>
+                      <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700, background: esc.aiVerdict === 'serious' ? '#f4433633' : '#2a2a2a', color: esc.aiVerdict === 'serious' ? '#f44336' : '#888' }}>{REPORT_VERDICT_LABELS[esc.aiVerdict] || esc.aiVerdict}</span>
+                      <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 10, background: (URGENCY_COLORS[esc.aiPriority] || '#888') + '22', color: URGENCY_COLORS[esc.aiPriority] || '#888' }}>{esc.aiPriority}</span>
+                    </div>
+                    <span style={{ fontSize: 11, color: '#555' }}>{formatDate(esc.createdAt)}</span>
+                  </div>
+                  {esc.description && <p style={{ margin: '0 0 6px', fontSize: 13, color: '#ccc', background: '#12121e', padding: '8px 12px', borderRadius: 6, borderLeft: '3px solid #f44336', fontStyle: 'italic' }}>{esc.description}</p>}
+                  <p style={{ margin: '0 0 10px', fontSize: 12, color: '#888' }}>{'\ud83d\udcac'} AI: {esc.aiReason}</p>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <a href="#reports" style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #f44336', color: '#ef9a9a', fontSize: 12, textDecoration: 'none' }}>Открыть жалобу</a>
+                    <button type="button" onClick={() => void resolveReportEscalation(esc.id)}
+                      style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #555', background: 'transparent', color: '#888', fontSize: 12, cursor: 'pointer' }}>Закрыть</button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -604,7 +652,7 @@ export const AiControlCenterPage = ({ user }: Props) => {
   const tabs: Array<{ key: Tab; label: string; badge?: number }> = [
     { key: 'model', label: 'Модель' },
     { key: 'autonomous', label: 'Автономность' },
-    { key: 'escalations', label: 'Эскалации', badge: escalations.length },
+    { key: 'escalations', label: 'Эскалации', badge: escalations.length + supportEscalations.length + reportEscalations.length },
     { key: 'log', label: 'Лог действий' },
     { key: 'stats', label: 'Статистика' },
   ];

@@ -122,3 +122,38 @@ export type AiQueueLastRun = {
   totalRejected: number;
   totalEscalated: number;
 };
+
+export type SupportEscalationItem = {
+  id: string;
+  ticketId: string;
+  userId: string | null;
+  userName: string;
+  category: string;
+  urgency: 'low' | 'medium' | 'high';
+  userMessage: string;
+  aiDraftReply: string;
+  createdAt: number;
+  status: 'pending' | 'resolved';
+  resolvedAt?: number;
+  resolvedBy?: string;
+  requiresHuman: boolean;
+};
+
+export type ReportEscalationItem = {
+  id: string;
+  reportId: string;
+  reporterId: string | null;
+  reportedUserId: string | null;
+  reportedListingId: string | null;
+  reason: string;
+  description: string;
+  aiVerdict: 'spam' | 'revenge' | 'legitimate' | 'serious';
+  aiConfidence: number;
+  aiPriority: 'low' | 'medium' | 'high';
+  aiReason: string;
+  provider: string;
+  createdAt: number;
+  status: 'pending' | 'resolved';
+  resolvedAt?: number;
+  resolvedBy?: string;
+};
