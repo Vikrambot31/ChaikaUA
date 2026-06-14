@@ -4029,7 +4029,12 @@ async function handleCommentModeration(snapshot, context, collectionPath) {
 
     const result = await analyzeTextInternal(db, aiConfig, 'comments', text, comment.uid || null);
     if (!result) {
-      // AI failed — keep pending for batch to retry
+      // AI failed (key expired, API error) — publish immediately
+      await db.ref(`${collectionPath}/${requestId}/${commentId}`).update({
+        status: 'visible',
+        ai_auto_processed: true,
+        moderatedBy: 'ai-unavailable',
+      });
       return null;
     }
 
