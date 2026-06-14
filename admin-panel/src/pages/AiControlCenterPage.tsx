@@ -152,14 +152,14 @@ export const AiControlCenterPage = ({ user }: Props) => {
 
   const renderTabModel = () => (
     <div style={{ maxWidth: 600, color: '#e0e0e0' }}>
-      <h3 style={{ marginBottom: 20, color: '#fff' }}>Настройка AI-провайдера</h3>
+      <h3 style={{ marginBottom: 20, color: '#fff', fontSize: 20 }}>Настройка AI-провайдера</h3>
 
       <div style={{ marginBottom: 16 }}>
-        <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 13 }}>Провайдер</label>
+        <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 16 }}>Провайдер</label>
         <select
           value={config.provider}
           onChange={(e) => handleProviderChange(e.target.value as AiProvider)}
-          style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid #444', background: '#2a2a3a', color: '#e0e0e0', fontSize: 14 }}
+          style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid #444', background: '#2a2a3a', color: '#e0e0e0', fontSize: 16 }}
         >
           {(Object.keys(AI_PROVIDER_LABELS) as AiProvider[]).map((p) => (
             <option key={p} value={p}>{AI_PROVIDER_LABELS[p]}</option>
@@ -168,7 +168,7 @@ export const AiControlCenterPage = ({ user }: Props) => {
       </div>
 
       <div style={{ marginBottom: 16 }}>
-        <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 13 }}>Модель</label>
+        <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 16 }}>Модель</label>
         <input
           type="text"
           value={config.model}
@@ -179,14 +179,14 @@ export const AiControlCenterPage = ({ user }: Props) => {
       </div>
 
       <div style={{ marginBottom: 16 }}>
-        <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 13 }}>API Ключ</label>
+        <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 16 }}>API Ключ</label>
         <div style={{ display: 'flex', gap: 8 }}>
           <input
             type={showKey ? 'text' : 'password'}
             value={config.apiKey}
             onChange={(e) => setConfig((c) => ({ ...c, apiKey: e.target.value }))}
             placeholder="sk-..."
-            style={{ flex: 1, padding: '8px 12px', borderRadius: 6, border: '1px solid #444', background: '#2a2a3a', color: '#e0e0e0', fontSize: 14 }}
+            style={{ flex: 1, padding: '8px 12px', borderRadius: 6, border: '1px solid #444', background: '#2a2a3a', color: '#e0e0e0', fontSize: 16 }}
           />
           <button
             type="button"
@@ -197,13 +197,13 @@ export const AiControlCenterPage = ({ user }: Props) => {
           </button>
         </div>
         {savedConfig.apiKey && (
-          <p style={{ fontSize: 11, color: '#888', marginTop: 4 }}>Сохранённый: {maskApiKey(savedConfig.apiKey)}</p>
+          <p style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>Сохранённый: {maskApiKey(savedConfig.apiKey)}</p>
         )}
       </div>
 
       <div style={{ marginBottom: 16 }}>
-        <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 13 }}>
-          Base URL <span style={{ fontWeight: 400, color: '#888' }}>(необязательно)</span>
+        <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 16 }}>
+          Base URL <span style={{ fontWeight: 400, color: '#aaa' }}>(необязательно)</span>
         </label>
         <input
           type="text"
@@ -216,7 +216,7 @@ export const AiControlCenterPage = ({ user }: Props) => {
 
       <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
         <div style={{ flex: 1 }}>
-          <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 13 }}>Дневной лимит (запросов)</label>
+          <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 16 }}>Дневной лимит (запросов)</label>
           <input
             type="number"
             value={config.budgetDaily}
@@ -227,7 +227,7 @@ export const AiControlCenterPage = ({ user }: Props) => {
           />
         </div>
         <div style={{ flex: 1 }}>
-          <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 13 }}>Месячный лимит (запросов)</label>
+          <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 16 }}>Месячный лимит (запросов)</label>
           <input
             type="number"
             value={config.budgetMonthly}
@@ -241,20 +241,20 @@ export const AiControlCenterPage = ({ user }: Props) => {
 
       {/* ---- Vision AI (фото-модерация) ---- */}
       <div style={{ marginTop: 32, paddingTop: 24, borderTop: '1px solid #444' }}>
-        <h3 style={{ marginBottom: 16 }}>Vision AI (фото-модерация)</h3>
-        <p style={{ fontSize: 12, color: '#888', marginBottom: 16 }}>
+        <h3 style={{ marginBottom: 16, fontSize: 20, color: '#fff' }}>Vision AI (фото-модерация)</h3>
+        <p style={{ fontSize: 14, color: '#aaa', marginBottom: 16 }}>
           Отдельный провайдер для анализа фотографий. Поддерживаются только Claude и OpenAI (Vision API).
         </p>
 
         <div style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 13 }}>Vision-провайдер</label>
+          <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 16 }}>Vision-провайдер</label>
           <select
             value={config.vision.provider}
             onChange={(e) => setConfig((c) => ({
               ...c,
               vision: { ...c.vision, provider: e.target.value as 'claude' | 'openai' },
             }))}
-            style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid #444', background: '#2a2a3a', color: '#e0e0e0', fontSize: 14 }}
+            style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid #444', background: '#2a2a3a', color: '#e0e0e0', fontSize: 16 }}
           >
             <option value="claude">Claude (Anthropic)</option>
             <option value="openai">OpenAI</option>
@@ -262,7 +262,7 @@ export const AiControlCenterPage = ({ user }: Props) => {
         </div>
 
         <div style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 13 }}>Vision-модель</label>
+          <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 16 }}>Vision-модель</label>
           <input
             type="text"
             value={config.vision.model}
@@ -276,8 +276,8 @@ export const AiControlCenterPage = ({ user }: Props) => {
         </div>
 
         <div style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 13 }}>
-            Vision API Ключ <span style={{ fontWeight: 400, color: '#888' }}>(если пустой — используется основной ключ)</span>
+          <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 16 }}>
+            Vision API Ключ <span style={{ fontWeight: 400, color: '#aaa' }}>(если пустой — используется основной ключ)</span>
           </label>
           <input
             type="password"
@@ -290,7 +290,7 @@ export const AiControlCenterPage = ({ user }: Props) => {
             style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid #444', background: '#2a2a3a', color: '#e0e0e0', fontSize: 14, boxSizing: 'border-box' }}
           />
           {savedConfig.vision?.apiKey && (
-            <p style={{ fontSize: 11, color: '#888', marginTop: 4 }}>Сохранённый: {maskApiKey(savedConfig.vision.apiKey)}</p>
+            <p style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>Сохранённый: {maskApiKey(savedConfig.vision.apiKey)}</p>
           )}
         </div>
       </div>
@@ -349,7 +349,7 @@ export const AiControlCenterPage = ({ user }: Props) => {
     <div style={{ maxWidth: 620, color: '#e0e0e0' }}>
       <div style={{
         marginBottom: 24, padding: '12px 16px', borderRadius: 8,
-        background: '#2a2a1a', border: '1px solid #665500', color: '#ffd54f', fontSize: 13,
+        background: '#2a2a1a', border: '1px solid #665500', color: '#ffd54f', fontSize: 15,
       }}>
         <strong>Фаза 2 (активна)</strong> — авто-модерация запущена. Scheduled function работает каждые 5 минут. Эскалации появляются во вкладке &quot;Эскалации&quot;.
       </div>
@@ -371,7 +371,7 @@ export const AiControlCenterPage = ({ user }: Props) => {
         </div>
         <label htmlFor="autonomous-master" style={{ cursor: 'pointer' }}>
           <div style={{ fontWeight: 700, fontSize: 15 }}>Автономный режим</div>
-          <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>Главный выключатель. Отключение останавливает все авто-действия AI.</div>
+          <div style={{ fontSize: 12, color: '#aaa', marginTop: 2 }}>Главный выключатель. Отключение останавливает все авто-действия AI.</div>
         </label>
       </div>
 
@@ -402,7 +402,7 @@ export const AiControlCenterPage = ({ user }: Props) => {
           </div>
           <label htmlFor={`autonomous-${key}`} style={{ cursor: config.autonomous.enabled ? 'pointer' : 'default' }}>
             <div style={{ fontWeight: 600, fontSize: 14 }}>{label}</div>
-            <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{desc}</div>
+            <div style={{ fontSize: 12, color: '#aaa', marginTop: 2 }}>{desc}</div>
           </label>
         </div>
       ))}
@@ -418,7 +418,7 @@ export const AiControlCenterPage = ({ user }: Props) => {
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
             <div>
               <span style={{ fontWeight: 600, fontSize: 13 }}>{label}</span>
-              <span style={{ fontSize: 11, color: '#888', marginLeft: 8 }}>{desc}</span>
+              <span style={{ fontSize: 11, color: '#aaa', marginLeft: 8 }}>{desc}</span>
             </div>
             <span style={{ fontWeight: 700, fontSize: 14, color }}>{Math.round(config.thresholds[key] * 100)}%</span>
           </div>
@@ -478,8 +478,8 @@ export const AiControlCenterPage = ({ user }: Props) => {
       <div style={{ color: '#e0e0e0' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
           <div>
-            <h3 style={{ margin: 0, marginBottom: 4, color: '#fff' }}>Очередь эскалаций</h3>
-            <p style={{ color: '#888', fontSize: 12, margin: 0 }}>Контент и тикеты, требующие вашего решения</p>
+            <h3 style={{ margin: 0, marginBottom: 4, color: '#fff', fontSize: 20 }}>Очередь эскалаций</h3>
+            <p style={{ color: '#aaa', fontSize: 14, margin: 0 }}>Контент и тикеты, требующие вашего решения</p>
           </div>
           {lastRun && (
             <div style={{ fontSize: 11, color: '#666', textAlign: 'right' }}>
@@ -522,7 +522,7 @@ export const AiControlCenterPage = ({ user }: Props) => {
                     <span style={{ fontSize: 11, color: '#555' }}>{formatDate(esc.createdAt)}</span>
                   </div>
                   <p style={{ margin: '0 0 6px', fontSize: 13, color: '#ccc', background: '#12121e', padding: '8px 12px', borderRadius: 6, borderLeft: '3px solid #333', fontStyle: 'italic' }}>{esc.textPreview}</p>
-                  {esc.ai_explanation && <p style={{ margin: '0 0 10px', fontSize: 12, color: '#888' }}>{'\ud83d\udcac'} {esc.ai_explanation}</p>}
+                  {esc.ai_explanation && <p style={{ margin: '0 0 10px', fontSize: 12, color: '#aaa' }}>{'\ud83d\udcac'} {esc.ai_explanation}</p>}
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button type="button" disabled={resolvingId === esc.id} onClick={() => void handleResolve(esc.id, 'approve')}
                       style={{ padding: '6px 16px', borderRadius: 6, border: 'none', background: resolvingId === esc.id ? '#555' : '#2e7d32', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>{'\u2713'} Одобрить</button>
@@ -547,7 +547,7 @@ export const AiControlCenterPage = ({ user }: Props) => {
                       <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700, background: '#2a2a4a', color: '#a0b4ff' }}>{esc.category}</span>
                       <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700, background: (URGENCY_COLORS[esc.urgency] || '#888') + '33', color: URGENCY_COLORS[esc.urgency] || '#888' }}>{esc.urgency}</span>
                       {esc.requiresHuman && <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 10, background: '#f4433633', color: '#f44336' }}>Требует человека</span>}
-                      <span style={{ fontSize: 12, color: '#888' }}>{esc.userName}</span>
+                      <span style={{ fontSize: 12, color: '#aaa' }}>{esc.userName}</span>
                     </div>
                     <span style={{ fontSize: 11, color: '#555' }}>{formatDate(esc.createdAt)}</span>
                   </div>
@@ -561,7 +561,7 @@ export const AiControlCenterPage = ({ user }: Props) => {
                   <div style={{ display: 'flex', gap: 8 }}>
                     <a href="#support" style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #1976d2', color: '#90caf9', fontSize: 12, textDecoration: 'none' }}>Открыть тикет</a>
                     <button type="button" onClick={() => void resolveSupportEscalation(esc.id)}
-                      style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #555', background: 'transparent', color: '#888', fontSize: 12, cursor: 'pointer' }}>Закрыть</button>
+                      style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #555', background: 'transparent', color: '#aaa', fontSize: 12, cursor: 'pointer' }}>Закрыть</button>
                   </div>
                 </div>
               ))}
@@ -585,11 +585,11 @@ export const AiControlCenterPage = ({ user }: Props) => {
                     <span style={{ fontSize: 11, color: '#555' }}>{formatDate(esc.createdAt)}</span>
                   </div>
                   {esc.description && <p style={{ margin: '0 0 6px', fontSize: 13, color: '#ccc', background: '#12121e', padding: '8px 12px', borderRadius: 6, borderLeft: '3px solid #f44336', fontStyle: 'italic' }}>{esc.description}</p>}
-                  <p style={{ margin: '0 0 10px', fontSize: 12, color: '#888' }}>{'\ud83d\udcac'} AI: {esc.aiReason}</p>
+                  <p style={{ margin: '0 0 10px', fontSize: 12, color: '#aaa' }}>{'\ud83d\udcac'} AI: {esc.aiReason}</p>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <a href="#reports" style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #f44336', color: '#ef9a9a', fontSize: 12, textDecoration: 'none' }}>Открыть жалобу</a>
                     <button type="button" onClick={() => void resolveReportEscalation(esc.id)}
-                      style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #555', background: 'transparent', color: '#888', fontSize: 12, cursor: 'pointer' }}>Закрыть</button>
+                      style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #555', background: 'transparent', color: '#aaa', fontSize: 12, cursor: 'pointer' }}>Закрыть</button>
                   </div>
                 </div>
               ))}
@@ -603,21 +603,21 @@ export const AiControlCenterPage = ({ user }: Props) => {
   const renderTabLog = () => (
     <div style={{ color: '#e0e0e0' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <h3 style={{ margin: 0, color: '#fff' }}>Лог действий AI</h3>
+        <h3 style={{ margin: 0, color: '#fff', fontSize: 20 }}>Лог действий AI</h3>
         <button type="button" onClick={() => void loadLog()} disabled={logLoading}
           style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #555', background: '#2a2a3a', color: '#ccc', cursor: 'pointer', fontSize: 13 }}>
           {logLoading ? 'Загрузка...' : '\u21bb Обновить'}
         </button>
       </div>
       {logLoading ? (
-        <div style={{ color: '#888', textAlign: 'center', padding: 40 }}>Загрузка...</div>
+        <div style={{ color: '#aaa', textAlign: 'center', padding: 40 }}>Загрузка...</div>
       ) : log.length === 0 ? (
         <div style={{ color: '#666', textAlign: 'center', padding: 40 }}>Лог пуст</div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
-              <tr style={{ background: '#1a1a2a', color: '#888' }}>
+              <tr style={{ background: '#1a1a2a', color: '#aaa' }}>
                 <th style={{ padding: '8px 10px', textAlign: 'left', borderBottom: '1px solid #333' }}>Время</th>
                 <th style={{ padding: '8px 10px', textAlign: 'left', borderBottom: '1px solid #333' }}>Раздел</th>
                 <th style={{ padding: '8px 10px', textAlign: 'left', borderBottom: '1px solid #333' }}>Вердикт</th>
@@ -644,10 +644,10 @@ export const AiControlCenterPage = ({ user }: Props) => {
                   <td style={{ padding: '7px 10px', color: '#ccc' }}>
                     {entry.confidence != null ? `${Math.round(entry.confidence * 100)}%` : '—'}
                   </td>
-                  <td style={{ padding: '7px 10px', color: '#888', fontFamily: 'monospace', fontSize: 11 }}>
+                  <td style={{ padding: '7px 10px', color: '#aaa', fontFamily: 'monospace', fontSize: 11 }}>
                     {entry.provider}/{entry.model?.slice(0, 20) || '—'}
                   </td>
-                  <td style={{ padding: '7px 10px', color: '#888' }}>{entry.tokensUsed || 0}</td>
+                  <td style={{ padding: '7px 10px', color: '#aaa' }}>{entry.tokensUsed || 0}</td>
                   <td style={{ padding: '7px 10px', color: entry.cached ? '#81c784' : '#666' }}>
                     {entry.cached ? '\u2713' : '—'}
                   </td>
@@ -666,7 +666,7 @@ export const AiControlCenterPage = ({ user }: Props) => {
 
     return (
       <div style={{ maxWidth: 500, color: '#e0e0e0' }}>
-        <h3 style={{ marginBottom: 24, color: '#fff' }}>Использование бюджета</h3>
+        <h3 style={{ marginBottom: 24, color: '#fff', fontSize: 20 }}>Использование бюджета</h3>
         {!stats ? (
           <div style={{ color: '#666' }}>Нет данных</div>
         ) : (
@@ -692,9 +692,9 @@ export const AiControlCenterPage = ({ user }: Props) => {
             </div>
 
             <div style={{ padding: '14px 18px', background: '#1a1a2a', borderRadius: 8, border: '1px solid #333' }}>
-              <div style={{ fontSize: 12, color: '#888', marginBottom: 6 }}>Провайдер: <span style={{ color: '#ccc' }}>{config.provider}</span></div>
-              <div style={{ fontSize: 12, color: '#888', marginBottom: 6 }}>Модель: <span style={{ color: '#ccc', fontFamily: 'monospace' }}>{config.model}</span></div>
-              <div style={{ fontSize: 12, color: '#888' }}>Запросов/мин сейчас: <span style={{ color: '#ccc' }}>{stats.minuteTotal || 0}</span></div>
+              <div style={{ fontSize: 12, color: '#aaa', marginBottom: 6 }}>Провайдер: <span style={{ color: '#ccc' }}>{config.provider}</span></div>
+              <div style={{ fontSize: 12, color: '#aaa', marginBottom: 6 }}>Модель: <span style={{ color: '#ccc', fontFamily: 'monospace' }}>{config.model}</span></div>
+              <div style={{ fontSize: 12, color: '#aaa' }}>Запросов/мин сейчас: <span style={{ color: '#ccc' }}>{stats.minuteTotal || 0}</span></div>
             </div>
 
             <button type="button" onClick={() => void loadStats()}
@@ -718,7 +718,7 @@ export const AiControlCenterPage = ({ user }: Props) => {
   return (
     <div style={{ padding: '24px 32px', color: '#e0e0e0' }}>
       <h2 style={{ marginBottom: 8, fontSize: 22, fontWeight: 800, color: '#fff' }}>AI Control Center</h2>
-      <p style={{ color: '#888', marginBottom: 28, fontSize: 13 }}>
+      <p style={{ color: '#aaa', marginBottom: 28, fontSize: 16 }}>
         Управление AI-провайдером и автономным режимом модерации
       </p>
 
@@ -733,7 +733,7 @@ export const AiControlCenterPage = ({ user }: Props) => {
               background: tab === key ? '#2a2a4a' : 'transparent',
               color: tab === key ? '#a0b4ff' : '#888',
               fontWeight: tab === key ? 700 : 400,
-              fontSize: 14, cursor: 'pointer',
+              fontSize: 16, cursor: 'pointer',
               borderBottom: tab === key ? '2px solid #7c4dff' : '2px solid transparent',
               display: 'flex', alignItems: 'center', gap: 6,
             }}
