@@ -169,6 +169,7 @@ const CommentSection: React.FC<Props> = ({ requestId, requestAuthorUid, isReques
     const isAuthor = item.uid === requestAuthorUid;
     const isOwn = item.uid === currentUser?.id;
     const isPending = item.status === 'pending';
+    const isHidden = item.status === 'hidden';
     const avatarUri = isOwn ? pickUserAvatarUri(currentUser) : (avatarMap[item.uid] || '');
 
     const handleContact = () => {
@@ -209,11 +210,17 @@ const CommentSection: React.FC<Props> = ({ requestId, requestAuthorUid, isReques
               </TouchableOpacity>
             )}
           </View>
-          <Text style={[styles.commentText, { color: colors.textPrimary }]}>{item.text}</Text>
+          <Text style={[styles.commentText, isHidden && styles.commentTextHidden, { color: isHidden ? colors.textMuted : colors.textPrimary }]}>{item.text}</Text>
           {isPending && isOwn && (
             <View style={styles.pendingRow}>
               <MaterialCommunityIcons name="shield-check-outline" size={14} color={colors.accentText} />
               <Text style={[styles.pendingText, { color: colors.textMuted }]}>{t.comments.pendingPublish}</Text>
+            </View>
+          )}
+          {isHidden && isOwn && (
+            <View style={styles.pendingRow}>
+              <MaterialCommunityIcons name="shield-alert-outline" size={14} color="#D32F2F" />
+              <Text style={[styles.pendingText, { color: '#D32F2F' }]}>{t.comments.hiddenByAi}</Text>
             </View>
           )}
         </View>
@@ -391,6 +398,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#444',
     lineHeight: 18,
+  },
+  commentTextHidden: {
+    textDecorationLine: 'line-through',
+    opacity: 0.5,
   },
   pendingRow: {
     flexDirection: 'row',

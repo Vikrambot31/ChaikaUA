@@ -36,7 +36,7 @@ export function subscribeComments(
           aiModeration: d.aiModeration as Comment['aiModeration'],
         };
       })
-      .filter((c) => c.status === 'visible' || (c.status === 'pending' && c.uid === currentUid))
+      .filter((c) => c.status === 'visible' || ((c.status === 'pending' || c.status === 'hidden') && c.uid === currentUid))
       .sort((a, b) => a.createdAt - b.createdAt);
 
     onComments(comments);

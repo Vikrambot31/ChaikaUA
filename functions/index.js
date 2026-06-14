@@ -3017,9 +3017,10 @@ const AI_SECTION_RULES = {
 - Отклонять: личные сборы под видом общедомовых, мошенничество`,
 
   comments: `Правила для раздела "Комментарии":
-- Одобрять: конструктивные комментарии, предложения помощи, вопросы по теме, благодарности, бытовое общение
-- Проверить: грубость без прямых оскорблений, спорные высказывания, сообщения не по теме
-- Отклонять: прямые оскорбления и угрозы, мат/нецензурная лексика, спам, мошенничество, разжигание ненависти, номера карт/личные данные, реклама`,
+- Одобрять: конструктивные комментарии, предложения помощи, вопросы по теме, благодарности, бытовое общение, нейтральные мнения
+- Проверить: спорные высказывания без оскорблений, сообщения не по теме, избыточные эмоции
+- Отклонять (suspicious): ЛЮБЫЕ прямые оскорбления ("свинья", "дурак", "жлоб", "идиот" и т.п.), угрозы, нецензурная лексика, мат, переход на личности, спам, мошенничество, разжигание ненависти, номера карт/личные данные, реклама
+ВАЖНО: Комментарий с обращением "ты + оскорбительное слово" (ты свинья, ты дурак) — ВСЕГДА suspicious. Даже одно оскорбительное слово = suspicious.`,
 };
 
 const SUPPORT_SYSTEM_PROMPT = `Ти — AI помічник сервісу "Чайка Life" (мобільний додаток для мешканців Чайки, Київ).
@@ -3080,7 +3081,12 @@ const AI_FEW_SHOT = {
   comments: [
     { text: 'Спасибо, очень помогли! Обращусь ещё раз если нужно будет.', verdict: 'approve', reason: 'Благодарность, конструктивный комментарий' },
     { text: 'Могу помочь с этим, напишите мне в личные.', verdict: 'approve', reason: 'Предложение помощи по теме' },
-    { text: 'Ты дурак!!! Я тебе покажу!!!', verdict: 'suspicious', reason: 'Прямое оскорбление и угроза' },
+    { text: 'А когда можно подойти? Я живу рядом.', verdict: 'approve', reason: 'Уточняющий вопрос по теме' },
+    { text: 'Свинья ты!', verdict: 'suspicious', reason: 'Прямое оскорбление другого человека' },
+    { text: 'Ты дурак!!! Я тебе покажу!!!', verdict: 'suspicious', reason: 'Оскорбление и угроза' },
+    { text: 'Иди нафиг, никто тебя не просил', verdict: 'suspicious', reason: 'Грубость и оскорбление' },
+    { text: 'Нет он жлоб', verdict: 'suspicious', reason: 'Оскорбление конкретного человека' },
+    { text: 'Я вам буду угрожать теперь.. понятнО!!!', verdict: 'suspicious', reason: 'Прямая угроза' },
     { text: 'Заработок 5000$/день! Пиши @spam_bot', verdict: 'suspicious', reason: 'Спам, мошенничество' },
   ],
 };
@@ -3777,7 +3783,7 @@ exports.aiAutoModerateScheduled = functionsV1.pubsub
                 }
               }
 
-            } else if (result.verdict === 'suspicious' && result.confidence >= autoRejectThreshold) {
+            } else if (result.verdict === 'suspicious' && (section.nested || result.confidence >= autoRejectThreshold)) {
               // Авто-отклонение
               const updateData = {
                 [section.statusField]: section.rejectedStatus,
@@ -3820,10 +3826,10 @@ exports.aiAutoModerateScheduled = functionsV1.pubsub
 
             } else {
               // Эскалация — отправить человеку
-              // Для комментариев: при эскалации одобряем (fail-open), но логируем для ревью
+              // Для комментариев: fail-closed — скрываем и логируем для ручной проверки
               if (section.nested) {
                 await db.ref(itemRef).update({
-                  [section.statusField]: section.approvedStatus,
+                  [section.statusField]: section.rejectedStatus,
                   ai_auto_processed: true,
                   ai_escalated: true,
                   aiModeration: {
@@ -3969,6 +3975,196 @@ exports.aiResolveEscalation = functionsV1.https.onCall(async (data, context) => 
     throw new functionsV1.https.HttpsError('internal', 'Ошибка при разрешении эскалации');
   }
 });
+
+// =============================================================
+//  moderateNewComment — мгновенная AI-модерация при создании комментария
+//  Trigger: onCreate в request_comments/{requestId}/{commentId}
+//  Время отклика: 2-5 сек (вместо ожидания batch каждые 5 мин)
+// =============================================================
+
+async function handleCommentModeration(snapshot, context, collectionPath) {
+  const comment = snapshot.val();
+  const { requestId, commentId } = context.params;
+
+  if (!comment || comment.status !== 'pending' || comment.ai_auto_processed) return null;
+
+  const db = admin.database();
+
+  try {
+    // Check autonomous mode
+    const autonomousSnap = await db.ref('ai_config/autonomous').once('value');
+    const autonomous = autonomousSnap.val() || {};
+    if (!autonomous.enabled || !autonomous.textModeration) {
+      // AI disabled — approve immediately
+      await db.ref(`${collectionPath}/${requestId}/${commentId}`).update({
+        status: 'visible',
+        ai_auto_processed: true,
+        moderatedBy: 'auto-bypass',
+      });
+      return null;
+    }
+
+    const aiConfig = await getAiRuntimeConfig(db);
+    if (!isConfiguredAiApiKey(aiConfig.apiKey)) {
+      await db.ref(`${collectionPath}/${requestId}/${commentId}`).update({
+        status: 'visible',
+        ai_auto_processed: true,
+        moderatedBy: 'no-ai-key',
+      });
+      return null;
+    }
+
+    const text = String(comment.text || '').trim();
+    if (!text || text.length < 3) {
+      await db.ref(`${collectionPath}/${requestId}/${commentId}`).update({
+        status: 'visible',
+        ai_auto_processed: true,
+      });
+      return null;
+    }
+
+    const threshSnap = await db.ref('ai_config/thresholds').once('value');
+    const thresh = threshSnap.val() || {};
+    const autoApproveThreshold = Number(thresh.autoApprove) || 0.90;
+
+    const result = await analyzeTextInternal(db, aiConfig, 'comments', text, comment.uid || null);
+    if (!result) {
+      // AI failed — keep pending for batch to retry
+      return null;
+    }
+
+    const now = Date.now();
+    const commentRef = `${collectionPath}/${requestId}/${commentId}`;
+
+    if (result.verdict === 'approve' && result.confidence >= autoApproveThreshold) {
+      // Approve
+      await db.ref(commentRef).update({
+        status: 'visible',
+        ai_auto_processed: true,
+        ai_verdict: result.verdict,
+        ai_confidence: result.confidence,
+        ai_provider: result.provider,
+        moderatedAt: now,
+        moderatedBy: 'ai-instant',
+        aiModeration: {
+          verdict: result.verdict,
+          confidence: result.confidence,
+          flags: result.flags || [],
+          provider: result.provider,
+          model: result.model,
+        },
+      });
+
+      // Push notification to other thread participants
+      try {
+        const threadSnap = await db.ref(`${collectionPath}/${requestId}`).once('value');
+        const thread = threadSnap.val() || {};
+        const participantUids = new Set();
+        Object.values(thread).forEach((c) => {
+          if (c && c.uid && c.uid !== comment.uid && c.status === 'visible') {
+            participantUids.add(c.uid);
+          }
+        });
+        for (const uid of participantUids) {
+          const prefSnap = await db.ref(`user_roles/${uid}/notifPrefs/comments`).once('value');
+          if (prefSnap.val() === false) continue;
+          await sendUserNotification(uid, {
+            title: comment.name || 'Чайка',
+            body: text.slice(0, 100),
+          }, { type: 'comment', category: 'comments', requestId, commentId });
+        }
+      } catch (notifErr) {
+        console.error('[moderateNewComment] push error:', notifErr?.message);
+      }
+
+    } else if (result.verdict === 'suspicious') {
+      // Reject — any suspicious verdict hides the comment (fail-closed)
+      await db.ref(commentRef).update({
+        status: 'hidden',
+        ai_auto_processed: true,
+        ai_verdict: result.verdict,
+        ai_confidence: result.confidence,
+        ai_provider: result.provider,
+        moderatedAt: now,
+        moderatedBy: 'ai-instant',
+        aiModeration: {
+          verdict: result.verdict,
+          confidence: result.confidence,
+          flags: result.flags || [],
+          provider: result.provider,
+          model: result.model,
+        },
+      });
+
+    } else {
+      // review / uncertain — hide and escalate (fail-closed for comments)
+      await db.ref(commentRef).update({
+        status: 'hidden',
+        ai_auto_processed: true,
+        ai_escalated: true,
+        ai_verdict: result.verdict,
+        ai_confidence: result.confidence,
+        moderatedAt: now,
+        moderatedBy: 'ai-instant',
+        aiModeration: {
+          verdict: result.verdict,
+          confidence: result.confidence,
+          flags: result.flags || [],
+          provider: result.provider,
+          model: result.model,
+        },
+      });
+      await db.ref('ai_queue/escalations').push({
+        itemPath: commentRef,
+        section: 'comments',
+        statusField: 'status',
+        approvedStatus: 'visible',
+        rejectedStatus: 'hidden',
+        itemId: commentId,
+        textPreview: text.slice(0, 400),
+        userId: comment.uid || null,
+        ai_verdict: result.verdict,
+        ai_confidence: result.confidence,
+        ai_explanation: result.explanation || '',
+        ai_flags: result.flags || [],
+        provider: result.provider,
+        model: result.model,
+        createdAt: now,
+        status: 'pending',
+      });
+    }
+
+    await db.ref('ai_queue/log').push({
+      action: result.verdict === 'approve' ? 'auto_approve' : (result.verdict === 'suspicious' ? 'auto_reject' : 'escalation'),
+      section: 'comments',
+      itemId: commentId,
+      itemPath: commentRef,
+      verdict: result.verdict,
+      confidence: result.confidence,
+      flags: result.flags,
+      provider: result.provider,
+      model: result.model,
+      tokensUsed: result.tokensUsed,
+      cached: result.cached,
+      timestamp: now,
+      source: 'instant',
+    });
+
+  } catch (err) {
+    console.error('[moderateNewComment] error:', err?.message);
+    await writeOpsError('moderateNewComment', err, { requestId, commentId });
+  }
+
+  return null;
+}
+
+exports.moderateNewRequestComment = functionsV1.database
+  .ref('request_comments/{requestId}/{commentId}')
+  .onCreate((snapshot, context) => handleCommentModeration(snapshot, context, 'request_comments'));
+
+exports.moderateNewContactComment = functionsV1.database
+  .ref('contact_comments/{requestId}/{commentId}')
+  .onCreate((snapshot, context) => handleCommentModeration(snapshot, context, 'contact_comments'));
 
 // =============================================================
 //  aiAutoReplySupport — авто-ответ на первое сообщение поддержки
