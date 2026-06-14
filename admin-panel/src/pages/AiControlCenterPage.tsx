@@ -151,8 +151,8 @@ export const AiControlCenterPage = ({ user }: Props) => {
   if (loading) return <div className="loadingScreen">Загрузка конфигурации AI...</div>;
 
   const renderTabModel = () => (
-    <div style={{ maxWidth: 600 }}>
-      <h3 style={{ marginBottom: 20 }}>Настройка AI-провайдера</h3>
+    <div style={{ maxWidth: 600, color: '#e0e0e0' }}>
+      <h3 style={{ marginBottom: 20, color: '#fff' }}>Настройка AI-провайдера</h3>
 
       <div style={{ marginBottom: 16 }}>
         <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 13 }}>Провайдер</label>
@@ -346,7 +346,7 @@ export const AiControlCenterPage = ({ user }: Props) => {
   );
 
   const renderTabAutonomous = () => (
-    <div style={{ maxWidth: 620 }}>
+    <div style={{ maxWidth: 620, color: '#e0e0e0' }}>
       <div style={{
         marginBottom: 24, padding: '12px 16px', borderRadius: 8,
         background: '#2a2a1a', border: '1px solid #665500', color: '#ffd54f', fontSize: 13,
@@ -475,10 +475,10 @@ export const AiControlCenterPage = ({ user }: Props) => {
     ];
 
     return (
-      <div>
+      <div style={{ color: '#e0e0e0' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
           <div>
-            <h3 style={{ margin: 0, marginBottom: 4 }}>Очередь эскалаций</h3>
+            <h3 style={{ margin: 0, marginBottom: 4, color: '#fff' }}>Очередь эскалаций</h3>
             <p style={{ color: '#888', fontSize: 12, margin: 0 }}>Контент и тикеты, требующие вашего решения</p>
           </div>
           {lastRun && (
@@ -601,9 +601,9 @@ export const AiControlCenterPage = ({ user }: Props) => {
   };
 
   const renderTabLog = () => (
-    <div>
+    <div style={{ color: '#e0e0e0' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <h3 style={{ margin: 0 }}>Лог действий AI</h3>
+        <h3 style={{ margin: 0, color: '#fff' }}>Лог действий AI</h3>
         <button type="button" onClick={() => void loadLog()} disabled={logLoading}
           style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #555', background: '#2a2a3a', color: '#ccc', cursor: 'pointer', fontSize: 13 }}>
           {logLoading ? 'Загрузка...' : '\u21bb Обновить'}
@@ -665,8 +665,8 @@ export const AiControlCenterPage = ({ user }: Props) => {
     const monthlyPct = stats ? Math.min((stats.monthlyTotal / config.budgetMonthly) * 100, 100) : 0;
 
     return (
-      <div style={{ maxWidth: 500 }}>
-        <h3 style={{ marginBottom: 24 }}>Использование бюджета</h3>
+      <div style={{ maxWidth: 500, color: '#e0e0e0' }}>
+        <h3 style={{ marginBottom: 24, color: '#fff' }}>Использование бюджета</h3>
         {!stats ? (
           <div style={{ color: '#666' }}>Нет данных</div>
         ) : (
@@ -717,7 +717,7 @@ export const AiControlCenterPage = ({ user }: Props) => {
 
   return (
     <div style={{ padding: '24px 32px', color: '#e0e0e0' }}>
-      <h2 style={{ marginBottom: 8, fontSize: 22, fontWeight: 800 }}>AI Control Center</h2>
+      <h2 style={{ marginBottom: 8, fontSize: 22, fontWeight: 800, color: '#fff' }}>AI Control Center</h2>
       <p style={{ color: '#888', marginBottom: 28, fontSize: 13 }}>
         Управление AI-провайдером и автономным режимом модерации
       </p>
