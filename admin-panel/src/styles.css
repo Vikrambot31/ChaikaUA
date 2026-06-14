@@ -2,7 +2,7 @@
   color-scheme: light;
   font-family: "Nunito", "Segoe UI", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   background: #eef3fb;
-  color: #25324a;
+  color: #e0e0e0;
 }
 
 * {
@@ -74,22 +74,22 @@ select {
   width: 100%;
   min-height: 44px;
   padding: 0 12px;
-  border: 1px solid #c9d9ef;
+  border: 1px solid #444;
   border-radius: 6px;
   outline: none;
-  background: #ffffff;
-  color: #25324a;
+  background: #2a2a3a;
+  color: #e0e0e0;
 }
 
 .field select {
   width: 100%;
   min-height: 44px;
   padding: 0 12px;
-  border: 1px solid #c9d9ef;
+  border: 1px solid #444;
   border-radius: 6px;
   outline: none;
-  background: #ffffff;
-  color: #25324a;
+  background: #2a2a3a;
+  color: #e0e0e0;
 }
 
 .field input:focus,
@@ -608,10 +608,11 @@ h3 {
 .panel {
   min-height: 180px;
   padding: 18px;
-  border: 1px solid #d6e2f4;
+  border: 1px solid #333;
   border-radius: 12px;
-  background: #ffffff;
-  box-shadow: 0 8px 24px rgba(40, 74, 130, 0.08);
+  background: #242836;
+  color: #e0e0e0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
 }
 
 .dashboardGrid > .panel:nth-child(4n + 1),
@@ -859,7 +860,7 @@ td small {
   border-radius: 12px;
   outline: none;
   background: #ffffff;
-  color: #25324a;
+  color: #e0e0e0;
   font: inherit;
   resize: vertical;
 }
@@ -1059,7 +1060,7 @@ td small {
   border: 2px solid #607594;
   border-radius: 8px;
   background: #ffffff;
-  color: #25324a;
+  color: #e0e0e0;
   cursor: pointer;
   font-size: 16px;
   line-height: 1;
@@ -1116,7 +1117,7 @@ td small {
   border-radius: 10px;
   background: #ffffff;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  color: #25324a;
+  color: #e0e0e0;
   z-index: 50;
   font-size: 13px;
   line-height: 1.4;
@@ -1199,7 +1200,7 @@ td small {
   margin: 0;
 }
 .editModalMeta dt { color: #607594; font-size: 12px; font-weight: 700; }
-.editModalMeta dd { margin: 0; color: #25324a; }
+.editModalMeta dd { margin: 0; color: #e0e0e0; }
 
 .editField {
   display: grid;
@@ -1218,7 +1219,7 @@ td small {
   border-radius: 8px;
   outline: none;
   font: inherit;
-  color: #25324a;
+  color: #e0e0e0;
   background: #ffffff;
   transition: border-color 0.2s;
   box-sizing: border-box;
@@ -1241,7 +1242,7 @@ td small {
 }
 .aiSuggestionBlock .issue { color: #c95f0a; font-weight: 700; }
 .aiSuggestionBlock .suggestion {
-  color: #25324a;
+  color: #e0e0e0;
   padding: 8px;
   background: #ffffff;
   border: 1px solid #d6e2f4;
@@ -1268,7 +1269,7 @@ td small {
   border-radius: 4px;
 }
 .editHistoryItem .meta { color: #607594; font-size: 12px; font-weight: 700; }
-.editHistoryItem .diff { color: #25324a; font-size: 13px; }
+.editHistoryItem .diff { color: #e0e0e0; font-size: 13px; }
 .editHistoryItem .diff del { color: #ef5b5b; text-decoration: line-through; }
 .editHistoryItem .diff ins { color: #38d85b; text-decoration: none; }
 .editHistoryItem .aiTag {
@@ -1336,7 +1337,7 @@ td small {
   flex: 1;
   font-size: 13px;
   font-weight: 700;
-  color: #25324a;
+  color: #e0e0e0;
 }
 
 .logItem {
@@ -1551,7 +1552,7 @@ td {
 .details dd {
   margin: 0;
   overflow-wrap: anywhere;
-  color: #25324a;
+  color: #e0e0e0;
 }
 
 .healthText {
@@ -1583,7 +1584,7 @@ td {
 
 .releaseDiagnosticsSwitch h3 {
   margin: 0;
-  color: #25324a;
+  color: #e0e0e0;
 }
 
 .releaseDiagnosticsSwitch p {
@@ -1796,7 +1797,7 @@ td {
   border: 1px solid #c9d9ef;
   border-radius: 10px;
   background: #ffffff;
-  color: #25324a;
+  color: #e0e0e0;
 }
 
 .diagnosticSearch {
@@ -1822,7 +1823,7 @@ td {
   border-left-width: 5px;
   border-radius: 12px;
   background: #ffffff;
-  color: #25324a;
+  color: #e0e0e0;
   text-align: left;
   cursor: pointer;
 }
@@ -2057,7 +2058,7 @@ td {
 }
 
 .appRulesRiskBoardHeader strong {
-  color: #25324a;
+  color: #e0e0e0;
   font-size: 18px;
 }
 
@@ -2102,7 +2103,7 @@ td {
 }
 
 .appRulesRiskCard strong {
-  color: #25324a;
+  color: #e0e0e0;
   line-height: 1.25;
 }
 
@@ -2244,7 +2245,7 @@ td {
 .appRulesSection > summary strong {
   display: block;
   margin-bottom: 3px;
-  color: #25324a;
+  color: #e0e0e0;
   font-size: 18px;
 }
 
@@ -2307,7 +2308,7 @@ td {
 }
 
 .appRulesPipelineStep strong {
-  color: #25324a;
+  color: #e0e0e0;
 }
 
 .appRulesPipelineStep small {
@@ -2574,7 +2575,7 @@ td {
   padding: 9px 12px;
   border-bottom: 1px solid #eef3fb;
   vertical-align: middle;
-  color: #25324a;
+  color: #e0e0e0;
 }
 
 .dataTable tr:last-child td {
@@ -2638,7 +2639,7 @@ td {
   border: 1px solid #c9d9ef;
   border-radius: 12px;
   background: #ffffff;
-  color: #25324a;
+  color: #e0e0e0;
   font: inherit;
 }
 
@@ -2703,7 +2704,7 @@ td {
   min-height: 44px;
   border: 0;
   outline: none;
-  color: #25324a;
+  color: #e0e0e0;
 }
 
 .search-spinner {
@@ -2738,7 +2739,7 @@ td {
   border: 0;
   border-bottom: 1px solid #eef3fb;
   background: #ffffff;
-  color: #25324a;
+  color: #e0e0e0;
   text-align: left;
   cursor: pointer;
 }
@@ -2787,7 +2788,7 @@ td {
   min-width: 116px;
   border: 0;
   background: transparent;
-  color: #25324a;
+  color: #e0e0e0;
   cursor: pointer;
 }
 
@@ -3390,7 +3391,7 @@ td {
   padding: 12px 16px;
   border: 0;
   background: #ffffff;
-  color: #25324a;
+  color: #e0e0e0;
   text-align: left;
   cursor: pointer;
 }
@@ -3459,7 +3460,7 @@ td {
 
 .accordion-children-title {
   margin-bottom: 8px;
-  color: #25324a;
+  color: #e0e0e0;
   font-weight: 900;
 }
 
@@ -3484,7 +3485,7 @@ td {
   border: 1px solid #d6e2f4;
   border-radius: 12px;
   background: #f8fbff;
-  color: #25324a;
+  color: #e0e0e0;
   text-align: left;
   cursor: pointer;
 }
@@ -3654,7 +3655,7 @@ td {
   background: #eef3fb;
   font-family: "Fira Mono", "Consolas", monospace;
   font-size: 12px;
-  color: #25324a;
+  color: #e0e0e0;
 }
 
 /* ── Controls ── */
@@ -3732,7 +3733,7 @@ td {
   margin-bottom: 10px;
 }
 
-.diagProgressLabel { font-weight: 700; font-size: 14px; color: #25324a; }
+.diagProgressLabel { font-weight: 700; font-size: 14px; color: #e0e0e0; }
 .diagProgressMeta  { font-size: 13px; color: #607594; }
 
 .diagProgressTrack {
@@ -3809,7 +3810,7 @@ td {
   margin-bottom: -2px;
 }
 
-.diagTab:hover:not(.active) { background: #f0f5fb; color: #25324a; }
+.diagTab:hover:not(.active) { background: #f0f5fb; color: #e0e0e0; }
 
 .diagTab.active {
   background: #ffffff;
@@ -3983,7 +3984,7 @@ td {
 }
 
 .diagHistoryLeft  { display: flex; align-items: center; gap: 10px; }
-.diagHistoryTime  { font-weight: 700; color: #25324a; }
+.diagHistoryTime  { font-weight: 700; color: #e0e0e0; }
 .diagHistoryDur   { color: #8a9ab0; font-size: 12px; }
 .diagHistoryRight { display: flex; gap: 10px; align-items: center; }
 
@@ -4049,7 +4050,7 @@ td {
   border: 1px solid #c9d9ef;
   border-radius: 8px;
   background: #ffffff;
-  color: #25324a;
+  color: #e0e0e0;
   font-size: 12px;
   outline: none;
   transition: border-color 0.15s;
@@ -4169,7 +4170,7 @@ td {
 .classTag.verified  { background: #e8f5e9; color: #2e7d32; }
 .classTag.heuristic { background: #fff8e1; color: #e65100; }
 
-.diagFindingRule { font-size: 12px; font-weight: 700; color: #25324a; }
+.diagFindingRule { font-size: 12px; font-weight: 700; color: #e0e0e0; }
 
 /* ── Shadow Deny ── */
 .diagShadowInfo {
