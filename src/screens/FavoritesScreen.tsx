@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import {
+  Image,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -12,6 +13,7 @@ import { NavigationProp, useFocusEffect, useNavigation } from '@react-navigation
 import { useSelector } from 'react-redux';
 import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
+import { useAppTheme } from '../hooks/useAppTheme';
 import { chaykaPlaces } from '../services/chaykaPlacesData';
 import { getFavorites, removeFavorite, invalidateFavoritesCache, type FavoriteItem, type FavoriteSource } from '../services/favoritesService';
 import { useSoftToast } from '../hooks/useSoftToast';
@@ -19,6 +21,7 @@ import { Place } from '../types/app';
 import { database } from '../firebase-core';
 import { ref, get } from 'firebase/database';
 import type { User } from '../types/app';
+import { getStartAvatarByKey, getDefaultAvatarKey } from '../utils/startAvatars';
 
 type Lang = 'ua' | 'ru' | 'en';
 type AppNavigation = NavigationProp<Record<string, object | undefined>>;
@@ -109,6 +112,7 @@ export default function FavoritesScreen() {
   const navigation = useNavigation<AppNavigation>();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as Lang;
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
+  const { colors } = useAppTheme();
   const [items, setItems] = useState<ResolvedFavorite[]>([]);
   const { showError, showSuccess } = useSoftToast();
 
@@ -225,7 +229,7 @@ export default function FavoritesScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} activeOpacity={0.8}>
@@ -251,6 +255,20 @@ export default function FavoritesScreen() {
               const iconColor = SOURCE_COLORS[item.source] ?? SCREEN_THEME.enamelBlueDark;
               const isLyudi = item.source === 'lyudi';
 
+              // Resolve avatar for lyudi cards
+              const lyudiAvatarSource = isLyudi && item.user
+                ? (() => {
+                    if (item.user!.photoURL) return { uri: item.user!.photoURL };
+                    const avatarKey = item.user!.startAvatarKey || getDefaultAvatarKey(item.user!.gender, item.user!.age);
+                    const avatar = getStartAvatarByKey(avatarKey);
+                    return avatar ? avatar.source : undefined;
+                  })()
+                : undefined;
+
+              const lyudiName = isLyudi && item.user
+                ? item.user.name || (language === 'ua' ? 'Анкета' : language === 'ru' ? 'Анкета' : 'Profile')
+                : undefined;
+
               return (
                 <TouchableOpacity
                   key={`${item.source}-${item.id}`}
@@ -258,14 +276,22 @@ export default function FavoritesScreen() {
                   activeOpacity={0.88}
                   onPress={() => handleOpen(item)}
                 >
-                  <View style={[styles.cardIcon, { backgroundColor: iconColor + '20' }]}>
-                    <MaterialCommunityIcons name={iconName} size={22} color={iconColor} />
-                  </View>
+                  {isLyudi && lyudiAvatarSource ? (
+                    <Image source={lyudiAvatarSource} style={styles.cardAvatar} />
+                  ) : isLyudi ? (
+                    <View style={[styles.cardAvatar, { backgroundColor: iconColor + '20', alignItems: 'center', justifyContent: 'center' }]}>
+                      <MaterialCommunityIcons name="account-outline" size={24} color={iconColor} />
+                    </View>
+                  ) : (
+                    <View style={[styles.cardIcon, { backgroundColor: iconColor + '20' }]}>
+                      <MaterialCommunityIcons name={iconName} size={22} color={iconColor} />
+                    </View>
+                  )}
                   <View style={styles.cardContent}>
                     {isLyudi && item.user ? (
                       <>
                         <Text style={styles.cardTitle} numberOfLines={2}>
-                          {item.user.name || item.id}
+                          {lyudiName}
                         </Text>
                         {item.user.age ? (
                           <Text style={styles.cardAddress} numberOfLines={1}>
@@ -275,6 +301,13 @@ export default function FavoritesScreen() {
                         {item.user.profession ? (
                           <Text style={styles.cardAddress} numberOfLines={1}>{item.user.profession}</Text>
                         ) : null}
+                        <Text style={styles.cardSource}>{sourceLabel}</Text>
+                      </>
+                    ) : isLyudi ? (
+                      <>
+                        <Text style={styles.cardTitle} numberOfLines={2}>
+                          {language === 'ua' ? 'Анкета' : language === 'ru' ? 'Анкета' : 'Profile'}
+                        </Text>
                         <Text style={styles.cardSource}>{sourceLabel}</Text>
                       </>
                     ) : (
@@ -399,6 +432,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
+  },
+  cardAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    marginRight: 12,
+    backgroundColor: '#F0E8EC',
   },
   cardContent: {
     flex: 1,
