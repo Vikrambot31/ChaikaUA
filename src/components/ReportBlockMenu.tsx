@@ -29,6 +29,12 @@ interface Props {
 }
 
 const REPORT_REASONS: ReportReason[] = ['spam', 'inappropriate', 'fake', 'other'];
+const REPORT_FIELD_BG = '#F8F2F6';
+const REPORT_FIELD_BORDER = '#DAB7CA';
+const REPORT_FIELD_TEXT = '#4A3C27';
+const REPORT_FIELD_PLACEHOLDER = '#9B6F87';
+const REPORT_ACTIVE_BG = '#7A2551';
+const REPORT_ACTIVE_TEXT = '#FFFFFF';
 
 const UI_TEXT: Record<Lang, {
   menuTitle: string;
@@ -203,17 +209,17 @@ export default function ReportBlockMenu({
               <Text style={[styles.title, { color: colors.textPrimary }]}>{t.menuTitle}</Text>
               <View style={styles.options}>
                 <TouchableOpacity
-                  style={styles.optionBtn}
+                  style={[styles.optionBtn, { backgroundColor: REPORT_FIELD_BG, borderColor: REPORT_FIELD_BORDER }]}
                   onPress={() => setMode('report')}
                   activeOpacity={0.8}
                 >
                   <MaterialCommunityIcons name="flag-outline" size={20} color={colors.accentText} style={styles.optionIcon} />
-                  <Text style={[styles.optionLabel, { color: colors.textPrimary }]}>{t.reportOption}</Text>
+                  <Text style={[styles.optionLabel, { color: REPORT_FIELD_TEXT }]}>{t.reportOption}</Text>
                   <MaterialCommunityIcons name="chevron-right" size={18} color={colors.textMuted} />
                 </TouchableOpacity>
                 {!hideBlock ? (
                   <TouchableOpacity
-                    style={styles.optionBtn}
+                    style={[styles.optionBtn, { backgroundColor: REPORT_FIELD_BG, borderColor: REPORT_FIELD_BORDER }]}
                     onPress={handleBlockPress}
                     activeOpacity={0.8}
                   >
@@ -231,20 +237,24 @@ export default function ReportBlockMenu({
                 {REPORT_REASONS.map((r) => (
                   <TouchableOpacity
                     key={r}
-                    style={[styles.reasonBtn, reason === r && styles.reasonBtnActive]}
+                    style={[
+                      styles.reasonBtn,
+                      { backgroundColor: REPORT_FIELD_BG, borderColor: REPORT_FIELD_BORDER },
+                      reason === r && styles.reasonBtnActive,
+                    ]}
                     onPress={() => setReason(r)}
                     activeOpacity={0.8}
                   >
-                    <Text style={[styles.reasonLabel, { color: colors.textPrimary }, reason === r && styles.reasonLabelActive]}>{t.reasons[r]}</Text>
+                    <Text style={[styles.reasonLabel, { color: reason === r ? REPORT_ACTIVE_TEXT : REPORT_FIELD_TEXT }]}>{t.reasons[r]}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
               <TextInput
-                style={[styles.descInput, { backgroundColor: colors.inputBg, borderColor: colors.uiBorder, color: colors.textPrimary }]}
+                style={[styles.descInput, { backgroundColor: REPORT_FIELD_BG, borderColor: REPORT_FIELD_BORDER, color: REPORT_FIELD_TEXT }]}
                 value={description}
                 onChangeText={setDescription}
                 placeholder={t.descriptionPlaceholder}
-                placeholderTextColor={colors.placeholder}
+                placeholderTextColor={REPORT_FIELD_PLACEHOLDER}
                 multiline
                 maxLength={500}
               />
@@ -329,16 +339,12 @@ const styles = StyleSheet.create({
     borderColor: '#E4D0AB',
   },
   reasonBtnActive: {
-    borderColor: '#7A2551',
-    backgroundColor: 'rgba(122,37,81,0.1)',
+    borderColor: REPORT_ACTIVE_BG,
+    backgroundColor: REPORT_ACTIVE_BG,
   },
   reasonLabel: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#2D2520',
-  },
-  reasonLabelActive: {
-    color: '#7A2551',
   },
   descInput: {
     backgroundColor: '#FFFFFF',

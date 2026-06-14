@@ -9,7 +9,7 @@
  * - Admin-only functions gated by role check
  * - All operations logged to bonus_transactions
  *
- * Exports: createBonusFunctions({ functions, admin, writeOpsEvent, writeOpsError, getRoleForUid })
+ * Exports: createBonusFunctions({ functions, admin, writeOpsEvent, writeOpsError, getRoleForUid, isPrimaryServiceOwnerContext })
  */
 
 'use strict';
@@ -489,9 +489,22 @@ const spendTrustBonuses = async (db, uid, amount, category, sourceId, now) => {
 
 // ─── Exported Cloud Functions factory ────────────────────────────────────────
 
-const createBonusFunctions = ({ functions, admin, writeOpsEvent, writeOpsError, getRoleForUid }) => {
+const createBonusFunctions = ({
+  functions,
+  admin,
+  writeOpsEvent,
+  writeOpsError,
+  getRoleForUid,
+  isPrimaryServiceOwnerContext = () => false,
+}) => {
   const db = admin.database();
   const fns = {};
+
+  const assertAdminOrPrimaryOwner = async (context) => {
+    if (isPrimaryServiceOwnerContext(context)) return;
+    const role = await getRoleForUid(context.auth.uid);
+    if (role !== 'admin') throw new functions.https.HttpsError('permission-denied', 'admin_only');
+  };
 
   // ────────────────────────────────────────────────────────────────────────
   //  awardHelpBonus — Helper responded to request (+5)
@@ -826,8 +839,7 @@ const createBonusFunctions = ({ functions, admin, writeOpsEvent, writeOpsError, 
   fns.adminGrantPromoCredits = functions.https.onCall(async (data, context) => {
     if (!context.auth?.uid) throw new functions.https.HttpsError('unauthenticated', 'auth_required');
 
-    const role = await getRoleForUid(context.auth.uid);
-    if (role !== 'admin') throw new functions.https.HttpsError('permission-denied', 'admin_only');
+    await assertAdminOrPrimaryOwner(context);
 
     const targetUid = String(data.targetUid || '').trim();
     const amount = Number(data.amount || 0);
@@ -878,8 +890,7 @@ const createBonusFunctions = ({ functions, admin, writeOpsEvent, writeOpsError, 
   fns.adminAdjustPromoCredits = functions.https.onCall(async (data, context) => {
     if (!context.auth?.uid) throw new functions.https.HttpsError('unauthenticated', 'auth_required');
 
-    const role = await getRoleForUid(context.auth.uid);
-    if (role !== 'admin') throw new functions.https.HttpsError('permission-denied', 'admin_only');
+    await assertAdminOrPrimaryOwner(context);
 
     const targetUid = String(data.targetUid || '').trim();
     const amount = Number(data.amount || 0); // positive = add, negative = deduct
@@ -942,8 +953,7 @@ const createBonusFunctions = ({ functions, admin, writeOpsEvent, writeOpsError, 
   fns.adminAdjustTrustBonuses = functions.https.onCall(async (data, context) => {
     if (!context.auth?.uid) throw new functions.https.HttpsError('unauthenticated', 'auth_required');
 
-    const role = await getRoleForUid(context.auth.uid);
-    if (role !== 'admin') throw new functions.https.HttpsError('permission-denied', 'admin_only');
+    await assertAdminOrPrimaryOwner(context);
 
     const targetUid = String(data.targetUid || '').trim();
     const amount = Number(data.amount || 0);
@@ -1005,8 +1015,7 @@ const createBonusFunctions = ({ functions, admin, writeOpsEvent, writeOpsError, 
   fns.adminBlockBonusAccrual = functions.https.onCall(async (data, context) => {
     if (!context.auth?.uid) throw new functions.https.HttpsError('unauthenticated', 'auth_required');
 
-    const role = await getRoleForUid(context.auth.uid);
-    if (role !== 'admin') throw new functions.https.HttpsError('permission-denied', 'admin_only');
+    await assertAdminOrPrimaryOwner(context);
 
     const targetUid = String(data.targetUid || '').trim();
     const blocked = data.blocked === true;
@@ -1035,8 +1044,7 @@ const createBonusFunctions = ({ functions, admin, writeOpsEvent, writeOpsError, 
   fns.getFraudFlags = functions.https.onCall(async (data, context) => {
     if (!context.auth?.uid) throw new functions.https.HttpsError('unauthenticated', 'auth_required');
 
-    const role = await getRoleForUid(context.auth.uid);
-    if (role !== 'admin') throw new functions.https.HttpsError('permission-denied', 'admin_only');
+    await assertAdminOrPrimaryOwner(context);
 
     const limit = Math.min(Number(data.limit || 50), 200);
     const snap = await db.ref(FRAUD_FLAGS_PATH).orderByChild('at').limitToLast(limit).once('value');

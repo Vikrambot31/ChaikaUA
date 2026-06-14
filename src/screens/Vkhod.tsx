@@ -608,7 +608,7 @@ const styles = StyleSheet.create({
     borderColor: SCREEN_THEME.terracottaDark,
   },
   loginButtonText: {
-    color: '#2F1C12',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '900',
     letterSpacing: 0.3,

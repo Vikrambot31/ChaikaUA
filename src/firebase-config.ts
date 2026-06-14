@@ -910,6 +910,32 @@ export const firebaseChatAPI = {
     }
   },
 
+  /** Fetches one request by id and maps it to the public request card shape. */
+  getRequestById: async (requestId: string): Promise<ApiResult<AppRequest | null>> => {
+    try {
+      await ensureFirebaseAuth();
+      const safeId = normalizeText(requestId, 160);
+      if (!safeId) {
+        throw new Error('Invalid request id');
+      }
+      const snapshot = await get(ref(database, `requests/${safeId}`));
+      if (!snapshot.exists()) {
+        return { success: true, data: null };
+      }
+      const request = mapDbRequestToAppRequest(safeId, snapshot.val());
+      if (request.category === 'app_suggestion') {
+        return { success: true, data: null };
+      }
+      return { success: true, data: request };
+    } catch (error: unknown) {
+      void logClientError('firebaseChatAPI.getRequestById', error, { requestId });
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  },
+
   /** Approves or rejects a request for an authenticated user. */
   moderateRequest: async (
     requestId: string,

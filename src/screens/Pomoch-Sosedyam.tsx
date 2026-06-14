@@ -205,8 +205,8 @@ const HelpNeighborsScreen: React.FC = () => {
               </TouchableOpacity>
 
               <View style={styles.listHeader}>
-                <Text style={[styles.listTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{text.listTitle}</Text>
-                <View style={styles.listCountBadge}>
+                <Text style={[styles.listTitle, { color: colors.textPrimary }]}>{text.listTitle}</Text>
+                <View style={[styles.listCountBadge, { backgroundColor: isDark ? colors.navTabActive : SCREEN_THEME.terracotta }]}>
                   <Text style={styles.listCount}>{burningRequests.length}</Text>
                 </View>
               </View>
@@ -216,17 +216,24 @@ const HelpNeighborsScreen: React.FC = () => {
             <>
               {item.isYesterday && (index === 0 || !listData[index - 1]?.isYesterday) && (
                 <View style={styles.yesterdaySeparator}>
-                  <View style={styles.yesterdayLine} />
-                  <Text style={styles.yesterdayLabel}>{text.yesterday}</Text>
-                  <View style={styles.yesterdayLine} />
+                  <View style={[styles.yesterdayLine, { backgroundColor: colors.uiBorder }]} />
+                  <Text style={[styles.yesterdayLabel, { color: colors.textMuted }]}>{text.yesterday}</Text>
+                  <View style={[styles.yesterdayLine, { backgroundColor: colors.uiBorder }]} />
                 </View>
               )}
-            <TouchableOpacity style={item.isYesterday ? styles.requestCardYesterday : styles.requestCard} onPress={() => { if (navLock.current) return; navLock.current = true; openDetail(item); setTimeout(() => { navLock.current = false; }, 800); }} activeOpacity={0.86}>
+            <TouchableOpacity
+              style={[
+                item.isYesterday ? styles.requestCardYesterday : styles.requestCard,
+                { backgroundColor: colors.cardBg, borderColor: colors.uiBorder },
+              ]}
+              onPress={() => { if (navLock.current) return; navLock.current = true; openDetail(item); setTimeout(() => { navLock.current = false; }, 800); }}
+              activeOpacity={0.86}
+            >
               <View style={styles.requestHeader}>
                 <View style={styles.userInfo}>
-                  <Text style={styles.userName}>{item.name}</Text>
+                  <Text style={[styles.userName, { color: colors.textPrimary }]}>{item.name}</Text>
                 </View>
-                <View style={styles.timeBadge}>
+                <View style={[styles.timeBadge, { backgroundColor: isDark ? colors.navTabActive : SCREEN_THEME.terracotta }]}>
                   <Text style={styles.timeText}>{formatPublishedAt(item.createdAt)}</Text>
                 </View>
               </View>
@@ -234,16 +241,16 @@ const HelpNeighborsScreen: React.FC = () => {
                 <AppPhotoImage
                   uri={item.photoUri}
                   storagePath={item.photoStoragePath}
-                  style={styles.requestPhoto}
+                  style={[styles.requestPhoto, { backgroundColor: colors.cardBg }]}
                   resizeMode="cover"
                   debugLabel={`HelpNeighborsCard:${item.id}`}
                   showDebugInfo={false}
                 />
               ) : null}
-              <Text style={styles.requestDescription}>{item.description}</Text>
+              <Text style={[styles.requestDescription, { color: colors.textPrimary }]}>{item.description}</Text>
               {item.moderationStatus === 'pending' && item.userId === user?.id && (
-                <View style={styles.pendingBadge}>
-                  <Text style={styles.pendingBadgeText}>{text.awaitingModeration}</Text>
+                <View style={[styles.pendingBadge, { backgroundColor: isDark ? colors.navTabActive : 'rgba(141, 122, 184, 0.20)', borderColor: colors.uiBorder }]}>
+                  <Text style={[styles.pendingBadgeText, { color: colors.textPrimary }]}>{text.awaitingModeration}</Text>
                 </View>
               )}
               <UserCardActionBar
@@ -264,10 +271,10 @@ const HelpNeighborsScreen: React.FC = () => {
           )}
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>{text.emptyTitle}</Text>
-              <Text style={styles.emptySubtext}>{text.emptySubtitle}</Text>
+              <Text style={[styles.emptyText, { color: colors.textPrimary }]}>{text.emptyTitle}</Text>
+              <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>{text.emptySubtitle}</Text>
               <TouchableOpacity
-                style={styles.emptyActionButton}
+                style={[styles.emptyActionButton, { backgroundColor: isDark ? colors.navTabActive : SCREEN_THEME.terracotta }]}
                 onPress={() => { void openRequestFormWithLimitCheck(navigation, language); }}
                 activeOpacity={0.86}
               >
@@ -343,7 +350,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: 'center',
     backgroundColor: SCREEN_THEME.terracotta,
-    shadowColor: '#7A3A22',
+    shadowColor: SCREEN_THEME.shadowDeep,
     shadowOpacity: 0.18,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 5 },
@@ -360,17 +367,17 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#E4D0AB',
+    borderColor: SCREEN_THEME.borderSoft,
   },
   requestHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
   userInfo: { flex: 1 },
   userName: { fontWeight: '900', color: SCREEN_THEME.textPrimary },
   timeBadge: { backgroundColor: SCREEN_THEME.terracotta, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
   timeText: { color: '#FFFFFF', fontWeight: '800', fontSize: 12 },
-  requestPhoto: { width: '100%', height: 170, borderRadius: 14, marginBottom: 8, backgroundColor: '#E7D6B6' },
+  requestPhoto: { width: '100%', height: 170, borderRadius: 14, marginBottom: 8, backgroundColor: SCREEN_THEME.cardCream },
   requestDescription: { color: SCREEN_THEME.textPrimary, backgroundColor: 'rgba(141, 122, 184, 0.20)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 7, lineHeight: 20, marginBottom: 8, fontWeight: '600', overflow: 'hidden' },
-  pendingBadge: { backgroundColor: '#FFF3CD', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, marginBottom: 8, alignSelf: 'flex-start', borderWidth: 1, borderColor: '#F0C96B' },
-  pendingBadgeText: { color: '#7A5C00', fontWeight: '800', fontSize: 12 },
+  pendingBadge: { backgroundColor: 'rgba(141, 122, 184, 0.20)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, marginBottom: 8, alignSelf: 'flex-start', borderWidth: 1, borderColor: SCREEN_THEME.borderSoft },
+  pendingBadgeText: { color: SCREEN_THEME.textPrimary, fontWeight: '800', fontSize: 12 },
   emptyState: { alignItems: 'center', paddingVertical: 40 },
   emptyText: { fontWeight: '900', color: SCREEN_THEME.textPrimary, marginTop: 12 },
   emptySubtext: { color: SCREEN_THEME.textSecondary, marginTop: 4 },
@@ -380,7 +387,7 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     paddingHorizontal: 32,
     backgroundColor: SCREEN_THEME.terracotta,
-    shadowColor: '#7A3A22',
+    shadowColor: SCREEN_THEME.shadowDeep,
     shadowOpacity: 0.15,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
@@ -393,7 +400,7 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#E4D0AB',
+    borderColor: SCREEN_THEME.borderSoft,
   },
   yesterdaySeparator: {
     flexDirection: 'row',
@@ -401,7 +408,7 @@ const styles = StyleSheet.create({
     marginVertical: 14,
     gap: 8,
   },
-  yesterdayLine: { flex: 1, height: 1, backgroundColor: '#C8B89A' },
+  yesterdayLine: { flex: 1, height: 1, backgroundColor: SCREEN_THEME.borderSoft },
   yesterdayLabel: { color: SCREEN_THEME.textMuted, fontWeight: '800', fontSize: 13 },
 });
 

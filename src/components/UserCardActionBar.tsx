@@ -7,6 +7,7 @@ import MiniUserAvatar from './MiniUserAvatar';
 import { useSoftToast } from '../hooks/useSoftToast';
 import { resolveUserAvatarMap } from '../utils/userAvatar';
 import { normaliseLikesSnapshot } from '../utils/likeUtils';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 const RTDB_FORBIDDEN_KEY_CHARS = /[.#$[\]/]/g;
 const toSafeRtdbKey = (value: string): string => (value ?? '').replace(RTDB_FORBIDDEN_KEY_CHARS, '_').trim();
@@ -88,6 +89,7 @@ export default function UserCardActionBar({
   const [likeAvatarByUserId, setLikeAvatarByUserId] = useState<Record<string, string>>({});
   const [localBusy, setLocalBusy] = useState(false);
   const { showError, showInfo } = useSoftToast();
+  const { colors, isDark } = useAppTheme();
   const safeLikeId = useMemo(() => (likeId ? toSafeRtdbKey(likeId) : undefined), [likeId]);
   const canUseLocalLike = Boolean(likePath && safeLikeId && currentUserId && liked === undefined && likeCount === undefined && !onLike);
   const needsAuth = !currentUserId && !onLike;
@@ -171,6 +173,12 @@ export default function UserCardActionBar({
   };
 
   const likeDisabled = resolvedBusy || localBusy;
+  const profileColor = isDark ? colors.textPrimary : '#7A1E5C';
+  const contactColor = isDark ? colors.textPrimary : '#6B5BA8';
+  const disabledColor = isDark ? colors.textMuted : '#B0A090';
+  const buttonBorderColor = isDark ? 'rgba(255, 255, 255, 0.62)' : '#D4B9A8';
+  const contactBorderColor = isDark ? 'rgba(255, 255, 255, 0.46)' : 'rgba(141, 122, 184, 0.35)';
+  const contactBackgroundColor = isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(141, 122, 184, 0.20)';
 
   return (
     <View style={styles.row}>
@@ -185,16 +193,16 @@ export default function UserCardActionBar({
       ) : null}
 
       {showProfile ? (
-        <TouchableOpacity style={[styles.outlined, profileDisabled && styles.disabled]} onPress={(event) => { event.stopPropagation(); if (requireRegisteredUser()) onProfile?.(); }} disabled={profileDisabled} activeOpacity={0.8}>
-          <MaterialCommunityIcons name="badge-account-horizontal-outline" size={13} color={profileDisabled ? '#B0A090' : '#7A1E5C'} />
-          <Text style={[styles.outlinedText, profileDisabled && styles.disabledText]}>{t.profile}</Text>
+        <TouchableOpacity style={[styles.outlined, { borderColor: buttonBorderColor }, profileDisabled && styles.disabled]} onPress={(event) => { event.stopPropagation(); if (requireRegisteredUser()) onProfile?.(); }} disabled={profileDisabled} activeOpacity={0.8}>
+          <MaterialCommunityIcons name="badge-account-horizontal-outline" size={13} color={profileDisabled ? disabledColor : profileColor} />
+          <Text style={[styles.outlinedText, { color: profileDisabled ? disabledColor : profileColor }]}>{t.profile}</Text>
         </TouchableOpacity>
       ) : null}
 
       {showContact ? (
-        <TouchableOpacity style={[styles.outlined, styles.contactOutlined, resolvedContactDisabled && styles.disabled]} onPress={(event) => { event.stopPropagation(); if (requireRegisteredUser()) onContact?.(); }} disabled={resolvedContactDisabled} activeOpacity={0.8}>
-          <MaterialCommunityIcons name="message-text-outline" size={13} color={resolvedContactDisabled ? '#B0A090' : '#6B5BA8'} />
-          <Text style={[styles.outlinedText, styles.contactOutlinedText, resolvedContactDisabled && styles.disabledText]}>{contactLabel ?? t.contact}</Text>
+        <TouchableOpacity style={[styles.outlined, styles.contactOutlined, { backgroundColor: contactBackgroundColor, borderColor: contactBorderColor }, resolvedContactDisabled && styles.disabled]} onPress={(event) => { event.stopPropagation(); if (requireRegisteredUser()) onContact?.(); }} disabled={resolvedContactDisabled} activeOpacity={0.8}>
+          <MaterialCommunityIcons name="message-text-outline" size={13} color={resolvedContactDisabled ? disabledColor : contactColor} />
+          <Text style={[styles.outlinedText, styles.contactOutlinedText, { color: resolvedContactDisabled ? disabledColor : contactColor }]}>{contactLabel ?? t.contact}</Text>
         </TouchableOpacity>
       ) : null}
 

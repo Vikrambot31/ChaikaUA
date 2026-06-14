@@ -1294,7 +1294,13 @@ const RequestsScreen: React.FC = () => {
         onPress={() => { if (navLock.current) return; navLock.current = true; navigation.navigate('RequestDetail', { request }); setTimeout(() => { navLock.current = false; }, 800); }}
         onDelete={isOwn ? () => void removeRequest(request.id) : undefined}
         onProfile={isOther ? () => { if (navLock.current) return; navLock.current = true; navigation.navigate('ViewUserProfile', { userId: request.userId as string }); setTimeout(() => { navLock.current = false; }, 800); } : undefined}
-        onContact={isOther ? () => openContactModal({ userId: request.userId as string, name: request.name ?? 'Unknown', sourceType: 'help', sourceId: request.id, sourceTitle: request.description?.slice(0, 60) }) : undefined}
+        onContact={isOther ? () => openContactModal({
+          userId: request.userId as string,
+          name: request.name ?? 'Unknown',
+          sourceType: 'help',
+          sourceId: request.id,
+          sourceTitle: (request.text || request.description || '').slice(0, 90),
+        }) : undefined}
         onApprove={isModerator ? () => void moderate(request.id, 'approved') : undefined}
         onReject={isModerator ? () => void moderate(request.id, 'rejected') : undefined}
         onModDelete={isModerator ? () => void removeRequest(request.id) : undefined}

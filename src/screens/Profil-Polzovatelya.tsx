@@ -737,7 +737,7 @@ const ProfileScreen: React.FC = () => {
 
           <Animated.View style={hasUnreadPendingRequests ? { transform: [{ scale: pulseAnim }] } : undefined}>
           <TouchableOpacity
-            style={[styles.menuItem, hasUnreadPendingRequests && styles.contactRequestAlert]}
+            style={[styles.menuItem, hasUnreadPendingRequests ? styles.contactRequestAlert : styles.contactRequestItem]}
             onPress={() => {
               markPendingRequestsSeen();
               navigation.navigate('ProfileRequestsScreen');
@@ -747,7 +747,7 @@ const ProfileScreen: React.FC = () => {
             {hasUnreadPendingRequests ? (
               <>
                 <View style={styles.contactRequestGloss} />
-                <TactileIcon icon="account-arrow-left-outline" size={40} iconSize={18} backgroundColor="#C85A8F" />
+                <TactileIcon icon="account-arrow-left-outline" size={40} iconSize={18} backgroundColor="#420837" tint="#FFFFFF" />
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.menuLabel, styles.contactRequestLabel]}>{text.contactRequests}</Text>
                 </View>
@@ -757,7 +757,7 @@ const ProfileScreen: React.FC = () => {
               </>
             ) : (
               <>
-                <TactileIcon icon="account-arrow-left-outline" size={40} iconSize={18} backgroundColor="#7A1E5C" />
+                <TactileIcon icon="account-arrow-left-outline" size={40} iconSize={18} backgroundColor="#420837" tint="#FFFFFF" />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.menuLabel}>{text.contactRequests}</Text>
                 </View>
@@ -1407,7 +1407,7 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   requestsBadge: {
-    backgroundColor: '#7A1E5C',
+    backgroundColor: '#C89000',
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -1417,14 +1417,23 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '900',
   },
-  contactRequestAlert: {
-    backgroundColor: '#7A2551',
+  contactRequestItem: {
+    backgroundColor: '#FFD400',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#7A2551',
+    borderColor: '#F0B800',
     marginHorizontal: 16,
     marginVertical: 4,
-    shadowColor: '#7A2551',
+    overflow: 'hidden',
+  },
+  contactRequestAlert: {
+    backgroundColor: '#FFD400',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#F0B800',
+    marginHorizontal: 16,
+    marginVertical: 4,
+    shadowColor: '#C9A84C',
     shadowOpacity: 0.45,
     shadowRadius: 6,
     shadowOffset: { width: 1, height: 5 },
@@ -1441,7 +1450,7 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 16,
   },
   contactRequestLabel: {
-    color: '#FFFFFF',
+    color: '#3A2800',
   },
   settingsSeeMoreBtn: {
     flexDirection: 'row',

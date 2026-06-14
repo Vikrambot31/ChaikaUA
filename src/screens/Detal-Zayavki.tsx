@@ -512,7 +512,7 @@ const RequestDetailScreen = ({
         photoURL: resolvedAvatarUri,
         sourceType: 'help',
         sourceId: request.id,
-        sourceTitle: (request.text || request.description || '').slice(0, 60),
+        sourceTitle: (request.text || request.description || '').slice(0, 90),
       });
       return;
     }

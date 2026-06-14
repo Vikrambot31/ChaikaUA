@@ -130,7 +130,7 @@ const ServicesHubScreen: React.FC = () => {
       : { label: 'Фото для душі', desc: 'Особлива галерея теплих фото від мешканців', screen: 'SoulPhotosScreen', icon: 'tag-heart-outline', accent: '#C97959' };
 
   const renderItem = (item: ServiceHubItem) => {
-    const isFoodHub = item.screen === 'EdaNaChaykeScreen';
+    const isFoodHub = item.screen === 'EdaNaChaykeScreen' || item.screen === 'BizznesChaikaScreen' || item.screen === 'KontaktiChaikyScreen';
 
     return (
       <TouchableOpacity
@@ -143,8 +143,8 @@ const ServicesHubScreen: React.FC = () => {
           icon={item.icon}
           size={46}
           iconSize={21}
-          backgroundColor={isFoodHub ? '#C89000' : item.accent}
-          tint={isFoodHub ? '#FFF8CF' : undefined}
+          backgroundColor={isFoodHub ? '#420837' : item.accent}
+          tint={isFoodHub ? '#FFFFFF' : undefined}
         />
         <View style={styles.copy}>
           <Text style={[styles.label, isFoodHub && styles.foodText]}>{item.label}</Text>

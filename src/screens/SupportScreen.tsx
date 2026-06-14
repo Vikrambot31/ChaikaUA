@@ -50,6 +50,7 @@ const UI_TEXT = {
     openNewChat: 'Відкрити новий чат',
     openNewChatError: 'Не вдалося відкрити новий чат',
     accountNotice: 'Щоб писати в службу підтримки, спочатку потрібно отримати статус користувача з акаунтом. Для цього пройдіть реєстрацію.',
+    accountNoticeHighlight: 'отримати статус користувача',
     noConnection: "Немає з'єднання з Інтернетом",
     sendError: 'Не вдалося відправити повідомлення',
     sendErrorBody: "Перевірте з'єднання з Інтернетом і спробуйте ще раз.",
@@ -69,6 +70,7 @@ const UI_TEXT = {
     openNewChat: 'Открыть новый чат',
     openNewChatError: 'Не удалось открыть новый чат',
     accountNotice: 'Чтобы писать в службу поддержки, сначала нужно получить статус пользователя с аккаунтом. Для этого пройдите регистрацию.',
+    accountNoticeHighlight: 'получить статус пользователя',
     noConnection: 'Нет подключения к Интернету',
     sendError: 'Не удалось отправить сообщение',
     sendErrorBody: 'Проверьте подключение к Интернету и попробуйте ещё раз.',
@@ -88,6 +90,7 @@ const UI_TEXT = {
     openNewChat: 'Open new chat',
     openNewChatError: 'Failed to open new chat',
     accountNotice: 'To write to support, you first need user-with-account status. Please complete registration.',
+    accountNoticeHighlight: 'user-with-account status',
     noConnection: 'No internet connection',
     sendError: 'Failed to send message',
     sendErrorBody: 'Check your internet connection and try again.',
@@ -307,8 +310,12 @@ const SupportScreen: React.FC = () => {
 
       {!user && (
         <View style={styles.accountNotice}>
-          <MaterialCommunityIcons name="account-check-outline" size={18} color="#7C5A16" />
-          <Text style={styles.accountNoticeText}>{text.accountNotice}</Text>
+          <MaterialCommunityIcons name="account-check-outline" size={22} color="#7C5A16" />
+          <Text style={styles.accountNoticeText}>
+            {text.accountNotice.split(text.accountNoticeHighlight)[0]}
+            <Text style={styles.accountNoticeHighlightText}>{text.accountNoticeHighlight}</Text>
+            {text.accountNotice.split(text.accountNoticeHighlight)[1]}
+          </Text>
         </View>
       )}
 
@@ -487,9 +494,14 @@ const styles = StyleSheet.create({
   accountNoticeText: {
     flex: 1,
     color: '#7C5A16',
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 26,
+    lineHeight: 36,
     fontWeight: '700',
+  },
+  accountNoticeHighlightText: {
+    fontWeight: '900',
+    textDecorationLine: 'underline',
+    color: '#5A3A00',
   },
   categorySection: {
     paddingHorizontal: 16,

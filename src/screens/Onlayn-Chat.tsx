@@ -138,6 +138,12 @@ const UI_TEXT = {
 
 const PAGE_SIZE = 20;
 const CATEGORY_STORAGE_KEY = 'online-chat:selected-category';
+const CHAT_PANEL_BG = 'rgba(141, 122, 184, 0.20)';
+const CHAT_PANEL_BORDER = 'rgba(141, 122, 184, 0.35)';
+const CHAT_PANEL_BORDER_STRONG = 'rgba(141, 122, 184, 0.45)';
+const CHAT_AVATAR_BG = SCREEN_THEME.accentPurple;
+const CHAT_PHOTO_BG = SCREEN_THEME.cardCream;
+const CHAT_SHADOW = SCREEN_THEME.shadow;
 
 const TOPIC_LABELS = {
   ua: {
@@ -415,7 +421,7 @@ const OnlineChatScreen = () => {
   const navLock = useRef(false);
   const language = useSelector((state: RootState) => normalizeLanguage(state.language?.current)) as 'ua' | 'ru' | 'en';
   const currentUser = useSelector((state: RootState) => state.auth.user);
-  const { colors, isDark } = useAppTheme();
+  const { colors } = useAppTheme();
   const { guard: guestGuard, bannerVisible: guestBannerVisible, hideBanner: hideGuestBanner } = useGuestGuard();
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const text = UI_TEXT[language];
@@ -717,7 +723,7 @@ const OnlineChatScreen = () => {
       </View>
 
       <TactileCard elevated style={styles.headerCard} pressable={false}>
-        <Text style={[styles.headerTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{text.title}</Text>
+        <Text style={styles.headerTitle}>{text.title}</Text>
       </TactileCard>
 
       {loading ? (
@@ -848,14 +854,14 @@ const OnlineChatScreen = () => {
 
                   <View style={styles.problemChatActionsRow}>
                     <View style={styles.problemChatActionsInner}>
-                      <MiniUserAvatar uri={avatarUri} name={item.name || ''} size={42} borderRadius={14} backgroundColor="#8B7355" />
+                      <MiniUserAvatar uri={avatarUri} name={item.name || ''} size={42} borderRadius={14} backgroundColor={CHAT_AVATAR_BG} />
                       <TouchableOpacity
                         style={[styles.problemChatActionPill, styles.problemChatProfilePill, !item.userId && styles.problemChatActionPillDisabled]}
                         onPress={(event) => { event.stopPropagation(); if (!item.userId || navLock.current || !requireAuthForDetails({ userId: currentUser?.id, navigation, language })) return; navLock.current = true; navigation.navigate('ViewUserProfile', { userId: item.userId }); setTimeout(() => { navLock.current = false; }, 800); }}
                         disabled={!item.userId}
                         activeOpacity={item.userId ? 0.78 : 1}
                       >
-                        <MaterialCommunityIcons name="badge-account-horizontal-outline" size={15} color="#8B5E3C" />
+                        <MaterialCommunityIcons name="badge-account-horizontal-outline" size={15} color={SCREEN_THEME.terracottaDark} />
                         <Text style={styles.problemChatActionText} numberOfLines={1}>{language === 'en' ? 'Profile' : language === 'ru' ? 'Профиль' : 'Профіль'}</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
@@ -916,7 +922,7 @@ const OnlineChatScreen = () => {
 
                   <View style={styles.lostFoundBottomRow}>
                     <View style={styles.lostFoundPersonRow}>
-                      <MiniUserAvatar uri={avatarUri} name={item.name || ''} size={28} borderRadius={10} backgroundColor="#8B7355" />
+                      <MiniUserAvatar uri={avatarUri} name={item.name || ''} size={28} borderRadius={10} backgroundColor={CHAT_AVATAR_BG} />
                       <Text style={styles.lostFoundMeta} numberOfLines={1}>{item.name || 'Chaika'}</Text>
                     </View>
                     <FeedLikeButton
@@ -1004,7 +1010,7 @@ const OnlineChatScreen = () => {
                       name={item.name}
                       size={56}
                       borderRadius={14}
-                      backgroundColor="#8B7355"
+                      backgroundColor={CHAT_AVATAR_BG}
                     />
                   ) : (
                     <View style={styles.botAvatar}>
@@ -1257,7 +1263,7 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(58,40,22,0.38)',
+    backgroundColor: 'rgba(66, 8, 55, 0.45)',
     justifyContent: 'center',
     paddingHorizontal: 18,
   },
@@ -1332,7 +1338,7 @@ const styles = StyleSheet.create({
   },
   actionOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(58,40,22,0.45)',
+    backgroundColor: 'rgba(66, 8, 55, 0.55)',
     justifyContent: 'flex-end',
     paddingHorizontal: 16,
     paddingBottom: 20,
@@ -1368,7 +1374,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     borderWidth: 1,
-    borderColor: '#E4D0AB',
+    borderColor: CHAT_PANEL_BORDER,
   },
   actionSecondaryText: {
     color: SCREEN_THEME.textPrimary,
@@ -1394,9 +1400,9 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     flexDirection: 'column',
     borderWidth: 1,
-    borderColor: '#E4D0AB',
+    borderColor: CHAT_PANEL_BORDER,
     elevation: 2,
-    shadowColor: '#7A5C3A',
+    shadowColor: CHAT_SHADOW,
     shadowOpacity: 0.10,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
@@ -1415,7 +1421,7 @@ const styles = StyleSheet.create({
     width: '100%',
     aspectRatio: 1,
     borderRadius: 20,
-    backgroundColor: '#F0E8D8',
+    backgroundColor: CHAT_PHOTO_BG,
   },
   problemChatCopy: { flex: 1, minWidth: 0 },
   problemChatCopyNoPhoto: { width: '100%' },
@@ -1423,11 +1429,13 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 9,
     paddingVertical: 6,
-    backgroundColor: '#8B5E3C',
+    backgroundColor: CHAT_PANEL_BG,
+    borderWidth: 1,
+    borderColor: CHAT_PANEL_BORDER,
     minHeight: 52,
     justifyContent: 'center',
   },
-  problemChatTitle: { fontSize: 20, lineHeight: 24, fontWeight: '900', color: '#fff' },
+  problemChatTitle: { fontSize: 20, lineHeight: 24, fontWeight: '900', color: SCREEN_THEME.textPrimary },
   problemChatAddressRow: {
     marginTop: 5,
     flexDirection: 'row',
@@ -1436,26 +1444,26 @@ const styles = StyleSheet.create({
     minHeight: 22,
   },
   problemChatAddressStreet: {
-    color: '#4E4237',
+    color: SCREEN_THEME.textPrimary,
     fontSize: 12,
     fontWeight: '800',
     flex: 1,
     minWidth: 0,
   },
   problemChatAddressHouse: {
-    color: '#4E4237',
+    color: SCREEN_THEME.textPrimary,
     fontSize: 12,
     fontWeight: '800',
     flexShrink: 0,
     maxWidth: 58,
   },
   problemChatMetaRow: { marginTop: 3, flexDirection: 'row', alignItems: 'center' },
-  problemChatMetaText: { color: '#77695A', fontSize: 12, fontWeight: '800' },
+  problemChatMetaText: { color: SCREEN_THEME.textSecondary, fontSize: 12, fontWeight: '800' },
   problemChatActionsRow: {
     marginTop: 8,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#E4D0AB',
+    borderTopColor: CHAT_PANEL_BORDER,
   },
   problemChatActionsInner: {
     flexDirection: 'row',
@@ -1472,8 +1480,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#D4B9A8',
-    backgroundColor: '#FFF8EA',
+    borderColor: CHAT_PANEL_BORDER,
+    backgroundColor: CHAT_PANEL_BG,
     flexShrink: 1,
   },
   problemChatProfilePill: { flex: 1.2, minWidth: 0 },
@@ -1485,7 +1493,7 @@ const styles = StyleSheet.create({
   },
   problemChatActionPillDisabled: { opacity: 0.45 },
   problemChatActionText: {
-    color: '#8B5E3C',
+    color: SCREEN_THEME.terracottaDark,
     fontSize: 11,
     fontWeight: '900',
     flexShrink: 1,
@@ -1499,10 +1507,10 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     backgroundColor: SCREEN_THEME.paperStrong,
     borderWidth: 1,
-    borderColor: '#E4D0AB',
+    borderColor: CHAT_PANEL_BORDER,
     gap: 8,
     elevation: 2,
-    shadowColor: '#7A5C3A',
+    shadowColor: CHAT_SHADOW,
     shadowOpacity: 0.10,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
@@ -1519,7 +1527,7 @@ const styles = StyleSheet.create({
     width: '100%',
     aspectRatio: 1,
     borderRadius: 20,
-    backgroundColor: '#F0E8D8',
+    backgroundColor: CHAT_PHOTO_BG,
   },
 
   lostFoundChatCopy: { flex: 1, justifyContent: 'space-between', minWidth: 0 },
@@ -1557,9 +1565,9 @@ const styles = StyleSheet.create({
   },
   lostFoundTitleBox: {
     borderWidth: 1,
-    borderColor: '#8B5E3C',
+    borderColor: CHAT_PANEL_BORDER_STRONG,
     borderRadius: 16,
-    backgroundColor: '#FFF8EA',
+    backgroundColor: CHAT_PANEL_BG,
     paddingHorizontal: 9,
     paddingVertical: 6,
     minHeight: 52,
@@ -1616,9 +1624,9 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#E4D0AB',
+    borderColor: CHAT_PANEL_BORDER,
     elevation: 2,
-    shadowColor: '#7A5C3A',
+    shadowColor: CHAT_SHADOW,
     shadowOpacity: 0.10,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
@@ -1648,7 +1656,7 @@ const styles = StyleSheet.create({
     width: '100%',
     aspectRatio: 1,
     borderRadius: 16,
-    backgroundColor: '#F0E8D8',
+    backgroundColor: CHAT_PHOTO_BG,
   },
   botAvatar: {
     width: 56,
@@ -1656,9 +1664,9 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#8B7355',
+    backgroundColor: CHAT_AVATAR_BG,
     borderWidth: 1.5,
-    borderColor: 'rgba(255,248,220,0.70)',
+    borderColor: CHAT_PANEL_BORDER,
   },
   chatCardRight: {
     flex: 1,
@@ -1679,9 +1687,9 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   chatCategoryBadge: {
-    backgroundColor: '#F2E5C0',
+    backgroundColor: CHAT_PANEL_BG,
     borderWidth: 1,
-    borderColor: '#D8BF8B',
+    borderColor: CHAT_PANEL_BORDER,
     borderRadius: 999,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -1691,10 +1699,10 @@ const styles = StyleSheet.create({
   chatCategoryText: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#7A5523',
+    color: SCREEN_THEME.textPrimary,
   },
   chatDateBadge: {
-    backgroundColor: '#EFE3C8',
+    backgroundColor: CHAT_PANEL_BG,
     borderRadius: 999,
     paddingHorizontal: 7,
     paddingVertical: 3,
@@ -1704,13 +1712,13 @@ const styles = StyleSheet.create({
   chatDateText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#6B4F2F',
+    color: SCREEN_THEME.textSecondary,
   },
   chatDescBox: {
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    backgroundColor: 'rgba(141, 122, 184, 0.20)',
+    backgroundColor: CHAT_PANEL_BG,
   },
   chatDescText: {
     fontSize: 13,

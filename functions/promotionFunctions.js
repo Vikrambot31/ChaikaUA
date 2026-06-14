@@ -8,7 +8,7 @@
  * - autoRenewSubscriptions (daily auto-renew)
  * - expireSubscriptions (hourly cleanup)
  *
- * Exports: createPromotionFunctions({ functions, functionsV1, admin, writeOpsEvent, writeOpsError, getRoleForUid })
+ * Exports: createPromotionFunctions({ functions, functionsV1, admin, writeOpsEvent, writeOpsError, getRoleForUid, isPrimaryServiceOwnerContext })
  */
 
 'use strict';
@@ -90,9 +90,23 @@ const screenForPromoType = (promoType) => {
 
 // ─── Factory ─────────────────────────────────────────────────────────────────
 
-const createPromotionFunctions = ({ functions, functionsV1, admin, writeOpsEvent, writeOpsError, getRoleForUid }) => {
+const createPromotionFunctions = ({
+  functions,
+  functionsV1,
+  admin,
+  writeOpsEvent,
+  writeOpsError,
+  getRoleForUid,
+  isPrimaryServiceOwnerContext = () => false,
+}) => {
   const db = admin.database();
   const fns = {};
+
+  const assertAdminOrPrimaryOwner = async (context) => {
+    if (isPrimaryServiceOwnerContext(context)) return;
+    const role = await getRoleForUid(context.auth.uid);
+    if (role !== 'admin') throw new functions.https.HttpsError('permission-denied', 'admin_only');
+  };
 
   // ────────────────────────────────────────────────────────────────────────
   //  purchaseBonusPromotion — Buy a top placement with bonuses or credits
@@ -288,8 +302,7 @@ const createPromotionFunctions = ({ functions, functionsV1, admin, writeOpsEvent
   fns.adminModeratePromotion = functions.https.onCall(async (data, context) => {
     if (!context.auth?.uid) throw new functions.https.HttpsError('unauthenticated', 'auth_required');
 
-    const role = await getRoleForUid(context.auth.uid);
-    if (role !== 'admin') throw new functions.https.HttpsError('permission-denied', 'admin_only');
+    await assertAdminOrPrimaryOwner(context);
 
     const promotionId = String(data.promotionId || '').trim();
     const action = String(data.action || '').trim(); // 'approve' | 'reject'

@@ -202,7 +202,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   menuHeader: {
-    backgroundColor: '#B85042',
+    backgroundColor: '#420837',
     paddingHorizontal: 16,
     paddingVertical: 20,
     flexDirection: 'row',
@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 2,
-    backgroundColor: '#8F322A',
+    backgroundColor: '#2E0024',
   },
   menuHeaderGloss: {
     position: 'absolute',
