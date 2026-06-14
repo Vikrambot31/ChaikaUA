@@ -1,4 +1,4 @@
-import { ref, push, set, remove, get } from 'firebase/database';
+import { ref, push, set, remove, get, update } from 'firebase/database';
 import { database } from '../firebase-core';
 import { ensureFirebaseAuth, requireWriteSession } from '../firebase-auth-session';
 
@@ -46,6 +46,27 @@ export const reportBlockService = {
       screen: 'Kontakt-XXX',
     });
     await set(ref(database, `user_block_list/${user.uid}/${blockedUserId}`), true);
+  },
+
+  async setBlockWithReason(blockedUserId: string, reason: string): Promise<void> {
+    const user = await requireWriteSession({
+      operation: 'block',
+      screen: 'ViewUserProfile',
+    });
+    const reportRef = push(ref(database, 'reports'));
+    await update(ref(database), {
+      [`reports/${reportRef.key}`]: {
+        reporterId: user.uid,
+        reportedUserId: blockedUserId,
+        reportedListingId: blockedUserId,
+        reason: 'other',
+        description: reason,
+        source: 'profile_block',
+        createdAt: new Date().toISOString(),
+        status: 'pending',
+      },
+      [`user_block_list/${user.uid}/${blockedUserId}`]: true,
+    });
   },
 
   async removeBlock(blockedUserId: string): Promise<void> {

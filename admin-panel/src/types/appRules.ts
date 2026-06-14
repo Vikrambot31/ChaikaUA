@@ -17,6 +17,12 @@ export type AppRuleSourceKind =
   | 'source_code'
   | 'generated';
 
+// Zone classification: what the admin should actually do with this item
+export type AppRuleZone =
+  | 'action'     // truly broken / misconfigured — needs attention now
+  | 'monitor'    // live runtime toggles — watch, could flip critical
+  | 'reference'; // by-design architecture — informational only
+
 export type AppRuleSource = {
   kind: AppRuleSourceKind;
   name: string;
@@ -37,6 +43,8 @@ export type AppRuleItem = {
   source: AppRuleSource;
   tags: string[];
   updatedAt: number;
+  zone?: AppRuleZone;       // assigned by parsers or resolved in service layer
+  designLabel?: string;     // e.g. "BY DESIGN" for intentional public-read paths
 };
 
 export type AppRulePipelineStep = {
@@ -66,6 +74,15 @@ export type AppRulesRuntimeState = {
   errors: string[];
 };
 
+export type AppRulesZoneGroup = {
+  zone: AppRuleZone;
+  label: string;
+  description: string;
+  items: AppRuleItem[];
+  defaultOpen: boolean;
+  actionCount: number;
+};
+
 export type AppRulesSnapshot = {
   generatedAt: number;
   syncStatus: 'ready' | 'error';
@@ -73,6 +90,7 @@ export type AppRulesSnapshot = {
   sections: AppRulesSection[];
   warnings: AppRuleItem[];
   runtime: AppRulesRuntimeState;
+  zones?: AppRulesZoneGroup[];
 };
 
 export type SourceFileSnapshot = {

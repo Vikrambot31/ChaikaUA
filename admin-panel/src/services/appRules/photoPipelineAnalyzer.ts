@@ -1,4 +1,4 @@
-import type { AppRuleItem, AppRulePipelineStep, SourceFileSnapshot } from '../../types/appRules';
+import type { AppRuleItem, AppRulePipelineStep, AppRuleZone, SourceFileSnapshot } from '../../types/appRules';
 import { createSource, findEvidence, findLine, hasPattern } from './rulesRegistry';
 
 type PatternRule = {
@@ -30,6 +30,7 @@ const buildRule = (
 ): AppRuleItem => {
   const file = files.find((item) => item.name === config.fileName);
   const found = file ? hasPattern(file.content, config.pattern) : false;
+  const zone: AppRuleZone = found ? 'reference' : 'action';
   return {
     id: `photo:${config.id}`,
     sectionId: 'photos',
@@ -37,12 +38,13 @@ const buildRule = (
     name: config.name,
     status: found ? 'active' : 'missing',
     risk: found ? config.risk ?? 'low' : config.missingRisk ?? 'medium',
-    actualValue: found && file ? config.actualValue?.(file) ?? 'Найдено в коде' : 'Правило не найдено',
+    actualValue: found && file ? config.actualValue?.(file) ?? 'Знайдено в коді' : 'Не знайдено',
     explanation: config.explanation,
-    evidence: found && file ? findEvidence(file.content, config.pattern) : 'Фрагмент не найден в актуальных исходниках',
+    evidence: found && file ? findEvidence(file.content, config.pattern) : 'Фрагмент не знайдено в актуальних вихідниках',
     source: found && file ? ruleSource(file, config.pattern) : missingSource(config.fileName),
     tags: ['photo', ...config.tags],
     updatedAt: generatedAt,
+    zone,
   };
 };
 

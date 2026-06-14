@@ -24,6 +24,8 @@ interface Props {
   currentUserId: string;
   language: Lang;
   onBlock: (userId: string) => void;
+  hideBlock?: boolean;
+  source?: string;
 }
 
 const REPORT_REASONS: ReportReason[] = ['spam', 'inappropriate', 'fake', 'other'];
@@ -125,6 +127,8 @@ export default function ReportBlockMenu({
   currentUserId: _currentUserId,
   language,
   onBlock,
+  hideBlock = false,
+  source: reportSource,
 }: Props) {
   const { colors, isDark } = useAppTheme();
   const t = UI_TEXT[language];
@@ -149,7 +153,7 @@ export default function ReportBlockMenu({
         reportedListingId: listingId,
         reason,
         description: description.trim(),
-        source: 'kontakt-xxx',
+        source: reportSource || 'kontakt-xxx',
       });
       Alert.alert(t.reportSuccess);
       resetAndClose();
@@ -207,15 +211,17 @@ export default function ReportBlockMenu({
                   <Text style={[styles.optionLabel, { color: colors.textPrimary }]}>{t.reportOption}</Text>
                   <MaterialCommunityIcons name="chevron-right" size={18} color={colors.textMuted} />
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.optionBtn}
-                  onPress={handleBlockPress}
-                  activeOpacity={0.8}
-                >
-                  <MaterialCommunityIcons name="block-helper" size={20} color="#B91C1C" style={styles.optionIcon} />
-                  <Text style={[styles.optionLabel, { color: '#B91C1C' }]}>{t.blockOption}</Text>
-                  <MaterialCommunityIcons name="chevron-right" size={18} color={colors.textMuted} />
-                </TouchableOpacity>
+                {!hideBlock ? (
+                  <TouchableOpacity
+                    style={styles.optionBtn}
+                    onPress={handleBlockPress}
+                    activeOpacity={0.8}
+                  >
+                    <MaterialCommunityIcons name="block-helper" size={20} color="#B91C1C" style={styles.optionIcon} />
+                    <Text style={[styles.optionLabel, { color: '#B91C1C' }]}>{t.blockOption}</Text>
+                    <MaterialCommunityIcons name="chevron-right" size={18} color={colors.textMuted} />
+                  </TouchableOpacity>
+                ) : null}
               </View>
             </>
           ) : (

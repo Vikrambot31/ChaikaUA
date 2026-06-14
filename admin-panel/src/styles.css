@@ -2160,6 +2160,221 @@ td {
   gap: 14px;
 }
 
+/* ── Zone panels (3-zone redesign) ── */
+
+.appRulesZones {
+  display: grid;
+  gap: 16px;
+}
+
+.appRulesZonePanel {
+  overflow: hidden;
+  border: 1px solid #d4e0ef;
+  border-left-width: 6px;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(40, 74, 130, 0.08);
+}
+
+/* Zone: action — red */
+.appRulesZonePanel.zone-action {
+  border-color: #f87171;
+  border-left-color: #dc2626;
+  box-shadow: 0 8px 32px rgba(220, 38, 38, 0.14);
+}
+
+.appRulesZonePanel.zone-action > summary {
+  background: linear-gradient(90deg, #fff1f2 0%, #fef2f2 60%, #ffffff 100%);
+}
+
+/* Zone: monitor — amber */
+.appRulesZonePanel.zone-monitor {
+  border-color: #fcd34d;
+  border-left-color: #d97706;
+  box-shadow: 0 8px 32px rgba(217, 119, 6, 0.10);
+}
+
+.appRulesZonePanel.zone-monitor > summary {
+  background: linear-gradient(90deg, #fffbeb 0%, #fefce8 60%, #ffffff 100%);
+}
+
+/* Zone: reference — neutral grey */
+.appRulesZonePanel.zone-reference {
+  border-color: #d1d5db;
+  border-left-color: #6b7280;
+  opacity: 0.9;
+}
+
+.appRulesZonePanel.zone-reference > summary {
+  background: linear-gradient(90deg, #f3f4f6 0%, #f9fafb 60%, #ffffff 100%);
+}
+
+/* Summary layout */
+.appRulesZonePanel > summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 72px;
+  padding: 14px 18px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.appRulesZonePanel > summary::-webkit-details-marker {
+  display: none;
+}
+
+.appRulesZoneSummaryLeft {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+}
+
+.appRulesZoneIcon {
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.appRulesZoneSummaryLeft > div {
+  display: grid;
+  gap: 4px;
+}
+
+.appRulesZoneLabel {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.zone-action-label {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.zone-monitor-label {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.zone-reference-label {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.appRulesZoneDescription {
+  display: block;
+  max-width: 640px;
+  color: #aaa;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.appRulesZoneSummaryRight {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.appRulesZoneActionBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.zone-action-badge {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.zone-monitor-badge {
+  background: #d97706;
+  color: #ffffff;
+}
+
+.appRulesZoneCleanBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #166534;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.appRulesZoneCount {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid #cbd8ea;
+  border-radius: 999px;
+  color: #aaa;
+  font-size: 12px;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Empty zone message */
+.appRulesZoneEmpty {
+  padding: 24px 18px;
+  color: #6b7280;
+  font-size: 14px;
+  font-style: italic;
+}
+
+/* Zone footer */
+.appRulesZoneFooter {
+  padding: 8px 18px 10px;
+  border-top: 1px solid #e9f0fa;
+  color: #aaa;
+  font-size: 11px;
+}
+
+/* BY DESIGN chip on table rows */
+.appRulesDesignLabel {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 4px;
+  background: #dbeafe;
+  color: #1e40af;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+/* Subdued rows for BY DESIGN reference items */
+.appRuleRow.design-by-design td {
+  background: #f8faff;
+  color: #7a8aaa;
+  border-color: #dde8f5;
+}
+
+.appRuleRow.design-by-design td:first-child {
+  border-left-color: #93c5fd;
+}
+
+.appRuleRow.design-by-design td strong {
+  color: #8899bb;
+}
+
 .appRulesSection {
   overflow: hidden;
   border: 1px solid #d4e0ef;

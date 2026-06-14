@@ -24,13 +24,14 @@ import { BusinessPlusModerationPage } from './pages/BusinessPlusModerationPage';
 import { FeatureRatingsPage } from './pages/FeatureRatingsPage';
 import { TopListingsModerationPage } from './pages/TopListingsModerationPage';
 import { ReportsModerationPage } from './pages/ReportsModerationPage';
+import { UserBlocksPage } from './pages/UserBlocksPage';
 import { ViewModeProvider } from './contexts/ViewModeContext';
 import { DashboardProvider } from './contexts/DashboardContext';
 
 const AppRulesPage = lazy(() => import('./pages/AppRulesPage'));
 
 const VALID_PAGES = new Set<AdminPageKey>([
-  'dashboard', 'moderation', 'archive', 'invite_access', 'guarantor_tree', 'access_control', 'security', 'errors', 'photo_approval', 'releases', 'ai_diagnostics', 'ai_control', 'app_rules', 'support', 'bonus_credits', 'ad_chat', 'premium', 'business_plus', 'feature_ratings', 'top_listings', 'reports',
+  'dashboard', 'moderation', 'archive', 'invite_access', 'guarantor_tree', 'access_control', 'security', 'errors', 'photo_approval', 'releases', 'ai_diagnostics', 'ai_control', 'app_rules', 'support', 'bonus_credits', 'ad_chat', 'premium', 'business_plus', 'feature_ratings', 'top_listings', 'reports', 'user_blocks',
 ]);
 
 const getPageFromHash = (): AdminPageKey => {
@@ -88,6 +89,7 @@ export const App = () => {
     feature_ratings: 'Оцінка функцій',
     top_listings: 'Місця від юзерів',
     reports: 'Скарги',
+    user_blocks: 'Блокування користувачів',
   };
 
   const renderPage = () => {
@@ -110,6 +112,7 @@ export const App = () => {
     if (activePage === 'feature_ratings') return <FeatureRatingsPage />;
     if (activePage === 'top_listings') return <TopListingsModerationPage />;
     if (activePage === 'reports') return <ReportsModerationPage />;
+    if (activePage === 'user_blocks') return <UserBlocksPage />;
     if (activePage === 'app_rules') {
       return (
         <Suspense fallback={<div className="loadingScreen">Завантаження серверних правил...</div>}>

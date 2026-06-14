@@ -36,6 +36,7 @@ export type DashboardStats = {
   rulesOpenPaths: string[];
   rulesCheckedAt: number;
   pendingReports: number;
+  pendingBlockReports: number;
 };
 
 export type DashboardActivity = {
@@ -116,6 +117,7 @@ const emptyStats: DashboardStats = {
   rulesOpenPaths: [],
   rulesCheckedAt: 0,
   pendingReports: 0,
+  pendingBlockReports: 0,
 };
 
 const emptyCounter: ModerationCounter = {
@@ -470,6 +472,7 @@ const subscribeDashboardLocal = (
           rulesOpenPaths: [],
           rulesCheckedAt: 0,
           pendingReports: 0,
+          pendingBlockReports: 0,
         },
         issues,
       });
@@ -509,6 +512,7 @@ export const subscribeDashboard = LOCAL_MODE
   let rulesOpenPaths: string[] = [];
   let rulesCheckedAt = 0;
   let pendingReports = 0;
+  let pendingBlockReports = 0;
 
   const moderationByPath = new Map<string, ModerationCounter>();
 
@@ -551,6 +555,7 @@ export const subscribeDashboard = LOCAL_MODE
         rulesOpenPaths,
         rulesCheckedAt,
         pendingReports,
+        pendingBlockReports,
       },
       issues: [...systemIssues, ...deviceStats.deviceIssues, ...pendingOverflow],
     });
@@ -678,6 +683,18 @@ export const subscribeDashboard = LOCAL_MODE
   }).catch((error: unknown) => {
     if (error instanceof Error && isPermissionDenied(error)) { emit(); return; }
   });
+
+  // Pending block reports count (profile_block source only)
+  void get(query(ref(database, 'reports'), orderByChild('source'), equalTo('profile_block'))).then((snap) => {
+    if (!snap.exists()) { pendingBlockReports = 0; emit(); return; }
+    const data = snap.val() as Record<string, Record<string, unknown>>;
+    let count = 0;
+    for (const v of Object.values(data)) {
+      if ((typeof v.status === 'string' ? v.status : 'pending') === 'pending') count++;
+    }
+    pendingBlockReports = count;
+    emit();
+  }).catch(() => { /* ignore */ });
 
   moderationDashboardPaths.forEach((path) => {
     const dataRef = ref(database, path);

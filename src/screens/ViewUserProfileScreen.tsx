@@ -14,6 +14,9 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationProp, useNavigation, useRoute } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import ContactReasonModal from '../components/ContactReasonModal';
+import ReportBlockMenu from '../components/ReportBlockMenu';
+import BlockReasonModal from '../components/BlockReasonModal';
+import { reportBlockService } from '../services/reportBlockService';
 import MiniUserAvatar from '../components/MiniUserAvatar';
 import { useContactRequest } from '../hooks/useContactRequest';
 import { pickUserAvatarUri } from '../utils/userAvatar';
@@ -110,6 +113,24 @@ const UI_TEXT = {
   },
 } as const;
 
+const ACTION_TEXT = {
+  ua: {
+    report: 'Поскаржитись',
+    block: 'Заблокувати',
+    unblock: 'Розблокувати',
+  },
+  ru: {
+    report: 'Пожаловаться',
+    block: 'Заблокировать',
+    unblock: 'Разблокировать',
+  },
+  en: {
+    report: 'Report',
+    block: 'Block',
+    unblock: 'Unblock',
+  },
+} as const;
+
 const CONTACT_TEXT = {
   ua: {
     call: 'Зателефонувати',
@@ -161,6 +182,7 @@ const ViewUserProfileScreen: React.FC = () => {
   const { language } = useTranslation();
   const text = UI_TEXT[language];
   const contactText = CONTACT_TEXT[language];
+  const actionText = ACTION_TEXT[language];
   const currentUser = useSelector((state: RootState) => state.auth.user);
   const { modalVisible, pending, currentTarget, openModal, closeModal, sendRequest } = useContactRequest();
   const { colors } = useAppTheme();
@@ -178,6 +200,10 @@ const ViewUserProfileScreen: React.FC = () => {
   const [jobListing, setJobListing] = useState<JobListing | null>(null);
   const [contactApproved, setContactApproved] = useState(false);
   const [thankSent, setThankSent] = useState(false);
+  const [reportMenuVisible, setReportMenuVisible] = useState(false);
+  const [blockModalVisible, setBlockModalVisible] = useState(false);
+  const [blockLoading, setBlockLoading] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
   const isAuthenticated = Boolean(currentUser?.id);
   const isOwnProfile = Boolean(userId && currentUser?.id && userId === currentUser.id);
 
@@ -213,6 +239,20 @@ const ViewUserProfileScreen: React.FC = () => {
     })();
     return () => { cancelled = true; };
   }, [isAuthenticated, userId, currentUser?.id, isOwnProfile]);
+
+  useEffect(() => {
+    if (!userId || !currentUser?.id || isOwnProfile) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const blocked = await reportBlockService.loadBlockedUsers(currentUser.id);
+        if (!cancelled) setIsBlocked(blocked.has(userId));
+      } catch {
+        if (!cancelled) setIsBlocked(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [userId, currentUser?.id, isOwnProfile]);
 
   useEffect(() => {
     const loadUserProfile = async () => {
@@ -363,6 +403,44 @@ const ViewUserProfileScreen: React.FC = () => {
     ]);
   };
 
+  const handleBlockConfirm = async (reason: string) => {
+    if (!userId) return;
+    setBlockLoading(true);
+    try {
+      await reportBlockService.setBlockWithReason(userId, reason);
+      setIsBlocked(true);
+      setBlockModalVisible(false);
+      Alert.alert('', isOwnProfile ? '' : language === 'en' ? 'User blocked' : language === 'ru' ? 'Пользователь заблокирован' : 'Користувача заблоковано');
+    } catch {
+      Alert.alert(text.error, language === 'en' ? 'Failed to block user' : language === 'ru' ? 'Не удалось заблокировать' : 'Не вдалося заблокувати');
+    } finally {
+      setBlockLoading(false);
+    }
+  };
+
+  const handleUnblock = () => {
+    if (!userId) return;
+    Alert.alert(
+      language === 'en' ? 'Unblock user' : language === 'ru' ? 'Разблокировать пользователя' : 'Розблокувати користувача',
+      language === 'en' ? 'Are you sure?' : language === 'ru' ? 'Вы уверены?' : 'Ви впевнені?',
+      [
+        { text: language === 'en' ? 'Cancel' : language === 'ru' ? 'Отмена' : 'Скасувати', style: 'cancel' },
+        {
+          text: language === 'en' ? 'Unblock' : language === 'ru' ? 'Разблокировать' : 'Розблокувати',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await reportBlockService.removeBlock(userId);
+              setIsBlocked(false);
+            } catch {
+              Alert.alert(text.error, language === 'en' ? 'Failed to unblock' : language === 'ru' ? 'Не удалось разблокировать' : 'Не вдалося розблокувати');
+            }
+          },
+        },
+      ],
+    );
+  };
+
   if (!isAuthenticated) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
@@ -480,7 +558,55 @@ const ViewUserProfileScreen: React.FC = () => {
             </View>
           </View>
         )}
+
+        {!isOwnProfile && isAuthenticated ? (
+          <TouchableOpacity
+            style={styles.reportBtn}
+            onPress={() => setReportMenuVisible(true)}
+            activeOpacity={0.86}
+          >
+            <MaterialCommunityIcons name="flag-outline" size={18} color="#B91C1C" />
+            <Text style={styles.reportBtnText}>{actionText.report}</Text>
+          </TouchableOpacity>
+        ) : null}
+
+        {!isOwnProfile && isAuthenticated ? (
+          <TouchableOpacity
+            style={isBlocked ? styles.unblockBtn : styles.blockBtn}
+            onPress={isBlocked ? handleUnblock : () => setBlockModalVisible(true)}
+            activeOpacity={0.86}
+          >
+            <MaterialCommunityIcons
+              name={isBlocked ? 'account-check-outline' : 'block-helper'}
+              size={18}
+              color={isBlocked ? '#2E7D4F' : '#B91C1C'}
+            />
+            <Text style={isBlocked ? styles.unblockBtnText : styles.blockBtnText}>
+              {isBlocked ? actionText.unblock : actionText.block}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
       </ScrollView>
+      <ReportBlockMenu
+        visible={reportMenuVisible}
+        onClose={() => setReportMenuVisible(false)}
+        listingId={userId}
+        reportedUserId={userId}
+        currentUserId={currentUser?.id || ''}
+        language={language as 'ua' | 'ru' | 'en'}
+        hideBlock
+        source="profile_report"
+        onBlock={() => {
+          setReportMenuVisible(false);
+        }}
+      />
+      <BlockReasonModal
+        visible={blockModalVisible}
+        loading={blockLoading}
+        userName={name}
+        onConfirm={handleBlockConfirm}
+        onClose={() => setBlockModalVisible(false)}
+      />
       <ContactReasonModal
         visible={modalVisible}
         pending={pending}
@@ -693,6 +819,54 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     color: SCREEN_THEME.textPrimary,
     fontWeight: '500',
+  },
+  reportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#FFF0EE',
+    borderRadius: 16,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#F5D0CC',
+  },
+  reportBtnText: {
+    color: '#B91C1C',
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  blockBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#FFF0EE',
+    borderRadius: 16,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#F5D0CC',
+  },
+  blockBtnText: {
+    color: '#B91C1C',
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  unblockBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#EEF7F0',
+    borderRadius: 16,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#C8E6D0',
+  },
+  unblockBtnText: {
+    color: '#2E7D4F',
+    fontSize: 15,
+    fontWeight: '900',
   },
 });
 

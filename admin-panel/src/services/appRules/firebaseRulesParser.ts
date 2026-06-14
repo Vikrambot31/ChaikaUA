@@ -1,5 +1,23 @@
-import type { AppRuleItem, AppRuleSource } from '../../types/appRules';
+import type { AppRuleItem, AppRuleSource, AppRuleZone } from '../../types/appRules';
 import { FIREBASE_RULES_SOURCE } from './rulesRegistry';
+
+// These top-level RTDB paths have `.read: true` intentionally —
+// they are community data that must be accessible to unauthenticated guests
+// (public listings, community photos, etc.). They are NOT security issues.
+const PUBLIC_BY_DESIGN_PATHS = new Set([
+  'requests',
+  'community_photos_public',
+  'biznes_chaika_listings',
+  'lost_found',
+  'buy_sell_listings',
+  'food_top_listings',
+  'beauty_top_listings',
+  'children_top_listings',
+  'job_listings',
+  'local_business',
+  'sports_listings',
+  'security_config', // app_control/current is public by design for client reads
+]);
 
 type FirebaseRuleNode = {
   '.read'?: unknown;
@@ -71,7 +89,14 @@ const sourceFor = (rule: FlatFirebaseRule): AppRuleSource => ({
   name: `${FIREBASE_RULES_SOURCE.name}: ${rule.path}`,
 });
 
+const isPublicByDesign = (rule: FlatFirebaseRule): boolean =>
+  rule.type === 'read' &&
+  rule.expression === 'true' &&
+  PUBLIC_BY_DESIGN_PATHS.has(rule.path.split('/')[0]);
+
 const getRisk = (rule: FlatFirebaseRule): AppRuleItem['risk'] => {
+  // Public reads on known community paths are by design — not a risk
+  if (isPublicByDesign(rule)) return 'low';
   const expression = rule.expression.toLowerCase();
   const inheritedExpression = rule.inheritedExpression?.toLowerCase() ?? '';
   if ((rule.type === 'read' || rule.type === 'write') && expression === 'false') return 'low';
@@ -93,11 +118,20 @@ const getRisk = (rule: FlatFirebaseRule): AppRuleItem['risk'] => {
 };
 
 const getStatus = (rule: FlatFirebaseRule): AppRuleItem['status'] => {
+  if (isPublicByDesign(rule)) return 'info';
   const risk = getRisk(rule);
   if (risk === 'critical') return 'critical';
   if (risk === 'high') return 'warning';
   if (rule.expression === 'Правило не найдено') return 'missing';
   return 'active';
+};
+
+const getZone = (rule: FlatFirebaseRule): AppRuleZone => {
+  if (isPublicByDesign(rule)) return 'reference';
+  const risk = getRisk(rule);
+  // Only real parse errors or dangerously-open write rules go to action
+  if (risk === 'critical' || risk === 'high') return 'action';
+  return 'reference';
 };
 
 const explainRule = (rule: FlatFirebaseRule): string => {
@@ -112,20 +146,27 @@ export const parseFirebaseRules = (rawText: string, generatedAt: number): AppRul
     const parsed = JSON.parse(rawText) as { rules?: FirebaseRuleNode };
     const rules = parsed.rules ? flattenRules(parsed.rules) : [];
 
-    return rules.map((rule, index) => ({
-      id: `firebase:${rule.path}:${rule.type}:${index}`,
-      sectionId: 'firebase',
-      category: rule.type === 'index' ? 'indexes' : rule.type,
-      name: `${rule.path} / .${rule.type === 'index' ? 'indexOn' : rule.type}`,
-      status: getStatus(rule),
-      risk: getRisk(rule),
-      actualValue: rule.expression,
-      explanation: explainRule(rule),
-      evidence: rule.expression,
-      source: sourceFor(rule),
-      tags: ['firebase', rule.type, rule.path],
-      updatedAt: generatedAt,
-    }));
+    return rules.map((rule, index) => {
+      const byDesign = isPublicByDesign(rule);
+      return {
+        id: `firebase:${rule.path}:${rule.type}:${index}`,
+        sectionId: 'firebase',
+        category: rule.type === 'index' ? 'indexes' : rule.type,
+        name: `${rule.path} / .${rule.type === 'index' ? 'indexOn' : rule.type}`,
+        status: getStatus(rule),
+        risk: getRisk(rule),
+        actualValue: rule.expression,
+        explanation: byDesign
+          ? 'Публічний доступ за задумом дизайну — громадські дані (оголошення, фото, бізнес). Це не проблема безпеки.'
+          : explainRule(rule),
+        evidence: rule.expression,
+        source: sourceFor(rule),
+        tags: ['firebase', rule.type, rule.path],
+        updatedAt: generatedAt,
+        zone: getZone(rule),
+        designLabel: byDesign ? 'BY DESIGN' : undefined,
+      };
+    });
   } catch (error) {
     return [{
       id: 'firebase:parse_error',

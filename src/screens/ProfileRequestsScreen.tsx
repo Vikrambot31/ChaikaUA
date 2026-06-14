@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useIsFocused } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -33,6 +33,7 @@ import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
 import UserCardActionBar from '../components/UserCardActionBar';
 import ScreenTooltip from '../components/ScreenTooltip';
 import HintBadge, { HINT_BADGE_LABELS } from '../components/HintBadge';
+import { reportBlockService } from '../services/reportBlockService';
 import { useTrainingMode } from '../hooks/useTrainingMode';
 import { PROFILE_REQUESTS_TOOLTIP } from '../utils/screenTooltips';
 import useSoftToast from '../hooks/useSoftToast';
@@ -361,6 +362,7 @@ export default function ProfileRequestsScreen() {
   const [hiddenKeys, setHiddenKeys] = useState<Record<string, boolean>>({});
   const [incomingPhones, setIncomingPhones] = useState<Record<string, string>>({});
   const [incomingVotes, setIncomingVotes] = useState<Record<string, number>>({});
+  const [blockedUserIds, setBlockedUserIds] = useState<Set<string>>(new Set());
   const [seenContacts, setSeenContacts] = useState<Record<string, boolean>>({});
   const [clearingHistory, setClearingHistory] = useState(false);
   const [respondingRequestId, setRespondingRequestId] = useState<string | null>(null);
@@ -528,6 +530,22 @@ export default function ProfileRequestsScreen() {
     })();
   }, []);
 
+  const isFocused = useIsFocused();
+
+  useEffect(() => {
+    if (!currentUserId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const blocked = await reportBlockService.loadBlockedUsers(currentUserId);
+        if (!cancelled) setBlockedUserIds(blocked);
+      } catch {
+        if (!cancelled) setBlockedUserIds(new Set());
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [currentUserId, isFocused]);
+
   const markSeen = useCallback(async (key: string) => {
     setSeenContacts((prev) => {
       const next = { ...prev, [key]: true };
@@ -549,8 +567,10 @@ export default function ProfileRequestsScreen() {
 
   const filteredRequests = requests.filter((item) => {
     const targetUserId = activeTab === 'outgoing' ? (item.targetUserId ?? '') : currentUserId;
+    const otherUserId = activeTab === 'outgoing' ? (item.targetUserId ?? '') : item.requesterId;
     const hiddenKey = profilePermissionService.requestKey(targetUserId, item.requesterId);
     const isHidden = Boolean(hiddenKeys[hiddenKey]);
+    if (blockedUserIds.has(otherUserId)) return false;
     if (activeTab === 'incoming') return !isHidden;
     if (activeTab === 'history' && !isHidden) return false;
     if (activeTab === 'outgoing' && !showHidden && isHidden) return false;
