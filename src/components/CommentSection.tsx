@@ -31,9 +31,11 @@ interface Props {
 }
 
 const ACCENT = '#7A1E5C';
-const MAX_COMMENT_LENGTH = 500;
+const MAX_COMMENT_LENGTH = 250;
 const MIN_COMMENT_LENGTH = 3;
+const COMMENT_COUNTER_THRESHOLD = 200;
 const COOLDOWN_MS = 30000;
+const MAX_USER_COMMENTS_WHEN_OTHERS_EXIST = 2;
 
 const CommentSection: React.FC<Props> = ({ requestId, requestAuthorUid, isRequestClosed, collectionPath = COMMENTS_PATH, contactSourceType = 'help' }) => {
   const { t } = useTranslation();
@@ -48,6 +50,7 @@ const CommentSection: React.FC<Props> = ({ requestId, requestAuthorUid, isReques
   const [cooldownActive, setCooldownActive] = useState(false);
   const [hasPending, setHasPending] = useState(false);
   const [avatarMap, setAvatarMap] = useState<Record<string, string>>({});
+  const [limitReached, setLimitReached] = useState(false);
   const { modalVisible, pending, currentTarget, openModal, closeModal, sendRequest } = useContactRequest();
 
   const commentUids = useMemo(
@@ -70,6 +73,14 @@ const CommentSection: React.FC<Props> = ({ requestId, requestAuthorUid, isReques
         (c) => c.uid === currentUser?.id && c.status === 'pending',
       );
       setHasPending(ownPending);
+
+      const visibleComments = updatedComments.filter((c) => c.status !== 'pending');
+      let ownConsecutiveComments = 0;
+      for (let i = visibleComments.length - 1; i >= 0; i -= 1) {
+        if (visibleComments[i].uid !== currentUser?.id) break;
+        ownConsecutiveComments += 1;
+      }
+      setLimitReached(ownConsecutiveComments >= MAX_USER_COMMENTS_WHEN_OTHERS_EXIST);
     }, collectionPath);
     return unsubscribe;
   }, [requestId, currentUser?.id, collectionPath]);
@@ -77,7 +88,7 @@ const CommentSection: React.FC<Props> = ({ requestId, requestAuthorUid, isReques
   const charCount = inputText.length;
   const isOverLimit = charCount > MAX_COMMENT_LENGTH;
   const isTooShort = inputText.length > 0 && inputText.length < MIN_COMMENT_LENGTH;
-  const showCounter = charCount > 400;
+  const showCounter = charCount > COMMENT_COUNTER_THRESHOLD;
   const canSend =
     !sending &&
     !cooldownActive &&
@@ -85,7 +96,8 @@ const CommentSection: React.FC<Props> = ({ requestId, requestAuthorUid, isReques
     !isRequestClosed &&
     isAuthenticated &&
     inputText.length >= MIN_COMMENT_LENGTH &&
-    !isOverLimit;
+    !isOverLimit &&
+    !limitReached;
 
   const handleSend = async () => {
     if (!canSend || !currentUser?.id) return;
@@ -169,13 +181,12 @@ const CommentSection: React.FC<Props> = ({ requestId, requestAuthorUid, isReques
               </TouchableOpacity>
             )}
           </View>
-          {isPending && isOwn ? (
+          <Text style={[styles.commentText, { color: colors.textPrimary }]}>{item.text}</Text>
+          {isPending && isOwn && (
             <View style={styles.pendingRow}>
-              <ActivityIndicator size="small" color={colors.accentText} />
-              <Text style={[styles.pendingText, { color: colors.textMuted }]}>{t.comments.pendingLabel}</Text>
+              <MaterialCommunityIcons name="shield-check-outline" size={14} color={colors.accentText} />
+              <Text style={[styles.pendingText, { color: colors.textMuted }]}>{t.comments.pendingPublish}</Text>
             </View>
-          ) : (
-            <Text style={[styles.commentText, { color: colors.textPrimary }]}>{item.text}</Text>
           )}
         </View>
       </View>
@@ -191,6 +202,7 @@ const CommentSection: React.FC<Props> = ({ requestId, requestAuthorUid, isReques
     if (!isAuthenticated) return t.comments.loginRequired;
     if (cooldownActive) return t.comments.cooldown;
     if (hasPending) return t.comments.pendingLabel;
+    if (limitReached) return t.comments.limitReached;
     return t.comments.inputPlaceholder;
   };
 
@@ -218,8 +230,8 @@ const CommentSection: React.FC<Props> = ({ requestId, requestAuthorUid, isReques
                 borderColor: colors.uiBorder,
                 color: isDark ? '#2B1A24' : colors.textPrimary,
               },
-              (!isAuthenticated || isRequestClosed || cooldownActive || hasPending) && styles.inputDisabled,
-              (!isAuthenticated || isRequestClosed || cooldownActive || hasPending) && {
+              (!isAuthenticated || isRequestClosed || cooldownActive || hasPending || limitReached) && styles.inputDisabled,
+              (!isAuthenticated || isRequestClosed || cooldownActive || hasPending || limitReached) && {
                 backgroundColor: colors.inputDisabledBg,
                 color: colors.textMuted,
               },
@@ -228,7 +240,7 @@ const CommentSection: React.FC<Props> = ({ requestId, requestAuthorUid, isReques
             onChangeText={setInputText}
             placeholder={getInputPlaceholder()}
             placeholderTextColor={colors.placeholder}
-            editable={isAuthenticated && !isRequestClosed && !cooldownActive && !hasPending && !sending}
+            editable={isAuthenticated && !isRequestClosed && !cooldownActive && !hasPending && !limitReached && !sending}
             multiline
             maxLength={MAX_COMMENT_LENGTH}
           />
@@ -254,6 +266,10 @@ const CommentSection: React.FC<Props> = ({ requestId, requestAuthorUid, isReques
 
       {isTooShort && (
         <Text style={styles.hint}>{t.comments.minLength}</Text>
+      )}
+
+      {limitReached && (
+        <Text style={styles.limitHint}>{t.comments.limitReached}</Text>
       )}
 
       <ContactReasonModal
@@ -393,6 +409,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#D32F2F',
     marginTop: 2,
+  },
+  limitHint: {
+    fontSize: 12,
+    color: '#D32F2F',
+    marginTop: 2,
+    fontStyle: 'italic',
   },
 });
 

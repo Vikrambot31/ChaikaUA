@@ -1,9 +1,6 @@
-import { get, limitToLast, onValue, push, query, ref, serverTimestamp, set, update } from 'firebase/database';
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { auth, database, firebaseApp } from '../firebase-core';
+import { get, limitToLast, onValue, push, query, ref, serverTimestamp, set } from 'firebase/database';
+import { auth, database } from '../firebase-core';
 import type { Comment } from '../types/app';
-
-const functions = getFunctions(firebaseApp);
 
 export const COMMENTS_PATH = 'request_comments';
 export const CONTACT_COMMENTS_PATH = 'contact_comments';
@@ -48,6 +45,11 @@ export function subscribeComments(
   return unsub;
 }
 
+/**
+ * Submit a comment with status 'pending'.
+ * AI moderation runs server-side via aiAutoModerateScheduled (every 5 min).
+ * The comment stays pending until AI approves/rejects it.
+ */
 export async function submitComment(
   requestId: string,
   text: string,
@@ -76,20 +78,6 @@ export async function submitComment(
   }
 
   await set(newCommentRef, comment);
-
-  try {
-    const callable = httpsCallable<{ requestId: string; commentId: string }, { status: string }>(
-      functions,
-      'moderateComment',
-    );
-    await callable({ requestId, commentId });
-  } catch {
-    // fail-open: if AI moderation is unavailable, make comment visible immediately
-    await update(ref(database, `${collectionPath}/${requestId}/${commentId}`), {
-      status: 'visible',
-      aiModeration: null,
-    });
-  }
 
   return { commentId };
 }

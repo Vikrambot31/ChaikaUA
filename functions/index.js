@@ -311,6 +311,7 @@ Object.assign(exports, createBonusFunctions({
   admin,
   writeOpsEvent,
   writeOpsError,
+  isPrimaryServiceOwnerContext,
   getRoleForUid,
 }));
 
@@ -320,6 +321,7 @@ Object.assign(exports, createPromotionFunctions({
   admin,
   writeOpsEvent,
   writeOpsError,
+  isPrimaryServiceOwnerContext,
   getRoleForUid,
 }));
 
@@ -3013,6 +3015,11 @@ const AI_SECTION_RULES = {
 - Одобрять: сборы с ясной целью, суммой и отчётностью
 - Проверить: сборы без конкретной цели, без указания ответственного
 - Отклонять: личные сборы под видом общедомовых, мошенничество`,
+
+  comments: `Правила для раздела "Комментарии":
+- Одобрять: конструктивные комментарии, предложения помощи, вопросы по теме, благодарности, бытовое общение
+- Проверить: грубость без прямых оскорблений, спорные высказывания, сообщения не по теме
+- Отклонять: прямые оскорбления и угрозы, мат/нецензурная лексика, спам, мошенничество, разжигание ненависти, номера карт/личные данные, реклама`,
 };
 
 const SUPPORT_SYSTEM_PROMPT = `Ти — AI помічник сервісу "Чайка Life" (мобільний додаток для мешканців Чайки, Київ).
@@ -3046,6 +3053,7 @@ const AI_SECTION_LABELS = {
   osbbVotes: 'Голосования ОСББ',
   osbbHouseTopics: 'Темы дома',
   osbbCollections: 'Сборы ОСББ',
+  comments: 'Комментарии',
 };
 
 const AI_FEW_SHOT = {
@@ -3068,6 +3076,12 @@ const AI_FEW_SHOT = {
   osbbCollections: [
     { text: 'Сбор на ремонт лифта в подъезде №2. Цель: 45000 грн. Ответственный — глава ОСББ.', verdict: 'approve', reason: 'Конкретная цель, сумма, ответственное лицо' },
     { text: 'Срочно скиньте на карту 4149**** кто сколько может.', verdict: 'suspicious', reason: 'Нет конкретной цели, номер карты, давление' },
+  ],
+  comments: [
+    { text: 'Спасибо, очень помогли! Обращусь ещё раз если нужно будет.', verdict: 'approve', reason: 'Благодарность, конструктивный комментарий' },
+    { text: 'Могу помочь с этим, напишите мне в личные.', verdict: 'approve', reason: 'Предложение помощи по теме' },
+    { text: 'Ты дурак!!! Я тебе покажу!!!', verdict: 'suspicious', reason: 'Прямое оскорбление и угроза' },
+    { text: 'Заработок 5000$/день! Пиши @spam_bot', verdict: 'suspicious', reason: 'Спам, мошенничество' },
   ],
 };
 
@@ -3598,6 +3612,9 @@ const AUTO_MOD_SECTIONS = [
   { key: 'jobs',                 path: 'job_listings',           statusField: 'moderationStatus', pendingValue: 'pending', approvedStatus: 'approved',  rejectedStatus: 'rejected'  },
   { key: 'lostFound',            path: 'lost_found',             statusField: 'moderationStatus', pendingValue: 'pending', approvedStatus: 'approved',  rejectedStatus: 'rejected'  },
   { key: 'appSuggestions',       path: 'app_suggestions',        statusField: 'moderationStatus', pendingValue: 'pending', approvedStatus: 'approved',  rejectedStatus: 'rejected'  },
+  // Comments are nested: request_comments/{requestId}/{commentId}
+  { key: 'comments',             path: 'request_comments',       statusField: 'status',           pendingValue: 'pending', approvedStatus: 'visible',   rejectedStatus: 'hidden',   nested: true },
+  { key: 'comments',             path: 'contact_comments',       statusField: 'status',           pendingValue: 'pending', approvedStatus: 'visible',   rejectedStatus: 'hidden',   nested: true },
 ];
 
 function buildAutoModText(item) {
@@ -3643,51 +3660,82 @@ exports.aiAutoModerateScheduled = functionsV1.pubsub
 
       for (const section of AUTO_MOD_SECTIONS) {
         try {
-          const snap = await db.ref(section.path)
-            .orderByChild(section.statusField)
-            .equalTo(section.pendingValue)
-            .limitToFirst(5)
-            .once('value');
-
-          if (!snap.exists()) continue;
-
+          // Nested sections (comments): request_comments/{requestId}/{commentId}
+          // Scan parent keys, then find pending children inside each
           const items = [];
-          snap.forEach((child) => {
-            const val = child.val();
-            // Пропускаем уже обработанные или те что в очереди эскалаций
-            if (!val.ai_auto_processed) {
-              items.push({ id: child.key, ...val });
-            }
-          });
+          if (section.nested) {
+            const parentSnap = await db.ref(section.path).limitToFirst(20).once('value');
+            if (!parentSnap.exists()) continue;
+            parentSnap.forEach((parentChild) => {
+              const parentId = parentChild.key;
+              const children = parentChild.val();
+              if (!children || typeof children !== 'object') return;
+              Object.entries(children).forEach(([childId, childVal]) => {
+                if (childVal && childVal[section.statusField] === section.pendingValue && !childVal.ai_auto_processed) {
+                  items.push({ id: childId, parentId, ...childVal, _fullPath: `${section.path}/${parentId}/${childId}` });
+                }
+              });
+            });
+            // Limit to 10 comments per cycle to avoid overloading
+            items.splice(10);
+          } else {
+            const snap = await db.ref(section.path)
+              .orderByChild(section.statusField)
+              .equalTo(section.pendingValue)
+              .limitToFirst(5)
+              .once('value');
+
+            if (!snap.exists()) continue;
+
+            snap.forEach((child) => {
+              const val = child.val();
+              // Пропускаем уже обработанные или те что в очереди эскалаций
+              if (!val.ai_auto_processed) {
+                items.push({ id: child.key, ...val, _fullPath: `${section.path}/${child.key}` });
+              }
+            });
+          }
 
           for (const item of items) {
-            const text = buildAutoModText(item);
-            if (!text || text.length < 5) continue;
+            const text = section.nested ? String(item.text || '').trim() : buildAutoModText(item);
+            if (!text || text.length < 3) continue;
 
-            const result = await analyzeTextInternal(db, aiConfig, section.key, text, item.userId || null);
+            const result = await analyzeTextInternal(db, aiConfig, section.key, text, item.uid || item.userId || null);
             if (!result) continue;
 
             totalProcessed++;
             const now = Date.now();
+            const itemRef = item._fullPath;
 
             if (result.verdict === 'approve' && result.confidence >= autoApproveThreshold) {
               // Авто-одобрение
-              await db.ref(`${section.path}/${item.id}`).update({
+              const updateData = {
                 [section.statusField]: section.approvedStatus,
-                isApproved: true,
                 ai_auto_processed: true,
                 ai_verdict: result.verdict,
                 ai_confidence: result.confidence,
                 ai_provider: result.provider,
                 moderatedAt: now,
                 moderatedBy: 'ai-auto',
-                moderationReason: `AI авто-одобрено (${Math.round(result.confidence * 100)}%)`,
-              });
+              };
+              if (!section.nested) {
+                updateData.isApproved = true;
+                updateData.moderationReason = `AI авто-одобрено (${Math.round(result.confidence * 100)}%)`;
+              } else {
+                updateData.aiModeration = {
+                  verdict: result.verdict,
+                  confidence: result.confidence,
+                  flags: result.flags || [],
+                  provider: result.provider,
+                  model: result.model,
+                };
+              }
+              await db.ref(itemRef).update(updateData);
               await db.ref('ai_queue/log').push({
                 action: 'auto_approve',
                 section: section.key,
                 itemId: item.id,
-                itemPath: `${section.path}/${item.id}`,
+                itemPath: itemRef,
                 verdict: result.verdict,
                 confidence: result.confidence,
                 provider: result.provider,
@@ -3700,22 +3748,33 @@ exports.aiAutoModerateScheduled = functionsV1.pubsub
 
             } else if (result.verdict === 'suspicious' && result.confidence >= autoRejectThreshold) {
               // Авто-отклонение
-              await db.ref(`${section.path}/${item.id}`).update({
+              const updateData = {
                 [section.statusField]: section.rejectedStatus,
-                isApproved: false,
                 ai_auto_processed: true,
                 ai_verdict: result.verdict,
                 ai_confidence: result.confidence,
                 ai_provider: result.provider,
                 moderatedAt: now,
                 moderatedBy: 'ai-auto',
-                moderationReason: `AI авто-отклонено: ${(result.explanation || '').slice(0, 200)}`,
-              });
+              };
+              if (!section.nested) {
+                updateData.isApproved = false;
+                updateData.moderationReason = `AI авто-отклонено: ${(result.explanation || '').slice(0, 200)}`;
+              } else {
+                updateData.aiModeration = {
+                  verdict: result.verdict,
+                  confidence: result.confidence,
+                  flags: result.flags || [],
+                  provider: result.provider,
+                  model: result.model,
+                };
+              }
+              await db.ref(itemRef).update(updateData);
               await db.ref('ai_queue/log').push({
                 action: 'auto_reject',
                 section: section.key,
                 itemId: item.id,
-                itemPath: `${section.path}/${item.id}`,
+                itemPath: itemRef,
                 verdict: result.verdict,
                 confidence: result.confidence,
                 flags: result.flags,
@@ -3730,15 +3789,35 @@ exports.aiAutoModerateScheduled = functionsV1.pubsub
 
             } else {
               // Эскалация — отправить человеку
+              // Для комментариев: при эскалации одобряем (fail-open), но логируем для ревью
+              if (section.nested) {
+                await db.ref(itemRef).update({
+                  [section.statusField]: section.approvedStatus,
+                  ai_auto_processed: true,
+                  ai_escalated: true,
+                  aiModeration: {
+                    verdict: result.verdict,
+                    confidence: result.confidence,
+                    flags: result.flags || [],
+                    provider: result.provider,
+                    model: result.model,
+                  },
+                });
+              } else {
+                await db.ref(itemRef).update({
+                  ai_auto_processed: true,
+                  ai_escalated: true,
+                });
+              }
               await db.ref('ai_queue/escalations').push({
-                itemPath: `${section.path}/${item.id}`,
+                itemPath: itemRef,
                 section: section.key,
                 statusField: section.statusField,
                 approvedStatus: section.approvedStatus,
                 rejectedStatus: section.rejectedStatus,
                 itemId: item.id,
                 textPreview: text.slice(0, 400),
-                userId: item.userId || null,
+                userId: item.uid || item.userId || null,
                 ai_verdict: result.verdict,
                 ai_confidence: result.confidence,
                 ai_explanation: result.explanation || '',
@@ -3747,11 +3826,6 @@ exports.aiAutoModerateScheduled = functionsV1.pubsub
                 model: result.model,
                 createdAt: now,
                 status: 'pending',
-              });
-              // Помечаем что элемент уже в очереди эскалаций
-              await db.ref(`${section.path}/${item.id}`).update({
-                ai_auto_processed: true,
-                ai_escalated: true,
               });
               await db.ref('ai_queue/log').push({
                 action: 'escalation',
