@@ -39,8 +39,10 @@ const preparePhotoForStorage = (photo: UserPhoto): UserPhoto => ({
 const writePhotos = async (photos: UserPhoto[]): Promise<UserPhoto[]> => {
   const sorted = sortPhotos(photos).slice(0, MAX_STORED_PHOTOS).map(preparePhotoForStorage);
   memoryPhotos = sorted;
-  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(sorted));
+  // notify BEFORE AsyncStorage so subscriber order matches JS call order,
+  // preventing stale onProgress notifications from firing after status='uploaded'
   notify(sorted);
+  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(sorted));
   return sorted;
 };
 

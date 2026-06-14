@@ -357,6 +357,7 @@ export const UploadQueue = {
             storagePath: result.storagePath,
             rtdbId: result.rtdbId,
             status: 'uploaded',
+            progress: 100,
             moderationStatus:
               collection === 'community_photos' && !task.metadata?.moderationDeferred
                 ? 'pending'
