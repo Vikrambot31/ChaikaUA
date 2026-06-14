@@ -716,7 +716,7 @@ export const AiControlCenterPage = ({ user }: Props) => {
   ];
 
   return (
-    <div style={{ padding: '24px 32px', color: '#e0e0e0' }}>
+    <div style={{ padding: '24px 32px', color: '#e0e0e0', background: '#1a1a2a', minHeight: '100vh' }}>
       <h2 style={{ marginBottom: 8, fontSize: 22, fontWeight: 800, color: '#fff' }}>AI Control Center</h2>
       <p style={{ color: '#aaa', marginBottom: 28, fontSize: 16 }}>
         Управление AI-провайдером и автономным режимом модерации
