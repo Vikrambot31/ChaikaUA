@@ -118,7 +118,31 @@ elena.ferrara@chaika-bot.test      ← Контент, фото, всё
 - `registrationStatus: 'complete'` → `isActive: true`
 - `invite_access/{uid}: { status: 'approved' }`
 - `startAvatarKey: '1'-'6'` (встроенная аватарка)
+- `age` и `gender` (обязательные поля профиля)
 - Уникальный телефон: `+38067100000{N}`
+
+Перед созданием первой заявки каждый бот обязан через UI выполнить:
+
+```text
+Профіль → Редагувати профіль → Тимчасовий аватар → выбрать avatarKey → указать age → указать gender → Зберегти
+```
+
+Если профильный экран открылся автоматически (`ProfileSetupScreen`), исполнитель заполняет его сразу и не создаёт заявки до сохранения профиля.
+
+Фиксированные данные профиля:
+
+| Бот | avatarKey | age | gender |
+|---|---:|---:|---|
+| Luca Moretti | 1 | 34 | male |
+| Giulia Romano | 2 | 31 | female |
+| Matteo Bianchi | 3 | 39 | male |
+| Sofia Conti | 4 | 27 | female |
+| Alessandro Ricci | 5 | 36 | male |
+| Francesca Gallo | 6 | 42 | female |
+| Davide Esposito | 1 | 45 | male |
+| Chiara Lombardi | 2 | 33 | female |
+| Marco Santoro | 3 | 41 | male |
+| Elena Ferrara | 4 | 28 | female |
 
 Скрипт пересоздания (если нужно): `node scripts/seed-bot-users.mjs` (из корня проекта)
 

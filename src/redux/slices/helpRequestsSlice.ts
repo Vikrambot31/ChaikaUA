@@ -86,6 +86,8 @@ const helpRequestsSlice = createSlice({
             subcategory: item.subcategory,
             photoUri: item.photoUri,
             photoStoragePath: item.photoStoragePath,
+            userPhotoURL: item.userPhotoURL,
+            startAvatarKey: item.startAvatarKey,
             createdAt: createdAtDate.toISOString(),
             expiresAt: expiresAtDate.toISOString(),
             isBurning: item.status !== 'rejected' && expiresAtDate > now,
