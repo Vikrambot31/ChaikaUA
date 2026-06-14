@@ -10,7 +10,7 @@ import { useViewMode, type ViewMode } from '../contexts/ViewModeContext';
 import { useDashboardContext } from '../contexts/DashboardContext';
 import type { DashboardStats } from '../services/dashboardService';
 
-export type AdminPageKey = 'dashboard' | 'moderation' | 'archive' | 'invite_access' | 'guarantor_tree' | 'access_control' | 'security' | 'errors' | 'photo_approval' | 'releases' | 'ai_diagnostics' | 'app_rules' | 'support' | 'bonus_credits' | 'ad_chat' | 'premium' | 'business_plus' | 'feature_ratings' | 'top_listings' | 'reports';
+export type AdminPageKey = 'dashboard' | 'moderation' | 'archive' | 'invite_access' | 'guarantor_tree' | 'access_control' | 'security' | 'errors' | 'photo_approval' | 'releases' | 'ai_diagnostics' | 'ai_control' | 'app_rules' | 'support' | 'bonus_credits' | 'ad_chat' | 'premium' | 'business_plus' | 'feature_ratings' | 'top_listings' | 'reports';
 
 type AppShellProps = {
   children: ReactNode;
@@ -78,6 +78,11 @@ const navItems: Array<{ key: AdminPageKey; label: string; hint: string }> = [
     hint: 'Глубокий AI-аудит проекта: Upload, Firebase, Runtime, Performance, Observability, Crash Safety. Запуск, live-прогресс, отчёты.',
   },
   {
+    key: 'ai_control',
+    label: 'AI Control',
+    hint: 'Настройка AI-провайдера, автономный режим, лог действий и бюджет токенов.',
+  },
+  {
     key: 'app_rules',
     label: 'Серверні правила',
     hint: 'Живая карта текущих правил: Firebase Rules, Storage Rules, runtime-конфиги, upload pipeline, доступ, модерация и риски.',
@@ -136,6 +141,7 @@ const navItemIcons: Record<AdminPageKey, string> = {
   photo_approval: '\u{2705}',
   releases: '\u{1F4E6}',
   ai_diagnostics: '\u{1F9E0}',
+  ai_control: '\u{1F916}',
   app_rules: '\u{1F4CB}',
   support: '\u{1F3A7}',
   bonus_credits: '\u{1F4B0}',
@@ -191,6 +197,10 @@ const getAttentionMeter = (page: AdminPageKey, stats: DashboardStats): Attention
     if (critical > 0) return attentionMeter('high', 3, warning > 0 ? 1 : 0, 0, `${critical} критических факторов безопасности`);
     if (warning > 0) return attentionMeter('medium', 0, 3, 1, `${warning} предупреждений безопасности`);
     return attentionMeter('low', 0, 0, 4, 'Безопасность без срочных факторов');
+  }
+
+  if (page === 'ai_control') {
+    return attentionMeter('low', 0, 0, 4, 'AI-провайдер настроен');
   }
 
   if (page === 'errors' || page === 'ai_diagnostics') {

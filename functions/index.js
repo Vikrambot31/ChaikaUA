@@ -2752,18 +2752,147 @@ exports.offerHelp = functions.https.onCall(async (data, context) => {
 //  Провайдеронезависимый анализ текста заявок через AI API
 // =============================================================
 
-const AI_PROVIDER = process.env.AI_PROVIDER || 'opencode';
-const AI_API_KEY = process.env.AI_API_KEY || process.env.OPENCODE_API_KEY || process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY || '';
-const AI_MODEL = process.env.AI_MODEL || 'deepseek-v4-flash-free';
-const AI_BASE_URL = process.env.AI_BASE_URL || '';
-const AI_BUDGET_DAILY = Number(process.env.AI_BUDGET_DAILY) || 5000;
-const AI_BUDGET_MONTHLY = Number(process.env.AI_BUDGET_MONTHLY) || 100000;
+const AI_PROVIDER_DEFAULT = process.env.AI_PROVIDER || 'opencode';
+const AI_API_KEY_DEFAULT = process.env.AI_API_KEY || process.env.OPENCODE_API_KEY || process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY || '';
+const AI_MODEL_DEFAULT = process.env.AI_MODEL || 'deepseek-v4-flash-free';
+const AI_BASE_URL_DEFAULT = process.env.AI_BASE_URL || '';
+const AI_BUDGET_DAILY_DEFAULT = Number(process.env.AI_BUDGET_DAILY) || 5000;
+const AI_BUDGET_MONTHLY_DEFAULT = Number(process.env.AI_BUDGET_MONTHLY) || 100000;
+
+// Config cache — читаем из RTDB каждые 60 секунд
+let _aiConfigCache = null;
+let _aiConfigCacheTime = 0;
+const AI_CONFIG_CACHE_TTL_MS = 60_000;
+
+async function getAiRuntimeConfig(db) {
+  const now = Date.now();
+  if (_aiConfigCache && (now - _aiConfigCacheTime) < AI_CONFIG_CACHE_TTL_MS) {
+    return _aiConfigCache;
+  }
+  try {
+    const snap = await db.ref('ai_config').once('value');
+    const rc = snap.val() || {};
+    _aiConfigCache = {
+      provider: rc.provider || AI_PROVIDER_DEFAULT,
+      apiKey: rc.apiKey || AI_API_KEY_DEFAULT,
+      model: rc.model || AI_MODEL_DEFAULT,
+      baseUrl: rc.baseUrl || AI_BASE_URL_DEFAULT,
+      budgetDaily: Number(rc.budgetDaily) || AI_BUDGET_DAILY_DEFAULT,
+      budgetMonthly: Number(rc.budgetMonthly) || AI_BUDGET_MONTHLY_DEFAULT,
+    };
+  } catch (_err) {
+    // Если RTDB недоступна — используем env vars
+    _aiConfigCache = {
+      provider: AI_PROVIDER_DEFAULT,
+      apiKey: AI_API_KEY_DEFAULT,
+      model: AI_MODEL_DEFAULT,
+      baseUrl: AI_BASE_URL_DEFAULT,
+      budgetDaily: AI_BUDGET_DAILY_DEFAULT,
+      budgetMonthly: AI_BUDGET_MONTHLY_DEFAULT,
+    };
+  }
+  _aiConfigCacheTime = now;
+  return _aiConfigCache;
+}
 
 const isConfiguredAiApiKey = (key = '') => {
   const value = String(key || '').trim();
   const placeholders = ['sk-your-key-here', 'your-opencode-api-key', 'replace_with_your_opencode_api_key'];
   return Boolean(value && !placeholders.includes(value.toLowerCase()) && !/^sk-x+$/i.test(value));
 };
+
+// =============================================================
+//  analyzeTextInternal — внутренний AI-анализ для авто-модерации
+//  (не требует auth context, используется в scheduled functions)
+// =============================================================
+
+/**
+ * Прямой вызов AI без HTTP callable и rate-limiting.
+ * Используется внутри scheduled functions для авто-модерации.
+ */
+async function analyzeTextInternal(db, aiConfig, section, text, userId = null) {
+  if (!text || !section) return null;
+  if (!isConfiguredAiApiKey(aiConfig.apiKey)) return null;
+
+  // Проверка кеша (24ч)
+  const cacheKey = crypto.createHash('sha256').update(section + '||' + text).digest('hex');
+  const cacheRef = db.ref(`moderation_analysis_cache/${cacheKey}`);
+  const cacheSnap = await cacheRef.once('value');
+  const cached = cacheSnap.val();
+
+  if (cached && cached.cachedAt && (cached.cachedAt + AI_CACHE_TTL_MS > Date.now())) {
+    return {
+      verdict: cached.verdict,
+      confidence: cached.confidence,
+      explanation: cached.explanation,
+      flags: cached.flags || [],
+      provider: cached.provider || aiConfig.provider,
+      model: cached.model || aiConfig.model,
+      tokensUsed: 0,
+      cached: true,
+    };
+  }
+
+  // Строим промпт
+  let userHistoryBlock = '';
+  if (userId) {
+    try {
+      const userSnap = await db.ref('requests').orderByChild('userId').equalTo(userId).limitToLast(20).once('value');
+      const reqs = userSnap.val() || {};
+      let total = 0, approved = 0, rejected = 0;
+      Object.values(reqs).forEach((r) => {
+        total++;
+        if (r && r.status === 'approved') approved++;
+        if (r && r.status === 'rejected') rejected++;
+      });
+      if (total > 0) userHistoryBlock = `\nИстория: всего ${total}, одобрено ${approved}, отклонено ${rejected}`;
+    } catch (_) {}
+  }
+
+  const userPrompt = buildAiUserPrompt(section, '', text, userHistoryBlock);
+
+  let parsed = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const raw = await callAiProvider(aiConfig, AI_SYSTEM_PROMPT, userPrompt);
+      parsed = parseAiJsonResponse(raw);
+      if (parsed) break;
+    } catch (_) {}
+  }
+
+  if (!parsed) return null;
+
+  // Блок confidence === 1.0
+  if (parsed.confidence >= 1.0) {
+    parsed.confidence = 0.8;
+    parsed.verdict = 'review';
+  }
+
+  // Сохраняем в кеш
+  await cacheRef.set({
+    hash: cacheKey,
+    verdict: parsed.verdict,
+    confidence: parsed.confidence,
+    explanation: parsed.explanation,
+    flags: parsed.flags,
+    section,
+    cachedAt: Date.now(),
+    provider: aiConfig.provider,
+    model: aiConfig.model,
+    tokensUsed: parsed.tokensUsed,
+  }).catch(() => {});
+
+  return {
+    verdict: parsed.verdict,
+    confidence: parsed.confidence,
+    explanation: parsed.explanation,
+    flags: parsed.flags || [],
+    provider: aiConfig.provider,
+    model: aiConfig.model,
+    tokensUsed: parsed.tokensUsed,
+    cached: false,
+  };
+}
 
 const AI_PER_UID_MAX = 30; // запросов/мин на модератора
 const AI_GLOBAL_MAX = 100; // запросов/мин на всех
@@ -2849,6 +2978,23 @@ const AI_SECTION_RULES = {
 - Отклонять: личные сборы под видом общедомовых, мошенничество`,
 };
 
+const SUPPORT_SYSTEM_PROMPT = `Ти — AI помічник сервісу "Чайка Life" (мобільний додаток для мешканців Чайки, Київ).
+
+Твої задачі:
+1. Визнач категорію звернення з наведеного списку
+2. Визнач терміновість
+3. Склади корисну дружню відповідь МОВОЮ КОРИСТУВАЧА (якщо пише російською — відповідай російською, якщо українською — українською)
+4. Якщо питання про гроші/платежі/видалення/безпеку — встанови requiresHuman: true
+
+Категорії:
+registration | profile | photo | language | notifications | verification | guarantor | chat | map | moderation | payment | bug_report | account_delete | privacy | feature_request | other
+
+Відповідай СТРОГО в JSON (без markdown):
+{"category":"...","urgency":"low"|"medium"|"high","suggestedReply":"текст відповіді","requiresHuman":false}`;
+
+const SUPPORT_AUTO_CATEGORIES = new Set(['registration','profile','photo','language','notifications','feature_request','other']);
+const SUPPORT_CRITICAL_CATEGORIES = new Set(['payment','bug_report','account_delete','privacy']);
+
 const AI_SECTION_LABELS = {
   requests: 'Заявки',
   buySell: 'Куплю/Продам',
@@ -2917,12 +3063,12 @@ function buildAiUserPrompt(section, category, text, userHistoryBlock) {
 
 // --- AI provider adapters ---
 
-async function callDeepSeek(systemPrompt, userPrompt) {
+async function callDeepSeek(config, systemPrompt, userPrompt) {
   const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${AI_API_KEY}`, 'Content-Type': 'application/json' },
+    headers: { 'Authorization': `Bearer ${config.apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: AI_MODEL,
+      model: config.model,
       messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
       temperature: 0.1,
       max_tokens: 300,
@@ -2935,12 +3081,12 @@ async function callDeepSeek(systemPrompt, userPrompt) {
   return response.json();
 }
 
-async function callOpenAI(systemPrompt, userPrompt) {
+async function callOpenAI(config, systemPrompt, userPrompt) {
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${AI_API_KEY}`, 'Content-Type': 'application/json' },
+    headers: { 'Authorization': `Bearer ${config.apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: AI_MODEL,
+      model: config.model,
       messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
       temperature: 0.1,
       max_tokens: 300,
@@ -2953,16 +3099,16 @@ async function callOpenAI(systemPrompt, userPrompt) {
   return response.json();
 }
 
-async function callClaude(systemPrompt, userPrompt) {
+async function callClaude(config, systemPrompt, userPrompt) {
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
-      'x-api-key': AI_API_KEY,
+      'x-api-key': config.apiKey,
       'anthropic-version': '2023-06-01',
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: AI_MODEL,
+      model: config.model,
       max_tokens: 300,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
@@ -2981,13 +3127,13 @@ async function callClaude(systemPrompt, userPrompt) {
   };
 }
 
-async function callOpenCode(systemPrompt, userPrompt) {
-  const baseUrl = AI_BASE_URL || 'https://opencode.ai/zen/v1';
+async function callOpenCode(config, systemPrompt, userPrompt) {
+  const baseUrl = config.baseUrl || 'https://opencode.ai/zen/v1';
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${AI_API_KEY}`, 'Content-Type': 'application/json' },
+    headers: { 'Authorization': `Bearer ${config.apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: AI_MODEL,
+      model: config.model,
       messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
       temperature: 0.1,
       max_tokens: 300,
@@ -3000,13 +3146,13 @@ async function callOpenCode(systemPrompt, userPrompt) {
   return response.json();
 }
 
-function callAiProvider(systemPrompt, userPrompt) {
-  switch (AI_PROVIDER) {
-    case 'openai': return callOpenAI(systemPrompt, userPrompt);
-    case 'claude': return callClaude(systemPrompt, userPrompt);
-    case 'deepseek': return callDeepSeek(systemPrompt, userPrompt);
+function callAiProvider(config, systemPrompt, userPrompt) {
+  switch (config.provider) {
+    case 'openai': return callOpenAI(config, systemPrompt, userPrompt);
+    case 'claude': return callClaude(config, systemPrompt, userPrompt);
+    case 'deepseek': return callDeepSeek(config, systemPrompt, userPrompt);
     case 'opencode':
-    default: return callOpenCode(systemPrompt, userPrompt);
+    default: return callOpenCode(config, systemPrompt, userPrompt);
   }
 }
 
@@ -3078,7 +3224,10 @@ async function checkAiRateLimit(db, uid) {
   }
 }
 
-async function checkAiBudget(db) {
+async function checkAiBudget(db, dailyLimit, monthlyLimit) {
+  const effectiveDailyLimit = dailyLimit != null ? dailyLimit : AI_BUDGET_DAILY_DEFAULT;
+  const effectiveMonthlyLimit = monthlyLimit != null ? monthlyLimit : AI_BUDGET_MONTHLY_DEFAULT;
+
   const metaRef = db.ref('ops/ai_usage/_meta');
   const metaSnap = await metaRef.once('value');
   const meta = metaSnap.val() || {};
@@ -3100,13 +3249,13 @@ async function checkAiBudget(db) {
     await metaRef.update({ monthlyTotal: 0, monthlyDate: thisMonth });
   }
 
-  if (dailyTotal >= AI_BUDGET_DAILY) {
+  if (dailyTotal >= effectiveDailyLimit) {
     throw new functionsV1.https.HttpsError('resource-exhausted',
-      `Дневной лимит AI-запросов исчерпан (${AI_BUDGET_DAILY}). Попробуйте завтра.`);
+      `Дневной лимит AI-запросов исчерпан (${effectiveDailyLimit}). Попробуйте завтра.`);
   }
-  if (monthlyTotal >= AI_BUDGET_MONTHLY) {
+  if (monthlyTotal >= effectiveMonthlyLimit) {
     throw new functionsV1.https.HttpsError('resource-exhausted',
-      `Месячный лимит AI-запросов исчерпан (${AI_BUDGET_MONTHLY}).`);
+      `Месячный лимит AI-запросов исчерпан (${effectiveMonthlyLimit}).`);
   }
 
   return { dailyTotal, monthlyTotal };
@@ -3129,6 +3278,7 @@ exports.adminAnalyzeContent = functionsV1.https.onCall(async (data, context) => 
   try {
     const actor = await assertAdminModerationAccess(context);
     const db = admin.database();
+    const aiConfig = await getAiRuntimeConfig(db);
 
     // 1. Валидация входных данных
     const text = sanitizeText(data?.text || '', 5000);
@@ -3160,8 +3310,8 @@ exports.adminAnalyzeContent = functionsV1.https.onCall(async (data, context) => 
         confidence: cached.confidence,
         moderatorUid: actor.uid,
         timestamp: Date.now(),
-        provider: cached.provider || AI_PROVIDER,
-        model: cached.model || AI_MODEL,
+        provider: cached.provider || aiConfig.provider,
+        model: cached.model || aiConfig.model,
         tokensUsed: 0,
         cached: true,
         latency: Date.now() - startTime,
@@ -3173,8 +3323,8 @@ exports.adminAnalyzeContent = functionsV1.https.onCall(async (data, context) => 
         confidence: cached.confidence,
         explanation: cached.explanation,
         flags: cached.flags || [],
-        provider: cached.provider || AI_PROVIDER,
-        model: cached.model || AI_MODEL,
+        provider: cached.provider || aiConfig.provider,
+        model: cached.model || aiConfig.model,
         tokensUsed: 0,
         cached: true,
       };
@@ -3182,10 +3332,10 @@ exports.adminAnalyzeContent = functionsV1.https.onCall(async (data, context) => 
 
     // 3. Проверка rate limit и бюджета
     await checkAiRateLimit(db, actor.uid);
-    await checkAiBudget(db);
+    await checkAiBudget(db, aiConfig.budgetDaily, aiConfig.budgetMonthly);
 
     // 4. Проверка API ключа
-    if (!isConfiguredAiApiKey(AI_API_KEY)) {
+    if (!isConfiguredAiApiKey(aiConfig.apiKey)) {
       throw new functionsV1.https.HttpsError('failed-precondition',
         'AI_API_KEY не настроен. Добавьте реальный DeepSeek ключ в functions/.env или переменную DEEPSEEK_API_KEY');
     }
@@ -3219,7 +3369,7 @@ exports.adminAnalyzeContent = functionsV1.https.onCall(async (data, context) => 
     let rawResponse = null;
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        rawResponse = await callAiProvider(AI_SYSTEM_PROMPT, userPrompt);
+        rawResponse = await callAiProvider(aiConfig, AI_SYSTEM_PROMPT, userPrompt);
         parsed = parseAiJsonResponse(rawResponse);
         if (parsed) break;
       } catch (err) {
@@ -3256,8 +3406,8 @@ exports.adminAnalyzeContent = functionsV1.https.onCall(async (data, context) => 
       section,
       category,
       cachedAt: Date.now(),
-      provider: AI_PROVIDER,
-      model: AI_MODEL,
+      provider: aiConfig.provider,
+      model: aiConfig.model,
       tokensUsed: parsed.tokensUsed,
     });
 
@@ -3274,8 +3424,8 @@ exports.adminAnalyzeContent = functionsV1.https.onCall(async (data, context) => 
       flags: parsed.flags,
       moderatorUid: actor.uid,
       timestamp: Date.now(),
-      provider: AI_PROVIDER,
-      model: AI_MODEL,
+      provider: aiConfig.provider,
+      model: aiConfig.model,
       tokensUsed: parsed.tokensUsed,
       cached: false,
       latency: Date.now() - startTime,
@@ -3288,8 +3438,8 @@ exports.adminAnalyzeContent = functionsV1.https.onCall(async (data, context) => 
       confidence: parsed.confidence,
       explanation: parsed.explanation,
       flags: parsed.flags,
-      provider: AI_PROVIDER,
-      model: AI_MODEL,
+      provider: aiConfig.provider,
+      model: aiConfig.model,
       tokensUsed: parsed.tokensUsed,
       cached: false,
     };
@@ -3303,6 +3453,669 @@ exports.adminAnalyzeContent = functionsV1.https.onCall(async (data, context) => 
     throw new functionsV1.https.HttpsError('internal', 'AI analysis failed');
   }
 });
+
+// =============================================================
+//  Admin Test AI Config — проверка соединения с AI-провайдером
+// =============================================================
+
+exports.adminTestAiConfig = functionsV1.https.onCall(async (data, context) => {
+  const startTime = Date.now();
+  try {
+    await assertAdminModerationAccess(context);
+    const provider = String(data?.provider || 'opencode');
+    const apiKey = String(data?.apiKey || '');
+    const model = String(data?.model || '');
+    const baseUrl = String(data?.baseUrl || '');
+
+    if (!apiKey || !model) {
+      throw new functionsV1.https.HttpsError('invalid-argument', 'apiKey и model обязательны');
+    }
+
+    if (!isConfiguredAiApiKey(apiKey)) {
+      return { success: false, provider, model, error: 'API ключ не настроен или является placeholder-значением' };
+    }
+
+    const testConfig = { provider, apiKey, model, baseUrl };
+    const testSystemPrompt = 'You are a test assistant. Reply only with valid JSON.';
+    const testUserPrompt = 'Reply with exactly this JSON (no other text): {"status":"ok"}';
+
+    let response;
+    try {
+      response = await callAiProvider(testConfig, testSystemPrompt, testUserPrompt);
+    } catch (err) {
+      return { success: false, provider, model, error: err?.message || 'Connection failed', latencyMs: Date.now() - startTime };
+    }
+
+    const tokensUsed = (response?.usage?.total_tokens) || 0;
+    const content = response?.choices?.[0]?.message?.content || '';
+    const isValid = content.includes('"ok"') || content.includes('ok');
+
+    if (!isValid) {
+      return { success: false, provider, model, error: `Неожиданный ответ: ${content.slice(0, 100)}`, latencyMs: Date.now() - startTime };
+    }
+
+    return { success: true, provider, model, tokensUsed, latencyMs: Date.now() - startTime };
+  } catch (error) {
+    if (error instanceof functionsV1.https.HttpsError) throw error;
+    return { success: false, provider: data?.provider || '', model: data?.model || '', error: error?.message || 'Unknown error' };
+  }
+});
+
+// Разделы для авто-модерации: path, statusField, как выглядит 'pending', как выглядит 'approved'
+const AUTO_MOD_SECTIONS = [
+  { key: 'requests',             path: 'requests',               statusField: 'status',           pendingValue: 'pending', approvedStatus: 'approved',  rejectedStatus: 'rejected'  },
+  { key: 'buySell',              path: 'buy_sell_listings',      statusField: 'moderationStatus', pendingValue: 'pending', approvedStatus: 'approved',  rejectedStatus: 'rejected'  },
+  { key: 'contactsListings',     path: 'contacts_listings',      statusField: 'moderationStatus', pendingValue: 'pending', approvedStatus: 'approved',  rejectedStatus: 'rejected'  },
+  { key: 'biznesChaikaListings', path: 'biznes_chaika_listings', statusField: 'moderationStatus', pendingValue: 'pending', approvedStatus: 'approved',  rejectedStatus: 'rejected'  },
+  { key: 'jobs',                 path: 'job_listings',           statusField: 'moderationStatus', pendingValue: 'pending', approvedStatus: 'approved',  rejectedStatus: 'rejected'  },
+  { key: 'lostFound',            path: 'lost_found',             statusField: 'moderationStatus', pendingValue: 'pending', approvedStatus: 'approved',  rejectedStatus: 'rejected'  },
+  { key: 'appSuggestions',       path: 'app_suggestions',        statusField: 'moderationStatus', pendingValue: 'pending', approvedStatus: 'approved',  rejectedStatus: 'rejected'  },
+];
+
+function buildAutoModText(item) {
+  const parts = [item.title, item.text, item.description, item.about, item.goal, item.name, item.itemName]
+    .filter(Boolean)
+    .map(String);
+  return parts.join(' ').trim().slice(0, 3000);
+}
+
+// =============================================================
+//  aiAutoModerateScheduled — авто-модерация текста (каждые 5 мин)
+//  Работает 24/7 на серверах Google, не требует локального запуска
+// =============================================================
+
+exports.aiAutoModerateScheduled = functionsV1.pubsub
+  .schedule('every 5 minutes')
+  .timeZone('Europe/Kiev')
+  .onRun(async (_context) => {
+    const db = admin.database();
+
+    try {
+      // Проверяем: включён ли автономный режим
+      const autonomousSnap = await db.ref('ai_config/autonomous').once('value');
+      const autonomous = autonomousSnap.val() || {};
+      if (!autonomous.enabled || !autonomous.textModeration) return null;
+
+      // Читаем конфиг и пороги
+      const aiConfig = await getAiRuntimeConfig(db);
+      const threshSnap = await db.ref('ai_config/thresholds').once('value');
+      const thresh = threshSnap.val() || {};
+      const autoApproveThreshold = Number(thresh.autoApprove) || 0.90;
+      const autoRejectThreshold = Number(thresh.autoReject) || 0.95;
+
+      if (!isConfiguredAiApiKey(aiConfig.apiKey)) {
+        console.warn('[aiAutoMod] AI API key not configured, skipping');
+        return null;
+      }
+
+      let totalProcessed = 0;
+      let totalApproved = 0;
+      let totalRejected = 0;
+      let totalEscalated = 0;
+
+      for (const section of AUTO_MOD_SECTIONS) {
+        try {
+          const snap = await db.ref(section.path)
+            .orderByChild(section.statusField)
+            .equalTo(section.pendingValue)
+            .limitToFirst(5)
+            .once('value');
+
+          if (!snap.exists()) continue;
+
+          const items = [];
+          snap.forEach((child) => {
+            const val = child.val();
+            // Пропускаем уже обработанные или те что в очереди эскалаций
+            if (!val.ai_auto_processed) {
+              items.push({ id: child.key, ...val });
+            }
+          });
+
+          for (const item of items) {
+            const text = buildAutoModText(item);
+            if (!text || text.length < 5) continue;
+
+            const result = await analyzeTextInternal(db, aiConfig, section.key, text, item.userId || null);
+            if (!result) continue;
+
+            totalProcessed++;
+            const now = Date.now();
+
+            if (result.verdict === 'approve' && result.confidence >= autoApproveThreshold) {
+              // Авто-одобрение
+              await db.ref(`${section.path}/${item.id}`).update({
+                [section.statusField]: section.approvedStatus,
+                isApproved: true,
+                ai_auto_processed: true,
+                ai_verdict: result.verdict,
+                ai_confidence: result.confidence,
+                ai_provider: result.provider,
+                moderatedAt: now,
+                moderatedBy: 'ai-auto',
+                moderationReason: `AI авто-одобрено (${Math.round(result.confidence * 100)}%)`,
+              });
+              await db.ref('ai_queue/log').push({
+                action: 'auto_approve',
+                section: section.key,
+                itemId: item.id,
+                itemPath: `${section.path}/${item.id}`,
+                verdict: result.verdict,
+                confidence: result.confidence,
+                provider: result.provider,
+                model: result.model,
+                tokensUsed: result.tokensUsed,
+                cached: result.cached,
+                timestamp: now,
+              });
+              totalApproved++;
+
+            } else if (result.verdict === 'suspicious' && result.confidence >= autoRejectThreshold) {
+              // Авто-отклонение
+              await db.ref(`${section.path}/${item.id}`).update({
+                [section.statusField]: section.rejectedStatus,
+                isApproved: false,
+                ai_auto_processed: true,
+                ai_verdict: result.verdict,
+                ai_confidence: result.confidence,
+                ai_provider: result.provider,
+                moderatedAt: now,
+                moderatedBy: 'ai-auto',
+                moderationReason: `AI авто-отклонено: ${(result.explanation || '').slice(0, 200)}`,
+              });
+              await db.ref('ai_queue/log').push({
+                action: 'auto_reject',
+                section: section.key,
+                itemId: item.id,
+                itemPath: `${section.path}/${item.id}`,
+                verdict: result.verdict,
+                confidence: result.confidence,
+                flags: result.flags,
+                explanation: result.explanation,
+                provider: result.provider,
+                model: result.model,
+                tokensUsed: result.tokensUsed,
+                cached: result.cached,
+                timestamp: now,
+              });
+              totalRejected++;
+
+            } else {
+              // Эскалация — отправить человеку
+              await db.ref('ai_queue/escalations').push({
+                itemPath: `${section.path}/${item.id}`,
+                section: section.key,
+                statusField: section.statusField,
+                approvedStatus: section.approvedStatus,
+                rejectedStatus: section.rejectedStatus,
+                itemId: item.id,
+                textPreview: text.slice(0, 400),
+                userId: item.userId || null,
+                ai_verdict: result.verdict,
+                ai_confidence: result.confidence,
+                ai_explanation: result.explanation || '',
+                ai_flags: result.flags || [],
+                provider: result.provider,
+                model: result.model,
+                createdAt: now,
+                status: 'pending',
+              });
+              // Помечаем что элемент уже в очереди эскалаций
+              await db.ref(`${section.path}/${item.id}`).update({
+                ai_auto_processed: true,
+                ai_escalated: true,
+              });
+              await db.ref('ai_queue/log').push({
+                action: 'escalation',
+                section: section.key,
+                itemId: item.id,
+                verdict: result.verdict,
+                confidence: result.confidence,
+                provider: result.provider,
+                model: result.model,
+                tokensUsed: result.tokensUsed,
+                cached: result.cached,
+                timestamp: now,
+              });
+              totalEscalated++;
+            }
+
+            // Небольшая пауза между элементами, чтобы не перегрузить AI API
+            await new Promise((r) => setTimeout(r, 300));
+          }
+        } catch (sectionErr) {
+          console.error(`[aiAutoMod] Section ${section.key} error:`, sectionErr?.message);
+        }
+      }
+
+      console.log(`[aiAutoMod] Done: processed=${totalProcessed} approved=${totalApproved} rejected=${totalRejected} escalated=${totalEscalated}`);
+
+      // Записываем итоги прогона
+      await db.ref('ai_queue/last_run').set({
+        timestamp: Date.now(),
+        totalProcessed,
+        totalApproved,
+        totalRejected,
+        totalEscalated,
+      });
+
+    } catch (err) {
+      console.error('[aiAutoMod] Fatal error:', err?.message, err?.stack);
+      await writeOpsError('aiAutoModerateScheduled', err, {});
+    }
+
+    return null;
+  });
+
+// =============================================================
+//  aiResolveEscalation — модератор разрешает эскалацию вручную
+// =============================================================
+
+exports.aiResolveEscalation = functionsV1.https.onCall(async (data, context) => {
+  try {
+    const actor = await assertAdminModerationAccess(context);
+    const db = admin.database();
+
+    const escalationId = String(data?.escalationId || '').trim();
+    const action = String(data?.action || '');
+    const reason = String(data?.reason || '').trim();
+
+    if (!escalationId) {
+      throw new functionsV1.https.HttpsError('invalid-argument', 'escalationId обязателен');
+    }
+    if (action !== 'approve' && action !== 'reject') {
+      throw new functionsV1.https.HttpsError('invalid-argument', 'action должен быть approve или reject');
+    }
+
+    const escSnap = await db.ref(`ai_queue/escalations/${escalationId}`).once('value');
+    if (!escSnap.exists()) {
+      throw new functionsV1.https.HttpsError('not-found', 'Эскалация не найдена');
+    }
+
+    const esc = escSnap.val();
+    if (esc.status !== 'pending') {
+      throw new functionsV1.https.HttpsError('failed-precondition', 'Эскалация уже разрешена');
+    }
+
+    const now = Date.now();
+    const isApprove = action === 'approve';
+    const newStatus = isApprove ? esc.approvedStatus : esc.rejectedStatus;
+
+    // Обновляем оригинальный элемент
+    await db.ref(esc.itemPath).update({
+      [esc.statusField]: newStatus,
+      isApproved: isApprove,
+      ai_escalated: false,
+      moderatedAt: now,
+      moderatedBy: actor.uid,
+      moderationReason: reason || (isApprove ? 'Одобрено после эскалации AI' : 'Отклонено после эскалации AI'),
+    });
+
+    // Закрываем эскалацию
+    await db.ref(`ai_queue/escalations/${escalationId}`).update({
+      status: isApprove ? 'resolved_approved' : 'resolved_rejected',
+      resolvedAt: now,
+      resolvedBy: actor.uid,
+      resolvedReason: reason || '',
+    });
+
+    // Логируем
+    await db.ref('ai_queue/log').push({
+      action: isApprove ? 'human_approved' : 'human_rejected',
+      section: esc.section,
+      itemId: esc.itemId,
+      escalationId,
+      moderatorUid: actor.uid,
+      timestamp: now,
+    });
+
+    return { success: true };
+  } catch (error) {
+    if (error instanceof functionsV1.https.HttpsError) throw error;
+    console.error('[aiResolveEscalation] error:', error?.message);
+    throw new functionsV1.https.HttpsError('internal', 'Ошибка при разрешении эскалации');
+  }
+});
+
+// =============================================================
+//  aiAutoReplySupport — авто-ответ на первое сообщение поддержки
+//  Trigger: при создании нового сообщения в support_messages
+// =============================================================
+
+exports.aiAutoReplySupport = functionsV1.database
+  .ref('support_messages/{ticketId}/{messageId}')
+  .onCreate(async (snapshot, context) => {
+    const message = snapshot.val();
+    const { ticketId, messageId } = context.params;
+
+    // Только первые сообщения от пользователя
+    if (!message || message.senderRole !== 'user') return null;
+
+    const db = admin.database();
+
+    try {
+      // Проверяем флаг автономности
+      const autonomousSnap = await db.ref('ai_config/autonomous').once('value');
+      const autonomous = autonomousSnap.val() || {};
+      if (!autonomous.enabled || !autonomous.supportReplies) return null;
+
+      // Читаем тикет
+      const ticketSnap = await db.ref(`support_tickets/${ticketId}`).once('value');
+      if (!ticketSnap.exists()) return null;
+      const ticket = ticketSnap.val();
+
+      // Пропускаем если AI уже отвечал
+      if (ticket.aiReplied) return null;
+      // Пропускаем закрытые тикеты
+      if (ticket.status === 'closed') return null;
+
+      // Отмечаем что обрабатываем (предотвращаем двойную обработку)
+      await db.ref(`support_tickets/${ticketId}`).update({ aiProcessing: true });
+
+      const aiConfig = await getAiRuntimeConfig(db);
+      if (!isConfiguredAiApiKey(aiConfig.apiKey)) return null;
+
+      const userText = String(message.text || '').trim();
+      const category = String(ticket.category || '');
+      const userName = String(ticket.userName || 'користувач');
+
+      const userPrompt = `Категорія: ${category}\nІм'я: ${userName}\nПовідомлення:\n"""\n${userText.slice(0, 1000)}\n"""`;
+
+      let parsed = null;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const raw = await callAiProvider(aiConfig, SUPPORT_SYSTEM_PROMPT, userPrompt);
+          const content = raw?.choices?.[0]?.message?.content || '';
+          const jsonMatch = String(content).match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            parsed = JSON.parse(jsonMatch[0]);
+            if (parsed && parsed.suggestedReply) break;
+          }
+        } catch (_) {}
+      }
+
+      if (!parsed || !parsed.suggestedReply) {
+        await db.ref(`support_tickets/${ticketId}`).update({ aiProcessing: false });
+        return null;
+      }
+
+      const now = Date.now();
+      const detectedCategory = parsed.category || category;
+      const requiresHuman = parsed.requiresHuman === true || SUPPORT_CRITICAL_CATEGORIES.has(detectedCategory);
+
+      if (requiresHuman || !SUPPORT_AUTO_CATEGORIES.has(detectedCategory)) {
+        // Эскалация — критическая тема или средняя сложность
+        const urgency = SUPPORT_CRITICAL_CATEGORIES.has(detectedCategory) ? 'high' : 'medium';
+
+        await db.ref('ai_queue/support_escalations').push({
+          ticketId,
+          userId: ticket.userId || null,
+          userName,
+          category: detectedCategory,
+          urgency,
+          userMessage: userText.slice(0, 500),
+          aiDraftReply: parsed.suggestedReply,
+          createdAt: now,
+          status: 'pending',
+          requiresHuman,
+        });
+
+        await db.ref(`support_tickets/${ticketId}`).update({
+          aiProcessing: false,
+          aiEscalated: true,
+          aiEscalatedAt: now,
+          aiCategory: detectedCategory,
+        });
+
+        // Telegram уведомление для критических тем
+        if (SUPPORT_CRITICAL_CATEGORIES.has(detectedCategory)) {
+          try {
+            const emoji = detectedCategory === 'payment' ? '💰' : detectedCategory === 'account_delete' ? '🗑' : detectedCategory === 'privacy' ? '🔒' : '🐛';
+            await sendTelegramMessage(
+              `${emoji} КРИТИЧНИЙ ТИКЕТ [${detectedCategory.toUpperCase()}]\n👤 ${userName}\n💬 ${userText.slice(0, 200)}`,
+            );
+          } catch (_) {}
+        }
+
+      } else {
+        // Авто-ответ для простых категорий
+        const replyRef = db.ref(`support_messages/${ticketId}`).push();
+        await replyRef.set({
+          ticketId,
+          senderId: 'ai-assistant',
+          senderRole: 'admin',
+          text: parsed.suggestedReply,
+          isAiReply: true,
+          timestamp: now,
+        });
+
+        await db.ref(`support_tickets/${ticketId}`).update({
+          aiReplied: true,
+          aiRepliedAt: now,
+          aiProcessing: false,
+          aiCategory: detectedCategory,
+          lastAdminMessage: parsed.suggestedReply.slice(0, 100),
+          updatedAt: now,
+        });
+
+        await db.ref('ai_queue/log').push({
+          action: 'support_auto_reply',
+          ticketId,
+          category: detectedCategory,
+          provider: aiConfig.provider,
+          model: aiConfig.model,
+          timestamp: now,
+        });
+      }
+
+    } catch (err) {
+      console.error('[aiAutoReplySupport] error:', err?.message);
+      await db.ref(`support_tickets/${ticketId}`).update({ aiProcessing: false }).catch(() => {});
+      await writeOpsError('aiAutoReplySupport', err, { ticketId });
+    }
+
+    return null;
+  });
+
+// =============================================================
+//  aiAutoTriageReports — классификация жалоб при создании
+// =============================================================
+
+exports.aiAutoTriageReports = functionsV1.database
+  .ref('reports/{reportId}')
+  .onCreate(async (snapshot, context) => {
+    const report = snapshot.val();
+    const { reportId } = context.params;
+
+    if (!report) return null;
+
+    const db = admin.database();
+
+    try {
+      const autonomousSnap = await db.ref('ai_config/autonomous').once('value');
+      const autonomous = autonomousSnap.val() || {};
+      if (!autonomous.enabled || !autonomous.reportsTriage) return null;
+
+      const aiConfig = await getAiRuntimeConfig(db);
+      if (!isConfiguredAiApiKey(aiConfig.apiKey)) return null;
+
+      const now = Date.now();
+      const reporterId = String(report.reporterId || '');
+      const reason = String(report.reason || 'other');
+      const description = String(report.description || '').trim();
+
+      // Проверка серийного жалобщика (> 5 жалоб за последние 24 ч)
+      let isSerialReporter = false;
+      if (reporterId) {
+        try {
+          const recentSnap = await db.ref('reports')
+            .orderByChild('reporterId').equalTo(reporterId)
+            .limitToLast(10).once('value');
+          let recentCount = 0;
+          const oneDayAgo = now - 24 * 60 * 60 * 1000;
+          recentSnap.forEach((child) => {
+            const r = child.val();
+            if (r && r.createdAt > oneDayAgo) recentCount++;
+          });
+          if (recentCount > 5) isSerialReporter = true;
+        } catch (_) {}
+      }
+
+      if (isSerialReporter) {
+        await snapshot.ref.update({
+          aiTriaged: true,
+          aiVerdict: 'serial_reporter',
+          status: 'reviewed',
+          reviewNote: 'AI: серийный жалобщик — авто-отклонено',
+          reviewedAt: now,
+          reviewedBy: 'ai-auto',
+        });
+        await db.ref('ai_queue/log').push({
+          action: 'report_auto_dismiss',
+          reportId,
+          reason: 'serial_reporter',
+          provider: aiConfig.provider,
+          timestamp: now,
+        });
+        return null;
+      }
+
+      // AI анализ описания жалобы
+      const reportText = `Тип жалобы: ${reason}\nОписание: ${description || '(нет описания)'}`;
+      const reportSystemPrompt = `Ты — помощник модератора. Проанализируй жалобу пользователя.
+Ответь строго в JSON: {"verdict":"spam"|"revenge"|"legitimate"|"serious","confidence":0.0-0.99,"priority":"low"|"medium"|"high","reason":"пояснение на русском 1 предложение"}
+spam — жалоба без оснований/спам
+revenge — похоже на месть/конкурентную жалобу
+legitimate — обоснованная жалоба, требует проверки
+serious — серьёзное нарушение (насилие, мошенничество, угрозы)`;
+
+      let aiVerdict = null;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const raw = await callAiProvider(aiConfig, reportSystemPrompt, reportText);
+          const content = raw?.choices?.[0]?.message?.content || '';
+          const jsonMatch = String(content).match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const p = JSON.parse(jsonMatch[0]);
+            if (p && ['spam','revenge','legitimate','serious'].includes(p.verdict)) {
+              aiVerdict = p;
+              break;
+            }
+          }
+        } catch (_) {}
+      }
+
+      if (!aiVerdict) return null;
+
+      await snapshot.ref.update({ aiTriaged: true, aiVerdict: aiVerdict.verdict });
+
+      if ((aiVerdict.verdict === 'spam' || aiVerdict.verdict === 'revenge') && aiVerdict.confidence >= 0.85) {
+        // Авто-отклонение спам-жалобы
+        await snapshot.ref.update({
+          status: 'reviewed',
+          reviewNote: `AI: ${aiVerdict.verdict} — ${aiVerdict.reason}`,
+          reviewedAt: now,
+          reviewedBy: 'ai-auto',
+        });
+        await db.ref('ai_queue/log').push({
+          action: 'report_auto_dismiss',
+          reportId,
+          reason: aiVerdict.verdict,
+          confidence: aiVerdict.confidence,
+          provider: aiConfig.provider,
+          timestamp: now,
+        });
+      } else {
+        // Эскалация реальной жалобы
+        await db.ref('ai_queue/report_escalations').push({
+          reportId,
+          reporterId: report.reporterId || null,
+          reportedUserId: report.reportedUserId || null,
+          reportedListingId: report.reportedListingId || null,
+          reason,
+          description: description.slice(0, 500),
+          aiVerdict: aiVerdict.verdict,
+          aiConfidence: aiVerdict.confidence,
+          aiPriority: aiVerdict.priority,
+          aiReason: aiVerdict.reason,
+          provider: aiConfig.provider,
+          createdAt: now,
+          status: 'pending',
+        });
+
+        // Telegram для серьёзных нарушений
+        if (aiVerdict.verdict === 'serious') {
+          try {
+            await sendTelegramMessage(
+              `🚨 СЕРЙОЗНА СКАРГА [${reason}]\n${description.slice(0, 200)}\nAI: ${aiVerdict.reason}`,
+            );
+          } catch (_) {}
+        }
+
+        await db.ref('ai_queue/log').push({
+          action: 'report_escalation',
+          reportId,
+          verdict: aiVerdict.verdict,
+          priority: aiVerdict.priority,
+          provider: aiConfig.provider,
+          timestamp: now,
+        });
+      }
+
+    } catch (err) {
+      console.error('[aiAutoTriageReports] error:', err?.message);
+      await writeOpsError('aiAutoTriageReports', err, { reportId });
+    }
+
+    return null;
+  });
+
+// =============================================================
+//  aiCloseStaleAiTickets — авто-закрытие тикетов (AI ответил, нет реакции 24ч)
+// =============================================================
+
+exports.aiCloseStaleAiTickets = functionsV1.pubsub
+  .schedule('every 24 hours')
+  .timeZone('Europe/Kiev')
+  .onRun(async (_context) => {
+    const db = admin.database();
+    try {
+      const autonomousSnap = await db.ref('ai_config/autonomous').once('value');
+      const autonomous = autonomousSnap.val() || {};
+      if (!autonomous.enabled || !autonomous.supportReplies) return null;
+
+      const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+      const ticketsSnap = await db.ref('support_tickets')
+        .orderByChild('aiRepliedAt')
+        .startAt(1)
+        .endAt(cutoff)
+        .limitToFirst(20)
+        .once('value');
+
+      if (!ticketsSnap.exists()) return null;
+
+      let closed = 0;
+      const updates = {};
+      ticketsSnap.forEach((child) => {
+        const t = child.val();
+        if (t && t.aiReplied && t.status === 'open') {
+          updates[`support_tickets/${child.key}/status`] = 'closed';
+          updates[`support_tickets/${child.key}/closedAt`] = Date.now();
+          updates[`support_tickets/${child.key}/closedBy`] = 'ai-auto';
+          updates[`support_tickets/${child.key}/closeReason`] = 'AI відповів, відповіді від користувача не надійшло протягом 24 годин';
+          closed++;
+        }
+      });
+
+      if (closed > 0) {
+        await db.ref('/').update(updates);
+        console.log(`[aiCloseStaleAiTickets] Closed ${closed} stale AI-replied tickets`);
+      }
+    } catch (err) {
+      console.error('[aiCloseStaleAiTickets] error:', err?.message);
+    }
+    return null;
+  });
 
 // =============================================================
 //  Admin Edit Content Item — редактирование заявок модератором
@@ -3456,6 +4269,7 @@ exports.adminSuggestFix = functionsV1.https.onCall(async (data, context) => {
   try {
     const actor = await assertAdminModerationAccess(context);
     const db = admin.database();
+    const aiConfig = await getAiRuntimeConfig(db);
 
     const section = String(data?.section || '').trim();
     const category = String(data?.category || '').trim();
@@ -3468,9 +4282,9 @@ exports.adminSuggestFix = functionsV1.https.onCall(async (data, context) => {
 
     // Rate limit (shared with analyze)
     await checkAiRateLimit(db, actor.uid);
-    await checkAiBudget(db);
+    await checkAiBudget(db, aiConfig.budgetDaily, aiConfig.budgetMonthly);
 
-    if (!AI_API_KEY) {
+    if (!aiConfig.apiKey) {
       return { suggestions: [] };
     }
 
@@ -3499,7 +4313,7 @@ JSON формат:
 
     let rawResponse = null;
     try {
-      rawResponse = await callAiProvider(SUGGEST_SYSTEM_PROMPT, userPrompt);
+      rawResponse = await callAiProvider(aiConfig, SUGGEST_SYSTEM_PROMPT, userPrompt);
     } catch (err) {
       console.error('[adminSuggestFix] AI API error:', err?.message);
       return { suggestions: [] };
@@ -3546,8 +4360,8 @@ JSON формат:
       suggestionsCount: suggestions.length,
       moderatorUid: actor.uid,
       timestamp: Date.now(),
-      provider: AI_PROVIDER,
-      model: AI_MODEL,
+      provider: aiConfig.provider,
+      model: aiConfig.model,
       tokensUsed,
     });
 
@@ -3631,13 +4445,14 @@ exports.getAiBudgetUsage = functionsV1.https.onCall(async (_data, context) => {
     const metaSnap = await db.ref('ops/ai_usage/_meta').once('value');
     const meta = metaSnap.val() || {};
 
+    const aiConfig = await getAiRuntimeConfig(db);
     return {
       dailyUsed: Number(meta.dailyTotal) || 0,
-      dailyLimit: AI_BUDGET_DAILY,
+      dailyLimit: aiConfig.budgetDaily,
       monthlyUsed: Number(meta.monthlyTotal) || 0,
-      monthlyLimit: AI_BUDGET_MONTHLY,
-      provider: AI_PROVIDER,
-      model: AI_MODEL,
+      monthlyLimit: aiConfig.budgetMonthly,
+      provider: aiConfig.provider,
+      model: aiConfig.model,
     };
   } catch (error) {
     if (error instanceof functionsV1.https.HttpsError) throw error;
@@ -4144,3 +4959,114 @@ exports.purgeSecurityLogs = functionsV1.pubsub
     }
   }
 );
+
+// ─── Purge stale operational & diagnostic data ──────────────────────────────
+// Runs daily at 04:00 UTC. Removes entries older than the configured TTL.
+// Flat targets: diagnostics/runtime (14d), diagnostics/runtime_moderation (14d),
+//   ops/events (30d), ops/errors (30d), moderation_analysis_cache (7d).
+// Per-user targets (paginated): bonus_idempotency (30d), notifications (30d read),
+//   bonus_transactions (180d).
+exports.purgeStaleData = functionsV1.pubsub
+  .schedule('0 4 * * *')
+  .timeZone('UTC')
+  .onRun(async () => {
+    const db = admin.database();
+    const now = Date.now();
+
+    // Paths with a simple "at" or "timestamp" field and their retention period in ms.
+    const targets = [
+      { path: 'diagnostics/runtime', tsField: 'at', retentionMs: 14 * 24 * 60 * 60 * 1000 },
+      { path: 'diagnostics/runtime_moderation', tsField: 'at', retentionMs: 14 * 24 * 60 * 60 * 1000 },
+      { path: 'ops/events', tsField: 'at', retentionMs: 30 * 24 * 60 * 60 * 1000 },
+      { path: 'ops/errors', tsField: 'at', retentionMs: 30 * 24 * 60 * 60 * 1000 },
+      { path: 'moderation_analysis_cache', tsField: 'cachedAt', retentionMs: 7 * 24 * 60 * 60 * 1000 },
+    ];
+
+    for (const { path, tsField, retentionMs } of targets) {
+      try {
+        const cutoff = now - retentionMs;
+        const snap = await db.ref(path).orderByChild(tsField).endAt(cutoff).limitToFirst(500).once('value');
+        const val = snap.val();
+        if (!val) {
+          console.log(`[purgeStaleData] ${path}: nothing to delete`);
+          continue;
+        }
+        const keys = Object.keys(val);
+        const updates = {};
+        for (const key of keys) {
+          updates[`${path}/${key}`] = null;
+        }
+        await db.ref().update(updates);
+        console.log(`[purgeStaleData] ${path}: deleted ${keys.length} entries`);
+      } catch (err) {
+        console.error(`[purgeStaleData] ${path} error:`, err?.message);
+      }
+    }
+
+    // ── Helper: paginated cleanup for per-user keyed nodes ──
+    // Processes users in pages of PAGE_SIZE. Each invocation handles up to
+    // MAX_DELETES total deletions across all pages to stay within function timeout.
+    const PAGE_SIZE = 100;
+    const MAX_DELETES = 2000;
+
+    const purgePerUserNode = async (nodePath, filterFn, label) => {
+      try {
+        let cursor = null;
+        let totalDeleted = 0;
+
+        while (totalDeleted < MAX_DELETES) {
+          let pageQuery = db.ref(nodePath).orderByKey().limitToFirst(PAGE_SIZE);
+          if (cursor) {
+            pageQuery = db.ref(nodePath).orderByKey().startAfter(cursor).limitToFirst(PAGE_SIZE);
+          }
+          const pageSnap = await pageQuery.once('value');
+          const pageData = pageSnap.val();
+          if (!pageData) break;
+
+          const uids = Object.keys(pageData);
+          if (uids.length === 0) break;
+          cursor = uids[uids.length - 1];
+
+          const updates = {};
+          let pageCount = 0;
+          for (const uid of uids) {
+            const children = pageData[uid];
+            if (!children || typeof children !== 'object') continue;
+            for (const childKey of Object.keys(children)) {
+              if (filterFn(children[childKey])) {
+                updates[`${nodePath}/${uid}/${childKey}`] = null;
+                pageCount += 1;
+              }
+            }
+            if (totalDeleted + pageCount >= MAX_DELETES) break;
+          }
+
+          if (pageCount > 0) {
+            await db.ref().update(updates);
+            totalDeleted += pageCount;
+          }
+
+          // If we got fewer UIDs than PAGE_SIZE, we've reached the end.
+          if (uids.length < PAGE_SIZE) break;
+        }
+
+        console.log(`[purgeStaleData] ${label}: deleted ${totalDeleted} entries`);
+      } catch (err) {
+        console.error(`[purgeStaleData] ${label} error:`, err?.message);
+      }
+    };
+
+    // Purge bonus_idempotency keys older than 30 days.
+    // Values are plain timestamps: bonus_idempotency/{uid}/{key} = number.
+    const IDEMP_CUTOFF = now - 30 * 24 * 60 * 60 * 1000;
+    await purgePerUserNode('bonus_idempotency', (val) => typeof val === 'number' && val < IDEMP_CUTOFF, 'bonus_idempotency');
+
+    // Purge read notifications older than 30 days.
+    const NOTIF_CUTOFF = now - 30 * 24 * 60 * 60 * 1000;
+    await purgePerUserNode('notifications', (n) => n && n.read === true && typeof n.createdAt === 'number' && n.createdAt < NOTIF_CUTOFF, 'notifications');
+
+    // Purge bonus_transactions older than 6 months.
+    // Structure: bonus_transactions/{uid}/{pushId} = { createdAt, ... }.
+    const TX_CUTOFF = now - 180 * 24 * 60 * 60 * 1000;
+    await purgePerUserNode('bonus_transactions', (tx) => tx && typeof tx.createdAt === 'number' && tx.createdAt < TX_CUTOFF, 'bonus_transactions');
+  });
