@@ -16,6 +16,7 @@ import { showUserError } from '../utils/userFacingErrors';
 import { useOperationTrace } from '../hooks/useOperationTrace';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { ITEM_CATEGORY_VALUES, ITEM_CONDITION_VALUES, THREE_MONTHS_MS, UI_TEXT } from './Kuplu-Prodam';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 const DRAFT_KEY = '@chaika:buy_sell_draft';
 
@@ -24,6 +25,7 @@ const CreateBuySellScreen: React.FC = () => {
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const user = useSelector((state: RootState) => state.auth.user);
   const text = UI_TEXT[language];
+  const { colors } = useAppTheme();
   const { startOperation, trace } = useOperationTrace('CreateBuySellScreen');
   const allowLeaveRef = useRef(false);
   const draftHadPhotos = useRef(false);
@@ -123,10 +125,13 @@ const CreateBuySellScreen: React.FC = () => {
 
   useEffect(() => {
     if (!isDirty) return;
-    void AsyncStorage.setItem(
-      DRAFT_KEY,
-      JSON.stringify({ itemName, listingType, category, condition, price, description, phone, hadPhotos: formPhotos.length > 0 }),
-    ).catch(() => {});
+    const timer = setTimeout(() => {
+      void AsyncStorage.setItem(
+        DRAFT_KEY,
+        JSON.stringify({ itemName, listingType, category, condition, price, description, phone, hadPhotos: formPhotos.length > 0 }),
+      ).catch(() => {});
+    }, 600);
+    return () => clearTimeout(timer);
   }, [category, condition, description, formPhotos.length, isDirty, itemName, listingType, phone, price]);
 
   useEffect(() => {
@@ -136,6 +141,7 @@ const CreateBuySellScreen: React.FC = () => {
   }, [text.draftRestoredMsg, text.draftRestoredOk, text.draftRestoredTitle]);
 
   const handleSubmit = async () => {
+    if (submitting) return;
     startOperation();
 
     trace('validate', 'start');
@@ -215,6 +221,7 @@ const CreateBuySellScreen: React.FC = () => {
         photoUri: donePhotos[0]?.downloadUrl ?? '',
         photoStoragePath: donePhotos[0]?.storagePath ?? '',
         photoId: '',
+        photos: donePhotos.map((p) => ({ downloadUrl: p.downloadUrl, storagePath: p.storagePath })),
         moderationStatus: 'pending',
         submittedForModerationAt: createdAt.toISOString(),
         createdAt: createdAt.toISOString(),
@@ -238,7 +245,7 @@ const CreateBuySellScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.keyboard}>
         <View style={styles.header}>
           <TouchableOpacity style={styles.backBtn} onPress={requestClose} activeOpacity={0.8}>
@@ -411,7 +418,7 @@ const styles = StyleSheet.create({
   photoLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   requiredMark: { fontSize: 11, fontWeight: '700', color: SCREEN_THEME.terracottaDark, marginBottom: 8, marginTop: 12 },
   signInNote: { color: SCREEN_THEME.textSecondary, fontSize: 13, fontWeight: '700', paddingVertical: 10, lineHeight: 18 },
-  submitBtn: { backgroundColor: SCREEN_THEME.terracotta, borderRadius: 16, paddingVertical: 14, alignItems: 'center', marginTop: 18 },
+  submitBtn: { backgroundColor: '#7d0e59', borderRadius: 16, paddingVertical: 14, alignItems: 'center', marginTop: 18 },
   submitBtnDisabled: { opacity: 0.65 },
   submitBtnText: { color: '#FFFFFF', fontWeight: '800', textAlign: 'center', paddingHorizontal: 10 },
 });

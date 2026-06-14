@@ -1,4 +1,4 @@
-import { get, limitToLast, off, onValue, query, ref } from 'firebase/database';
+import { get, limitToLast, off, onValue, orderByChild, equalTo, query, ref } from 'firebase/database';
 import { database, firebaseConfig } from '../firebase/firebase';
 import { LOCAL_MODE, LOCAL_API } from '../local/LOCAL_MODE';
 import { probeRulesLevel } from './rulesProbeService';
@@ -35,6 +35,8 @@ export type DashboardStats = {
   rulesEnforcementLevel: 'OPEN' | 'PARTIAL' | 'SECURE' | 'UNKNOWN';
   rulesOpenPaths: string[];
   rulesCheckedAt: number;
+  pendingReports: number;
+  pendingBlockReports: number;
 };
 
 export type DashboardActivity = {
@@ -114,6 +116,8 @@ const emptyStats: DashboardStats = {
   rulesEnforcementLevel: 'UNKNOWN',
   rulesOpenPaths: [],
   rulesCheckedAt: 0,
+  pendingReports: 0,
+  pendingBlockReports: 0,
 };
 
 const emptyCounter: ModerationCounter = {
@@ -467,6 +471,8 @@ const subscribeDashboardLocal = (
           rulesEnforcementLevel: 'UNKNOWN',
           rulesOpenPaths: [],
           rulesCheckedAt: 0,
+          pendingReports: 0,
+          pendingBlockReports: 0,
         },
         issues,
       });
@@ -505,6 +511,8 @@ export const subscribeDashboard = LOCAL_MODE
   let rulesEnforcementLevel: DashboardStats['rulesEnforcementLevel'] = 'UNKNOWN';
   let rulesOpenPaths: string[] = [];
   let rulesCheckedAt = 0;
+  let pendingReports = 0;
+  let pendingBlockReports = 0;
 
   const moderationByPath = new Map<string, ModerationCounter>();
 
@@ -546,6 +554,8 @@ export const subscribeDashboard = LOCAL_MODE
         rulesEnforcementLevel,
         rulesOpenPaths,
         rulesCheckedAt,
+        pendingReports,
+        pendingBlockReports,
       },
       issues: [...systemIssues, ...deviceStats.deviceIssues, ...pendingOverflow],
     });
@@ -665,6 +675,26 @@ export const subscribeDashboard = LOCAL_MODE
     moderationAvgHours = getNumber(snapshot.val());
     emit();
   }, silentOnPermDenied(emit)));
+
+  // Pending reports count (one-shot, не realtime — reports меняются редко)
+  void get(query(ref(database, 'reports'), orderByChild('status'), equalTo('pending'))).then((snap) => {
+    pendingReports = snap.exists() ? Object.keys(snap.val() as Record<string, unknown>).length : 0;
+    emit();
+  }).catch((error: unknown) => {
+    if (error instanceof Error && isPermissionDenied(error)) { emit(); return; }
+  });
+
+  // Pending block reports count (profile_block source only)
+  void get(query(ref(database, 'reports'), orderByChild('source'), equalTo('profile_block'))).then((snap) => {
+    if (!snap.exists()) { pendingBlockReports = 0; emit(); return; }
+    const data = snap.val() as Record<string, Record<string, unknown>>;
+    let count = 0;
+    for (const v of Object.values(data)) {
+      if ((typeof v.status === 'string' ? v.status : 'pending') === 'pending') count++;
+    }
+    pendingBlockReports = count;
+    emit();
+  }).catch(() => { /* ignore */ });
 
   moderationDashboardPaths.forEach((path) => {
     const dataRef = ref(database, path);

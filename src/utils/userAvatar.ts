@@ -12,11 +12,8 @@ export const pickUserAvatarUri = (...sources: unknown[]): string => {
   for (const source of sources) {
     if (!source || typeof source !== 'object') continue;
     const record = source as Record<string, unknown>;
-    const startAvatarKey = record.startAvatarKey;
-    if (typeof startAvatarKey === 'string' && startAvatarKey.trim().length > 0) {
-      return `${START_AVATAR_URI_PREFIX}${startAvatarKey.trim()}`;
-    }
 
+    // Real photos always take precedence over temporary avatars
     const direct = pickFirstNonEmpty([
       record.photoURL,
       record.photoUri,
@@ -37,6 +34,18 @@ export const pickUserAvatarUri = (...sources: unknown[]): string => {
     if (Array.isArray(urls)) {
       const first = urls.find((entry) => typeof entry === 'string' && entry.trim().length > 0);
       if (typeof first === 'string' && first.trim().length > 0) return first.trim();
+    }
+
+    // Fall back to Firebase Storage path if no direct URL
+    const photoStoragePath = record.photoStoragePath;
+    if (typeof photoStoragePath === 'string' && photoStoragePath.trim().length > 0) {
+      return photoStoragePath.trim();
+    }
+
+    // Fall back to temporary avatar ONLY if no real photos exist
+    const startAvatarKey = record.startAvatarKey;
+    if (typeof startAvatarKey === 'string' && startAvatarKey.trim().length > 0) {
+      return `${START_AVATAR_URI_PREFIX}${startAvatarKey.trim()}`;
     }
   }
   return '';

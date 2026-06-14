@@ -201,7 +201,7 @@ export const AccessControlPage = ({ role, onNavigateToInvites }: AccessControlPa
       .catch((err: unknown) => console.warn('[AccessControl] Failed to load APK/version data:', err))
       .finally(() => { if (mounted) setVersionLoading(false); });
 
-    const unsub = subscribeManagedAuthorizedDevices(setDevices);
+    const unsub = subscribeManagedAuthorizedDevices(setDevices, (err) => console.warn('[AccessControl] devices:', err.message));
     return () => { mounted = false; unsub(); };
   }, []);
 

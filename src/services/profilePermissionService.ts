@@ -1,4 +1,5 @@
 import { ref, get, set, update, onValue, serverTimestamp } from 'firebase/database';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { database } from '../firebase-core';
 import { logClientError } from '../utils/errorLogger';
 import { RATE_LIMITERS } from '../utils/rateLimiter';
@@ -7,6 +8,14 @@ export type ProfilePrivacyMode = 'open' | 'request';
 export type ViewRequestContext = 'lyudi' | 'help' | 'sport' | 'buysell' | 'job';
 export type ViewRequestStatus = 'pending' | 'approved' | 'denied';
 export type ContactReason = 'acquaintance' | 'by_listing' | 'by_services' | 'by_issue';
+export type ProfileViewRequestResult =
+  | 'sent'
+  | 'already_approved'
+  | 'already_pending'
+  | 'open_profile'
+  | 'cooldown'
+  | 'daily_limit'
+  | 'retry_later';
 
 export interface ProfileViewRequest {
   requesterId: string;
@@ -146,6 +155,45 @@ type ArchivedRequestEntry = {
   updatedAt: object | number | null;
 };
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+const PROFILE_CONTACT_DAILY_LIMIT = 10;
+const DAILY_COUNTER_PREFIX = '@chaika:profile_contact_daily:v1:';
+
+const getLocalDayStart = (timeMs = Date.now()): number => {
+  const date = new Date(timeMs);
+  date.setHours(0, 0, 0, 0);
+  return date.getTime();
+};
+
+const readDailyRequestCount = async (requesterId: string): Promise<{ dayStart: number; count: number }> => {
+  const todayStart = getLocalDayStart();
+  try {
+    const raw = await AsyncStorage.getItem(`${DAILY_COUNTER_PREFIX}${requesterId}`);
+    if (!raw) return { dayStart: todayStart, count: 0 };
+    const parsed = JSON.parse(raw) as Partial<{ dayStart: number; count: number }>;
+    if (parsed.dayStart !== todayStart) return { dayStart: todayStart, count: 0 };
+    return { dayStart: todayStart, count: Math.max(0, Number(parsed.count) || 0) };
+  } catch {
+    return { dayStart: todayStart, count: 0 };
+  }
+};
+
+const recordDailyRequest = async (requesterId: string): Promise<void> => {
+  const current = await readDailyRequestCount(requesterId);
+  const next = { dayStart: current.dayStart, count: current.count + 1 };
+  try {
+    await AsyncStorage.setItem(`${DAILY_COUNTER_PREFIX}${requesterId}`, JSON.stringify(next));
+  } catch {
+    // Local anti-spam is best-effort only; never turn storage issues into permission problems.
+  }
+};
+
+const isWithinLastDay = (isoDate: unknown): boolean => {
+  if (typeof isoDate !== 'string') return false;
+  const time = new Date(isoDate).getTime();
+  return Number.isFinite(time) && Date.now() - time < DAY_MS;
+};
+
 export const profilePermissionService = {
   requestKey(targetUserId: string, requesterId: string): string {
     return `${targetUserId}__${requesterId}`;
@@ -227,7 +275,7 @@ export const profilePermissionService = {
     context: ViewRequestContext,
     _targetProfile?: { name?: string; photoURL?: string },
     options?: ContactRequestOptions
-  ): Promise<'sent' | 'already_approved' | 'already_pending' | 'open_profile'> {
+  ): Promise<ProfileViewRequestResult> {
     if (!targetUserId || !requester.id || targetUserId === requester.id) {
       throw new Error('Invalid requestView arguments');
     }
@@ -240,20 +288,29 @@ export const profilePermissionService = {
 
     const cooldownLeft = RATE_LIMITERS.profileViewRequest.cooldownSecondsLeft();
     if (cooldownLeft > 0) {
-      throw new Error(`Занадто часто. Спробуйте через ${cooldownLeft} сек.`);
+      return 'cooldown';
     }
 
     const path = `profileViewRequests/${targetUserId}/${requester.id}`;
     try {
       const existing = await get(ref(database, path));
       if (existing.exists()) {
-        const s = existing.val()?.status as ViewRequestStatus;
+        const value = existing.val() as Partial<ProfileViewRequest>;
+        const s = value?.status as ViewRequestStatus;
         if (s === 'approved') return 'already_approved';
         if (s === 'pending') return 'already_pending';
+        if (s === 'denied' && isWithinLastDay(value?.requestedAt ?? value?.createdAt)) {
+          return 'retry_later';
+        }
       }
     } catch {
       // can't read existing status — proceed to write attempt
     }
+    const daily = await readDailyRequestCount(requester.id);
+    if (daily.count >= PROFILE_CONTACT_DAILY_LIMIT) {
+      return 'daily_limit';
+    }
+
     const now = new Date().toISOString();
     const payload: Record<string, unknown> = {
       requesterId: requester.id,
@@ -281,6 +338,7 @@ export const profilePermissionService = {
       [`outgoingProfileRequestsByUser/${requester.id}/${targetUserId}`]: payload,
     });
     RATE_LIMITERS.profileViewRequest.recordSubmit();
+    void recordDailyRequest(requester.id);
     return 'sent';
   },
 

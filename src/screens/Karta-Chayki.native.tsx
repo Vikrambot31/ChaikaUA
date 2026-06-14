@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useAppTheme } from '../hooks/useAppTheme';
 import { openInGoogleMaps } from '../utils/googleMapsLink';
 import MapView, { Marker, Region, PROVIDER_GOOGLE } from 'react-native-maps';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -47,6 +48,7 @@ const UI_TEXT = {
     loadError: 'Не вдалося завантажити місця',
     retry: 'Спробувати ще раз',
     support: 'Якщо проблема зберігається: support_chaika_ua@ukr.net',
+    showMore: 'Більше',
   },
   ru: {
     all: 'Все',
@@ -59,6 +61,7 @@ const UI_TEXT = {
     loadError: 'Не удалось загрузить места',
     retry: 'Попробовать снова',
     support: 'Если проблема сохраняется: support_chaika_ua@ukr.net',
+    showMore: 'Больше',
   },
   en: {
     all: 'All',
@@ -71,6 +74,7 @@ const UI_TEXT = {
     loadError: 'Failed to load places',
     retry: 'Try again',
     support: 'If the issue persists: support_chaika_ua@ukr.net',
+    showMore: 'More',
   },
 } as const;
 
@@ -176,12 +180,14 @@ const MapScreen: React.FC = () => {
   const error = useSelector((state: RootState) => state.places.error);
   const selectedTypes = useSelector((state: RootState) => state.places.selectedTypes);
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
+  const [showAllMapPlaces, setShowAllMapPlaces] = useState(false);
   const [detailsPanelVisible, setDetailsPanelVisible] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [typeSearchText, setTypeSearchText] = useState('');
   const [filtersVisible, setFiltersVisible] = useState(false);
   const [mapReady, setMapReady] = useState(false);
   const [mapLoadFailed, setMapLoadFailed] = useState(false);
+  const { colors, isDark } = useAppTheme();
   const mapFallbackText = MAP_FALLBACK_TEXT[language];
   const placeLabels = PLACE_TYPE_LABELS[language];
   const fallbackFocusedPlace = useMemo<Place | null>(() => {
@@ -376,6 +382,10 @@ const MapScreen: React.FC = () => {
     );
   }, [activePlaces]);
 
+  useEffect(() => {
+    setShowAllMapPlaces(false);
+  }, [searchText, typeSearchText, selectedTypes]);
+
   const focusPlace = useCallback((place: Place) => {
     setSelectedPlaceId(place.id);
     setDetailsPanelVisible(true);
@@ -538,7 +548,7 @@ const MapScreen: React.FC = () => {
         <View style={styles.resultsHeader}>
           <View style={styles.resultsHeaderLeft}>
             <TactileIcon icon="format-list-bulleted" size={38} iconSize={17} backgroundColor="#403933" />
-            <Text style={styles.resultsTitle}>{text.found}</Text>
+            <Text style={[styles.resultsTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{text.found}</Text>
           </View>
           <View style={styles.resultsCount}>
             <Text style={styles.resultsCountText}>{activePlaces.length}</Text>
@@ -550,7 +560,7 @@ const MapScreen: React.FC = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View pointerEvents="none" style={styles.backgroundOrbs}>
         {LIGHT_ORBS.map((orb, index) => (
           <View
@@ -589,7 +599,7 @@ const MapScreen: React.FC = () => {
             onPress={() => setFiltersVisible((value) => !value)}
             activeOpacity={0.8}
           >
-            <MaterialCommunityIcons name="tune-variant" color={SCREEN_THEME.terracottaDark} size={20} />
+            <MaterialCommunityIcons name="tune-variant" color={SCREEN_THEME.textSecondary} size={20} />
           </TouchableOpacity>
         </View>
 
@@ -633,12 +643,20 @@ const MapScreen: React.FC = () => {
 
       <FlatList
         ref={listRef}
-        data={activePlaces}
+        data={showAllMapPlaces ? activePlaces : activePlaces.slice(0, 4)}
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
         keyboardShouldPersistTaps="handled"
         ListHeaderComponent={listHeader}
+        ListFooterComponent={
+          !showAllMapPlaces && activePlaces.length > 4 ? (
+            <TouchableOpacity style={styles.showMoreButton} activeOpacity={0.82} onPress={() => setShowAllMapPlaces(true)}>
+              <Text style={styles.showMoreText}>{text.showMore}</Text>
+              <MaterialCommunityIcons name="chevron-down" size={18} color={SCREEN_THEME.textSecondary} />
+            </TouchableOpacity>
+          ) : null
+        }
         ListEmptyComponent={renderEmpty}
         initialNumToRender={8}
         maxToRenderPerBatch={8}
@@ -683,7 +701,7 @@ const styles = StyleSheet.create({
   searchCard: {
     backgroundColor: SCREEN_THEME.paperStrong,
     borderWidth: 1,
-    borderColor: '#E4D0AB',
+    borderColor: SCREEN_THEME.uiBorder,
     paddingHorizontal: 16,
     paddingVertical: 14,
     marginHorizontal: 16,
@@ -704,7 +722,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E1CFAB',
+    borderColor: SCREEN_THEME.uiBorder,
   },
   searchInput: {
     flex: 1,
@@ -722,7 +740,7 @@ const styles = StyleSheet.create({
     color: SCREEN_THEME.textPrimary,
     fontSize: SIZES.fontRegular,
     borderWidth: 1,
-    borderColor: '#E1CFAB',
+    borderColor: SCREEN_THEME.uiBorder,
   },
   filterButton: {
     width: 36,
@@ -741,7 +759,7 @@ const styles = StyleSheet.create({
   filterChip: {
     backgroundColor: '#F5ECD7',
     borderWidth: 1,
-    borderColor: '#E0CFAC',
+    borderColor: SCREEN_THEME.uiBorder,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 999,
@@ -766,7 +784,7 @@ const styles = StyleSheet.create({
     backgroundColor: SCREEN_THEME.paperStrong,
     height: 340,
     borderWidth: 1,
-    borderColor: '#E4D0AB',
+    borderColor: SCREEN_THEME.uiBorder,
     shadowColor: '#6E573B',
     shadowOpacity: 0.12,
     shadowRadius: 16,
@@ -782,7 +800,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 22,
-    backgroundColor: '#FFF9EE',
+    backgroundColor: '#FBF8FD',
   },
   mapFallbackTitle: {
     marginTop: 10,
@@ -817,9 +835,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   quickFilterChip: {
-    backgroundColor: '#FFF9EE',
+    backgroundColor: '#FBF8FD',
     borderWidth: 1,
-    borderColor: '#E0CFAC',
+    borderColor: SCREEN_THEME.uiBorder,
     paddingHorizontal: 12,
     paddingVertical: 9,
     borderRadius: 999,
@@ -928,7 +946,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#E4D0AB',
+    borderColor: SCREEN_THEME.uiBorder,
     shadowColor: '#6E573B',
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -968,6 +986,24 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#4285F4',
     fontWeight: '600',
+  },
+  showMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderRadius: 18,
+    paddingVertical: 13,
+    marginHorizontal: 16,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: SCREEN_THEME.uiBorder,
+  },
+  showMoreText: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#21041B',
   },
   emptyContainer: {
     height: 300,

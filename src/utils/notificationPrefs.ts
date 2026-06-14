@@ -8,6 +8,7 @@ export interface NotificationPrefs {
   osbb: boolean;
   electricity: boolean;
   general: boolean;
+  comments: boolean;
 }
 
 export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
@@ -16,6 +17,7 @@ export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
   osbb: true,
   electricity: true,
   general: true,
+  comments: true,
 };
 
 export const loadNotificationPrefs = async (): Promise<NotificationPrefs> => {
@@ -46,6 +48,7 @@ export const resolveNotificationCategory = (message: any): keyof NotificationPre
     ''
   ).toLowerCase();
 
+  if (raw.includes('comment')) return 'comments';
   if (raw.includes('request') || raw.includes('help')) return 'requests';
   if (raw.includes('chat') || raw.includes('message')) return 'chat';
   if (raw.includes('osbb') || raw.includes('vote') || raw.includes('news') || raw.includes('collection')) return 'osbb';

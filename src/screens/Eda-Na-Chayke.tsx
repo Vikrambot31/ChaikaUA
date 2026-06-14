@@ -2,10 +2,13 @@ import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
+  Image,
   KeyboardAvoidingView,
   Modal,
   SafeAreaView,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -14,9 +17,14 @@ import {
   Linking,
   Platform,
 } from 'react-native';
+
+const OFFER_PLACEHOLDER = require('../../assets/_zaglushka-lenta.webp');
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
+import { ref, get } from 'firebase/database';
+import { subscribeBiznesPlusPlaces } from '../services/bonusService';
+import { database } from '../firebase-core';
 import { chaykaPlaces } from '../services/chaykaPlacesData';
 import { getFoodPlaces, getActiveFoodOffers, foodInfoSeed } from '../services/foodSeed';
 import { logFoodEvent } from '../services/foodAnalytics';
@@ -24,11 +32,22 @@ import { foodTopService, type FoodTopListing } from '../services/foodTopService'
 import { FoodCategory, FoodOffer, Place } from '../types/app';
 import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
+import { useAppTheme } from '../hooks/useAppTheme';
+import { getMapFocusPlaceParams } from '../utils/mapFocusParams';
 import AppPhotoImage from '../components/AppPhotoImage';
+import { FeatureRatingBanner } from '../components/FeatureRatingBanner';
 import PhotoUploadField, { type UploadedPhoto } from '../components/PhotoUploadField';
+import UploadedPhotosGrid from '../components/UploadedPhotosGrid';
 import { getDonePhotos, validateSubmissionRequirements } from '../utils/submissionRequirements';
 import { getLanguageValidationError } from '../utils/contentLanguageGuard';
 import { showUserError } from '../utils/userFacingErrors';
+import FeedLikeButton from '../components/FeedLikeButton';
+import { toggleFavorite, getFavorites, type FavoriteSource } from '../services/favoritesService';
+import { useSoftToast } from '../hooks/useSoftToast';
+import { selectUserId } from '../redux/selectors';
+import { useTrainingMode } from '../hooks/useTrainingMode';
+import TrainingHint from '../components/TrainingHint';
+import HintBadge, { HINT_BADGE_LABELS } from '../components/HintBadge';
 
 type Lang = 'ua' | 'ru' | 'en';
 type AppNavigation = NavigationProp<Record<string, object | undefined>>;
@@ -77,6 +96,16 @@ const UI_TEXT = {
     topPhotoUploading: 'Дочекайтесь завершення завантаження фото.',
     topPhotoError: 'Фото не завантажилось. Видаліть його або спробуйте ще раз.',
     topPhotoRequired: 'Додайте фото для картки.',
+    businessTitle: 'Ваш бізнес на Чайці?',
+    businessDesc: 'Додайте заклад у топ без нових правил доступу.',
+    businessButton: 'Додати заклад',
+    offerBadge: 'Акція',
+    offerAlertTitle: 'Акція поруч',
+    offerAlertRoute: 'Маршрут',
+    share: 'Поділитися',
+    favoriteAdded: 'Додано в обране',
+    favoriteRemoved: 'Видалено з обраного',
+    showMore: 'Більше',
     errorTitle: 'Помилка',
     ok: 'OK',
     filters: {
@@ -127,6 +156,16 @@ const UI_TEXT = {
     topPhotoUploading: 'Дождитесь завершения загрузки фото.',
     topPhotoError: 'Фото не загрузилось. Удалите его или попробуйте ещё раз.',
     topPhotoRequired: 'Добавьте фото для карточки.',
+    businessTitle: 'Ваш бизнес на Чайке?',
+    businessDesc: 'Добавьте заведение в топ без новых правил доступа.',
+    businessButton: 'Добавить заведение',
+    offerBadge: 'Акция',
+    offerAlertTitle: 'Акция рядом',
+    offerAlertRoute: 'Маршрут',
+    share: 'Поделиться',
+    favoriteAdded: 'Добавлено в избранное',
+    favoriteRemoved: 'Удалено из избранного',
+    showMore: 'Больше',
     errorTitle: 'Ошибка',
     ok: 'OK',
     filters: {
@@ -177,6 +216,16 @@ const UI_TEXT = {
     topPhotoUploading: 'Wait until the photo upload finishes.',
     topPhotoError: 'The photo did not upload. Remove it or try again.',
     topPhotoRequired: 'Add a photo for the card.',
+    businessTitle: 'Your business at Chaika?',
+    businessDesc: 'Add your place to the top without new access rules.',
+    businessButton: 'Add place',
+    offerBadge: 'Deal',
+    offerAlertTitle: 'Deal nearby',
+    offerAlertRoute: 'Route',
+    share: 'Share',
+    favoriteAdded: 'Added to favorites',
+    favoriteRemoved: 'Removed from favorites',
+    showMore: 'More',
     errorTitle: 'Error',
     ok: 'OK',
     filters: {
@@ -188,12 +237,20 @@ const UI_TEXT = {
   },
 } as const;
 
+const FOOD_FAVORITE_SOURCE: FavoriteSource = 'food';
+
 const EAT_FILTERS: { key: EatFilter; icon: React.ComponentProps<typeof MaterialCommunityIcons>['name'] }[] = [
   { key: 'all', icon: 'view-grid-outline' },
   { key: 'pizza', icon: 'pizza' },
   { key: 'cafe', icon: 'coffee' },
   { key: 'restaurant', icon: 'silverware-fork-knife' },
 ];
+
+const TRAINING_HINT: Record<Lang, string> = {
+  ua: 'Шукай заклади через пошук або обери категорію. Натисни на картку, щоб побачити деталі.',
+  ru: 'Ищи заведения через поиск или выбери категорию. Нажми на карточку, чтобы увидеть детали.',
+  en: 'Search places or pick a category. Tap a card to see details.',
+};
 
 // --- Helpers ---
 
@@ -240,13 +297,6 @@ function openPhone(phone?: string) {
   Linking.openURL(`tel:${safePhone}`);
 }
 
-function openRoute(lat: number, lng: number) {
-  const url = Platform.select({
-    ios: `maps:0,0?q=${lat},${lng}`,
-    default: `geo:0,0?q=${lat},${lng}`,
-  });
-  Linking.openURL(url);
-}
 
 function openTelegram(telegram?: string) {
   const handle = telegram?.trim().replace('@', '').replace('https://t.me/', '');
@@ -264,51 +314,102 @@ const formatOfferDate = (timestamp?: number) => {
 
 export default function EdaNaChaykeScreen() {
   const navigation = useNavigation<AppNavigation>();
+  const { colors } = useAppTheme();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as Lang;
   const user = useSelector((state: RootState) => state.auth.user);
+  const isAdmin = user?.email === 'vikramsave@ukr.net';
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
+  const training = useTrainingMode('eda_na_chayke');
 
+  const currentUserId = useSelector(selectUserId);
   const [mode, setMode] = useState<ScreenMode>('home');
+  const [claimPlaceIds, setClaimPlaceIds] = useState<Set<string>>(new Set());
   const [eatFilter, setEatFilter] = useState<EatFilter>('all');
   const [query, setQuery] = useState('');
   const [topListings, setTopListings] = useState<FoodTopListing[]>([]);
+  const [topListingsReady, setTopListingsReady] = useState(false);
   const [topFormVisible, setTopFormVisible] = useState(false);
   const [topTitle, setTopTitle] = useState('');
   const [topDescription, setTopDescription] = useState('');
   const [topPhotos, setTopPhotos] = useState<UploadedPhoto[]>([]);
   const [topSubmitting, setTopSubmitting] = useState(false);
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+  const [biznesPlusIds, setBiznesPlusIds] = useState<string[]>([]);
   const scrollRef = useRef<ScrollView>(null);
   const offersSectionY = useRef(0);
+  const { showSuccess } = useSoftToast();
+  const [showAllEatPlaces, setShowAllEatPlaces] = useState(false);
 
   useEffect(() => {
     logFoodEvent('food_open_screen');
   }, []);
 
-  useEffect(() => foodTopService.subscribe(setTopListings, user?.id), [user?.id]);
+  useEffect(() => {
+    return subscribeBiznesPlusPlaces('food', setBiznesPlusIds);
+  }, []);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    void (async () => {
+      try {
+        const snap = await get(ref(database, 'business_plus_claims'));
+        if (!snap.exists()) return;
+        const ids = new Set<string>();
+        snap.forEach((child) => {
+          if (child.val()?.status === 'pending') ids.add(child.key!);
+        });
+        setClaimPlaceIds(ids);
+      } catch { /* ignore */ }
+    })();
+  }, [isAdmin]);
+
+  useEffect(() => {
+    getFavorites(FOOD_FAVORITE_SOURCE).then((items) => {
+      setFavoriteIds(new Set(items.map((item) => item.id)));
+    });
+  }, []);
+
+  useEffect(() => foodTopService.subscribe((items) => {
+    setTopListings(items);
+    setTopListingsReady(true);
+  }, user?.id), [user?.id]);
 
   const allFoodPlaces = useMemo(() => getFoodPlaces(chaykaPlaces), []);
 
   const activeOffers = useMemo(() => getActiveFoodOffers(chaykaPlaces), []);
+  const offerPlaceIds = useMemo(() => new Set(activeOffers.map((offer) => offer.placeId)), [activeOffers]);
 
   // Eat mode: filtered by category + search
   const eatPlaces = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    return allFoodPlaces.filter((place) => {
-      // exclude grocery from eat mode
-      const cat = getPlaceFoodCategory(place);
-      if (cat === 'grocery') return false;
-      if (!matchesEatFilter(place, eatFilter)) return false;
-      if (!normalizedQuery) return true;
-      return `${place.name} ${place.address}`.toLowerCase().includes(normalizedQuery);
-    });
-  }, [allFoodPlaces, eatFilter, query]);
+    return allFoodPlaces
+      .filter((place) => {
+        // exclude grocery from eat mode
+        const cat = getPlaceFoodCategory(place);
+        if (cat === 'grocery') return false;
+        if (!matchesEatFilter(place, eatFilter)) return false;
+        if (!normalizedQuery) return true;
+        return `${place.name} ${place.address}`.toLowerCase().includes(normalizedQuery);
+      })
+      .sort((a, b) => {
+        const aPlus = biznesPlusIds.indexOf(a.id);
+        const bPlus = biznesPlusIds.indexOf(b.id);
+        if (aPlus !== -1 || bPlus !== -1) {
+          if (aPlus === -1) return 1;
+          if (bPlus === -1) return -1;
+          return aPlus - bPlus;
+        }
+        return 0;
+      });
+  }, [allFoodPlaces, biznesPlusIds, eatFilter, query]);
 
   // Home mode: recommended (non-grocery, max 4)
   const recommendedPlaces = useMemo(() => {
     return allFoodPlaces
       .filter((p) => getPlaceFoodCategory(p) !== 'grocery')
-      .slice(0, 4);
-  }, [allFoodPlaces]);
+      .filter((p) => !offerPlaceIds.has(p.id))
+      .slice(0, 3);
+  }, [allFoodPlaces, offerPlaceIds]);
 
   // Home mode: offers with places
   const offersWithPlaces = useMemo(() => {
@@ -413,6 +514,22 @@ export default function EdaNaChaykeScreen() {
     user?.id,
   ]);
 
+  const handleSharePlace = useCallback(async (place: Place) => {
+    try {
+      await Share.share({ message: `${place.name}\n${place.address}` });
+    } catch { /* user cancelled */ }
+  }, []);
+
+  const handleToggleFavorite = useCallback(async (placeId: string) => {
+    const added = await toggleFavorite(placeId, FOOD_FAVORITE_SOURCE);
+    setFavoriteIds((prev) => {
+      const next = new Set(prev);
+      if (added) next.add(placeId); else next.delete(placeId);
+      return next;
+    });
+    showSuccess(added ? text.favoriteAdded : text.favoriteRemoved);
+  }, [showSuccess, text.favoriteAdded, text.favoriteRemoved]);
+
   const handleBack = useCallback(() => {
     if (mode === 'eat') {
       setMode('home');
@@ -446,8 +563,11 @@ export default function EdaNaChaykeScreen() {
 
   const handleRoutePlace = useCallback((place: Place) => {
     logFoodEvent('food_route_place', { placeId: place.id });
-    openRoute(place.latitude, place.longitude);
-  }, []);
+    navigation.navigate('MainTabs', {
+      screen: 'MapTab',
+      params: getMapFocusPlaceParams(place),
+    });
+  }, [navigation]);
 
   const handleTelegramPlace = useCallback((place: Place, telegram?: string) => {
     if (!telegram) return;
@@ -472,6 +592,7 @@ export default function EdaNaChaykeScreen() {
         sourceType: 'place',
         sourceId: place.id,
       },
+      feedScreen: 'food',
     });
   }, [navigation, text.closed, text.hoursUnknown, text.open, text.openUntil]);
 
@@ -588,6 +709,7 @@ export default function EdaNaChaykeScreen() {
                     onPhotosChange={setTopPhotos}
                     metadata={{ sourceScreen: 'Eda-Na-Chayke', sourceScreenLabel: text.addTop }}
                   />
+                  <UploadedPhotosGrid />
                 </>
               ) : null}
 
@@ -616,11 +738,13 @@ export default function EdaNaChaykeScreen() {
     const hasPhone = !!place.phone;
     const isPartner = false; // MVP: no paid places yet
     const hasDelivery = !!info?.deliveryAvailable;
+    const isFav = favoriteIds.has(place.id);
+    const hasClaim = isAdmin && claimPlaceIds.has(place.id);
 
     return (
       <TouchableOpacity
         key={place.id}
-        style={styles.placeCard}
+        style={[styles.placeCard, hasClaim && styles.placeCardClaimed]}
         activeOpacity={0.88}
         onPress={() => handleOpenPlaceDetail(place)}
       >
@@ -686,24 +810,83 @@ export default function EdaNaChaykeScreen() {
               <Text style={styles.actionButtonText}>{text.telegram}</Text>
             </TouchableOpacity>
           )}
+          <View style={styles.cardActionsRight}>
+            <TouchableOpacity
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              onPress={(e) => { e.stopPropagation?.(); void handleSharePlace(place); }}
+              activeOpacity={0.7}
+              accessibilityLabel={text.share}
+            >
+              <MaterialCommunityIcons name="share-variant-outline" size={18} color={SCREEN_THEME.textSecondary} />
+            </TouchableOpacity>
+            <FeedLikeButton
+              currentUserId={currentUserId}
+              likePath="feed_likes/food"
+              likeId={place.id}
+            />
+            <TouchableOpacity
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              onPress={(e) => { e.stopPropagation?.(); void handleToggleFavorite(place.id); }}
+              activeOpacity={0.7}
+              accessibilityLabel={isFav ? text.favoriteRemoved : text.favoriteAdded}
+            >
+              <MaterialCommunityIcons
+                name={isFav ? 'bookmark' : 'bookmark-outline'}
+                size={20}
+                color={isFav ? SCREEN_THEME.terracotta : SCREEN_THEME.textSecondary}
+              />
+            </TouchableOpacity>
+          </View>
         </View>
       </TouchableOpacity>
     );
   };
 
-  const renderOfferCard = (offer: FoodOffer, placeName?: string) => {
+  const renderAddPlaceButton = () => (
+    <TouchableOpacity style={styles.addPlaceButton} activeOpacity={0.88} onPress={handleOpenTopForm}>
+      <MaterialCommunityIcons name="store-plus" size={16} color="#FFFFFF" />
+      <Text style={styles.addPlaceBtnText}>{text.businessButton}</Text>
+    </TouchableOpacity>
+  );
+
+  const renderOfferCard = (offer: FoodOffer, place?: Place) => {
     const dateStr = offer.validUntil ? `${text.validUntil} ${formatOfferDate(offer.validUntil)}` : '';
+    const placeName = place?.name;
     return (
       <TouchableOpacity
         key={offer.id}
         style={styles.offerCard}
         activeOpacity={0.86}
-        onPress={() => logFoodEvent('food_open_offer', { placeId: offer.placeId })}
+        onPress={() => {
+          logFoodEvent('food_open_offer', { placeId: offer.placeId });
+          Alert.alert(
+            text.offerAlertTitle,
+            `${offer.title}\n\n${offer.shortText}${placeName ? `\n\n${placeName}` : ''}`,
+            [
+              ...(place ? [{ text: text.offerAlertRoute, onPress: () => handleRoutePlace(place) }] : []),
+              { text: text.ok, style: 'cancel' as const },
+            ],
+          );
+        }}
       >
-        <Text style={styles.offerTitle} numberOfLines={2}>{offer.title}</Text>
-        <Text style={styles.offerShortText} numberOfLines={2}>{offer.shortText}</Text>
-        {dateStr ? <Text style={styles.offerMeta}>{dateStr}</Text> : null}
-        {placeName ? <Text style={styles.offerPlaceName} numberOfLines={1}>{placeName}</Text> : null}
+        <View style={styles.offerRow}>
+          <Image
+            source={OFFER_PLACEHOLDER}
+            style={styles.offerVisual}
+            resizeMode="cover"
+          />
+          <View style={styles.offerTextBlock}>
+            <View style={styles.offerBadge}>
+              <Text style={styles.offerBadgeText}>{text.offerBadge}</Text>
+            </View>
+            <Text style={styles.offerTitle} numberOfLines={2}>{offer.title}</Text>
+            <Text style={styles.offerShortText} numberOfLines={2}>{offer.shortText}</Text>
+            <View style={styles.offerFooterRow}>
+              {dateStr ? <Text style={styles.offerMeta}>{dateStr}</Text> : null}
+              {placeName ? <Text style={styles.offerPlaceName} numberOfLines={1}>{placeName}</Text> : null}
+            </View>
+          </View>
+        </View>
       </TouchableOpacity>
     );
   };
@@ -730,7 +913,7 @@ export default function EdaNaChaykeScreen() {
   // --- EAT MODE ---
   if (mode === 'eat') {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
         {renderTopFoodForm()}
         <ScrollView ref={scrollRef} contentContainerStyle={[styles.content, styles.contentWithAddBar]} showsVerticalScrollIndicator={false}>
           {/* Header */}
@@ -767,6 +950,7 @@ export default function EdaNaChaykeScreen() {
                   onPress={() => {
                     logFoodEvent('food_select_category', { category: filter.key });
                     setEatFilter(filter.key);
+                    setShowAllEatPlaces(false);
                   }}
                   activeOpacity={0.84}
                 >
@@ -783,7 +967,9 @@ export default function EdaNaChaykeScreen() {
             })}
           </ScrollView>
 
-          {visibleTopListings.length > 0 ? (
+          {!topListingsReady ? (
+            <ActivityIndicator size="small" color={SCREEN_THEME.accentGold} style={{ marginVertical: 8 }} />
+          ) : visibleTopListings.length > 0 ? (
             <View style={styles.topFoodSection}>
               <Text style={styles.topFoodTitle}>{text.topFoodTitle}</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.topFoodScroll}>
@@ -793,16 +979,31 @@ export default function EdaNaChaykeScreen() {
           ) : null}
 
           {/* Place list */}
-          {eatPlaces.length > 0 ? (
-            <View style={styles.cardList}>
-              {eatPlaces.map((place) => renderPlaceCard(place))}
-            </View>
-          ) : (
-            <View style={styles.emptyState}>
-              <MaterialCommunityIcons name="magnify-close" size={34} color={SCREEN_THEME.textMuted} />
-              <Text style={styles.emptyText}>{text.noPlaces}</Text>
-            </View>
-          )}
+          <>
+            <FlatList
+              scrollEnabled={false}
+              data={showAllEatPlaces ? eatPlaces : eatPlaces.slice(0, 4)}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => renderPlaceCard(item)}
+              contentContainerStyle={eatPlaces.length > 0 ? styles.cardList : undefined}
+              ListEmptyComponent={
+                <View style={styles.emptyState}>
+                  <MaterialCommunityIcons name="magnify-close" size={34} color={SCREEN_THEME.textMuted} />
+                  <Text style={styles.emptyText}>{text.noPlaces}</Text>
+                </View>
+              }
+            />
+            {!showAllEatPlaces && eatPlaces.length > 4 ? (
+              <TouchableOpacity
+                style={styles.showMoreButton}
+                activeOpacity={0.82}
+                onPress={() => setShowAllEatPlaces(true)}
+              >
+                <Text style={styles.showMoreText}>{text.showMore}</Text>
+                <MaterialCommunityIcons name="chevron-down" size={18} color={SCREEN_THEME.textSecondary} />
+              </TouchableOpacity>
+            ) : null}
+          </>
         </ScrollView>
         <View style={styles.addTopBar}>
           <TouchableOpacity style={styles.addTopButton} onPress={handleOpenTopForm} activeOpacity={0.88}>
@@ -827,6 +1028,14 @@ export default function EdaNaChaykeScreen() {
           <View style={styles.heroTextBlock}>
             <Text style={styles.title}>{text.title}</Text>
             <Text style={styles.subtitle}>{text.subtitle}</Text>
+          </View>
+          <View style={{ position: 'absolute', top: 12, right: 12, zIndex: 10 }}>
+            <HintBadge
+              visible={training.isVisible}
+              onTap={training.openHint}
+              onDismiss={training.dismiss}
+              label={HINT_BADGE_LABELS[language]}
+            />
           </View>
         </View>
 
@@ -862,6 +1071,18 @@ export default function EdaNaChaykeScreen() {
           </>
         ) : (
           <>
+            {/* Top food feed — same as in eat mode */}
+            {!topListingsReady ? (
+              <ActivityIndicator size="small" color={SCREEN_THEME.accentGold} style={{ marginVertical: 8 }} />
+            ) : visibleTopListings.length > 0 ? (
+              <View style={styles.topFoodSection}>
+                <Text style={styles.topFoodTitle}>{text.topFoodTitle}</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.topFoodScroll}>
+                  {visibleTopListings.map((item) => renderTopFoodCard(item))}
+                </ScrollView>
+              </View>
+            ) : null}
+
             {/* CTA buttons */}
             <View style={styles.sectionHeaderRow}>
               <Text style={styles.sectionTitle}>{text.whatNeeded}</Text>
@@ -870,6 +1091,7 @@ export default function EdaNaChaykeScreen() {
             {renderCTA('pizza', text.eatNow, text.eatNowDesc, '#E07B39', handleEatNow)}
             {renderCTA('cart', text.shopping, text.shoppingDesc, SCREEN_THEME.enamelBlueDark, handleShopping)}
             {renderCTA('fire', text.offers, text.offersDesc, '#C0392B', handleOffersScroll)}
+            {renderAddPlaceButton()}
 
             {/* Recommended nearby */}
             {recommendedPlaces.length > 0 && (
@@ -891,7 +1113,7 @@ export default function EdaNaChaykeScreen() {
               {offersWithPlaces.length > 0 ? (
                 <View style={styles.cardList}>
                   {offersWithPlaces.map(({ offer, place }) =>
-                    renderOfferCard(offer, place?.name),
+                    renderOfferCard(offer, place),
                   )}
                 </View>
               ) : (
@@ -903,7 +1125,12 @@ export default function EdaNaChaykeScreen() {
             </View>
           </>
         )}
+
+        <FeatureRatingBanner screenId="eda" />
       </ScrollView>
+      {training.showHint && (
+        <TrainingHint text={TRAINING_HINT[language]} onDismiss={training.closeHint} />
+      )}
     </SafeAreaView>
   );
 }
@@ -1036,6 +1263,22 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: SCREEN_THEME.textSecondary,
     lineHeight: 17,
+  },
+  addPlaceButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#2E7D5B',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginBottom: 16,
+    gap: 8,
+  },
+  addPlaceBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '900',
   },
 
   // Category chips (eat mode)
@@ -1249,11 +1492,16 @@ const styles = StyleSheet.create({
     padding: 14,
     borderWidth: 1,
     borderColor: SCREEN_THEME.borderSoft,
-    shadowColor: '#5C3A1E',
+    shadowColor: '#6B3A5A',
     shadowOpacity: 0.12,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
     elevation: 3,
+  },
+  placeCardClaimed: {
+    borderColor: '#F9C400',
+    borderWidth: 2,
+    backgroundColor: '#FFFDE7',
   },
   placeHeader: {
     flexDirection: 'row',
@@ -1345,9 +1593,15 @@ const styles = StyleSheet.create({
   // Card actions
   cardActions: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
     gap: 8,
     marginTop: 12,
+  },
+  cardActionsRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginLeft: 'auto',
   },
   actionButton: {
     flexDirection: 'row',
@@ -1379,11 +1633,43 @@ const styles = StyleSheet.create({
 
   // Offers
   offerCard: {
-    backgroundColor: '#FFF7E3',
+    backgroundColor: '#FFF8EA',
     borderRadius: 18,
-    padding: 14,
+    padding: 12,
     borderWidth: 1,
-    borderColor: 'rgba(216, 175, 89, 0.35)',
+    borderColor: '#E8BE68',
+    shadowColor: '#6B3A5A',
+    shadowOpacity: 0.1,
+    shadowRadius: 7,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
+  },
+  offerRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+  },
+  offerVisual: {
+    width: 62,
+    height: 62,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginRight: 12,
+  },
+  offerTextBlock: {
+    flex: 1,
+  },
+  offerBadge: {
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    backgroundColor: '#C0392B',
+    marginBottom: 6,
+  },
+  offerBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '900',
   },
   offerTitle: {
     fontSize: 14,
@@ -1399,16 +1685,41 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   offerMeta: {
-    marginTop: 7,
+    marginTop: 0,
+    marginRight: 8,
     fontSize: 12,
     fontWeight: '900',
     color: SCREEN_THEME.terracotta,
   },
   offerPlaceName: {
-    marginTop: 6,
+    flex: 1,
+    marginTop: 0,
     fontSize: 11,
     fontWeight: '800',
     color: SCREEN_THEME.enamelBlueDark,
+  },
+  offerFooterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+
+  showMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderRadius: 18,
+    paddingVertical: 13,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: SCREEN_THEME.borderSoft,
+  },
+  showMoreText: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#21041B',
   },
 
   // Empty state

@@ -31,7 +31,10 @@ import {
 import { subscribeMyPromoCredits, type PromoCredits } from '../services/bonusService';
 import type { AdMessage, AdTicket } from '../types/ad';
 import ScreenTooltip from '../components/ScreenTooltip';
+import HintBadge, { HINT_BADGE_LABELS } from '../components/HintBadge';
+import { useTrainingMode } from '../hooks/useTrainingMode';
 import { PROMO_CREDITS_TOPUP_TOOLTIP } from '../utils/screenTooltips';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 type AppNav = NavigationProp<Record<string, object | undefined>>;
 
@@ -54,18 +57,19 @@ const formatTime = (timestamp: number) => {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 };
 
-const buildTopupMessage = (pack: typeof PACKAGES[number]) =>
+const buildTopupMessage = (pack: typeof PACKAGES[number], pc: { topupRequestTitle: string; topupPackageLabel: string; topupAmountLabel: string; topupPackageIdLabel: string; topupAdminNote: string }) =>
   [
-    'Заявка на пополнение промо-кредитов',
-    `Пакет: ${pack.credits} кредитов`,
-    `Ожидаемая сумма: ${pack.amount} UAH`,
-    `ID пакета: ${pack.id}`,
-    'Прошу администратора подтвердить оплату и начислить кредиты.',
+    pc.topupRequestTitle,
+    `${pc.topupPackageLabel}: ${pack.credits}`,
+    `${pc.topupAmountLabel}: ${pack.amount} UAH`,
+    `${pc.topupPackageIdLabel}: ${pack.id}`,
+    pc.topupAdminNote,
   ].join('\n');
 
 const PromoCreditsTopupScreen: React.FC = () => {
   const navigation = useNavigation<AppNav>();
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
+  const training = useTrainingMode('promo_credits_topup');
   const user = useSelector(selectUser);
   const isOnline = useSelector(selectIsOnline);
   const [authUid, setAuthUid] = useState<string | null>(null);
@@ -79,6 +83,7 @@ const PromoCreditsTopupScreen: React.FC = () => {
   const [sending, setSending] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
+  const { colors, isDark } = useAppTheme();
   const selectedPackage = PACKAGES.find((item) => item.id === selectedPackageId) || PACKAGES[1];
 
   useEffect(() => {
@@ -112,9 +117,10 @@ const PromoCreditsTopupScreen: React.FC = () => {
   }, [authUid]);
 
   useEffect(() => {
+    if (!authUid) return;
     const unsub = subscribeMyPromoCredits(setCredits);
     return unsub;
-  }, []);
+  }, [authUid]);
 
   useEffect(() => {
     if (!ticket?.ticketId) {
@@ -137,7 +143,7 @@ const PromoCreditsTopupScreen: React.FC = () => {
     try {
       await createAdTicket({
         category: 'promo_topup',
-        firstMessage: buildTopupMessage(selectedPackage),
+        firstMessage: buildTopupMessage(selectedPackage, t.promoCredits),
         userName: user?.name || 'User',
         requestedCredits: selectedPackage.credits,
         expectedAmount: selectedPackage.amount,
@@ -176,7 +182,7 @@ const PromoCreditsTopupScreen: React.FC = () => {
     return (
       <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleAdmin]}>
         <Text style={[styles.bubbleSender, isUser ? styles.bubbleSenderUser : styles.bubbleSenderAdmin]}>
-          {isUser ? t.common.profile : 'Адмін'}
+          {isUser ? t.common.profile : t.promoCredits.adminLabel}
         </Text>
         <Text style={[styles.bubbleText, isUser ? styles.bubbleTextUser : styles.bubbleTextAdmin]}>
           {item.text}
@@ -190,28 +196,37 @@ const PromoCreditsTopupScreen: React.FC = () => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
         <ActivityIndicator size="large" color={SCREEN_THEME.terracotta} style={{ flex: 1 }} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScreenTooltip
         storageKey={PROMO_CREDITS_TOPUP_TOOLTIP.storageKey}
         title={PROMO_CREDITS_TOPUP_TOOLTIP.title}
         items={PROMO_CREDITS_TOPUP_TOOLTIP.items}
+        language={language}
         accentColor={SCREEN_THEME.terracotta}
+        forceVisible={training.showHint}
+        onClose={training.closeHint}
       />
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.8}>
           <MaterialCommunityIcons name="arrow-left" size={22} color={SCREEN_THEME.textPrimary} />
         </TouchableOpacity>
         <View style={styles.headerCopy}>
-          <Text style={styles.headerTitle}>{t.promoCredits.topupTitle}</Text>
+          <Text style={[styles.headerTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{t.promoCredits.topupTitle}</Text>
           <Text style={styles.headerSubtitle}>{t.promoCredits.topupDesc}</Text>
         </View>
+        <HintBadge
+          visible={training.isVisible}
+          onTap={training.openHint}
+          onDismiss={training.dismiss}
+          label={HINT_BADGE_LABELS[language]}
+        />
       </View>
 
       <View style={styles.balanceCard}>
@@ -236,7 +251,7 @@ const PromoCreditsTopupScreen: React.FC = () => {
                   activeOpacity={0.84}
                 >
                   <Text style={[styles.packageCredits, active && styles.packageCreditsActive]}>{pack.credits}</Text>
-                  <Text style={[styles.packageLabel, active && styles.packageLabelActive]}>{t.common.loading}</Text>
+                  <Text style={[styles.packageLabel, active && styles.packageLabelActive]}>{pack.label}</Text>
                   <Text style={[styles.packageAmount, active && styles.packageAmountActive]}>{pack.amount} UAH</Text>
                 </TouchableOpacity>
               );
@@ -251,16 +266,16 @@ const PromoCreditsTopupScreen: React.FC = () => {
           </View>
 
           <TouchableOpacity
-            style={[styles.createButton, (!isOnline || creating) && styles.disabledButton]}
+            style={[styles.createButton, (!isOnline || creating || !authUid) && styles.disabledButton]}
             onPress={() => void createTopupTicket()}
-            disabled={!isOnline || creating}
+            disabled={!isOnline || creating || !authUid}
             activeOpacity={0.86}
           >
             {creating ? (
-              <ActivityIndicator color="#FFF9EE" />
+              <ActivityIndicator color="#FBF8FD" />
             ) : (
               <>
-                <MaterialCommunityIcons name="file-document-outline" size={21} color="#FFF9EE" />
+                <MaterialCommunityIcons name="file-document-outline" size={21} color="#FBF8FD" />
                 <Text style={styles.createButtonText}>{t.promoCredits.chatAdmin}</Text>
               </>
             )}
@@ -424,7 +439,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   packageCreditsActive: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
   },
   packageLabel: {
     color: SCREEN_THEME.textSecondary,
@@ -432,7 +447,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   packageLabelActive: {
-    color: 'rgba(255,249,238,0.82)',
+    color: 'rgba(247,241,251,0.82)',
   },
   packageAmount: {
     color: SCREEN_THEME.terracottaDark,
@@ -441,7 +456,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   packageAmountActive: {
-    color: '#FFF3CE',
+    color: '#F5EEF9',
   },
   noticeCard: {
     flexDirection: 'row',
@@ -472,7 +487,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   createButtonText: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
     fontSize: 15,
     fontWeight: '900',
   },

@@ -15,6 +15,7 @@ import {
 import type { PersistedState } from 'redux-persist/es/types';
 import authReducer from './slices/authSlice';
 import { normalizeLanguage } from './slices/languageSlice';
+import themeReducer from './slices/themeSlice';
 import placesReducer from './slices/placesSlice';
 import requestsReducer from './slices/requestsSlice';
 import electricityReducer from './slices/electricitySlice';
@@ -23,6 +24,7 @@ import languageReducer from './slices/languageSlice';
 import subscriptionReducer from './slices/subscriptionSlice';
 import osbbReducer from './slices/osbbSlice';
 import networkReducer from './slices/networkSlice';
+import notificationReducer from './slices/notificationSlice';
 
 // Ліміт кількості записів, що зберігаються в AsyncStorage.
 // Запобігає накопиченню 10–50 МБ після тривалого використання.
@@ -48,11 +50,23 @@ const sanitizeObject = (state: PersistedState): PersistedState =>
     : {}) as PersistedState;
 
 const persistMigrations = {
-  1: (state: PersistedState) => sanitizeObject(state),
+  1: (state: PersistedState) => sanitizeObject(state) as PersistedState,
   4: (state: PersistedState) => {
     const next = sanitizeObject(state) as PersistedState & Record<string, unknown>;
     if ('current' in next) {
       next.current = normalizeLanguage(next.current);
+    }
+    // Add new subscription fields if missing (migration for subscription slice v4)
+    if (!('status' in next)) {
+      // Derive status from plan for legacy persisted data
+      const plan = next.plan;
+      next.status = (plan === 'premium' || plan === 'premium_plus') ? 'active' : 'free';
+    }
+    if (!('trialUsed' in next)) {
+      next.trialUsed = false;
+    }
+    if (!('paymentMethod' in next)) {
+      next.paymentMethod = null;
     }
     return next;
   },
@@ -150,11 +164,22 @@ const persistedSubscriptionReducer = persistReducer(
   {
     key: 'subscription',
     storage: AsyncStorage,
-    version: 3,
+    version: 4,
     migrate: createMigrate(persistMigrations, { debug: false }),
-    whitelist: ['plan', 'expiresAt', 'activatedAt'],
+    whitelist: ['plan', 'status', 'expiresAt', 'activatedAt', 'trialUsed', 'paymentMethod'],
   },
   subscriptionReducer
+);
+
+const persistedThemeReducer = persistReducer(
+  {
+    key: 'theme',
+    storage: AsyncStorage,
+    version: 1,
+    migrate: createMigrate(persistMigrations, { debug: false }),
+    whitelist: ['current'],
+  },
+  themeReducer
 );
 
 // ОСББ — зберігаємо вибір будинку та роль між сесіями
@@ -180,6 +205,8 @@ export const store = configureStore({
     subscription: persistedSubscriptionReducer,
     osbb: persistedOsbbReducer,
     network: networkReducer,
+    notifications: notificationReducer,
+    theme: persistedThemeReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

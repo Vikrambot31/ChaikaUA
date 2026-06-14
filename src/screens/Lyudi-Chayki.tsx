@@ -16,6 +16,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import MiniTabBar from '../components/MiniTabBar';
 import AppPhotoImage from '../components/AppPhotoImage';
+import { SCREEN_THEME } from '../utils/screenTheme';
 import { communityUsersAPI } from '../firebase-config';
 import { selectUser } from '../redux/slices/authSlice';
 import type { RootState } from '../redux/store';
@@ -25,12 +26,15 @@ import { profilePermissionService } from '../services/profilePermissionService';
 import { ProfileViewRequestModal, PermissionModalState } from '../components/ProfileViewRequestModal';
 import { useContactRequest } from '../hooks/useContactRequest';
 import ContactReasonModal from '../components/ContactReasonModal';
+import { VideoLoadingOverlay } from '../components/VideoLoadingOverlay';
 import type { DetailItemData } from '../utils/detailViewTypes';
 import UserCardActionBar from '../components/UserCardActionBar';
 import { START_AVATAR_URI_PREFIX } from '../utils/startAvatars';
 import { get, ref } from 'firebase/database';
 import { database } from '../firebase-config';
 import { requireAuthForDetails } from '../utils/authGuard';
+import { PremiumGate } from '../components/PremiumGate';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 const CACHE_KEY = '@chaika:community_users_cache_v1';
 const PRIMARY = '#7A1E5C';
@@ -62,6 +66,7 @@ const UI_TEXT = {
     userProfile: 'Профіль користувача',
     errorTitle: 'Помилка',
     requestFailed: 'Не вдалося надіслати запит',
+    showMore: 'Більше',
     fillProfileTitle: 'Додайте фото — сусіди побачать вас!',
     fillProfileBody: 'Заповніть профіль, щоб інші мешканці могли вас знайти.',
   },
@@ -89,6 +94,7 @@ const UI_TEXT = {
     userProfile: 'Профиль пользователя',
     errorTitle: 'Ошибка',
     requestFailed: 'Не удалось отправить запрос',
+    showMore: 'Больше',
     fillProfileTitle: 'Добавьте фото — соседи увидят вас!',
     fillProfileBody: 'Заполните профиль, чтобы другие жители могли вас найти.',
   },
@@ -116,12 +122,31 @@ const UI_TEXT = {
     userProfile: 'User profile',
     errorTitle: 'Error',
     requestFailed: 'Failed to send request',
+    showMore: 'More',
     fillProfileTitle: 'Add a photo — neighbors will see you!',
     fillProfileBody: 'Complete your profile so other residents can find you.',
   },
 } as const;
 
 type UiText = (typeof UI_TEXT)[Lang];
+
+const CONTACT_REQUEST_LIMIT_TEXT: Record<Lang, Record<'cooldown' | 'daily_limit' | 'retry_later', string>> = {
+  ua: {
+    cooldown: 'Зачекайте кілька секунд перед наступним запитом.',
+    daily_limit: 'Ліміт контактних запитів на сьогодні вичерпано.',
+    retry_later: 'Після відмови повторний запит до цієї людини доступний завтра.',
+  },
+  ru: {
+    cooldown: 'Подождите несколько секунд перед следующим запросом.',
+    daily_limit: 'Лимит контактных запросов на сегодня исчерпан.',
+    retry_later: 'После отказа повторный запрос этому человеку доступен завтра.',
+  },
+  en: {
+    cooldown: 'Wait a few seconds before sending another request.',
+    daily_limit: 'Today contact request limit has been reached.',
+    retry_later: 'After a denial, you can request this contact again tomorrow.',
+  },
+};
 
 type CommunityUser = {
   id: string;
@@ -214,7 +239,9 @@ export default function TopGirlsBoysScreen() {
   const [loading, setLoading] = useState(true);
   const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
   const [statusFilter, setStatusFilter] = useState<PersonStatusFilter>('all');
+  const [visibleCount, setVisibleCount] = useState(4);
   const [bonusByUserId, setBonusByUserId] = useState<Record<string, number>>({});
+  const { colors } = useAppTheme();
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const [permModal, setPermModal] = useState<{
     visible: boolean;
@@ -256,7 +283,7 @@ export default function TopGirlsBoysScreen() {
       userPhotoURL?: string;
       startAvatarKey?: string;
       building?: string;
-      createdAt?: number | Date;
+      createdAt?: number | Date | string;
       timestamp?: number;
     }) => {
       const id = typeof item.userId === 'string' ? item.userId.trim() : '';
@@ -270,9 +297,11 @@ export default function TopGirlsBoysScreen() {
         ? item.createdAt.getTime()
         : typeof item.createdAt === 'number'
           ? item.createdAt
-          : typeof item.timestamp === 'number'
-            ? item.timestamp
-            : undefined;
+          : typeof item.createdAt === 'string'
+            ? new Date(item.createdAt).getTime()
+            : typeof item.timestamp === 'number'
+              ? item.timestamp
+              : undefined;
       const next: CommunityUser = {
         id,
         name: firstText(item.name) || text.residentFallback,
@@ -437,6 +466,9 @@ export default function TopGirlsBoysScreen() {
         setPermModal((prev) => ({ ...prev, state: 'open', contactInfo: phone }));
       } else if (result === 'already_pending') {
         setPermModal((prev) => ({ ...prev, state: 'pending' }));
+      } else if (result === 'cooldown' || result === 'daily_limit' || result === 'retry_later') {
+        setPermModal((prev) => ({ ...prev, state: 'confirm' }));
+        Alert.alert(text.errorTitle, CONTACT_REQUEST_LIMIT_TEXT[language][result]);
       } else {
         setPermModal((prev) => ({ ...prev, state: 'sent' }));
       }
@@ -444,10 +476,10 @@ export default function TopGirlsBoysScreen() {
       setPermModal({ visible: false, state: 'confirm', targetId: '', targetName: '', contactInfo: '' });
       Alert.alert(text.errorTitle, error instanceof Error ? error.message : text.requestFailed);
     }
-  }, [user?.id, user?.name, user?.photoURL, permModal.targetId, filteredRanked, text.errorTitle, text.requestFailed]);
+  }, [user?.id, user?.name, user?.photoURL, permModal.targetId, filteredRanked, language, text.errorTitle, text.requestFailed]);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back}>
           <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
@@ -457,7 +489,7 @@ export default function TopGirlsBoysScreen() {
       </View>
 
       <FlatList<Person>
-        data={loading ? [] : filteredRanked}
+        data={loading ? [] : filteredRanked.slice(0, visibleCount)}
         keyExtractor={(item) => item.id}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.scroll}
@@ -469,16 +501,16 @@ export default function TopGirlsBoysScreen() {
               <View style={styles.filterBlock}>
                 <Text style={styles.filterTitle}>{text.statusLabel}</Text>
                 <View style={styles.filterRow}>
-                  <TouchableOpacity style={[styles.filterChip, statusFilter === 'all' && styles.filterChipActive]} onPress={() => setStatusFilter('all')} activeOpacity={0.82}>
+                  <TouchableOpacity style={[styles.filterChip, statusFilter === 'all' && styles.filterChipActive]} onPress={() => { setStatusFilter('all'); setVisibleCount(4); }} activeOpacity={0.82}>
                     <Text style={[styles.filterChipText, statusFilter === 'all' && styles.filterChipTextActive]}>{text.statusAll}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={[styles.filterChip, statusFilter === 'new' && styles.filterChipActive]} onPress={() => setStatusFilter('new')} activeOpacity={0.82}>
+                  <TouchableOpacity style={[styles.filterChip, statusFilter === 'new' && styles.filterChipActive]} onPress={() => { setStatusFilter('new'); setVisibleCount(4); }} activeOpacity={0.82}>
                     <Text style={[styles.filterChipText, statusFilter === 'new' && styles.filterChipTextActive]}>{text.statusNew}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={[styles.filterChip, statusFilter === 'active' && styles.filterChipActive]} onPress={() => setStatusFilter('active')} activeOpacity={0.82}>
+                  <TouchableOpacity style={[styles.filterChip, statusFilter === 'active' && styles.filterChipActive]} onPress={() => { setStatusFilter('active'); setVisibleCount(4); }} activeOpacity={0.82}>
                     <Text style={[styles.filterChipText, statusFilter === 'active' && styles.filterChipTextActive]}>{text.statusActive}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={[styles.filterChip, statusFilter === 'pro' && styles.filterChipActive]} onPress={() => setStatusFilter('pro')} activeOpacity={0.82}>
+                  <TouchableOpacity style={[styles.filterChip, statusFilter === 'pro' && styles.filterChipActive]} onPress={() => { setStatusFilter('pro'); setVisibleCount(4); }} activeOpacity={0.82}>
                     <Text style={[styles.filterChipText, statusFilter === 'pro' && styles.filterChipTextActive]}>{text.statusPro}</Text>
                   </TouchableOpacity>
                 </View>
@@ -505,6 +537,20 @@ export default function TopGirlsBoysScreen() {
             ) : null}
           </>
         }
+        ListFooterComponent={
+          !loading && visibleCount < filteredRanked.length ? (
+            <TouchableOpacity style={styles.showMoreButton} activeOpacity={0.82} onPress={() => {
+              setVisibleCount((prev) => {
+                if (prev <= 4) return 8;
+                if (prev <= 8) return 10;
+                return prev + 10;
+              });
+            }}>
+              <Text style={styles.showMoreText}>{text.showMore} ({filteredRanked.length - visibleCount})</Text>
+              <MaterialCommunityIcons name="chevron-down" size={18} color={SCREEN_THEME.textSecondary} />
+            </TouchableOpacity>
+          ) : null
+        }
         ListEmptyComponent={
           loading ? (
             <View style={styles.emptyCard}>
@@ -524,7 +570,7 @@ export default function TopGirlsBoysScreen() {
           const isCurrentUser = person.id === user?.id;
           const isNavigating = navigatingId === person.id;
           return (
-            <TouchableOpacity style={[styles.personCard, isCurrentUser && styles.personCardCurrent]} onPress={() => openPersonDetails(person)} activeOpacity={0.88} disabled={isCurrentUser || isNavigating}>
+            <TouchableOpacity style={[styles.personCard, isCurrentUser && styles.personCardCurrent]} onPress={() => openPersonDetails(person)} activeOpacity={0.88} disabled={isNavigating}>
               <View style={styles.personCardMain}>
                 <View style={styles.rankBox}>
                   {isNavigating ? (
@@ -557,18 +603,20 @@ export default function TopGirlsBoysScreen() {
                 <Text style={styles.professionText} numberOfLines={1}>{person.profession?.trim() || text.noProfession}</Text>
                 </View>
               </View>
-              <UserCardActionBar
-                avatarUri={person.photoURL || ''}
-                name={person.name}
-                userId={person.id}
-                currentUserId={user?.id}
-                language={language}
-                onProfile={!isCurrentUser ? () => navigation.navigate('ViewUserProfile', { userId: person.id }) : undefined}
-                onContact={!isCurrentUser ? () => openContactModal({ userId: person.id, name: person.name, photoURL: person.photoURL, sourceType: 'lyudi', sourceId: person.id, sourceTitle: person.name }) : undefined}
-                contactDisabled={isCurrentUser}
-                likePath="feed_likes/people"
-                likeId={person.id}
-              />
+              <PremiumGate required={!isCurrentUser}>
+                <UserCardActionBar
+                  avatarUri={person.photoURL || ''}
+                  name={person.name}
+                  userId={person.id}
+                  currentUserId={user?.id}
+                  language={language}
+                  onProfile={() => navigation.navigate('ViewUserProfile', { userId: person.id })}
+                  onContact={!isCurrentUser ? () => openContactModal({ userId: person.id, name: person.name, photoURL: person.photoURL, sourceType: 'lyudi', sourceId: person.id, sourceTitle: person.name }) : undefined}
+                  contactDisabled={isCurrentUser}
+                  likePath="feed_likes/people"
+                  likeId={person.id}
+                />
+              </PremiumGate>
               {(bonusByUserId[person.id] ?? 0) > 0 ? (
                 <View style={styles.bonusCoinRow}>
                   <MaterialCommunityIcons name="circle-multiple" size={14} color="#C79C47" />
@@ -596,6 +644,7 @@ export default function TopGirlsBoysScreen() {
         onSelect={(reason) => void sendContactRequest(reason)}
         onClose={closeContactModal}
       />
+      <VideoLoadingOverlay visible={loading} />
     </SafeAreaView>
   );
 }
@@ -721,4 +770,22 @@ const styles = StyleSheet.create({
   fillProfileCopy: { flex: 1 },
   fillProfileTitle: { color: '#5B5048', fontSize: 13, fontWeight: '900' },
   fillProfileBody: { color: '#7A6D64', fontSize: 11, fontWeight: '700', marginTop: 2 },
+  showMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    paddingVertical: 13,
+    marginTop: 4,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#E4D0AB',
+  },
+  showMoreText: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#21041B',
+  },
 });

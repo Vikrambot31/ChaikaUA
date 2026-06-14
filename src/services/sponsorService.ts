@@ -1,5 +1,5 @@
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { get, onValue, ref } from 'firebase/database';
+import { get, onValue, orderByChild, query, equalTo, ref } from 'firebase/database';
 import { auth, database, firebaseApp } from '../firebase-core';
 import { CACHE_TTL, cacheGet, cacheSet } from '../utils/cacheLayer';
 import { normalizeSponsorPhoneValue } from '../utils/rulesEngine';
@@ -326,12 +326,14 @@ export const getMyTrustNode = async (): Promise<TrustTreeNode | null> => {
   return normalizeTrustNode(snapshot.val());
 };
 
-export const getMyTrustChain = async (): Promise<TrustChainLink[]> => {
-  const node = await getMyTrustNode();
+export const getMyTrustChain = async (existingNode?: TrustTreeNode): Promise<TrustChainLink[]> => {
+  const node = existingNode ?? await getMyTrustNode();
   if (!node || !node.rootPath.length) return [];
+  const selfUid = auth.currentUser?.uid;
   const chain: TrustChainLink[] = [];
   for (let i = 0; i < node.rootPath.length; i++) {
     const chainUid = node.rootPath[i];
+    if (chainUid === selfUid) continue; // exclude self — already rendered as "You" chip
     let name = '';
     try {
       const userSnap = await get(ref(database, `users/${chainUid}/name`));
@@ -351,8 +353,19 @@ export const getMyInvitedChildren = async (): Promise<TrustTreeChild[]> => {
   return result.data.children ?? [];
 };
 
+export const subscribeMyConfirmations = (
+  onChanged: () => void,
+  onError?: (error: Error) => void,
+): (() => void) => {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return () => {};
+  const q = query(ref(database, 'sponsor_confirmations'), orderByChild('sponsorUid'), equalTo(uid));
+  return onValue(q, () => { void onChanged(); }, onError);
+};
+
 export const subscribeMyTrustNode = (
   onChanged: (node: TrustTreeNode | null) => void,
+  onError?: (error: Error) => void,
 ): (() => void) => {
   const uid = auth.currentUser?.uid;
   if (!uid) {
@@ -361,5 +374,5 @@ export const subscribeMyTrustNode = (
   }
   return onValue(ref(database, `trust_tree/${uid}`), (snapshot) => {
     onChanged(normalizeTrustNode(snapshot.val()));
-  });
+  }, onError);
 };

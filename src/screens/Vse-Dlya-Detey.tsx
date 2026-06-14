@@ -1,5 +1,11 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
   Platform,
   SafeAreaView,
   ScrollView,
@@ -10,20 +16,35 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+
+const OFFER_PLACEHOLDER = require('../../assets/_zaglushka-lenta.webp');
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
+import { ref, get } from 'firebase/database';
+import { database } from '../firebase-core';
 import { chaykaPlaces } from '../services/chaykaPlacesData';
 import { CHILDREN_SCREEN_BLACKLIST, childInfoSeed, getActiveOffers } from '../services/childrenSeed';
 import { ChildCategory, ChildFeature, ChildOffer, Place, PlaceType } from '../types/app';
 import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
-import { subscribeActiveBonusPromotions, type BonusPromotion } from '../services/bonusService';
+import { useAppTheme } from '../hooks/useAppTheme';
+import { subscribeActiveBonusPromotions, subscribeBiznesPlusPlaces, type BonusPromotion } from '../services/bonusService';
 import { safeCallPhone, safeOpenExternalUrl } from '../utils/communicationActions';
 import { selectUserId } from '../redux/selectors';
 import FeedLikeButton from '../components/FeedLikeButton';
+import { FeatureRatingBanner } from '../components/FeatureRatingBanner';
 import { toggleFavorite, getFavorites, type FavoriteSource } from '../services/favoritesService';
 import { useSoftToast } from '../hooks/useSoftToast';
+import PhotoUploadField, { type UploadedPhoto } from '../components/PhotoUploadField';
+import UploadedPhotosGrid from '../components/UploadedPhotosGrid';
+import { getDonePhotos, validateSubmissionRequirements } from '../utils/submissionRequirements';
+import { getLanguageValidationError } from '../utils/contentLanguageGuard';
+import { showUserError } from '../utils/userFacingErrors';
+import { childrenTopService } from '../services/childrenTopService';
+import { useTrainingMode } from '../hooks/useTrainingMode';
+import TrainingHint from '../components/TrainingHint';
+import HintBadge, { HINT_BADGE_LABELS } from '../components/HintBadge';
 
 type Lang = 'ua' | 'ru' | 'en';
 type AppNavigation = NavigationProp<Record<string, object | undefined>>;
@@ -44,12 +65,30 @@ const UI_TEXT = {
     actualTitle: 'Актуально для дітей',
     actualEmptyTitle: 'Тут зʼявляться відкриті дні та акції',
     actualEmptyText: 'Садочки, школи та гуртки зможуть показувати набори, пробні заняття й події для мешканців району.',
+    addPlace: 'Додати місце',
+    showMore: 'Більше',
+    addPlaceFormTitle: 'Додати дитяче місце',
+    formNameLabel: 'Назва',
+    formNamePlaceholder: 'Назва закладу або гуртка',
+    formDescriptionLabel: 'Опис',
+    formDescriptionPlaceholder: 'Коротко опишіть послуги, вік, контакти',
+    formPhotoLabel: 'Фото',
+    formSubmit: 'Надіслати на модерацію',
+    formSuccessTitle: 'Готово',
+    formSuccessMsg: 'Заявку надіслано на модерацію. Після перевірки місце зʼявиться у списку.',
+    formFillError: 'Додайте назву, опис і фото.',
+    formPhotoUploading: 'Дочекайтесь завершення завантаження фото.',
+    formPhotoError: 'Фото не завантажилось. Видаліть його або спробуйте ще раз.',
+    formPhotoRequired: 'Додайте фото.',
+    errorTitle: 'Помилка',
+    ok: 'OK',
     categoriesTitle: 'Категорії',
     allPlacesTitle: 'Всі місця для дітей',
     eventsListTitle: 'Події та пропозиції',
     noResults: 'Нічого не знайдено. Спробуйте змінити пошук або категорію.',
     noOffers: 'Поки що немає активних подій або пропозицій.',
     details: 'Детальніше',
+    route: 'Маршрут',
     call: 'Подзвонити',
     telegram: 'Telegram',
     validUntil: 'до',
@@ -122,12 +161,30 @@ const UI_TEXT = {
     actualTitle: 'Актуально для детей',
     actualEmptyTitle: 'Здесь появятся открытые дни и акции',
     actualEmptyText: 'Садики, школы и кружки смогут показывать наборы, пробные занятия и события для жителей района.',
+    addPlace: 'Добавить место',
+    showMore: 'Больше',
+    addPlaceFormTitle: 'Добавить детское место',
+    formNameLabel: 'Название',
+    formNamePlaceholder: 'Название заведения или кружка',
+    formDescriptionLabel: 'Описание',
+    formDescriptionPlaceholder: 'Кратко опишите услуги, возраст, контакты',
+    formPhotoLabel: 'Фото',
+    formSubmit: 'Отправить на модерацию',
+    formSuccessTitle: 'Готово',
+    formSuccessMsg: 'Заявка отправлена на модерацию. После проверки место появится в списке.',
+    formFillError: 'Добавьте название, описание и фото.',
+    formPhotoUploading: 'Дождитесь завершения загрузки фото.',
+    formPhotoError: 'Фото не загрузилось. Удалите его или попробуйте ещё раз.',
+    formPhotoRequired: 'Добавьте фото.',
+    errorTitle: 'Ошибка',
+    ok: 'OK',
     categoriesTitle: 'Категории',
     allPlacesTitle: 'Все места для детей',
     eventsListTitle: 'События и предложения',
     noResults: 'Ничего не найдено. Попробуйте изменить поиск или категорию.',
     noOffers: 'Пока нет активных событий или предложений.',
     details: 'Подробнее',
+    route: 'Маршрут',
     call: 'Позвонить',
     telegram: 'Telegram',
     validUntil: 'до',
@@ -200,12 +257,30 @@ const UI_TEXT = {
     actualTitle: 'Relevant for kids',
     actualEmptyTitle: 'Open days and offers will appear here',
     actualEmptyText: 'Kindergartens, schools and clubs will be able to show enrollments, trial lessons and local events.',
+    addPlace: 'Add place',
+    showMore: 'More',
+    addPlaceFormTitle: 'Add kids place',
+    formNameLabel: 'Name',
+    formNamePlaceholder: 'Place or club name',
+    formDescriptionLabel: 'Description',
+    formDescriptionPlaceholder: 'Briefly describe services, age group, contacts',
+    formPhotoLabel: 'Photo',
+    formSubmit: 'Send to moderation',
+    formSuccessTitle: 'Done',
+    formSuccessMsg: 'The request was sent to moderation. After review the place will appear in the list.',
+    formFillError: 'Add a name, description, and photo.',
+    formPhotoUploading: 'Wait until the photo upload finishes.',
+    formPhotoError: 'The photo did not upload. Remove it or try again.',
+    formPhotoRequired: 'Add a photo.',
+    errorTitle: 'Error',
+    ok: 'OK',
     categoriesTitle: 'Categories',
     allPlacesTitle: 'All kids places',
     eventsListTitle: 'Events and offers',
     noResults: 'Nothing found. Try changing search or category.',
     noOffers: 'No active events or offers yet.',
     details: 'Details',
+    route: 'Route',
     call: 'Call',
     telegram: 'Telegram',
     validUntil: 'until',
@@ -367,24 +442,27 @@ const matchesAgeRange = (place: Place, range: { from: number; to: number }): boo
   return placeAgeTo >= range.from && ageFrom <= range.to;
 };
 
-const buildMapUrl = (place: Place): string => {
-  if (place.latitude && place.longitude) {
-    if (Platform.OS === 'ios') {
-      return `https://maps.apple.com/?ll=${place.latitude},${place.longitude}&q=${encodeURIComponent(place.name)}`;
-    }
-    return `https://www.google.com/maps/search/?api=1&query=${place.latitude},${place.longitude}`;
-  }
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.address)}`;
+const TRAINING_HINT: Record<Lang, string> = {
+  ua: 'Фільтруй за віком дитини або категорією. Натисни на картку, щоб побачити деталі.',
+  ru: 'Фильтруй по возрасту ребёнка или категории. Нажми на карточку, чтобы увидеть детали.',
+  en: 'Filter by child age or category. Tap a card to see details.',
 };
 
 export default function VseDlyaDeteyScreen() {
   const navigation = useNavigation<AppNavigation>();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as Lang;
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
+  const { colors, isDark } = useAppTheme();
+  const training = useTrainingMode('vse_dlya_detey');
+  const user = useSelector((state: RootState) => state.auth.user);
   const currentUserId = useSelector(selectUserId);
+  const currentUserEmail = user?.email;
+  const isAdmin = currentUserEmail === 'vikramsave@ukr.net';
   const [activeCategory, setActiveCategory] = useState<CategoryKey>('all');
+  const [claimPlaceIds, setClaimPlaceIds] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
   const [activePromotions, setActivePromotions] = useState<BonusPromotion[]>([]);
+  const [biznesPlusIds, setBiznesPlusIds] = useState<string[]>([]);
   const [filterShelter, setFilterShelter] = useState(false);
   const [filterEnglish, setFilterEnglish] = useState(false);
   const [filterAge, setFilterAge] = useState<AgeRangeKey | null>(null);
@@ -392,10 +470,39 @@ export default function VseDlyaDeteyScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const resultsAnchorY = useRef(0);
   const { showSuccess } = useSoftToast();
+  const [showAllPlaces, setShowAllPlaces] = useState(false);
+
+  // --- Add-place form state ---
+  const [addFormVisible, setAddFormVisible] = useState(false);
+  const [formTitle, setFormTitle] = useState('');
+  const [formDescription, setFormDescription] = useState('');
+  const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
+  const [formSubmitting, setFormSubmitting] = useState(false);
+  const hasFormUploadingPhotos = formPhotos.some((p) => p.status === 'uploading');
+  const hasFormPhotoErrors = formPhotos.some((p) => p.status === 'error');
 
   useEffect(() => {
     return subscribeActiveBonusPromotions('kids', setActivePromotions);
   }, []);
+
+  useEffect(() => {
+    return subscribeBiznesPlusPlaces('kids', setBiznesPlusIds);
+  }, []);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    void (async () => {
+      try {
+        const snap = await get(ref(database, 'business_plus_claims'));
+        if (!snap.exists()) return;
+        const ids = new Set<string>();
+        snap.forEach((child) => {
+          if (child.val()?.status === 'pending') ids.add(child.key!);
+        });
+        setClaimPlaceIds(ids);
+      } catch { /* ignore */ }
+    })();
+  }, [isAdmin]);
 
   useEffect(() => {
     getFavorites(FAVORITE_SOURCE).then((items) => {
@@ -445,6 +552,13 @@ export default function VseDlyaDeteyScreen() {
         return true;
       })
       .sort((a, b) => {
+        const aPlus = biznesPlusIds.indexOf(a.place.id);
+        const bPlus = biznesPlusIds.indexOf(b.place.id);
+        if (aPlus !== -1 || bPlus !== -1) {
+          if (aPlus === -1) return 1;
+          if (bPlus === -1) return -1;
+          return aPlus - bPlus;
+        }
         const aPromoted = promotedPlaceIds.get(a.place.id);
         const bPromoted = promotedPlaceIds.get(b.place.id);
         if (aPromoted !== undefined || bPromoted !== undefined) {
@@ -454,7 +568,7 @@ export default function VseDlyaDeteyScreen() {
         }
         return 0;
       });
-  }, [activeCategory, activePromotions, childPlaces, query, filterShelter, filterEnglish, filterAge]);
+  }, [activeCategory, activePromotions, biznesPlusIds, childPlaces, query, filterShelter, filterEnglish, filterAge]);
 
   const activeOffers = useMemo(() => {
     const promotedEventIds = new Map(
@@ -484,8 +598,91 @@ export default function VseDlyaDeteyScreen() {
     navigation.navigate('DetalDetskogoPredlozheniyaScreen', { offer });
   };
 
+  const resetAddForm = useCallback(() => {
+    setFormTitle('');
+    setFormDescription('');
+    setFormPhotos([]);
+  }, []);
+
+  const openBusinessForm = useCallback(() => {
+    if (!validateSubmissionRequirements({ language, userId: user?.id, navigation })) return;
+    setAddFormVisible(true);
+  }, [language, navigation, user?.id]);
+
+  const handleSubmitPlace = useCallback(async () => {
+    if (!validateSubmissionRequirements({ language, userId: user?.id, navigation })) return;
+    const trimmedTitle = formTitle.trim();
+    const trimmedDescription = formDescription.trim();
+    if (!trimmedTitle || !trimmedDescription) {
+      Alert.alert(text.errorTitle, text.formFillError);
+      return;
+    }
+    const langError = getLanguageValidationError(`${trimmedTitle} ${trimmedDescription}`, language);
+    if (langError) {
+      Alert.alert(text.errorTitle, langError);
+      return;
+    }
+    if (hasFormUploadingPhotos) {
+      Alert.alert(text.errorTitle, text.formPhotoUploading);
+      return;
+    }
+    if (hasFormPhotoErrors) {
+      Alert.alert(text.errorTitle, text.formPhotoError);
+      return;
+    }
+    const donePhotos = getDonePhotos(formPhotos);
+    if (donePhotos.length === 0) {
+      Alert.alert(text.errorTitle, text.formPhotoRequired);
+      return;
+    }
+
+    setFormSubmitting(true);
+    try {
+      const firstPhoto = donePhotos[0];
+      const createdAt = new Date().toISOString();
+      await childrenTopService.add({
+        title: trimmedTitle,
+        description: trimmedDescription,
+        photoUri: firstPhoto.downloadUrl,
+        photoStoragePath: firstPhoto.storagePath,
+        photoId: firstPhoto.photoId,
+        moderationStatus: 'pending',
+        submittedForModerationAt: createdAt,
+        createdAt,
+        userId: user?.id || '',
+        language,
+      });
+      Alert.alert(text.formSuccessTitle, text.formSuccessMsg, [
+        { text: text.ok, onPress: () => { resetAddForm(); setAddFormVisible(false); } },
+      ]);
+    } catch (error) {
+      showUserError(language, 'send', error);
+    } finally {
+      setFormSubmitting(false);
+    }
+  }, [
+    hasFormPhotoErrors,
+    hasFormUploadingPhotos,
+    language,
+    navigation,
+    resetAddForm,
+    text.errorTitle,
+    text.ok,
+    text.formFillError,
+    text.formPhotoError,
+    text.formPhotoRequired,
+    text.formPhotoUploading,
+    text.formSuccessMsg,
+    text.formSuccessTitle,
+    formDescription,
+    formPhotos,
+    formTitle,
+    user?.id,
+  ]);
+
   const handleCategoryPress = (category: CategoryKey) => {
     setActiveCategory(category);
+    setShowAllPlaces(false);
     setTimeout(() => {
       scrollRef.current?.scrollTo({
         y: Math.max(resultsAnchorY.current - 10, 0),
@@ -516,10 +713,6 @@ export default function VseDlyaDeteyScreen() {
     }
   };
 
-  const handleOpenMap = (place: Place) => {
-    void safeOpenExternalUrl(buildMapUrl(place), language);
-  };
-
   const handleToggleFavorite = async (placeId: string) => {
     const added = await toggleFavorite(placeId, FAVORITE_SOURCE);
     setFavoriteIds((prev) => {
@@ -541,22 +734,29 @@ export default function VseDlyaDeteyScreen() {
         activeOpacity={0.88}
         onPress={() => openOffer(offer)}
       >
-        <View style={styles.offerTopRow}>
-          <View style={styles.offerBadge}>
-            <Text style={styles.offerBadgeText}>{text.offerTypes[offer.type]}</Text>
+        <Image
+          source={OFFER_PLACEHOLDER}
+          style={[styles.offerImage, wide && styles.offerImageWide]}
+          resizeMode="cover"
+        />
+        <View style={styles.offerCardBody}>
+          <View style={styles.offerTopRow}>
+            <View style={styles.offerBadge}>
+              <Text style={styles.offerBadgeText}>{text.offerTypes[offer.type]}</Text>
+            </View>
+            <TouchableOpacity
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              onPress={(e) => { e.stopPropagation(); void handleShareOffer(offer); }}
+              activeOpacity={0.7}
+            >
+              <MaterialCommunityIcons name="share-variant-outline" size={18} color={SCREEN_THEME.textSecondary} />
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            onPress={(e) => { e.stopPropagation(); void handleShareOffer(offer); }}
-            activeOpacity={0.7}
-          >
-            <MaterialCommunityIcons name="share-variant-outline" size={18} color={SCREEN_THEME.textSecondary} />
-          </TouchableOpacity>
+          {offerPlace ? <Text style={styles.offerPlaceName} numberOfLines={1}>{offerPlace.name}</Text> : null}
+          <Text style={styles.offerTitle} numberOfLines={2}>{offer.title}</Text>
+          <Text style={styles.offerShortText} numberOfLines={wide ? 3 : 2}>{offer.shortText}</Text>
+          {offerMeta ? <Text style={styles.offerMeta} numberOfLines={1}>{offerMeta}</Text> : null}
         </View>
-        <Text style={styles.offerTitle} numberOfLines={2}>{offer.title}</Text>
-        <Text style={styles.offerShortText} numberOfLines={wide ? 3 : 2}>{offer.shortText}</Text>
-        {offerMeta ? <Text style={styles.offerMeta} numberOfLines={1}>{offerMeta}</Text> : null}
-        {offerPlace ? <Text style={styles.offerPlaceName} numberOfLines={1}>{offerPlace.name}</Text> : null}
       </TouchableOpacity>
     );
   };
@@ -566,9 +766,10 @@ export default function VseDlyaDeteyScreen() {
     const hasPhone = Boolean(place.phone);
     const hasTelegram = Boolean(place.childInfo?.telegram);
     const isFav = favoriteIds.has(place.id);
+    const hasClaim = isAdmin && claimPlaceIds.has(place.id);
 
     return (
-      <TouchableOpacity key={place.id} style={styles.placeCard} activeOpacity={0.88} onPress={() => openPlace(place)}>
+      <TouchableOpacity key={place.id} style={[styles.placeCard, hasClaim && styles.placeCardClaimed]} activeOpacity={0.88} onPress={() => openPlace(place)}>
         <View style={styles.placeHeader}>
           <View style={styles.placeIconWrap}>
             <MaterialCommunityIcons
@@ -583,18 +784,6 @@ export default function VseDlyaDeteyScreen() {
           </View>
         </View>
 
-        {/* Address — tappable to open map */}
-        <TouchableOpacity
-          style={styles.addressRow}
-          activeOpacity={0.7}
-          onPress={(e) => { e.stopPropagation(); handleOpenMap(place); }}
-          accessibilityLabel={text.openMap}
-        >
-          <MaterialCommunityIcons name="map-marker-outline" size={16} color={SCREEN_THEME.terracotta} />
-          <Text style={[styles.addressText, styles.addressLink]} numberOfLines={1}>{place.address}</Text>
-          <MaterialCommunityIcons name="open-in-new" size={12} color={SCREEN_THEME.textMuted} />
-        </TouchableOpacity>
-
         {featureBadges.length > 0 ? (
           <View style={styles.badgeRow}>
             {featureBadges.map((badge) => (
@@ -605,7 +794,7 @@ export default function VseDlyaDeteyScreen() {
           </View>
         ) : null}
 
-        {/* Action row: details, contacts, share, like, favorite */}
+        {/* Action row: details, route, contacts, share, like, favorite */}
         <View style={styles.cardActions}>
           <TouchableOpacity style={styles.primaryAction} onPress={() => openPlace(place)} activeOpacity={0.85}>
             <Text style={styles.primaryActionText}>{text.details}</Text>
@@ -669,7 +858,7 @@ export default function VseDlyaDeteyScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScrollView ref={scrollRef} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} activeOpacity={0.8}>
@@ -678,6 +867,14 @@ export default function VseDlyaDeteyScreen() {
           <View style={styles.heroTextBlock}>
             <Text style={styles.title}>{text.title}</Text>
             <Text style={styles.subtitle}>{text.subtitle}</Text>
+          </View>
+          <View style={{ position: 'absolute', top: 12, right: 12, zIndex: 10 }}>
+            <HintBadge
+              visible={training.isVisible}
+              onTap={training.openHint}
+              onDismiss={training.dismiss}
+              label={HINT_BADGE_LABELS[language]}
+            />
           </View>
         </View>
 
@@ -737,26 +934,21 @@ export default function VseDlyaDeteyScreen() {
         </View>
 
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>{text.actualTitle}</Text>
+          <Text style={[styles.sectionTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{text.actualTitle}</Text>
         </View>
         {activeOffers.length > 0 ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.offersRow}>
             {activeOffers.map((offer) => renderOfferCard(offer))}
           </ScrollView>
         ) : (
-          <View style={styles.actualCard}>
-            <View style={styles.actualIcon}>
-              <MaterialCommunityIcons name="calendar-star" size={24} color="#FFFFFF" />
-            </View>
-            <View style={styles.actualTextBlock}>
-              <Text style={styles.actualTitle}>{text.actualEmptyTitle}</Text>
-              <Text style={styles.actualText}>{text.actualEmptyText}</Text>
-            </View>
-          </View>
+          <TouchableOpacity style={styles.addPlaceButton} activeOpacity={0.88} onPress={openBusinessForm}>
+            <MaterialCommunityIcons name="store-plus" size={16} color="#FFFFFF" />
+            <Text style={styles.addPlaceBtnText}>{text.addPlace}</Text>
+          </TouchableOpacity>
         )}
 
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>{text.categoriesTitle}</Text>
+          <Text style={[styles.sectionTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{text.categoriesTitle}</Text>
         </View>
         <View style={styles.categoryGrid}>
           {CATEGORIES.map((category) => {
@@ -798,33 +990,136 @@ export default function VseDlyaDeteyScreen() {
           }}
         >
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>{isEventsCategory ? text.eventsListTitle : text.allPlacesTitle}</Text>
-            <Text style={styles.resultCount}>{isEventsCategory ? activeOffers.length : filteredPlaces.length}</Text>
+            <Text style={[styles.sectionTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{isEventsCategory ? text.eventsListTitle : text.allPlacesTitle}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+              <Text style={styles.resultCount}>{isEventsCategory ? activeOffers.length : filteredPlaces.length}</Text>
+              <TouchableOpacity style={styles.addPlaceButton} activeOpacity={0.88} onPress={openBusinessForm}>
+                <MaterialCommunityIcons name="store-plus" size={14} color="#FFFFFF" />
+                <Text style={styles.addPlaceBtnText}>{text.addPlace}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {isEventsCategory ? (
-            activeOffers.length > 0 ? (
-              <View style={styles.cardList}>
-                {activeOffers.map((offer) => renderOfferCard(offer, true))}
-              </View>
-            ) : (
-              <View style={styles.emptyState}>
-                <MaterialCommunityIcons name="calendar-remove-outline" size={34} color={SCREEN_THEME.textMuted} />
-                <Text style={styles.emptyText}>{text.noOffers}</Text>
-              </View>
-            )
-          ) : filteredPlaces.length > 0 ? (
-            <View style={styles.cardList}>
-              {filteredPlaces.map((item) => renderPlaceCard(item))}
-            </View>
+            <FlatList
+              scrollEnabled={false}
+              data={activeOffers}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => renderOfferCard(item, true)}
+              contentContainerStyle={activeOffers.length > 0 ? styles.cardList : undefined}
+              ListEmptyComponent={
+                <View style={styles.emptyState}>
+                  <MaterialCommunityIcons name="calendar-remove-outline" size={34} color={SCREEN_THEME.textMuted} />
+                  <Text style={styles.emptyText}>{text.noOffers}</Text>
+                </View>
+              }
+            />
           ) : (
-            <View style={styles.emptyState}>
-              <MaterialCommunityIcons name="magnify-close" size={34} color={SCREEN_THEME.textMuted} />
-              <Text style={styles.emptyText}>{text.noResults}</Text>
-            </View>
+            <>
+              <FlatList
+                scrollEnabled={false}
+                data={showAllPlaces ? filteredPlaces : filteredPlaces.slice(0, 4)}
+                keyExtractor={(item) => item.place.id}
+                renderItem={({ item }) => renderPlaceCard(item)}
+                contentContainerStyle={filteredPlaces.length > 0 ? styles.cardList : undefined}
+                ListEmptyComponent={
+                  <View style={styles.emptyState}>
+                    <MaterialCommunityIcons name="magnify-close" size={34} color={SCREEN_THEME.textMuted} />
+                    <Text style={styles.emptyText}>{text.noResults}</Text>
+                  </View>
+                }
+              />
+              {!showAllPlaces && filteredPlaces.length > 4 ? (
+                <TouchableOpacity
+                  style={styles.showMoreButton}
+                  activeOpacity={0.82}
+                  onPress={() => setShowAllPlaces(true)}
+                >
+                  <Text style={styles.showMoreText}>{text.showMore}</Text>
+                  <MaterialCommunityIcons name="chevron-down" size={18} color={SCREEN_THEME.textSecondary} />
+                </TouchableOpacity>
+              ) : null}
+            </>
           )}
         </View>
+
+        <FeatureRatingBanner screenId="deti" />
       </ScrollView>
+
+      <Modal visible={addFormVisible} transparent animationType="slide" onRequestClose={() => setAddFormVisible(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.sheetOverlay}>
+          <TouchableOpacity style={styles.sheetBackdrop} activeOpacity={1} onPress={() => setAddFormVisible(false)} />
+          <View style={styles.sheetWrapper}>
+            <View style={styles.sheet}>
+              <View style={styles.sheetHandle} />
+              <View style={styles.sheetHeader}>
+                <Text style={styles.sheetTitle}>{text.addPlaceFormTitle}</Text>
+                <TouchableOpacity onPress={() => setAddFormVisible(false)} style={styles.sheetCloseBtn} activeOpacity={0.75}>
+                  <MaterialCommunityIcons name="close" size={18} color={SCREEN_THEME.textSecondary} />
+                </TouchableOpacity>
+              </View>
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={styles.sheetContent}
+                style={styles.sheetScroll}
+              >
+                <Text style={styles.formLabel}>{text.formNameLabel}</Text>
+                <TextInput
+                  value={formTitle}
+                  onChangeText={setFormTitle}
+                  placeholder={text.formNamePlaceholder}
+                  placeholderTextColor="#A0938D"
+                  style={styles.input}
+                  maxLength={70}
+                />
+
+                <Text style={styles.formLabel}>{text.formDescriptionLabel}</Text>
+                <TextInput
+                  value={formDescription}
+                  onChangeText={setFormDescription}
+                  placeholder={text.formDescriptionPlaceholder}
+                  placeholderTextColor="#A0938D"
+                  style={[styles.input, styles.textarea]}
+                  multiline
+                  maxLength={220}
+                />
+
+                {user?.id ? (
+                  <>
+                    <Text style={styles.formLabel}>{text.formPhotoLabel}</Text>
+                    <PhotoUploadField
+                      uid={user.id}
+                      userName={user.name || user.email || user.id}
+                      maxPhotos={1}
+                      storagePath="children_top_listings"
+                      onPhotosChange={setFormPhotos}
+                      metadata={{ sourceScreen: 'Vse-Dlya-Detey', sourceScreenLabel: text.addPlaceFormTitle }}
+                    />
+                    <UploadedPhotosGrid />
+                  </>
+                ) : null}
+
+                <TouchableOpacity
+                  style={[styles.submitBtn, (formSubmitting || hasFormUploadingPhotos) && styles.submitBtnDisabled]}
+                  onPress={handleSubmitPlace}
+                  activeOpacity={0.86}
+                  disabled={formSubmitting || hasFormUploadingPhotos}
+                >
+                  {formSubmitting ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.submitBtnText}>{hasFormUploadingPhotos ? text.formPhotoUploading : text.formSubmit}</Text>
+                  )}
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+      {training.showHint && (
+        <TrainingHint text={TRAINING_HINT[language]} onDismiss={training.closeHint} />
+      )}
     </SafeAreaView>
   );
 }
@@ -933,9 +1228,12 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   sectionTitle: {
+    flex: 1,
+    flexShrink: 1,
     fontSize: 18,
     fontWeight: '900',
     color: SCREEN_THEME.textPrimary,
+    marginRight: 8,
   },
   resultCount: {
     minWidth: 30,
@@ -982,10 +1280,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   categoryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: TILE_GAP,
     marginBottom: 6,
   },
   categoryTile: {
+    flex: 1,
+    flexBasis: '47%',
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 18,
@@ -994,7 +1296,7 @@ const styles = StyleSheet.create({
     minHeight: 60,
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.18)',
-    shadowColor: '#5C3A1E',
+    shadowColor: '#6B3A5A',
     shadowOpacity: 0.22,
     shadowRadius: 6,
     shadowOffset: { width: 1, height: 4 },
@@ -1049,11 +1351,16 @@ const styles = StyleSheet.create({
     padding: 14,
     borderWidth: 1,
     borderColor: SCREEN_THEME.borderSoft,
-    shadowColor: '#5C3A1E',
+    shadowColor: '#6B3A5A',
     shadowOpacity: 0.12,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
     elevation: 3,
+  },
+  placeCardClaimed: {
+    borderColor: '#F9C400',
+    borderWidth: 2,
+    backgroundColor: '#FFFDE7',
   },
   placeHeader: {
     flexDirection: 'row',
@@ -1139,6 +1446,22 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     fontSize: 13,
   },
+  routeAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderRadius: 15,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    backgroundColor: SCREEN_THEME.accentCream,
+    borderWidth: 1,
+    borderColor: SCREEN_THEME.borderSoft,
+  },
+  routeActionText: {
+    color: SCREEN_THEME.enamelBlueDark,
+    fontWeight: '800',
+    fontSize: 13,
+  },
   contactAction: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1181,12 +1504,22 @@ const styles = StyleSheet.create({
     width: 220,
     backgroundColor: '#FFF7E3',
     borderRadius: 18,
-    padding: 14,
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(216, 175, 89, 0.35)',
   },
   offerCardWide: {
     width: '100%',
+  },
+  offerImage: {
+    width: '100%',
+    height: 110,
+  },
+  offerImageWide: {
+    height: 160,
+  },
+  offerCardBody: {
+    padding: 12,
   },
   offerTopRow: {
     flexDirection: 'row',
@@ -1223,12 +1556,68 @@ const styles = StyleSheet.create({
     marginTop: 7,
     fontSize: 12,
     fontWeight: '900',
-    color: SCREEN_THEME.terracottaDark,
+    color: SCREEN_THEME.textSecondary,
   },
   offerPlaceName: {
-    marginTop: 6,
+    marginBottom: 3,
     fontSize: 11,
     fontWeight: '800',
     color: SCREEN_THEME.enamelBlueDark,
   },
+  showMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderRadius: 18,
+    paddingVertical: 13,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: SCREEN_THEME.borderSoft,
+  },
+  showMoreText: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#21041B',
+  },
+  addPlaceButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2E7D5B',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    gap: 6,
+  },
+  addPlaceBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  // --- Add-place form sheet styles ---
+  sheetOverlay: { flex: 1, justifyContent: 'flex-end' },
+  sheetBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
+  sheetWrapper: { justifyContent: 'flex-end' },
+  sheet: {
+    maxHeight: '88%',
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    paddingTop: 10,
+    borderWidth: 1,
+    borderColor: SCREEN_THEME.borderSoft,
+  },
+  sheetScroll: { flexGrow: 0 },
+  sheetHandle: { width: 42, height: 5, borderRadius: 999, backgroundColor: '#D9C69E', alignSelf: 'center', marginBottom: 10 },
+  sheetHeader: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, paddingHorizontal: 16, paddingBottom: 8 },
+  sheetTitle: { fontSize: 17, fontWeight: '900' as const, color: SCREEN_THEME.textPrimary },
+  sheetCloseBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center' as const, justifyContent: 'center' as const, backgroundColor: SCREEN_THEME.accentCream },
+  sheetContent: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 28 },
+  formLabel: { fontWeight: '800' as const, color: SCREEN_THEME.textPrimary, marginBottom: 8, marginTop: 8 },
+  input: { backgroundColor: '#F7F3EE', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, color: SCREEN_THEME.textPrimary, borderWidth: 1, borderColor: '#E8DDD3', fontWeight: '700' as const },
+  textarea: { minHeight: 86, textAlignVertical: 'top' as const },
+  submitBtn: { backgroundColor: '#E07B39', borderRadius: 16, paddingVertical: 14, alignItems: 'center' as const, marginTop: 14 },
+  submitBtnDisabled: { opacity: 0.65 },
+  submitBtnText: { color: '#FFFFFF', fontWeight: '900' as const },
 });

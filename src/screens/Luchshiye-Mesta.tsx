@@ -16,9 +16,11 @@ import { useSelector } from 'react-redux';
 import { Place as AppPlace, PlaceType } from '../types/app';
 import { RootState } from '../redux/store';
 import { COLORS } from '../utils/constants';
+import { useAppTheme } from '../hooks/useAppTheme';
 import MiniTabBar from '../components/MiniTabBar';
 import { usePlaces } from '../hooks/usePlaces';
 import { selectPlacesLoading } from '../redux/slices/placesSlice';
+import { VideoLoadingOverlay } from '../components/VideoLoadingOverlay';
 
 type AppNavigation = import('@react-navigation/native').NavigationProp<Record<string, object | undefined>>;
 type TabType = 'cafe' | 'store' | 'people';
@@ -54,6 +56,7 @@ const TopPlacesScreen: React.FC = () => {
   const loading = useSelector((state: RootState) => selectPlacesLoading(state));
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const text = UI_TEXT[language];
+  const { colors } = useAppTheme();
   const [selectedType, setSelectedType] = useState<TabType>('cafe');
   const [refreshing, setRefreshing] = useState(false);
 
@@ -138,7 +141,7 @@ const TopPlacesScreen: React.FC = () => {
   ), [navigation]);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <MaterialCommunityIcons name="chevron-left" size={28} color="#FFFFFF" />
@@ -227,6 +230,7 @@ const TopPlacesScreen: React.FC = () => {
         }
       />
       <MiniTabBar />
+      <VideoLoadingOverlay visible={loading} />
     </SafeAreaView>
   );
 };

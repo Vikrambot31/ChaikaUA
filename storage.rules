@@ -15,7 +15,7 @@ service firebase.storage {
     }
 
     function isAdmin() {
-      return registered() && request.auth.token.admin == true;
+      return registered() && (request.auth.token.admin == true || request.auth.token.moderator == true);
     }
 
     // ── Группа E: Storage (Этап 1, шаги 1.3 Дни 9-10) ──────────────────────
@@ -56,11 +56,65 @@ service firebase.storage {
       allow write: if isOwner(uid) || isAdmin();
     }
 
-    // Остальные пути (lost_found, buy_sell, contacts, local_business и др.)
-    // Читает любой auth. Пишет любой auth — модерация на уровне CF и RTDB rules.
+    // job_listings/{uid}/... — фото до резюме та вакансій
+    match /job_listings/{uid}/{allPaths=**} {
+      allow get, list: if signedIn();
+      allow write: if isOwner(uid) || isAdmin();
+    }
+
+    // buy_sell_listings/{uid}/... — фото оголошень купити/продати
+    match /buy_sell_listings/{uid}/{allPaths=**} {
+      allow get, list: if signedIn();
+      allow write: if isOwner(uid) || isAdmin();
+    }
+
+    // lost_found/{uid}/... — фото оголошень "хто загубив"
+    match /lost_found/{uid}/{allPaths=**} {
+      allow get, list: if signedIn();
+      allow write: if isOwner(uid) || isAdmin();
+    }
+
+    // biznes_chaika_listings/{uid}/... — фото оголошень Бізнес Чайка
+    match /biznes_chaika_listings/{uid}/{allPaths=**} {
+      allow get, list: if signedIn();
+      allow write: if isOwner(uid) || isAdmin();
+    }
+
+    // contacts_listings/{uid}/... — фото анкет знайомств
+    match /contacts_listings/{uid}/{allPaths=**} {
+      allow get, list: if signedIn();
+      allow write: if isOwner(uid) || isAdmin();
+    }
+
+    // food_top_listings/{uid}/... — фото оголошень Їжа на Чайці
+    match /food_top_listings/{uid}/{allPaths=**} {
+      allow get, list: if signedIn();
+      allow write: if isOwner(uid) || isAdmin();
+    }
+
+    // beauty_top_listings/{uid}/... — фото оголошень Салони Краси
+    match /beauty_top_listings/{uid}/{allPaths=**} {
+      allow get, list: if signedIn();
+      allow write: if isOwner(uid) || isAdmin();
+    }
+
+    // children_top_listings/{uid}/... — фото оголошень Все для дітей
+    match /children_top_listings/{uid}/{allPaths=**} {
+      allow get, list: if signedIn();
+      allow write: if isOwner(uid) || isAdmin();
+    }
+
+    // thumbnails/{namespace}/{uid}/... — мініатюри для всіх оголошень
+    match /thumbnails/{namespace}/{uid}/{allPaths=**} {
+      allow get, list: if signedIn();
+      allow write: if isOwner(uid) || isAdmin();
+    }
+
+    // Остальные пути — только чтение. Запись в неспецифичные пути запрещена;
+    // все uploads должны идти через явно описанные match-блоки выше.
     match /{allPaths=**} {
       allow get, list: if signedIn();
-      allow write: if registered();
+      allow write: if false;
     }
   }
 }

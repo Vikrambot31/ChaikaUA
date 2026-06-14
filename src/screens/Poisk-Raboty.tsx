@@ -25,6 +25,8 @@ import { checkYellowList } from '../utils/yellowListCheck';
 import UserCardActionBar from '../components/UserCardActionBar';
 import GuestRegisterBanner from '../components/GuestRegisterBanner';
 import { useGuestGuard } from '../hooks/useGuestGuard';
+import { VideoLoadingOverlay } from '../components/VideoLoadingOverlay';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 const TWO_MONTHS_MS = 60 * 24 * 60 * 60 * 1000;
 type AppLanguage = 'ua' | 'ru' | 'en';
@@ -166,6 +168,7 @@ const UI_TEXT = {
     viewProfile: 'Переглянути профіль',
     contactUser: "Зв'язатися",
     authRequired: 'Увійдіть в акаунт, щоб опублікувати оголошення.',
+    showMore: 'Більше',
     ready: 'Готово',
     nameHint: "Вкажіть ім'я або контактну особу.",
     nameEmpty: "Напишіть ім'я.",
@@ -272,6 +275,7 @@ const UI_TEXT = {
     viewProfile: 'Просмотреть профиль',
     contactUser: 'Связаться',
     authRequired: 'Войдите в аккаунт, чтобы опубликовать объявление.',
+    showMore: 'Больше',
     ready: 'Готово',
     nameHint: 'Укажите имя или контактное лицо.',
     nameEmpty: 'Напишите имя.',
@@ -378,6 +382,7 @@ const UI_TEXT = {
     viewProfile: 'View profile',
     contactUser: 'Contact',
     authRequired: 'Sign in to publish a listing.',
+    showMore: 'More',
     ready: 'Ready',
     nameHint: 'Enter your name or contact person.',
     nameEmpty: 'Enter a name.',
@@ -421,6 +426,7 @@ const JobSearchScreen: React.FC = () => {
   const user = useSelector((state: RootState) => state.auth.user);
   const { guard: guestGuard, bannerVisible: guestBannerVisible, hideBanner: hideGuestBanner } = useGuestGuard();
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
+  const { colors } = useAppTheme();
   const text = UI_TEXT[language];
   const requiredPhotoLabel = getRequiredPhotoLabel(language);
   const [listingKind, setListingKind] = useState<JobListingKind>('resume');
@@ -447,6 +453,7 @@ const JobSearchScreen: React.FC = () => {
   const [searchWorkType, setSearchWorkType] = useState('');
   const [searchAbout, setSearchAbout] = useState('');
   const [actionModal, setActionModal] = useState<{ visible: boolean; userId: string; userName: string }>({ visible: false, userId: '', userName: '' });
+  const [showAllListings, setShowAllListings] = useState(false);
   const blinkAnim = useRef(new Animated.Value(1)).current;
   const avatarByUserId = useUserAvatarMap(listings.map((item) => item.userId));
 
@@ -630,6 +637,10 @@ const JobSearchScreen: React.FC = () => {
     });
   }, [listings, searchAge, searchAbout, searchContact, searchName, searchWorkType, selectedFilter]);
 
+  useEffect(() => {
+    setShowAllListings(false);
+  }, [selectedFilter, searchName, searchContact, searchAge, searchWorkType, searchAbout]);
+
   const resetSearch = () => {
     setSearchName('');
     setSearchContact('');
@@ -773,7 +784,7 @@ const JobSearchScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <Modal visible={searchModalVisible} animationType="slide" transparent onRequestClose={() => setSearchModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalSheet}>
@@ -851,7 +862,7 @@ const JobSearchScreen: React.FC = () => {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
-        data={listings.length > 0 ? filteredListings : []}
+        data={listings.length > 0 ? (showAllListings ? filteredListings : filteredListings.slice(0, 4)) : []}
         keyExtractor={(item) => item.id}
         initialNumToRender={8}
         windowSize={5}
@@ -1077,9 +1088,18 @@ const JobSearchScreen: React.FC = () => {
               contactDisabled={!item.phone && (!item.userId || item.userId === user?.id)}
               likePath="feed_likes/jobs"
               likeId={item.id}
+              shareMessage={[item.name, item.workType, item.about].filter(Boolean).join('\n')}
             />
           </TouchableOpacity>
         )}
+        ListFooterComponent={
+          !showAllListings && filteredListings.length > 4 ? (
+            <TouchableOpacity style={styles.showMoreButton} activeOpacity={0.82} onPress={() => setShowAllListings(true)}>
+              <Text style={styles.showMoreText}>{text.showMore}</Text>
+              <MaterialCommunityIcons name="chevron-down" size={18} color={SCREEN_THEME.textSecondary} />
+            </TouchableOpacity>
+          ) : null
+        }
         ListEmptyComponent={
           !listingsReady ? (
             <View style={styles.emptyState}>
@@ -1129,6 +1149,7 @@ const JobSearchScreen: React.FC = () => {
         onClose={closeContactModal}
       />
       <GuestRegisterBanner visible={guestBannerVisible} onClose={hideGuestBanner} />
+      <VideoLoadingOverlay visible={!listingsReady} />
     </SafeAreaView>
   );
 };
@@ -1281,7 +1302,7 @@ const styles = StyleSheet.create({
   workTypeChipActive: { backgroundColor: '#DDEAF0', borderColor: SCREEN_THEME.enamelBlueDark },
   workTypeText: { color: SCREEN_THEME.textSecondary, fontSize: 12, fontWeight: '800' },
   workTypeTextActive: { color: SCREEN_THEME.enamelBlueDark },
-  submitBtn: { backgroundColor: SCREEN_THEME.terracotta, borderRadius: 16, paddingVertical: 14, paddingHorizontal: 16, alignItems: 'center', marginTop: 14, flexDirection: 'row', justifyContent: 'center', gap: 8 },
+  submitBtn: { backgroundColor: '#7d0e59', borderRadius: 16, paddingVertical: 14, paddingHorizontal: 16, alignItems: 'center', marginTop: 14, flexDirection: 'row', justifyContent: 'center', gap: 8 },
   submitBtnText: { color: '#FFFFFF', fontWeight: '800' },
   inputError: { borderColor: '#B84A3A', backgroundColor: '#FFF7F5' },
   inputValid: { borderColor: '#2F7D50', backgroundColor: '#FBFFFC' },
@@ -1337,7 +1358,9 @@ const styles = StyleSheet.create({
   kindBadgeVacancy: { backgroundColor: SCREEN_THEME.terracotta },
   badge: { color: SCREEN_THEME.enamelBlueDark, backgroundColor: '#E8F0F3', borderRadius: 999, paddingHorizontal: 9, paddingVertical: 5, fontSize: 11, fontWeight: '900' },
   moderationBadge: { color: '#8A5A00', backgroundColor: '#FFF2C7', borderRadius: 999, paddingHorizontal: 9, paddingVertical: 5, fontSize: 11, fontWeight: '900' },
-  listingAbout: { color: '#fff', backgroundColor: '#7A1E5C', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 7, lineHeight: 18, marginBottom: 8, fontWeight: '800', overflow: 'hidden' },
+  listingAbout: { color: SCREEN_THEME.textPrimary, backgroundColor: 'rgba(141, 122, 184, 0.20)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 7, lineHeight: 18, marginBottom: 8, fontWeight: '800', overflow: 'hidden' },
+  showMoreButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 18, paddingVertical: 13, marginBottom: 10, borderWidth: 1, borderColor: '#E4D0AB' },
+  showMoreText: { fontSize: 15, fontWeight: '900', color: '#21041B' },
   emptyState: { alignItems: 'center', paddingVertical: 32 },
   emptyTitle: { fontSize: 18, fontWeight: '800', color: SCREEN_THEME.textPrimary, marginTop: 14 },
   emptySub: { color: SCREEN_THEME.textSecondary, marginTop: 6, textAlign: 'center' },

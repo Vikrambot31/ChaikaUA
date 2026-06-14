@@ -4,11 +4,14 @@ import { createRequest, deleteRequestById, getRequests } from '../../services/ap
 import { Request, RequestFormData, RequestsState } from '../../types/app';
 import { safeLogError } from '../../utils/errorLogger';
 
+const REQUESTS_CACHE_TTL_MS = 30 * 1000; // 30 seconds
+
 const initialState: RequestsState = {
   items: [],
   loading: false,
   error: null,
   approved: [],
+  lastFetchedAt: null,
 };
 
 const sortNewestFirst = (items: Request[]) =>
@@ -45,7 +48,7 @@ export const submitRequest = createAsyncThunk<Request, RequestFormData, { reject
   }
 );
 
-export const fetchRequests = createAsyncThunk<Request[], void, { rejectValue: string }>(
+export const fetchRequests = createAsyncThunk<Request[], { force?: boolean } | undefined, { state: RootState; rejectValue: string }>(
   'requests/fetchRequests',
   async (_, { rejectWithValue }) => {
     try {
@@ -59,6 +62,14 @@ export const fetchRequests = createAsyncThunk<Request[], void, { rejectValue: st
       safeLogError('requestsSlice.fetchRequests', error);
       return rejectWithValue('Не удалось загрузить заявки. Проверьте интернет и попробуйте ещё раз.');
     }
+  },
+  {
+    condition: (arg, { getState }) => {
+      if (arg?.force) return true;
+      const { requests } = getState();
+      if (!requests.lastFetchedAt || requests.items.length === 0) return true;
+      return Date.now() - requests.lastFetchedAt > REQUESTS_CACHE_TTL_MS;
+    },
   }
 );
 
@@ -87,6 +98,7 @@ const requestsSlice = createSlice({
       state.items = sortNewestFirst(action.payload);
       state.loading = false;
       state.error = null;
+      state.lastFetchedAt = Date.now();
     },
     setApproved: (state, action: PayloadAction<Request[]>) => {
       state.approved = action.payload;
@@ -115,9 +127,13 @@ const requestsSlice = createSlice({
       state.items[index] = action.payload;
 
       const approvedIndex = state.approved.findIndex((r) => r.id === action.payload.id);
-      if (approvedIndex !== -1 && action.payload.isApproved) {
-        state.approved[approvedIndex] = action.payload;
-      } else if (approvedIndex !== -1 && !action.payload.isApproved) {
+      if (action.payload.isApproved) {
+        if (approvedIndex !== -1) {
+          state.approved[approvedIndex] = action.payload;
+        } else {
+          state.approved.push(action.payload);
+        }
+      } else if (approvedIndex !== -1) {
         state.approved.splice(approvedIndex, 1);
       }
     },
@@ -165,6 +181,7 @@ const requestsSlice = createSlice({
         state.approved = action.payload.filter((request) => request.isApproved);
         state.loading = false;
         state.error = null;
+        state.lastFetchedAt = Date.now();
       })
       .addCase(fetchRequests.rejected, (state, action) => {
         state.loading = false;

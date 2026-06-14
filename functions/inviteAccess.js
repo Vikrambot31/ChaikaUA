@@ -518,6 +518,7 @@ const awardInviteBonus = async (db, sponsorUid, invitedUid, invitedName, now) =>
     const newTotal = newInvitePoints + Number(likes.points || 0) + Number(help.points || 0);
     const newHistory = [...history, { uid: invitedUid, name: String(invitedName || '').slice(0, 60), points: BONUS_INVITE_POINTS, at: now }];
     return {
+      ...data,
       total: Math.min(newTotal, BONUS_TOTAL_CAP),
       invites: { count: newInviteCount, points: newInvitePoints },
       likes: likes,

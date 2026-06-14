@@ -145,11 +145,12 @@ export const SecurityPage = ({ user }: SecurityPageProps) => {
 
   const saveMinimumVersion = () => {
     const value = minimumVersion.trim();
-    if (!value) {
-      setMessage('Укажите версию в формате X.Y.Z перед сохранением.');
+    const versionRegex = /^\d+\.\d+\.\d+$/;
+    if (value && !versionRegex.test(value)) {
+      setMessage('Неверный формат версии. Используйте формат X.Y.Z (например 1.2.3).');
       return;
     }
-    void patchConfig({ minimum_required_version: value }, 'minimum_version');
+    void patchConfig({ minimum_required_version: value || undefined }, 'minimum_version');
   };
 
   const blockUserDevice = (item: UserLastSeenRow) => {

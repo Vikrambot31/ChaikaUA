@@ -1,5 +1,12 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -8,20 +15,38 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+
+const OFFER_PLACEHOLDER = require('../../assets/_zaglushka-lenta.webp');
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
+import { ref, get } from 'firebase/database';
+import { database } from '../firebase-core';
 import { chaykaPlaces } from '../services/chaykaPlacesData';
 import { beautyInfoSeed, getActiveBeautyOffers } from '../services/beautySeed';
 import { BeautyCategory, BeautyFeature, BeautyOffer, Place } from '../types/app';
 import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
-import { subscribeActiveBonusPromotions, type BonusPromotion } from '../services/bonusService';
+import { useAppTheme } from '../hooks/useAppTheme';
+import { subscribeActiveBonusPromotions, subscribeBiznesPlusPlaces, type BonusPromotion } from '../services/bonusService';
+import UserCardActionBar from '../components/UserCardActionBar';
+import { toggleFavorite, getFavorites, type FavoriteSource } from '../services/favoritesService';
+import { useSoftToast } from '../hooks/useSoftToast';
+import PhotoUploadField, { type UploadedPhoto } from '../components/PhotoUploadField';
+import UploadedPhotosGrid from '../components/UploadedPhotosGrid';
+import { getDonePhotos, validateSubmissionRequirements } from '../utils/submissionRequirements';
+import { getLanguageValidationError } from '../utils/contentLanguageGuard';
+import { showUserError } from '../utils/userFacingErrors';
+import { beautyTopService } from '../services/beautyTopService';
+import { useTrainingMode } from '../hooks/useTrainingMode';
+import TrainingHint from '../components/TrainingHint';
+import HintBadge, { HINT_BADGE_LABELS } from '../components/HintBadge';
 
 type Lang = 'ua' | 'ru' | 'en';
 type AppNavigation = NavigationProp<Record<string, object | undefined>>;
 
 const TILE_GAP = 10;
+const FAVORITE_SOURCE: FavoriteSource = 'beauty';
 type CategoryKey = 'all' | BeautyCategory;
 type ScreenText = (typeof UI_TEXT)[Lang];
 
@@ -38,17 +63,40 @@ const UI_TEXT = {
     actualTitle: 'Актуальні пропозиції',
     actualEmptyTitle: 'Тут зʼявляться акції та знижки',
     actualEmptyText: 'Салони зможуть показувати свої акції, нових майстрів та вільні вікна для мешканців району.',
+    addOffer: 'Додати акцію',
+    addPlace: 'Додати місце',
+    showMore: 'Більше',
+    businessOwner: 'Ви власник салону?',
     categoriesTitle: 'Категорії',
     allPlacesTitle: 'Всі салони',
     noResults: 'Нічого не знайдено. Спробуйте змінити пошук або категорію.',
     noOffers: 'Поки що немає активних пропозицій.',
-    details: 'Детальніше',
+    details: 'Обрати послугу',
+    route: 'Маршрут',
+    share: 'Поділитись',
     validUntil: 'до',
     free: 'безкоштовно',
     priceFrom: 'від',
     currency: 'грн',
     priceUnknown: 'ціну уточнюйте',
     hasSlots: 'є вільні вікна',
+    favoriteAdded: 'Додано в обране',
+    favoriteRemoved: 'Видалено з обраного',
+    addPlaceFormTitle: 'Додати салон / майстра',
+    formNameLabel: 'Назва',
+    formNamePlaceholder: 'Назва салону або імʼя майстра',
+    formDescriptionLabel: 'Опис',
+    formDescriptionPlaceholder: 'Коротко опишіть послуги, графік, контакти',
+    formPhotoLabel: 'Фото',
+    formSubmit: 'Надіслати на модерацію',
+    formSuccessTitle: 'Готово',
+    formSuccessMsg: 'Заявку надіслано на модерацію. Після перевірки місце зʼявиться у списку.',
+    formFillError: 'Додайте назву, опис і фото.',
+    formPhotoUploading: 'Дочекайтесь завершення завантаження фото.',
+    formPhotoError: 'Фото не завантажилось. Видаліть його або спробуйте ще раз.',
+    formPhotoRequired: 'Додайте фото.',
+    errorTitle: 'Помилка',
+    ok: 'OK',
     categories: {
       all: 'Всі',
       hair: 'Перукарні',
@@ -96,17 +144,40 @@ const UI_TEXT = {
     actualTitle: 'Актуальные предложения',
     actualEmptyTitle: 'Здесь появятся акции и скидки',
     actualEmptyText: 'Салоны смогут показывать свои акции, новых мастеров и свободные окна для жителей района.',
+    addOffer: 'Добавить акцию',
+    addPlace: 'Добавить место',
+    showMore: 'Больше',
+    businessOwner: 'Вы владелец салона?',
     categoriesTitle: 'Категории',
     allPlacesTitle: 'Все салоны',
     noResults: 'Ничего не найдено. Попробуйте изменить поиск или категорию.',
     noOffers: 'Пока нет активных предложений.',
-    details: 'Подробнее',
+    details: 'Выбрать услугу',
+    route: 'Маршрут',
+    share: 'Поделиться',
     validUntil: 'до',
     free: 'бесплатно',
     priceFrom: 'от',
     currency: 'грн',
     priceUnknown: 'цену уточняйте',
     hasSlots: 'есть свободные окна',
+    favoriteAdded: 'Добавлено в избранное',
+    favoriteRemoved: 'Удалено из избранного',
+    addPlaceFormTitle: 'Добавить салон / мастера',
+    formNameLabel: 'Название',
+    formNamePlaceholder: 'Название салона или имя мастера',
+    formDescriptionLabel: 'Описание',
+    formDescriptionPlaceholder: 'Кратко опишите услуги, график, контакты',
+    formPhotoLabel: 'Фото',
+    formSubmit: 'Отправить на модерацию',
+    formSuccessTitle: 'Готово',
+    formSuccessMsg: 'Заявка отправлена на модерацию. После проверки место появится в списке.',
+    formFillError: 'Добавьте название, описание и фото.',
+    formPhotoUploading: 'Дождитесь завершения загрузки фото.',
+    formPhotoError: 'Фото не загрузилось. Удалите его или попробуйте ещё раз.',
+    formPhotoRequired: 'Добавьте фото.',
+    errorTitle: 'Ошибка',
+    ok: 'OK',
     categories: {
       all: 'Все',
       hair: 'Парикмахерские',
@@ -154,17 +225,40 @@ const UI_TEXT = {
     actualTitle: 'Current offers',
     actualEmptyTitle: 'Deals and discounts will appear here',
     actualEmptyText: 'Salons will be able to show their promotions, new masters and available slots for local residents.',
+    addOffer: 'Add promotion',
+    addPlace: 'Add place',
+    showMore: 'More',
+    businessOwner: 'Salon owner?',
     categoriesTitle: 'Categories',
     allPlacesTitle: 'All salons',
     noResults: 'Nothing found. Try changing search or category.',
     noOffers: 'No active offers yet.',
-    details: 'Details',
+    details: 'Choose service',
+    route: 'Route',
+    share: 'Share',
     validUntil: 'until',
     free: 'free',
     priceFrom: 'from',
     currency: 'UAH',
     priceUnknown: 'ask for price',
     hasSlots: 'slots available',
+    favoriteAdded: 'Added to favorites',
+    favoriteRemoved: 'Removed from favorites',
+    addPlaceFormTitle: 'Add salon / master',
+    formNameLabel: 'Name',
+    formNamePlaceholder: 'Salon name or master name',
+    formDescriptionLabel: 'Description',
+    formDescriptionPlaceholder: 'Briefly describe services, schedule, contacts',
+    formPhotoLabel: 'Photo',
+    formSubmit: 'Send to moderation',
+    formSuccessTitle: 'Done',
+    formSuccessMsg: 'The request was sent to moderation. After review the place will appear in the list.',
+    formFillError: 'Add a name, description, and photo.',
+    formPhotoUploading: 'Wait until the photo upload finishes.',
+    formPhotoError: 'The photo did not upload. Remove it or try again.',
+    formPhotoRequired: 'Add a photo.',
+    errorTitle: 'Error',
+    ok: 'OK',
     categories: {
       all: 'All',
       hair: 'Hair salons',
@@ -265,19 +359,81 @@ const getCategoryIcon = (category: BeautyCategory): React.ComponentProps<typeof 
   return map[category];
 };
 
+const TRAINING_HINT: Record<Lang, string> = {
+  ua: 'Обери категорію послуг. Щоб додати свій салон — натисни + внизу списку.',
+  ru: 'Выбери категорию услуг. Чтобы добавить свой салон — нажми + внизу списка.',
+  en: 'Pick a service category. To add your salon — tap + at the bottom of the list.',
+};
+
 export default function SalonyKrasotyScreen() {
   const navigation = useNavigation<AppNavigation>();
+  const { colors, isDark } = useAppTheme();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as Lang;
+  const user = useSelector((state: RootState) => state.auth.user);
+  const currentUserEmail = user?.email;
+  const currentUserId = user?.id;
+  const isAdmin = currentUserEmail === 'vikramsave@ukr.net';
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
+  const training = useTrainingMode('salony_krasoty');
   const [activeCategory, setActiveCategory] = useState<CategoryKey>('all');
+  const [claimPlaceIds, setClaimPlaceIds] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
   const [activePromotions, setActivePromotions] = useState<BonusPromotion[]>([]);
+  const [biznesPlusIds, setBiznesPlusIds] = useState<string[]>([]);
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const scrollRef = useRef<ScrollView>(null);
   const resultsAnchorY = useRef(0);
+  const { showSuccess } = useSoftToast();
+  const [showAllPlaces, setShowAllPlaces] = useState(false);
+
+  // --- Add-place form state ---
+  const [addFormVisible, setAddFormVisible] = useState(false);
+  const [formTitle, setFormTitle] = useState('');
+  const [formDescription, setFormDescription] = useState('');
+  const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
+  const [formSubmitting, setFormSubmitting] = useState(false);
+  const hasFormUploadingPhotos = formPhotos.some((p) => p.status === 'uploading');
+  const hasFormPhotoErrors = formPhotos.some((p) => p.status === 'error');
 
   useEffect(() => {
     return subscribeActiveBonusPromotions('beauty', setActivePromotions);
   }, []);
+
+  useEffect(() => {
+    return subscribeBiznesPlusPlaces('beauty', setBiznesPlusIds);
+  }, []);
+
+  useEffect(() => {
+    void getFavorites(FAVORITE_SOURCE).then((items) => {
+      setFavoriteIds(new Set(items.map((item) => item.id)));
+    });
+  }, []);
+
+  const handleToggleFavorite = async (placeId: string) => {
+    const added = await toggleFavorite(placeId, FAVORITE_SOURCE);
+    setFavoriteIds((prev) => {
+      const next = new Set(prev);
+      if (added) next.add(placeId);
+      else next.delete(placeId);
+      return next;
+    });
+    showSuccess(added ? text.favoriteAdded : text.favoriteRemoved);
+  };
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    void (async () => {
+      try {
+        const snap = await get(ref(database, 'business_plus_claims'));
+        if (!snap.exists()) return;
+        const ids = new Set<string>();
+        snap.forEach((child) => {
+          if (child.val()?.status === 'pending') ids.add(child.key!);
+        });
+        setClaimPlaceIds(ids);
+      } catch { /* ignore */ }
+    })();
+  }, [isAdmin]);
 
   const beautyPlaces = useMemo(() => (
     chaykaPlaces
@@ -315,6 +471,13 @@ export default function SalonyKrasotyScreen() {
         return `${place.name} ${place.address}`.toLowerCase().includes(normalizedQuery);
       })
       .sort((a, b) => {
+        const aPlus = biznesPlusIds.indexOf(a.place.id);
+        const bPlus = biznesPlusIds.indexOf(b.place.id);
+        if (aPlus !== -1 || bPlus !== -1) {
+          if (aPlus === -1) return 1;
+          if (bPlus === -1) return -1;
+          return aPlus - bPlus;
+        }
         const aPromoted = promotedSalonIds.get(a.place.id);
         const bPromoted = promotedSalonIds.get(b.place.id);
         if (aPromoted !== undefined || bPromoted !== undefined) {
@@ -324,7 +487,7 @@ export default function SalonyKrasotyScreen() {
         }
         return 0;
       });
-  }, [activeCategory, activePromotions, beautyPlaces, query]);
+  }, [activeCategory, activePromotions, biznesPlusIds, beautyPlaces, query]);
 
   const activeOffers = useMemo(() => {
     const promotedOfferIds = new Map(
@@ -352,8 +515,91 @@ export default function SalonyKrasotyScreen() {
     navigation.navigate('DetalPredlozheniyaSalonaScreen', { offer });
   };
 
+  const resetAddForm = useCallback(() => {
+    setFormTitle('');
+    setFormDescription('');
+    setFormPhotos([]);
+  }, []);
+
+  const openBusinessForm = useCallback(() => {
+    if (!validateSubmissionRequirements({ language, userId: user?.id, navigation })) return;
+    setAddFormVisible(true);
+  }, [language, navigation, user?.id]);
+
+  const handleSubmitPlace = useCallback(async () => {
+    if (!validateSubmissionRequirements({ language, userId: user?.id, navigation })) return;
+    const trimmedTitle = formTitle.trim();
+    const trimmedDescription = formDescription.trim();
+    if (!trimmedTitle || !trimmedDescription) {
+      Alert.alert(text.errorTitle, text.formFillError);
+      return;
+    }
+    const langError = getLanguageValidationError(`${trimmedTitle} ${trimmedDescription}`, language);
+    if (langError) {
+      Alert.alert(text.errorTitle, langError);
+      return;
+    }
+    if (hasFormUploadingPhotos) {
+      Alert.alert(text.errorTitle, text.formPhotoUploading);
+      return;
+    }
+    if (hasFormPhotoErrors) {
+      Alert.alert(text.errorTitle, text.formPhotoError);
+      return;
+    }
+    const donePhotos = getDonePhotos(formPhotos);
+    if (donePhotos.length === 0) {
+      Alert.alert(text.errorTitle, text.formPhotoRequired);
+      return;
+    }
+
+    setFormSubmitting(true);
+    try {
+      const firstPhoto = donePhotos[0];
+      const createdAt = new Date().toISOString();
+      await beautyTopService.add({
+        title: trimmedTitle,
+        description: trimmedDescription,
+        photoUri: firstPhoto.downloadUrl,
+        photoStoragePath: firstPhoto.storagePath,
+        photoId: firstPhoto.photoId,
+        moderationStatus: 'pending',
+        submittedForModerationAt: createdAt,
+        createdAt,
+        userId: user?.id || '',
+        language,
+      });
+      Alert.alert(text.formSuccessTitle, text.formSuccessMsg, [
+        { text: text.ok, onPress: () => { resetAddForm(); setAddFormVisible(false); } },
+      ]);
+    } catch (error) {
+      showUserError(language, 'send', error);
+    } finally {
+      setFormSubmitting(false);
+    }
+  }, [
+    hasFormPhotoErrors,
+    hasFormUploadingPhotos,
+    language,
+    navigation,
+    resetAddForm,
+    text.errorTitle,
+    text.ok,
+    text.formFillError,
+    text.formPhotoError,
+    text.formPhotoRequired,
+    text.formPhotoUploading,
+    text.formSuccessMsg,
+    text.formSuccessTitle,
+    formDescription,
+    formPhotos,
+    formTitle,
+    user?.id,
+  ]);
+
   const handleCategoryPress = (category: CategoryKey) => {
     setActiveCategory(category);
+    setShowAllPlaces(false);
     setTimeout(() => {
       scrollRef.current?.scrollTo({
         y: Math.max(resultsAnchorY.current - 10, 0),
@@ -372,21 +618,29 @@ export default function SalonyKrasotyScreen() {
         activeOpacity={0.88}
         onPress={() => openOffer(offer)}
       >
-        <View style={styles.offerBadge}>
-          <Text style={styles.offerBadgeText}>{text.offerTypes[offer.type]}</Text>
+        <Image
+          source={OFFER_PLACEHOLDER}
+          style={[styles.offerImage, wide && styles.offerImageWide]}
+          resizeMode="cover"
+        />
+        <View style={styles.offerCardBody}>
+          <View style={styles.offerBadge}>
+            <Text style={styles.offerBadgeText}>{text.offerTypes[offer.type]}</Text>
+          </View>
+          {offerPlace ? <Text style={styles.offerPlaceName} numberOfLines={1}>{offerPlace.name}</Text> : null}
+          <Text style={styles.offerTitle} numberOfLines={2}>{offer.title}</Text>
+          <Text style={styles.offerShortText} numberOfLines={wide ? 3 : 2}>{offer.shortText}</Text>
+          {offerMeta ? <Text style={styles.offerMeta} numberOfLines={1}>{offerMeta}</Text> : null}
         </View>
-        <Text style={styles.offerTitle} numberOfLines={2}>{offer.title}</Text>
-        <Text style={styles.offerShortText} numberOfLines={wide ? 3 : 2}>{offer.shortText}</Text>
-        {offerMeta ? <Text style={styles.offerMeta} numberOfLines={1}>{offerMeta}</Text> : null}
-        {offerPlace ? <Text style={styles.offerPlaceName} numberOfLines={1}>{offerPlace.name}</Text> : null}
       </TouchableOpacity>
     );
   };
 
   const renderPlaceCard = ({ place, category }: { place: Place; category: BeautyCategory }) => {
     const featureBadges = getFeatureBadges(place, text);
+    const hasClaim = isAdmin && claimPlaceIds.has(place.id);
     return (
-      <TouchableOpacity key={place.id} style={styles.placeCard} activeOpacity={0.88} onPress={() => openPlace(place)}>
+      <TouchableOpacity key={place.id} style={[styles.placeCard, hasClaim && styles.placeCardClaimed]} activeOpacity={0.88} onPress={() => openPlace(place)}>
         <View style={styles.placeHeader}>
           <View style={styles.placeIconWrap}>
             <MaterialCommunityIcons
@@ -399,11 +653,6 @@ export default function SalonyKrasotyScreen() {
             <Text style={styles.placeTitle} numberOfLines={2}>{place.name}</Text>
             <Text style={styles.placeMeta} numberOfLines={1}>{text.categoryLabel[category]} · {getPriceLabel(place, text)}</Text>
           </View>
-        </View>
-
-        <View style={styles.addressRow}>
-          <MaterialCommunityIcons name="map-marker-outline" size={16} color={SCREEN_THEME.textMuted} />
-          <Text style={styles.addressText} numberOfLines={1}>{place.address}</Text>
         </View>
 
         {featureBadges.length > 0 ? (
@@ -421,12 +670,25 @@ export default function SalonyKrasotyScreen() {
             <Text style={styles.primaryActionText}>{text.details}</Text>
           </TouchableOpacity>
         </View>
+        <UserCardActionBar
+          showAvatar={false}
+          showProfile={false}
+          showContact={false}
+          showLikeAvatars
+          likePath="feed_likes/salony"
+          likeId={place.id}
+          currentUserId={currentUserId ?? undefined}
+          language={language}
+          shareMessage={`${place.name}\n\nЧайка — Салони краси`}
+          isFav={favoriteIds.has(place.id)}
+          onToggleFavorite={() => { void handleToggleFavorite(place.id); }}
+        />
       </TouchableOpacity>
     );
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScrollView ref={scrollRef} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} activeOpacity={0.8}>
@@ -435,6 +697,14 @@ export default function SalonyKrasotyScreen() {
           <View style={styles.heroTextBlock}>
             <Text style={styles.title}>{text.title}</Text>
             <Text style={styles.subtitle}>{text.subtitle}</Text>
+          </View>
+          <View style={{ position: 'absolute', top: 12, right: 12, zIndex: 10 }}>
+            <HintBadge
+              visible={training.isVisible}
+              onTap={training.openHint}
+              onDismiss={training.dismiss}
+              label={HINT_BADGE_LABELS[language]}
+            />
           </View>
         </View>
 
@@ -450,26 +720,21 @@ export default function SalonyKrasotyScreen() {
         </View>
 
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>{text.actualTitle}</Text>
+          <Text style={[styles.sectionTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{text.actualTitle}</Text>
         </View>
         {activeOffers.length > 0 ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.offersRow}>
             {activeOffers.map((offer) => renderOfferCard(offer))}
           </ScrollView>
         ) : (
-          <View style={styles.actualCard}>
-            <View style={styles.actualIcon}>
-              <MaterialCommunityIcons name="content-cut" size={24} color="#FFFFFF" />
-            </View>
-            <View style={styles.actualTextBlock}>
-              <Text style={styles.actualTitle}>{text.actualEmptyTitle}</Text>
-              <Text style={styles.actualText}>{text.actualEmptyText}</Text>
-            </View>
-          </View>
+          <TouchableOpacity style={styles.addPlaceButton} activeOpacity={0.88} onPress={openBusinessForm}>
+            <MaterialCommunityIcons name="store-plus" size={16} color="#FFFFFF" />
+            <Text style={styles.addPlaceBtnText}>{text.addPlace}</Text>
+          </TouchableOpacity>
         )}
 
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>{text.categoriesTitle}</Text>
+          <Text style={[styles.sectionTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{text.categoriesTitle}</Text>
         </View>
         <View style={styles.categoryGrid}>
           {CATEGORIES.map((category) => {
@@ -511,22 +776,118 @@ export default function SalonyKrasotyScreen() {
           }}
         >
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>{text.allPlacesTitle}</Text>
-            <Text style={styles.resultCount}>{filteredPlaces.length}</Text>
+            <Text style={[styles.sectionTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{text.allPlacesTitle}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+              <Text style={styles.resultCount}>{filteredPlaces.length}</Text>
+              <TouchableOpacity style={styles.addPlaceButton} activeOpacity={0.88} onPress={openBusinessForm}>
+                <MaterialCommunityIcons name="store-plus" size={14} color="#FFFFFF" />
+                <Text style={styles.addPlaceBtnText}>{text.addPlace}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
-          {filteredPlaces.length > 0 ? (
-            <View style={styles.cardList}>
-              {filteredPlaces.map((item) => renderPlaceCard(item))}
-            </View>
-          ) : (
-            <View style={styles.emptyState}>
-              <MaterialCommunityIcons name="magnify-close" size={34} color={SCREEN_THEME.textMuted} />
-              <Text style={styles.emptyText}>{text.noResults}</Text>
-            </View>
-          )}
+          <>
+            <FlatList
+              scrollEnabled={false}
+              data={showAllPlaces ? filteredPlaces : filteredPlaces.slice(0, 4)}
+              keyExtractor={(item) => item.place.id}
+              renderItem={({ item }) => renderPlaceCard(item)}
+              contentContainerStyle={filteredPlaces.length > 0 ? styles.cardList : undefined}
+              ListEmptyComponent={
+                <View style={styles.emptyState}>
+                  <MaterialCommunityIcons name="magnify-close" size={34} color={SCREEN_THEME.textMuted} />
+                  <Text style={styles.emptyText}>{text.noResults}</Text>
+                </View>
+              }
+            />
+            {!showAllPlaces && filteredPlaces.length > 4 ? (
+              <TouchableOpacity
+                style={styles.showMoreButton}
+                activeOpacity={0.82}
+                onPress={() => setShowAllPlaces(true)}
+              >
+                <Text style={styles.showMoreText}>{text.showMore}</Text>
+                <MaterialCommunityIcons name="chevron-down" size={18} color={SCREEN_THEME.textSecondary} />
+              </TouchableOpacity>
+            ) : null}
+          </>
         </View>
       </ScrollView>
+
+      <Modal visible={addFormVisible} transparent animationType="slide" onRequestClose={() => setAddFormVisible(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.sheetOverlay}>
+          <TouchableOpacity style={styles.sheetBackdrop} activeOpacity={1} onPress={() => setAddFormVisible(false)} />
+          <View style={styles.sheetWrapper}>
+            <View style={styles.sheet}>
+              <View style={styles.sheetHandle} />
+              <View style={styles.sheetHeader}>
+                <Text style={styles.sheetTitle}>{text.addPlaceFormTitle}</Text>
+                <TouchableOpacity onPress={() => setAddFormVisible(false)} style={styles.sheetCloseBtn} activeOpacity={0.75}>
+                  <MaterialCommunityIcons name="close" size={18} color={SCREEN_THEME.textSecondary} />
+                </TouchableOpacity>
+              </View>
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={styles.sheetContent}
+                style={styles.sheetScroll}
+              >
+                <Text style={styles.formLabel}>{text.formNameLabel}</Text>
+                <TextInput
+                  value={formTitle}
+                  onChangeText={setFormTitle}
+                  placeholder={text.formNamePlaceholder}
+                  placeholderTextColor="#A0938D"
+                  style={styles.input}
+                  maxLength={70}
+                />
+
+                <Text style={styles.formLabel}>{text.formDescriptionLabel}</Text>
+                <TextInput
+                  value={formDescription}
+                  onChangeText={setFormDescription}
+                  placeholder={text.formDescriptionPlaceholder}
+                  placeholderTextColor="#A0938D"
+                  style={[styles.input, styles.textarea]}
+                  multiline
+                  maxLength={220}
+                />
+
+                {user?.id ? (
+                  <>
+                    <Text style={styles.formLabel}>{text.formPhotoLabel}</Text>
+                    <PhotoUploadField
+                      uid={user.id}
+                      userName={user.name || user.email || user.id}
+                      maxPhotos={1}
+                      storagePath="beauty_top_listings"
+                      onPhotosChange={setFormPhotos}
+                      metadata={{ sourceScreen: 'Salony-Krasoty', sourceScreenLabel: text.addPlaceFormTitle }}
+                    />
+                    <UploadedPhotosGrid />
+                  </>
+                ) : null}
+
+                <TouchableOpacity
+                  style={[styles.submitBtn, (formSubmitting || hasFormUploadingPhotos) && styles.submitBtnDisabled]}
+                  onPress={handleSubmitPlace}
+                  activeOpacity={0.86}
+                  disabled={formSubmitting || hasFormUploadingPhotos}
+                >
+                  {formSubmitting ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.submitBtnText}>{hasFormUploadingPhotos ? text.formPhotoUploading : text.formSubmit}</Text>
+                  )}
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+      {training.showHint && (
+        <TrainingHint text={TRAINING_HINT[language]} onDismiss={training.closeHint} />
+      )}
     </SafeAreaView>
   );
 }
@@ -601,9 +962,12 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   sectionTitle: {
+    flex: 1,
+    flexShrink: 1,
     fontSize: 18,
     fontWeight: '900',
     color: SCREEN_THEME.textPrimary,
+    marginRight: 8,
   },
   resultCount: {
     minWidth: 30,
@@ -649,11 +1013,27 @@ const styles = StyleSheet.create({
     color: SCREEN_THEME.textSecondary,
     fontWeight: '600',
   },
+  actualCta: {
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#D4668E',
+    marginLeft: 8,
+  },
+  actualCtaText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
   categoryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: TILE_GAP,
     marginBottom: 6,
   },
   categoryTile: {
+    flex: 1,
+    flexBasis: '47%',
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 18,
@@ -662,7 +1042,7 @@ const styles = StyleSheet.create({
     minHeight: 60,
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.18)',
-    shadowColor: '#5C3A1E',
+    shadowColor: '#6B3A5A',
     shadowOpacity: 0.22,
     shadowRadius: 6,
     shadowOffset: { width: 1, height: 4 },
@@ -717,11 +1097,16 @@ const styles = StyleSheet.create({
     padding: 14,
     borderWidth: 1,
     borderColor: SCREEN_THEME.borderSoft,
-    shadowColor: '#5C3A1E',
+    shadowColor: '#6B3A5A',
     shadowOpacity: 0.12,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
     elevation: 3,
+  },
+  placeCardClaimed: {
+    borderColor: '#F9C400',
+    borderWidth: 2,
+    backgroundColor: '#FFFDE7',
   },
   placeHeader: {
     flexDirection: 'row',
@@ -783,16 +1168,46 @@ const styles = StyleSheet.create({
   cardActions: {
     flexDirection: 'row',
     marginTop: 12,
+    alignItems: 'center',
+    gap: 8,
   },
   primaryAction: {
     borderRadius: 15,
     paddingHorizontal: 14,
     paddingVertical: 9,
     backgroundColor: SCREEN_THEME.enamelBlueDark,
+    flex: 1,
+    alignItems: 'center',
+  },
+  shareAction: {
+    width: 38,
+    height: 38,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: SCREEN_THEME.accentCream,
+    borderWidth: 1,
+    borderColor: SCREEN_THEME.borderSoft,
   },
   primaryActionText: {
     color: '#FFFFFF',
     fontWeight: '900',
+    fontSize: 13,
+  },
+  routeAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderRadius: 15,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    backgroundColor: SCREEN_THEME.accentCream,
+    borderWidth: 1,
+    borderColor: SCREEN_THEME.borderSoft,
+  },
+  routeActionText: {
+    color: SCREEN_THEME.enamelBlueDark,
+    fontWeight: '800',
     fontSize: 13,
   },
   emptyState: {
@@ -819,12 +1234,22 @@ const styles = StyleSheet.create({
     width: 220,
     backgroundColor: '#FFF7E3',
     borderRadius: 18,
-    padding: 14,
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(216, 175, 89, 0.35)',
   },
   offerCardWide: {
     width: '100%',
+  },
+  offerImage: {
+    width: '100%',
+    height: 110,
+  },
+  offerImageWide: {
+    height: 160,
+  },
+  offerCardBody: {
+    padding: 12,
   },
   offerBadge: {
     alignSelf: 'flex-start',
@@ -856,12 +1281,68 @@ const styles = StyleSheet.create({
     marginTop: 7,
     fontSize: 12,
     fontWeight: '900',
-    color: SCREEN_THEME.terracottaDark,
+    color: SCREEN_THEME.textSecondary,
   },
   offerPlaceName: {
-    marginTop: 6,
+    marginBottom: 3,
     fontSize: 11,
     fontWeight: '800',
     color: SCREEN_THEME.enamelBlueDark,
   },
+  showMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderRadius: 18,
+    paddingVertical: 13,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: SCREEN_THEME.borderSoft,
+  },
+  showMoreText: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#21041B',
+  },
+  addPlaceButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2E7D5B',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    gap: 6,
+  },
+  addPlaceBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  // --- Add-place form sheet styles ---
+  sheetOverlay: { flex: 1, justifyContent: 'flex-end' },
+  sheetBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
+  sheetWrapper: { justifyContent: 'flex-end' },
+  sheet: {
+    maxHeight: '88%',
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    paddingTop: 10,
+    borderWidth: 1,
+    borderColor: SCREEN_THEME.borderSoft,
+  },
+  sheetScroll: { flexGrow: 0 },
+  sheetHandle: { width: 42, height: 5, borderRadius: 999, backgroundColor: '#D9C69E', alignSelf: 'center', marginBottom: 10 },
+  sheetHeader: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, paddingHorizontal: 16, paddingBottom: 8 },
+  sheetTitle: { fontSize: 17, fontWeight: '900' as const, color: SCREEN_THEME.textPrimary },
+  sheetCloseBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center' as const, justifyContent: 'center' as const, backgroundColor: SCREEN_THEME.accentCream },
+  sheetContent: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 28 },
+  formLabel: { fontWeight: '800' as const, color: SCREEN_THEME.textPrimary, marginBottom: 8, marginTop: 8 },
+  input: { backgroundColor: '#F7F3EE', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, color: SCREEN_THEME.textPrimary, borderWidth: 1, borderColor: '#E8DDD3', fontWeight: '700' as const },
+  textarea: { minHeight: 86, textAlignVertical: 'top' as const },
+  submitBtn: { backgroundColor: '#E07B39', borderRadius: 16, paddingVertical: 14, alignItems: 'center' as const, marginTop: 14 },
+  submitBtnDisabled: { opacity: 0.65 },
+  submitBtnText: { color: '#FFFFFF', fontWeight: '900' as const },
 });

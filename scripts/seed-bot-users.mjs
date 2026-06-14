@@ -3,7 +3,7 @@
  * Создаёт 10 тестовых бот-аккаунтов в Firebase Auth + RTDB.
  * Каждый бот получает:
  *   - Firebase Auth аккаунт (email/password)
- *   - users/{uid} с registrationStatus:'complete' и startAvatarKey
+ *   - users/{uid} с registrationStatus:'complete', startAvatarKey, age, gender
  *   - invite_access/{uid} со status:'approved'
  *
  * Запуск: node scripts/seed-bot-users.mjs
@@ -33,6 +33,8 @@ const BOTS = [
     email: 'luca.moretti@chaika-bot.test',
     phone: '+380671000001',
     avatarKey: '1',
+    age: 34,
+    gender: 'male',
     apartment: '47',
     profession: 'Координатор доставки та міський логіст',
     about:
@@ -43,6 +45,8 @@ const BOTS = [
     email: 'giulia.romano@chaika-bot.test',
     phone: '+380671000002',
     avatarKey: '2',
+    age: 31,
+    gender: 'female',
     apartment: '12',
     profession: 'Менеджер громадських ініціатив та озеленення',
     about:
@@ -53,6 +57,8 @@ const BOTS = [
     email: 'matteo.bianchi@chaika-bot.test',
     phone: '+380671000003',
     avatarKey: '3',
+    age: 39,
+    gender: 'male',
     apartment: '88',
     profession: 'Електрик по житлових будинках',
     about:
@@ -63,6 +69,8 @@ const BOTS = [
     email: 'sofia.conti@chaika-bot.test',
     phone: '+380671000004',
     avatarKey: '4',
+    age: 27,
+    gender: 'female',
     apartment: '23',
     profession: 'UX/UI дизайнер цифрових сервісів',
     about:
@@ -73,6 +81,8 @@ const BOTS = [
     email: 'alessandro.ricci@chaika-bot.test',
     phone: '+380671000005',
     avatarKey: '5',
+    age: 36,
+    gender: 'male',
     apartment: '61',
     profession: 'Шеф-кухар та власник кулінарної студії',
     about:
@@ -83,6 +93,8 @@ const BOTS = [
     email: 'francesca.gallo@chaika-bot.test',
     phone: '+380671000006',
     avatarKey: '6',
+    age: 42,
+    gender: 'female',
     apartment: '35',
     profession: 'Дитяча медсестра',
     about:
@@ -93,6 +105,8 @@ const BOTS = [
     email: 'davide.esposito@chaika-bot.test',
     phone: '+380671000007',
     avatarKey: '1',
+    age: 45,
+    gender: 'male',
     apartment: '9',
     profession: 'Автомеханік та майстер виїзної діагностики',
     about:
@@ -103,6 +117,8 @@ const BOTS = [
     email: 'chiara.lombardi@chaika-bot.test',
     phone: '+380671000008',
     avatarKey: '2',
+    age: 33,
+    gender: 'female',
     apartment: '74',
     profession: 'Організатор локальних заходів',
     about:
@@ -113,6 +129,8 @@ const BOTS = [
     email: 'marco.santoro@chaika-bot.test',
     phone: '+380671000009',
     avatarKey: '3',
+    age: 41,
+    gender: 'male',
     apartment: '56',
     profession: 'Сантехнік',
     about:
@@ -123,6 +141,8 @@ const BOTS = [
     email: 'elena.ferrara@chaika-bot.test',
     phone: '+380671000010',
     avatarKey: '4',
+    age: 28,
+    gender: 'female',
     apartment: '31',
     profession: 'Контент-редактор та модератор онлайн-спільнот',
     about:
@@ -131,9 +151,6 @@ const BOTS = [
 ];
 
 // ── helpers ──────────────────────────────────────────────────────────────────
-
-const randomGender = () => (Math.random() > 0.5 ? 'male' : 'female');
-const randomAge = () => Math.floor(Math.random() * (75 - 20 + 1)) + 20; // 20-75
 
 const makeProfile = (bot, uid) => ({
   name: bot.name,
@@ -145,8 +162,8 @@ const makeProfile = (bot, uid) => ({
   registrationStatus: 'complete',
   registeredAt: REGISTERED_AT,
   startAvatarKey: bot.avatarKey,
-  gender: randomGender(),
-  age: randomAge(),
+  gender: bot.gender,
+  age: bot.age,
   provider: 'email',
   providerId: uid,
   photoURL: `start-avatar://${bot.avatarKey}`,

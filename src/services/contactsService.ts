@@ -1,4 +1,4 @@
-import { ref, push, update, onValue, remove, query, orderByChild, equalTo, get, limitToLast } from 'firebase/database';
+import { ref, push, update, onValue, remove, query, orderByChild, equalTo, get, limitToLast, endBefore } from 'firebase/database';
 import { database } from '../firebase-core';
 import { createPendingModeration, ModerationStatus } from '../utils/moderation';
 import { sanitizeStoredText } from '../utils/textUtils';
@@ -29,13 +29,24 @@ export interface ContactListing {
   zodiacSign?: string;
   humanDesignType?: string;
   humanDesignProfile?: string;
+  lookingForGender?: string;
+  photoUris?: string[];
+  photoStoragePaths?: string[];
   isArchived?: boolean;
   language?: AppLang;
+  lastEditedAt?: string;
 }
+
+const normalizeRtdbArray = (val: unknown): string[] => {
+  if (!val) return [];
+  if (Array.isArray(val)) return (val as unknown[]).filter((v): v is string => typeof v === 'string' && Boolean(v));
+  if (typeof val === 'object') return Object.values(val as Record<string, unknown>).filter((v): v is string => typeof v === 'string' && Boolean(v));
+  return [];
+};
 
 const PATH = 'contacts_listings';
 const CONTACT_LISTING_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-const ACTIVE_LIMIT = 100;
+const PAGE_SIZE = 30;
 const ACTIVE_LIMIT_BUFFER = 20;
 const FEED_MINIMUM = 10;
 const ARCHIVED_FALLBACK_LIMIT = 20;
@@ -71,7 +82,11 @@ const mapContactItem = (id: string, data: any, isArchived?: boolean): ContactLis
   zodiacSign: data.zodiacSign || '',
   humanDesignType: data.humanDesignType || '',
   humanDesignProfile: data.humanDesignProfile || '',
+  lookingForGender: data.lookingForGender || '',
+  photoUris: normalizeRtdbArray(data.photoUris),
+  photoStoragePaths: normalizeRtdbArray(data.photoStoragePaths),
   isArchived,
+  lastEditedAt: data.lastEditedAt || '',
 });
 
 export const contactsService = {
@@ -91,11 +106,16 @@ export const contactsService = {
 
     const resolvePhotosInBackground = (items: ContactListing[], currentRequestId: number): void => {
       const resolvedPhotoUris = new Map<string, string>();
+      const resolvedPhotoUrisArrays = new Map<string, string[]>();
       const publishResolvedPhotos = () => {
         if (disposed || currentRequestId !== requestId) return;
         callback(items.map((item) => {
           const photoUri = resolvedPhotoUris.get(item.id);
-          return photoUri ? { ...item, photoUri } : item;
+          const photoUrisArr = resolvedPhotoUrisArrays.get(item.id);
+          const updates: Partial<ContactListing> = {};
+          if (photoUri) updates.photoUri = photoUri;
+          if (photoUrisArr) updates.photoUris = photoUrisArr;
+          return (photoUri || photoUrisArr) ? { ...item, ...updates } : item;
         }));
       };
 
@@ -113,6 +133,30 @@ export const contactsService = {
             resolvedPhotoUris.set(item.id, item.photoUri);
           }
         });
+        // Resolve multi-photo photoUris arrays
+        for (const item of chunk) {
+          if (disposed || currentRequestId !== requestId) return;
+          const storagePaths = item.photoUris || [];
+          if (storagePaths.length <= 1) continue;
+          try {
+            type Wrapper = { id: string; path: string };
+            const wrappers: Wrapper[] = storagePaths.map((p, i) => ({ id: `${item.id}_${i}`, path: p }));
+            const resolvedArr = await resolveMediaAccessUrls(
+              wrappers,
+              'contacts_listings',
+              (w) => w.path,
+              (w, url) => ({ ...w, path: url }),
+              { profile: 'list' },
+            );
+            if (disposed || currentRequestId !== requestId) return;
+            const urls = resolvedArr.map((w) => w.path).filter(Boolean);
+            if (urls.length > 0) {
+              resolvedPhotoUrisArrays.set(item.id, urls);
+            }
+          } catch {
+            // skip multi-photo resolve errors silently
+          }
+        }
         publishResolvedPhotos();
       };
 
@@ -129,7 +173,7 @@ export const contactsService = {
     void ensureFirebaseAuth().then(() => {
       if (disposed) return;
 
-      const listRef = query(ref(database, PATH), orderByChild('moderationStatus'), equalTo('approved'), limitToLast(ACTIVE_LIMIT + ACTIVE_LIMIT_BUFFER));
+      const listRef = query(ref(database, PATH), orderByChild('moderationStatus'), equalTo('approved'), limitToLast(PAGE_SIZE + ACTIVE_LIMIT_BUFFER));
 
       unsubscribeApproved = onValue(listRef, (snapshot) => {
         if (disposed) return;
@@ -145,7 +189,6 @@ export const contactsService = {
                 return item.moderationStatus === 'approved' && !expired;
               })
               .reverse()
-              .slice(0, ACTIVE_LIMIT)
           : [];
 
         if (active.length >= FEED_MINIMUM) {
@@ -240,6 +283,8 @@ export const contactsService = {
         zodiacSign: sanitizeStoredText(item.zodiacSign || ''),
         humanDesignType: sanitizeStoredText(item.humanDesignType || ''),
         humanDesignProfile: sanitizeStoredText(item.humanDesignProfile || ''),
+        lookingForGender: sanitizeStoredText(item.lookingForGender || ''),
+        photoUris: (item.photoUris || []).map((p) => sanitizeStoredText(p)),
         userId: user.uid,
         photoStoragePath,
         photoUri: '',
@@ -290,6 +335,66 @@ export const contactsService = {
     }
   },
 
+  async edit(id: string, fields: Partial<Omit<ContactListing, 'id' | 'userId' | 'createdAt'>>): Promise<void> {
+    try {
+      const user = await requireWriteSession({
+        operation: 'edit',
+        screen: 'Kontakt-XXX',
+      });
+      const snapshot = await get(ref(database, `${PATH}/${id}`));
+      const existing = snapshot.exists() ? snapshot.val() as Partial<ContactListing> : null;
+      if (!existing || existing.userId !== user.uid) {
+        throw new Error('owner_required');
+      }
+      const EDIT_COOLDOWN_MS = 3 * 24 * 60 * 60 * 1000;
+      const lastEdited = existing.lastEditedAt ? new Date(existing.lastEditedAt as string).getTime() : 0;
+      if (lastEdited && Date.now() - lastEdited < EDIT_COOLDOWN_MS) {
+        throw new Error('edit_cooldown');
+      }
+      if (existing.moderationStatus === 'pending') {
+        throw new Error('edit_while_pending');
+      }
+      const pendingModeration = createPendingModeration();
+      const patch: Record<string, unknown> = {};
+      if (fields.itemName !== undefined) patch.itemName = sanitizeStoredText(fields.itemName);
+      if (fields.category !== undefined) patch.category = sanitizeStoredText(fields.category);
+      if (fields.condition !== undefined) patch.condition = sanitizeStoredText(fields.condition);
+      if (fields.price !== undefined) patch.price = normalizePrice(fields.price);
+      if (fields.description !== undefined) patch.description = sanitizeStoredText(fields.description);
+      if (fields.phone !== undefined) patch.phone = sanitizeStoredText(fields.phone);
+      if (fields.zodiacSign !== undefined) patch.zodiacSign = sanitizeStoredText(fields.zodiacSign);
+      if (fields.humanDesignType !== undefined) patch.humanDesignType = sanitizeStoredText(fields.humanDesignType);
+      if (fields.humanDesignProfile !== undefined) patch.humanDesignProfile = sanitizeStoredText(fields.humanDesignProfile);
+      if (fields.lookingForGender !== undefined) patch.lookingForGender = sanitizeStoredText(fields.lookingForGender);
+      if (fields.showPhone !== undefined) patch.showPhone = fields.showPhone;
+      if (fields.photoStoragePath !== undefined) {
+        patch.photoStoragePath = fields.photoStoragePath;
+        patch.photoUri = '';
+      }
+      if (fields.photoUris !== undefined) patch.photoUris = fields.photoUris;
+      if (fields.photoStoragePaths !== undefined) {
+        patch.photoStoragePaths = fields.photoStoragePaths;
+        if (fields.photoStoragePaths.length > 0) {
+          patch.photoStoragePath = fields.photoStoragePaths[0];
+          patch.photoUri = '';
+        }
+      }
+      if (fields.language !== undefined) patch.language = normalizeAppLang(fields.language, 'ua');
+      const descText = (patch.description as string) ?? existing.description ?? '';
+      const nameText = (patch.itemName as string) ?? existing.itemName ?? '';
+      const lang = (patch.language as AppLang) ?? existing.language ?? 'ua';
+      assertTextMatchesLanguage(`${nameText} ${descText}`.trim(), lang);
+      patch.moderationStatus = pendingModeration.moderationStatus;
+      patch.submittedForModerationAt = pendingModeration.submittedForModerationAt;
+      patch.lastEditedAt = new Date().toISOString();
+      patch.expiresAt = new Date(Date.now() + CONTACT_LISTING_TTL_MS).toISOString();
+      await update(ref(database, `${PATH}/${id}`), patch);
+    } catch (error) {
+      console.error('[contactsService] edit failed:', error);
+      throw error;
+    }
+  },
+
   async moderate(id: string, status: Exclude<ModerationStatus, 'pending'>): Promise<void> {
     try {
       const snapshot = await get(ref(database, `${PATH}/${id}`));
@@ -317,4 +422,45 @@ export const contactsService = {
     }
   },
 
+  async fetchNextPage(cursor: string, pageSize: number = PAGE_SIZE): Promise<{ items: ContactListing[]; nextCursor: string | null; hasMore: boolean }> {
+    try {
+      await ensureFirebaseAuth();
+      const pageQuery = query(
+        ref(database, PATH),
+        orderByChild('createdAt'),
+        endBefore(cursor),
+        limitToLast(pageSize + 1),
+      );
+      const snap = await get(pageQuery);
+      const raw = snap.val();
+      if (!raw) return { items: [], nextCursor: null, hasMore: false };
+
+      const rawEntries = Object.entries(raw as Record<string, any>);
+      // hasMore based on PRE-filter count (RTDB returned more than pageSize items)
+      const hasMore = rawEntries.length > pageSize;
+
+      const now = Date.now();
+      const all = rawEntries
+        .map(([id, data]) => mapContactItem(id, data))
+        .filter((i) => i.moderationStatus === 'approved' && (!i.expiresAt || new Date(i.expiresAt).getTime() >= now))
+        .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+
+      const items = all.slice(0, pageSize);
+
+      // Cursor from oldest raw entry's createdAt (not filtered), to ensure no gaps
+      const oldestRawCreatedAt = rawEntries
+        .map(([, data]) => (data as any).createdAt || '')
+        .filter(Boolean)
+        .sort()[0];
+      const nextCursor = hasMore ? (oldestRawCreatedAt || null) : null;
+
+      return { items, nextCursor, hasMore };
+    } catch (error) {
+      console.warn('[contactsService] fetchNextPage failed:', error);
+      return { items: [], nextCursor: null, hasMore: false };
+    }
+  },
+
 };
+
+export { PAGE_SIZE };

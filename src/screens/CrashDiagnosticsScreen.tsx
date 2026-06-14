@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
+import { useSelector } from 'react-redux';
 import {
   getLastCrash,
   getConsoleErrors,
@@ -19,10 +20,93 @@ import {
   CrashDiagnostic,
   ConsoleErrorLog,
 } from '../services/crashDiagnosticsService';
+import type { RootState } from '../redux/store';
+import { normalizeLanguage } from '../redux/slices/languageSlice';
 
 type Tab = 'crash' | 'console';
+type Lang = 'ua' | 'ru' | 'en';
+
+const TEXTS = {
+  ua: {
+    title: 'Діагностика збоїв',
+    loadingText: 'Завантаження діагностики...',
+    copied: 'Скопійовано',
+    stackCopied: 'Стек скопійовано в буфер обміну',
+    copyFailed: 'Копіювання не вдалося',
+    cleared: 'Очищено',
+    lastCrashCleared: 'Діагностика останнього збою очищена',
+    logsCleared: 'Журнали консолі очищені',
+    lastCrash: 'Останній збій',
+    console: 'Консоль',
+    time: 'Час',
+    message: 'Повідомлення',
+    errorType: 'Тип помилки',
+    errorCode: 'Код помилки',
+    componentStack: 'Стек компонентів',
+    javaScriptStack: 'Стек JavaScript',
+    copy: 'Копіювати',
+    recentLogs: 'Останні журнали',
+    noCrashes: 'Немає збоїв',
+    noCrashesText: 'Чудово! Поки що зареєстровано жодних збоїв.',
+    noLogs: 'Немає журналів',
+    noLogsText: 'Помилок або попереджень консолі поки не записано.',
+    copyArgs: 'Копіювати аргументи',
+  },
+  ru: {
+    title: 'Диагностика сбоев',
+    loadingText: 'Загрузка диагностики...',
+    copied: 'Скопировано',
+    stackCopied: 'Стек скопирован в буфер обмена',
+    copyFailed: 'Копирование не удалось',
+    cleared: 'Очищено',
+    lastCrashCleared: 'Диагностика последнего сбоя очищена',
+    logsCleared: 'Журналы консоли очищены',
+    lastCrash: 'Последний сбой',
+    console: 'Консоль',
+    time: 'Время',
+    message: 'Сообщение',
+    errorType: 'Тип ошибки',
+    errorCode: 'Код ошибки',
+    componentStack: 'Стек компонентов',
+    javaScriptStack: 'Стек JavaScript',
+    copy: 'Копировать',
+    recentLogs: 'Последние журналы',
+    noCrashes: 'Нет сбоев',
+    noCrashesText: 'Отлично! Пока не зарегистрировано никаких сбоев.',
+    noLogs: 'Нет журналов',
+    noLogsText: 'Ошибки или предупреждения консоли еще не записаны.',
+    copyArgs: 'Копировать аргументы',
+  },
+  en: {
+    title: 'Crash Diagnostics',
+    loadingText: 'Loading diagnostics...',
+    copied: 'Copied',
+    stackCopied: 'Stack trace copied to clipboard',
+    copyFailed: 'Copy failed',
+    cleared: 'Cleared',
+    lastCrashCleared: 'Last crash diagnostic cleared',
+    logsCleared: 'Console logs cleared',
+    lastCrash: 'Last Crash',
+    console: 'Console',
+    time: 'Time',
+    message: 'Message',
+    errorType: 'Error Type',
+    errorCode: 'Error Code',
+    componentStack: 'Component Stack',
+    javaScriptStack: 'JavaScript Stack',
+    copy: 'Copy',
+    recentLogs: 'Recent Logs',
+    noCrashes: 'No Crashes',
+    noCrashesText: 'Great! No crashes have been recorded yet.',
+    noLogs: 'No Logs',
+    noLogsText: 'No console errors or warnings recorded yet.',
+    copyArgs: 'Copy args',
+  },
+} as const;
 
 export default function CrashDiagnosticsScreen() {
+  const language = useSelector((state: RootState) => state.language.current);
+  const text = TEXTS[normalizeLanguage(language) as Lang] ?? TEXTS.ua;
   const [activeTab, setActiveTab] = useState<Tab>('crash');
   const [lastCrash, setLastCrash] = useState<CrashDiagnostic | null>(null);
   const [consoleLogs, setConsoleLogs] = useState<ConsoleErrorLog[]>([]);
@@ -46,18 +130,18 @@ export default function CrashDiagnosticsScreen() {
     }
   };
 
-  const handleCopyStack = async (text: string) => {
+  const handleCopyStack = async (stackContent: string) => {
     try {
-      await Clipboard.setString(text);
+      await Clipboard.setString(stackContent);
       Toast.show({
         type: 'success',
-        text1: 'Copied',
-        text2: 'Stack trace copied to clipboard',
+        text1: text.copied,
+        text2: text.stackCopied,
       });
     } catch (error) {
       Toast.show({
         type: 'error',
-        text1: 'Copy failed',
+        text1: text.copyFailed,
       });
     }
   };
@@ -67,8 +151,8 @@ export default function CrashDiagnosticsScreen() {
     setLastCrash(null);
     Toast.show({
       type: 'success',
-      text1: 'Cleared',
-      text2: 'Last crash diagnostic cleared',
+      text1: text.cleared,
+      text2: text.lastCrashCleared,
     });
   };
 
@@ -77,8 +161,8 @@ export default function CrashDiagnosticsScreen() {
     setConsoleLogs([]);
     Toast.show({
       type: 'success',
-      text1: 'Cleared',
-      text2: 'Console logs cleared',
+      text1: text.cleared,
+      text2: text.logsCleared,
     });
   };
 
@@ -95,7 +179,7 @@ export default function CrashDiagnosticsScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color="#7A1E5C" />
-          <Text style={styles.loadingText}>Loading diagnostics...</Text>
+          <Text style={styles.loadingText}>{text.loadingText}</Text>
         </View>
       </SafeAreaView>
     );
@@ -110,7 +194,7 @@ export default function CrashDiagnosticsScreen() {
           size={28}
           color="#7A1E5C"
         />
-        <Text style={styles.headerTitle}>Crash Diagnostics</Text>
+        <Text style={styles.headerTitle}>{text.title}</Text>
         <TouchableOpacity onPress={loadDiagnostics} style={styles.refreshBtn}>
           <MaterialCommunityIcons name="refresh" size={20} color="#7A1E5C" />
         </TouchableOpacity>
@@ -136,7 +220,7 @@ export default function CrashDiagnosticsScreen() {
               activeTab === 'crash' && styles.activeTabLabel,
             ]}
           >
-            Last Crash
+            {text.lastCrash}
           </Text>
           {lastCrash && <View style={styles.badge} />}
         </TouchableOpacity>
@@ -159,7 +243,7 @@ export default function CrashDiagnosticsScreen() {
               activeTab === 'console' && styles.activeTabLabel,
             ]}
           >
-            Console ({consoleLogs.length})
+            {text.console} ({consoleLogs.length})
           </Text>
         </TouchableOpacity>
       </View>
@@ -171,7 +255,7 @@ export default function CrashDiagnosticsScreen() {
           lastCrash ? (
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Last Crash</Text>
+                <Text style={styles.sectionTitle}>{text.lastCrash}</Text>
                 <TouchableOpacity
                   onPress={handleClearLastCrash}
                   style={styles.deleteBtn}
@@ -185,27 +269,27 @@ export default function CrashDiagnosticsScreen() {
               </View>
 
               <View style={styles.infoBox}>
-                <Text style={styles.label}>Time</Text>
+                <Text style={styles.label}>{text.time}</Text>
                 <Text style={styles.value}>
                   {formatTime(lastCrash.timestamp)}
                 </Text>
               </View>
 
               <View style={styles.infoBox}>
-                <Text style={styles.label}>Message</Text>
+                <Text style={styles.label}>{text.message}</Text>
                 <Text style={styles.value}>{lastCrash.message}</Text>
               </View>
 
               {lastCrash.errorType && (
                 <View style={styles.infoBox}>
-                  <Text style={styles.label}>Error Type</Text>
+                  <Text style={styles.label}>{text.errorType}</Text>
                   <Text style={styles.value}>{lastCrash.errorType}</Text>
                 </View>
               )}
 
               {lastCrash.errorCode && (
                 <View style={styles.infoBox}>
-                  <Text style={styles.label}>Error Code</Text>
+                  <Text style={styles.label}>{text.errorCode}</Text>
                   <Text style={styles.value}>{lastCrash.errorCode}</Text>
                 </View>
               )}
@@ -213,7 +297,7 @@ export default function CrashDiagnosticsScreen() {
               {lastCrash.componentStack && (
                 <View style={styles.stackSection}>
                   <View style={styles.stackHeader}>
-                    <Text style={styles.label}>Component Stack</Text>
+                    <Text style={styles.label}>{text.componentStack}</Text>
                     <TouchableOpacity
                       onPress={() =>
                         handleCopyStack(lastCrash.componentStack || '')
@@ -225,7 +309,7 @@ export default function CrashDiagnosticsScreen() {
                         size={16}
                         color="#FFFFFF"
                       />
-                      <Text style={styles.copyBtnText}>Copy</Text>
+                      <Text style={styles.copyBtnText}>{text.copy}</Text>
                     </TouchableOpacity>
                   </View>
                   <ScrollView
@@ -243,7 +327,7 @@ export default function CrashDiagnosticsScreen() {
               {lastCrash.stack && (
                 <View style={styles.stackSection}>
                   <View style={styles.stackHeader}>
-                    <Text style={styles.label}>JavaScript Stack</Text>
+                    <Text style={styles.label}>{text.javaScriptStack}</Text>
                     <TouchableOpacity
                       onPress={() => handleCopyStack(lastCrash.stack || '')}
                       style={styles.copyBtn}
@@ -253,7 +337,7 @@ export default function CrashDiagnosticsScreen() {
                         size={16}
                         color="#FFFFFF"
                       />
-                      <Text style={styles.copyBtnText}>Copy</Text>
+                      <Text style={styles.copyBtnText}>{text.copy}</Text>
                     </TouchableOpacity>
                   </View>
                   <ScrollView
@@ -272,9 +356,9 @@ export default function CrashDiagnosticsScreen() {
                 size={48}
                 color="#10B981"
               />
-              <Text style={styles.emptyStateTitle}>No Crashes</Text>
+              <Text style={styles.emptyStateTitle}>{text.noCrashes}</Text>
               <Text style={styles.emptyStateText}>
-                Great! No crashes have been recorded yet.
+                {text.noCrashesText}
               </Text>
             </View>
           )
@@ -284,7 +368,7 @@ export default function CrashDiagnosticsScreen() {
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>
-                  Recent Logs ({consoleLogs.length})
+                  {text.recentLogs} ({consoleLogs.length})
                 </Text>
                 <TouchableOpacity
                   onPress={handleClearConsoleLogs}
@@ -355,7 +439,7 @@ export default function CrashDiagnosticsScreen() {
                           size={14}
                           color="#7A1E5C"
                         />
-                        <Text style={styles.logCopyText}>Copy args</Text>
+                        <Text style={styles.logCopyText}>{text.copyArgs}</Text>
                       </TouchableOpacity>
                     )}
                   </View>
@@ -368,9 +452,9 @@ export default function CrashDiagnosticsScreen() {
                 size={48}
                 color="#9CA3AF"
               />
-              <Text style={styles.emptyStateTitle}>No Logs</Text>
+              <Text style={styles.emptyStateTitle}>{text.noLogs}</Text>
               <Text style={styles.emptyStateText}>
-                No console errors or warnings recorded yet.
+                {text.noLogsText}
               </Text>
             </View>
           )

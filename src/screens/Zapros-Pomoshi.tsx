@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useAppTheme } from '../hooks/useAppTheme';
 import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { NavigationProp, RouteProp, useNavigation, useRoute } from '@react-navigation/native';
@@ -15,6 +16,7 @@ import { showUserError } from '../utils/userFacingErrors';
 import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField';
 import { getDonePhotos, validateSubmissionRequirements } from '../utils/submissionRequirements';
 import { checkYellowList } from '../utils/yellowListCheck';
+import { awardMilestoneBonus } from '../services/bonusService';
 
 // RootState type for language selector
 interface LangState { language?: { current?: string } }
@@ -310,7 +312,7 @@ const HelpRequestScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const route = useRoute<RouteProp<HelpRequestRouteParams, 'HelpRequestScreen'>>();
   const language = useSelector((state: LangState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
-  const user = useSelector((state: { auth?: { user?: { id?: string; name?: string; phone?: string; photoURL?: string; startAvatarKey?: string } } }) => state.auth?.user);
+  const user = useSelector((state: { auth?: { user?: { id?: string; name?: string; phone?: string; photoURL?: string; startAvatarKey?: string; houseNumber?: string } } }) => state.auth?.user);
   const text = UI_TEXT[language];
   const helpTypeLabels = HELP_TYPES_LABELS[language];
   const prefill = route.params?.prefill;
@@ -329,7 +331,7 @@ const HelpRequestScreen: React.FC = () => {
     description?: string;
   }>({});
 
-  const MAX_DESCRIPTION_LENGTH = 500;
+  const MAX_DESCRIPTION_LENGTH = 280;
 
   const subtypes = useMemo(
     () => (HELP_SUBTYPES[helpType] ?? []).map((subtype) => ({
@@ -349,9 +351,10 @@ const HelpRequestScreen: React.FC = () => {
       validatePhone(normalizedPhone) &&
       Boolean(helpType) &&
       (!hasSubtypes || Boolean(subType)) &&
-      description.trim().length >= 10
+      description.trim().length >= 10 &&
+      !formPhotos.some(p => p.status === 'uploading')
     );
-  }, [user?.id, hasSubtypes, helpType, name, phone, subType, description]);
+  }, [user?.id, hasSubtypes, helpType, name, phone, subType, description, formPhotos]);
   const isNameComplete = useMemo(() => validateName(normalizePersonName(name)), [name]);
   const isPhoneComplete = useMemo(() => validatePhone(normalizePhoneText(phone)), [phone]);
   const isHelpTypeComplete = Boolean(helpType);
@@ -362,7 +365,11 @@ const HelpRequestScreen: React.FC = () => {
     if (!validateSubmissionRequirements({ language, userId: user?.id, userPhotoURL: user?.photoURL, userStartAvatarKey: user?.startAvatarKey, navigation })) {
       return;
     }
-    if (await checkYellowList(user?.id, language)) return;
+    try {
+      if (await checkYellowList(user?.id, language)) return;
+    } catch {
+      // якщо перевірка жовтого списку не вдалася — дозволяємо публікацію
+    }
     const nextErrors: {
       name?: string;
       phone?: string;
@@ -406,6 +413,10 @@ const HelpRequestScreen: React.FC = () => {
 
     setFieldErrors({});
 
+    if (formPhotos.some(p => p.status === 'uploading')) {
+      Alert.alert(text.errorTitle, language === 'ru' ? 'Подождите, фото ещё загружается.' : language === 'en' ? 'Please wait, photo is still uploading.' : 'Зачекайте, фото ще завантажується.');
+      return;
+    }
     if (formPhotos.some(p => p.status === 'error')) {
       Alert.alert(text.errorTitle, text.photoErrorMessage);
       return;
@@ -429,10 +440,7 @@ const HelpRequestScreen: React.FC = () => {
     const helpLabel = helpTypeIndex >= 0 ? helpTypeLabels[helpTypeIndex] : helpType;
     const subLabel = subtypes.find((s) => s.value === subType)?.label;
     const categoryLabel = subLabel ? `${helpLabel} • ${subLabel}` : helpLabel;
-    const finalText = sanitizeStoredText(description.trim() || categoryLabel);
-    const finalDescription = sanitizeStoredText(
-      description.trim() ? description.trim() : categoryLabel
-    );
+    const finalDescription = sanitizeStoredText(description.trim() || categoryLabel);
 
     setSubmitting(true);
     try {
@@ -443,8 +451,7 @@ const HelpRequestScreen: React.FC = () => {
         category,
         group: 'help_neighbors',
         subcategory: helpType,
-        building: 'Чайка',
-        text: finalText,
+        building: user?.houseNumber ? `Чайка, буд. ${user.houseNumber}` : 'Чайка',
         description: finalDescription,
         photoUri: firstPhoto?.downloadUrl ?? '',
         photoStoragePath: firstPhoto?.storagePath ?? '',
@@ -455,6 +462,7 @@ const HelpRequestScreen: React.FC = () => {
         return;
       }
       RATE_LIMITERS.helpRequest.recordSubmit();
+      awardMilestoneBonus('first_request').catch(() => {});
 
       // Show success with request ID when available
       const requestId = result.data?.id;
@@ -462,8 +470,8 @@ const HelpRequestScreen: React.FC = () => {
         ? `${text.successMsg}\n\n${text.successRequestId}: ${String(requestId).slice(-6).toUpperCase()}`
         : text.successMsg;
       Alert.alert(text.successTitle, successDetail);
-      setName('');
-      setPhone('+380');
+      setName(normalizePersonName(user?.name || ''));
+      setPhone(normalizePhoneText(user?.phone || '+380'));
       setHelpType('');
       setSubType('');
       setDescription('');
@@ -475,8 +483,10 @@ const HelpRequestScreen: React.FC = () => {
     }
   };
 
+  const { colors } = useAppTheme();
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View style={styles.backgroundLayer}>
         {LIGHT_ORBS.map((orb, index) => (
           <View key={index} style={[styles.orb, orb]} />
@@ -489,7 +499,7 @@ const HelpRequestScreen: React.FC = () => {
           <Text style={styles.heroSubtitle}>{text.heroSubtitle}</Text>
         </View>
 
-        {!user && (
+        {!user?.id && (
           <View style={styles.authNoticeCard}>
             <Text style={styles.authNoticeTitle}>{text.authNoticeTitle}</Text>
             <Text style={styles.authNoticeBody}>{text.authNoticeBody}</Text>
@@ -511,6 +521,7 @@ const HelpRequestScreen: React.FC = () => {
               onChangeText={(value) => { setName(normalizePersonName(value)); if (fieldErrors.name) setFieldErrors((prev) => ({ ...prev, name: undefined })); }}
               style={styles.input}
               placeholderTextColor={SCREEN_THEME.textMuted}
+              editable={!submitting}
             />
             <FormFieldError error={fieldErrors.name} />
 
@@ -518,10 +529,12 @@ const HelpRequestScreen: React.FC = () => {
             <TextInput
               placeholder={text.phonePlaceholder}
               value={phone}
-              onChangeText={(value) => { setPhone(normalizePhoneText(value)); if (fieldErrors.phone) setFieldErrors((prev) => ({ ...prev, phone: undefined })); }}
+              onChangeText={(value) => { setPhone(value); if (fieldErrors.phone) setFieldErrors((prev) => ({ ...prev, phone: undefined })); }}
+              onBlur={() => setPhone(prev => normalizePhoneText(prev))}
               keyboardType="phone-pad"
               style={styles.input}
               placeholderTextColor={SCREEN_THEME.textMuted}
+              editable={!submitting}
             />
             <FormFieldError error={fieldErrors.phone} />
 
@@ -560,12 +573,13 @@ const HelpRequestScreen: React.FC = () => {
           <TextInput
             placeholder={text.descriptionPlaceholder}
             value={description}
-            onChangeText={(value) => setDescription(value.slice(0, MAX_DESCRIPTION_LENGTH))}
+            onChangeText={(value) => { setDescription(value.slice(0, MAX_DESCRIPTION_LENGTH)); if (fieldErrors.description) setFieldErrors((prev) => ({ ...prev, description: undefined })); }}
             style={[styles.input, styles.textArea]}
             placeholderTextColor={SCREEN_THEME.textMuted}
             multiline
             maxLength={MAX_DESCRIPTION_LENGTH}
             textAlignVertical="top"
+            editable={!submitting}
           />
           <Text style={styles.counter}>
             {description.length}/{MAX_DESCRIPTION_LENGTH} {text.charsLeft}
@@ -574,7 +588,7 @@ const HelpRequestScreen: React.FC = () => {
           <FormFieldError error={fieldErrors.description} />
 
           <FormSectionLabel label={text.labelPhoto} completed={getDonePhotos(formPhotos).length > 0} containerStyle={styles.labelRow} labelStyle={styles.label} />
-          {user ? (
+          {user?.id ? (
             <PhotoUploadField
               uid={user.id ?? ''}
               userName={user.name ?? ''}
@@ -597,7 +611,7 @@ const HelpRequestScreen: React.FC = () => {
 
           <TouchableOpacity style={[styles.submitBtn, (!canSubmit || submitting) && styles.submitBtnDisabled]} onPress={handleSubmit} activeOpacity={0.88} disabled={!canSubmit || submitting}>
             {submitting ? (
-              <ActivityIndicator color="#FFF9EE" size="small" />
+              <ActivityIndicator color="#FBF8FD" size="small" />
             ) : (
               <Text style={styles.submitBtnText}>{text.submitBtn}</Text>
             )}
@@ -664,16 +678,16 @@ const styles = StyleSheet.create({
     marginTop: 18,
     minHeight: 58,
     borderRadius: 20,
-    backgroundColor: SCREEN_THEME.terracotta,
+    backgroundColor: '#7d0e59',
     borderWidth: 1,
-    borderColor: SCREEN_THEME.terracottaDark,
+    borderColor: '#7d0e59',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
   },
   submitBtnDisabled: { opacity: 0.5 },
-  submitBtnText: { color: '#FFF9EE', fontWeight: '900', fontSize: 16 },
+  submitBtnText: { color: '#fff', fontWeight: '900', fontSize: 16 },
   authNoticeCard: {
     backgroundColor: '#FFF8E7',
     borderRadius: 20,
@@ -684,12 +698,12 @@ const styles = StyleSheet.create({
   authNoticeTitle: { fontSize: 15, fontWeight: '900', color: '#7A5C00', marginBottom: 6 },
   authNoticeBody: { fontSize: 13, color: '#7A5C00', lineHeight: 19, marginBottom: 12 },
   authNoticeBtn: {
-    backgroundColor: SCREEN_THEME.terracotta,
+    backgroundColor: '#7d0e59',
     borderRadius: 14,
     paddingVertical: 12,
     alignItems: 'center',
   },
-  authNoticeBtnText: { color: '#FFF9EE', fontWeight: '900', fontSize: 14 },
+  authNoticeBtnText: { color: '#fff', fontWeight: '900', fontSize: 14 },
   photoAuthBox: {
     backgroundColor: '#FFF8E7',
     borderRadius: 18,

@@ -4,6 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
+import { ref, set } from 'firebase/database';
 import MiniTabBar from '../components/MiniTabBar';
 import { LIGHT_ORBS, SCREEN_THEME } from '../utils/screenTheme';
 import TactileIcon from '../components/TactileIcon';
@@ -11,7 +12,9 @@ import TactileCard from '../components/TactileCard';
 import { RootState } from '../redux/store';
 import { setFCMToken } from '../redux/slices/authSlice';
 import { fcmAPI } from '../firebase-config';
+import { database } from '../firebase-core';
 import { DEFAULT_NOTIFICATION_PREFS, NotificationPrefs, loadNotificationPrefs, saveNotificationPrefs } from '../utils/notificationPrefs';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 type AppNavigation = import('@react-navigation/native').NavigationProp<Record<string, object | undefined>>;
 type Language = 'ua' | 'ru' | 'en';
@@ -32,6 +35,8 @@ type ScreenText = {
   electricityDesc: string;
   general: string;
   generalDesc: string;
+  comments: string;
+  commentsDesc: string;
   testTitle: string;
   testBody: string;
   testButton: string;
@@ -62,6 +67,8 @@ const SCREEN_TEXT: Record<Language, ScreenText> = {
     electricityDesc: 'Изменения в подаче электроэнергии',
     general: 'Общие',
     generalDesc: 'Обновления приложения и важные уведомления',
+    comments: 'Комментарии',
+    commentsDesc: 'Ответы в обсуждениях, где вы участвовали',
     testTitle: 'Тест уведомлений',
     testBody: 'Если вы видите это сообщение, уведомления на устройстве работают.',
     testButton: 'Проверить уведомления',
@@ -90,6 +97,8 @@ const SCREEN_TEXT: Record<Language, ScreenText> = {
     electricityDesc: 'Electricity supply changes',
     general: 'General',
     generalDesc: 'App updates and important alerts',
+    comments: 'Comments',
+    commentsDesc: 'Replies in discussions you participated in',
     testTitle: 'Notification test',
     testBody: 'If you can see this message, notifications are working on this device.',
     testButton: 'Test notifications',
@@ -118,6 +127,8 @@ const SCREEN_TEXT: Record<Language, ScreenText> = {
     electricityDesc: 'Зміни в подачі електроенергії',
     general: 'Загальні',
     generalDesc: 'Оновлення додатку та важливі сповіщення',
+    comments: 'Коментарі',
+    commentsDesc: 'Відповіді в обговореннях, де ви брали участь',
     testTitle: 'Тест сповіщень',
     testBody: 'Якщо ви бачите це повідомлення, сповіщення на пристрої працюють.',
     testButton: 'Перевірити сповіщення',
@@ -141,6 +152,7 @@ export default function NotificationSettingsScreen() {
   const [permissionGranted, setPermissionGranted] = useState(false);
 
   const text = useMemo(() => SCREEN_TEXT[language] ?? SCREEN_TEXT.ua, [language]);
+  const { colors, isDark } = useAppTheme();
 
   useEffect(() => {
     const load = async () => {
@@ -159,7 +171,15 @@ export default function NotificationSettingsScreen() {
   const savePrefs = useCallback(async (newPrefs: NotificationPrefs) => {
     setPrefs(newPrefs);
     await saveNotificationPrefs(newPrefs);
-  }, []);
+    // Sync comments pref to RTDB so server can filter before sending push
+    if (user?.id) {
+      try {
+        await set(ref(database, `user_roles/${user.id}/notifPrefs/comments`), newPrefs.comments);
+      } catch {
+        // non-critical, ignore
+      }
+    }
+  }, [user?.id]);
 
   const togglePref = useCallback((key: keyof NotificationPrefs) => {
     const newPrefs = { ...prefs, [key]: !prefs[key] };
@@ -208,13 +228,14 @@ export default function NotificationSettingsScreen() {
   const toggleItems: Array<{ key: keyof NotificationPrefs; icon: string; color: string; title: string; desc: string }> = [
     { key: 'requests', icon: 'hand-heart-outline', color: '#C79C47', title: text.requests, desc: text.requestsDesc },
     { key: 'chat', icon: 'chat-outline', color: '#4B7F9E', title: text.chat, desc: text.chatDesc },
+    { key: 'comments', icon: 'comment-text-outline', color: '#7A1E5C', title: text.comments, desc: text.commentsDesc },
     { key: 'osbb', icon: 'home-city-outline', color: '#8A7AB1', title: text.osbb, desc: text.osbbDesc },
     { key: 'electricity', icon: 'lightning-bolt-outline', color: '#E8A838', title: text.electricity, desc: text.electricityDesc },
     { key: 'general', icon: 'bell-outline', color: '#607D8B', title: text.general, desc: text.generalDesc },
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View style={styles.backgroundLayer}>
         {LIGHT_ORBS.map((orb, index) => (
           <View key={index} style={[styles.orb, orb]} />
@@ -225,7 +246,7 @@ export default function NotificationSettingsScreen() {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <MaterialCommunityIcons name="arrow-left" size={20} color={SCREEN_THEME.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{text.title}</Text>
+        <Text style={[styles.headerTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{text.title}</Text>
         <View style={styles.headerSpacer} />
       </View>
 

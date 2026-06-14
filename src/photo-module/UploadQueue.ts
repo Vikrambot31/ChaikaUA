@@ -32,6 +32,7 @@ const MAX_ERROR_LENGTH = 300;
 
 let processing = false;
 let pendingRerun = false;
+let knownEmpty = false;
 
 // Photo IDs the user removed while their upload may already be in flight.
 // process() checks this set before and after each upload so a cancelled photo
@@ -170,6 +171,7 @@ export const UploadQueue = {
       },
     });
 
+    knownEmpty = false;
     if (processing) {
       // process() is already running and has already read the queue snapshot.
       // Mark that a re-run is needed so the new task is picked up immediately
@@ -186,6 +188,22 @@ export const UploadQueue = {
     // committed) and hide it locally immediately.
     cancelledIds.add(photoId);
     await removeTask(photoId);
+
+    // If the photo was already fully uploaded, clean up the orphaned
+    // Storage file and RTDB record — otherwise they linger and consume
+    // the user's monthly quota.
+    const photos = await ImageStorage.getPhotos().catch(() => [] as import('./types').UserPhoto[]);
+    const photo = photos.find((p) => p.id === photoId);
+    if (photo && photo.status === 'uploaded' && photo.storagePath && photo.rtdbId && photo.userId) {
+      const collection = photo.storagePath.split('/')[0] ?? 'community_photos';
+      await deleteEngineUpload({
+        storagePath: photo.storagePath,
+        rtdbId: photo.rtdbId,
+        collection,
+        uid: photo.userId,
+      }).catch((err) => safeLogError('UploadQueue.remove.deleteUploaded', err, { photoId }));
+    }
+
     await ImageStorage.updatePhoto(photoId, { deleted: true }).catch(() => {});
   },
 
@@ -284,21 +302,17 @@ export const UploadQueue = {
             collection,
             compressedUri: task.compressedUri,
             metadata: task.metadata
-              ? {
-                  uploadedBy: task.metadata.uploadedBy,
-                  title: task.metadata.title,
-                  description: task.metadata.description,
-                  sourceScreen: task.metadata.sourceScreen,
-                  sourceScreenLabel: task.metadata.sourceScreenLabel,
-                  sourceFeature: task.metadata.sourceFeature,
-                  locationLabel: task.metadata.locationLabel,
-                  locationType: task.metadata.locationType,
-                  target: defaultTarget,
-                }
+              ? { ...task.metadata, target: defaultTarget }
               : { target: defaultTarget },
-            onProgress: (percent) => {
-              void ImageStorage.updatePhoto(task.photoId, { progress: percent });
-            },
+            onProgress: (() => {
+              let lastProgressUpdate = 0;
+              return (percent: number) => {
+                const now = Date.now();
+                if (now - lastProgressUpdate < 500) return;
+                lastProgressUpdate = now;
+                void ImageStorage.updatePhoto(task.photoId, { progress: percent });
+              };
+            })(),
           });
 
           // Cache compressed file path in the task so retries skip re-compression
@@ -341,14 +355,23 @@ export const UploadQueue = {
           await ImageStorage.updatePhoto(task.photoId, {
             imageUrl: result.downloadUrl,
             storagePath: result.storagePath,
+            rtdbId: result.rtdbId,
             status: 'uploaded',
-            moderationStatus: collection === 'community_photos' ? 'pending' : 'not_submitted',
+            progress: 100,
+            moderationStatus:
+              collection === 'community_photos' && !task.metadata?.moderationDeferred
+                ? 'pending'
+                : 'not_submitted',
             error: undefined,
             retryCount: task.retryCount,
           });
           await removeTask(task.photoId);
         } catch (error) {
-          const retryCount = task.retryCount + 1;
+          const errorCode = typeof error === 'object' && error !== null && 'code' in error
+            ? String((error as { code?: unknown }).code)
+            : '';
+          const shouldRetry = errorCode !== 'community-photo-monthly-limit';
+          const retryCount = shouldRetry ? task.retryCount + 1 : MAX_RETRY_COUNT;
           const message = (error instanceof Error ? error.message : String(error)).slice(0, MAX_ERROR_LENGTH);
 
           void recordRuntimeTrace({
@@ -362,7 +385,7 @@ export const UploadQueue = {
               photoId: task.photoId,
               retryCount,
               maxRetry: MAX_RETRY_COUNT,
-              willRetry: retryCount < MAX_RETRY_COUNT,
+              willRetry: shouldRetry && retryCount < MAX_RETRY_COUNT,
             },
           });
 
@@ -384,8 +407,15 @@ export const UploadQueue = {
       if (pendingRerun) {
         pendingRerun = false;
         void this.process().catch((error) => safeLogError('UploadQueue.process.rerun', error));
+      } else {
+        knownEmpty = true;
       }
     }
+  },
+
+  /** Returns true if the queue is known to be empty (no AsyncStorage read). */
+  isEmpty(): boolean {
+    return knownEmpty;
   },
 
   /** Returns true if any photo with this localUri is already in the queue. */

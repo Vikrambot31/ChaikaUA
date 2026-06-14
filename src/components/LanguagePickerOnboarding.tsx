@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   Image,
   SafeAreaView,
@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { setLanguage } from '../redux/slices/languageSlice';
 import { Language } from '../i18n/translations';
 import { SCREEN_THEME } from '../utils/screenTheme';
@@ -43,12 +43,9 @@ const PICKER_TEXT: Record<Language, { title: string; subtitle: string; continue:
 
 export default function LanguagePickerOnboarding({ onDone }: Props) {
   const dispatch = useDispatch();
-  const [selected, setSelected] = useState<Language>('ua');
+  const savedLanguage = useSelector((state: { language?: { current?: Language } }) => state.language?.current ?? 'ua');
+  const [selected, setSelected] = useState<Language>(savedLanguage);
   const text = PICKER_TEXT[selected];
-
-  useEffect(() => {
-    dispatch(setLanguage('ua'));
-  }, [dispatch]);
 
   const handleConfirm = () => {
     onDone();

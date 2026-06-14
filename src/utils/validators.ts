@@ -42,7 +42,8 @@ export const validatePassword = (password: string): boolean => {
 };
 
 export const validateName = (name: string): boolean => {
-  return name.trim().length >= 2;
+  const trimmed = name.trim();
+  return trimmed.length >= 2 && /^[A-Za-zА-ЯҐЄІЇа-яґєії\u2019'\- ]+$/u.test(trimmed);
 };
 
 export const validateRequestDescription = (text: string): boolean => {

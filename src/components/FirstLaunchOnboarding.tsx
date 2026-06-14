@@ -1,6 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
 import {
-  Dimensions,
   Image,
   SafeAreaView,
   ScrollView,
@@ -12,8 +11,7 @@ import {
 } from 'react-native';
 import { useSelector } from 'react-redux';
 import { SCREEN_THEME } from '../utils/screenTheme';
-
-const { width, height } = Dimensions.get('window');
+import { SCREEN_W as width, SCREEN_H as height } from '../utils/webDimensions';
 const isCompactHeight = height < 720;
 const captionFontSize = isCompactHeight ? 16 : 18;
 const captionLineHeight = isCompactHeight ? 21 : 24;
@@ -63,7 +61,7 @@ export default function FirstLaunchOnboarding({ onDone }: FirstLaunchOnboardingP
     en: [
       'Discover the best coffee, pizza and cozy places in Chaika Life',
       'Ask for help quickly when you urgently need something',
-      'Find nearby people for chats, meetings and new знакомства',
+      'Find nearby people for chats, meetings and new acquaintances',
     ],
   } as const;
 

@@ -1,6 +1,7 @@
-import React, { useCallback, useMemo, useState, useEffect } from 'react';
+import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   ScrollView,
   StyleSheet,
   Text,
@@ -24,6 +25,8 @@ import UploadedPhotosGrid from '../components/UploadedPhotosGrid';
 import InlineFieldHint from '../components/InlineFieldHint';
 import { useSoftToast } from '../hooks/useSoftToast';
 import { useOperationTrace } from '../hooks/useOperationTrace';
+import { getUserCommunityPhotosForMonth, COMMUNITY_PHOTO_MONTHLY_REVIEW_LIMIT } from '../utils/communityPhotoLimits';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 const UI_TEXT = {
   ua: {
@@ -57,9 +60,12 @@ const UI_TEXT = {
     addTitleWarning: 'Додайте коротку назву фото.',
     waitUploadWarning: 'Дочекайтесь завершення завантаження фото.',
     fixPhotoWarning: 'Одне з фото не завантажилось. Видаліть його або спробуйте ще раз.',
+    fixPhotoLimitWarning: 'Ліміт фото вичерпано. Видаліть це фото і спробуйте наступного місяця.',
     saveError: 'Не вдалося надіслати фото. Перевірте інтернет і спробуйте ще раз.',
     photoUploading: 'Фото завантажується...',
     photoUploadError: 'Помилка завантаження фото',
+    limitUsed: (used: number, limit: number) => `Використано ${used} з ${limit} фото цього місяця`,
+    limitExhausted: (limit: number) => `Ліміт вичерпано: ${limit}/${limit} фото цього місяця`,
     categories: {
       building: 'Будинок',
       place: 'Місце',
@@ -100,9 +106,12 @@ const UI_TEXT = {
     addTitleWarning: 'Добавьте короткое название фото.',
     waitUploadWarning: 'Дождитесь завершения загрузки фото.',
     fixPhotoWarning: 'Одно из фото не загрузилось. Удалите его или попробуйте ещё раз.',
+    fixPhotoLimitWarning: 'Лимит фото исчерпан. Удалите это фото и попробуйте в следующем месяце.',
     saveError: 'Не удалось отправить фото. Проверьте интернет и попробуйте ещё раз.',
     photoUploading: 'Фото загружается...',
     photoUploadError: 'Ошибка загрузки фото',
+    limitUsed: (used: number, limit: number) => `Использовано ${used} из ${limit} фото в этом месяце`,
+    limitExhausted: (limit: number) => `Лимит исчерпан: ${limit}/${limit} фото в этом месяце`,
     categories: {
       building: 'Дом',
       place: 'Место',
@@ -143,9 +152,12 @@ const UI_TEXT = {
     addTitleWarning: 'Add a short photo title.',
     waitUploadWarning: 'Wait until photo upload is complete.',
     fixPhotoWarning: 'One photo failed to upload. Remove it or try again.',
+    fixPhotoLimitWarning: 'Monthly photo limit reached. Remove this photo and try again next month.',
     saveError: 'Failed to submit the photo. Check your internet connection and try again.',
     photoUploading: 'Photo is uploading...',
     photoUploadError: 'Photo upload error',
+    limitUsed: (used: number, limit: number) => `Used ${used} of ${limit} photos this month`,
+    limitExhausted: (limit: number) => `Limit reached: ${limit}/${limit} photos this month`,
     categories: {
       building: 'Building',
       place: 'Place',
@@ -191,6 +203,7 @@ const PLACE_LOCATIONS: PhotoLocation[] = chaykaPlaces.map((p) => ({
 }));
 
 const PhotoUploadScreen: React.FC = () => {
+  const { colors } = useAppTheme();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const user = useSelector((state: RootState) => state.auth.user);
   const text = UI_TEXT[language];
@@ -204,6 +217,9 @@ const PhotoUploadScreen: React.FC = () => {
   const [selectedLocation, setSelectedLocation] = useState<PhotoLocation | null>(null);
   const [uploading, setUploading] = useState(false);
   const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
+  const [monthlyUsed, setMonthlyUsed] = useState<number | null>(null);
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const pulseLoopRef = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
     ErrorHandler.setLanguage(language);
@@ -213,12 +229,12 @@ const PhotoUploadScreen: React.FC = () => {
     if (user?.name) setAuthor(normalizePersonName(user.name));
   }, [user?.name]);
 
-  // Clear draft when leaving the screen without submitting
   useEffect(() => {
-    return () => {
-      void AsyncStorage.removeItem(PHOTO_UPLOAD_DRAFT_KEY).catch(() => {});
-    };
-  }, []);
+    if (!user?.id) return;
+    void getUserCommunityPhotosForMonth(user.id).then((photos) => {
+      setMonthlyUsed(photos.length);
+    }).catch(() => {});
+  }, [user?.id]);
 
   useEffect(() => {
     // Restore draft if Android restarts activity while picker/camera is open.
@@ -244,18 +260,44 @@ const PhotoUploadScreen: React.FC = () => {
   // Save draft whenever text fields change so Android activity-kill can't wipe them.
   useEffect(() => {
     if (!title && !description && !selectedCategory && !locationSearch) return;
-    const draft = { title, description, selectedCategory, locationSearch };
-    void AsyncStorage.setItem(PHOTO_UPLOAD_DRAFT_KEY, JSON.stringify(draft)).catch(() => {});
+    const timer = setTimeout(() => {
+      const draft = { title, description, selectedCategory, locationSearch };
+      void AsyncStorage.setItem(PHOTO_UPLOAD_DRAFT_KEY, JSON.stringify(draft)).catch(() => {});
+    }, 600);
+    return () => clearTimeout(timer);
   }, [title, description, selectedCategory, locationSearch]);
 
   const donePhotos = useMemo(() => formPhotos.filter((photo) => photo.status === 'done'), [formPhotos]);
   const hasUploadingPhotos = formPhotos.some((photo) => photo.status === 'uploading');
   const hasPhotoErrors = formPhotos.some((photo) => photo.status === 'error');
+  const hasLimitError = formPhotos.some(
+    (photo) =>
+      photo.status === 'error' &&
+      typeof photo.error === 'string' &&
+      (photo.error.toLowerCase().includes('ліміт') || photo.error.toLowerCase().includes('місяць')),
+  );
+
+  useEffect(() => {
+    if (donePhotos.length > 0 && !uploading) {
+      const loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, { toValue: 1.05, duration: 650, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 1, duration: 650, useNativeDriver: true }),
+        ]),
+      );
+      pulseLoopRef.current = loop;
+      loop.start();
+    } else {
+      pulseLoopRef.current?.stop();
+      pulseAnim.setValue(1);
+    }
+    return () => { pulseLoopRef.current?.stop(); };
+  }, [donePhotos.length, uploading, pulseAnim]);
 
   // location is optional — title and completed photo required
   const canSubmit = useMemo(
-    () => Boolean(title.trim()) && donePhotos.length > 0 && !hasUploadingPhotos && !hasPhotoErrors && !uploading,
-    [donePhotos.length, hasPhotoErrors, hasUploadingPhotos, title, uploading]
+    () => Boolean(title.trim()) && donePhotos.length > 0 && !hasUploadingPhotos && !uploading,
+    [donePhotos.length, hasUploadingPhotos, title, uploading]
   );
 
   const locationOptions = useMemo(() => {
@@ -284,6 +326,7 @@ const PhotoUploadScreen: React.FC = () => {
   const submit = useCallback(async () => {
     startOperation();
 
+    if (uploading) return;
     trace('validate', 'start');
     if (!canSubmit) {
       trace('validate', 'fail', { missing: 'canSubmit' });
@@ -310,10 +353,11 @@ const PhotoUploadScreen: React.FC = () => {
             storagePath: photo.storagePath,
             target: 'gallery_public',
             sourceScreen: 'PhotoUploadScreen',
-            sourceScreenLabel: 'Добавить фото',
+            sourceScreenLabel: 'Додати фото',
             sourceFeature: 'gallery_full_form',
             locationLabel: selectedLocation?.label,
             locationType: selectedLocation?.type,
+            category: selectedCategory || undefined,
           }),
         ),
       );
@@ -340,6 +384,11 @@ const PhotoUploadScreen: React.FC = () => {
       setLocationSearch('');
       setSelectedLocation(null);
       setFormPhotos([]);
+      if (user?.id) {
+        void getUserCommunityPhotosForMonth(user.id).then((photos) => {
+          setMonthlyUsed(photos.length);
+        }).catch(() => {});
+      }
     } catch (error) {
       safeLogError('PhotoUploadScreen.submit.unexpected', error, {
         feature: 'gallery',
@@ -355,27 +404,12 @@ const PhotoUploadScreen: React.FC = () => {
   const needsLocationList = selectedCategory === 'building' || selectedCategory === 'place';
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={styles.headerCard}>
           <Text style={styles.headerTitle}>{text.headerTitle}</Text>
           <Text style={styles.headerSub}>{text.headerSub}</Text>
         </View>
-
-        <View style={styles.previewWrapper}>
-          <PhotoUploadField
-            uid={user?.id ?? ''}
-            userName={user?.name ?? ''}
-            maxPhotos={5}
-            storagePath="community_photos"
-            onPhotosChange={setFormPhotos}
-          />
-          <UploadedPhotosGrid />
-        </View>
-        <Text style={styles.fieldHint}>{text.hintPhoto}</Text>
-        <InlineFieldHint message={text.addPhotoWarning} type="warning" visible={donePhotos.length === 0} />
-        <InlineFieldHint message={text.waitUploadWarning} type="hint" visible={hasUploadingPhotos} />
-        <InlineFieldHint message={text.fixPhotoWarning} type="error" visible={hasPhotoErrors} />
 
         <View style={styles.card}>
           <TextInput
@@ -407,6 +441,58 @@ const PhotoUploadScreen: React.FC = () => {
           />
           <Text style={styles.fieldHint}>{text.hintDesc}</Text>
 
+          {monthlyUsed !== null && (
+            <View style={[styles.limitBadge, monthlyUsed >= COMMUNITY_PHOTO_MONTHLY_REVIEW_LIMIT && styles.limitBadgeExhausted]}>
+              <MaterialCommunityIcons
+                name={monthlyUsed >= COMMUNITY_PHOTO_MONTHLY_REVIEW_LIMIT ? 'lock-outline' : 'calendar-month-outline'}
+                size={14}
+                color={monthlyUsed >= COMMUNITY_PHOTO_MONTHLY_REVIEW_LIMIT ? '#C0392B' : '#665A52'}
+              />
+              <Text style={[styles.limitBadgeText, monthlyUsed >= COMMUNITY_PHOTO_MONTHLY_REVIEW_LIMIT && styles.limitBadgeTextExhausted]}>
+                {monthlyUsed >= COMMUNITY_PHOTO_MONTHLY_REVIEW_LIMIT
+                  ? text.limitExhausted(COMMUNITY_PHOTO_MONTHLY_REVIEW_LIMIT)
+                  : text.limitUsed(monthlyUsed, COMMUNITY_PHOTO_MONTHLY_REVIEW_LIMIT)}
+              </Text>
+            </View>
+          )}
+
+          <View style={styles.previewWrapper}>
+            {user?.id ? (
+              <PhotoUploadField
+                uid={user.id}
+                userName={user?.name ?? ''}
+                maxPhotos={Math.max(0, COMMUNITY_PHOTO_MONTHLY_REVIEW_LIMIT - (monthlyUsed ?? 0))}
+                storagePath="community_photos"
+                onPhotosChange={setFormPhotos}
+                metadata={{
+                  sourceScreen: 'PhotoUploadScreen',
+                  sourceScreenLabel: 'Додати фото',
+                  sourceFeature: 'gallery_full_form',
+                  moderationDeferred: true,
+                }}
+              />
+            ) : (
+              <Text style={styles.fieldHint}>{text.signInRequired}</Text>
+            )}
+            <UploadedPhotosGrid />
+          </View>
+          <Text style={styles.fieldHint}>{text.hintPhoto}</Text>
+          <InlineFieldHint message={text.addPhotoWarning} type="warning" visible={donePhotos.length === 0 && !hasUploadingPhotos} />
+          <InlineFieldHint message={text.waitUploadWarning} type="hint" visible={hasUploadingPhotos} />
+          <InlineFieldHint message={text.fixPhotoLimitWarning} type="error" visible={hasPhotoErrors && hasLimitError} />
+          <InlineFieldHint message={text.fixPhotoWarning} type="error" visible={hasPhotoErrors && !hasLimitError} />
+
+          <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+            <TouchableOpacity
+              style={[styles.button, !canSubmit && styles.buttonDisabled]}
+              onPress={() => void submit()}
+              disabled={!canSubmit}
+              activeOpacity={0.85}
+            >
+              {uploading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{hasUploadingPhotos ? text.photoUploading : hasPhotoErrors ? text.photoUploadError : text.send}</Text>}
+            </TouchableOpacity>
+          </Animated.View>
+
           {/* Location section */}
           <Text style={styles.locationTitle}>{text.addressTitle}</Text>
           <Text style={styles.locationHint}>{text.addressOptional}</Text>
@@ -425,7 +511,7 @@ const PhotoUploadScreen: React.FC = () => {
                   <MaterialCommunityIcons
                     name={CATEGORY_ICONS[cat]}
                     size={16}
-                    color={active ? '#fff' : '#665A52'}
+                    color={active ? '#fff' : '#FFD54F'}
                     style={{ marginRight: 4 }}
                   />
                   <Text style={[styles.categoryChipText, active && styles.categoryChipTextActive]}>
@@ -475,15 +561,6 @@ const PhotoUploadScreen: React.FC = () => {
               <Text style={styles.selectedLocationText}>{selectedLocation.label}</Text>
             </View>
           )}
-
-          <TouchableOpacity
-            style={[styles.button, !canSubmit && styles.buttonDisabled]}
-            onPress={() => void submit()}
-            disabled={!canSubmit}
-            activeOpacity={0.85}
-          >
-            {uploading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{hasUploadingPhotos ? text.photoUploading : hasPhotoErrors ? text.photoUploadError : text.send}</Text>}
-          </TouchableOpacity>
         </View>
       </ScrollView>
 
@@ -514,9 +591,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 }, elevation: 3,
   },
   input: {
-    backgroundColor: '#F3ECE4', borderRadius: 14,
+    backgroundColor: '#FFFFFF', borderRadius: 14,
     paddingHorizontal: 14, paddingVertical: 12,
     color: '#302621', marginBottom: 12, fontWeight: '600',
+    borderWidth: 1, borderColor: '#E8DDD3',
   },
   textarea: { minHeight: 82, textAlignVertical: 'top' },
   locationTitle: { color: '#302621', fontWeight: '900', marginBottom: 4, fontSize: 15 },
@@ -524,21 +602,21 @@ const styles = StyleSheet.create({
   categoryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
   categoryChip: {
     flexDirection: 'row', alignItems: 'center',
-    borderRadius: 999, backgroundColor: '#F3ECE4',
+    borderRadius: 999, backgroundColor: '#7d0e59',
     borderWidth: 1, borderColor: '#E8DDD3',
     paddingHorizontal: 12, paddingVertical: 8,
   },
   categoryChipActive: { backgroundColor: '#7A1E5C', borderColor: '#7A1E5C' },
-  categoryChipText: { color: '#665A52', fontWeight: '700', fontSize: 13 },
+  categoryChipText: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
   categoryChipTextActive: { color: '#fff' },
   locationBlock: { marginBottom: 8 },
   locationList: { gap: 6, maxHeight: 260 },
   locationChip: {
-    borderRadius: 14, backgroundColor: '#F3ECE4',
+    borderRadius: 14, backgroundColor: '#7d0e59',
     borderWidth: 1, borderColor: '#E8DDD3',
     paddingHorizontal: 12, paddingVertical: 10,
   },
-  locationChipText: { color: '#665A52', fontWeight: '700', fontSize: 12, lineHeight: 17 },
+  locationChipText: { color: '#FFFFFF', fontWeight: '700', fontSize: 12, lineHeight: 17 },
   selectedLocation: {
     flexDirection: 'row', alignItems: 'center',
     borderRadius: 14, backgroundColor: '#E9F0E0',
@@ -549,12 +627,37 @@ const styles = StyleSheet.create({
   clearLocation: { color: '#7A1E5C', fontWeight: '900', fontSize: 12, marginLeft: 8 },
   button: {
     backgroundColor: '#5a2c2c', borderRadius: 16,
-    paddingVertical: 14, alignItems: 'center', marginTop: 8,
+    paddingVertical: 14, alignItems: 'center', marginTop: 4, marginBottom: 16,
   },
   buttonDisabled: { opacity: 0.5 },
   buttonText: { color: '#fff', fontWeight: '800' },
   fieldHint: { color: '#8a8178', fontSize: 11, marginTop: -8, marginBottom: 12, paddingHorizontal: 4 },
   inputReadonly: { opacity: 0.7, color: '#665A52' },
+  limitBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#7d0e59',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#E8DDD3',
+  },
+  limitBadgeExhausted: {
+    backgroundColor: '#FDE8E6',
+    borderColor: '#E8A09A',
+  },
+  limitBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
+  },
+  limitBadgeTextExhausted: {
+    color: '#C0392B',
+  },
 });
 
 export default PhotoUploadScreen;

@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -10,45 +11,77 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+
+const HERO_IMAGE = require('../../assets/_readme.webp');
 import { SCREEN_THEME } from '../utils/screenTheme';
+import { Language } from '../i18n/translations';
 
 type ScreenTooltipProps = {
   storageKey: string;
-  title: string;
-  items: string[];
+  title: Record<Language, string>;
+  items: Record<Language, string[]>;
+  language: Language;
   accentColor?: string;
+  /** When provided, controls visibility externally (ignores AsyncStorage auto-open). */
+  forceVisible?: boolean;
+  /** Called when user closes the tooltip (only used with forceVisible). */
+  onClose?: () => void;
 };
 
 const DONE_VALUE = '1';
-const QUICK_READ_LABEL = '15 \u0441\u0435\u043a\u0443\u043d\u0434';
-const DONE_LABEL = '\u041f\u043e\u043d\u044f\u0442\u043d\u043e';
+const QUICK_READ_LABELS: Record<Language, string> = {
+  ua: '15 СЕКУНД',
+  ru: '15 СЕКУНД',
+  en: '15 SECONDS',
+};
+const DONE_LABELS: Record<Language, string> = {
+  ua: 'Зрозуміло',
+  ru: 'Понятно',
+  en: 'Got It',
+};
 
 export default function ScreenTooltip({
   storageKey,
   title,
   items,
+  language,
   accentColor = SCREEN_THEME.terracotta,
+  forceVisible,
+  onClose,
 }: ScreenTooltipProps) {
-  const [visible, setVisible] = useState(false);
+  const controlled = forceVisible !== undefined;
+  const [autoVisible, setAutoVisible] = useState(false);
 
   useEffect(() => {
+    if (controlled) return;
     let active = true;
     void AsyncStorage.getItem(storageKey)
       .then((value) => {
-        if (active && value !== DONE_VALUE) setVisible(true);
+        if (active && value !== DONE_VALUE) setAutoVisible(true);
       })
       .catch(() => {
-        if (active) setVisible(true);
+        if (active) setAutoVisible(true);
       });
     return () => {
       active = false;
     };
-  }, [storageKey]);
+  }, [storageKey, controlled]);
+
+  const visible = controlled ? forceVisible : autoVisible;
 
   const close = useCallback(() => {
-    setVisible(false);
-    void AsyncStorage.setItem(storageKey, DONE_VALUE).catch(() => undefined);
-  }, [storageKey]);
+    if (controlled) {
+      onClose?.();
+    } else {
+      setAutoVisible(false);
+      void AsyncStorage.setItem(storageKey, DONE_VALUE).catch(() => undefined);
+    }
+  }, [storageKey, controlled, onClose]);
+
+  const localizedTitle = title[language];
+  const localizedItems = items[language];
+  const quickReadLabel = QUICK_READ_LABELS[language];
+  const doneLabel = DONE_LABELS[language];
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={close}>
@@ -56,19 +89,21 @@ export default function ScreenTooltip({
         <Pressable style={styles.card}>
           <View style={styles.topRow}>
             <View style={[styles.iconBubble, { backgroundColor: accentColor }]}>
-              <MaterialCommunityIcons name="lightbulb-on-outline" size={24} color="#FFF9EE" />
+              <MaterialCommunityIcons name="lightbulb-on-outline" size={24} color="#FBF8FD" />
             </View>
             <View style={styles.titleWrap}>
-              <Text style={styles.kicker}>{QUICK_READ_LABEL}</Text>
-              <Text style={styles.title}>{title}</Text>
+              <Text style={styles.kicker}>{quickReadLabel}</Text>
+              <Text style={styles.title}>{localizedTitle}</Text>
             </View>
             <TouchableOpacity style={styles.closeButton} onPress={close} activeOpacity={0.78}>
               <MaterialCommunityIcons name="close" size={22} color={SCREEN_THEME.textSecondary} />
             </TouchableOpacity>
           </View>
 
+          <Image source={HERO_IMAGE} style={styles.heroImage} resizeMode="contain" />
+
           <ScrollView contentContainerStyle={styles.steps} showsVerticalScrollIndicator={false}>
-            {items.map((item, index) => (
+            {localizedItems.map((item, index) => (
               <View key={`${storageKey}-${index}`} style={styles.stepRow}>
                 <View style={[styles.stepNumber, { borderColor: accentColor }]}>
                   <Text style={[styles.stepNumberText, { color: accentColor }]}>{index + 1}</Text>
@@ -79,8 +114,8 @@ export default function ScreenTooltip({
           </ScrollView>
 
           <TouchableOpacity style={[styles.actionButton, { backgroundColor: accentColor }]} onPress={close} activeOpacity={0.86}>
-            <Text style={styles.actionText}>{DONE_LABEL}</Text>
-            <MaterialCommunityIcons name="check" size={18} color="#FFF9EE" />
+            <Text style={styles.actionText}>{doneLabel}</Text>
+            <MaterialCommunityIcons name="check" size={18} color="#FBF8FD" />
           </TouchableOpacity>
         </Pressable>
       </Pressable>
@@ -101,6 +136,7 @@ const styles = StyleSheet.create({
     backgroundColor: SCREEN_THEME.paperStrong,
     borderWidth: 1,
     borderColor: SCREEN_THEME.borderStrong,
+    overflow: 'hidden',
     padding: 18,
     shadowColor: '#2F241A',
     shadowOffset: { width: 0, height: 12 },
@@ -143,6 +179,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: SCREEN_THEME.cardCream,
   },
+  heroImage: {
+    width: '100%',
+    height: 150,
+    borderRadius: 8,
+    marginTop: 14,
+  },
   steps: {
     paddingTop: 18,
     paddingBottom: 14,
@@ -165,7 +207,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFF9EE',
+    backgroundColor: '#FBF8FD',
   },
   stepNumberText: {
     fontSize: 14,
@@ -187,7 +229,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionText: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
     fontSize: 16,
     fontWeight: '900',
   },

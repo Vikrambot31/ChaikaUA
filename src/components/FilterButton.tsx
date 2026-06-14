@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, TextStyle, TouchableOpacity, ViewStyle } from 'react-native';
 import { PlaceType } from '../types/app';
 import { SCREEN_THEME } from '../utils/screenTheme';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 interface FilterButtonProps {
   type: PlaceType;
@@ -23,13 +24,14 @@ const TYPE_COLORS: Record<PlaceType, string> = {
 };
 
 const FilterButton: React.FC<FilterButtonProps> = ({ type, label, isSelected, onPress }) => {
+  const { colors, isDark } = useAppTheme();
   const activeColor = TYPE_COLORS[type];
   const buttonStyle: ViewStyle = {
-    backgroundColor: isSelected ? activeColor : '#F5ECD7',
-    borderColor: isSelected ? activeColor : '#E0CFAC',
+    backgroundColor: isSelected ? activeColor : colors.cardBg,
+    borderColor: isSelected ? activeColor : colors.uiBorder,
   };
   const textStyle: TextStyle = {
-    color: isSelected ? '#FFFFFF' : SCREEN_THEME.textSecondary,
+    color: isSelected ? '#FFFFFF' : (isDark ? colors.textPrimary : SCREEN_THEME.textSecondary),
   };
 
   return (

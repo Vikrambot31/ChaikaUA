@@ -3,7 +3,7 @@ const functionsV1 = require('firebase-functions/v1');
 const admin = require('firebase-admin');
 const crypto = require('crypto');
 const { createInviteAccessFunctions, BONUS_LIKE_POINTS, BONUS_LIKE_CAP, BONUS_TOTAL_CAP, resolveBadge, USER_BONUSES_PATH } = require('./inviteAccess');
-const { createBonusFunctions } = require('./bonusFunctions');
+const { createBonusFunctions, awardTrustBonus, grantPromoCredits, BONUS_AUTHOR_CLOSED } = require('./bonusFunctions');
 const { createPromotionFunctions } = require('./promotionFunctions');
 
 admin.initializeApp();
@@ -40,6 +40,8 @@ const sanitizePayload = (payload) => {
   return payload;
 };
 
+const TELEGRAM_REQUEST_TIMEOUT_MS = 8000;
+
 const sendTelegramMessage = async (text, options = {}) => {
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
     throw new Error('Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID');
@@ -56,6 +58,7 @@ const sendTelegramMessage = async (text, options = {}) => {
       disable_web_page_preview: true,
       ...options,
     }),
+    signal: AbortSignal.timeout(TELEGRAM_REQUEST_TIMEOUT_MS),
   });
 
   if (!response.ok) {
@@ -171,7 +174,7 @@ const writeOpsError = async (functionName, error, payload = {}) => {
   }
 };
 
-const PRIMARY_SERVICE_EMAIL = 'vikramsave@ukr.net';
+const PRIMARY_SERVICE_EMAIL = process.env.PRIMARY_SERVICE_EMAIL || 'vikramsave@ukr.net';
 const ADMIN_BACKUP_UID = String(process.env.ADMIN_BACKUP_UID || '').trim();
 const EMERGENCY_ACCESS_PATH = 'security_config/emergency_access/current';
 const EMERGENCY_ADMIN_LOG_PATH = 'security_logs/admin_actions';
@@ -205,16 +208,43 @@ const isPrimaryServiceOwnerContext = (context) =>
     context?.auth?.token?.email_verified === true),
   );
 
+const assertRealAuthenticatedUser = (context) => {
+  if (!context.auth?.uid) {
+    throw new functionsV1.https.HttpsError('unauthenticated', 'Authentication required');
+  }
+
+  const provider = String(context.auth.token?.firebase?.sign_in_provider || '');
+  if (provider === 'anonymous') {
+    throw new functionsV1.https.HttpsError('permission-denied', 'Registered account required');
+  }
+
+  return context.auth.uid;
+};
+
 const isAdminRoleContext = async (context) => {
   if (!context?.auth?.uid) return false;
   const role = await getRoleForUid(context.auth.uid);
   return role === 'admin';
 };
 
+const ROLE_CACHE_TTL_MS = 5 * 60 * 1000; // 5 min
+const roleCache = new Map(); // uid → { role, expiresAt }
+
 const getRoleForUid = async (uid) => {
   if (!uid) return '';
+  const cached = roleCache.get(uid);
+  if (cached && Date.now() < cached.expiresAt) return cached.role;
   const snapshot = await admin.database().ref(`user_roles/${uid}/role`).once('value');
-  return String(snapshot.val() || '');
+  const role = String(snapshot.val() || '');
+  roleCache.set(uid, { role, expiresAt: Date.now() + ROLE_CACHE_TTL_MS });
+  // Evict stale entries when cache grows large
+  if (roleCache.size > 200) {
+    const now = Date.now();
+    for (const [key, entry] of roleCache) {
+      if (now >= entry.expiresAt) roleCache.delete(key);
+    }
+  }
+  return role;
 };
 
 const getVerifiedActorEmail = (context) => {
@@ -281,6 +311,7 @@ Object.assign(exports, createBonusFunctions({
   admin,
   writeOpsEvent,
   writeOpsError,
+  isPrimaryServiceOwnerContext,
   getRoleForUid,
 }));
 
@@ -290,8 +321,58 @@ Object.assign(exports, createPromotionFunctions({
   admin,
   writeOpsEvent,
   writeOpsError,
+  isPrimaryServiceOwnerContext,
   getRoleForUid,
 }));
+
+// ─── Fire-and-forget bonus triggers (client writes RTDB instantly, server processes async) ──
+
+exports.processCloseBonusTrigger = functionsV1.database
+  .ref('/bonus_triggers/close_request/{requestId}')
+  .onCreate(async (snapshot, context) => {
+    const { requestId } = context.params;
+    const data = snapshot.val();
+    if (!data) return null;
+
+    const { uid } = data;
+    if (!uid) {
+      await snapshot.ref.remove();
+      return null;
+    }
+
+    const db = admin.database();
+    const now = Date.now();
+
+    try {
+      const reqSnap = await db.ref(`requests/${requestId}`).once('value');
+      const reqVal = reqSnap.val();
+      if (!reqVal || reqVal.userId !== uid) {
+        await snapshot.ref.remove();
+        return null;
+      }
+
+      const accessSnap = await db.ref(`trust_tree/${uid}/status`).once('value');
+      const isNewcomer = accessSnap.val() !== 'active';
+      const subSnap = await db.ref(`user_subscription/${uid}`).once('value');
+      const userPlan = subSnap.val()?.plan || 'free';
+
+      const reqCategory = reqVal?.category || '';
+      const note = reqCategory ? `request_closed:${reqCategory}` : 'request_closed';
+      await awardTrustBonus(
+        db, uid, 'help', BONUS_AUTHOR_CLOSED,
+        `request_closed_${requestId}`,
+        { sourceId: requestId, sourceType: 'request', note },
+        now, isNewcomer, userPlan,
+      );
+    } catch (error) {
+      console.error(`[processCloseBonusTrigger] ${requestId}:`, error?.message || error);
+    } finally {
+      // Cleanup: trigger node has served its purpose
+      await snapshot.ref.remove().catch((e) => {
+        console.error('[processCloseBonusTrigger] cleanup remove failed:', e?.message);
+      });
+    }
+  });
 
 const userHasBuildingAccess = async (uid, buildingId) => {
   if (!uid || !buildingId) return false;
@@ -649,7 +730,7 @@ const signInWithEmailRateLimitedHandler = functionsV1
   }
 
   const rateLimit = await assertAuthAttemptAllowed(email, context.rawRequest?.ip);
-  const apiKey = process.env.FIREBASE_API_KEY || '';
+  const apiKey = process.env.APP_API_KEY || '';
   if (!apiKey) {
     throw new functionsV1.https.HttpsError('failed-precondition', 'Server sign-in API key is not configured');
   }
@@ -933,6 +1014,7 @@ const ADMIN_MODERATION_SECTIONS = {
   appSuggestions: { path: 'app_suggestions', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
   communityPhotos: { path: 'community_photos', statusField: 'status', approvedValue: 'approved', rejectedValue: 'rejected' },
   userPhotos: { path: 'user_photos', statusField: 'status', approvedValue: 'approved', rejectedValue: 'rejected', nested: true },
+  requestPhotos: { path: 'request_photos', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected', nested: true },
   datingProfiles: { path: 'dating_profiles', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
   datingAnketaListings: { path: 'dating_anketa_listings', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
   coffeeRequests: { path: 'coffee_requests', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
@@ -946,6 +1028,9 @@ const ADMIN_MODERATION_SECTIONS = {
   osbbVotes: { path: 'osbb_votes', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected', nested: true },
   osbbHouseTopics: { path: 'osbb_house_topics', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected', nested: true },
   osbbCollections: { path: 'osbb_collections', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected', nested: true },
+  foodTopListings: { path: 'food_top_listings', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
+  beautyTopListings: { path: 'beauty_top_listings', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
+  childrenTopListings: { path: 'children_top_listings', statusField: 'moderationStatus', approvedValue: 'approved', rejectedValue: 'rejected' },
 };
 
 const ADMIN_MODERATION_RESTORE_TTL_MS = {
@@ -1038,7 +1123,7 @@ exports.adminModerateContentItem = functionsV1.https.onCall(async (data, context
         patch.rejectionReason = null;
       }
 
-      if (section === 'communityPhotos') {
+      if (section === 'communityPhotos' || section === 'userPhotos' || section === 'requestPhotos') {
         patch.moderationStatus = nextStatusValue;
       }
 
@@ -1059,6 +1144,20 @@ exports.adminModerateContentItem = functionsV1.https.onCall(async (data, context
       }
 
       await targetRef.update(patch);
+
+      if (section === 'communityPhotos' || section === 'userPhotos' || section === 'requestPhotos') {
+        const parts = targetPath.split('/');
+        const ownerUid = config.nested ? parts[1] : String(target.userId || '').trim();
+        if (ownerUid) {
+          const isApproved = action === 'approved';
+          await sendUserNotification(ownerUid, {
+            title: isApproved ? 'Фото схвалено ✅' : 'Фото відхилено',
+            body: isApproved
+              ? 'Ваше фото пройшло модерацію і опубліковано.'
+              : `Ваше фото відхилено. ${patch.moderationReason || ''}`.trim(),
+          }, { type: 'photo_moderation', action });
+        }
+      }
     }
 
     await writeOpsEvent('admin_moderation_action', {
@@ -1902,15 +2001,13 @@ exports.closeExpiredOsbbVotes = functionsV1.pubsub
 
 exports.getUserSubscription = functionsV1.https.onCall(async (_data, context) => {
   try {
-    if (!context.auth?.uid) {
-      throw new functionsV1.https.HttpsError('unauthenticated', 'Authentication required');
-    }
+    const uid = assertRealAuthenticatedUser(context);
 
-    const snapshot = await admin.database().ref(`user_subscription/${context.auth.uid}`).once('value');
+    const snapshot = await admin.database().ref(`user_subscription/${uid}`).once('value');
     const normalized = normalizeSubscriptionRecord(snapshot.val());
 
     if (!normalized.isActive && snapshot.exists()) {
-      await snapshot.ref.set({
+      await snapshot.ref.update({
         plan: 'free',
         expiresAt: null,
         activatedAt: null,
@@ -1929,9 +2026,7 @@ exports.getUserSubscription = functionsV1.https.onCall(async (_data, context) =>
 
 exports.activatePromoPremium = functionsV1.https.onCall(async (data, context) => {
   try {
-    if (!context.auth?.uid) {
-      throw new functionsV1.https.HttpsError('unauthenticated', 'Authentication required');
-    }
+    const uid = assertRealAuthenticatedUser(context);
 
     const plan = PREMIUM_PLANS.has(data?.plan) ? data.plan : null;
     if (!plan) {
@@ -1939,7 +2034,7 @@ exports.activatePromoPremium = functionsV1.https.onCall(async (data, context) =>
     }
 
     const db = admin.database();
-    const subscriptionRef = db.ref(`user_subscription/${context.auth.uid}`);
+    const subscriptionRef = db.ref(`user_subscription/${uid}`);
     const existingSnapshot = await subscriptionRef.once('value');
     const existing = normalizeSubscriptionRecord(existingSnapshot.val());
     if (existing.isActive) {
@@ -2007,12 +2102,11 @@ exports.activatePromoPremium = functionsV1.https.onCall(async (data, context) =>
 
 exports.cancelUserSubscription = functionsV1.https.onCall(async (_data, context) => {
   try {
-    if (!context.auth?.uid) {
-      throw new functionsV1.https.HttpsError('unauthenticated', 'Authentication required');
-    }
+    const uid = assertRealAuthenticatedUser(context);
 
-    await admin.database().ref(`user_subscription/${context.auth.uid}`).set({
+    await admin.database().ref(`user_subscription/${uid}`).update({
       plan: 'free',
+      status: 'free',
       activatedAt: null,
       expiresAt: null,
       updatedAt: new Date().toISOString(),
@@ -2183,6 +2277,18 @@ exports.deleteCommunityUserFully = functionsV1.https.onCall(async (data, context
     );
     await Promise.all(directRemovals);
 
+    // Clean up Business+ cards and active promotions for all places owned by this user
+    const bpCardsSnap = await db.ref('business_plus_cards')
+      .orderByChild('ownerId').equalTo(uid).once('value');
+    const bpUpdates = {};
+    bpCardsSnap.forEach((child) => {
+      bpUpdates[`business_plus_cards/${child.key}`] = null;
+      bpUpdates[`business_plus_active/${child.key}`] = null;
+    });
+    if (Object.keys(bpUpdates).length > 0) {
+      await db.ref().update(bpUpdates);
+    }
+
     const storageResults = await Promise.all(
       STORAGE_USER_PREFIXES.map(async (prefix) => ({
         prefix,
@@ -2231,6 +2337,7 @@ exports.onRoleChanged = functionsV1.database
     const isMod = role === 'admin' || role === 'moderator';
     try {
       await setCustomClaimMerged(uid, 'moderator', isMod);
+      await setCustomClaimMerged(uid, 'admin', role === 'admin');
     } catch (error) {
       console.error('[onRoleChanged] setCustomUserClaims failed', uid, error?.message);
     }
@@ -2476,22 +2583,46 @@ exports.createRequest = functionsV1.https.onCall(async (data, context) => {
   const uid = context.auth.uid;
   const db = admin.database();
 
-  // Проверяем timestamp последней заявки пользователя
-  const lastRequestSnap = await db.ref('requests')
-    .orderByChild('userId')
-    .equalTo(uid)
-    .limitToLast(1)
-    .once('value');
+  // Перевіряємо ліміт активних заявок за планом підписки
+  const REQUESTS_LIMIT_FREE = 3;
+  const REQUESTS_LIMIT_PREMIUM = 6;
+  const TERMINAL_STATUSES = ['closed', 'archived', 'rejected'];
 
-  if (lastRequestSnap.exists()) {
-    let lastAt = 0;
-    lastRequestSnap.forEach((child) => {
-      const createdAt = child.val()?.createdAt;
-      if (typeof createdAt === 'number' && createdAt > lastAt) {
-        lastAt = createdAt;
+  const [subSnap, allRequestsSnap] = await Promise.all([
+    db.ref(`user_subscription/${uid}`).once('value'),
+    db.ref('requests').orderByChild('userId').equalTo(uid).once('value'),
+  ]);
+
+  const subData = subSnap.val();
+  const subActive = subData?.status === 'active' || subData?.status === 'trial';
+  const userPlan = (subActive && subData?.plan) ? subData.plan : 'free';
+  const isPaidPlan = userPlan !== 'free';
+  const requestsLimit = isPaidPlan ? REQUESTS_LIMIT_PREMIUM : REQUESTS_LIMIT_FREE;
+
+  let activeCount = 0;
+  let lastCreatedAt = 0;
+  if (allRequestsSnap.exists()) {
+    allRequestsSnap.forEach((child) => {
+      const val = child.val();
+      if (!TERMINAL_STATUSES.includes(val?.status)) activeCount++;
+      if (typeof val?.createdAt === 'number' && val.createdAt > lastCreatedAt) {
+        lastCreatedAt = val.createdAt;
       }
     });
-    const elapsed = Date.now() - lastAt;
+  }
+
+  if (activeCount >= requestsLimit) {
+    throw new functionsV1.https.HttpsError(
+      'resource-exhausted',
+      isPaidPlan
+        ? `Досягнуто ліміт активних заявок для вашого плану (${requestsLimit})`
+        : `Безкоштовний план дозволяє лише ${requestsLimit} активних заявки. Оформіть Premium для більшого ліміту`,
+    );
+  }
+
+  // Перевіряємо 60с між створенням заявок
+  if (lastCreatedAt > 0) {
+    const elapsed = Date.now() - lastCreatedAt;
     if (elapsed < REQUEST_RATE_LIMIT_MS) {
       const remaining = Math.ceil((REQUEST_RATE_LIMIT_MS - elapsed) / 1000);
       throw new functionsV1.https.HttpsError(
@@ -2632,18 +2763,175 @@ exports.offerHelp = functions.https.onCall(async (data, context) => {
 //  Провайдеронезависимый анализ текста заявок через AI API
 // =============================================================
 
-const AI_PROVIDER = process.env.AI_PROVIDER || 'opencode';
-const AI_API_KEY = process.env.AI_API_KEY || process.env.OPENCODE_API_KEY || process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY || '';
-const AI_MODEL = process.env.AI_MODEL || 'deepseek-v4-flash-free';
-const AI_BASE_URL = process.env.AI_BASE_URL || '';
-const AI_BUDGET_DAILY = Number(process.env.AI_BUDGET_DAILY) || 5000;
-const AI_BUDGET_MONTHLY = Number(process.env.AI_BUDGET_MONTHLY) || 100000;
+const AI_PROVIDER_DEFAULT = process.env.AI_PROVIDER || 'opencode';
+const AI_API_KEY_DEFAULT = process.env.AI_API_KEY || process.env.OPENCODE_API_KEY || process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY || '';
+const AI_MODEL_DEFAULT = process.env.AI_MODEL || 'deepseek-v4-flash-free';
+const AI_BASE_URL_DEFAULT = process.env.AI_BASE_URL || '';
+const AI_BUDGET_DAILY_DEFAULT = Number(process.env.AI_BUDGET_DAILY) || 5000;
+const AI_BUDGET_MONTHLY_DEFAULT = Number(process.env.AI_BUDGET_MONTHLY) || 100000;
+
+// Config cache — читаем из RTDB каждые 60 секунд
+let _aiConfigCache = null;
+let _aiConfigCacheTime = 0;
+const AI_CONFIG_CACHE_TTL_MS = 60_000;
+
+async function getAiRuntimeConfig(db) {
+  const now = Date.now();
+  if (_aiConfigCache && (now - _aiConfigCacheTime) < AI_CONFIG_CACHE_TTL_MS) {
+    return _aiConfigCache;
+  }
+  try {
+    const snap = await db.ref('ai_config').once('value');
+    const rc = snap.val() || {};
+    _aiConfigCache = {
+      provider: rc.provider || AI_PROVIDER_DEFAULT,
+      apiKey: rc.apiKey || AI_API_KEY_DEFAULT,
+      model: rc.model || AI_MODEL_DEFAULT,
+      baseUrl: rc.baseUrl || AI_BASE_URL_DEFAULT,
+      budgetDaily: Number(rc.budgetDaily) || AI_BUDGET_DAILY_DEFAULT,
+      budgetMonthly: Number(rc.budgetMonthly) || AI_BUDGET_MONTHLY_DEFAULT,
+      fallback: {
+        enabled: rc.fallback?.enabled === true,
+        provider: rc.fallback?.provider || '',
+        apiKey: rc.fallback?.apiKey || '',
+        model: rc.fallback?.model || '',
+        baseUrl: rc.fallback?.baseUrl || '',
+      },
+    };
+  } catch (_err) {
+    // Если RTDB недоступна — используем env vars
+    _aiConfigCache = {
+      provider: AI_PROVIDER_DEFAULT,
+      apiKey: AI_API_KEY_DEFAULT,
+      model: AI_MODEL_DEFAULT,
+      baseUrl: AI_BASE_URL_DEFAULT,
+      budgetDaily: AI_BUDGET_DAILY_DEFAULT,
+      budgetMonthly: AI_BUDGET_MONTHLY_DEFAULT,
+      fallback: {
+        enabled: false,
+        provider: '',
+        apiKey: '',
+        model: '',
+        baseUrl: '',
+      },
+    };
+  }
+  _aiConfigCacheTime = now;
+  return _aiConfigCache;
+}
 
 const isConfiguredAiApiKey = (key = '') => {
   const value = String(key || '').trim();
   const placeholders = ['sk-your-key-here', 'your-opencode-api-key', 'replace_with_your_opencode_api_key'];
   return Boolean(value && !placeholders.includes(value.toLowerCase()) && !/^sk-x+$/i.test(value));
 };
+
+// =============================================================
+//  analyzeTextInternal — внутренний AI-анализ для авто-модерации
+//  (не требует auth context, используется в scheduled functions)
+// =============================================================
+
+/**
+ * Прямой вызов AI без HTTP callable и rate-limiting.
+ * Используется внутри scheduled functions для авто-модерации.
+ */
+async function analyzeTextInternal(db, aiConfig, section, text, userId = null) {
+  if (!text || !section) return null;
+  if (!isConfiguredAiApiKey(aiConfig.apiKey)) return null;
+
+  // Проверка кеша (24ч)
+  const cacheKey = crypto.createHash('sha256').update(section + '||' + text).digest('hex');
+  const cacheRef = db.ref(`moderation_analysis_cache/${cacheKey}`);
+  const cacheSnap = await cacheRef.once('value');
+  const cached = cacheSnap.val();
+
+  if (cached && cached.cachedAt && (cached.cachedAt + AI_CACHE_TTL_MS > Date.now())) {
+    return {
+      verdict: cached.verdict,
+      confidence: cached.confidence,
+      explanation: cached.explanation,
+      flags: cached.flags || [],
+      provider: cached.provider || aiConfig.provider,
+      model: cached.model || aiConfig.model,
+      tokensUsed: 0,
+      cached: true,
+    };
+  }
+
+  // Строим промпт
+  let userHistoryBlock = '';
+  if (userId) {
+    try {
+      const userSnap = await db.ref('requests').orderByChild('userId').equalTo(userId).limitToLast(20).once('value');
+      const reqs = userSnap.val() || {};
+      let total = 0, approved = 0, rejected = 0;
+      Object.values(reqs).forEach((r) => {
+        total++;
+        if (r && r.status === 'approved') approved++;
+        if (r && r.status === 'rejected') rejected++;
+      });
+      if (total > 0) userHistoryBlock = `\nИстория: всего ${total}, одобрено ${approved}, отклонено ${rejected}`;
+    } catch (e) {
+      console.error('[aiModerateContent] user history fetch failed:', e?.message);
+    }
+  }
+
+  const userPrompt = buildAiUserPrompt(section, '', text, userHistoryBlock);
+
+  let parsed = null;
+  let rawMeta = {};
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const raw = await callAiProviderWithFallback(aiConfig, AI_SYSTEM_PROMPT, userPrompt);
+      rawMeta = {
+        providerUsed: raw.__providerUsed || aiConfig.provider,
+        modelUsed: raw.__modelUsed || aiConfig.model,
+        fallbackUsed: Boolean(raw.__fallbackUsed),
+      };
+      parsed = parseAiJsonResponse(raw);
+      if (parsed) break;
+    } catch (e) {
+      console.error('[aiModerateContent] AI call failed:', e?.message);
+    }
+  }
+
+  if (!parsed) return null;
+
+  // Блок confidence === 1.0
+  if (parsed.confidence >= 1.0) {
+    parsed.confidence = 0.8;
+    parsed.verdict = 'review';
+  }
+
+  // Сохраняем в кеш
+  await cacheRef.set({
+    hash: cacheKey,
+    verdict: parsed.verdict,
+    confidence: parsed.confidence,
+    explanation: parsed.explanation,
+    flags: parsed.flags,
+    section,
+    cachedAt: Date.now(),
+    provider: rawMeta.providerUsed || aiConfig.provider,
+    model: rawMeta.modelUsed || aiConfig.model,
+    fallbackUsed: Boolean(rawMeta.fallbackUsed),
+    tokensUsed: parsed.tokensUsed,
+  }).catch((e) => {
+    console.error('[aiModerateContent] cache write failed:', e?.message);
+  });
+
+  return {
+    verdict: parsed.verdict,
+    confidence: parsed.confidence,
+    explanation: parsed.explanation,
+    flags: parsed.flags || [],
+    provider: rawMeta.providerUsed || aiConfig.provider,
+    model: rawMeta.modelUsed || aiConfig.model,
+    tokensUsed: parsed.tokensUsed,
+    cached: false,
+    fallbackUsed: Boolean(rawMeta.fallbackUsed),
+  };
+}
 
 const AI_PER_UID_MAX = 30; // запросов/мин на модератора
 const AI_GLOBAL_MAX = 100; // запросов/мин на всех
@@ -2727,7 +3015,30 @@ const AI_SECTION_RULES = {
 - Одобрять: сборы с ясной целью, суммой и отчётностью
 - Проверить: сборы без конкретной цели, без указания ответственного
 - Отклонять: личные сборы под видом общедомовых, мошенничество`,
+
+  comments: `Правила для раздела "Комментарии":
+- Одобрять: конструктивные комментарии, предложения помощи, вопросы по теме, благодарности, бытовое общение, нейтральные мнения
+- Проверить: спорные высказывания без оскорблений, сообщения не по теме, избыточные эмоции
+- Отклонять (suspicious): ЛЮБЫЕ прямые оскорбления ("свинья", "дурак", "жлоб", "идиот" и т.п.), угрозы, нецензурная лексика, мат, переход на личности, спам, мошенничество, разжигание ненависти, номера карт/личные данные, реклама
+ВАЖНО: Комментарий с обращением "ты + оскорбительное слово" (ты свинья, ты дурак) — ВСЕГДА suspicious. Даже одно оскорбительное слово = suspicious.`,
 };
+
+const SUPPORT_SYSTEM_PROMPT = `Ти — AI помічник сервісу "Чайка Life" (мобільний додаток для мешканців Чайки, Київ).
+
+Твої задачі:
+1. Визнач категорію звернення з наведеного списку
+2. Визнач терміновість
+3. Склади корисну дружню відповідь МОВОЮ КОРИСТУВАЧА (якщо пише російською — відповідай російською, якщо українською — українською)
+4. Якщо питання про гроші/платежі/видалення/безпеку — встанови requiresHuman: true
+
+Категорії:
+registration | profile | photo | language | notifications | verification | guarantor | chat | map | moderation | payment | bug_report | account_delete | privacy | feature_request | other
+
+Відповідай СТРОГО в JSON (без markdown):
+{"category":"...","urgency":"low"|"medium"|"high","suggestedReply":"текст відповіді","requiresHuman":false}`;
+
+const SUPPORT_AUTO_CATEGORIES = new Set(['registration','profile','photo','language','notifications','feature_request','other']);
+const SUPPORT_CRITICAL_CATEGORIES = new Set(['payment','bug_report','account_delete','privacy']);
 
 const AI_SECTION_LABELS = {
   requests: 'Заявки',
@@ -2743,6 +3054,7 @@ const AI_SECTION_LABELS = {
   osbbVotes: 'Голосования ОСББ',
   osbbHouseTopics: 'Темы дома',
   osbbCollections: 'Сборы ОСББ',
+  comments: 'Комментарии',
 };
 
 const AI_FEW_SHOT = {
@@ -2765,6 +3077,17 @@ const AI_FEW_SHOT = {
   osbbCollections: [
     { text: 'Сбор на ремонт лифта в подъезде №2. Цель: 45000 грн. Ответственный — глава ОСББ.', verdict: 'approve', reason: 'Конкретная цель, сумма, ответственное лицо' },
     { text: 'Срочно скиньте на карту 4149**** кто сколько может.', verdict: 'suspicious', reason: 'Нет конкретной цели, номер карты, давление' },
+  ],
+  comments: [
+    { text: 'Спасибо, очень помогли! Обращусь ещё раз если нужно будет.', verdict: 'approve', reason: 'Благодарность, конструктивный комментарий' },
+    { text: 'Могу помочь с этим, напишите мне в личные.', verdict: 'approve', reason: 'Предложение помощи по теме' },
+    { text: 'А когда можно подойти? Я живу рядом.', verdict: 'approve', reason: 'Уточняющий вопрос по теме' },
+    { text: 'Свинья ты!', verdict: 'suspicious', reason: 'Прямое оскорбление другого человека' },
+    { text: 'Ты дурак!!! Я тебе покажу!!!', verdict: 'suspicious', reason: 'Оскорбление и угроза' },
+    { text: 'Иди нафиг, никто тебя не просил', verdict: 'suspicious', reason: 'Грубость и оскорбление' },
+    { text: 'Нет он жлоб', verdict: 'suspicious', reason: 'Оскорбление конкретного человека' },
+    { text: 'Я вам буду угрожать теперь.. понятнО!!!', verdict: 'suspicious', reason: 'Прямая угроза' },
+    { text: 'Заработок 5000$/день! Пиши @spam_bot', verdict: 'suspicious', reason: 'Спам, мошенничество' },
   ],
 };
 
@@ -2797,12 +3120,12 @@ function buildAiUserPrompt(section, category, text, userHistoryBlock) {
 
 // --- AI provider adapters ---
 
-async function callDeepSeek(systemPrompt, userPrompt) {
+async function callDeepSeek(config, systemPrompt, userPrompt) {
   const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${AI_API_KEY}`, 'Content-Type': 'application/json' },
+    headers: { 'Authorization': `Bearer ${config.apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: AI_MODEL,
+      model: config.model,
       messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
       temperature: 0.1,
       max_tokens: 300,
@@ -2815,12 +3138,12 @@ async function callDeepSeek(systemPrompt, userPrompt) {
   return response.json();
 }
 
-async function callOpenAI(systemPrompt, userPrompt) {
+async function callOpenAI(config, systemPrompt, userPrompt) {
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${AI_API_KEY}`, 'Content-Type': 'application/json' },
+    headers: { 'Authorization': `Bearer ${config.apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: AI_MODEL,
+      model: config.model,
       messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
       temperature: 0.1,
       max_tokens: 300,
@@ -2833,16 +3156,16 @@ async function callOpenAI(systemPrompt, userPrompt) {
   return response.json();
 }
 
-async function callClaude(systemPrompt, userPrompt) {
+async function callClaude(config, systemPrompt, userPrompt) {
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
-      'x-api-key': AI_API_KEY,
+      'x-api-key': config.apiKey,
       'anthropic-version': '2023-06-01',
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: AI_MODEL,
+      model: config.model,
       max_tokens: 300,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
@@ -2861,16 +3184,16 @@ async function callClaude(systemPrompt, userPrompt) {
   };
 }
 
-async function callOpenCode(systemPrompt, userPrompt) {
-  const baseUrl = AI_BASE_URL || 'https://opencode.ai/zen/v1';
+async function callOpenCode(config, systemPrompt, userPrompt) {
+  const baseUrl = config.baseUrl || 'https://opencode.ai/zen/v1';
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${AI_API_KEY}`, 'Content-Type': 'application/json' },
+    headers: { 'Authorization': `Bearer ${config.apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: AI_MODEL,
+      model: config.model,
       messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
       temperature: 0.1,
-      max_tokens: 300,
+      max_tokens: 900,
     }),
   });
   if (!response.ok) {
@@ -2880,13 +3203,55 @@ async function callOpenCode(systemPrompt, userPrompt) {
   return response.json();
 }
 
-function callAiProvider(systemPrompt, userPrompt) {
-  switch (AI_PROVIDER) {
-    case 'openai': return callOpenAI(systemPrompt, userPrompt);
-    case 'claude': return callClaude(systemPrompt, userPrompt);
-    case 'deepseek': return callDeepSeek(systemPrompt, userPrompt);
+function callAiProvider(config, systemPrompt, userPrompt) {
+  switch (config.provider) {
+    case 'openai': return callOpenAI(config, systemPrompt, userPrompt);
+    case 'claude': return callClaude(config, systemPrompt, userPrompt);
+    case 'deepseek': return callDeepSeek(config, systemPrompt, userPrompt);
     case 'opencode':
-    default: return callOpenCode(systemPrompt, userPrompt);
+    default: return callOpenCode(config, systemPrompt, userPrompt);
+  }
+}
+
+function isFallbackEligibleAiError(error) {
+  const message = String((error && error.message) || error || '').toLowerCase();
+  return (
+    message.includes(' 429') ||
+    message.includes('rate') ||
+    message.includes('quota') ||
+    message.includes('limit') ||
+    message.includes('timeout') ||
+    message.includes('econn') ||
+    message.includes(' 500') ||
+    message.includes(' 502') ||
+    message.includes(' 503') ||
+    message.includes(' 504')
+  );
+}
+
+async function callAiProviderWithFallback(config, systemPrompt, userPrompt) {
+  try {
+    const raw = await callAiProvider(config, systemPrompt, userPrompt);
+    raw.__providerUsed = config.provider;
+    raw.__modelUsed = config.model;
+    raw.__fallbackUsed = false;
+    return raw;
+  } catch (primaryError) {
+    const fallback = config.fallback || {};
+    const fallbackReady = fallback.enabled && fallback.provider && fallback.model && isConfiguredAiApiKey(fallback.apiKey);
+    const sameProviderAndModel = fallback.provider === config.provider && fallback.model === config.model;
+
+    if (!fallbackReady || sameProviderAndModel || !isFallbackEligibleAiError(primaryError)) {
+      throw primaryError;
+    }
+
+    console.warn(`[AI] Primary provider failed, trying fallback: ${config.provider}/${config.model} -> ${fallback.provider}/${fallback.model}. Reason: ${primaryError?.message || primaryError}`);
+    const raw = await callAiProvider(fallback, systemPrompt, userPrompt);
+    raw.__providerUsed = fallback.provider;
+    raw.__modelUsed = fallback.model;
+    raw.__fallbackUsed = true;
+    raw.__primaryError = String(primaryError?.message || primaryError).slice(0, 240);
+    return raw;
   }
 }
 
@@ -2958,7 +3323,10 @@ async function checkAiRateLimit(db, uid) {
   }
 }
 
-async function checkAiBudget(db) {
+async function checkAiBudget(db, dailyLimit, monthlyLimit) {
+  const effectiveDailyLimit = dailyLimit != null ? dailyLimit : AI_BUDGET_DAILY_DEFAULT;
+  const effectiveMonthlyLimit = monthlyLimit != null ? monthlyLimit : AI_BUDGET_MONTHLY_DEFAULT;
+
   const metaRef = db.ref('ops/ai_usage/_meta');
   const metaSnap = await metaRef.once('value');
   const meta = metaSnap.val() || {};
@@ -2980,13 +3348,13 @@ async function checkAiBudget(db) {
     await metaRef.update({ monthlyTotal: 0, monthlyDate: thisMonth });
   }
 
-  if (dailyTotal >= AI_BUDGET_DAILY) {
+  if (dailyTotal >= effectiveDailyLimit) {
     throw new functionsV1.https.HttpsError('resource-exhausted',
-      `Дневной лимит AI-запросов исчерпан (${AI_BUDGET_DAILY}). Попробуйте завтра.`);
+      `Дневной лимит AI-запросов исчерпан (${effectiveDailyLimit}). Попробуйте завтра.`);
   }
-  if (monthlyTotal >= AI_BUDGET_MONTHLY) {
+  if (monthlyTotal >= effectiveMonthlyLimit) {
     throw new functionsV1.https.HttpsError('resource-exhausted',
-      `Месячный лимит AI-запросов исчерпан (${AI_BUDGET_MONTHLY}).`);
+      `Месячный лимит AI-запросов исчерпан (${effectiveMonthlyLimit}).`);
   }
 
   return { dailyTotal, monthlyTotal };
@@ -3009,6 +3377,7 @@ exports.adminAnalyzeContent = functionsV1.https.onCall(async (data, context) => 
   try {
     const actor = await assertAdminModerationAccess(context);
     const db = admin.database();
+    const aiConfig = await getAiRuntimeConfig(db);
 
     // 1. Валидация входных данных
     const text = sanitizeText(data?.text || '', 5000);
@@ -3040,8 +3409,8 @@ exports.adminAnalyzeContent = functionsV1.https.onCall(async (data, context) => 
         confidence: cached.confidence,
         moderatorUid: actor.uid,
         timestamp: Date.now(),
-        provider: cached.provider || AI_PROVIDER,
-        model: cached.model || AI_MODEL,
+        provider: cached.provider || aiConfig.provider,
+        model: cached.model || aiConfig.model,
         tokensUsed: 0,
         cached: true,
         latency: Date.now() - startTime,
@@ -3053,8 +3422,8 @@ exports.adminAnalyzeContent = functionsV1.https.onCall(async (data, context) => 
         confidence: cached.confidence,
         explanation: cached.explanation,
         flags: cached.flags || [],
-        provider: cached.provider || AI_PROVIDER,
-        model: cached.model || AI_MODEL,
+        provider: cached.provider || aiConfig.provider,
+        model: cached.model || aiConfig.model,
         tokensUsed: 0,
         cached: true,
       };
@@ -3062,10 +3431,10 @@ exports.adminAnalyzeContent = functionsV1.https.onCall(async (data, context) => 
 
     // 3. Проверка rate limit и бюджета
     await checkAiRateLimit(db, actor.uid);
-    await checkAiBudget(db);
+    await checkAiBudget(db, aiConfig.budgetDaily, aiConfig.budgetMonthly);
 
     // 4. Проверка API ключа
-    if (!isConfiguredAiApiKey(AI_API_KEY)) {
+    if (!isConfiguredAiApiKey(aiConfig.apiKey)) {
       throw new functionsV1.https.HttpsError('failed-precondition',
         'AI_API_KEY не настроен. Добавьте реальный DeepSeek ключ в functions/.env или переменную DEEPSEEK_API_KEY');
     }
@@ -3097,9 +3466,15 @@ exports.adminAnalyzeContent = functionsV1.https.onCall(async (data, context) => 
     // 6. Вызов AI с retry
     let parsed = null;
     let rawResponse = null;
+    let providerUsed = aiConfig.provider;
+    let modelUsed = aiConfig.model;
+    let fallbackUsed = false;
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        rawResponse = await callAiProvider(AI_SYSTEM_PROMPT, userPrompt);
+        rawResponse = await callAiProviderWithFallback(aiConfig, AI_SYSTEM_PROMPT, userPrompt);
+        providerUsed = rawResponse.__providerUsed || aiConfig.provider;
+        modelUsed = rawResponse.__modelUsed || aiConfig.model;
+        fallbackUsed = Boolean(rawResponse.__fallbackUsed);
         parsed = parseAiJsonResponse(rawResponse);
         if (parsed) break;
       } catch (err) {
@@ -3136,8 +3511,9 @@ exports.adminAnalyzeContent = functionsV1.https.onCall(async (data, context) => 
       section,
       category,
       cachedAt: Date.now(),
-      provider: AI_PROVIDER,
-      model: AI_MODEL,
+      provider: providerUsed,
+      model: modelUsed,
+      fallbackUsed,
       tokensUsed: parsed.tokensUsed,
     });
 
@@ -3154,9 +3530,10 @@ exports.adminAnalyzeContent = functionsV1.https.onCall(async (data, context) => 
       flags: parsed.flags,
       moderatorUid: actor.uid,
       timestamp: Date.now(),
-      provider: AI_PROVIDER,
-      model: AI_MODEL,
+      provider: providerUsed,
+      model: modelUsed,
       tokensUsed: parsed.tokensUsed,
+      fallbackUsed,
       cached: false,
       latency: Date.now() - startTime,
       autoApproved: false,
@@ -3168,9 +3545,10 @@ exports.adminAnalyzeContent = functionsV1.https.onCall(async (data, context) => 
       confidence: parsed.confidence,
       explanation: parsed.explanation,
       flags: parsed.flags,
-      provider: AI_PROVIDER,
-      model: AI_MODEL,
+      provider: providerUsed,
+      model: modelUsed,
       tokensUsed: parsed.tokensUsed,
+      fallbackUsed,
       cached: false,
     };
   } catch (error) {
@@ -3183,6 +3561,1269 @@ exports.adminAnalyzeContent = functionsV1.https.onCall(async (data, context) => 
     throw new functionsV1.https.HttpsError('internal', 'AI analysis failed');
   }
 });
+
+// =============================================================
+//  Admin Test AI Config — проверка соединения с AI-провайдером
+// =============================================================
+
+exports.adminTestAiConfig = functionsV1.https.onCall(async (data, context) => {
+  const startTime = Date.now();
+  try {
+    await assertAdminModerationAccess(context);
+    const provider = String(data?.provider || 'opencode');
+    const apiKey = String(data?.apiKey || '');
+    const model = String(data?.model || '');
+    const baseUrl = String(data?.baseUrl || '');
+
+    if (!apiKey || !model) {
+      throw new functionsV1.https.HttpsError('invalid-argument', 'apiKey и model обязательны');
+    }
+
+    if (!isConfiguredAiApiKey(apiKey)) {
+      return { success: false, provider, model, error: 'API ключ не настроен или является placeholder-значением' };
+    }
+
+    const testConfig = { provider, apiKey, model, baseUrl };
+    const testSystemPrompt = 'You are a test assistant. Reply only with valid JSON.';
+    const testUserPrompt = 'Reply with exactly this JSON (no other text): {"status":"ok"}';
+
+    let response;
+    try {
+      response = await callAiProvider(testConfig, testSystemPrompt, testUserPrompt);
+    } catch (err) {
+      return { success: false, provider, model, error: err?.message || 'Connection failed', latencyMs: Date.now() - startTime };
+    }
+
+    const tokensUsed = (response?.usage?.total_tokens) || 0;
+    const content = response?.choices?.[0]?.message?.content || '';
+    const isValid = content.includes('"ok"') || content.includes('ok');
+
+    if (!isValid) {
+      return { success: false, provider, model, error: `Неожиданный ответ: ${content.slice(0, 100)}`, latencyMs: Date.now() - startTime };
+    }
+
+    return { success: true, provider, model, tokensUsed, latencyMs: Date.now() - startTime };
+  } catch (error) {
+    if (error instanceof functionsV1.https.HttpsError) throw error;
+    return { success: false, provider: data?.provider || '', model: data?.model || '', error: error?.message || 'Unknown error' };
+  }
+});
+
+// Разделы для авто-модерации: path, statusField, как выглядит 'pending', как выглядит 'approved'
+const AUTO_MOD_SECTIONS = [
+  { key: 'requests',             path: 'requests',               statusField: 'status',           pendingValue: 'pending', approvedStatus: 'approved',  rejectedStatus: 'rejected'  },
+  { key: 'buySell',              path: 'buy_sell_listings',      statusField: 'moderationStatus', pendingValue: 'pending', approvedStatus: 'approved',  rejectedStatus: 'rejected'  },
+  { key: 'contactsListings',     path: 'contacts_listings',      statusField: 'moderationStatus', pendingValue: 'pending', approvedStatus: 'approved',  rejectedStatus: 'rejected'  },
+  { key: 'biznesChaikaListings', path: 'biznes_chaika_listings', statusField: 'moderationStatus', pendingValue: 'pending', approvedStatus: 'approved',  rejectedStatus: 'rejected'  },
+  { key: 'jobs',                 path: 'job_listings',           statusField: 'moderationStatus', pendingValue: 'pending', approvedStatus: 'approved',  rejectedStatus: 'rejected'  },
+  { key: 'lostFound',            path: 'lost_found',             statusField: 'moderationStatus', pendingValue: 'pending', approvedStatus: 'approved',  rejectedStatus: 'rejected'  },
+  { key: 'appSuggestions',       path: 'app_suggestions',        statusField: 'moderationStatus', pendingValue: 'pending', approvedStatus: 'approved',  rejectedStatus: 'rejected'  },
+  // Comments are nested: request_comments/{requestId}/{commentId}
+  { key: 'comments',             path: 'request_comments',       statusField: 'status',           pendingValue: 'pending', approvedStatus: 'visible',   rejectedStatus: 'hidden',   nested: true },
+  { key: 'comments',             path: 'contact_comments',       statusField: 'status',           pendingValue: 'pending', approvedStatus: 'visible',   rejectedStatus: 'hidden',   nested: true },
+];
+
+function buildAutoModText(item) {
+  const parts = [item.title, item.text, item.description, item.about, item.goal, item.name, item.itemName]
+    .filter(Boolean)
+    .map(String);
+  return parts.join(' ').trim().slice(0, 3000);
+}
+
+// =============================================================
+//  aiAutoModerateScheduled — авто-модерация текста (каждые 5 мин)
+//  Работает 24/7 на серверах Google, не требует локального запуска
+// =============================================================
+
+exports.aiAutoModerateScheduled = functionsV1.pubsub
+  .schedule('every 5 minutes')
+  .timeZone('Europe/Kiev')
+  .onRun(async (_context) => {
+    const db = admin.database();
+
+    try {
+      // Проверяем: включён ли автономный режим
+      const autonomousSnap = await db.ref('ai_config/autonomous').once('value');
+      const autonomous = autonomousSnap.val() || {};
+      if (!autonomous.enabled || !autonomous.textModeration) return null;
+
+      // Читаем конфиг и пороги
+      const aiConfig = await getAiRuntimeConfig(db);
+      const threshSnap = await db.ref('ai_config/thresholds').once('value');
+      const thresh = threshSnap.val() || {};
+      const autoApproveThreshold = Number(thresh.autoApprove) || 0.90;
+      const autoRejectThreshold = Number(thresh.autoReject) || 0.95;
+
+      if (!isConfiguredAiApiKey(aiConfig.apiKey)) {
+        console.warn('[aiAutoMod] AI API key not configured, skipping');
+        return null;
+      }
+
+      let totalProcessed = 0;
+      let totalApproved = 0;
+      let totalRejected = 0;
+      let totalEscalated = 0;
+
+      for (const section of AUTO_MOD_SECTIONS) {
+        try {
+          // Nested sections (comments): request_comments/{requestId}/{commentId}
+          // Scan parent keys, then find pending children inside each
+          const items = [];
+          if (section.nested) {
+            const parentSnap = await db.ref(section.path).limitToFirst(20).once('value');
+            if (!parentSnap.exists()) continue;
+            parentSnap.forEach((parentChild) => {
+              const parentId = parentChild.key;
+              const children = parentChild.val();
+              if (!children || typeof children !== 'object') return;
+              Object.entries(children).forEach(([childId, childVal]) => {
+                if (childVal && childVal[section.statusField] === section.pendingValue && !childVal.ai_auto_processed) {
+                  items.push({ id: childId, parentId, ...childVal, _fullPath: `${section.path}/${parentId}/${childId}` });
+                }
+              });
+            });
+            // Limit to 10 comments per cycle to avoid overloading
+            items.splice(10);
+          } else {
+            const snap = await db.ref(section.path)
+              .orderByChild(section.statusField)
+              .equalTo(section.pendingValue)
+              .limitToFirst(5)
+              .once('value');
+
+            if (!snap.exists()) continue;
+
+            snap.forEach((child) => {
+              const val = child.val();
+              // Пропускаем уже обработанные или те что в очереди эскалаций
+              if (!val.ai_auto_processed) {
+                items.push({ id: child.key, ...val, _fullPath: `${section.path}/${child.key}` });
+              }
+            });
+          }
+
+          for (const item of items) {
+            const text = section.nested ? String(item.text || '').trim() : buildAutoModText(item);
+            if (!text || text.length < 3) continue;
+
+            const result = await analyzeTextInternal(db, aiConfig, section.key, text, item.uid || item.userId || null);
+            if (!result) continue;
+
+            totalProcessed++;
+            const now = Date.now();
+            const itemRef = item._fullPath;
+
+            if (result.verdict === 'approve' && result.confidence >= autoApproveThreshold) {
+              // Авто-одобрение
+              const updateData = {
+                [section.statusField]: section.approvedStatus,
+                ai_auto_processed: true,
+                ai_verdict: result.verdict,
+                ai_confidence: result.confidence,
+                ai_provider: result.provider,
+                moderatedAt: now,
+                moderatedBy: 'ai-auto',
+              };
+              if (!section.nested) {
+                updateData.isApproved = true;
+                updateData.moderationReason = `AI авто-одобрено (${Math.round(result.confidence * 100)}%)`;
+              } else {
+                updateData.aiModeration = {
+                  verdict: result.verdict,
+                  confidence: result.confidence,
+                  flags: result.flags || [],
+                  provider: result.provider,
+                  model: result.model,
+                };
+              }
+              await db.ref(itemRef).update(updateData);
+              await db.ref('ai_queue/log').push({
+                action: 'auto_approve',
+                section: section.key,
+                itemId: item.id,
+                itemPath: itemRef,
+                verdict: result.verdict,
+                confidence: result.confidence,
+                provider: result.provider,
+                model: result.model,
+                tokensUsed: result.tokensUsed,
+                cached: result.cached,
+                timestamp: now,
+              });
+              totalApproved++;
+
+              // Push notification to other thread participants (comments only)
+              if (section.nested && item.parentId) {
+                try {
+                  const threadSnap = await db.ref(`${section.path}/${item.parentId}`).once('value');
+                  const thread = threadSnap.val() || {};
+                  const participantUids = new Set();
+                  Object.values(thread).forEach((c) => {
+                    if (c && c.uid && c.uid !== item.uid && c.status === 'visible') {
+                      participantUids.add(c.uid);
+                    }
+                  });
+                  for (const uid of participantUids) {
+                    // Check per-user comments notification preference
+                    const prefSnap = await db.ref(`user_roles/${uid}/notifPrefs/comments`).once('value');
+                    const commentsEnabled = prefSnap.val() !== false; // default true if not set
+                    if (!commentsEnabled) continue;
+                    await sendUserNotification(uid, {
+                      title: item.name || 'Чайка',
+                      body: String(item.text || '').slice(0, 100),
+                    }, {
+                      type: 'comment',
+                      category: 'comments',
+                      requestId: item.parentId,
+                      commentId: item.id,
+                    });
+                  }
+                } catch (notifErr) {
+                  console.error('[aiAutoMod] comment push notification error:', notifErr?.message);
+                }
+              }
+
+            } else if (result.verdict === 'suspicious' && (section.nested || result.confidence >= autoRejectThreshold)) {
+              // Авто-отклонение
+              const updateData = {
+                [section.statusField]: section.rejectedStatus,
+                ai_auto_processed: true,
+                ai_verdict: result.verdict,
+                ai_confidence: result.confidence,
+                ai_provider: result.provider,
+                moderatedAt: now,
+                moderatedBy: 'ai-auto',
+              };
+              if (!section.nested) {
+                updateData.isApproved = false;
+                updateData.moderationReason = `AI авто-отклонено: ${(result.explanation || '').slice(0, 200)}`;
+              } else {
+                updateData.aiModeration = {
+                  verdict: result.verdict,
+                  confidence: result.confidence,
+                  flags: result.flags || [],
+                  provider: result.provider,
+                  model: result.model,
+                };
+              }
+              await db.ref(itemRef).update(updateData);
+              await db.ref('ai_queue/log').push({
+                action: 'auto_reject',
+                section: section.key,
+                itemId: item.id,
+                itemPath: itemRef,
+                verdict: result.verdict,
+                confidence: result.confidence,
+                flags: result.flags,
+                explanation: result.explanation,
+                provider: result.provider,
+                model: result.model,
+                tokensUsed: result.tokensUsed,
+                cached: result.cached,
+                timestamp: now,
+              });
+              totalRejected++;
+
+            } else {
+              // Эскалация — отправить человеку
+              // Для комментариев: fail-closed — скрываем и логируем для ручной проверки
+              if (section.nested) {
+                await db.ref(itemRef).update({
+                  [section.statusField]: section.rejectedStatus,
+                  ai_auto_processed: true,
+                  ai_escalated: true,
+                  aiModeration: {
+                    verdict: result.verdict,
+                    confidence: result.confidence,
+                    flags: result.flags || [],
+                    provider: result.provider,
+                    model: result.model,
+                  },
+                });
+              } else {
+                await db.ref(itemRef).update({
+                  ai_auto_processed: true,
+                  ai_escalated: true,
+                });
+              }
+              await db.ref('ai_queue/escalations').push({
+                itemPath: itemRef,
+                section: section.key,
+                statusField: section.statusField,
+                approvedStatus: section.approvedStatus,
+                rejectedStatus: section.rejectedStatus,
+                itemId: item.id,
+                textPreview: text.slice(0, 400),
+                userId: item.uid || item.userId || null,
+                ai_verdict: result.verdict,
+                ai_confidence: result.confidence,
+                ai_explanation: result.explanation || '',
+                ai_flags: result.flags || [],
+                provider: result.provider,
+                model: result.model,
+                createdAt: now,
+                status: 'pending',
+              });
+              await db.ref('ai_queue/log').push({
+                action: 'escalation',
+                section: section.key,
+                itemId: item.id,
+                verdict: result.verdict,
+                confidence: result.confidence,
+                provider: result.provider,
+                model: result.model,
+                tokensUsed: result.tokensUsed,
+                cached: result.cached,
+                timestamp: now,
+              });
+              totalEscalated++;
+            }
+
+            // Небольшая пауза между элементами, чтобы не перегрузить AI API
+            await new Promise((r) => setTimeout(r, 300));
+          }
+        } catch (sectionErr) {
+          console.error(`[aiAutoMod] Section ${section.key} error:`, sectionErr?.message);
+        }
+      }
+
+      console.log(`[aiAutoMod] Done: processed=${totalProcessed} approved=${totalApproved} rejected=${totalRejected} escalated=${totalEscalated}`);
+
+      // Записываем итоги прогона
+      await db.ref('ai_queue/last_run').set({
+        timestamp: Date.now(),
+        totalProcessed,
+        totalApproved,
+        totalRejected,
+        totalEscalated,
+      });
+
+    } catch (err) {
+      console.error('[aiAutoMod] Fatal error:', err?.message, err?.stack);
+      await writeOpsError('aiAutoModerateScheduled', err, {});
+    }
+
+    return null;
+  });
+
+// =============================================================
+//  aiResolveEscalation — модератор разрешает эскалацию вручную
+// =============================================================
+
+exports.aiResolveEscalation = functionsV1.https.onCall(async (data, context) => {
+  try {
+    const actor = await assertAdminModerationAccess(context);
+    const db = admin.database();
+
+    const escalationId = String(data?.escalationId || '').trim();
+    const action = String(data?.action || '');
+    const reason = String(data?.reason || '').trim();
+
+    if (!escalationId) {
+      throw new functionsV1.https.HttpsError('invalid-argument', 'escalationId обязателен');
+    }
+    if (action !== 'approve' && action !== 'reject') {
+      throw new functionsV1.https.HttpsError('invalid-argument', 'action должен быть approve или reject');
+    }
+
+    const escSnap = await db.ref(`ai_queue/escalations/${escalationId}`).once('value');
+    if (!escSnap.exists()) {
+      throw new functionsV1.https.HttpsError('not-found', 'Эскалация не найдена');
+    }
+
+    const esc = escSnap.val();
+    if (esc.status !== 'pending') {
+      throw new functionsV1.https.HttpsError('failed-precondition', 'Эскалация уже разрешена');
+    }
+
+    const now = Date.now();
+    const isApprove = action === 'approve';
+    const newStatus = isApprove ? esc.approvedStatus : esc.rejectedStatus;
+
+    // Обновляем оригинальный элемент
+    await db.ref(esc.itemPath).update({
+      [esc.statusField]: newStatus,
+      isApproved: isApprove,
+      ai_escalated: false,
+      moderatedAt: now,
+      moderatedBy: actor.uid,
+      moderationReason: reason || (isApprove ? 'Одобрено после эскалации AI' : 'Отклонено после эскалации AI'),
+    });
+
+    // Закрываем эскалацию
+    await db.ref(`ai_queue/escalations/${escalationId}`).update({
+      status: isApprove ? 'resolved_approved' : 'resolved_rejected',
+      resolvedAt: now,
+      resolvedBy: actor.uid,
+      resolvedReason: reason || '',
+    });
+
+    // Логируем
+    await db.ref('ai_queue/log').push({
+      action: isApprove ? 'human_approved' : 'human_rejected',
+      section: esc.section,
+      itemId: esc.itemId,
+      escalationId,
+      moderatorUid: actor.uid,
+      timestamp: now,
+    });
+
+    return { success: true };
+  } catch (error) {
+    if (error instanceof functionsV1.https.HttpsError) throw error;
+    console.error('[aiResolveEscalation] error:', error?.message);
+    throw new functionsV1.https.HttpsError('internal', 'Ошибка при разрешении эскалации');
+  }
+});
+
+// =============================================================
+//  moderateNewComment — мгновенная AI-модерация при создании комментария
+//  Trigger: onCreate в request_comments/{requestId}/{commentId}
+//  Время отклика: 2-5 сек (вместо ожидания batch каждые 5 мин)
+// =============================================================
+
+async function handleCommentModeration(snapshot, context, collectionPath) {
+  const comment = snapshot.val();
+  const { requestId, commentId } = context.params;
+
+  if (!comment || comment.status !== 'pending' || comment.ai_auto_processed) return null;
+
+  const db = admin.database();
+
+  try {
+    // Check autonomous mode
+    const autonomousSnap = await db.ref('ai_config/autonomous').once('value');
+    const autonomous = autonomousSnap.val() || {};
+    if (!autonomous.enabled || !autonomous.textModeration) {
+      // AI disabled — approve immediately
+      await db.ref(`${collectionPath}/${requestId}/${commentId}`).update({
+        status: 'visible',
+        ai_auto_processed: true,
+        moderatedBy: 'auto-bypass',
+      });
+      return null;
+    }
+
+    const aiConfig = await getAiRuntimeConfig(db);
+    if (!isConfiguredAiApiKey(aiConfig.apiKey)) {
+      await db.ref(`${collectionPath}/${requestId}/${commentId}`).update({
+        status: 'visible',
+        ai_auto_processed: true,
+        moderatedBy: 'no-ai-key',
+      });
+      return null;
+    }
+
+    const text = String(comment.text || '').trim();
+    if (!text || text.length < 3) {
+      await db.ref(`${collectionPath}/${requestId}/${commentId}`).update({
+        status: 'visible',
+        ai_auto_processed: true,
+      });
+      return null;
+    }
+
+    const threshSnap = await db.ref('ai_config/thresholds').once('value');
+    const thresh = threshSnap.val() || {};
+    const autoApproveThreshold = Number(thresh.autoApprove) || 0.90;
+
+    const result = await analyzeTextInternal(db, aiConfig, 'comments', text, comment.uid || null);
+    if (!result) {
+      // AI failed (key expired, API error) — publish immediately
+      await db.ref(`${collectionPath}/${requestId}/${commentId}`).update({
+        status: 'visible',
+        ai_auto_processed: true,
+        moderatedBy: 'ai-unavailable',
+      });
+      return null;
+    }
+
+    const now = Date.now();
+    const commentRef = `${collectionPath}/${requestId}/${commentId}`;
+
+    if (result.verdict === 'approve' && result.confidence >= autoApproveThreshold) {
+      // Approve
+      await db.ref(commentRef).update({
+        status: 'visible',
+        ai_auto_processed: true,
+        ai_verdict: result.verdict,
+        ai_confidence: result.confidence,
+        ai_provider: result.provider,
+        moderatedAt: now,
+        moderatedBy: 'ai-instant',
+        aiModeration: {
+          verdict: result.verdict,
+          confidence: result.confidence,
+          flags: result.flags || [],
+          provider: result.provider,
+          model: result.model,
+        },
+      });
+
+      // Push notification to other thread participants
+      try {
+        const threadSnap = await db.ref(`${collectionPath}/${requestId}`).once('value');
+        const thread = threadSnap.val() || {};
+        const participantUids = new Set();
+        Object.values(thread).forEach((c) => {
+          if (c && c.uid && c.uid !== comment.uid && c.status === 'visible') {
+            participantUids.add(c.uid);
+          }
+        });
+        for (const uid of participantUids) {
+          const prefSnap = await db.ref(`user_roles/${uid}/notifPrefs/comments`).once('value');
+          if (prefSnap.val() === false) continue;
+          await sendUserNotification(uid, {
+            title: comment.name || 'Чайка',
+            body: text.slice(0, 100),
+          }, { type: 'comment', category: 'comments', requestId, commentId });
+        }
+      } catch (notifErr) {
+        console.error('[moderateNewComment] push error:', notifErr?.message);
+      }
+
+    } else if (result.verdict === 'suspicious') {
+      // Reject — any suspicious verdict hides the comment (fail-closed)
+      await db.ref(commentRef).update({
+        status: 'hidden',
+        ai_auto_processed: true,
+        ai_verdict: result.verdict,
+        ai_confidence: result.confidence,
+        ai_provider: result.provider,
+        moderatedAt: now,
+        moderatedBy: 'ai-instant',
+        aiModeration: {
+          verdict: result.verdict,
+          confidence: result.confidence,
+          flags: result.flags || [],
+          provider: result.provider,
+          model: result.model,
+        },
+      });
+
+    } else {
+      // review / uncertain — hide and escalate (fail-closed for comments)
+      await db.ref(commentRef).update({
+        status: 'hidden',
+        ai_auto_processed: true,
+        ai_escalated: true,
+        ai_verdict: result.verdict,
+        ai_confidence: result.confidence,
+        moderatedAt: now,
+        moderatedBy: 'ai-instant',
+        aiModeration: {
+          verdict: result.verdict,
+          confidence: result.confidence,
+          flags: result.flags || [],
+          provider: result.provider,
+          model: result.model,
+        },
+      });
+      await db.ref('ai_queue/escalations').push({
+        itemPath: commentRef,
+        section: 'comments',
+        statusField: 'status',
+        approvedStatus: 'visible',
+        rejectedStatus: 'hidden',
+        itemId: commentId,
+        textPreview: text.slice(0, 400),
+        userId: comment.uid || null,
+        ai_verdict: result.verdict,
+        ai_confidence: result.confidence,
+        ai_explanation: result.explanation || '',
+        ai_flags: result.flags || [],
+        provider: result.provider,
+        model: result.model,
+        createdAt: now,
+        status: 'pending',
+      });
+    }
+
+    await db.ref('ai_queue/log').push({
+      action: result.verdict === 'approve' ? 'auto_approve' : (result.verdict === 'suspicious' ? 'auto_reject' : 'escalation'),
+      section: 'comments',
+      itemId: commentId,
+      itemPath: commentRef,
+      verdict: result.verdict,
+      confidence: result.confidence,
+      flags: result.flags,
+      provider: result.provider,
+      model: result.model,
+      tokensUsed: result.tokensUsed,
+      cached: result.cached,
+      timestamp: now,
+      source: 'instant',
+    });
+
+  } catch (err) {
+    console.error('[moderateNewComment] error:', err?.message);
+    await writeOpsError('moderateNewComment', err, { requestId, commentId });
+  }
+
+  return null;
+}
+
+exports.moderateNewRequestComment = functionsV1.database
+  .ref('request_comments/{requestId}/{commentId}')
+  .onCreate((snapshot, context) => handleCommentModeration(snapshot, context, 'request_comments'));
+
+exports.moderateNewContactComment = functionsV1.database
+  .ref('contact_comments/{requestId}/{commentId}')
+  .onCreate((snapshot, context) => handleCommentModeration(snapshot, context, 'contact_comments'));
+
+// =============================================================
+//  aiAutoReplySupport — авто-ответ на первое сообщение поддержки
+//  Trigger: при создании нового сообщения в support_messages
+// =============================================================
+
+exports.aiAutoReplySupport = functionsV1.database
+  .ref('support_messages/{ticketId}/{messageId}')
+  .onCreate(async (snapshot, context) => {
+    const message = snapshot.val();
+    const { ticketId, messageId } = context.params;
+
+    // Только первые сообщения от пользователя
+    if (!message || message.senderRole !== 'user') return null;
+
+    const db = admin.database();
+
+    try {
+      const aiConfig = await getAiRuntimeConfig(db);
+      const hasRuntimeAiKey = isConfiguredAiApiKey(aiConfig.apiKey);
+
+      // Проверяем флаг автономности. Если RTDB-конфиг еще не создан,
+      // но ключ уже задан в env функций, поддержка должна отвечать сразу.
+      const autonomousSnap = await db.ref('ai_config/autonomous').once('value');
+      const autonomous = autonomousSnap.val();
+      const supportRepliesEnabled = autonomousSnap.exists()
+        ? autonomous?.enabled === true && autonomous?.supportReplies === true
+        : hasRuntimeAiKey;
+      if (!supportRepliesEnabled) return null;
+
+      // Читаем тикет
+      const ticketSnap = await db.ref(`support_tickets/${ticketId}`).once('value');
+      if (!ticketSnap.exists()) return null;
+      const ticket = ticketSnap.val();
+
+      // Пропускаем если AI уже отвечал
+      if (ticket.aiReplied) return null;
+      // Пропускаем закрытые тикеты
+      if (ticket.status === 'closed') return null;
+
+      // Отмечаем что обрабатываем (предотвращаем двойную обработку)
+      await db.ref(`support_tickets/${ticketId}`).update({ aiProcessing: true });
+
+      if (!hasRuntimeAiKey) {
+        await db.ref(`support_tickets/${ticketId}`).update({ aiProcessing: false });
+        return null;
+      }
+
+      const userText = String(message.text || '').trim();
+      const category = String(ticket.category || '');
+      const userName = String(ticket.userName || 'користувач');
+
+      const userPrompt = `Категорія: ${category}\nІм'я: ${userName}\nПовідомлення:\n"""\n${userText.slice(0, 1000)}\n"""`;
+
+      let parsed = null;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const raw = await callAiProviderWithFallback(aiConfig, SUPPORT_SYSTEM_PROMPT, userPrompt);
+          const content = raw?.choices?.[0]?.message?.content || '';
+          const jsonMatch = String(content).match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            parsed = JSON.parse(jsonMatch[0]);
+            if (parsed && parsed.suggestedReply) break;
+          }
+        } catch (e) {
+          console.error('[aiAutoReplySupport] AI call failed:', e?.message);
+        }
+      }
+
+      if (!parsed || !parsed.suggestedReply) {
+        await db.ref(`support_tickets/${ticketId}`).update({ aiProcessing: false });
+        return null;
+      }
+
+      const now = Date.now();
+      const detectedCategory = parsed.category || category;
+      const requiresHuman = parsed.requiresHuman === true || SUPPORT_CRITICAL_CATEGORIES.has(detectedCategory);
+
+      if (requiresHuman || !SUPPORT_AUTO_CATEGORIES.has(detectedCategory)) {
+        // Эскалация — критическая тема или средняя сложность
+        const urgency = SUPPORT_CRITICAL_CATEGORIES.has(detectedCategory) ? 'high' : 'medium';
+        const replyRef = db.ref(`support_messages/${ticketId}`).push();
+        const replyText = parsed.suggestedReply;
+
+        await db.ref('ai_queue/support_escalations').push({
+          ticketId,
+          userId: ticket.userId || null,
+          userName,
+          category: detectedCategory,
+          urgency,
+          userMessage: userText.slice(0, 500),
+          aiDraftReply: parsed.suggestedReply,
+          createdAt: now,
+          status: 'pending',
+          requiresHuman,
+        });
+
+        await replyRef.set({
+          ticketId,
+          senderId: 'ai-assistant',
+          senderRole: 'admin',
+          text: replyText,
+          isAiReply: true,
+          requiresHumanReview: true,
+          timestamp: now,
+        });
+
+        await db.ref(`support_tickets/${ticketId}`).update({
+          aiReplied: true,
+          aiRepliedAt: now,
+          aiProcessing: false,
+          aiEscalated: true,
+          aiEscalatedAt: now,
+          aiCategory: detectedCategory,
+          lastAdminMessage: replyText.slice(0, 100),
+          updatedAt: now,
+        });
+
+        // Telegram уведомление для критических тем
+        if (SUPPORT_CRITICAL_CATEGORIES.has(detectedCategory)) {
+          try {
+            const emoji = detectedCategory === 'payment' ? '💰' : detectedCategory === 'account_delete' ? '🗑' : detectedCategory === 'privacy' ? '🔒' : '🐛';
+            await sendTelegramMessage(
+              `${emoji} КРИТИЧНИЙ ТИКЕТ [${detectedCategory.toUpperCase()}]\n👤 ${userName}\n💬 ${userText.slice(0, 200)}`,
+            );
+          } catch (e) {
+            console.error('[aiAutoReplySupport] Telegram send failed:', e?.message);
+          }
+        }
+
+        await db.ref('ai_queue/log').push({
+          action: 'support_escalated_reply',
+          ticketId,
+          category: detectedCategory,
+          urgency,
+          provider: aiConfig.provider,
+          model: aiConfig.model,
+          timestamp: now,
+        });
+
+      } else {
+        // Авто-ответ для простых категорий
+        const replyRef = db.ref(`support_messages/${ticketId}`).push();
+        await replyRef.set({
+          ticketId,
+          senderId: 'ai-assistant',
+          senderRole: 'admin',
+          text: parsed.suggestedReply,
+          isAiReply: true,
+          timestamp: now,
+        });
+
+        await db.ref(`support_tickets/${ticketId}`).update({
+          aiReplied: true,
+          aiRepliedAt: now,
+          aiProcessing: false,
+          aiCategory: detectedCategory,
+          lastAdminMessage: parsed.suggestedReply.slice(0, 100),
+          updatedAt: now,
+        });
+
+        await db.ref('ai_queue/log').push({
+          action: 'support_auto_reply',
+          ticketId,
+          category: detectedCategory,
+          provider: aiConfig.provider,
+          model: aiConfig.model,
+          timestamp: now,
+        });
+      }
+
+    } catch (err) {
+      console.error('[aiAutoReplySupport] error:', err?.message);
+      await db.ref(`support_tickets/${ticketId}`).update({ aiProcessing: false }).catch((e) => {
+        console.error('[aiAutoReplySupport] aiProcessing reset failed:', e?.message);
+      });
+      await writeOpsError('aiAutoReplySupport', err, { ticketId });
+    }
+
+    return null;
+  });
+
+// =============================================================
+//  aiAutoTriageReports — классификация жалоб при создании
+// =============================================================
+
+exports.aiAutoTriageReports = functionsV1.database
+  .ref('reports/{reportId}')
+  .onCreate(async (snapshot, context) => {
+    const report = snapshot.val();
+    const { reportId } = context.params;
+
+    if (!report) return null;
+
+    const db = admin.database();
+
+    try {
+      const autonomousSnap = await db.ref('ai_config/autonomous').once('value');
+      const autonomous = autonomousSnap.val() || {};
+      if (!autonomous.enabled || !autonomous.reportsTriage) return null;
+
+      const aiConfig = await getAiRuntimeConfig(db);
+      if (!isConfiguredAiApiKey(aiConfig.apiKey)) return null;
+
+      const now = Date.now();
+      const reporterId = String(report.reporterId || '');
+      const reason = String(report.reason || 'other');
+      const description = String(report.description || '').trim();
+
+      // Проверка серийного жалобщика (> 5 жалоб за последние 24 ч)
+      let isSerialReporter = false;
+      if (reporterId) {
+        try {
+          const recentSnap = await db.ref('reports')
+            .orderByChild('reporterId').equalTo(reporterId)
+            .limitToLast(10).once('value');
+          let recentCount = 0;
+          const oneDayAgo = now - 24 * 60 * 60 * 1000;
+          recentSnap.forEach((child) => {
+            const r = child.val();
+            if (r && r.createdAt > oneDayAgo) recentCount++;
+          });
+          if (recentCount > 5) isSerialReporter = true;
+        } catch (e) {
+          console.error('[aiAutoTriageReports] serial reporter check failed:', e?.message);
+        }
+      }
+
+      if (isSerialReporter) {
+        await snapshot.ref.update({
+          aiTriaged: true,
+          aiVerdict: 'serial_reporter',
+          status: 'reviewed',
+          reviewNote: 'AI: серийный жалобщик — авто-отклонено',
+          reviewedAt: now,
+          reviewedBy: 'ai-auto',
+        });
+        await db.ref('ai_queue/log').push({
+          action: 'report_auto_dismiss',
+          reportId,
+          reason: 'serial_reporter',
+          provider: aiConfig.provider,
+          timestamp: now,
+        });
+        return null;
+      }
+
+      // AI анализ описания жалобы
+      const reportText = `Тип жалобы: ${reason}\nОписание: ${description || '(нет описания)'}`;
+      const reportSystemPrompt = `Ты — помощник модератора. Проанализируй жалобу пользователя.
+Ответь строго в JSON: {"verdict":"spam"|"revenge"|"legitimate"|"serious","confidence":0.0-0.99,"priority":"low"|"medium"|"high","reason":"пояснение на русском 1 предложение"}
+spam — жалоба без оснований/спам
+revenge — похоже на месть/конкурентную жалобу
+legitimate — обоснованная жалоба, требует проверки
+serious — серьёзное нарушение (насилие, мошенничество, угрозы)`;
+
+      let aiVerdict = null;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const raw = await callAiProviderWithFallback(aiConfig, reportSystemPrompt, reportText);
+          const content = raw?.choices?.[0]?.message?.content || '';
+          const jsonMatch = String(content).match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const p = JSON.parse(jsonMatch[0]);
+            if (p && ['spam','revenge','legitimate','serious'].includes(p.verdict)) {
+              aiVerdict = p;
+              break;
+            }
+          }
+        } catch (e) {
+          console.error('[aiAutoTriageReports] AI call failed:', e?.message);
+        }
+      }
+
+      if (!aiVerdict) return null;
+
+      await snapshot.ref.update({ aiTriaged: true, aiVerdict: aiVerdict.verdict });
+
+      if ((aiVerdict.verdict === 'spam' || aiVerdict.verdict === 'revenge') && aiVerdict.confidence >= 0.85) {
+        // Авто-отклонение спам-жалобы
+        await snapshot.ref.update({
+          status: 'reviewed',
+          reviewNote: `AI: ${aiVerdict.verdict} — ${aiVerdict.reason}`,
+          reviewedAt: now,
+          reviewedBy: 'ai-auto',
+        });
+        await db.ref('ai_queue/log').push({
+          action: 'report_auto_dismiss',
+          reportId,
+          reason: aiVerdict.verdict,
+          confidence: aiVerdict.confidence,
+          provider: aiConfig.provider,
+          timestamp: now,
+        });
+      } else {
+        // Эскалация реальной жалобы
+        await db.ref('ai_queue/report_escalations').push({
+          reportId,
+          reporterId: report.reporterId || null,
+          reportedUserId: report.reportedUserId || null,
+          reportedListingId: report.reportedListingId || null,
+          reason,
+          description: description.slice(0, 500),
+          aiVerdict: aiVerdict.verdict,
+          aiConfidence: aiVerdict.confidence,
+          aiPriority: aiVerdict.priority,
+          aiReason: aiVerdict.reason,
+          provider: aiConfig.provider,
+          createdAt: now,
+          status: 'pending',
+        });
+
+        // Telegram для серьёзных нарушений
+        if (aiVerdict.verdict === 'serious') {
+          try {
+            await sendTelegramMessage(
+              `🚨 СЕРЙОЗНА СКАРГА [${reason}]\n${description.slice(0, 200)}\nAI: ${aiVerdict.reason}`,
+            );
+          } catch (e) {
+            console.error('[aiAutoTriageReports] Telegram send failed:', e?.message);
+          }
+        }
+
+        await db.ref('ai_queue/log').push({
+          action: 'report_escalation',
+          reportId,
+          verdict: aiVerdict.verdict,
+          priority: aiVerdict.priority,
+          provider: aiConfig.provider,
+          timestamp: now,
+        });
+      }
+
+    } catch (err) {
+      console.error('[aiAutoTriageReports] error:', err?.message);
+      await writeOpsError('aiAutoTriageReports', err, { reportId });
+    }
+
+    return null;
+  });
+
+// =============================================================
+//  aiCloseStaleAiTickets — авто-закрытие тикетов (AI ответил, нет реакции 24ч)
+// =============================================================
+
+exports.aiCloseStaleAiTickets = functionsV1.pubsub
+  .schedule('every 24 hours')
+  .timeZone('Europe/Kiev')
+  .onRun(async (_context) => {
+    const db = admin.database();
+    try {
+      const autonomousSnap = await db.ref('ai_config/autonomous').once('value');
+      const autonomous = autonomousSnap.val() || {};
+      if (!autonomous.enabled || !autonomous.supportReplies) return null;
+
+      const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+      const ticketsSnap = await db.ref('support_tickets')
+        .orderByChild('aiRepliedAt')
+        .startAt(1)
+        .endAt(cutoff)
+        .limitToFirst(20)
+        .once('value');
+
+      if (!ticketsSnap.exists()) return null;
+
+      let closed = 0;
+      const updates = {};
+      ticketsSnap.forEach((child) => {
+        const t = child.val();
+        if (t && t.aiReplied && t.status === 'open') {
+          updates[`support_tickets/${child.key}/status`] = 'closed';
+          updates[`support_tickets/${child.key}/closedAt`] = Date.now();
+          updates[`support_tickets/${child.key}/closedBy`] = 'ai-auto';
+          updates[`support_tickets/${child.key}/closeReason`] = 'AI відповів, відповіді від користувача не надійшло протягом 24 годин';
+          closed++;
+        }
+      });
+
+      if (closed > 0) {
+        await db.ref('/').update(updates);
+        console.log(`[aiCloseStaleAiTickets] Closed ${closed} stale AI-replied tickets`);
+      }
+    } catch (err) {
+      console.error('[aiCloseStaleAiTickets] error:', err?.message);
+    }
+    return null;
+  });
+
+// =============================================================
+//  aiAutoModeratePhotos — Vision AI модерация фото (каждые 15 мин)
+// =============================================================
+
+const VISION_SYSTEM_PROMPT = `You are a content moderator for a community photo sharing app "Chaika Life" (neighborhood in Kyiv, Ukraine).
+Analyze the image and classify it.
+
+Categories:
+- safe: normal community photo (landscape, pets, events, buildings, people in public settings, nature, neighborhood)
+- review: unclear, low quality, or ambiguous content that needs human review
+- nsfw: explicit sexual or nude content
+- violence: violent, disturbing, or graphic imagery
+- spam: promotional graphics, text-heavy marketing images, screenshots of ads, QR codes
+- personal_data: visible documents, IDs, bank cards, phone numbers, addresses, private information
+
+Return ONLY JSON (no markdown):
+{"verdict":"safe","confidence":0.0-0.99,"explanation":"1 sentence in Russian","flags":[]}`;
+
+async function callVisionClaude(apiKey, model, base64, contentType) {
+  const mediaType = contentType.includes('png') ? 'image/png' : contentType.includes('webp') ? 'image/webp' : 'image/jpeg';
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model,
+      max_tokens: 300,
+      system: VISION_SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: [
+        { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
+        { type: 'text', text: 'Analyze this image.' },
+      ] }],
+      temperature: 0.1,
+    }),
+  });
+  if (!response.ok) {
+    const errText = await response.text().catch(() => '');
+    throw new Error(`Claude Vision API ${response.status}: ${errText.slice(0, 200)}`);
+  }
+  const data = await response.json();
+  return {
+    choices: [{ message: { content: (data.content && data.content[0] && data.content[0].text) || '' } }],
+    usage: { total_tokens: ((data.usage && data.usage.input_tokens) || 0) + ((data.usage && data.usage.output_tokens) || 0) },
+  };
+}
+
+async function callVisionOpenAI(apiKey, model, base64, contentType) {
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: 'system', content: VISION_SYSTEM_PROMPT },
+        { role: 'user', content: [
+          { type: 'image_url', image_url: { url: `data:${contentType};base64,${base64}` } },
+          { type: 'text', text: 'Analyze this image.' },
+        ] },
+      ],
+      max_tokens: 300,
+      temperature: 0.1,
+    }),
+  });
+  if (!response.ok) {
+    const errText = await response.text().catch(() => '');
+    throw new Error(`OpenAI Vision API ${response.status}: ${errText.slice(0, 200)}`);
+  }
+  return response.json();
+}
+
+async function callVisionProvider(provider, model, apiKey, base64, contentType) {
+  switch (provider) {
+    case 'openai': return callVisionOpenAI(apiKey, model, base64, contentType);
+    case 'claude':
+    default: return callVisionClaude(apiKey, model, base64, contentType);
+  }
+}
+
+const PHOTO_SAFE_VERDICTS = new Set(['safe']);
+const PHOTO_REJECT_VERDICTS = new Set(['nsfw', 'violence', 'personal_data']);
+
+exports.aiAutoModeratePhotos = functionsV1.pubsub
+  .schedule('every 15 minutes')
+  .timeZone('Europe/Kiev')
+  .onRun(async (_context) => {
+    const db = admin.database();
+
+    try {
+      const autonomousSnap = await db.ref('ai_config/autonomous').once('value');
+      const autonomous = autonomousSnap.val() || {};
+      if (!autonomous.enabled || !autonomous.photoModeration) return null;
+
+      // Читаем vision конфиг
+      const aiConfig = await getAiRuntimeConfig(db);
+      const visionSnap = await db.ref('ai_config/vision').once('value');
+      const vision = visionSnap.val() || {};
+      const vProvider = vision.provider || 'claude';
+      const vModel = vision.model || 'claude-haiku-4-5-20251001';
+      const vApiKey = vision.apiKey || aiConfig.apiKey;
+
+      if (!isConfiguredAiApiKey(vApiKey)) {
+        console.warn('[aiAutoModeratePhotos] Vision API key not configured');
+        return null;
+      }
+
+      // Читаем пороги
+      const threshSnap = await db.ref('ai_config/thresholds').once('value');
+      const thresh = threshSnap.val() || {};
+      const approveThreshold = Number(thresh.autoApprove) || 0.90;
+      const rejectThreshold = Number(thresh.autoReject) || 0.95;
+
+      // Обрабатываем pending community_photos
+      const photosSnap = await db.ref('community_photos')
+        .orderByChild('status')
+        .equalTo('pending')
+        .limitToFirst(5)
+        .once('value');
+
+      if (!photosSnap.exists()) return null;
+
+      const photos = [];
+      photosSnap.forEach((child) => {
+        const val = child.val();
+        if (!val.ai_auto_processed) photos.push({ id: child.key, ...val });
+      });
+
+      if (photos.length === 0) return null;
+
+      const bucket = admin.storage().bucket();
+      let totalProcessed = 0, totalApproved = 0, totalRejected = 0, totalEscalated = 0;
+
+      for (const photo of photos) {
+        try {
+          const storagePath = photo.storagePath || photo.photoStoragePath || photo.imageStoragePath || photo.imageUri || photo.photoUri || '';
+          if (!storagePath) continue;
+
+          const file = bucket.file(storagePath);
+          const [exists] = await file.exists();
+          if (!exists) continue;
+
+          const [buffer] = await file.download();
+          if (buffer.length > 5 * 1024 * 1024) continue; // >5MB пропускаем
+
+          const base64 = buffer.toString('base64');
+          const [metadata] = await file.getMetadata();
+          const contentType = metadata?.contentType || 'image/jpeg';
+
+          // Вызываем Vision API
+          let parsed = null;
+          for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+              const raw = await callVisionProvider(vProvider, vModel, vApiKey, base64, contentType);
+              parsed = parseAiJsonResponse(raw);
+              if (parsed) break;
+            } catch (e) {
+              console.error('[aiAutoModerateCommunityPhotos] Vision API call failed:', e?.message);
+            }
+          }
+
+          if (!parsed) continue;
+          if (parsed.confidence >= 1.0) { parsed.confidence = 0.8; parsed.verdict = 'review'; }
+
+          totalProcessed++;
+          const now = Date.now();
+
+          if (PHOTO_SAFE_VERDICTS.has(parsed.verdict) && parsed.confidence >= approveThreshold) {
+            // Авто-одобрение безопасного фото
+            await db.ref(`community_photos/${photo.id}`).update({
+              status: 'approved',
+              ai_auto_processed: true,
+              ai_verdict: parsed.verdict,
+              ai_confidence: parsed.confidence,
+              ai_provider: `${vProvider}/${vModel}`,
+              moderatedAt: now,
+              moderatedBy: 'ai-vision',
+              moderationReason: `Vision AI: safe (${Math.round(parsed.confidence * 100)}%)`,
+            });
+            totalApproved++;
+
+          } else if (PHOTO_REJECT_VERDICTS.has(parsed.verdict) && parsed.confidence >= rejectThreshold) {
+            // Авто-отклонение опасного контента
+            await db.ref(`community_photos/${photo.id}`).update({
+              status: 'rejected',
+              ai_auto_processed: true,
+              ai_verdict: parsed.verdict,
+              ai_confidence: parsed.confidence,
+              ai_provider: `${vProvider}/${vModel}`,
+              moderatedAt: now,
+              moderatedBy: 'ai-vision',
+              moderationReason: `Vision AI: ${parsed.verdict} — ${(parsed.explanation || '').slice(0, 200)}`,
+            });
+            totalRejected++;
+
+            // Telegram для NSFW/violence
+            if (parsed.verdict === 'nsfw' || parsed.verdict === 'violence') {
+              try {
+                const emoji = parsed.verdict === 'nsfw' ? '\u{1F534}' : '\u{26A0}';
+                await sendTelegramMessage(`${emoji} ФОТО ЗАБЛОКОВАНО [${parsed.verdict.toUpperCase()}]\nPath: ${storagePath.slice(0, 100)}\nAI: ${(parsed.explanation || '').slice(0, 150)}`);
+              } catch (e) {
+                console.error('[aiAutoModerateCommunityPhotos] Telegram send failed:', e?.message);
+              }
+            }
+
+          } else {
+            // Эскалация — неуверенный результат
+            await db.ref('ai_queue/escalations').push({
+              itemPath: `community_photos/${photo.id}`,
+              section: 'communityPhotos',
+              statusField: 'status',
+              approvedStatus: 'approved',
+              rejectedStatus: 'rejected',
+              itemId: photo.id,
+              textPreview: `[PHOTO] ${parsed.verdict}: ${parsed.explanation || ''}`.slice(0, 400),
+              userId: photo.userId || null,
+              ai_verdict: parsed.verdict,
+              ai_confidence: parsed.confidence,
+              ai_explanation: parsed.explanation || '',
+              ai_flags: parsed.flags || [],
+              provider: `${vProvider}/${vModel}`,
+              model: vModel,
+              createdAt: now,
+              status: 'pending',
+            });
+            await db.ref(`community_photos/${photo.id}`).update({
+              ai_auto_processed: true,
+              ai_escalated: true,
+            });
+            totalEscalated++;
+          }
+
+          await db.ref('ai_queue/log').push({
+            action: PHOTO_SAFE_VERDICTS.has(parsed.verdict) && parsed.confidence >= approveThreshold ? 'photo_auto_approve'
+              : PHOTO_REJECT_VERDICTS.has(parsed.verdict) && parsed.confidence >= rejectThreshold ? 'photo_auto_reject'
+              : 'photo_escalation',
+            section: 'communityPhotos',
+            itemId: photo.id,
+            verdict: parsed.verdict,
+            confidence: parsed.confidence,
+            provider: vProvider,
+            model: vModel,
+            tokensUsed: parsed.tokensUsed || 0,
+            timestamp: now,
+          });
+
+          // Пауза между фото (Vision API rate limits)
+          await new Promise((r) => setTimeout(r, 1000));
+        } catch (err) {
+          console.error(`[aiAutoModeratePhotos] Error on ${photo.id}:`, err?.message);
+        }
+      }
+
+      console.log(`[aiAutoModeratePhotos] Done: processed=${totalProcessed} approved=${totalApproved} rejected=${totalRejected} escalated=${totalEscalated}`);
+
+      await db.ref('ai_queue/photo_last_run').set({
+        timestamp: Date.now(),
+        totalProcessed,
+        totalApproved,
+        totalRejected,
+        totalEscalated,
+      });
+    } catch (err) {
+      console.error('[aiAutoModeratePhotos] Fatal:', err?.message, err?.stack);
+      await writeOpsError('aiAutoModeratePhotos', err, {});
+    }
+
+    return null;
+  });
 
 // =============================================================
 //  Admin Edit Content Item — редактирование заявок модератором
@@ -3336,6 +4977,7 @@ exports.adminSuggestFix = functionsV1.https.onCall(async (data, context) => {
   try {
     const actor = await assertAdminModerationAccess(context);
     const db = admin.database();
+    const aiConfig = await getAiRuntimeConfig(db);
 
     const section = String(data?.section || '').trim();
     const category = String(data?.category || '').trim();
@@ -3348,9 +4990,9 @@ exports.adminSuggestFix = functionsV1.https.onCall(async (data, context) => {
 
     // Rate limit (shared with analyze)
     await checkAiRateLimit(db, actor.uid);
-    await checkAiBudget(db);
+    await checkAiBudget(db, aiConfig.budgetDaily, aiConfig.budgetMonthly);
 
-    if (!AI_API_KEY) {
+    if (!aiConfig.apiKey) {
       return { suggestions: [] };
     }
 
@@ -3379,7 +5021,7 @@ JSON формат:
 
     let rawResponse = null;
     try {
-      rawResponse = await callAiProvider(SUGGEST_SYSTEM_PROMPT, userPrompt);
+      rawResponse = await callAiProviderWithFallback(aiConfig, SUGGEST_SYSTEM_PROMPT, userPrompt);
     } catch (err) {
       console.error('[adminSuggestFix] AI API error:', err?.message);
       return { suggestions: [] };
@@ -3426,8 +5068,8 @@ JSON формат:
       suggestionsCount: suggestions.length,
       moderatorUid: actor.uid,
       timestamp: Date.now(),
-      provider: AI_PROVIDER,
-      model: AI_MODEL,
+      provider: aiConfig.provider,
+      model: aiConfig.model,
       tokensUsed,
     });
 
@@ -3511,13 +5153,14 @@ exports.getAiBudgetUsage = functionsV1.https.onCall(async (_data, context) => {
     const metaSnap = await db.ref('ops/ai_usage/_meta').once('value');
     const meta = metaSnap.val() || {};
 
+    const aiConfig = await getAiRuntimeConfig(db);
     return {
       dailyUsed: Number(meta.dailyTotal) || 0,
-      dailyLimit: AI_BUDGET_DAILY,
+      dailyLimit: aiConfig.budgetDaily,
       monthlyUsed: Number(meta.monthlyTotal) || 0,
-      monthlyLimit: AI_BUDGET_MONTHLY,
-      provider: AI_PROVIDER,
-      model: AI_MODEL,
+      monthlyLimit: aiConfig.budgetMonthly,
+      provider: aiConfig.provider,
+      model: aiConfig.model,
     };
   } catch (error) {
     if (error instanceof functionsV1.https.HttpsError) throw error;
@@ -3548,3 +5191,587 @@ exports.getMyInvitedChildren = functionsV1.https.onCall(async (data, context) =>
   });
   return { children };
 });
+
+// ─────────────────────────────────────────────
+// BUSINESS+ SUBSCRIPTION — MANUAL ADMIN SYSTEM
+// ─────────────────────────────────────────────
+
+const BUSINESS_PLUS_MONTHS_VALID = new Set([1, 3, 6, 12]);
+const BUSINESS_PLUS_MONTH_MS = 30 * 24 * 60 * 60 * 1000;
+
+exports.activateBusinessPlusManual = functionsV1.https.onCall(async (data, context) => {
+  try {
+    const actor = await assertAdminModerationAccess(context);
+    const uid = String(data?.uid || '').trim();
+    if (!uid) {
+      throw new functionsV1.https.HttpsError('invalid-argument', 'uid is required');
+    }
+    const months = Number(data?.months);
+    if (!BUSINESS_PLUS_MONTHS_VALID.has(months)) {
+      throw new functionsV1.https.HttpsError('invalid-argument', 'months must be 1, 3, 6, or 12');
+    }
+    const notes = String(data?.notes || '').slice(0, 300);
+
+    const db = admin.database();
+    const subRef = db.ref(`user_subscription/${uid}`);
+
+    const nowMs = Date.now();
+    const nowIso = new Date(nowMs).toISOString();
+    const durationMs = months * BUSINESS_PLUS_MONTH_MS;
+
+    // Atomic read-modify-write: prevents two simultaneous activations
+    // from both calculating extension from the same base expiresAt
+    const txResult = await subRef.transaction((current) => {
+      const existing = current || {};
+      let baseMs = nowMs;
+      if (existing.plan === 'business_plus' && existing.status === 'active' && existing.expiresAt) {
+        const currentExpiry = new Date(existing.expiresAt).getTime();
+        if (currentExpiry > nowMs) baseMs = currentExpiry;
+      }
+      return {
+        plan: 'business_plus',
+        status: 'active',
+        startedAt: existing.startedAt || nowIso,
+        expiresAt: new Date(baseMs + durationMs).toISOString(),
+        activatedBy: actor.uid,
+        activatedAt: nowIso,
+        paymentMethod: 'monobank_manual',
+        notes,
+      };
+    });
+
+    if (!txResult.committed) {
+      throw new functionsV1.https.HttpsError('aborted', 'subscription_update_conflict');
+    }
+
+    const expiresAt = txResult.snapshot.val().expiresAt;
+    await db.ref(`users/${uid}/subscription`).set({ plan: 'business_plus', expiresAt });
+
+    // Send push notification to user
+    await sendUserNotification(uid, {
+      title: '🏪 Бізнес+ активовано!',
+      body: `Вашу підписку Бізнес+ активовано на ${months} міс. Керуйте карткою закладу вже зараз.`,
+    }, { type: 'business_plus_activated', months: String(months), expiresAt });
+
+    await writeOpsEvent('business_plus_manual_activated', {
+      targetUid: uid,
+      months,
+      expiresAt,
+      actorUid: actor.uid,
+    });
+
+    // Grant 1000 promo credits per month of Business+ subscription
+    const promoCreditsAmount = months * 1000;
+    await grantPromoCredits(db, uid, promoCreditsAmount, actor.uid, `Business+ activated (${months} mo)`, 'business_plus_activation', nowMs);
+
+    return { ok: true, expiresAt, months, promoCreditsGranted: promoCreditsAmount };
+  } catch (error) {
+    if (error instanceof functionsV1.https.HttpsError) throw error;
+    console.error('[activateBusinessPlusManual] error:', error?.message);
+    throw new functionsV1.https.HttpsError('internal', 'Failed to activate Business+');
+  }
+});
+
+exports.cancelBusinessPlusSubscription = functionsV1.https.onCall(async (data, context) => {
+  try {
+    await assertAdminModerationAccess(context);
+    const uid = String(data?.uid || '').trim();
+    if (!uid) {
+      throw new functionsV1.https.HttpsError('invalid-argument', 'uid is required');
+    }
+
+    const db = admin.database();
+    const subRef = db.ref(`user_subscription/${uid}`);
+    const snapshot = await subRef.once('value');
+    const existing = snapshot.val() || {};
+
+    if (existing.plan !== 'business_plus') {
+      throw new functionsV1.https.HttpsError('failed-precondition', 'User does not have Business+ subscription');
+    }
+
+    await subRef.update({
+      plan: 'free',
+      status: 'expired',
+      expiresAt: new Date().toISOString(),
+    });
+    await db.ref(`users/${uid}/subscription`).set({ plan: 'free', expiresAt: null });
+
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof functionsV1.https.HttpsError) throw error;
+    console.error('[cancelBusinessPlusSubscription] error:', error?.message);
+    throw new functionsV1.https.HttpsError('internal', 'Failed to cancel Business+');
+  }
+});
+
+// ─────────────────────────────────────────────
+// PREMIUM SUBSCRIPTION — MANUAL ADMIN SYSTEM
+// ─────────────────────────────────────────────
+
+const PREMIUM_MONTHS_VALID = new Set([1, 3, 6, 12]);
+const PREMIUM_MONTH_MS = 30 * 24 * 60 * 60 * 1000;
+
+exports.activatePremiumManual = functionsV1.https.onCall(async (data, context) => {
+  try {
+    const actor = await assertAdminModerationAccess(context);
+    const uid = String(data?.uid || '').trim();
+    if (!uid) {
+      throw new functionsV1.https.HttpsError('invalid-argument', 'uid is required');
+    }
+    const months = Number(data?.months);
+    if (!PREMIUM_MONTHS_VALID.has(months)) {
+      throw new functionsV1.https.HttpsError('invalid-argument', 'months must be 1, 3, 6, or 12');
+    }
+    const notes = String(data?.notes || '').slice(0, 300);
+
+    const db = admin.database();
+    const subRef = db.ref(`user_subscription/${uid}`);
+    const snapshot = await subRef.once('value');
+    const existing = snapshot.val() || {};
+
+    const nowMs = Date.now();
+    const nowIso = new Date(nowMs).toISOString();
+    const durationMs = months * PREMIUM_MONTH_MS;
+
+    // Extend from current expiresAt if still active
+    let baseMs = nowMs;
+    if (existing.status === 'active' && existing.expiresAt) {
+      const currentExpiry = new Date(existing.expiresAt).getTime();
+      if (currentExpiry > nowMs) {
+        baseMs = currentExpiry;
+      }
+    }
+    const expiresAt = new Date(baseMs + durationMs).toISOString();
+    const startedAt = existing.startedAt || nowIso;
+
+    // Don't downgrade an active Business+ subscription to premium
+    if (existing.plan === 'business_plus' && existing.status === 'active') {
+      const currentExpiry = existing.expiresAt ? new Date(existing.expiresAt).getTime() : 0;
+      if (currentExpiry > nowMs) {
+        throw new functionsV1.https.HttpsError(
+          'failed-precondition',
+          'User has an active Business+ subscription. Cancel it first before activating Premium.',
+        );
+      }
+    }
+
+    const record = {
+      plan: 'premium',
+      status: 'active',
+      startedAt,
+      expiresAt,
+      activatedBy: actor.uid,
+      activatedAt: nowIso,
+      paymentMethod: 'monobank_manual',
+      notes,
+    };
+
+    await subRef.set(record);
+    await db.ref(`users/${uid}/subscription`).set({ plan: 'premium', expiresAt });
+
+    await writeOpsEvent('premium_manual_activated', {
+      targetUid: uid,
+      months,
+      expiresAt,
+      actorUid: actor.uid,
+    });
+
+    return { ok: true, expiresAt, months };
+  } catch (error) {
+    if (error instanceof functionsV1.https.HttpsError) throw error;
+    console.error('[activatePremiumManual] error:', error?.message);
+    throw new functionsV1.https.HttpsError('internal', 'Failed to activate premium');
+  }
+});
+
+exports.activateTrialPremium = functionsV1.https.onCall(async (_data, context) => {
+  try {
+    const uid = assertRealAuthenticatedUser(context);
+    const db = admin.database();
+    const subRef = db.ref(`user_subscription/${uid}`);
+
+    const nowIso = new Date().toISOString();
+    const expiresAt = new Date(Date.now() + PREMIUM_MONTH_MS).toISOString();
+
+    const result = await subRef.transaction((current) => {
+      if (current && current.trialUsed === true) {
+        return; // abort — trial already used
+      }
+      return {
+        ...(current || {}),
+        plan: 'premium',
+        status: 'trial',
+        startedAt: nowIso,
+        expiresAt,
+        activatedBy: uid,
+        activatedAt: nowIso,
+        paymentMethod: 'trial',
+        notes: 'Free trial - 30 days',
+        trialUsed: true,
+      };
+    });
+
+    if (!result.committed) {
+      throw new functionsV1.https.HttpsError('already-exists', 'Trial has already been used');
+    }
+
+    await db.ref(`users/${uid}/subscription`).set({ plan: 'premium', expiresAt });
+
+    return { ok: true, expiresAt };
+  } catch (error) {
+    if (error instanceof functionsV1.https.HttpsError) throw error;
+    console.error('[activateTrialPremium] error:', error?.message);
+    throw new functionsV1.https.HttpsError('internal', 'Failed to activate trial');
+  }
+});
+
+exports.checkExpiredSubscriptions = functionsV1.pubsub
+  .schedule('0 9 * * *')
+  .timeZone('Europe/Kiev')
+  .onRun(async () => {
+    try {
+      const db = admin.database();
+      const nowIso = new Date().toISOString();
+      const snapshot = await db.ref('user_subscription').once('value');
+      const all = snapshot.val() || {};
+      const updates = {};
+
+      for (const [uid, sub] of Object.entries(all)) {
+        if (!sub || typeof sub !== 'object') continue;
+        const status = sub.status;
+        if (status !== 'active' && status !== 'trial') continue;
+        if (!sub.expiresAt) continue;
+        const expiresAt = new Date(sub.expiresAt).getTime();
+        if (expiresAt >= Date.now()) continue;
+
+        updates[`user_subscription/${uid}/status`] = 'expired';
+        updates[`user_subscription/${uid}/expiresAt`] = nowIso;
+        updates[`users/${uid}/subscription`] = { plan: 'free' };
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await db.ref().update(updates);
+        console.log(`[checkExpiredSubscriptions] expired ${Object.keys(updates).length / 3} subscriptions`);
+      }
+    } catch (error) {
+      console.error('[checkExpiredSubscriptions] error:', error?.message);
+    }
+  });
+
+exports.sendSubscriptionReminders = functionsV1.pubsub
+  .schedule('0 10 * * *')
+  .timeZone('Europe/Kiev')
+  .onRun(async () => {
+    try {
+      const db = admin.database();
+      const snapshot = await db.ref('user_subscription').once('value');
+      const all = snapshot.val() || {};
+      const MS_PER_DAY = 24 * 60 * 60 * 1000;
+      const now = Date.now();
+
+      for (const [uid, sub] of Object.entries(all)) {
+        if (!sub || typeof sub !== 'object') continue;
+        const status = sub.status;
+        if (status !== 'active' && status !== 'trial') continue;
+        if (!sub.expiresAt) continue;
+
+        const expiresMs = new Date(sub.expiresAt).getTime();
+        const daysLeft = Math.floor((expiresMs - now) / MS_PER_DAY);
+
+        let title = '';
+        let body = '';
+
+        if (daysLeft === 7) {
+          title = '\u2B50 Premium \u0427\u0430\u0439\u043A\u0430 Life';
+          body = '\u0412\u0430\u0448\u0430 \u043F\u0456\u0434\u043F\u0438\u0441\u043A\u0430 \u0437\u0430\u043A\u0456\u043D\u0447\u0443\u0454\u0442\u044C\u0441\u044F \u0447\u0435\u0440\u0435\u0437 7 \u0434\u043D\u0456\u0432. \u041F\u0440\u043E\u0434\u043E\u0432\u0436\u0442\u0435 \u0449\u043E\u0431 \u043D\u0435 \u0432\u0442\u0440\u0430\u0442\u0438\u0442\u0438 \u0434\u043E\u0441\u0442\u0443\u043F!';
+        } else if (daysLeft === 3) {
+          title = '\u2B50 Premium \u0427\u0430\u0439\u043A\u0430 Life';
+          body = '\u0417\u0430\u043B\u0438\u0448\u0438\u043B\u043E\u0441\u044C 3 \u0434\u043D\u0456 Premium. \u0417\u0432\u02BC\u044F\u0436\u0456\u0442\u044C\u0441\u044F \u0437 \u043F\u0456\u0434\u0442\u0440\u0438\u043C\u043A\u043E\u044E \u0434\u043B\u044F \u043F\u0440\u043E\u0434\u043E\u0432\u0436\u0435\u043D\u043D\u044F.';
+        } else if (daysLeft === 1) {
+          title = '\u26A0\uFE0F Premium \u0437\u0430\u043A\u0456\u043D\u0447\u0443\u0454\u0442\u044C\u0441\u044F \u0437\u0430\u0432\u0442\u0440\u0430';
+          body = '\u0417\u0430\u0432\u0442\u0440\u0430 \u0432\u0430\u0448 Premium \u0437\u0430\u043A\u0456\u043D\u0447\u0438\u0442\u044C\u0441\u044F. \u041D\u0430\u043F\u0438\u0448\u0456\u0442\u044C \u0432 \u043F\u0456\u0434\u0442\u0440\u0438\u043C\u043A\u0443 \u0449\u043E\u0431 \u043F\u0440\u043E\u0434\u043E\u0432\u0436\u0438\u0442\u0438.';
+        } else if (daysLeft <= 0) {
+          title = 'Premium \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u043E';
+          body = '\u0412\u0430\u0448 Premium \u0427\u0430\u0439\u043A\u0430 Life \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u043E. \u041F\u0435\u0440\u0448\u0438\u0439 \u043C\u0456\u0441\u044F\u0446\u044C \u0437\u0430\u0432\u0436\u0434\u0438 \u0431\u0435\u0437\u043A\u043E\u0448\u0442\u043E\u0432\u043D\u043E \u0434\u043B\u044F \u043D\u043E\u0432\u0438\u0445 \u0443\u0447\u0430\u0441\u043D\u0438\u043A\u0456\u0432!';
+        }
+
+        if (!title) continue;
+
+        try {
+          const userSnap = await db.ref(`users/${uid}/fcmToken`).once('value');
+          const fcmToken = userSnap.val();
+          if (!fcmToken || typeof fcmToken !== 'string') continue;
+
+          await admin.messaging().send({
+            token: fcmToken,
+            notification: { title, body },
+            android: { priority: 'high' },
+            apns: { payload: { aps: { badge: 1 } } },
+          });
+        } catch (sendErr) {
+          console.error(`[sendSubscriptionReminders] failed for uid ${uid}:`, sendErr?.message);
+        }
+      }
+    } catch (error) {
+      console.error('[sendSubscriptionReminders] error:', error?.message);
+    }
+  });
+
+exports.cancelPremiumSubscription = functionsV1.https.onCall(async (data, context) => {
+  try {
+    const actor = await assertAdminModerationAccess(context);
+    const uid = String(data?.uid || '').trim();
+    if (!uid) {
+      throw new functionsV1.https.HttpsError('invalid-argument', 'uid is required');
+    }
+
+    const db = admin.database();
+    const nowIso = new Date().toISOString();
+    await db.ref(`user_subscription/${uid}`).update({
+      status: 'expired',
+      expiredAt: nowIso,
+      cancelledBy: actor.uid,
+      cancelledAt: nowIso,
+    });
+    await db.ref(`users/${uid}/subscription`).set({ plan: 'free' });
+
+    await writeOpsEvent('premium_cancelled_by_admin', {
+      targetUid: uid,
+      actorUid: actor.uid,
+    });
+
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof functionsV1.https.HttpsError) throw error;
+    console.error('[cancelPremiumSubscription] error:', error?.message);
+    throw new functionsV1.https.HttpsError('internal', 'Failed to cancel subscription');
+  }
+});
+
+// ── Business claim approval/rejection push notification ──────────────────────
+// Fires whenever a business_plus_claims/{placeId} record is written.
+// Sends a push notification to the owner when status changes to approved/rejected.
+exports.onBusinessClaimStatusChange = functionsV1.database
+  .ref('business_plus_claims/{placeId}')
+  .onWrite(async (change, context) => {
+    try {
+      const before = change.before.val();
+      const after = change.after.val();
+
+      if (!after) return null; // record deleted — nothing to do
+
+      const newStatus = String(after.status || '').toLowerCase();
+      const oldStatus = String(before?.status || '').toLowerCase();
+
+      // Only react when status actually transitions to approved or rejected
+      if (newStatus === oldStatus) return null;
+      if (newStatus !== 'approved' && newStatus !== 'rejected') return null;
+
+      const ownerUid = String(after.ownerUid || '').trim();
+      const placeName = String(after.placeName || 'Ваш заклад').trim();
+      const rejectReason = String(after.rejectReason || '').trim();
+      const placeId = String(context.params.placeId || '').trim();
+
+      if (!ownerUid) return null;
+
+      const title = newStatus === 'approved'
+        ? '✅ Заявку схвалено!'
+        : '❌ Заявку відхилено';
+
+      const body = newStatus === 'approved'
+        ? `«${placeName}» — ваше право власності підтверджено. Тепер ви можете керувати карткою закладу.`
+        : `«${placeName}» — заявку відхилено.${rejectReason ? ` Причина: ${rejectReason}` : ''}`;
+
+      await sendUserNotification(ownerUid, { title, body }, {
+        type: 'business_claim_status',
+        status: newStatus,
+        placeId,
+        placeName,
+      });
+
+      return null;
+    } catch (error) {
+      await writeOpsError('onBusinessClaimStatusChange', error, {
+        placeId: context.params.placeId || null,
+      });
+      return null;
+    }
+  });
+
+exports.getAllPremiumSubscriptions = functionsV1.https.onCall(async (_data, context) => {
+  try {
+    await assertAdminModerationAccess(context);
+    const db = admin.database();
+    const snapshot = await db.ref('user_subscription').once('value');
+    const all = snapshot.val() || {};
+    const result = [];
+    for (const [uid, sub] of Object.entries(all)) {
+      if (!sub || typeof sub !== 'object') continue;
+      if (!sub.plan || sub.plan === 'free') continue;
+      result.push({ uid, ...sub });
+    }
+    return { subscriptions: result };
+  } catch (error) {
+    if (error instanceof functionsV1.https.HttpsError) throw error;
+    console.error('[getAllPremiumSubscriptions] error:', error?.message);
+    throw new functionsV1.https.HttpsError('internal', 'Failed to load subscriptions');
+  }
+});
+
+// Scheduled: purge security_logs entries older than 30 days, keep at most 1000 records.
+// Runs daily at 03:00 UTC.
+exports.purgeSecurityLogs = functionsV1.pubsub
+  .schedule('0 3 * * *')
+  .timeZone('UTC')
+  .onRun(async () => {
+    const db = admin.database();
+    const logsRef = db.ref('security_logs');
+    const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+    const MAX_RECORDS = 1000;
+    const cutoff = Date.now() - RETENTION_MS;
+
+    try {
+      const snap = await logsRef.once('value');
+      if (!snap.exists()) return;
+
+      const entries = [];
+      snap.forEach((child) => {
+        entries.push({ key: child.key, ts: child.val()?.timestamp ?? 0 });
+      });
+
+      // Delete entries older than 30 days
+      const toDelete = entries.filter((e) => e.ts < cutoff);
+      // Also delete oldest entries beyond MAX_RECORDS cap
+      const remaining = entries.filter((e) => e.ts >= cutoff);
+      if (remaining.length > MAX_RECORDS) {
+        const overflow = remaining.sort((a, b) => a.ts - b.ts).slice(0, remaining.length - MAX_RECORDS);
+        toDelete.push(...overflow);
+      }
+
+      if (toDelete.length === 0) {
+        console.log('[purgeSecurityLogs] nothing to delete');
+        return;
+      }
+
+      const updates = {};
+      for (const { key } of toDelete) {
+        updates[key] = null;
+      }
+      await logsRef.update(updates);
+      console.log(`[purgeSecurityLogs] deleted ${toDelete.length} entries`);
+    } catch (err) {
+      console.error('[purgeSecurityLogs] error:', err?.message);
+    }
+  }
+);
+
+// ─── Purge stale operational & diagnostic data ──────────────────────────────
+// Runs daily at 04:00 UTC. Removes entries older than the configured TTL.
+// Flat targets: diagnostics/runtime (14d), diagnostics/runtime_moderation (14d),
+//   ops/events (30d), ops/errors (30d), moderation_analysis_cache (7d).
+// Per-user targets (paginated): bonus_idempotency (30d), notifications (30d read),
+//   bonus_transactions (180d).
+exports.purgeStaleData = functionsV1.pubsub
+  .schedule('0 4 * * *')
+  .timeZone('UTC')
+  .onRun(async () => {
+    const db = admin.database();
+    const now = Date.now();
+
+    // Paths with a simple "at" or "timestamp" field and their retention period in ms.
+    const targets = [
+      { path: 'diagnostics/runtime', tsField: 'at', retentionMs: 14 * 24 * 60 * 60 * 1000 },
+      { path: 'diagnostics/runtime_moderation', tsField: 'at', retentionMs: 14 * 24 * 60 * 60 * 1000 },
+      { path: 'ops/events', tsField: 'at', retentionMs: 30 * 24 * 60 * 60 * 1000 },
+      { path: 'ops/errors', tsField: 'at', retentionMs: 30 * 24 * 60 * 60 * 1000 },
+      { path: 'moderation_analysis_cache', tsField: 'cachedAt', retentionMs: 7 * 24 * 60 * 60 * 1000 },
+    ];
+
+    for (const { path, tsField, retentionMs } of targets) {
+      try {
+        const cutoff = now - retentionMs;
+        const snap = await db.ref(path).orderByChild(tsField).endAt(cutoff).limitToFirst(500).once('value');
+        const val = snap.val();
+        if (!val) {
+          console.log(`[purgeStaleData] ${path}: nothing to delete`);
+          continue;
+        }
+        const keys = Object.keys(val);
+        const updates = {};
+        for (const key of keys) {
+          updates[`${path}/${key}`] = null;
+        }
+        await db.ref().update(updates);
+        console.log(`[purgeStaleData] ${path}: deleted ${keys.length} entries`);
+      } catch (err) {
+        console.error(`[purgeStaleData] ${path} error:`, err?.message);
+      }
+    }
+
+    // ── Helper: paginated cleanup for per-user keyed nodes ──
+    // Processes users in pages of PAGE_SIZE. Each invocation handles up to
+    // MAX_DELETES total deletions across all pages to stay within function timeout.
+    const PAGE_SIZE = 100;
+    const MAX_DELETES = 2000;
+
+    const purgePerUserNode = async (nodePath, filterFn, label) => {
+      try {
+        let cursor = null;
+        let totalDeleted = 0;
+
+        while (totalDeleted < MAX_DELETES) {
+          let pageQuery = db.ref(nodePath).orderByKey().limitToFirst(PAGE_SIZE);
+          if (cursor) {
+            pageQuery = db.ref(nodePath).orderByKey().startAfter(cursor).limitToFirst(PAGE_SIZE);
+          }
+          const pageSnap = await pageQuery.once('value');
+          const pageData = pageSnap.val();
+          if (!pageData) break;
+
+          const uids = Object.keys(pageData);
+          if (uids.length === 0) break;
+          cursor = uids[uids.length - 1];
+
+          const updates = {};
+          let pageCount = 0;
+          for (const uid of uids) {
+            const children = pageData[uid];
+            if (!children || typeof children !== 'object') continue;
+            for (const childKey of Object.keys(children)) {
+              if (filterFn(children[childKey])) {
+                updates[`${nodePath}/${uid}/${childKey}`] = null;
+                pageCount += 1;
+              }
+            }
+            if (totalDeleted + pageCount >= MAX_DELETES) break;
+          }
+
+          if (pageCount > 0) {
+            await db.ref().update(updates);
+            totalDeleted += pageCount;
+          }
+
+          // If we got fewer UIDs than PAGE_SIZE, we've reached the end.
+          if (uids.length < PAGE_SIZE) break;
+        }
+
+        console.log(`[purgeStaleData] ${label}: deleted ${totalDeleted} entries`);
+      } catch (err) {
+        console.error(`[purgeStaleData] ${label} error:`, err?.message);
+      }
+    };
+
+    // Purge bonus_idempotency keys older than 30 days.
+    // Values are plain timestamps: bonus_idempotency/{uid}/{key} = number.
+    const IDEMP_CUTOFF = now - 30 * 24 * 60 * 60 * 1000;
+    await purgePerUserNode('bonus_idempotency', (val) => typeof val === 'number' && val < IDEMP_CUTOFF, 'bonus_idempotency');
+
+    // Purge read notifications older than 30 days.
+    const NOTIF_CUTOFF = now - 30 * 24 * 60 * 60 * 1000;
+    await purgePerUserNode('notifications', (n) => n && n.read === true && typeof n.createdAt === 'number' && n.createdAt < NOTIF_CUTOFF, 'notifications');
+
+    // Purge bonus_transactions older than 6 months.
+    // Structure: bonus_transactions/{uid}/{pushId} = { createdAt, ... }.
+    const TX_CUTOFF = now - 180 * 24 * 60 * 60 * 1000;
+    await purgePerUserNode('bonus_transactions', (tx) => tx && typeof tx.createdAt === 'number' && tx.createdAt < TX_CUTOFF, 'bonus_transactions');
+  });

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Dimensions, Easing, Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, Easing, Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
@@ -8,6 +8,7 @@ import { ensureFirebaseAuth } from '../firebase-auth-session';
 import { safeNavigate } from '../utils/safeNavigation';
 import { RootState } from '../redux/store';
 import { LIGHT_ORBS, SCREEN_THEME } from '../utils/screenTheme';
+import { useAppTheme } from '../hooks/useAppTheme';
 import TactileIcon from '../components/TactileIcon';
 import { openRequestFormWithLimitCheck } from '../utils/requestFormLimitGuard';
 import MiniUserAvatar from '../components/MiniUserAvatar';
@@ -36,6 +37,13 @@ const UI_TEXT = {
   ua: {
     quickLabel: 'ВСІ ЗАЯВКИ ЧАЙКИ',
     quickDesc: 'Відкрити живий список заявок',
+    activityTitle: 'сьогодні активність',
+    activeUsers: (count: number) => `активні за добу: ${count}`,
+    activityFallback: 'активність за добу',
+    sosCaption: 'допомога сусідів сьогодні',
+    offerCaption: 'робота і бізнес сьогодні',
+    seeMore: 'Більше',
+    seeLess: 'Згорнути',
     topics: [
       { label: 'Допомога сусідам', desc: 'Термінові запити від мешканців - тільки сьогодні', screen: 'HelpNeighborsScreen', icon: 'hand-heart-outline', accent: SCREEN_THEME.woodGreen },
       { label: 'Нова заявка', desc: 'Категорія, деталі або терміново - одна форма', screen: 'RequestFormScreen', icon: 'clipboard-edit-outline', accent: SCREEN_THEME.terracotta },
@@ -47,6 +55,13 @@ const UI_TEXT = {
   ru: {
     quickLabel: 'ВСЕ ЗАЯВКИ ЧАЙКИ',
     quickDesc: 'Открыть живой список заявок',
+    activityTitle: 'сегодня активность',
+    activeUsers: (count: number) => `активные за сутки: ${count}`,
+    activityFallback: 'активность за сутки',
+    sosCaption: 'помощь соседей сегодня',
+    offerCaption: 'работа и бизнес сегодня',
+    seeMore: 'Больше',
+    seeLess: 'Свернуть',
     topics: [
       { label: 'Помощь соседям', desc: 'Срочные запросы жителей - только сегодня', screen: 'HelpNeighborsScreen', icon: 'hand-heart-outline', accent: SCREEN_THEME.woodGreen },
       { label: 'Новая заявка', desc: 'Категория, детали или срочно - одна форма', screen: 'RequestFormScreen', icon: 'clipboard-edit-outline', accent: SCREEN_THEME.terracotta },
@@ -58,6 +73,13 @@ const UI_TEXT = {
   en: {
     quickLabel: 'ALL CHAIKA REQUESTS',
     quickDesc: 'Open live request list',
+    activityTitle: "today's activity",
+    activeUsers: (count: number) => `active in 24h: ${count}`,
+    activityFallback: 'activity in 24h',
+    sosCaption: 'neighbor help today',
+    offerCaption: 'jobs and business today',
+    seeMore: 'More',
+    seeLess: 'Less',
     topics: [
       { label: 'Neighbor Help', desc: 'Urgent requests from residents - today only', screen: 'HelpNeighborsScreen', icon: 'hand-heart-outline', accent: SCREEN_THEME.woodGreen },
       { label: 'New Request', desc: 'Category, details, or urgent - one form', screen: 'RequestFormScreen', icon: 'clipboard-edit-outline', accent: SCREEN_THEME.terracotta },
@@ -68,7 +90,8 @@ const UI_TEXT = {
   },
 } as const;
 
-const SCREEN_W = Dimensions.get('window').width;
+import { SCREEN_W as _SCREEN_W } from '../utils/webDimensions';
+const SCREEN_W = _SCREEN_W;
 const SOS_MAX_VISIBLE_COUNT = 20;
 const OFFERS_MAX_VISIBLE_COUNT = 20;
 
@@ -94,14 +117,16 @@ const isCreatedToday = (value: string | number | Date | undefined) => {
 const RequestTopicScreen: React.FC = () => {
   const navigation =
     useNavigation<NavigationProp<Record<string, object | undefined>>>();
+  const { colors } = useAppTheme();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const text = UI_TEXT[language];
   const currentUser = useSelector((state: RootState) => state.auth.user) as User | null;
+  const [topicsExpanded, setTopicsExpanded] = useState(false);
   const [todayOffersCount, setTodayOffersCount] = useState(0);
   const [offerActivityUsers, setOfferActivityUsers] = useState<ActivityUser[]>([]);
   const todayHelpRequests = useSelector((state: RootState) => selectTodayHelpRequests(state)) as HelpRequest[];
   const sosRequests = useMemo(
-    () => todayHelpRequests.filter((request) => request.isBurning && request.expiresAt > new Date()),
+    () => todayHelpRequests.filter((request) => request.isBurning && new Date(request.expiresAt).getTime() > Date.now()),
     [todayHelpRequests]
   );
   const sosUsers = useMemo<ActivityUser[]>(() => {
@@ -198,8 +223,8 @@ const RequestTopicScreen: React.FC = () => {
   }, []);
 
   const activeUsersLabel = activeAvatarUsers.length > 0
-    ? `активные за сутки: ${activeAvatarUsers.length}`
-    : 'активность за сутки';
+    ? text.activeUsers(activeAvatarUsers.length)
+    : text.activityFallback;
 
   const shimmerTranslate = shimmerX.interpolate({
     inputRange: [0, 1],
@@ -215,7 +240,7 @@ const RequestTopicScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View pointerEvents="none" style={styles.backgroundOrbs}>
         {LIGHT_ORBS.map((orb, index) => (
           <View
@@ -239,8 +264,12 @@ const RequestTopicScreen: React.FC = () => {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Image source={require('../../assets/WEBP-version/Operator.webp')} style={styles.headerImage} resizeMode="cover" />
 
-        <View style={styles.activityPanel}>
-          <Text style={styles.activityTitle}>сегодня активность</Text>
+        <TouchableOpacity
+          style={styles.activityPanel}
+          onPress={() => safeNavigate(navigation, 'OnlineChatTab')}
+          activeOpacity={0.88}
+        >
+          <Text style={styles.activityTitle}>{text.activityTitle}</Text>
           <View style={styles.activityRow}>
             <View style={styles.activityAvatars}>
               {[0, 1, 2].map((index) => {
@@ -267,7 +296,7 @@ const RequestTopicScreen: React.FC = () => {
                   <Text style={styles.sosText}>SOS {sosRequests.length}</Text>
                 </View>
               </View>
-              <Text style={styles.sosCaption}>помощь соседей сегодня</Text>
+              <Text style={styles.sosCaption}>{text.sosCaption}</Text>
             </View>
           </View>
           <View style={styles.offerRow}>
@@ -279,10 +308,10 @@ const RequestTopicScreen: React.FC = () => {
                   <Text style={styles.offerText}>😃 {todayOffersCount}</Text>
                 </View>
               </View>
-              <Text style={styles.offerCaption}>работа и бизнес сегодня</Text>
+              <Text style={styles.offerCaption}>{text.offerCaption}</Text>
             </View>
           </View>
-        </View>
+        </TouchableOpacity>
 
         <View style={styles.quickGrid}>
           <TouchableOpacity
@@ -300,7 +329,7 @@ const RequestTopicScreen: React.FC = () => {
         </View>
 
         <View style={styles.topicsGrid}>
-          {text.topics.map((topic) => (
+          {text.topics.filter(t => t.screen !== 'RequestFormScreen' && t.screen !== 'RatingScreen').map((topic) => (
             <TouchableOpacity
               key={topic.screen}
               style={styles.topicCard}
@@ -318,6 +347,28 @@ const RequestTopicScreen: React.FC = () => {
               </View>
             </TouchableOpacity>
           ))}
+          {topicsExpanded && text.topics.filter(t => t.screen === 'RequestFormScreen' || t.screen === 'RatingScreen').map((topic) => (
+            <TouchableOpacity
+              key={topic.screen}
+              style={styles.topicCard}
+              onPress={() => openTopic(topic.screen)}
+              activeOpacity={0.86}
+            >
+              <View style={styles.topicGloss} />
+              <View style={styles.topicRow}>
+                <TactileIcon icon={topic.icon} size={46} iconSize={21} backgroundColor={topic.accent} />
+                <View style={styles.topicCopy}>
+                  <Text style={styles.topicLabel}>{topic.label}</Text>
+                  <Text style={styles.topicDesc}>{topic.desc}</Text>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
+              </View>
+            </TouchableOpacity>
+          ))}
+          <TouchableOpacity style={styles.seeMoreBtn} onPress={() => setTopicsExpanded(v => !v)} activeOpacity={0.8}>
+            <Text style={styles.seeMoreText}>{topicsExpanded ? text.seeLess : text.seeMore}</Text>
+            <MaterialCommunityIcons name={topicsExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={SCREEN_THEME.accentGold} />
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -489,6 +540,24 @@ const styles = StyleSheet.create({
   topicCopy: { flex: 1, marginLeft: 12, marginRight: 8 },
   topicLabel: { fontSize: 15, fontWeight: '900', color: SCREEN_THEME.textPrimary },
   topicDesc: { fontSize: 12, color: SCREEN_THEME.textSecondary, marginTop: 3, fontWeight: '600' },
+  seeMoreBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 10,
+    borderRadius: 14,
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderWidth: 1,
+    borderColor: '#E4D0AB',
+    marginTop: 2,
+  },
+  seeMoreText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#21041B',
+    letterSpacing: 0.5,
+  },
 });
 
 export default RequestTopicScreen;

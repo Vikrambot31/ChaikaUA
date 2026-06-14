@@ -59,6 +59,10 @@ deploy_cli_config/
 tools/
 android/
 
+# Temporary files and diagnostic reports (auto-generated, never commit)
+временные/
+diagnostics-reports/history/
+
 # Local/generated document extraction folders and ad-hoc reports
 Info--/
 Biz-PROCESS-MONITOR/

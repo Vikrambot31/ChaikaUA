@@ -15,16 +15,23 @@ import { PhotoApprovalPage } from './pages/PhotoApprovalPage';
 import { ReleasesPage } from './pages/ReleasesPage';
 import { SecurityPage } from './pages/SecurityPage';
 import { AIDiagnosticsPage } from './pages/AIDiagnosticsPage';
+import { AiControlCenterPage } from './pages/AiControlCenterPage';
 import { SupportPage } from './pages/SupportPage';
 import { BonusCreditsPage } from './pages/BonusCreditsPage';
 import { AdChatPage } from './pages/AdChatPage';
+import { PremiumPage } from './pages/PremiumPage';
+import { BusinessPlusModerationPage } from './pages/BusinessPlusModerationPage';
+import { FeatureRatingsPage } from './pages/FeatureRatingsPage';
+import { TopListingsModerationPage } from './pages/TopListingsModerationPage';
+import { ReportsModerationPage } from './pages/ReportsModerationPage';
+import { UserBlocksPage } from './pages/UserBlocksPage';
 import { ViewModeProvider } from './contexts/ViewModeContext';
 import { DashboardProvider } from './contexts/DashboardContext';
 
 const AppRulesPage = lazy(() => import('./pages/AppRulesPage'));
 
 const VALID_PAGES = new Set<AdminPageKey>([
-  'dashboard', 'moderation', 'archive', 'invite_access', 'guarantor_tree', 'access_control', 'security', 'errors', 'photo_approval', 'releases', 'ai_diagnostics', 'app_rules', 'support', 'bonus_credits', 'ad_chat',
+  'dashboard', 'moderation', 'archive', 'invite_access', 'guarantor_tree', 'access_control', 'security', 'errors', 'photo_approval', 'releases', 'ai_diagnostics', 'ai_control', 'app_rules', 'support', 'bonus_credits', 'ad_chat', 'premium', 'business_plus', 'feature_ratings', 'top_listings', 'reports', 'user_blocks',
 ]);
 
 const getPageFromHash = (): AdminPageKey => {
@@ -72,10 +79,17 @@ export const App = () => {
     photo_approval: 'Одобрение фото',
     releases: 'Релизы',
     ai_diagnostics: 'AI Diagnostics',
+    ai_control: 'AI Control Center',
     app_rules: 'Серверні правила',
     support: 'Служба Підтримки',
     bonus_credits: 'Бонуси та кредити',
     ad_chat: 'Рекламний чат',
+    premium: 'Premium підписки',
+    business_plus: 'Бізнес+ картки',
+    feature_ratings: 'Оцінка функцій',
+    top_listings: 'Місця від юзерів',
+    reports: 'Скарги',
+    user_blocks: 'Блокування користувачів',
   };
 
   const renderPage = () => {
@@ -89,9 +103,16 @@ export const App = () => {
     if (activePage === 'photo_approval') return <PhotoApprovalPage />;
     if (activePage === 'releases') return <ReleasesPage />;
     if (activePage === 'ai_diagnostics') return <AIDiagnosticsPage role={access.role} userEmail={access.user.email || ''} />;
+    if (activePage === 'ai_control') return <AiControlCenterPage user={access.user} />;
     if (activePage === 'support') return <SupportPage />;
     if (activePage === 'bonus_credits') return <BonusCreditsPage />;
     if (activePage === 'ad_chat') return <AdChatPage />;
+    if (activePage === 'premium') return <PremiumPage />;
+    if (activePage === 'business_plus') return <BusinessPlusModerationPage />;
+    if (activePage === 'feature_ratings') return <FeatureRatingsPage />;
+    if (activePage === 'top_listings') return <TopListingsModerationPage />;
+    if (activePage === 'reports') return <ReportsModerationPage />;
+    if (activePage === 'user_blocks') return <UserBlocksPage />;
     if (activePage === 'app_rules') {
       return (
         <Suspense fallback={<div className="loadingScreen">Завантаження серверних правил...</div>}>

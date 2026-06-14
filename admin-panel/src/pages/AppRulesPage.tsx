@@ -1,23 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AppRulesSectionTable } from '../components/app-rules/AppRulesSectionTable';
+import { AppRulesZonePanel } from '../components/app-rules/AppRulesZonePanel';
 import { AppRulesToolbar, type AppRulesViewMode } from '../components/app-rules/AppRulesToolbar';
 import {
+  buildZoneGroups,
   generateAppRulesSnapshot,
   loadCachedAppRulesSnapshot,
   sanitizeSnapshotForExport,
   snapshotToMarkdown,
 } from '../services/appRules/appRulesService';
-import type { AppRuleRisk, AppRuleStatus, AppRulesSection, AppRulesSnapshot } from '../types/appRules';
+import type { AppRuleRisk, AppRuleStatus, AppRulesSnapshot, AppRulesZoneGroup } from '../types/appRules';
 import type { SecurityRole } from '../services/authService';
 
 const REFRESH_INTERVAL_MS = 2 * 60 * 1000;
-
-const riskLabel: Record<AppRuleRisk, string> = {
-  critical: 'Критический риск',
-  high: 'Высокий риск',
-  medium: 'Средний риск',
-  low: 'Низкий риск',
-};
 
 const downloadText = (fileName: string, text: string, type: string): void => {
   const blob = new Blob([text], { type });
@@ -29,22 +23,15 @@ const downloadText = (fileName: string, text: string, type: string): void => {
   URL.revokeObjectURL(url);
 };
 
-const isRealProblem = (item: { status: AppRuleStatus; risk: AppRuleRisk }): boolean =>
-  item.status === 'critical' ||
-  item.status === 'warning' ||
-  item.risk === 'critical' ||
-  item.risk === 'high' ||
-  (item.status === 'missing' && item.risk !== 'low');
-
-const filterSection = (
-  section: AppRulesSection,
+const filterZoneGroup = (
+  group: AppRulesZoneGroup,
   search: string,
   statusFilter: AppRuleStatus | 'all',
   riskFilter: AppRuleRisk | 'all',
   viewMode: AppRulesViewMode,
-): AppRulesSection => {
+): AppRulesZoneGroup => {
   const query = search.trim().toLowerCase();
-  const items = (section.items ?? []).filter((item) => {
+  const items = group.items.filter((item) => {
     const matchesSearch = !query || [
       item.category,
       item.name,
@@ -55,14 +42,29 @@ const filterSection = (
       item.evidence,
       item.source?.path,
       (item.tags ?? []).join(' '),
+      item.designLabel ?? '',
     ].join(' ').toLowerCase().includes(query);
+
     const matchesStatus = statusFilter === 'all' || item.status === statusFilter;
     const matchesRisk = riskFilter === 'all' || item.risk === riskFilter;
-    const matchesMode = viewMode === 'all' || isRealProblem(item);
+
+    // In "problems" mode, reference zone only shows non-info/non-active items
+    // Action and monitor zones always show their items (they ARE the problems)
+    const matchesMode =
+      viewMode === 'all' ||
+      group.zone === 'action' ||
+      group.zone === 'monitor' ||
+      (item.status !== 'active' && item.status !== 'info');
+
     return matchesSearch && matchesStatus && matchesRisk && matchesMode;
   });
 
-  return { ...section, items };
+  const actionCount =
+    group.zone === 'action'
+      ? items.length
+      : items.filter((item) => item.status === 'warning' || item.status === 'missing').length;
+
+  return { ...group, items, actionCount };
 };
 
 type AppRulesPageProps = {
@@ -100,43 +102,29 @@ const AppRulesContent = () => {
     return () => window.clearInterval(interval);
   }, [refresh]);
 
-  const filteredSections = useMemo(
-    () => snapshot?.sections.map((section) => filterSection(section, search, statusFilter, riskFilter, viewMode)) ?? [],
-    [riskFilter, search, snapshot, statusFilter, viewMode],
-  );
-
-  const allItems = useMemo(
-    () => snapshot?.sections.flatMap((section) => section.items) ?? [],
+  // Use zones from snapshot, or build them on the fly if cache is pre-v2
+  const rawZones = useMemo(
+    () => snapshot?.zones ?? buildZoneGroups(snapshot?.sections.flatMap((s) => s.items) ?? []),
     [snapshot],
   );
 
-  const filteredItems = useMemo(
-    () => filteredSections.flatMap((section) => section.items),
-    [filteredSections],
+  const filteredZones = useMemo(
+    () => rawZones.map((group) => filterZoneGroup(group, search, statusFilter, riskFilter, viewMode)),
+    [rawZones, search, statusFilter, riskFilter, viewMode],
   );
 
-  const visibleSections = useMemo(
-    () => filteredSections.filter((section) => section.items.length > 0 || (section.id === 'photos' && Boolean(section.pipeline?.length))),
-    [filteredSections],
-  );
+  const actionZone = useMemo(() => filteredZones.find((g) => g.zone === 'action'), [filteredZones]);
+  const monitorZone = useMemo(() => filteredZones.find((g) => g.zone === 'monitor'), [filteredZones]);
+  const referenceZone = useMemo(() => filteredZones.find((g) => g.zone === 'reference'), [filteredZones]);
 
-  const topRiskItems = useMemo(
-    () => filteredItems.filter((item) => item.risk === 'critical' || item.risk === 'high' || item.status === 'warning').slice(0, 6),
-    [filteredItems],
+  const totalItems = useMemo(
+    () => rawZones.reduce((sum, g) => sum + g.items.length, 0),
+    [rawZones],
   );
-
-  const problemItems = useMemo(
-    () => allItems.filter(isRealProblem),
-    [allItems],
+  const filteredCount = useMemo(
+    () => filteredZones.reduce((sum, g) => sum + g.items.length, 0),
+    [filteredZones],
   );
-
-  const stats = useMemo(() => ({
-    total: allItems.length,
-    problems: problemItems.length,
-    critical: problemItems.filter((item) => item.status === 'critical' || item.risk === 'critical').length,
-    high: problemItems.filter((item) => item.risk === 'high').length,
-    warnings: problemItems.filter((item) => item.status === 'warning').length,
-  }), [allItems.length, problemItems]);
 
   const exportJson = () => {
     if (!snapshot) return;
@@ -149,14 +137,9 @@ const AppRulesContent = () => {
 
   const exportMarkdown = () => {
     if (!snapshot) return;
-    const visibleSnapshot: AppRulesSnapshot = {
-      ...snapshot,
-      sections: filteredSections,
-      warnings: filteredItems.filter(isRealProblem),
-    };
     downloadText(
       `chaika-app-rules-${new Date(snapshot.generatedAt).toISOString().slice(0, 10)}.md`,
-      snapshotToMarkdown(visibleSnapshot),
+      snapshotToMarkdown(snapshot),
       'text/markdown;charset=utf-8',
     );
   };
@@ -166,13 +149,14 @@ const AppRulesContent = () => {
       <div className="pageHeader">
         <div>
           <p className="eyebrow">Жива документація</p>
-          <h2>Діагностика серверних правил</h2>
+          <h2>Серверні правила та діагностика</h2>
           <p className="appRulesLead">
-            За замовчуванням показані лише реальні проблеми. Повний список правил доступний через перемикач режиму.
+            Правила розділені на 3 зони: що потребує дії прямо зараз, що потрібно моніторити,
+            і що працює за задумом архітектури (не потребує уваги).
           </p>
         </div>
         <span className={snapshot?.syncStatus === 'ready' ? 'status active' : 'status warning'}>
-          {snapshot?.syncStatus === 'ready' ? 'СИНХРОНИЗИРОВАНО' : refreshing ? 'ОБНОВЛЕНИЕ' : 'ЕСТЬ ПРЕДУПРЕЖДЕНИЯ'}
+          {snapshot?.syncStatus === 'ready' ? 'СИНХРОНІЗОВАНО' : refreshing ? 'ОНОВЛЕННЯ' : 'ЧАСТКОВІ ДАНІ'}
         </span>
       </div>
 
@@ -184,35 +168,25 @@ const AppRulesContent = () => {
         </div>
       ) : null}
 
+      {/* Zone stats — 3 clear numbers */}
       <div className="statsGrid appRulesStats">
-        <article className="metric metric-primary"><span>Реальних проблем</span><strong>{stats.problems}</strong></article>
-        <article className="metric metric-danger"><span>Критично</span><strong>{stats.critical}</strong></article>
-        <article className="metric metric-warning"><span>High risk</span><strong>{stats.high}</strong></article>
-        <article className="metric metric-violet"><span>Warnings</span><strong>{stats.warnings}</strong></article>
+        <article className={`metric ${(actionZone?.actionCount ?? 0) > 0 ? 'metric-danger' : 'metric-primary'}`}>
+          <span>🔴 Потрібна дія</span>
+          <strong>{actionZone?.items.length ?? 0}</strong>
+        </article>
+        <article className={`metric ${(monitorZone?.actionCount ?? 0) > 0 ? 'metric-warning' : 'metric-primary'}`}>
+          <span>🟡 Моніторинг</span>
+          <strong>{monitorZone?.items.length ?? 0}</strong>
+        </article>
+        <article className="metric metric-primary">
+          <span>📋 Архітектура</span>
+          <strong>{referenceZone?.items.length ?? 0}</strong>
+        </article>
+        <article className="metric metric-primary">
+          <span>Всього правил</span>
+          <strong>{totalItems}</strong>
+        </article>
       </div>
-
-      <section className="appRulesRiskBoard" aria-label="Самые критические риски">
-        <div className="appRulesRiskBoardHeader">
-          <span>Приоритет проверки</span>
-          <strong>{problemItems.length ? 'Спочатку реальні проблеми' : 'Реальних проблем не знайдено'}</strong>
-        </div>
-        <div className="appRulesRiskList">
-          {topRiskItems.map((item) => (
-            <article key={item.id} className={`appRulesRiskCard risk-${item.risk}`}>
-              <span>{riskLabel[item.risk]}</span>
-              <strong>{item.name}</strong>
-              <small>{item.category} · {item.source.path}</small>
-            </article>
-          ))}
-          {!topRiskItems.length ? (
-            <article className="appRulesRiskCard risk-low">
-              <span>Диагностика чистая</span>
-              <strong>За поточними фільтрами реальних проблем не знайдено</strong>
-              <small>Перемкніть режим на “Всі правила”, щоб побачити довідкові записи.</small>
-            </article>
-          ) : null}
-        </div>
-      </section>
 
       <AppRulesToolbar
         snapshot={snapshot}
@@ -231,16 +205,23 @@ const AppRulesContent = () => {
       />
 
       <div className="appRulesSyncMeta">
-        <span>Last sync: {snapshot ? new Date(snapshot.generatedAt).toLocaleString() : 'завантаження...'}</span>
-        <span>Auto refresh: кожні {Math.round(REFRESH_INTERVAL_MS / 60000)} хв.</span>
-        <span>Показано: {filteredItems.length} з {stats.total}</span>
+        <span>Оновлено: {snapshot ? new Date(snapshot.generatedAt).toLocaleString() : 'завантаження...'}</span>
+        <span>Авто-оновлення: кожні {Math.round(REFRESH_INTERVAL_MS / 60000)} хв.</span>
+        <span>Показано: {filteredCount} з {totalItems}</span>
         <span>Джерел: {snapshot?.sources?.length ?? 0}</span>
       </div>
 
-      <div className="appRulesSections">
-        {visibleSections.map((section) => (
-          <AppRulesSectionTable key={section.id} section={section} updatedAt={snapshot?.generatedAt ?? null} />
-        ))}
+      {/* 3 Zone panels */}
+      <div className="appRulesZones">
+        {actionZone ? (
+          <AppRulesZonePanel group={actionZone} updatedAt={snapshot?.generatedAt ?? null} search={search} />
+        ) : null}
+        {monitorZone ? (
+          <AppRulesZonePanel group={monitorZone} updatedAt={snapshot?.generatedAt ?? null} search={search} />
+        ) : null}
+        {referenceZone ? (
+          <AppRulesZonePanel group={referenceZone} updatedAt={snapshot?.generatedAt ?? null} search={search} />
+        ) : null}
       </div>
     </section>
   );

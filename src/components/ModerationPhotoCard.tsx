@@ -76,7 +76,7 @@ const ModerationPhotoCard: React.FC<ModerationPhotoCardProps> = ({
     <TactileCard onPress={onPress} style={styles.card}>
       <View style={styles.topRow}>
         <View style={styles.iconBadge}>
-          <MaterialCommunityIcons name="image-multiple-outline" size={20} color="#FFF9EE" />
+          <MaterialCommunityIcons name="image-multiple-outline" size={20} color="#FBF8FD" />
         </View>
         <View style={styles.infoCol}>
           <View style={styles.nameRow}>
@@ -319,16 +319,16 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   modBtnApprove: {
-    backgroundColor: '#2A7B41',
+    backgroundColor: '#7d0e59',
   },
   modBtnDetails: {
-    backgroundColor: '#5F6F52',
+    backgroundColor: '#7d0e59',
   },
   modBtnReject: {
-    backgroundColor: '#C77A2B',
+    backgroundColor: '#7d0e59',
   },
   modBtnDelete: {
-    backgroundColor: '#C0392B',
+    backgroundColor: '#7d0e59',
   },
   modBtnText: {
     fontSize: 12,

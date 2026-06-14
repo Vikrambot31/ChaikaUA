@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useAppTheme } from '../hooks/useAppTheme';
 import {
   Alert,
   SafeAreaView,
@@ -23,6 +24,7 @@ import { safeCallPhone } from '../utils/communicationActions';
 import type { DetailItemData } from '../utils/detailViewTypes';
 import { openRequestFormWithLimitCheck } from '../utils/requestFormLimitGuard';
 import { getRequestTopicLabel } from '../data/categories';
+import { VideoLoadingOverlay } from '../components/VideoLoadingOverlay';
 
 const UI_TEXT = {
   ua: {
@@ -137,6 +139,7 @@ const MyRequestsScreen = () => {
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
   const text = UI_TEXT[language];
   const user = useSelector((state: RootState) => state.auth.user);
+  const { colors } = useAppTheme();
   const [requests, setRequests] = useState<MyRequestItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -350,7 +353,7 @@ const MyRequestsScreen = () => {
 
   if (requests.length === 0) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
         <View style={styles.listContent}>
           <View style={styles.headerCard}>
             <Text style={styles.headerTitle}>{text.title}</Text>
@@ -423,6 +426,7 @@ const MyRequestsScreen = () => {
         removeClippedSubviews
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />}
       />
+      <VideoLoadingOverlay visible={loading} />
     </SafeAreaView>
   );
 };

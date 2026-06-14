@@ -26,6 +26,12 @@ const UI_TEXT = {
     errorCountMsg: (count: number) => `Кількість помилок: ${count}. Якщо проблема зберігається, зверніться з підтримкою: support_chaika_ua@ukr.net`,
     retry: 'Спробувати ще раз',
     home: 'На домашню',
+    stackCopied: 'Стек скопійовано',
+    stackCopiedMsg: 'Повний стек помилки скопійовано в буфер обміну',
+    copyFailed: 'Копіювання не вдалося',
+    copyFailedMsg: 'Не вдалося скопіювати в буфер обміну',
+    stackTrace: 'Стек помилки',
+    copy: 'Копіювати',
   },
   ru: {
     title: 'Произошла ошибка',
@@ -38,6 +44,12 @@ const UI_TEXT = {
     errorCountMsg: (count: number) => `Количество ошибок: ${count}. Если проблема сохраняется, обратитесь в поддержку: support_chaika_ua@ukr.net`,
     retry: 'Попробовать снова',
     home: 'На главную',
+    stackCopied: 'Стек скопирован',
+    stackCopiedMsg: 'Полный стек ошибки скопирован в буфер обмена',
+    copyFailed: 'Копирование не удалось',
+    copyFailedMsg: 'Не удалось скопировать в буфер обмена',
+    stackTrace: 'Стек ошибки',
+    copy: 'Копировать',
   },
   en: {
     title: 'An error occurred',
@@ -50,6 +62,12 @@ const UI_TEXT = {
     errorCountMsg: (count: number) => `Error count: ${count}. If the problem persists, contact support: support_chaika_ua@ukr.net`,
     retry: 'Try again',
     home: 'Go home',
+    stackCopied: 'Stack copied',
+    stackCopiedMsg: 'Full stack trace copied to clipboard',
+    copyFailed: 'Copy failed',
+    copyFailedMsg: 'Could not copy to clipboard',
+    stackTrace: 'Stack Trace',
+    copy: 'Copy',
   },
 } as const;
 
@@ -148,17 +166,21 @@ export class ErrorBoundary extends React.Component<Props, State> {
     const stack = (this.state.error?.details as any)?.stack || '';
     if (stack) {
       try {
+        const language = normalizeLanguage(this.props.language);
+        const text = UI_TEXT[language] ?? UI_TEXT.ua;
         await Clipboard.setString(stack);
         Toast.show({
           type: 'success',
-          text1: 'Stack copied',
-          text2: 'Full stack trace copied to clipboard',
+          text1: text.stackCopied,
+          text2: text.stackCopiedMsg,
         });
       } catch (error) {
+        const language = normalizeLanguage(this.props.language);
+        const text = UI_TEXT[language] ?? UI_TEXT.ua;
         Toast.show({
           type: 'error',
-          text1: 'Copy failed',
-          text2: 'Could not copy to clipboard',
+          text1: text.copyFailed,
+          text2: text.copyFailedMsg,
         });
       }
     }
@@ -246,13 +268,13 @@ export class ErrorBoundary extends React.Component<Props, State> {
           {(error.details as any)?.stack && (
             <View style={styles.stackBox}>
               <View style={styles.stackHeader}>
-                <Text style={styles.stackTitle}>Stack Trace</Text>
+                <Text style={styles.stackTitle}>{text.stackTrace}</Text>
                 <TouchableOpacity
                   onPress={this.handleCopyStack}
                   style={styles.copyButton}
                 >
                   <MaterialCommunityIcons name="content-copy" size={16} color="#7A1E5C" />
-                  <Text style={styles.copyButtonText}>Copy</Text>
+                  <Text style={styles.copyButtonText}>{text.copy}</Text>
                 </TouchableOpacity>
               </View>
               <ScrollView

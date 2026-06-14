@@ -81,10 +81,9 @@ export const inferRegistrationStatus = (
 
   // Social auth users (Google, Facebook, Apple) are considered complete if they have a name.
   // They authenticate via the provider — phone and address can be filled later.
-  const isSocialProvider =
-    firebaseUser.providerData[0]?.providerId === 'google.com' ||
-    firebaseUser.providerData[0]?.providerId === 'facebook.com' ||
-    firebaseUser.providerData[0]?.providerId === 'apple.com';
+  const isSocialProvider = firebaseUser.providerData.some(
+    (p) => p.providerId === 'google.com' || p.providerId === 'facebook.com' || p.providerId === 'apple.com',
+  );
   const hasName = Boolean(profile?.name || firebaseUser.displayName);
 
   if (isSocialProvider && hasName) {
@@ -110,8 +109,12 @@ export const mapFirebaseUserToAppUser = (
   const startAvatarUri = normalizedProfile.startAvatarKey
     ? `${START_AVATAR_URI_PREFIX}${normalizedProfile.startAvatarKey}`
     : '';
-  const primaryPhotoUrl = startAvatarUri || photoURLs[0] || normalizedProfile.photoURL || firebaseUser.photoURL || undefined;
-  const resolvedPhotoURLs = startAvatarUri ? [startAvatarUri] : photoURLs;
+  // Real photos always take precedence over temporary avatars
+  const hasRealPhotos = photoURLs.length > 0 || Boolean(firebaseUser.photoURL);
+  const primaryPhotoUrl = hasRealPhotos
+    ? (photoURLs[0] || normalizedProfile.photoURL || firebaseUser.photoURL || undefined)
+    : (startAvatarUri || undefined);
+  const resolvedPhotoURLs = hasRealPhotos ? photoURLs : (startAvatarUri ? [startAvatarUri] : []);
 
   return {
     id: firebaseUser.uid,
@@ -133,13 +136,15 @@ export const mapFirebaseUserToAppUser = (
     startAvatarKey: normalizedProfile.startAvatarKey || undefined,
     gender: normalizedProfile.gender,
     age: normalizedProfile.age,
-    provider: (normalizedProfile.provider as User['provider']) || (firebaseUser.providerData[0]?.providerId === 'facebook.com'
-      ? 'facebook'
-      : firebaseUser.providerData[0]?.providerId === 'google.com'
-        ? 'google'
-        : firebaseUser.providerData[0]?.providerId === 'apple.com'
-          ? 'apple'
-        : 'email'),
+    provider: (normalizedProfile.provider as User['provider']) || (() => {
+      const sp = firebaseUser.providerData.find(
+        (p) => p.providerId === 'facebook.com' || p.providerId === 'google.com' || p.providerId === 'apple.com',
+      );
+      if (!sp) return 'email';
+      if (sp.providerId === 'facebook.com') return 'facebook';
+      if (sp.providerId === 'google.com') return 'google';
+      return 'apple';
+    })(),
     providerId: normalizedProfile.providerId || firebaseUser.uid,
     referrerPhone: normalizedProfile.referrerPhone || undefined,
   };

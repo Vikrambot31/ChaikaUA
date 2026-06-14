@@ -12,6 +12,7 @@ import {
 } from '../services/chaykaNewsService';
 import type { RootState } from '../redux/store';
 import { safeOpenExternalUrl } from '../utils/communicationActions';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 type AppLanguage = 'ua' | 'ru' | 'en';
 type FeedItem = Awaited<ReturnType<typeof loadChaykaNewsFeedDetailed>>['items'][number];
@@ -142,6 +143,7 @@ const NewsCard: React.FC<{ item: FeedItem; text: NewsText; language: AppLanguage
 
 const ImportantNewsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
+  const { colors, isDark } = useAppTheme();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as AppLanguage;
   const text = UI_TEXT[language];
   const [items, setItems] = useState<FeedItem[]>([]);
@@ -236,11 +238,17 @@ const ImportantNewsScreen: React.FC = () => {
       );
     }
 
-    return null;
+    return (
+      <View style={styles.stateCard}>
+        <MaterialCommunityIcons name="newspaper-variant-outline" size={38} color={SCREEN_THEME.textMuted} />
+        <Text style={styles.stateTitle}>{text.heroEmptyTitle}</Text>
+        <Text style={styles.stateText}>{text.heroEmptyText}</Text>
+      </View>
+    );
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <FlatList
         data={liveItems}
         keyExtractor={(item) => item.id}
@@ -250,7 +258,7 @@ const ImportantNewsScreen: React.FC = () => {
         onRefresh={() => void loadFeed(true)}
         ListHeaderComponent={(
           <>
-            <Text style={styles.screenTitle}>{text.headerTitle}</Text>
+            <Text style={[styles.screenTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{text.headerTitle}</Text>
             <View style={styles.coverWrap}>
               <Image source={require('../../assets/WEBP-version/NOVOSTI.webp')} style={styles.coverImage} resizeMode="cover" />
             </View>

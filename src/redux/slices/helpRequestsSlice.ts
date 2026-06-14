@@ -6,6 +6,7 @@ import { Request } from '../../types/app';
 export interface HelpRequestsState {
   items: HelpRequest[];
   todayItems: HelpRequest[];
+  hiddenIds: string[];
   loading: boolean;
   error: string | null;
 }
@@ -13,6 +14,7 @@ export interface HelpRequestsState {
 const initialState: HelpRequestsState = {
   items: [],
   todayItems: [],
+  hiddenIds: [],
   loading: false,
   error: null,
 };
@@ -43,13 +45,16 @@ const helpRequestsSlice = createSlice({
       }
     },
     removeHelpRequest: (state, action: PayloadAction<string>) => {
+      if (!state.hiddenIds.includes(action.payload)) {
+        state.hiddenIds.push(action.payload);
+      }
       state.items = state.items.filter((r) => r.id !== action.payload);
       state.todayItems = state.todayItems.filter((r) => r.id !== action.payload);
     },
     clearExpiredRequests: (state) => {
-      const now = new Date();
-      state.items = state.items.filter((r) => r.expiresAt > now);
-      state.todayItems = state.todayItems.filter((r) => r.expiresAt > now);
+      const nowIso = new Date().toISOString();
+      state.items = state.items.filter((r) => r.expiresAt > nowIso);
+      state.todayItems = state.todayItems.filter((r) => r.expiresAt > nowIso);
     },
     setLoading: (state, action: PayloadAction<boolean>) => {
       state.loading = action.payload;
@@ -62,13 +67,14 @@ const helpRequestsSlice = createSlice({
       state.error = null;
     },
     syncFromRequests: (state, action: PayloadAction<Request[]>) => {
+      const now = new Date();
       const mapped = action.payload
         .filter((item) => item.group === 'help_neighbors' || item.group === 'care' || item.category === 'help' || item.category === 'care')
         .map((item) => {
-          const createdAt = new Date(item.createdAt);
-          const expiresAt = typeof item.expires_at === 'number'
+          const createdAtDate = new Date(item.createdAt);
+          const expiresAtDate = typeof item.expires_at === 'number'
             ? new Date(item.expires_at)
-            : new Date(createdAt.getTime() + 24 * 60 * 60 * 1000);
+            : new Date(createdAtDate.getTime() + 24 * 60 * 60 * 1000);
           return {
             id: item.id,
             userId: item.userId,
@@ -80,27 +86,28 @@ const helpRequestsSlice = createSlice({
             subcategory: item.subcategory,
             photoUri: item.photoUri,
             photoStoragePath: item.photoStoragePath,
-            createdAt,
-            expiresAt,
-            isBurning: item.status !== 'rejected' && expiresAt > new Date(),
+            userPhotoURL: item.userPhotoURL,
+            startAvatarKey: item.startAvatarKey,
+            createdAt: createdAtDate.toISOString(),
+            expiresAt: expiresAtDate.toISOString(),
+            isBurning: item.status !== 'rejected' && expiresAtDate > now,
             moderationStatus: item.status,
             submittedForModerationAt: item.moderatedAt ? new Date(item.moderatedAt).toISOString() : undefined,
             moderatedAt: item.moderatedAt ? new Date(item.moderatedAt).toISOString() : undefined,
           } as HelpRequest;
         });
-      const mappedIds = new Set(mapped.map((item) => item.id));
-      const localOnly = state.items.filter((item) => !mappedIds.has(item.id));
-      const merged = [...localOnly, ...mapped];
+      const merged = mapped.filter((item) => !state.hiddenIds.includes(item.id));
       state.items = merged;
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      state.todayItems = merged.filter((item) => item.createdAt >= today);
+      state.todayItems = merged.filter((item) => item.createdAt >= today.toISOString());
     },
   },
   extraReducers: (builder) => {
     builder.addCase('auth/logout', (state) => {
       state.items = [];
       state.todayItems = [];
+      state.hiddenIds = [];
     });
   },
 });
@@ -123,7 +130,8 @@ export const selectAllHelpRequests = (state: RootState) => state.helpRequests?.i
 export const selectTodayHelpRequests = (state: RootState) => state.helpRequests?.todayItems ?? [];
 export const selectActiveBurningRequests = (state: RootState) => {
   const today = state.helpRequests?.todayItems ?? [];
-  return today.filter((r: HelpRequest) => r.isBurning && r.expiresAt > new Date());
+  const nowIso = new Date().toISOString();
+  return today.filter((r: HelpRequest) => r.isBurning && r.expiresAt > nowIso);
 };
 export const selectCompletedRequests = (state: RootState) => {
   const all = state.helpRequests?.items ?? [];
@@ -136,7 +144,9 @@ export const selectYesterdayHelpRequests = (state: RootState): HelpRequest[] => 
   todayStart.setHours(0, 0, 0, 0);
   const yesterdayStart = new Date(todayStart);
   yesterdayStart.setDate(yesterdayStart.getDate() - 1);
-  return all.filter((r: HelpRequest) => r.createdAt >= yesterdayStart && r.createdAt < todayStart);
+  const todayIso = todayStart.toISOString();
+  const yesterdayIso = yesterdayStart.toISOString();
+  return all.filter((r: HelpRequest) => r.createdAt >= yesterdayIso && r.createdAt < todayIso);
 };
 export const selectHelpRequestsLoading = (state: RootState) => state.helpRequests?.loading ?? false;
 export const selectHelpRequestsError = (state: RootState) => state.helpRequests?.error ?? null;
@@ -144,8 +154,8 @@ export const selectHelpRequestsError = (state: RootState) => state.helpRequests?
 // Фільтри по часам
 export const selectHelpRequestsByTime = (state: RootState, hours: number) => {
   const today = state.helpRequests?.todayItems ?? [];
-  const cutoffTime = new Date(Date.now() - hours * 60 * 60 * 1000);
-  return today.filter((r: HelpRequest) => r.createdAt > cutoffTime);
+  const cutoffIso = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+  return today.filter((r: HelpRequest) => r.createdAt > cutoffIso);
 };
 
 export default helpRequestsSlice.reducer;

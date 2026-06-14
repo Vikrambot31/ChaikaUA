@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, KeyboardAvoidingView, Linking, Modal, Platform, SafeAreaView, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, KeyboardAvoidingView, Linking, Modal, PanResponder, Platform, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { useSelector } from 'react-redux';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
@@ -8,12 +8,15 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import MiniTabBar from '../components/MiniTabBar';
 import MiniUserAvatar from '../components/MiniUserAvatar';
 import AppPhotoImage from '../components/AppPhotoImage';
+import TactileButton from '../components/TactileButton';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { normalizePhoneText } from '../utils/textUtils';
 import { RootState } from '../redux/store';
-import { contactsService, ContactListing } from '../services/contactsService';
+import { contactsService, ContactListing, PAGE_SIZE } from '../services/contactsService';
+import WhoLikedMeList from '../components/WhoLikedMeList';
 import { getModerationUserMessage, showUserError } from '../utils/userFacingErrors';
 import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField';
+import UploadedPhotosGrid from '../components/UploadedPhotosGrid';
 import { get, ref } from 'firebase/database';
 import { database } from '../firebase-config';
 import { useContactRequest } from '../hooks/useContactRequest';
@@ -28,11 +31,19 @@ import { getDonePhotos, validateSubmissionRequirements } from '../utils/submissi
 import { checkYellowList } from '../utils/yellowListCheck';
 import { getLanguageValidationError } from '../utils/contentLanguageGuard';
 import UserCardActionBar from '../components/UserCardActionBar';
+import ReportBlockMenu from '../components/ReportBlockMenu';
+import PhotoCarousel from '../components/PhotoCarousel';
+import ProfileCompletenessBadge from '../components/ProfileCompletenessBadge';
+import { reportBlockService } from '../services/reportBlockService';
 import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 import { useOperationTrace } from '../hooks/useOperationTrace';
+import { useAppTheme } from '../hooks/useAppTheme';
 import { subscribeActiveBonusPromotions, type BonusPromotion } from '../services/bonusService';
 import ScreenTooltip from '../components/ScreenTooltip';
+import HintBadge, { HINT_BADGE_LABELS } from '../components/HintBadge';
+import { useTrainingMode } from '../hooks/useTrainingMode';
 import { CONTACTS_CHAIKA_TOOLTIP } from '../utils/screenTooltips';
+import { VideoLoadingOverlay } from '../components/VideoLoadingOverlay';
 
 const CONTACT_LISTING_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const PROFILE_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -78,6 +89,7 @@ const ITEM_CONDITION_VALUES = ['new', 'like_new', 'good', 'fair'] as const;
 const ZODIAC_VALUES = ['aries', 'taurus', 'gemini', 'cancer', 'leo', 'virgo', 'libra', 'scorpio', 'sagittarius', 'capricorn', 'aquarius', 'pisces'] as const;
 const HUMAN_DESIGN_TYPE_VALUES = ['generator', 'projector', 'manifestor', 'reflector'] as const;
 const HUMAN_DESIGN_PROFILE_VALUES = ['1/3', '1/4', '2/4', '2/5', '3/5', '3/6', '4/1', '4/6', '5/1', '5/2', '6/2', '6/3'] as const;
+const LOOKING_FOR_GENDER_VALUES = ['male', 'female', 'any', 'couple'] as const;
 const HUMAN_DESIGN_TELEGRAM_URL = 'https://t.me/Vikram_2027';
 const HUMAN_DESIGN_TELEGRAM_MESSAGE = 'Добрый день. Я с приложения Чайка Life - хочу бесплатно узнать про ДЧ свой тип';
 
@@ -92,6 +104,7 @@ type ContactsDraft = Partial<{
   zodiacSign: string;
   humanDesignType: string;
   humanDesignProfile: string;
+  lookingForGender: string;
 }>;
 
 const UI_TEXT = {
@@ -104,6 +117,7 @@ const UI_TEXT = {
     priceError: 'Вкажіть коректний вік.',
     phoneLabel: 'Контактний телефон',
     photoLabel: 'Фото',
+    photoUploading: 'Дочекайтесь завершення завантаження фото.',
     addPhoto: 'Обрати з Моїх фотографій',
     removePhoto: 'Прибрати фото',
     descriptionLabel: 'Про себе',
@@ -190,6 +204,33 @@ const UI_TEXT = {
     live: 'НАЖИВО',
     liveCount: (count: number) => `всього ${count} людей шукають знайомств`,
     topAnketyTitle: 'Топ анкети',
+    swipeFilterTitle: 'Я шукаю',
+    swipeFilterGenderAll: 'Будь-кого',
+    swipeFilterGenderMale: 'Чоловіка',
+    swipeFilterGenderFemale: 'Жінку',
+    swipeFilterGenderFriends: 'Друзів',
+    swipeFilterAgeFrom: 'Вік від',
+    swipeFilterAgeTo: 'до',
+    swipeFilterStart: 'Почати листати',
+    swipeFilterSkip: 'Без фільтрів',
+    swipeBackBtn: '← Контакти',
+    swipeDoneTitle: 'Переглянуто всі анкети',
+    swipeDoneLiked: (n: number) => `Вподобано: ${n}`,
+    swipeRestartBtn: 'Почати знову',
+    swipeLikeLabel: 'ЛАЙК ♥',
+    swipePassLabel: 'ДАЛІ →',
+    reportMenuLabel: 'Ще',
+    lookingForLabel: 'Кого шукаю',
+    lookingForValues: { male: 'Чоловiка', female: 'Жiнку', any: 'Будь-кого', couple: 'Пару' },
+    selectLookingFor: 'Оберiть...',
+    completenessHint: 'Заповнiть профiль для бiльшої видимостi',
+    emptyTitle: 'Ще немає анкет',
+    emptyCta: 'Створити анкету',
+    noProfileBanner: 'Створiть анкету, щоб вас знайшли!',
+    noProfileCta: 'Створити',
+    whoLikedMeBtn: 'Хто лайкнув',
+    undoBtn: 'Повернути',
+    loadingMore: 'Завантаження...',
   },
   ru: {
     title: 'Знакомства на кофе',
@@ -200,6 +241,7 @@ const UI_TEXT = {
     priceError: 'Укажите корректный возраст.',
     phoneLabel: 'Контактный телефон',
     photoLabel: 'Фото',
+    photoUploading: 'Дождитесь завершения загрузки фото.',
     addPhoto: 'Выбрать из Моих фотографий',
     removePhoto: 'Убрать фото',
     descriptionLabel: 'О себе',
@@ -286,6 +328,33 @@ const UI_TEXT = {
     live: 'В ЭФИРЕ',
     liveCount: (count: number) => `всего ${count} людей ищут знакомства`,
     topAnketyTitle: 'Топ анкеты',
+    swipeFilterTitle: 'Я ищу',
+    swipeFilterGenderAll: 'Кого угодно',
+    swipeFilterGenderMale: 'Мужчину',
+    swipeFilterGenderFemale: 'Женщину',
+    swipeFilterGenderFriends: 'Друзей',
+    swipeFilterAgeFrom: 'Возраст от',
+    swipeFilterAgeTo: 'до',
+    swipeFilterStart: 'Начать листать',
+    swipeFilterSkip: 'Без фильтров',
+    swipeBackBtn: '← Контакты',
+    swipeDoneTitle: 'Просмотрены все анкеты',
+    swipeDoneLiked: (n: number) => `Понравилось: ${n}`,
+    swipeRestartBtn: 'Начать заново',
+    swipeLikeLabel: 'ЛАЙК ♥',
+    swipePassLabel: 'ДАЛЬШЕ →',
+    reportMenuLabel: 'Ещё',
+    lookingForLabel: 'Кого ищу',
+    lookingForValues: { male: 'Мужчину', female: 'Женщину', any: 'Кого угодно', couple: 'Пару' },
+    selectLookingFor: 'Выберите...',
+    completenessHint: 'Заполните профиль для большей видимости',
+    emptyTitle: 'Анкет пока нет',
+    emptyCta: 'Создать анкету',
+    noProfileBanner: 'Создайте анкету, чтобы вас нашли!',
+    noProfileCta: 'Создать',
+    whoLikedMeBtn: 'Кто лайкнул',
+    undoBtn: 'Вернуть',
+    loadingMore: 'Загрузка...',
   },
   en: {
     title: 'Coffee Meetups',
@@ -296,6 +365,7 @@ const UI_TEXT = {
     priceError: 'Enter a valid age.',
     phoneLabel: 'Phone',
     photoLabel: 'Photo',
+    photoUploading: 'Wait until the photo upload finishes.',
     addPhoto: 'Choose from My photos',
     removePhoto: 'Remove photo',
     descriptionLabel: 'About me',
@@ -382,6 +452,33 @@ const UI_TEXT = {
     live: 'LIVE',
     liveCount: (count: number) => `${count} people looking for contacts`,
     topAnketyTitle: 'Top profiles',
+    swipeFilterTitle: 'I am looking for',
+    swipeFilterGenderAll: 'Anyone',
+    swipeFilterGenderMale: 'A man',
+    swipeFilterGenderFemale: 'A woman',
+    swipeFilterGenderFriends: 'Friends',
+    swipeFilterAgeFrom: 'Age from',
+    swipeFilterAgeTo: 'to',
+    swipeFilterStart: 'Start swiping',
+    swipeFilterSkip: 'No filters',
+    swipeBackBtn: '← Contacts',
+    swipeDoneTitle: 'All profiles viewed',
+    swipeDoneLiked: (n: number) => `Liked: ${n}`,
+    swipeRestartBtn: 'Start again',
+    swipeLikeLabel: 'LIKE ♥',
+    swipePassLabel: 'NEXT →',
+    reportMenuLabel: 'More',
+    lookingForLabel: 'Looking for',
+    lookingForValues: { male: 'A man', female: 'A woman', any: 'Anyone', couple: 'A couple' },
+    selectLookingFor: 'Select...',
+    completenessHint: 'Complete your profile for more visibility',
+    emptyTitle: 'No profiles yet',
+    emptyCta: 'Create profile',
+    noProfileBanner: 'Create a profile so people can find you!',
+    noProfileCta: 'Create',
+    whoLikedMeBtn: 'Who liked',
+    undoBtn: 'Undo',
+    loadingMore: 'Loading...',
   },
 } as const;
 
@@ -389,6 +486,8 @@ const KontaktiChaikyScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const navLock = useRef(false);
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
+  const { colors, isDark } = useAppTheme();
+  const training = useTrainingMode('contacts_chaika');
   const user = useSelector((state: RootState) => state.auth.user);
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const text = UI_TEXT[language];
@@ -403,6 +502,7 @@ const KontaktiChaikyScreen: React.FC = () => {
   const [zodiacSign, setZodiacSign] = useState('');
   const [humanDesignType, setHumanDesignType] = useState('');
   const [humanDesignProfile, setHumanDesignProfile] = useState('');
+  const [lookingForGender, setLookingForGender] = useState('');
   const [formPhotos, setFormPhotos] = useState<UploadedPhoto[]>([]);
   const [showPhoneOnCard, setShowPhoneOnCard] = useState(true);
   const [listings, setListings] = useState<ContactListing[]>([]);
@@ -422,9 +522,32 @@ const KontaktiChaikyScreen: React.FC = () => {
   const [searchDescription, setSearchDescription] = useState('');
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [activePromotions, setActivePromotions] = useState<BonusPromotion[]>([]);
+  // Report/Block
+  const [blockedUserIds, setBlockedUserIds] = useState<Set<string>>(new Set());
+  const [reportMenuVisible, setReportMenuVisible] = useState(false);
+  const [reportTargetListing, setReportTargetListing] = useState<ContactListing | null>(null);
+  // Pull-to-refresh
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  // Who Liked Me
+  const [whoLikedMeVisible, setWhoLikedMeVisible] = useState(false);
+  // Pagination
+  const [paginationCursor, setPaginationCursor] = useState<string | null>(null);
+  const [hasMorePages, setHasMorePages] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  // Swipe mode
+  const [swipeMode, setSwipeMode] = useState(false);
+  const [swipeIndex, setSwipeIndex] = useState(0);
+  const [likedIds, setLikedIds] = useState<string[]>([]);
+  const [swipeFilterVisible, setSwipeFilterVisible] = useState(false);
+  const [swipeGenderFilter, setSwipeGenderFilter] = useState<'all' | 'furniture' | 'appliances' | 'kids'>('all');
+  const [swipeAgeFrom, setSwipeAgeFrom] = useState('');
+  const [swipeAgeTo, setSwipeAgeTo] = useState('');
+  const [lastDismissedDirection, setLastDismissedDirection] = useState<'left' | 'right' | null>(null);
+  const swipePosition = useRef(new Animated.ValueXY()).current;
   const blinkAnim = useRef(new Animated.Value(1)).current;
   const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const latestDraftRef = useRef({ category, condition, price, description, phone, addFormVisible, isInterestingFormExpanded, zodiacSign, humanDesignType, humanDesignProfile });
+  const latestDraftRef = useRef({ category, condition, price, description, phone, addFormVisible, isInterestingFormExpanded, zodiacSign, humanDesignType, humanDesignProfile, lookingForGender });
   const avatarByUserId = useUserAvatarMap(listings.map((item) => item.userId));
   const previousAddFormVisibleRef = useRef(addFormVisible);
   const skipNextDraftFlushRef = useRef(false);
@@ -445,6 +568,7 @@ const KontaktiChaikyScreen: React.FC = () => {
       zodiacSign !== '' ||
       humanDesignType !== '' ||
       humanDesignProfile !== '' ||
+      lookingForGender !== '' ||
       formPhotos.length > 0 ||
       !showPhoneOnCard;
     if (!isDirty) {
@@ -461,21 +585,53 @@ const KontaktiChaikyScreen: React.FC = () => {
         { text: 'Так', onPress: () => setAddFormVisible(false) },
       ],
     );
-  }, [category, condition, description, formPhotos.length, humanDesignProfile, humanDesignType, phone, price, showPhoneOnCard, user?.phone, zodiacSign]);
+  }, [category, condition, description, formPhotos.length, humanDesignProfile, humanDesignType, lookingForGender, phone, price, showPhoneOnCard, user?.phone, zodiacSign]);
 
+  // Subscription useEffect: depends on user?.id and refreshKey
   useEffect(() => {
-    let isMounted = true;
     setListingsReady(false);
     setListingsLoadError(false);
+    // Reset pagination on refresh
+    if (refreshKey > 0) {
+      setPaginationCursor(null);
+      setHasMorePages(true);
+    }
     const unsubscribe = contactsService.subscribe((items) => {
       setListingsReady(true);
       setListingsLoadError(false);
-      setListings(items);
+      // ID-based merge: preserve paginated pages when real-time updates arrive
+      setListings((prev) => {
+        const liveIds = new Set(items.map((i) => i.id));
+        const pagedOnly = prev.filter((p) => !liveIds.has(p.id));
+        return [...items, ...pagedOnly];
+      });
+      // Set initial pagination cursor from oldest item
+      if (items.length > 0) {
+        const oldestCreatedAt = items[items.length - 1].createdAt;
+        setPaginationCursor(oldestCreatedAt || null);
+        setHasMorePages(items.length >= PAGE_SIZE);
+      }
+      if (refreshing) setRefreshing(false);
     }, user?.id, () => {
       setListingsReady(true);
       setListingsLoadError(true);
+      if (refreshing) setRefreshing(false);
     });
-    // Restore draft if Android restarted the activity while picker was open
+    // Timeout for offline: stop spinner after 10s
+    let refreshTimeout: ReturnType<typeof setTimeout> | undefined;
+    if (refreshing) {
+      refreshTimeout = setTimeout(() => setRefreshing(false), 10_000);
+    }
+    return () => {
+      unsubscribe();
+      if (refreshTimeout) clearTimeout(refreshTimeout);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, refreshKey]);
+
+  // Draft restore useEffect: mount only
+  useEffect(() => {
+    let isMounted = true;
     (async () => {
       try {
         const raw = await AsyncStorage.getItem(CONTACTS_DRAFT_KEY);
@@ -490,14 +646,22 @@ const KontaktiChaikyScreen: React.FC = () => {
         if (draft.zodiacSign) setZodiacSign(draft.zodiacSign);
         if (draft.humanDesignType) setHumanDesignType(draft.humanDesignType);
         if (draft.humanDesignProfile) setHumanDesignProfile(draft.humanDesignProfile);
+        if (draft.lookingForGender) setLookingForGender(draft.lookingForGender);
         if (draft.addFormVisible) setAddFormVisible(true);
         await AsyncStorage.removeItem(CONTACTS_DRAFT_KEY);
       } catch { /* ignore */ }
     })();
-    return () => {
-      isMounted = false;
-      unsubscribe();
-    };
+    return () => { isMounted = false; };
+  }, []);
+
+  // Load blocked users on mount (separate from subscription)
+  useEffect(() => {
+    if (!user?.id) return;
+    reportBlockService.loadBlockedUsers(user.id).then((set) => {
+      setBlockedUserIds(set);
+    }).catch((err) => {
+      console.warn('[Kontakt-XXX] loadBlockedUsers failed:', err);
+    });
   }, [user?.id]);
 
   useEffect(() => {
@@ -505,15 +669,15 @@ const KontaktiChaikyScreen: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    latestDraftRef.current = { category, condition, price, description, phone, addFormVisible, isInterestingFormExpanded, zodiacSign, humanDesignType, humanDesignProfile };
-  }, [addFormVisible, category, condition, description, humanDesignProfile, humanDesignType, isInterestingFormExpanded, phone, price, zodiacSign]);
+    latestDraftRef.current = { category, condition, price, description, phone, addFormVisible, isInterestingFormExpanded, zodiacSign, humanDesignType, humanDesignProfile, lookingForGender };
+  }, [addFormVisible, category, condition, description, humanDesignProfile, humanDesignType, isInterestingFormExpanded, lookingForGender, phone, price, zodiacSign]);
 
   const saveDraftNow = useCallback((visible = latestDraftRef.current.addFormVisible) => {
     if (!visible) return;
-    const { category: draftCategory, condition: draftCondition, price: draftPrice, description: draftDescription, phone: draftPhone, isInterestingFormExpanded: draftInteresting, zodiacSign: draftZodiac, humanDesignType: draftDesignType, humanDesignProfile: draftDesignProfile } = latestDraftRef.current;
+    const { category: draftCategory, condition: draftCondition, price: draftPrice, description: draftDescription, phone: draftPhone, isInterestingFormExpanded: draftInteresting, zodiacSign: draftZodiac, humanDesignType: draftDesignType, humanDesignProfile: draftDesignProfile, lookingForGender: draftLookingFor } = latestDraftRef.current;
     void AsyncStorage.setItem(
       CONTACTS_DRAFT_KEY,
-      JSON.stringify({ category: draftCategory, condition: draftCondition, price: draftPrice, description: draftDescription, phone: draftPhone, addFormVisible: true, isInterestingFormExpanded: draftInteresting, zodiacSign: draftZodiac, humanDesignType: draftDesignType, humanDesignProfile: draftDesignProfile }),
+      JSON.stringify({ category: draftCategory, condition: draftCondition, price: draftPrice, description: draftDescription, phone: draftPhone, addFormVisible: true, isInterestingFormExpanded: draftInteresting, zodiacSign: draftZodiac, humanDesignType: draftDesignType, humanDesignProfile: draftDesignProfile, lookingForGender: draftLookingFor }),
     ).catch(() => {});
   }, []);
 
@@ -544,7 +708,7 @@ const KontaktiChaikyScreen: React.FC = () => {
         draftSaveTimerRef.current = null;
       }
     };
-  }, [addFormVisible, category, condition, description, humanDesignProfile, humanDesignType, isInterestingFormExpanded, phone, price, saveDraftNow, zodiacSign]);
+  }, [addFormVisible, category, condition, description, humanDesignProfile, humanDesignType, isInterestingFormExpanded, lookingForGender, phone, price, saveDraftNow, zodiacSign]);
 
   useEffect(() => () => {
     if (draftSaveTimerRef.current) {
@@ -639,6 +803,43 @@ const KontaktiChaikyScreen: React.FC = () => {
     void safeOpenViber(phoneRaw, language);
   };
 
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true);
+    setPaginationCursor(null);
+    setHasMorePages(true);
+    setRefreshKey((k) => k + 1);
+  }, []);
+
+  const handleBlockUser = useCallback((userId: string) => {
+    setBlockedUserIds((prev) => {
+      const next = new Set(prev);
+      next.add(userId);
+      return next;
+    });
+  }, []);
+
+  const hasOwnListing = useMemo(() => listings.some((l) => l.userId === user?.id), [listings, user?.id]);
+  const ownListing = useMemo(() => listings.find((l) => l.userId === user?.id && l.moderationStatus === 'approved'), [listings, user?.id]);
+
+  const handleLoadMore = useCallback(async () => {
+    if (!hasMorePages || loadingMore || !paginationCursor) return;
+    setLoadingMore(true);
+    try {
+      const { items, nextCursor, hasMore } = await contactsService.fetchNextPage(paginationCursor);
+      setListings((prev) => {
+        const ids = new Set(prev.map((p) => p.id));
+        const newItems = items.filter((i) => !ids.has(i.id));
+        return [...prev, ...newItems];
+      });
+      setPaginationCursor(nextCursor);
+      setHasMorePages(hasMore);
+    } catch (e) {
+      console.warn('[Kontakt-XXX] pagination error:', e);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [hasMorePages, loadingMore, paginationCursor]);
+
   const filteredListings = useMemo(() => {
     const queryItemName = searchItemName.trim().toLowerCase();
     const queryContact = searchContact.trim().toLowerCase();
@@ -647,6 +848,7 @@ const KontaktiChaikyScreen: React.FC = () => {
     const priceTo = searchPriceTo ? Number(searchPriceTo) : null;
 
     return listings.filter((item) => {
+      if (blockedUserIds.size > 0 && item.userId && blockedUserIds.has(item.userId)) return false;
       const numericPrice = Number(String(item.price).replace(',', '.').replace(/[^\d.]/g, ''));
 
       if (selectedFilterCategory && item.category !== selectedFilterCategory) return false;
@@ -661,6 +863,7 @@ const KontaktiChaikyScreen: React.FC = () => {
     });
   }, [
     listings,
+    blockedUserIds,
     searchCategory,
     searchCondition,
     searchContact,
@@ -739,6 +942,7 @@ const KontaktiChaikyScreen: React.FC = () => {
     setZodiacSign('');
     setHumanDesignType('');
     setHumanDesignProfile('');
+    setLookingForGender('');
     setFormPhotos([]);
     setSubmitAttempted(false);
     void AsyncStorage.removeItem(CONTACTS_DRAFT_KEY).catch(() => {});
@@ -784,12 +988,19 @@ const KontaktiChaikyScreen: React.FC = () => {
     }
     trace('validate', 'success');
 
+    const hasUploadingPhotos = formPhotos.some((p) => p.status === 'uploading');
+    if (hasUploadingPhotos) {
+      toast.showWarning(text.errorTitle, text.photoUploading);
+      return;
+    }
+
     setSubmitting(true);
     try {
       trace('photo_check', 'start');
       const donePhotos = getDonePhotos(formPhotos);
       const resolvedPhotoUri = donePhotos[0]?.downloadUrl ?? '';
       const resolvedStoragePath = donePhotos[0]?.storagePath ?? '';
+      const allPhotoStoragePaths = donePhotos.map((p) => p.storagePath).filter(Boolean);
       trace('photo_check', 'success');
 
       const itemName = user?.name?.trim() || getCategoryLabel(category);
@@ -817,6 +1028,8 @@ const KontaktiChaikyScreen: React.FC = () => {
         zodiacSign: isInterestingFormExpanded ? zodiacSign : '',
         humanDesignType: isInterestingFormExpanded ? humanDesignType : '',
         humanDesignProfile: isInterestingFormExpanded ? humanDesignProfile : '',
+        lookingForGender,
+        photoUris: allPhotoStoragePaths,
         language,
       });
       trace('api_call', 'success');
@@ -863,6 +1076,85 @@ const KontaktiChaikyScreen: React.FC = () => {
     ]);
   };
 
+  // Swipe mode logic
+  const myCategory = ownListing?.category || '';
+  const swipeItems = useMemo(() => {
+    let items = filteredListings.filter((i) => !i.isArchived);
+    if (swipeGenderFilter !== 'all') {
+      items = items.filter((i) => i.category === swipeGenderFilter);
+    }
+    // Filter by lookingForGender: show only cards whose lookingForGender matches my category (or is 'any'/empty)
+    if (myCategory) {
+      items = items.filter((i) => {
+        const lfg = i.lookingForGender;
+        if (!lfg || lfg === 'any' || lfg === '') return true;
+        return lfg === myCategory;
+      });
+    }
+    const ageFromNum = swipeAgeFrom ? parseInt(swipeAgeFrom, 10) : null;
+    const ageToNum = swipeAgeTo ? parseInt(swipeAgeTo, 10) : null;
+    if (ageFromNum !== null || ageToNum !== null) {
+      items = items.filter((i) => {
+        const age = i.price ? parseInt(i.price, 10) : null;
+        if (age === null || isNaN(age)) return true;
+        if (ageFromNum !== null && age < ageFromNum) return false;
+        if (ageToNum !== null && age > ageToNum) return false;
+        return true;
+      });
+    }
+    return items;
+  }, [filteredListings, swipeGenderFilter, swipeAgeFrom, swipeAgeTo, myCategory]);
+  const swipeItemsRef = useRef(swipeItems);
+  swipeItemsRef.current = swipeItems;
+  const swipeIndexRef = useRef(swipeIndex);
+  swipeIndexRef.current = swipeIndex;
+
+  const advanceSwipe = useCallback(() => {
+    swipePosition.setValue({ x: 0, y: 0 });
+    setSwipeIndex((prev) => prev + 1);
+  }, [swipePosition]);
+
+  const handleSwipeRight = useCallback(() => {
+    const item = swipeItemsRef.current[swipeIndexRef.current];
+    if (!item) return;
+    setLikedIds((prev) => [...prev, item.id]);
+    setLastDismissedDirection('right');
+    Animated.timing(swipePosition, { toValue: { x: 600, y: 0 }, duration: 280, useNativeDriver: false }).start(advanceSwipe);
+  }, [advanceSwipe, swipePosition]);
+
+  const handleSwipeLeft = useCallback(() => {
+    setLastDismissedDirection('left');
+    Animated.timing(swipePosition, { toValue: { x: -600, y: 0 }, duration: 280, useNativeDriver: false }).start(advanceSwipe);
+  }, [advanceSwipe, swipePosition]);
+
+  const handleUndo = useCallback(() => {
+    if (lastDismissedDirection !== 'left') return;
+    swipePosition.setValue({ x: 0, y: 0 });
+    setSwipeIndex((prev) => Math.max(0, prev - 1));
+    setLastDismissedDirection(null);
+  }, [lastDismissedDirection, swipePosition]);
+
+  const handleSwipeRightRef = useRef(handleSwipeRight);
+  handleSwipeRightRef.current = handleSwipeRight;
+  const handleSwipeLeftRef = useRef(handleSwipeLeft);
+  handleSwipeLeftRef.current = handleSwipeLeft;
+
+  const swipePanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderMove: Animated.event([null, { dx: swipePosition.x, dy: swipePosition.y }], { useNativeDriver: false }),
+      onPanResponderRelease: (_, { dx }) => {
+        if (dx > 100) {
+          handleSwipeRightRef.current();
+        } else if (dx < -100) {
+          handleSwipeLeftRef.current();
+        } else {
+          Animated.spring(swipePosition, { toValue: { x: 0, y: 0 }, useNativeDriver: false }).start();
+        }
+      },
+    }),
+  ).current;
+
   const mapToDetailData = (item: ContactListing, ownerAvatarUri?: string): DetailItemData => {
     const categoryLabel = getCategoryLabel(item.category);
     const conditionLabel = text.conditionLabels[item.condition as keyof typeof text.conditionLabels] ?? item.condition;
@@ -872,6 +1164,7 @@ const KontaktiChaikyScreen: React.FC = () => {
       title: item.itemName,
       description: item.description,
       phone: item.showPhone !== false ? item.phone : undefined,
+      rawPhone: item.phone,
       photoUri: item.photoUri,
       photoStoragePath: item.photoStoragePath,
       category: categoryLabel || conditionLabel,
@@ -883,8 +1176,37 @@ const KontaktiChaikyScreen: React.FC = () => {
       createdAt: item.createdAt,
       sourceType: 'lyudi',
       sourceId: item.id,
+      moderationStatus: item.moderationStatus,
+      photoUris: item.photoUris ?? (item.photoUri ? [item.photoUri] : []),
+      photoStoragePaths: item.photoStoragePaths ?? (item.photoStoragePath ? [item.photoStoragePath] : []),
+      rawCondition: item.condition,
+      zodiacSign: item.zodiacSign,
+      humanDesignType: item.humanDesignType,
+      humanDesignProfile: item.humanDesignProfile,
+      lookingForGender: item.lookingForGender,
+      showPhone: item.showPhone,
+      lastEditedAt: item.lastEditedAt,
     };
   };
+
+  // Scroll-near-bottom detection for pagination
+  const handleScroll = useCallback((event: { nativeEvent: { layoutMeasurement: { height: number }; contentOffset: { y: number }; contentSize: { height: number } } }) => {
+    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+    const paddingToBottom = 200;
+    if (layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom) {
+      void handleLoadMore();
+    }
+  }, [handleLoadMore]);
+
+  // Swipe mode pre-fetch: when 5 cards remain
+  useEffect(() => {
+    if (!swipeMode) return;
+    const remaining = swipeItems.length - swipeIndex;
+    if (remaining <= 5 && hasMorePages && !loadingMore) {
+      void handleLoadMore();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [swipeIndex, swipeMode]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -892,7 +1214,10 @@ const KontaktiChaikyScreen: React.FC = () => {
         storageKey={CONTACTS_CHAIKA_TOOLTIP.storageKey}
         title={CONTACTS_CHAIKA_TOOLTIP.title}
         items={CONTACTS_CHAIKA_TOOLTIP.items}
+        language={language}
         accentColor={SCREEN_THEME.woodGreen}
+        forceVisible={training.showHint}
+        onClose={training.closeHint}
       />
       <Modal visible={searchModalVisible} animationType="slide" transparent onRequestClose={() => setSearchModalVisible(false)}>
         <View style={styles.modalOverlay}>
@@ -911,7 +1236,7 @@ const KontaktiChaikyScreen: React.FC = () => {
                 value={searchItemName}
                 onChangeText={setSearchItemName}
                 placeholder={text.searchPlaceholderName}
-                placeholderTextColor="#A0938D"
+                placeholderTextColor={colors.placeholder}
               />
 
               <Text style={styles.formLabel}>{text.searchCategory}</Text>
@@ -940,7 +1265,7 @@ const KontaktiChaikyScreen: React.FC = () => {
                 value={searchPriceFrom}
                 onChangeText={(value) => setSearchPriceFrom(value.replace(/[^0-9.,]/g, ''))}
                 placeholder="0"
-                placeholderTextColor="#A0938D"
+                placeholderTextColor={colors.placeholder}
                 keyboardType="decimal-pad"
               />
 
@@ -950,7 +1275,7 @@ const KontaktiChaikyScreen: React.FC = () => {
                 value={searchPriceTo}
                 onChangeText={(value) => setSearchPriceTo(value.replace(/[^0-9.,]/g, ''))}
                 placeholder="0"
-                placeholderTextColor="#A0938D"
+                placeholderTextColor={colors.placeholder}
                 keyboardType="decimal-pad"
               />
 
@@ -960,7 +1285,7 @@ const KontaktiChaikyScreen: React.FC = () => {
                 value={searchContact}
                 onChangeText={setSearchContact}
                 placeholder={text.searchPlaceholderContact}
-                placeholderTextColor="#A0938D"
+                placeholderTextColor={colors.placeholder}
               />
 
               <Text style={styles.formLabel}>{text.searchDescription}</Text>
@@ -969,7 +1294,7 @@ const KontaktiChaikyScreen: React.FC = () => {
                 value={searchDescription}
                 onChangeText={setSearchDescription}
                 placeholder={text.searchPlaceholderDescription}
-                placeholderTextColor="#A0938D"
+                placeholderTextColor={colors.placeholder}
                 multiline
                 maxLength={260}
               />
@@ -985,8 +1310,16 @@ const KontaktiChaikyScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={400} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#7A2551" colors={['#7A2551']} />}>
         <View style={styles.headerCard}>
+          <View style={{ position: 'absolute', top: 12, right: 12, zIndex: 10 }}>
+            <HintBadge
+              visible={training.isVisible}
+              onTap={training.openHint}
+              onDismiss={training.dismiss}
+              label={HINT_BADGE_LABELS[language]}
+            />
+          </View>
           <Text style={styles.headerTitle}>{text.title}</Text>
           <Text style={styles.headerSubtitle}>{text.subtitle}</Text>
           <View style={styles.liveLine}>
@@ -1045,6 +1378,25 @@ const KontaktiChaikyScreen: React.FC = () => {
           </View>
         )}
 
+        {listingsReady && !listingsLoadError && listings.length === 0 && (
+          <View style={styles.emptyStateBox}>
+            <MaterialCommunityIcons name="account-search-outline" size={64} color="#7A2551" />
+            <Text style={styles.emptyStateTitle}>{text.emptyTitle}</Text>
+            <TactileButton
+              title={text.emptyCta}
+              onPress={() => {
+                if (!user?.id) {
+                  Alert.alert(text.errorTitle, text.authRequired);
+                  return;
+                }
+                setAddFormVisible(true);
+              }}
+              variant="primary"
+              style={styles.emptyStateCta}
+            />
+          </View>
+        )}
+
         {!listingsLoadError && listings.length > 0 && (
           <View style={styles.listingsSection}>
             <Text style={styles.formLabel}>{text.filterLabel}</Text>
@@ -1067,6 +1419,14 @@ const KontaktiChaikyScreen: React.FC = () => {
               <TouchableOpacity style={styles.clearSearchBtn} onPress={resetSearch} activeOpacity={0.82}>
                 <Text style={styles.clearSearchText}>{text.clearSearch}</Text>
               </TouchableOpacity>
+            ) : null}
+            {!hasOwnListing && listings.length > 0 && user?.id ? (
+              <TactileButton
+                title={text.noProfileCta}
+                onPress={() => setAddFormVisible(true)}
+                variant="primary"
+                style={styles.noProfileBanner}
+              />
             ) : null}
             {filteredListings.length === 0 ? (
               <View style={styles.emptyFiltered}>
@@ -1095,12 +1455,29 @@ const KontaktiChaikyScreen: React.FC = () => {
                     key={item.id}
                     style={styles.kCard}
                   >
+                    {!isOwn && item.userId ? (
+                      <TouchableOpacity
+                        style={styles.kReportBtn}
+                        onPress={() => { setReportTargetListing(item); setReportMenuVisible(true); }}
+                        activeOpacity={0.7}
+                        accessibilityLabel={text.reportMenuLabel}
+                      >
+                        <MaterialCommunityIcons name="dots-vertical" size={18} color="#78716C" />
+                      </TouchableOpacity>
+                    ) : null}
                     <TouchableOpacity
                       style={styles.kCardTop}
                       onPress={() => { if (navLock.current) return; navLock.current = true; navigation.navigate('ItemDetailScreen', { item: mapToDetailData(item, avatarUri || undefined) }); setTimeout(() => { navLock.current = false; }, 800); }}
                       activeOpacity={0.86}
                     >
-                      {Boolean(item.photoUri || item.photoStoragePath) ? (
+                      {item.photoUris && item.photoUris.length > 1 ? (
+                        <PhotoCarousel
+                          photoUris={item.photoUris}
+                          width={92}
+                          height={108}
+                          borderRadius={14}
+                        />
+                      ) : Boolean(item.photoUri || item.photoStoragePath) ? (
                         <AppPhotoImage
                           uri={item.photoUri}
                           storagePath={item.photoStoragePath}
@@ -1128,6 +1505,11 @@ const KontaktiChaikyScreen: React.FC = () => {
                               <Text style={styles.kAgeText}>{ageText}</Text>
                             </View>
                           ) : null}
+                          <ProfileCompletenessBadge
+                            listing={item}
+                            isOwn={isOwn}
+                            hintText={isOwn ? text.completenessHint : undefined}
+                          />
                         </View>
 
                         <View style={styles.kMetaChips}>
@@ -1137,6 +1519,11 @@ const KontaktiChaikyScreen: React.FC = () => {
                           <View style={styles.kConditionBadge}>
                             <Text style={styles.kConditionText} numberOfLines={1}>{conditionLabel}</Text>
                           </View>
+                          {item.lookingForGender && item.lookingForGender !== 'any' ? (
+                            <View style={styles.kConditionBadge}>
+                              <Text style={styles.kConditionText} numberOfLines={1}>{text.lookingForValues[item.lookingForGender as keyof typeof text.lookingForValues] ?? item.lookingForGender}</Text>
+                            </View>
+                          ) : null}
                         </View>
 
                         {zodiacLabel || designTypeLabel || designProfileLabel ? (
@@ -1173,19 +1560,194 @@ const KontaktiChaikyScreen: React.FC = () => {
                       showLikeAvatars
                     />
                     {isOwn ? (
-                      <TouchableOpacity style={styles.kDeleteLink} onPress={() => handleDelete(item.id)} activeOpacity={0.8}>
-                        <MaterialCommunityIcons name="trash-can-outline" size={14} color="#C0392B" />
-                        <Text style={styles.kDeleteLinkText}>{text.deleteText}</Text>
-                      </TouchableOpacity>
+                      <View style={styles.kOwnActions}>
+                        {item.moderationStatus === 'approved' ? (
+                          <TouchableOpacity style={styles.kEditLink} onPress={() => setWhoLikedMeVisible(true)} activeOpacity={0.8}>
+                            <MaterialCommunityIcons name="heart-outline" size={14} color="#7A2551" />
+                            <Text style={styles.kEditLinkText}>{text.whoLikedMeBtn}</Text>
+                          </TouchableOpacity>
+                        ) : null}
+                        <TouchableOpacity style={styles.kDeleteLink} onPress={() => handleDelete(item.id)} activeOpacity={0.8}>
+                          <MaterialCommunityIcons name="trash-can-outline" size={14} color="#C0392B" />
+                          <Text style={styles.kDeleteLinkText}>{text.deleteText}</Text>
+                        </TouchableOpacity>
+                      </View>
                     ) : null}
                   </View>
                 );
               })
             )}
+            {loadingMore ? (
+              <View style={styles.loadingMoreBox}>
+                <ActivityIndicator size="small" color="#7A2551" />
+                <Text style={styles.loadingMoreText}>{text.loadingMore}</Text>
+              </View>
+            ) : null}
           </View>
         )}
       </ScrollView>
+
+      {/* Swipe filter modal */}
+      <Modal visible={swipeFilterVisible} transparent animationType="fade" onRequestClose={() => setSwipeFilterVisible(false)}>
+        <View style={styles.swipeFilterBackdrop}>
+          <View style={[styles.swipeFilterSheet, { backgroundColor: isDark ? colors.paper : '#612e51', borderColor: colors.uiBorder }]}>
+            <Text style={[styles.swipeFilterTitle, { color: isDark ? colors.textPrimary : '#FFFFFF' }]}>{text.swipeFilterTitle}</Text>
+            <View style={styles.swipeFilterPills}>
+              {(['all', 'furniture', 'appliances', 'kids'] as const).map((g) => {
+                const label = g === 'all' ? text.swipeFilterGenderAll : g === 'furniture' ? text.swipeFilterGenderMale : g === 'appliances' ? text.swipeFilterGenderFemale : text.swipeFilterGenderFriends;
+                const active = swipeGenderFilter === g;
+                return (
+                  <TouchableOpacity
+                    key={g}
+                    style={[
+                      styles.swipeFilterPill,
+                      { backgroundColor: isDark ? colors.cardBg : '#612e51', borderColor: colors.uiBorder },
+                      active && { backgroundColor: isDark ? colors.navTabActive : '#F8F2F6', borderColor: isDark ? colors.textPrimary : '#7A2551' },
+                    ]}
+                    onPress={() => setSwipeGenderFilter(g)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.swipeFilterPillText, { color: active ? (isDark ? '#FFFFFF' : '#7A2551') : (isDark ? colors.textPrimary : '#FFFFFF') }]}>{label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <View style={styles.swipeFilterAgeRow}>
+              <Text style={[styles.swipeFilterAgeLabel, { color: isDark ? colors.textPrimary : '#FFFFFF' }]}>{text.swipeFilterAgeFrom}</Text>
+              <TextInput style={[styles.swipeFilterAgeInput, { backgroundColor: colors.inputBg, borderColor: colors.uiBorder, color: isDark ? '#2B1A24' : colors.textPrimary }]} value={swipeAgeFrom} onChangeText={setSwipeAgeFrom} keyboardType="numeric" placeholder="18" placeholderTextColor={colors.placeholder} maxLength={3} />
+              <Text style={[styles.swipeFilterAgeLabel, { color: isDark ? colors.textPrimary : '#FFFFFF' }]}>{text.swipeFilterAgeTo}</Text>
+              <TextInput style={[styles.swipeFilterAgeInput, { backgroundColor: colors.inputBg, borderColor: colors.uiBorder, color: isDark ? '#2B1A24' : colors.textPrimary }]} value={swipeAgeTo} onChangeText={setSwipeAgeTo} keyboardType="numeric" placeholder="99" placeholderTextColor={colors.placeholder} maxLength={3} />
+            </View>
+            <TactileButton
+              title={text.swipeFilterStart}
+              onPress={() => { swipePosition.setValue({ x: 0, y: 0 }); setSwipeFilterVisible(false); setSwipeIndex(0); setLikedIds([]); setLastDismissedDirection(null); setSwipeMode(true); }}
+              variant="primary"
+              style={styles.swipeFilterStartBtn}
+            />
+            <TouchableOpacity style={styles.swipeFilterSkipBtn} onPress={() => { swipePosition.setValue({ x: 0, y: 0 }); setSwipeGenderFilter('all'); setSwipeAgeFrom(''); setSwipeAgeTo(''); setSwipeFilterVisible(false); setSwipeIndex(0); setLikedIds([]); setLastDismissedDirection(null); setSwipeMode(true); }} activeOpacity={0.7}>
+              <Text style={[styles.swipeFilterSkipText, { color: isDark ? colors.textPrimary : '#FFFFFF' }]}>{text.swipeFilterSkip}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Swipe mode overlay */}
+      {swipeMode ? (() => {
+        const swipeCard = swipeItems[swipeIndex];
+        const swipeRotation = swipePosition.x.interpolate({ inputRange: [-200, 0, 200], outputRange: ['-12deg', '0deg', '12deg'] });
+        const likeOpacity = swipePosition.x.interpolate({ inputRange: [0, 80], outputRange: [0, 1], extrapolate: 'clamp' });
+        const passOpacity = swipePosition.x.interpolate({ inputRange: [-80, 0], outputRange: [1, 0], extrapolate: 'clamp' });
+        const swipeProfile = swipeCard && swipeCard.userId ? profileByUserId[swipeCard.userId] : undefined;
+
+        const swipeDisplayName = swipeProfile?.name || swipeCard?.itemName || '';
+        const swipeCategoryLabel = swipeCard ? getCategoryLabel(swipeCard.category) : '';
+        const swipeConditionLabel = swipeCard ? (text.conditionLabels[swipeCard.condition as keyof typeof text.conditionLabels] ?? swipeCard.condition) : '';
+        const swipeDone = swipeIndex >= swipeItems.length;
+        return (
+          <View style={styles.swipeOverlay}>
+            {/* Back button */}
+            <TouchableOpacity style={styles.swipeBackBtn} onPress={() => setSwipeMode(false)} activeOpacity={0.85}>
+              <MaterialCommunityIcons name="arrow-left" size={20} color="#7A2551" />
+              <Text style={styles.swipeBackBtnText}>{text.swipeBackBtn}</Text>
+            </TouchableOpacity>
+            {swipeDone ? (
+              <View style={styles.swipeDoneBox}>
+                <Text style={styles.swipeDoneTitle}>{text.swipeDoneTitle}</Text>
+                <Text style={styles.swipeDoneSub}>{text.swipeDoneLiked(likedIds.length)}</Text>
+                <TactileButton
+                  title={text.swipeRestartBtn}
+                  onPress={() => { swipePosition.setValue({ x: 0, y: 0 }); setSwipeIndex(0); setLikedIds([]); setLastDismissedDirection(null); }}
+                  variant="primary"
+                  style={styles.swipeRestartBtn}
+                />
+              </View>
+            ) : (
+              <>
+                {/* Next card (behind) */}
+                {swipeItems[swipeIndex + 1] ? (
+                  <View style={[styles.swipeCard, styles.swipeCardBack]} pointerEvents="none" />
+                ) : null}
+                {/* Current card */}
+                <Animated.View
+                  style={[styles.swipeCard, { transform: [{ translateX: swipePosition.x }, { translateY: swipePosition.y }, { rotate: swipeRotation }] }]}
+                  {...swipePanResponder.panHandlers}
+                >
+                  {swipeCard?.photoUris && swipeCard.photoUris.length > 1 ? (
+                    <PhotoCarousel
+                      photoUris={swipeCard.photoUris}
+                      width={320}
+                      height={460}
+                      borderRadius={0}
+                      style={styles.swipePhoto}
+                    />
+                  ) : (
+                    <AppPhotoImage
+                      uri={swipeCard?.photoUri}
+                      storagePath={swipeCard?.photoStoragePath}
+                      style={styles.swipePhoto}
+                      resizeMode="cover"
+                    />
+                  )}
+                  {/* Like overlay */}
+                  <Animated.View style={[styles.swipeLikeOverlay, { opacity: likeOpacity }]}>
+                    <Text style={styles.swipeLikeText}>{text.swipeLikeLabel}</Text>
+                  </Animated.View>
+                  {/* Pass overlay */}
+                  <Animated.View style={[styles.swipePassOverlay, { opacity: passOpacity }]}>
+                    <Text style={styles.swipePassText}>{text.swipePassLabel}</Text>
+                  </Animated.View>
+                  {/* Info bottom */}
+                  <View style={styles.swipeInfoBar}>
+                    <View style={styles.swipeNameRow}>
+                      <Text style={styles.swipeName}>{swipeDisplayName}</Text>
+                      {swipeCard?.price ? <Text style={styles.swipeAge}>{swipeCard.price}</Text> : null}
+                    </View>
+                    <View style={styles.swipeChips}>
+                      {swipeCategoryLabel ? <Text style={styles.swipeChip}>{swipeCategoryLabel}</Text> : null}
+                      {swipeConditionLabel ? <Text style={styles.swipeChip}>{swipeConditionLabel}</Text> : null}
+                    </View>
+                    {swipeCard?.description ? <Text style={styles.swipeDesc} numberOfLines={2}>{swipeCard.description}</Text> : null}
+                  </View>
+                </Animated.View>
+                {/* Action buttons */}
+                <View style={styles.swipeActions}>
+                  <TouchableOpacity
+                    style={[styles.swipeUndoBtn, lastDismissedDirection !== 'left' && styles.swipeBtnDisabled]}
+                    onPress={handleUndo}
+                    disabled={lastDismissedDirection !== 'left'}
+                    activeOpacity={0.85}
+                  >
+                    <MaterialCommunityIcons name="undo" size={24} color={lastDismissedDirection === 'left' ? '#612e51' : '#A0938D'} />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.swipePassBtn} onPress={handleSwipeLeft} activeOpacity={0.85}>
+                    <MaterialCommunityIcons name="close" size={40} color="#612e51" />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.swipeLikeBtn} onPress={handleSwipeRight} activeOpacity={0.85}>
+                    <MaterialCommunityIcons name="heart" size={48} color="#612e51" />
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.swipeCounter}>{swipeIndex + 1} / {swipeItems.length}</Text>
+              </>
+            )}
+          </View>
+        );
+      })() : null}
+
       <View style={styles.addBar}>
+        <TouchableOpacity
+          style={styles.swipeModeBtn}
+          onPress={() => {
+            if (swipeMode) {
+              setSwipeMode(false);
+            } else {
+              setSwipeFilterVisible(true);
+            }
+          }}
+          activeOpacity={0.85}
+        >
+          <MaterialCommunityIcons name={swipeMode ? 'view-list' : 'cards'} size={18} color={swipeMode ? '#7A2551' : '#FAFAF9'} />
+          <Text style={[styles.swipeModeBtnText, swipeMode && { color: '#7A2551' }]}>{swipeMode ? 'Список' : 'Листати'}</Text>
+        </TouchableOpacity>
         <TouchableOpacity style={styles.addBarBtn} onPress={() => {
           if (!user?.id) {
             Alert.alert(text.errorTitle, text.authRequired);
@@ -1243,6 +1805,16 @@ const KontaktiChaikyScreen: React.FC = () => {
               <InlineFieldHint message={text.conditionHint} type={condition ? 'success' : 'hint'} />
               <FormFieldError error={!condition && submitAttempted ? text.errorFill : undefined} />
 
+              <Text style={styles.formLabel}>{text.lookingForLabel}</Text>
+              <View style={styles.pickerWrapper}>
+                <Picker selectedValue={lookingForGender} onValueChange={setLookingForGender} style={styles.picker}>
+                  <Picker.Item label={text.selectLookingFor} value="" />
+                  {LOOKING_FOR_GENDER_VALUES.map((value) => (
+                    <Picker.Item key={`lfg-${value}`} label={text.lookingForValues[value]} value={value} />
+                  ))}
+                </Picker>
+              </View>
+
               <Text style={styles.formLabel}>{text.priceLabel}</Text>
               <TextInput
                 placeholder="0"
@@ -1250,7 +1822,7 @@ const KontaktiChaikyScreen: React.FC = () => {
                 onChangeText={(value) => setPrice(value.replace(',', '.').replace(/[^\d.]/g, ''))}
                 keyboardType="decimal-pad"
                 style={styles.input}
-                placeholderTextColor="#A0938D"
+                placeholderTextColor={colors.placeholder}
               />
               <InlineFieldHint message={text.ageHint} type={price.trim() ? 'success' : 'hint'} />
               <FormFieldError error={submitAttempted && (!price.trim() || Number(price) <= 0) ? text.priceError : undefined} />
@@ -1261,7 +1833,7 @@ const KontaktiChaikyScreen: React.FC = () => {
                 value={description}
                 onChangeText={setDescription}
                 style={[styles.input, styles.textarea]}
-                placeholderTextColor="#A0938D"
+                placeholderTextColor={colors.placeholder}
                 multiline
                 maxLength={260}
               />
@@ -1269,7 +1841,7 @@ const KontaktiChaikyScreen: React.FC = () => {
               <FormFieldError error={submitAttempted && !description.trim() ? text.descriptionRequired : undefined} />
 
               <Text style={styles.formLabel}>{text.phoneLabel}</Text>
-              <TextInput placeholder="+380..." value={phone} onChangeText={(value) => setPhone(normalizePhoneText(value))} keyboardType="phone-pad" style={styles.input} placeholderTextColor="#A0938D" />
+              <TextInput placeholder="+380..." value={phone} onChangeText={(value) => setPhone(normalizePhoneText(value))} keyboardType="phone-pad" style={styles.input} placeholderTextColor={colors.placeholder} />
               <InlineFieldHint message={text.phoneHint} type={phone.replace(/\D/g, '').length >= 7 ? 'success' : 'hint'} />
               <FormFieldError error={submitAttempted && phone.replace(/\D/g, '').length < 7 ? text.errorPhone : undefined} />
 
@@ -1329,13 +1901,16 @@ const KontaktiChaikyScreen: React.FC = () => {
 
               <Text style={styles.formLabel}>{text.photoLabel}</Text>
               {user?.id ? (
-                <PhotoUploadField
-                  uid={user.id}
-                  userName={user?.name ?? ''}
-                  maxPhotos={5}
-                  storagePath="contacts_listings"
-                  onPhotosChange={setFormPhotos}
-                />
+                <>
+                  <PhotoUploadField
+                    uid={user.id}
+                    userName={user?.name ?? ''}
+                    maxPhotos={3}
+                    storagePath="contacts_listings"
+                    onPhotosChange={setFormPhotos}
+                  />
+                  <UploadedPhotosGrid />
+                </>
               ) : (
                 <Text style={styles.signInNote}>{text.authRequired}</Text>
               )}
@@ -1350,13 +1925,14 @@ const KontaktiChaikyScreen: React.FC = () => {
                 />
               </View>
 
-              <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} activeOpacity={0.85} disabled={submitting}>
-                {submitting ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.submitBtnText}>{text.submitBtn}</Text>
-                )}
-              </TouchableOpacity>
+              <TactileButton
+                title={text.submitBtn}
+                onPress={handleSubmit}
+                variant="primary"
+                disabled={submitting}
+                loading={submitting}
+                style={styles.submitBtn}
+              />
             </ScrollView>
             </View>
           </View>
@@ -1370,117 +1946,164 @@ const KontaktiChaikyScreen: React.FC = () => {
         onSelect={(reason) => void sendContactRequest(reason)}
         onClose={closeContactModal}
       />
+      <ReportBlockMenu
+        visible={reportMenuVisible}
+        onClose={() => { setReportMenuVisible(false); setReportTargetListing(null); }}
+        listingId={reportTargetListing?.id || ''}
+        reportedUserId={reportTargetListing?.userId || ''}
+        currentUserId={user?.id || ''}
+        language={language}
+        onBlock={handleBlockUser}
+      />
+      <WhoLikedMeList
+        visible={whoLikedMeVisible}
+        listingId={ownListing?.id || ''}
+        currentUserId={user?.id || ''}
+        blockedUserIds={blockedUserIds}
+        language={language}
+        onViewProfile={(userId) => {
+          setWhoLikedMeVisible(false);
+          if (navLock.current) return;
+          navLock.current = true;
+          navigation.navigate('ViewUserProfile', { userId });
+          setTimeout(() => { navLock.current = false; }, 800);
+        }}
+        onClose={() => setWhoLikedMeVisible(false)}
+      />
+      <VideoLoadingOverlay visible={!listingsReady} />
     </SafeAreaView>
   );
 };
 
+// Elegant Luxury Design System — ChaikaUA Знайомства на каву
+// Colors: Primary #612e51, Accent #7A2551, Background #FAFAF9, Text #612e51
+// Style: Liquid Glass + Premium Black/Gold
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: SCREEN_THEME.appBg },
+  container: { flex: 1, backgroundColor: '#FAFAF9' },
   content: { padding: 16, paddingTop: 24, paddingBottom: 110 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(97,46,81,0.6)', justifyContent: 'flex-end' },
   modalSheet: {
-    backgroundColor: SCREEN_THEME.paperStrong,
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
     maxHeight: '84%',
     paddingBottom: 16,
+    borderTopWidth: 1,
+    borderColor: '#E8D9B5',
   },
-  modalHandle: { width: 42, height: 4, borderRadius: 99, backgroundColor: '#D9C69E', alignSelf: 'center', marginTop: 10, marginBottom: 4 },
+  modalHandle: { width: 42, height: 4, borderRadius: 99, backgroundColor: '#7A2551', alignSelf: 'center', marginTop: 10, marginBottom: 4 },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#E8DDD3',
+    borderBottomColor: '#E8D9B5',
   },
-  modalTitle: { color: SCREEN_THEME.textPrimary, fontSize: 17, fontWeight: '900', flex: 1, paddingRight: 8 },
-  modalCloseBtn: { backgroundColor: SCREEN_THEME.enamelBlue, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
-  modalCloseText: { color: '#fff', fontWeight: '800', fontSize: 12 },
-  modalContent: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 20 },
+  modalTitle: { color: '#612e51', fontSize: 17, fontWeight: '900', flex: 1, paddingRight: 8, letterSpacing: 0.3 },
+  modalCloseBtn: { backgroundColor: '#612e51', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
+  modalCloseText: { color: '#7A2551', fontWeight: '800', fontSize: 12 },
+  modalContent: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20 },
   modalActions: { flexDirection: 'row', gap: 10, marginTop: 10 },
   resetBtn: {
     flex: 1,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#D9C69E',
-    backgroundColor: '#F7F3EE',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#E8D9B5',
+    backgroundColor: '#FAFAF9',
     alignItems: 'center',
     paddingVertical: 12,
   },
-  resetBtnText: { color: SCREEN_THEME.textSecondary, fontWeight: '800', fontSize: 13 },
-  applyBtn: { flex: 1, borderRadius: 14, backgroundColor: SCREEN_THEME.woodGreen, alignItems: 'center', paddingVertical: 12 },
-  applyBtnText: { color: '#fff', fontWeight: '800', fontSize: 13 },
-  headerCard: { backgroundColor: '#E6F0E9', borderRadius: 28, padding: 18, marginBottom: 20, alignItems: 'center', borderWidth: 1.5, borderColor: '#B8D3BF' },
-  headerTitle: { fontSize: 28, fontWeight: '900', color: SCREEN_THEME.textPrimary, marginTop: 8 },
-  headerSubtitle: { marginTop: 6, color: SCREEN_THEME.textSecondary, textAlign: 'center' },
+  resetBtnText: { color: '#44403C', fontWeight: '700', fontSize: 13 },
+  applyBtn: { flex: 1, borderRadius: 16, backgroundColor: '#612e51', alignItems: 'center', paddingVertical: 12 },
+  applyBtnText: { color: '#7A2551', fontWeight: '800', fontSize: 13 },
+  headerCard: {
+    backgroundColor: '#612e51',
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#7A2551',
+  },
+  headerTitle: { fontSize: 26, fontWeight: '900', color: '#FAFAF9', marginTop: 8, letterSpacing: 0.5 },
+  headerSubtitle: { marginTop: 6, color: '#B5A990', textAlign: 'center', fontSize: 13 },
   liveLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', marginTop: 8 },
-  liveDot: { color: '#2D7E4D', fontSize: 12, fontWeight: '900', marginRight: 4 },
-  liveText: { color: '#2D7E4D', fontSize: 11, fontWeight: '900', marginRight: 6 },
-  liveCount: { color: SCREEN_THEME.textSecondary, fontSize: 11, fontWeight: '700', textAlign: 'center' },
-  formLabel: { fontWeight: '700', color: SCREEN_THEME.textPrimary, marginBottom: 8, marginTop: 8 },
-  signInNote: { color: SCREEN_THEME.textSecondary, fontSize: 13, fontWeight: '700', paddingVertical: 10, lineHeight: 18 },
-  input: { backgroundColor: '#F7F3EE', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, color: SCREEN_THEME.textPrimary, borderWidth: 1, borderColor: '#E8DDD3' },
+  liveDot: { color: '#7A2551', fontSize: 12, fontWeight: '900', marginRight: 4 },
+  liveText: { color: '#7A2551', fontSize: 11, fontWeight: '900', marginRight: 6 },
+  liveCount: { color: '#B5A990', fontSize: 11, fontWeight: '700', textAlign: 'center' },
+  formLabel: { fontWeight: '700', color: '#612e51', marginBottom: 8, marginTop: 8, letterSpacing: 0.2 },
+  signInNote: { color: '#44403C', fontSize: 13, fontWeight: '700', paddingVertical: 10, lineHeight: 18 },
+  input: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    color: '#612e51',
+    borderWidth: 1.5,
+    borderColor: '#E8D9B5',
+    fontSize: 15,
+  },
   textarea: { minHeight: 80, textAlignVertical: 'top' },
-  pickerWrapper: { backgroundColor: '#F7F3EE', borderRadius: 16, borderWidth: 1, borderColor: '#E8DDD3', overflow: 'hidden' },
-  picker: { color: SCREEN_THEME.textPrimary, height: 50 },
-  submitBtn: { backgroundColor: SCREEN_THEME.terracotta, borderRadius: 16, paddingVertical: 14, alignItems: 'center', marginTop: 14 },
-  submitBtnText: { color: '#FFFFFF', fontWeight: '800' },
-  topAnketySection: { marginBottom: 16 },
-  topAnketyTitle: { fontSize: 14, fontWeight: '900', color: SCREEN_THEME.textPrimary, marginBottom: 8 },
-  topAnketyScroll: { paddingHorizontal: 4, gap: 12 },
+  pickerWrapper: { backgroundColor: '#FFFFFF', borderRadius: 14, borderWidth: 1.5, borderColor: '#E8D9B5', overflow: 'hidden' },
+  picker: { color: '#612e51', height: 50 },
+  submitBtn: { backgroundColor: '#7d0e59', borderRadius: 16, paddingVertical: 15, alignItems: 'center', marginTop: 16 },
+  submitBtnText: { color: '#fff', fontWeight: '900', fontSize: 15, letterSpacing: 0.5 },
+  topAnketySection: { marginBottom: 18 },
+  topAnketyTitle: { fontSize: 11, fontWeight: '800', color: '#44403C', marginBottom: 10, letterSpacing: 1.2, textTransform: 'uppercase' },
+  topAnketyScroll: { paddingHorizontal: 4, gap: 14 },
   topAnketyItem: { width: 72, alignItems: 'center' },
-  topAnketyPhoto: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#FFF3E0' },
-  topAnketyName: { fontSize: 11, fontWeight: '700', color: SCREEN_THEME.textPrimary, textAlign: 'center', width: 72, marginTop: 4 },
-  topAnketyAge: { fontSize: 10, fontWeight: '600', color: SCREEN_THEME.textSecondary, textAlign: 'center' },
+  topAnketyPhoto: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#F5EDD6', borderWidth: 2, borderColor: '#7A2551' },
+  topAnketyName: { fontSize: 11, fontWeight: '700', color: '#612e51', textAlign: 'center', width: 72, marginTop: 5 },
+  topAnketyAge: { fontSize: 10, fontWeight: '600', color: '#44403C', textAlign: 'center' },
   listingsSection: { marginBottom: 16 },
   listingsHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 8 },
-  listingsSectionTitle: { fontSize: 16, fontWeight: '900', color: SCREEN_THEME.textPrimary },
-  searchBtn: { backgroundColor: SCREEN_THEME.enamelBlue, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
-  searchBtnText: { color: '#fff', fontWeight: '800', fontSize: 12 },
+  listingsSectionTitle: { fontSize: 16, fontWeight: '900', color: '#612e51', letterSpacing: 0.3 },
+  searchBtn: { backgroundColor: '#612e51', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
+  searchBtnText: { color: '#7A2551', fontWeight: '800', fontSize: 12 },
   clearSearchBtn: { alignSelf: 'flex-start', marginBottom: 10 },
-  clearSearchText: { color: SCREEN_THEME.terracottaDark, fontWeight: '800', fontSize: 12 },
+  clearSearchText: { color: '#7A2551', fontWeight: '800', fontSize: 12 },
   emptyFiltered: {
-    backgroundColor: SCREEN_THEME.paperStrong,
+    backgroundColor: '#FFFFFF',
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#E4D0AB',
-    padding: 16,
+    borderColor: '#E8D9B5',
+    padding: 18,
     marginBottom: 8,
   },
-  emptyFilteredTitle: { color: SCREEN_THEME.textPrimary, fontWeight: '800', fontSize: 14 },
-  emptyFilteredSub: { color: SCREEN_THEME.textSecondary, marginTop: 4, fontSize: 12, lineHeight: 18 },
-  listingCard: { backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 20, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#E4D0AB' },
+  emptyFilteredTitle: { color: '#612e51', fontWeight: '800', fontSize: 14 },
+  emptyFilteredSub: { color: '#44403C', marginTop: 4, fontSize: 12, lineHeight: 18 },
+  listingCard: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16, marginBottom: 10, borderWidth: 1, borderColor: '#E8D9B5' },
   listingHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  listingName: { fontWeight: '800', color: SCREEN_THEME.textPrimary, flex: 1, marginRight: 8 },
-  deleteText: { color: '#D05B4D', fontWeight: '700' },
+  listingName: { fontWeight: '800', color: '#612e51', flex: 1, marginRight: 8 },
+  deleteText: { color: '#B91C1C', fontWeight: '700' },
   listingMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
-  listingBadgeText: { fontSize: 11, fontWeight: '700', color: '#7B1FA2' },
-  listingPrice: { fontSize: 15, fontWeight: '900', color: '#00897B' },
-  statusBadge: { fontSize: 11, fontWeight: '900', color: '#8A5A00', backgroundColor: '#FFF2C7', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
-  listingDescription: { color: SCREEN_THEME.textSecondary, lineHeight: 18, marginBottom: 8 },
-  listingPhoto: { width: '100%', height: 170, borderRadius: 16, marginBottom: 8, backgroundColor: '#FFF3E0' },
-  moderationInfo: { color: '#5F5043', backgroundColor: '#FFF8EA', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 8, fontSize: 12, lineHeight: 17, fontWeight: '700' },
-  // New card styles (incoming-style layout)
+  listingBadgeText: { fontSize: 11, fontWeight: '700', color: '#44403C' },
+  listingPrice: { fontSize: 15, fontWeight: '900', color: '#7A2551' },
+  statusBadge: { fontSize: 11, fontWeight: '900', color: '#92400E', backgroundColor: '#FEF3C7', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
+  listingDescription: { color: '#44403C', lineHeight: 18, marginBottom: 8 },
+  listingPhoto: { width: '100%', height: 170, borderRadius: 16, marginBottom: 8, backgroundColor: '#F5EDD6' },
+  moderationInfo: { color: '#78350F', backgroundColor: '#FEF9C3', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 8, fontSize: 12, lineHeight: 17, fontWeight: '700' },
+  // Elegant Luxury card — premium black/gold palette
   kCard: {
-    backgroundColor: '#F7F3EE',
-    borderRadius: 14,
-    padding: 8,
-    marginBottom: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 12,
+    marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#E4D0AB',
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOpacity: 0.03,
-    shadowRadius: 2,
-    shadowOffset: { width: 0, height: 1 },
+    borderColor: '#E8D9B5',
+    elevation: 2,
+    shadowColor: '#7A2551',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
   },
   kCardTop: {
     flexDirection: 'row',
-    gap: 9,
+    gap: 12,
     alignItems: 'flex-start',
-    marginBottom: 7,
+    marginBottom: 8,
   },
   kAvatar: {
     width: 56,
@@ -1489,19 +2112,20 @@ const styles = StyleSheet.create({
   },
   kInfo: {
     flex: 1,
-    gap: 5,
+    gap: 6,
   },
   kNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
     flexWrap: 'nowrap',
   },
   kName: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '800',
-    color: '#2D2520',
+    color: '#612e51',
     flexShrink: 1,
+    letterSpacing: 0.2,
   },
   kMetaChips: {
     flexDirection: 'row',
@@ -1510,57 +2134,57 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   kCategoryBadge: {
-    backgroundColor: '#E6F0E9',
+    backgroundColor: '#FEF9C3',
     borderWidth: 1,
-    borderColor: '#B8D3BF',
+    borderColor: '#E8D9B5',
     borderRadius: 999,
-    paddingHorizontal: 7,
+    paddingHorizontal: 8,
     paddingVertical: 3,
     maxWidth: '52%',
   },
   kCategoryText: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#2D7E4D',
+    color: '#92400E',
   },
-  kArchiveBadge: { fontSize: 10, fontWeight: '700', color: '#fff', backgroundColor: '#8B7355', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 3, overflow: 'hidden', flexShrink: 0 },
+  kArchiveBadge: { fontSize: 10, fontWeight: '700', color: '#FAFAF9', backgroundColor: '#44403C', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 3, overflow: 'hidden', flexShrink: 0 },
   kConditionBadge: {
-    backgroundColor: '#F3E5F5',
+    backgroundColor: '#F5EDD6',
     borderWidth: 1,
-    borderColor: '#CE93D8',
+    borderColor: '#E8D9B5',
     borderRadius: 999,
-    paddingHorizontal: 7,
+    paddingHorizontal: 8,
     paddingVertical: 3,
     flexShrink: 0,
   },
   kConditionText: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#6A1B9A',
+    color: '#44403C',
   },
   kAgeBadge: {
-    backgroundColor: '#DDEAF0',
+    backgroundColor: '#612e51',
     borderRadius: 999,
-    paddingHorizontal: 7,
+    paddingHorizontal: 8,
     paddingVertical: 3,
     marginLeft: 'auto' as const,
   },
   kAgeText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#3D5D87',
+    color: '#7A2551',
   },
   kDescBox: {
-    borderRadius: 8,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    backgroundColor: '#7A1E5C',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: '#612e51',
   },
   kDescText: {
     fontSize: 12,
-    color: '#fff',
+    color: '#FAFAF9',
     lineHeight: 17,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   kInterestingChips: {
     flexDirection: 'row',
@@ -1568,21 +2192,21 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   kInterestingChip: {
-    backgroundColor: '#FFF8EA',
+    backgroundColor: '#FEF9C3',
     borderWidth: 1,
-    borderColor: '#E4D0AB',
+    borderColor: '#E8D9B5',
     borderRadius: 999,
-    color: '#5F5043',
+    color: '#92400E',
     fontSize: 10,
     fontWeight: '800',
     overflow: 'hidden',
-    paddingHorizontal: 7,
+    paddingHorizontal: 8,
     paddingVertical: 3,
   },
   kModInfo: {
     fontSize: 11,
-    color: '#8A6200',
-    backgroundColor: '#FFF8EA',
+    color: '#78350F',
+    backgroundColor: '#FEF9C3',
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -1593,7 +2217,7 @@ const styles = StyleSheet.create({
     width: 92,
     height: 108,
     borderRadius: 14,
-    backgroundColor: '#FFF3E0',
+    backgroundColor: '#F5EDD6',
   },
   sectionDivider: {
     flexDirection: 'row' as const,
@@ -1602,22 +2226,35 @@ const styles = StyleSheet.create({
     marginTop: 18,
     marginBottom: 6,
   },
-  sectionDividerLine: { flex: 1, height: 1, backgroundColor: '#E8DDD3' },
-  sectionDividerText: { fontSize: 10, fontWeight: '900' as const, color: '#A0938D', textTransform: 'uppercase' as const, letterSpacing: 1 },
+  sectionDividerLine: { flex: 1, height: 1, backgroundColor: '#E8D9B5' },
+  sectionDividerText: { fontSize: 10, fontWeight: '900' as const, color: '#44403C', textTransform: 'uppercase' as const, letterSpacing: 1.5 },
+  kOwnActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 8,
+  },
+  kEditLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  kEditLinkText: { color: '#7A2551', fontSize: 11, fontWeight: '800' },
   kDeleteLink: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    alignSelf: 'flex-end',
-    marginTop: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
-  kDeleteLinkText: { color: '#C0392B', fontSize: 11, fontWeight: '800' },
+  kDeleteLinkText: { color: '#B91C1C', fontSize: 11, fontWeight: '800' },
   interestingBtn: {
     alignItems: 'center',
-    backgroundColor: '#F3E5F5',
-    borderColor: '#CE93D8',
+    backgroundColor: '#FEF9C3',
+    borderColor: '#E8D9B5',
     borderRadius: 16,
     borderWidth: 1,
     flexDirection: 'row',
@@ -1627,14 +2264,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
-  interestingBtnText: { color: '#7A1E5C', fontSize: 14, fontWeight: '900', textAlign: 'center' },
+  interestingBtnText: { color: '#92400E', fontSize: 14, fontWeight: '900', textAlign: 'center' },
   interestingSection: {
-    backgroundColor: '#FFF8EA',
-    borderColor: '#E4D0AB',
+    backgroundColor: '#FAFAF9',
+    borderColor: '#E8D9B5',
     borderRadius: 16,
     borderWidth: 1,
     marginTop: 10,
-    padding: 12,
+    padding: 14,
   },
   consultationLink: {
     alignItems: 'center',
@@ -1644,55 +2281,245 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingVertical: 8,
   },
-  consultationLinkText: { color: '#2D7E4D', flex: 1, fontSize: 13, fontWeight: '900', lineHeight: 18 },
+  consultationLinkText: { color: '#7A2551', flex: 1, fontSize: 13, fontWeight: '900', lineHeight: 18 },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: 8,
-    backgroundColor: '#F7F3EE',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: '#E8DDD3',
+    paddingVertical: 10,
+    borderWidth: 1.5,
+    borderColor: '#E8D9B5',
   },
   addBar: {
-    paddingHorizontal: 16,
+    flexDirection: 'row',
+    paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: SCREEN_THEME.appBg,
+    gap: 10,
+    backgroundColor: '#FAFAF9',
     borderTopWidth: 1,
-    borderTopColor: '#E4D0AB',
+    borderTopColor: '#E8D9B5',
   },
   addBarBtn: {
-    backgroundColor: SCREEN_THEME.woodGreenDark,
+    flex: 1,
+    backgroundColor: '#7d0e59',
     borderRadius: 16,
     paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#7A2551',
   },
-  addBarBtnText: { color: '#fff', fontSize: 16, fontWeight: '900', letterSpacing: 0.3 },
+  addBarBtnText: { color: '#fff', fontSize: 15, fontWeight: '900', letterSpacing: 0.5 },
+  swipeModeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#7d0e59',
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderWidth: 1,
+    borderColor: '#44403C',
+  },
+  swipeModeBtnText: { color: '#FAFAF9', fontSize: 14, fontWeight: '900' },
+  // Swipe mode overlay
+  swipeOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#612e51',
+    zIndex: 100,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: 100,
+  },
+  swipeCard: {
+    width: 320,
+    height: 460,
+    borderRadius: 24,
+    backgroundColor: '#612e51',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#7A2551',
+    elevation: 12,
+    shadowColor: '#7A2551',
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  swipeCardBack: {
+    position: 'absolute',
+    transform: [{ scale: 0.95 }],
+    opacity: 0.6,
+  },
+  swipePhoto: {
+    width: '100%',
+    height: '100%',
+    position: 'absolute',
+  },
+  swipeLikeOverlay: {
+    position: 'absolute',
+    top: 32,
+    left: 24,
+    backgroundColor: 'rgba(122,37,81,0.9)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    transform: [{ rotate: '-12deg' }],
+  },
+  swipeLikeText: { color: '#612e51', fontSize: 22, fontWeight: '900', letterSpacing: 1 },
+  swipePassOverlay: {
+    position: 'absolute',
+    top: 32,
+    right: 24,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderWidth: 2,
+    borderColor: '#FAFAF9',
+    transform: [{ rotate: '12deg' }],
+  },
+  swipePassText: { color: '#FAFAF9', fontSize: 20, fontWeight: '900', letterSpacing: 1 },
+  swipeInfoBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(97,46,81,0.82)',
+    padding: 16,
+    gap: 6,
+  },
+  swipeNameRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  swipeName: { fontSize: 22, fontWeight: '900', color: '#FAFAF9', flex: 1 },
+  swipeAge: { fontSize: 18, fontWeight: '800', color: '#7A2551' },
+  swipeChips: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
+  swipeChip: { backgroundColor: 'rgba(122,37,81,0.18)', borderWidth: 1, borderColor: '#7A2551', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3, color: '#7A2551', fontSize: 11, fontWeight: '800' },
+  swipeDesc: { color: '#B5A990', fontSize: 13, lineHeight: 18 },
+  swipeActions: {
+    position: 'absolute',
+    bottom: -90,
+    flexDirection: 'row',
+    gap: 40,
+    alignSelf: 'center',
+    alignItems: 'center',
+  },
+  swipePassBtn: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#FAFAF9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4,
+    shadowColor: '#612e51',
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  swipeLikeBtn: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#7A2551',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 6,
+    shadowColor: '#7A2551',
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  swipeCounter: { position: 'absolute', top: 60, alignSelf: 'center', color: '#B5A990', fontSize: 12, fontWeight: '700', letterSpacing: 1 },
+  swipeBackBtn: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(97,46,81,0.85)',
+    borderWidth: 1,
+    borderColor: '#7A2551',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    zIndex: 10,
+  },
+  swipeBackBtnText: { color: '#7A2551', fontSize: 13, fontWeight: '800' },
+  swipeDoneBox: { alignItems: 'center', gap: 12, padding: 32 },
+  swipeDoneTitle: { fontSize: 22, fontWeight: '900', color: '#FAFAF9', textAlign: 'center' },
+  swipeDoneSub: { fontSize: 16, color: '#7A2551', fontWeight: '700' },
+  swipeRestartBtn: { backgroundColor: '#7A2551', borderRadius: 16, paddingHorizontal: 28, paddingVertical: 14, marginTop: 8 },
+  swipeRestartBtnText: { color: '#612e51', fontWeight: '900', fontSize: 15 },
+  swipeFilterBackdrop: { flex: 1, backgroundColor: 'rgba(97,46,81,0.7)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  swipeFilterSheet: {
+    backgroundColor: '#612e51',
+    borderRadius: 24,
+    padding: 28,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: '#44403C',
+    gap: 20,
+  },
+  swipeFilterTitle: { fontSize: 20, fontWeight: '900', color: '#FFFFFF', textAlign: 'center' },
+  swipeFilterPills: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' },
+  swipeFilterPill: {
+    borderWidth: 1,
+    borderColor: '#44403C',
+    borderRadius: 999,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    backgroundColor: '#612e51',
+  },
+  swipeFilterPillActive: { borderColor: '#7A2551', backgroundColor: 'rgba(122,37,81,0.15)' },
+  swipeFilterPillText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
+  swipeFilterPillTextActive: { color: '#7A2551' },
+  swipeFilterAgeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, justifyContent: 'center' },
+  swipeFilterAgeLabel: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
+  swipeFilterAgeInput: {
+    backgroundColor: '#612e51',
+    borderWidth: 1,
+    borderColor: '#44403C',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    color: '#FAFAF9',
+    fontSize: 16,
+    fontWeight: '800',
+    width: 70,
+    textAlign: 'center',
+  },
+  swipeFilterStartBtn: { backgroundColor: '#7A2551', borderRadius: 16, paddingVertical: 16, alignItems: 'center' },
+  swipeFilterStartBtnText: { color: '#612e51', fontWeight: '900', fontSize: 16 },
+  swipeFilterSkipBtn: { alignItems: 'center', paddingVertical: 4 },
+  swipeFilterSkipText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
   sheetOverlay: { flex: 1, justifyContent: 'flex-end' },
-  sheetBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
+  sheetBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(97,46,81,0.6)' },
   sheetWrapper: { justifyContent: 'flex-end' },
   sheet: {
-    backgroundColor: '#FFFAF4',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
     maxHeight: '92%',
     paddingBottom: 32,
-    shadowColor: '#000',
+    shadowColor: '#7A2551',
     shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
     elevation: 20,
+    borderTopWidth: 1,
+    borderColor: '#E8D9B5',
   },
   sheetScroll: { flexGrow: 0 },
   sheetHandle: {
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#D4C0A8',
+    backgroundColor: '#7A2551',
     alignSelf: 'center',
     marginTop: 10,
     marginBottom: 4,
@@ -1702,23 +2529,117 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#EDE3D5',
+    borderBottomColor: '#E8D9B5',
   },
-  sheetTitle: { fontSize: 17, fontWeight: '900', color: SCREEN_THEME.textPrimary },
+  sheetTitle: { fontSize: 17, fontWeight: '900', color: '#612e51', letterSpacing: 0.3 },
   sheetCloseBtn: {
     width: 32,
     height: 32,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F4E8D8',
+    backgroundColor: '#612e51',
     borderWidth: 1,
-    borderColor: '#E4D0AB',
+    borderColor: '#7A2551',
   },
-  sheetCloseTxt: { fontSize: 16, color: '#7A6D64', fontWeight: '900' },
+  sheetCloseTxt: { fontSize: 16, color: '#7A2551', fontWeight: '900' },
   sheetContent: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 28 },
+  // Report/Block three-dot button
+  kReportBtn: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    zIndex: 5,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(250,250,249,0.85)',
+  },
+  // Empty state
+  emptyStateBox: {
+    alignItems: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 24,
+    gap: 12,
+  },
+  emptyStateTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#612e51',
+    textAlign: 'center',
+  },
+  emptyStateCta: {
+    backgroundColor: '#7A2551',
+    borderRadius: 16,
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    marginTop: 4,
+  },
+  emptyStateCtaText: {
+    color: '#612e51',
+    fontWeight: '900',
+    fontSize: 15,
+    letterSpacing: 0.5,
+  },
+  // No-profile banner
+  noProfileBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(122,37,81,0.08)',
+    borderWidth: 1,
+    borderColor: '#7A2551',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 12,
+  },
+  noProfileBannerText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#44403C',
+    marginRight: 8,
+  },
+  noProfileBannerCta: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#7A2551',
+  },
+  // Undo swipe button
+  swipeUndoBtn: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FAFAF9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 3,
+    shadowColor: '#612e51',
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  swipeBtnDisabled: {
+    opacity: 0.4,
+  },
+  // Loading more indicator
+  loadingMoreBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 16,
+  },
+  loadingMoreText: {
+    color: '#78716C',
+    fontSize: 13,
+    fontWeight: '700',
+  },
 });
 
 export default KontaktiChaikyScreen;

@@ -4,8 +4,12 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { SCREEN_THEME } from '../utils/screenTheme';
+import { useAppTheme } from '../hooks/useAppTheme';
 import type { RootState } from '../redux/store';
 import { sportsService, SportKey, SportTodayEntry } from '../services/sportsService';
+import { useTrainingMode } from '../hooks/useTrainingMode';
+import TrainingHint from '../components/TrainingHint';
+import HintBadge, { HINT_BADGE_LABELS } from '../components/HintBadge';
 
 type Lang = 'ua' | 'ru' | 'en';
 
@@ -124,10 +128,18 @@ const SPORT_FEED_TEXT: Record<Lang, {
   },
 };
 
+const TRAINING_HINT: Record<Lang, string> = {
+  ua: 'Обери вид спорту і натисни Обрати. Побачиш, хто вже грає сьогодні.',
+  ru: 'Выбери вид спорта и нажми Выбрать. Увидишь, кто уже играет сегодня.',
+  en: 'Pick a sport and tap Choose. You will see who is playing today.',
+};
+
 const SportNaChaykeScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as Lang;
   const text = UI_TEXT[language];
+  const { colors, isDark } = useAppTheme();
+  const training = useTrainingMode('sport_na_chayke');
   const feedText = SPORT_FEED_TEXT[language];
   const blinkAnim = useRef(new Animated.Value(1)).current;
   const [todayEntriesBySport, setTodayEntriesBySport] = useState<Record<SportKey, SportTodayEntry[]>>({
@@ -184,13 +196,20 @@ const SportNaChaykeScreen: React.FC = () => {
         time,
         players,
       }));
-    }).sort((a, b) => a.time.localeCompare(b.time) || text.sports[a.sport.key].localeCompare(text.sports[b.sport.key]));
+    }).sort((a, b) => { const toMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + (m || 0); }; return toMin(a.time) - toMin(b.time) || text.sports[a.sport.key].localeCompare(text.sports[b.sport.key]); });
   }, [todayEntriesBySport, text.sports]);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
+          <HintBadge
+            visible={training.isVisible}
+            onTap={training.openHint}
+            onDismiss={training.dismiss}
+            label={HINT_BADGE_LABELS[language]}
+            style={{ position: 'absolute', top: 12, right: 12, zIndex: 10 }}
+          />
           <View style={styles.heroImageWrap}>
             <Image source={require('../../assets/WEBP-version/Sport.webp')} style={styles.heroImage} resizeMode="contain" />
           </View>
@@ -203,7 +222,7 @@ const SportNaChaykeScreen: React.FC = () => {
           <Text style={styles.subtitle}>{text.subtitle}</Text>
         </View>
 
-        <Text style={styles.sectionTitle}>{feedText.gamesTitle}</Text>
+        <Text style={[styles.sectionTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{feedText.gamesTitle}</Text>
         <View style={styles.gamesList}>
           {upcomingGames.length === 0 ? (
             <View style={styles.emptyCard}>
@@ -240,7 +259,7 @@ const SportNaChaykeScreen: React.FC = () => {
           ))}
         </View>
 
-        <Text style={styles.sectionTitle}>{feedText.sportsTitle}</Text>
+        <Text style={[styles.sectionTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{feedText.sportsTitle}</Text>
         <View style={styles.list}>
           {SPORTS.map((sport) => (
             <TouchableOpacity
@@ -261,6 +280,9 @@ const SportNaChaykeScreen: React.FC = () => {
           ))}
         </View>
       </ScrollView>
+      {training.showHint && (
+        <TrainingHint text={TRAINING_HINT[language]} onDismiss={training.closeHint} />
+      )}
     </SafeAreaView>
   );
 };

@@ -7,12 +7,14 @@ import { setLanguage } from '../redux/slices/languageSlice';
 import { RootState } from '../redux/store';
 import { useTranslation } from '../i18n/useTranslation';
 import MiniTabBar from '../components/MiniTabBar';
+import { useTrainingMode } from '../hooks/useTrainingMode';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import TactileIcon from '../components/TactileIcon';
 import { createPendingModeration } from '../utils/moderation';
 import { APP_BUILD_DATE, APP_VERSION } from '../utils/constants';
 import { showUserError } from '../utils/userFacingErrors';
 import { appSuggestionsService } from '../services/appSuggestionsService';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 const SUGGESTIONS_ARCHIVE_KEY = '@chaika:app_feature_suggestions_moderation_v1';
 const SUGGESTION_MAX_LENGTH = 200;
@@ -52,6 +54,7 @@ const suggestionText = {
     missionTitle: 'Наша мета',
     missionText: 'Головна ідея застосунку — зробити життя в Chaika Life зручнішим: швидше знаходити потрібні місця, вирішувати побутові питання та підтримувати контакт із сусідами.',
     featuresTitle: 'Що вміє застосунок',
+    trainingMode: 'Підказки для новачків',
     helpTitle: 'Потрібна допомога?',
     helpText: 'Якщо у вас є питання або пропозиції, напишіть нам на support_chaika_ua@ukr.net',
     copiedTitle: 'Скопійовано',
@@ -77,6 +80,7 @@ const suggestionText = {
     missionTitle: 'Наша цель',
     missionText: 'Главная идея приложения — сделать жизнь в Chaika Life удобнее: быстрее находить нужные места, решать бытовые вопросы и поддерживать контакт с соседями.',
     featuresTitle: 'Что умеет приложение',
+    trainingMode: 'Подсказки для новичков',
     helpTitle: 'Нужна помощь?',
     helpText: 'Если у вас есть вопросы или предложения, напишите нам на support_chaika_ua@ukr.net',
     copiedTitle: 'Скопировано',
@@ -102,6 +106,7 @@ const suggestionText = {
     missionTitle: 'Our mission',
     missionText: 'The main goal of the app is to make life in Chaika Life easier: find useful places faster, solve everyday issues and stay connected with neighbors.',
     featuresTitle: 'What the app can do',
+    trainingMode: 'Hints for beginners',
     helpTitle: 'Need help?',
     helpText: 'If you have any questions or suggestions, write to us at support_chaika_ua@ukr.net',
     copiedTitle: 'Copied',
@@ -119,8 +124,10 @@ const AppInfoScreen: React.FC = () => {
   const dispatch = useDispatch();
   const currentLang = useSelector((state: RootState) => state.language?.current ?? 'ua');
   const authUser = useSelector((state: RootState) => state.auth.user);
+  const { colors, isDark } = useAppTheme();
   const [suggestion, setSuggestion] = useState('');
   const text = suggestionText[language];
+  const training = useTrainingMode('_global');
 
   const canSubmitSuggestion = useMemo(
     () => suggestion.trim().length > 0,
@@ -177,10 +184,10 @@ const AppInfoScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.headerCard}>
-          <Text style={styles.headerTitle}>{t.appInfo.title}</Text>
+          <Text style={[styles.headerTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{t.appInfo.title}</Text>
           <Text style={styles.headerSubtitle}>
             {language === 'ua'
               ? 'Що вміє Chaika Life і як він допомагає мешканцям'
@@ -241,6 +248,22 @@ const AppInfoScreen: React.FC = () => {
               <Text style={styles.featureText}>{item}</Text>
             </View>
           ))}
+        </View>
+
+        <View style={styles.card}>
+          <View style={styles.sectionHeader}>
+            <TactileIcon icon="school-outline" size={40} iconSize={18} backgroundColor="#2F7D50" />
+            <Text style={styles.sectionTitle}>{text.trainingMode}</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.trainingToggleContainer}
+            onPress={() => training.setGlobal(!training.globalOn)}
+            activeOpacity={0.84}
+          >
+            <View style={[styles.trainingToggle, training.globalOn && styles.trainingToggleOn]}>
+              <Text style={styles.trainingToggleText}>{training.globalOn ? 'ON' : 'OFF'}</Text>
+            </View>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.infoCard}>
@@ -308,7 +331,7 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 26, fontWeight: '900', color: SCREEN_THEME.textPrimary, marginTop: 10 },
   headerSubtitle: { marginTop: 6, color: SCREEN_THEME.textSecondary, textAlign: 'center' },
   logoCard: { backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 20, padding: 14, marginBottom: 14, borderWidth: 1, borderColor: '#E4D0AB' },
-  logoFrame: { borderRadius: 16, backgroundColor: '#F3ECE4', alignItems: 'center', justifyContent: 'center', minHeight: 170, padding: 18 },
+  logoFrame: { borderRadius: 16, backgroundColor: '#7d0e59', alignItems: 'center', justifyContent: 'center', minHeight: 170, padding: 18 },
   logo: { width: '88%', height: 140 },
   card: { backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 20, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: '#E4D0AB' },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
@@ -323,6 +346,10 @@ const styles = StyleSheet.create({
   featureRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#F0E7DF' },
   bullet: { width: 8, height: 8, borderRadius: 4, backgroundColor: SCREEN_THEME.terracotta, marginTop: 7, marginRight: 10 },
   featureText: { flex: 1, color: SCREEN_THEME.textPrimary, fontSize: 14, lineHeight: 21 },
+  trainingToggleContainer: { alignItems: 'flex-end', marginTop: 4 },
+  trainingToggle: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: SCREEN_THEME.cardCream, borderWidth: 1, borderColor: SCREEN_THEME.borderSoft },
+  trainingToggleOn: { backgroundColor: '#D9F5E3', borderColor: '#A8D5B7' },
+  trainingToggleText: { fontSize: 12, fontWeight: '900', color: SCREEN_THEME.textPrimary },
   infoCard: { backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 20, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: '#E4D0AB' },
   infoTitle: { fontSize: 16, fontWeight: '900', color: SCREEN_THEME.textPrimary, marginBottom: 8 },
   infoText: { color: SCREEN_THEME.textSecondary, fontSize: 14, lineHeight: 21 },

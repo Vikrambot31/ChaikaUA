@@ -8,8 +8,8 @@ const { width, height } = Dimensions.get('window');
 
 // App Name and Version
 export const APP_NAME = 'Chaika Life';
-export const APP_VERSION = '1.1.404';
-export const APP_BUILD_DATE = '2026-06-06';
+export const APP_VERSION = '1.1.433';
+export const APP_BUILD_DATE = '2026-06-13';
 export const APP_BUILD_STAMP = '2026-06-04_09-20';
 export const APP_COMMIT_HASH = '14ceb634f8';
 export const APP_BUILD_MODE = 'LOCAL_APK_PLUS_FIREBASE_DEPLOY';
@@ -86,11 +86,11 @@ export const PLACE_TYPE_COLORS: Record<string, string> = {
 
 // Place type names
 export const PLACE_TYPE_NAMES: Record<string, string> = {
-  shop: 'РњР°РіР°Р·РёРЅ',
-  school: 'РЁРєРѕР»Р°',
-  cafe: 'РљР°С„Рµ',
-  pharmacy: 'РђРїС‚РµРєР°',
-  salon: 'РЎР°Р»РѕРЅ',
-  restaurant: 'Р РµСЃС‚РѕСЂР°РЅ',
-  building: 'Р”С–Рј',
+  shop: 'Магазин',
+  school: 'Школа',
+  cafe: 'Кафе',
+  pharmacy: 'Аптека',
+  salon: 'Салон',
+  restaurant: 'Ресторан',
+  building: 'Дім',
 };

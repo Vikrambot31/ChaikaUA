@@ -15,20 +15,21 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { equalTo, get, orderByChild, query, ref } from 'firebase/database';
 import { selectUser } from '../redux/selectors';
-import { database } from '../firebase-core';
+import { auth, database } from '../firebase-core';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { purchaseBonusPromotion, subscribeMyBonuses, subscribeMyPromoCredits, type PromoCredits, type UserBonuses } from '../services/bonusService';
-import { chaykaPlaces } from '../services/chaykaPlacesData';
-import { getBeautyPlaces, getActiveBeautyOffers } from '../services/beautySeed';
-import { getChildrenPlaces, getActiveOffers } from '../services/childrenSeed';
 import { useTranslation } from '../i18n/useTranslation';
 import ScreenTooltip from '../components/ScreenTooltip';
+import HintBadge, { HINT_BADGE_LABELS } from '../components/HintBadge';
+import { useTrainingMode } from '../hooks/useTrainingMode';
 import { BONUS_PROMOTION_PURCHASE_TOOLTIP } from '../utils/screenTooltips';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 type AppNav = NavigationProp<Record<string, object | undefined>>;
 type RouteParams = {
   BonusPromotionPurchaseScreen: {
     initialPromoType?: string;
+    initialTargetId?: string;
   } | undefined;
 };
 
@@ -55,11 +56,18 @@ const buildOptions = (t: any): PromotionOption[] => [
     durations: { '24h': 80, '3d': 200, '7d': 420 },
   },
   {
+    promoType: 'services_top',
+    title: t.bonus.servicesTop ?? 'Послуги в топ',
+    subtitle: t.bonus.boostServices ?? 'Підняти свою послугу вгору',
+    currency: 'trust',
+    durations: { '24h': 100, '3d': 250, '7d': 500 },
+  },
+  {
     promoType: 'business_top',
     title: t.bonus.businessTop,
     subtitle: t.bonus.boostBusiness,
     currency: 'promo',
-    durations: { '24h': 120, '3d': 300, '7d': 650, '30d': 2200 },
+    durations: { '30d': 500 },
   },
   {
     promoType: 'beauty_salon_top',
@@ -97,16 +105,69 @@ const EMPTY_CREDITS: PromoCredits = { balance: 0, lifetime: 0, spent: { total: 0
 const normalizeBizTitle = (raw: Record<string, unknown>, id: string) =>
   String(raw.itemName || raw.businessName || raw.contactName || raw.category || id);
 
+const normalizeListingTitle = (raw: Record<string, unknown>, id: string) =>
+  String(raw.itemName || raw.title || raw.name || raw.category || id);
+
+const normalizeListingSubtitle = (raw: Record<string, unknown>, fallback: string) =>
+  String(raw.category || raw.condition || raw.moderationStatus || raw.status || fallback);
+
+const fetchOwnedTargets = async (
+  collection: string,
+  uid: string,
+  fallbackSubtitle: string,
+): Promise<PromotionTarget[]> => {
+  const snap = await get(query(ref(database, collection), orderByChild('userId'), equalTo(uid)));
+  const next: PromotionTarget[] = [];
+  snap.forEach((child) => {
+    const raw = child.val() && typeof child.val() === 'object' ? child.val() as Record<string, unknown> : {};
+    const id = child.key || '';
+    if (!id) return;
+    next.push({
+      id,
+      title: normalizeListingTitle(raw, id),
+      subtitle: normalizeListingSubtitle(raw, fallbackSubtitle),
+    });
+  });
+  return next;
+};
+
+const getPromotionErrorMessage = (error: any, fallback: string, bonus: { errorOwnCard: string; errorInsufficientFunds: string; errorAlreadyActive: string; errorMaxSlots: string; errorAccessNotConfirmed: string; errorMinBadge: string; errorSubscriptionExists: string; errorInvalidDuration: string; errorSaveFailed: string }) => {
+  const code = String(error?.code || '').replace('functions/', '');
+  const msg = String(error?.message || '');
+
+  if (code === 'permission-denied') return bonus.errorOwnCard;
+
+  if (code === 'failed-precondition') {
+    if (msg === 'already_has_active_promotion') return bonus.errorAlreadyActive;
+    if (msg === 'max_top_slots_reached') return bonus.errorMaxSlots;
+    if (msg === 'access_not_confirmed') return bonus.errorAccessNotConfirmed;
+    if (msg.startsWith('min_badge')) return bonus.errorMinBadge;
+    if (msg === 'active_subscription_already_exists') return bonus.errorSubscriptionExists;
+    if (msg === 'insufficient_funds' || msg === 'insufficient_credits' || msg === 'not_enough_credits') return bonus.errorInsufficientFunds;
+  }
+
+  if (code === 'invalid-argument') {
+    if (msg === 'invalid_promo_type_or_duration' || msg === 'invalid_duration') return bonus.errorInvalidDuration;
+  }
+
+  if (code === 'internal' && msg === 'promotion_write_failed_funds_returned') return bonus.errorSaveFailed;
+
+  return fallback;
+};
+
 const BonusPromotionPurchaseScreen: React.FC = () => {
   const navigation = useNavigation<AppNav>();
   const route = useRoute<RouteProp<RouteParams, 'BonusPromotionPurchaseScreen'>>();
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
+  const { colors, isDark } = useAppTheme();
+  const training = useTrainingMode('bonus_promotion_purchase');
   const user = useSelector(selectUser);
   const initialPromoType = route.params?.initialPromoType || 'contacts_top';
+  const initialTargetId = route.params?.initialTargetId || '';
   const [selectedPromoType, setSelectedPromoType] = useState(initialPromoType);
-  const [selectedTargetId, setSelectedTargetId] = useState('');
+  const [selectedTargetId, setSelectedTargetId] = useState(initialTargetId);
   const [selectedDuration, setSelectedDuration] = useState('24h');
-  const [businessTargets, setBusinessTargets] = useState<PromotionTarget[]>([]);
+  const [promotionTargets, setPromotionTargets] = useState<PromotionTarget[]>([]);
   const [targetsLoading, setTargetsLoading] = useState(false);
   const [bonuses, setBonuses] = useState<UserBonuses | null>(EMPTY_BONUSES);
   const [credits, setCredits] = useState<PromoCredits>(EMPTY_CREDITS);
@@ -139,17 +200,18 @@ const BonusPromotionPurchaseScreen: React.FC = () => {
       return;
     }
 
-    if (selectedPromoType === 'business_top') {
-      if (!user?.id) {
-        setBusinessTargets([]);
-        setSelectedTargetId('');
-        return;
-      }
-      setTargetsLoading(true);
-      void (async () => {
-        try {
+    if (!user?.id) {
+      setPromotionTargets([]);
+      setSelectedTargetId('');
+      return;
+    }
+
+    setTargetsLoading(true);
+    void (async () => {
+      try {
+        let next: PromotionTarget[] = [];
+        if (selectedPromoType === 'business_top') {
           const snap = await get(query(ref(database, 'biznes_chaika_listings'), orderByChild('userId'), equalTo(user.id)));
-          const next: PromotionTarget[] = [];
           snap.forEach((child) => {
             const raw = child.val() && typeof child.val() === 'object' ? child.val() as Record<string, unknown> : {};
             next.push({
@@ -158,34 +220,38 @@ const BonusPromotionPurchaseScreen: React.FC = () => {
               subtitle: String(raw.moderationStatus || raw.status || 'business'),
             });
           });
-          setBusinessTargets(next);
-          setSelectedTargetId((current) => current && next.some((item) => item.id === current) ? current : next[0]?.id || '');
-        } catch {
-          setBusinessTargets([]);
-          setSelectedTargetId('');
-        } finally {
-          setTargetsLoading(false);
+          const localBusiness = await fetchOwnedTargets('local_business', user.id, 'business');
+          const knownIds = new Set(next.map((item) => item.id));
+          next = [...next, ...localBusiness.filter((item) => !knownIds.has(item.id))];
+        } else {
+          next = await fetchOwnedTargets('contacts_listings', user.id, 'listing');
         }
-      })();
-      return;
-    }
-
-    const nextTargets = buildStaticTargets(selectedPromoType);
-    setSelectedTargetId((current) => current && nextTargets.some((item) => item.id === current) ? current : nextTargets[0]?.id || '');
+        setPromotionTargets(next);
+        setSelectedTargetId((current) => current && next.some((item) => item.id === current) ? current : next[0]?.id || '');
+      } catch {
+        setPromotionTargets([]);
+        setSelectedTargetId('');
+      } finally {
+        setTargetsLoading(false);
+      }
+    })();
   }, [selectedPromoType, user?.id]);
 
   const targets = useMemo(() => {
     if (selectedPromoType === 'contacts_top') {
       return [{ id: user?.id || '', title: user?.name || t.bonus.activePromotions, subtitle: t.bonus.trustBonuses }];
     }
-    if (selectedPromoType === 'business_top') return businessTargets;
-    return buildStaticTargets(selectedPromoType);
-  }, [businessTargets, selectedPromoType, user?.id, user?.name, t.bonus.activePromotions, t.bonus.trustBonuses]);
+    return promotionTargets;
+  }, [promotionTargets, selectedPromoType, user?.id, user?.name, t.bonus.activePromotions, t.bonus.trustBonuses]);
 
   const canBuy = Boolean(selectedTargetId) && balance >= selectedPrice && !buying;
 
   const buyPromotion = async () => {
     if (!selectedTargetId || buying) return;
+    if (!auth.currentUser || auth.currentUser.isAnonymous) {
+      Alert.alert(t.common.error, 'Необхідно авторизуватись.');
+      return;
+    }
     setBuying(true);
     try {
       const result = await purchaseBonusPromotion({
@@ -196,33 +262,42 @@ const BonusPromotionPurchaseScreen: React.FC = () => {
       Alert.alert(
         t.bonus.activePromotions,
         result.moderationStatus === 'pending'
-          ? t.common.loading
-          : `${t.bonus.active_resident} ${new Date(result.expiresAt).toLocaleString()}.`,
+          ? 'Запит на просування надіслано. Воно буде активоване після перевірки модератором.'
+          : `Просування активне до ${new Date(result.expiresAt).toLocaleString()}.`,
       );
       navigation.goBack();
     } catch (error: any) {
-      Alert.alert(t.common.error, error?.message || '');
+      Alert.alert(t.common.error, getPromotionErrorMessage(error, t.common.error, t.bonus));
     } finally {
       setBuying(false);
     }
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScreenTooltip
         storageKey={BONUS_PROMOTION_PURCHASE_TOOLTIP.storageKey}
         title={BONUS_PROMOTION_PURCHASE_TOOLTIP.title}
         items={BONUS_PROMOTION_PURCHASE_TOOLTIP.items}
+        language={language}
         accentColor={SCREEN_THEME.woodGreen}
+        forceVisible={training.showHint}
+        onClose={training.closeHint}
       />
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.8}>
           <MaterialCommunityIcons name="arrow-left" size={22} color={SCREEN_THEME.textPrimary} />
         </TouchableOpacity>
         <View style={styles.headerCopy}>
-          <Text style={styles.headerTitle}>{t.bonus.activePromotions}</Text>
-          <Text style={styles.headerSubtitle}>{t.promoCredits.topupDesc}</Text>
+          <Text style={[styles.headerTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{t.bonus.activePromotions}</Text>
+          <Text style={[styles.headerSubtitle, { color: isDark ? '#F5E8F0' : undefined }]}>{t.promoCredits.topupDesc}</Text>
         </View>
+        <HintBadge
+          visible={training.isVisible}
+          onTap={training.openHint}
+          onDismiss={training.dismiss}
+          label={HINT_BADGE_LABELS[language]}
+        />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -318,10 +393,10 @@ const BonusPromotionPurchaseScreen: React.FC = () => {
           activeOpacity={0.86}
         >
           {buying ? (
-            <ActivityIndicator color="#FFF9EE" />
+            <ActivityIndicator color="#FBF8FD" />
           ) : (
             <>
-              <MaterialCommunityIcons name="bullhorn-outline" size={21} color="#FFF9EE" />
+              <MaterialCommunityIcons name="bullhorn-outline" size={21} color="#FBF8FD" />
               <Text style={styles.buyButtonText}>{t.adChat.promotion}</Text>
             </>
           )}
@@ -329,38 +404,6 @@ const BonusPromotionPurchaseScreen: React.FC = () => {
       </ScrollView>
     </SafeAreaView>
   );
-};
-
-const buildStaticTargets = (promoType: string): PromotionTarget[] => {
-  if (promoType === 'beauty_salon_top') {
-    return getBeautyPlaces(chaykaPlaces).map((place) => ({
-      id: place.id,
-      title: place.name,
-      subtitle: place.address,
-    }));
-  }
-  if (promoType === 'beauty_promo_top') {
-    return getActiveBeautyOffers().map((offer) => ({
-      id: offer.id,
-      title: offer.title,
-      subtitle: offer.shortText,
-    }));
-  }
-  if (promoType === 'kids_place_top') {
-    return getChildrenPlaces(chaykaPlaces).map((place) => ({
-      id: place.id,
-      title: place.name,
-      subtitle: place.address,
-    }));
-  }
-  if (promoType === 'kids_event_top') {
-    return getActiveOffers().map((offer) => ({
-      id: offer.id,
-      title: offer.title,
-      subtitle: offer.shortText,
-    }));
-  }
-  return [];
 };
 
 const BalanceCard = ({
@@ -478,7 +521,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   optionTextActive: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
   },
   currencyPill: {
     color: SCREEN_THEME.textSecondary,
@@ -487,7 +530,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   currencyPillActive: {
-    color: '#FFF3CE',
+    color: '#F5EEF9',
   },
   optionSubtitle: {
     color: SCREEN_THEME.textSecondary,
@@ -495,7 +538,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   optionSubActive: {
-    color: 'rgba(255,249,238,0.82)',
+    color: 'rgba(247,241,251,0.82)',
   },
   targetList: {
     gap: 8,
@@ -564,7 +607,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   durationTextActive: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
   },
   durationPrice: {
     color: SCREEN_THEME.textSecondary,
@@ -573,7 +616,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   durationPriceActive: {
-    color: '#FFF3CE',
+    color: '#F5EEF9',
   },
   summaryCard: {
     borderRadius: 8,
@@ -620,7 +663,7 @@ const styles = StyleSheet.create({
     opacity: 0.58,
   },
   buyButtonText: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
     fontSize: 15,
     fontWeight: '900',
   },

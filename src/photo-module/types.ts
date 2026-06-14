@@ -33,6 +33,8 @@ export type UserPhoto = {
   moderationStatus?: PhotoModerationStatus;
   deleted?: boolean;
   storagePath?: string;
+  /** RTDB push-key of the pending record written by PhotoUploadEngine. */
+  rtdbId?: string;
   createdAt: number;
   updatedAt: number;
   error?: string;
@@ -50,6 +52,12 @@ export type PhotoUploadMetadata = {
   sourceFeature?: string;
   locationLabel?: string;
   locationType?: 'building' | 'place';
+  category?: string;
+  /**
+   * When true, the RTDB record is written with status='saved' / moderationStatus='not_submitted'.
+   * The caller is responsible for flipping it to 'pending' when the user confirms submission.
+   */
+  moderationDeferred?: boolean;
 };
 
 export type PhotoUploadTask = {

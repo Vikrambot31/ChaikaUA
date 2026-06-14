@@ -21,6 +21,9 @@ import GuestRegisterBanner from '../components/GuestRegisterBanner';
 import { useGuestGuard } from '../hooks/useGuestGuard';
 import { requireAuthForDetails } from '../utils/authGuard';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import { VideoLoadingOverlay } from '../components/VideoLoadingOverlay';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 export const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000;
 
@@ -120,6 +123,7 @@ export const UI_TEXT = {
     ok: 'OK',
     loginBtn: 'Увійти',
     authRequired: 'Увійдіть в акаунт, щоб додати оголошення.',
+    showMore: 'Більше',
   },
   ru: {
     title: 'Куплю / Продам',
@@ -200,6 +204,7 @@ export const UI_TEXT = {
     ok: 'OK',
     loginBtn: 'Войти',
     authRequired: 'Войдите в аккаунт, чтобы добавить объявление.',
+    showMore: 'Больше',
   },
   en: {
     title: 'Buy / Sell',
@@ -280,6 +285,7 @@ export const UI_TEXT = {
     ok: 'OK',
     loginBtn: 'Sign in',
     authRequired: 'Sign in to add a listing.',
+    showMore: 'More',
   },
 } as const;
 
@@ -290,6 +296,7 @@ const BuySellScreen: React.FC = () => {
   const user = useSelector((state: RootState) => state.auth.user);
   const { guard: guestGuard, bannerVisible: guestBannerVisible, hideBanner: hideGuestBanner } = useGuestGuard();
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
+  const { colors } = useAppTheme();
   const text = UI_TEXT[language];
   const [listings, setListings] = useState<BuySellListing[]>([]);
   const [listingsReady, setListingsReady] = useState(false);
@@ -305,6 +312,7 @@ const BuySellScreen: React.FC = () => {
   const [searchPriceTo, setSearchPriceTo] = useState('');
   const [searchContact, setSearchContact] = useState('');
   const [searchDescription, setSearchDescription] = useState('');
+  const [showAllListings, setShowAllListings] = useState(false);
   const blinkAnim = useRef(new Animated.Value(1)).current;
   const avatarByUserId = useUserAvatarMap(listings.map((item) => item.userId));
 
@@ -336,8 +344,8 @@ const BuySellScreen: React.FC = () => {
     const queryItemName = searchItemName.trim().toLowerCase();
     const queryContact = searchContact.trim().toLowerCase();
     const queryDescription = searchDescription.trim().toLowerCase();
-    const priceFrom = searchPriceFrom ? Number(searchPriceFrom) : null;
-    const priceTo = searchPriceTo ? Number(searchPriceTo) : null;
+    const priceFrom = searchPriceFrom ? Number(searchPriceFrom.replace(',', '.')) : null;
+    const priceTo = searchPriceTo ? Number(searchPriceTo.replace(',', '.')) : null;
 
     return listings.filter((item) => {
       const numericPrice = Number(String(item.price).replace(',', '.').replace(/[^\d.]/g, ''));
@@ -393,6 +401,10 @@ const BuySellScreen: React.FC = () => {
     ],
   );
 
+  useEffect(() => {
+    setShowAllListings(false);
+  }, [selectedFilterCategory, selectedFilterListingType, searchItemName, searchCategory, searchListingType, searchCondition, searchPriceFrom, searchPriceTo, searchContact, searchDescription]);
+
   const resetSearch = () => {
     setSearchItemName('');
     setSearchCategory('');
@@ -415,7 +427,7 @@ const BuySellScreen: React.FC = () => {
       phone: item.phone,
       photoUri: item.photoUri,
       photoStoragePath: item.photoStoragePath,
-      price: item.price ? `${item.price} грн` : undefined,
+      price: item.price !== null && item.price !== undefined ? `${item.price} грн` : undefined,
       category: categoryLabel,
       status: getModerationLabel(item.moderationStatus, {
         pending: text.pending,
@@ -452,7 +464,7 @@ const BuySellScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <Modal visible={searchModalVisible} animationType="slide" transparent onRequestClose={() => setSearchModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalSheet}>
@@ -558,7 +570,7 @@ const BuySellScreen: React.FC = () => {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
-        data={listings.length > 0 ? filteredListings : []}
+        data={listings.length > 0 ? (showAllListings ? filteredListings : filteredListings.slice(0, 4)) : []}
         keyExtractor={(item) => item.id}
         initialNumToRender={8}
         windowSize={5}
@@ -678,10 +690,19 @@ const BuySellScreen: React.FC = () => {
               contactDisabled={!item.phone && (!item.userId || item.userId === user?.id)}
               likePath="feed_likes/buysell"
               likeId={item.id}
+              shareMessage={`${item.itemName}${item.price ? ` · ${item.price} грн` : ''}${item.description ? `\n${item.description}` : ''}`}
             />
             </TouchableOpacity>
           );
         }}
+        ListFooterComponent={
+          !showAllListings && filteredListings.length > 4 ? (
+            <TouchableOpacity style={styles.showMoreButton} activeOpacity={0.82} onPress={() => setShowAllListings(true)}>
+              <Text style={styles.showMoreText}>{text.showMore}</Text>
+              <MaterialCommunityIcons name="chevron-down" size={18} color={SCREEN_THEME.textSecondary} />
+            </TouchableOpacity>
+          ) : null
+        }
         ListEmptyComponent={
           !listingsReady ? (
             <View style={styles.emptyFiltered}>
@@ -716,6 +737,7 @@ const BuySellScreen: React.FC = () => {
         onClose={closeContactModal}
       />
       <GuestRegisterBanner visible={guestBannerVisible} onClose={hideGuestBanner} />
+      <VideoLoadingOverlay visible={!listingsReady} />
     </SafeAreaView>
   );
 };
@@ -783,7 +805,7 @@ const styles = StyleSheet.create({
   typeToggleInactive: { backgroundColor: '#ECE7E1', borderWidth: 1, borderColor: '#D9CFC4' },
   typeToggleText: { color: SCREEN_THEME.textPrimary, fontWeight: '900', fontSize: 13, textAlign: 'center' },
   typeToggleTextActive: { color: '#fff' },
-  submitBtn: { backgroundColor: SCREEN_THEME.terracotta, borderRadius: 16, paddingVertical: 14, alignItems: 'center', marginTop: 14 },
+  submitBtn: { backgroundColor: '#7d0e59', borderRadius: 16, paddingVertical: 14, alignItems: 'center', marginTop: 14 },
   submitBtnDisabled: { opacity: 0.65 },
   submitBtnText: { color: '#FFFFFF', fontWeight: '800' },
   listingsSection: { marginBottom: 16 },
@@ -815,10 +837,12 @@ const styles = StyleSheet.create({
   listingBadgeText: { fontSize: 11, fontWeight: '700', color: '#7B1FA2' },
   listingPrice: { fontSize: 15, fontWeight: '900', color: '#00897B' },
   statusBadge: { fontSize: 11, fontWeight: '900', color: '#8A5A00', backgroundColor: '#FFF2C7', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
-  listingDescription: { color: '#fff', backgroundColor: '#7A1E5C', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 7, lineHeight: 18, marginBottom: 8, fontWeight: '800', overflow: 'hidden' },
-  listingDescriptionCompact: { backgroundColor: '#F7F3EE', color: SCREEN_THEME.textPrimary, borderWidth: 1, borderColor: '#E8DDD3', marginBottom: 6 },
+  listingDescription: { color: SCREEN_THEME.textPrimary, backgroundColor: 'rgba(141, 122, 184, 0.20)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 7, lineHeight: 18, marginBottom: 8, fontWeight: '800', overflow: 'hidden' },
+  listingDescriptionCompact: { backgroundColor: 'rgba(141, 122, 184, 0.20)', borderWidth: 1, borderColor: 'rgba(141, 122, 184, 0.30)', marginBottom: 6 },
   listingPhoto: { width: '100%', height: 220, borderRadius: 16, marginBottom: 8, backgroundColor: '#F0EDE8' },
   moderationInfo: { color: '#5F5043', backgroundColor: '#FFF8EA', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 8, fontSize: 12, lineHeight: 17, fontWeight: '700' },
+  showMoreButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 18, paddingVertical: 13, marginBottom: 10, borderWidth: 1, borderColor: '#E4D0AB' },
+  showMoreText: { fontSize: 15, fontWeight: '900', color: '#21041B' },
   addBar: {
     paddingHorizontal: 16,
     paddingVertical: 10,
@@ -827,7 +851,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#E4D0AB',
   },
   addBarBtn: {
-    backgroundColor: SCREEN_THEME.woodGreenDark,
+    backgroundColor: '#7d0e59',
     borderRadius: 16,
     paddingVertical: 14,
     alignItems: 'center',

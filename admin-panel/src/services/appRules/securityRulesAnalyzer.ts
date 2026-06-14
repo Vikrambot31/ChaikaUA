@@ -1,4 +1,4 @@
-import type { AppRuleItem, AppRuleSectionId, SourceFileSnapshot } from '../../types/appRules';
+import type { AppRuleItem, AppRuleSectionId, AppRuleZone, SourceFileSnapshot } from '../../types/appRules';
 import { createSource, findEvidence, findLine, hasPattern } from './rulesRegistry';
 
 type CodeRule = {
@@ -13,6 +13,15 @@ type CodeRule = {
   risk?: AppRuleItem['risk'];
   missingRisk?: AppRuleItem['risk'];
   tags: string[];
+  // Override zone when found (default is 'reference' if found, computed if missing)
+  foundZone?: AppRuleZone;
+};
+
+const resolveCodeZone = (found: boolean, missingRisk: AppRuleItem['risk'], foundZone?: AppRuleZone): AppRuleZone => {
+  if (found) return foundZone ?? 'reference';
+  // Missing — zone depends on how critical the absence is
+  if (missingRisk === 'critical' || missingRisk === 'high') return 'action';
+  return 'monitor';
 };
 
 const buildCodeRule = (
@@ -22,21 +31,23 @@ const buildCodeRule = (
 ): AppRuleItem => {
   const file = files.find((item) => item.name === rule.fileName);
   const found = file ? hasPattern(file.content, rule.pattern) : false;
+  const missingRisk = rule.missingRisk ?? 'medium';
   return {
     id: `code:${rule.id}`,
     sectionId: rule.sectionId,
     category: rule.category,
     name: rule.name,
     status: found ? 'active' : 'missing',
-    risk: found ? rule.risk ?? 'low' : rule.missingRisk ?? 'medium',
-    actualValue: found ? rule.actualValue ?? 'Найдено в коде' : 'Правило не найдено',
+    risk: found ? rule.risk ?? 'low' : missingRisk,
+    actualValue: found ? rule.actualValue ?? 'Знайдено в коді' : 'Не знайдено',
     explanation: rule.explanation,
-    evidence: found && file ? findEvidence(file.content, rule.pattern) : 'Фрагмент не найден в актуальных исходниках',
+    evidence: found && file ? findEvidence(file.content, rule.pattern) : 'Фрагмент не знайдено в актуальних вихідниках',
     source: found && file
       ? createSource('source_code', file.name, file.path, findLine(file.content, rule.pattern))
       : createSource('generated', rule.fileName, rule.fileName),
     tags: rule.tags,
     updatedAt: generatedAt,
+    zone: resolveCodeZone(found, missingRisk, rule.foundZone),
   };
 };
 

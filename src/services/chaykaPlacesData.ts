@@ -69,7 +69,7 @@ export const chaykaPlaces: Place[] = [
   },
   {
     id: 'place-7',
-    name: 'Пан Аптекарь !5BL Аптек',
+    name: 'Пан Аптекарь Сеть Аптек',
     address: 'вулиця Коцюбинського, 36',
     latitude: 50.4298418,
     longitude: 30.2817989,
@@ -521,7 +521,7 @@ export const chaykaPlaces: Place[] = [
   {
     id: 'place-48',
     name: 'SPMoto Group',
-    address: 'вулиця Миколи !0<>:8H0, 2',
+    address: 'вулиця Миколи Самокиша, 2',
     latitude: 50.43807380000001,
     longitude: 30.29948819999999,
     type: PlaceType.SHOP,
@@ -653,7 +653,7 @@ export const chaykaPlaces: Place[] = [
   {
     id: 'place-60',
     name: 'ВІРАСТАР СКЛАД (VIRASTAR)',
-    address: 'вулиця Миколи !0<>:8H0',
+    address: 'вулиця Миколи Самокиша',
     latitude: 50.44032379999999,
     longitude: 30.3006422,
     type: PlaceType.SHOP,
@@ -686,7 +686,7 @@ export const chaykaPlaces: Place[] = [
   {
     id: 'place-63',
     name: 'Квадроциклы Polaris от официального импортера в Украине: компании Motortech',
-    address: 'вулиця Миколи !0<>:8H0',
+    address: 'вулиця Миколи Самокиша',
     latitude: 50.4398059,
     longitude: 30.300444,
     type: PlaceType.SHOP,
@@ -752,7 +752,7 @@ export const chaykaPlaces: Place[] = [
   {
     id: 'place-69',
     name: 'МАН Трак енд Бас Юкрейн',
-    address: 'вулиця Миколи !0<>:8H0, 16',
+    address: 'вулиця Миколи Самокиша, 16',
     latitude: 50.4401964,
     longitude: 30.2951114,
     type: PlaceType.SHOP,
@@ -851,7 +851,7 @@ export const chaykaPlaces: Place[] = [
   {
     id: 'place-78',
     name: 'ТОВ "Омега"',
-    address: 'вулиця Миколи !0<>:8H0, 1',
+    address: 'вулиця Миколи Самокиша, 1',
     latitude: 50.4412846,
     longitude: 30.30318299999999,
     type: PlaceType.SHOP,
@@ -1016,7 +1016,7 @@ export const chaykaPlaces: Place[] = [
   {
     id: 'place-93',
     name: 'Tatarka: Чебуреки по-кримськи',
-    address: 'вулиця Миколи !0<>:8H0, 2',
+    address: 'вулиця Миколи Самокиша, 2',
     latitude: 50.4377909,
     longitude: 30.2994987,
     type: PlaceType.RESTAURANT,
@@ -1081,7 +1081,7 @@ export const chaykaPlaces: Place[] = [
   },
   {
     id: 'place-99',
-    name: ' >1>B0',
+    name: 'Робота',
     address: 'вулиця Валерія Лобановського',
     latitude: 50.4421405,
     longitude: 30.2912989,
@@ -1170,7 +1170,7 @@ export const chaykaPlaces: Place[] = [
   {
     id: 'place-107',
     name: 'Q.SALON',
-    address: 'вулиця Миколи !0<>:8H0, 16',
+    address: 'вулиця Миколи Самокиша, 16',
     latitude: 50.4403212,
     longitude: 30.29548090000001,
     type: PlaceType.SALON,
@@ -1412,7 +1412,7 @@ export const chaykaPlaces: Place[] = [
   {
     id: 'place-129',
     name: 'Candy Kids Club',
-    address: 'вулиця !B5;L<0E0, 4',
+    address: 'вулиця Стельмаха, 4',
     latitude: 50.4354049,
     longitude: 30.279281,
     type: PlaceType.KINDERGARTEN,
@@ -1510,7 +1510,7 @@ export const chaykaPlaces: Place[] = [
   },
   {
     id: 'place-138',
-    name: 'Заклад 4>H:V;L=>W освіти №747 "Берізка"',
+    name: 'Заклад дошкільної освіти №747 "Берізка"',
     address: 'вулиця Українського Відродження',
     latitude: 50.4445047,
     longitude: 30.2784028,

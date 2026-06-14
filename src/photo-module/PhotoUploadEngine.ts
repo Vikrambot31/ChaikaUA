@@ -22,6 +22,7 @@ import { ensureFirebaseAuth, isAnonymousFirebaseUser } from '../firebase-auth-se
 import { uploadPhotoToNamespace } from '../services/photoUploadService';
 import { recordRuntimeTrace } from '../services/runtimeMonitorService';
 import { safeLogError } from '../utils/errorLogger';
+import { assertCommunityPhotoMonthlyLimit } from '../utils/communityPhotoLimits';
 import type { EngineUploadState } from './types';
 
 // ─── Constraints ──────────────────────────────────────────────────────────────
@@ -59,6 +60,8 @@ export interface EngineUploadOptions {
     sourceFeature?: string;
     locationLabel?: string;
     locationType?: 'building' | 'place';
+    category?: string;
+    moderationDeferred?: boolean;
   };
   /** Called with 0–100 as upload progresses. */
   onProgress?: (percent: number) => void;
@@ -195,7 +198,10 @@ export async function uploadPhotoWithEngine(
   // ── Step 2: upload to Firebase Storage ─────────────────────────────────────
   const user = await ensureFirebaseAuth();
   // Guests are auto-signed-in anonymously for reads; block them from uploading.
-  if (!user || isAnonymousFirebaseUser(user)) throw new Error('Sign in required to upload photos.');
+  if (!user || isAnonymousFirebaseUser(user)) throw new Error('auth: sign in required to upload photos');
+  if (collection === 'community_photos') {
+    await assertCommunityPhotoMonthlyLimit(user.uid, 1);
+  }
 
   let storagePath = '';
   let downloadUrl: string | undefined;
@@ -340,12 +346,13 @@ export async function uploadPhotoWithEngine(
 
   const isRequestPhoto = collection === 'requests';
   const isPersonalPhoto = collection !== 'community_photos' && !isRequestPhoto;
+  const isDeferred = Boolean(metadata?.moderationDeferred);
   const rtdbPayload: Record<string, unknown> = {
     storagePath,
     imageUri: downloadUrl ?? storagePath,
-    status: isPersonalPhoto ? 'saved' : 'pending',
+    status: isPersonalPhoto || isDeferred ? 'saved' : 'pending',
     uploadStatus: 'saved',
-    moderationStatus: isPersonalPhoto ? 'not_submitted' : 'pending',
+    moderationStatus: isPersonalPhoto || isDeferred ? 'not_submitted' : 'pending',
     uploadedAt: now,
     createdAt: now,
     updatedAt: now,
@@ -353,7 +360,11 @@ export async function uploadPhotoWithEngine(
     userId: user.uid,
     uploadedBy: metadata?.uploadedBy ?? user.email ?? user.uid,
     target: metadata?.target ?? (collection === 'community_photos' ? 'gallery_public' : 'my_photos'),
-    ...(isRequestPhoto ? { sourceScreen: 'HelpNeighborsScreen', sourceScreenLabel: 'Помощь соседям' } : {}),
+    ...(isRequestPhoto
+      ? { sourceScreen: 'HelpNeighborsScreen', sourceScreenLabel: 'Допомога сусідам' }
+      : collection === 'community_photos'
+        ? { sourceScreen: 'PhotoUploadScreen', sourceScreenLabel: 'Додати фото' }
+        : {}),
     ...(metadata?.title ? { title: metadata.title } : {}),
     ...(metadata?.description ? { description: metadata.description } : {}),
     ...(metadata?.sourceScreen ? { sourceScreen: metadata.sourceScreen } : {}),
@@ -361,6 +372,7 @@ export async function uploadPhotoWithEngine(
     ...(metadata?.sourceFeature ? { sourceFeature: metadata.sourceFeature } : {}),
     ...(metadata?.locationLabel ? { locationLabel: metadata.locationLabel } : {}),
     ...(metadata?.locationType ? { locationType: metadata.locationType } : {}),
+    ...(metadata?.category ? { category: metadata.category } : {}),
     ...(thumbnailUrl ? { thumbnailUrl } : {}),
   };
 

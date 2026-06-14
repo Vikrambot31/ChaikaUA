@@ -28,6 +28,9 @@ const TOAST_TEXT: Record<string, Record<Lang, string>> = {
   already_pending: { ua: 'Запит вже надіслано', ru: 'Запрос уже отправлен', en: 'Already sent' },
   already_approved: { ua: 'Вже погоджено', ru: 'Уже одобрено', en: 'Already approved' },
   open_profile: { ua: 'Контакт відкрито', ru: 'Контакт открыт', en: 'Contact available' },
+  cooldown: { ua: 'Зачекайте кілька секунд перед наступним запитом', ru: 'Подождите несколько секунд перед следующим запросом', en: 'Wait a few seconds before sending another request' },
+  daily_limit: { ua: 'Ліміт запитів на сьогодні вичерпано', ru: 'Лимит запросов на сегодня исчерпан', en: 'Today request limit reached' },
+  retry_later: { ua: 'Після відмови повторний запит доступний завтра', ru: 'После отказа повторный запрос доступен завтра', en: 'After a denial, try again tomorrow' },
   error: { ua: 'Помилка. Спробуйте ще раз', ru: 'Ошибка. Попробуйте снова', en: 'Error. Try again' },
   no_auth: { ua: 'Потрібна авторизація', ru: 'Требуется авторизация', en: 'Authorization required' },
   no_user: { ua: 'Користувача не знайдено', ru: 'Пользователь не найден', en: 'User not found' },
@@ -116,6 +119,12 @@ export function useContactRequest() {
           Toast.show({ type: 'success', text1: TOAST_TEXT.open_profile[language] });
         } else if (result === 'already_approved') {
           Toast.show({ type: 'success', text1: TOAST_TEXT.already_approved[language] });
+        } else if (result === 'cooldown') {
+          Toast.show({ type: 'info', text1: TOAST_TEXT.cooldown[language] });
+        } else if (result === 'daily_limit') {
+          Toast.show({ type: 'info', text1: TOAST_TEXT.daily_limit[language] });
+        } else if (result === 'retry_later') {
+          Toast.show({ type: 'info', text1: TOAST_TEXT.retry_later[language] });
         }
       } catch {
         Toast.show({ type: 'error', text1: TOAST_TEXT.error[language] });

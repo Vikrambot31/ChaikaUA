@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -9,13 +10,25 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationProp, RouteProp, useNavigation, useRoute } from '@react-navigation/native';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
+import { ref, get, set, remove, getDatabase } from 'firebase/database';
 import { ChildCategory, ChildFeature, ChildOffer, Place, PlaceType } from '../types/app';
 import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
-import { openInGoogleMaps } from '../utils/googleMapsLink';
+import { useAppTheme } from '../hooks/useAppTheme';
 import { safeCallPhone, safeOpenExternalUrl } from '../utils/communicationActions';
 import { getActiveOffers } from '../services/childrenSeed';
+import { database } from '../firebase-core';
+import {
+  selectIsBusinessPlus,
+  hydrateSubscription,
+  normalizeServerSubscription,
+} from '../redux/slices/subscriptionSlice';
+import { getMapFocusPlaceParams } from '../utils/mapFocusParams';
+import CommentSection from '../components/CommentSection';
+import { COMMENTS_PATH } from '../services/commentService';
+import ContentComplaintModal from '../components/ContentComplaintModal';
+import type { DetailItemData } from '../utils/detailViewTypes';
 
 type Lang = 'ua' | 'ru' | 'en';
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
@@ -36,6 +49,9 @@ const UI_TEXT = {
     offersTitle: 'Актуальні пропозиції',
     readMore: 'Читати повністю',
     readLess: 'Згорнути',
+    showMore: 'Показати більше',
+    hide: 'Сховати',
+    businessSectionTitle: 'Для власників бізнесу',
     age: 'Вік дітей',
     price: 'Ціна від',
     schedule: 'Графік',
@@ -48,6 +64,10 @@ const UI_TEXT = {
     ageUnknown: 'уточнюйте',
     infoUnknown: 'уточнюйте',
     descriptionEmpty: 'Детальна інформація поки не заповнена. Можна скористатися маршрутом або контактами, якщо вони доступні.',
+    bookingTitle: 'Записати дитину',
+    bookingVisitorText: 'Власник закладу ще не налаштував онлайн-запис. Зв\'яжіться із власником для запису.',
+    bookingOwnerText: 'Підключіть Бізнес+, щоб батьки бачили контакти, розклад та актуальні пропозиції прямо тут.',
+    bookingCta: 'Підключити Бізнес+',
     categoryLabel: {
       kindergarten: 'Садочок',
       school: 'Школа',
@@ -104,6 +124,9 @@ const UI_TEXT = {
     offersTitle: 'Актуальные предложения',
     readMore: 'Читать полностью',
     readLess: 'Свернуть',
+    showMore: 'Показать больше',
+    hide: 'Скрыть',
+    businessSectionTitle: 'Для владельцев бизнеса',
     age: 'Возраст детей',
     price: 'Цена от',
     schedule: 'График',
@@ -116,6 +139,10 @@ const UI_TEXT = {
     ageUnknown: 'уточняйте',
     infoUnknown: 'уточняйте',
     descriptionEmpty: 'Подробная информация пока не заполнена. Можно воспользоваться маршрутом или контактами, если они доступны.',
+    bookingTitle: 'Записать ребёнка',
+    bookingVisitorText: 'Владелец заведения ещё не настроил онлайн-запись. Свяжитесь с владельцем для записи.',
+    bookingOwnerText: 'Подключите Бизнес+, чтобы родители видели контакты, расписание и актуальные предложения прямо здесь.',
+    bookingCta: 'Подключить Бизнес+',
     categoryLabel: {
       kindergarten: 'Садик',
       school: 'Школа',
@@ -172,6 +199,9 @@ const UI_TEXT = {
     offersTitle: 'Current offers',
     readMore: 'Read more',
     readLess: 'Collapse',
+    showMore: 'Show more',
+    hide: 'Hide',
+    businessSectionTitle: 'For business owners',
     age: 'Age range',
     price: 'Price from',
     schedule: 'Schedule',
@@ -184,6 +214,10 @@ const UI_TEXT = {
     ageUnknown: 'ask',
     infoUnknown: 'ask',
     descriptionEmpty: 'Detailed information has not been filled in yet. You can use route or contacts if available.',
+    bookingTitle: 'Enroll your child',
+    bookingVisitorText: "Online enrollment hasn't been set up yet. Contact the venue owner to sign up.",
+    bookingOwnerText: 'Connect Business+ so parents can see contacts, schedule and current offers right here.',
+    bookingCta: 'Get Business+',
     categoryLabel: {
       kindergarten: 'Kindergarten',
       school: 'School',
@@ -276,9 +310,61 @@ export default function DetalDetskogoMestaScreen() {
   const category: ChildCategory = info?.category
     ?? (place.type === PlaceType.SCHOOL ? 'school' : place.type === PlaceType.KINDERGARTEN ? 'kindergarten' : 'development');
 
+  const dispatch = useDispatch();
   const language = useSelector((s: RootState) => s.language?.current ?? 'ua') as Lang;
+  const currentUser = useSelector((s: RootState) => s.auth.user);
+  const isBusinessPlus = useSelector(selectIsBusinessPlus);
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
+  const { colors, isDark } = useAppTheme();
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+  const [showBusinessSection, setShowBusinessSection] = useState(false);
+  const [claimStatus, setClaimStatus] = useState<'none' | 'pending' | 'approved' | 'rejected'>('none');
+  const [complaintVisible, setComplaintVisible] = useState(false);
+  const [isBiznesPlusActive, setIsBiznesPlusActive] = useState(false);
+
+  const isAuthenticated = Boolean(currentUser?.id);
+  const isAdmin = currentUser?.email === 'vikramsave@ukr.net';
+  const isMyApprovedPlace = claimStatus === 'approved';
+
+  // Sync subscription from RTDB on screen open
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { firebaseApp } = require('../firebase-core') as typeof import('../firebase-core');
+        const db = getDatabase(firebaseApp);
+        const snap = await get(ref(db, `user_subscription/${currentUser.id}`));
+        if (cancelled) return;
+        const normalized = normalizeServerSubscription(snap.val() as Record<string, unknown> | null);
+        dispatch(hydrateSubscription(normalized));
+      } catch { /* realtime listener in App.tsx is primary */ }
+    })();
+    return () => { cancelled = true; };
+  }, [currentUser?.id, dispatch]);
+
+  // Load business claim status
+  useEffect(() => {
+    if (!isAuthenticated || !currentUser?.id) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const claimRef = ref(database, `business_plus_claims/${place.id}`);
+        const snap = await get(claimRef);
+        if (cancelled) return;
+        if (!snap.exists()) { setClaimStatus('none'); return; }
+        const data = snap.val() as { ownerUid?: string; status?: string };
+        if (currentUser.email === 'vikramsave@ukr.net') {
+          setClaimStatus((data.status as 'pending' | 'approved' | 'rejected') ?? 'none');
+        } else if (data.ownerUid === currentUser.id) {
+          setClaimStatus((data.status as 'pending' | 'approved' | 'rejected') ?? 'none');
+        } else {
+          setClaimStatus('none');
+        }
+      } catch { if (!cancelled) setClaimStatus('none'); }
+    })();
+    return () => { cancelled = true; };
+  }, [isAuthenticated, place.id, currentUser?.id]);
 
   const offers = useMemo(() => getActiveOffers(place.id), [place.id]);
 
@@ -320,6 +406,22 @@ export default function DetalDetskogoMestaScreen() {
     return items;
   }, [info, text]);
 
+  const claimLabel = language === 'ua' ? 'Я власник цього закладу' : language === 'ru' ? 'Я владелец этого заведения' : 'I am the owner';
+  const claimPendingLabel = language === 'ua' ? 'Заявку надіслано — на розгляді' : language === 'ru' ? 'Заявка отправлена — на рассмотрении' : 'Claim submitted — pending review';
+  const claimApprovedLabel = language === 'ua' ? 'Підтверджений власник' : language === 'ru' ? 'Подтверждённый владелец' : 'Verified owner';
+  const claimRejectedLabel = language === 'ua' ? 'Заявку відхилено — подати нову' : language === 'ru' ? 'Заявка отклонена — подать новую' : 'Claim rejected — resubmit';
+  const activateBusinessPlusLabel = language === 'ua' ? 'Активувати Бізнес+ (49 грн/міс)' : language === 'ru' ? 'Активировать Бизнес+ (49 грн/мес)' : 'Activate Business+ (49 UAH/mo)';
+
+  const claimItem: DetailItemData = {
+    id: place.id,
+    title: place.name,
+    address: place.address,
+    phone: place.phone,
+    category: 'kids',
+    sourceType: 'place',
+    sourceId: place.id,
+  };
+
   const handleCall = () => safeCallPhone(place.phone, language);
   const handleTelegram = () => {
     const tg = info?.telegram;
@@ -328,7 +430,77 @@ export default function DetalDetskogoMestaScreen() {
   const handleWebsite = () => {
     if (place.website) void safeOpenExternalUrl(place.website, language);
   };
-  const handleRoute = () => openInGoogleMaps(place.name, place.address);
+  const handleRoute = () => {
+    navigation.navigate('MainTabs', {
+      screen: 'MapTab',
+      params: getMapFocusPlaceParams(place),
+    });
+  };
+
+  // Load Business+ active status
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const snap = await get(ref(database, `business_plus_active/${place.id}`));
+      if (!cancelled) setIsBiznesPlusActive(snap.exists());
+    })();
+    return () => { cancelled = true; };
+  }, [place.id]);
+
+  const handleAdminToggleBiznesPlus = () => {
+    void (async () => {
+      try {
+        if (isBiznesPlusActive) {
+          await remove(ref(database, `business_plus_active/${place.id}`));
+          setIsBiznesPlusActive(false);
+        } else {
+          await set(ref(database, `business_plus_active/${place.id}`), {
+            screen: 'kids',
+            activatedAt: Date.now(),
+            expiresAt: 0,
+          });
+          setIsBiznesPlusActive(true);
+        }
+      } catch {
+        Alert.alert('Помилка', 'Не вдалося змінити Бізнес+ статус.');
+      }
+    })();
+  };
+
+  const handleAdminApprove = () => {
+    void (async () => {
+      try {
+        const now = new Date().toISOString();
+        await set(ref(database, `business_plus_claims/${place.id}/status`), 'approved');
+        await set(ref(database, `business_plus_claims/${place.id}/moderatedAt`), now);
+        setClaimStatus('approved');
+      } catch {
+        Alert.alert('Помилка', 'Не вдалося схвалити заявку. Спробуйте ще раз.');
+      }
+    })();
+  };
+
+  const handleAdminReject = () => {
+    Alert.alert('Відхилити заявку?', '', [
+      { text: 'Скасувати', style: 'cancel' },
+      {
+        text: 'Відхилити',
+        style: 'destructive',
+        onPress: () => {
+          void (async () => {
+            try {
+              const now = new Date().toISOString();
+              await set(ref(database, `business_plus_claims/${place.id}/status`), 'rejected');
+              await set(ref(database, `business_plus_claims/${place.id}/moderatedAt`), now);
+              setClaimStatus('rejected');
+            } catch {
+              Alert.alert('Помилка', 'Не вдалося відхилити заявку. Спробуйте ще раз.');
+            }
+          })();
+        },
+      },
+    ]);
+  };
 
   const renderInfoRow = (label: string, value: string) => (
     <View style={styles.infoRow} key={label}>
@@ -363,7 +535,7 @@ export default function DetalDetskogoMestaScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
         {/* 10.1 Header */}
@@ -383,7 +555,7 @@ export default function DetalDetskogoMestaScreen() {
         {/* Address */}
         <View style={styles.addressRow}>
           <MaterialCommunityIcons name="map-marker-outline" size={18} color={SCREEN_THEME.textMuted} />
-          <Text style={styles.addressText}>{place.address}</Text>
+          <Text style={[styles.addressText, { color: isDark ? '#F5E8F0' : undefined }]}>{place.address}</Text>
         </View>
 
         {/* Badges */}
@@ -434,6 +606,19 @@ export default function DetalDetskogoMestaScreen() {
           </View>
         </View>
 
+        {/* Booking section — visible to all when Business+ not active for this place */}
+        {!isBiznesPlusActive && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{text.bookingTitle}</Text>
+            <View style={styles.bookingEmptyBlock}>
+              <MaterialCommunityIcons name="calendar-clock-outline" size={38} color={SCREEN_THEME.textMuted} />
+              <Text style={styles.bookingEmptyText}>
+                {isMyApprovedPlace ? text.bookingOwnerText : text.bookingVisitorText}
+              </Text>
+            </View>
+          </View>
+        )}
+
         {/* 10.3 Safety */}
         {safetyItems.length > 0 ? (
           <View style={styles.section}>
@@ -477,7 +662,121 @@ export default function DetalDetskogoMestaScreen() {
           </View>
         ) : null}
 
+        {/* Admin moderation panel — only for vikramsave@ukr.net */}
+        {isAdmin && claimStatus !== 'none' ? (
+          <View style={styles.adminSection}>
+            <View style={styles.adminSectionHeader}>
+              <MaterialCommunityIcons name="shield-account-outline" size={15} color="#8A7A5A" />
+              <Text style={styles.adminSectionTitle}>МОДЕРАЦІЯ</Text>
+            </View>
+            <View style={[styles.claimStatusCard, claimStatus === 'approved' && styles.claimStatusApproved]}>
+              <MaterialCommunityIcons
+                name={claimStatus === 'pending' ? 'clock-outline' : claimStatus === 'approved' ? 'check-circle-outline' : 'close-circle-outline'}
+                size={15}
+                color={claimStatus === 'approved' ? '#2E7D32' : '#8A7A5A'}
+              />
+              <Text style={[styles.claimStatusText, claimStatus === 'approved' && styles.claimStatusApprovedText]}>
+                {claimStatus === 'pending' ? 'На розгляді' : claimStatus === 'approved' ? 'Схвалено' : 'Відхилено'}
+              </Text>
+            </View>
+            <View style={styles.adminActions}>
+              {claimStatus !== 'approved' ? (
+                <TouchableOpacity style={styles.adminApproveBtn} onPress={handleAdminApprove} activeOpacity={0.85}>
+                  <MaterialCommunityIcons name="check-circle-outline" size={15} color="#fff" />
+                  <Text style={styles.adminBtnText}>Схвалити</Text>
+                </TouchableOpacity>
+              ) : null}
+              {claimStatus !== 'rejected' ? (
+                <TouchableOpacity style={styles.adminRejectBtn} onPress={handleAdminReject} activeOpacity={0.85}>
+                  <MaterialCommunityIcons name="close-circle-outline" size={15} color="#fff" />
+                  <Text style={styles.adminBtnText}>Відхилити</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            <TouchableOpacity
+              style={[styles.adminBiznesPlusBtn, isBiznesPlusActive && styles.adminBiznesPlusBtnActive]}
+              onPress={handleAdminToggleBiznesPlus}
+              activeOpacity={0.85}
+            >
+              <MaterialCommunityIcons name="briefcase-check-outline" size={15} color="#fff" />
+              <Text style={styles.adminBtnText}>{isBiznesPlusActive ? 'Бізнес+ ВКЛ ✓' : 'Бізнес+ ВИКЛ'}</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
+        {/* Business ownership claim section */}
+        {showBusinessSection ? (
+          <View style={styles.businessSectionContainer}>
+            <View style={styles.businessSectionHeader}>
+              <MaterialCommunityIcons name="briefcase-outline" size={18} color={SCREEN_THEME.textSecondary} />
+              <Text style={styles.businessSectionTitle}>{text.businessSectionTitle}</Text>
+            </View>
+            {claimStatus === 'none' || claimStatus === 'rejected' ? (
+              <TouchableOpacity
+                style={styles.claimBtn}
+                onPress={() => navigation.navigate('BusinessClaimScreen', { item: claimItem })}
+                activeOpacity={0.86}
+              >
+                <MaterialCommunityIcons name="store-plus-outline" size={18} color={SCREEN_THEME.terracotta} />
+                <Text style={styles.claimBtnText}>
+                  {claimStatus === 'rejected' ? claimRejectedLabel : claimLabel}
+                </Text>
+              </TouchableOpacity>
+            ) : claimStatus === 'pending' ? (
+              <View style={styles.claimStatusCard}>
+                <MaterialCommunityIcons name="clock-outline" size={16} color="#8A7A5A" />
+                <Text style={styles.claimStatusText}>{claimPendingLabel}</Text>
+              </View>
+            ) : isMyApprovedPlace ? (
+              <View style={{ gap: 8 }}>
+                <View style={[styles.claimStatusCard, styles.claimStatusApproved]}>
+                  <MaterialCommunityIcons name="check-circle-outline" size={16} color="#2E7D32" />
+                  <Text style={[styles.claimStatusText, styles.claimStatusApprovedText]}>{claimApprovedLabel}</Text>
+                </View>
+                {!isBusinessPlus && (
+                  <TouchableOpacity
+                    style={styles.activateBusinessBtn}
+                    onPress={() => navigation.navigate('BusinessPlusSubscriptionScreen')}
+                    activeOpacity={0.86}
+                  >
+                    <MaterialCommunityIcons name="storefront" size={16} color="#fff" />
+                    <Text style={styles.activateBusinessBtnText}>{activateBusinessPlusLabel}</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : null}
+            <TouchableOpacity style={styles.hideBtn} onPress={() => setShowBusinessSection(false)}>
+              <Text style={styles.hideBtnText}>{text.hide}</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity style={styles.showMoreBtn} onPress={() => setShowBusinessSection(true)}>
+            <MaterialCommunityIcons name="chevron-down-circle-outline" size={18} color={SCREEN_THEME.enamelBlueDark} />
+            <Text style={styles.showMoreBtnText}>{text.showMore}</Text>
+          </TouchableOpacity>
+        )}
+
+        <CommentSection
+          requestId={`childplace_${place.id}`}
+          requestAuthorUid={''}
+          isRequestClosed={false}
+          collectionPath={COMMENTS_PATH}
+        />
+
+        <TouchableOpacity style={styles.complaintBtn} onPress={() => setComplaintVisible(true)} activeOpacity={0.7}>
+          <MaterialCommunityIcons name="flag-outline" size={13} color={SCREEN_THEME.textMuted} />
+          <Text style={styles.complaintBtnText}>{language === 'ua' ? 'Поскаржитись' : language === 'ru' ? 'Пожаловаться' : 'Report'}</Text>
+        </TouchableOpacity>
+
       </ScrollView>
+      <ContentComplaintModal
+        visible={complaintVisible}
+        onClose={() => setComplaintVisible(false)}
+        contentId={place.id}
+        contentType="kids-place"
+        contentTitle={place.name}
+        language={language}
+      />
     </SafeAreaView>
   );
 }
@@ -709,4 +1008,201 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: SCREEN_THEME.textMuted,
   },
+  claimBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    borderWidth: 1,
+    borderColor: SCREEN_THEME.terracotta,
+    marginBottom: 12,
+  },
+  claimBtnText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+    color: SCREEN_THEME.terracotta,
+  },
+  claimStatusCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFF8E6',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    borderWidth: 1,
+    borderColor: '#D4B95E',
+    marginBottom: 12,
+  },
+  claimStatusApproved: {
+    backgroundColor: '#F0FFF4',
+    borderColor: '#81C784',
+  },
+  claimStatusText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#8A7A5A',
+  },
+  claimStatusApprovedText: {
+    color: '#2E7D32',
+  },
+  activateBusinessBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#7A1E5C',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    marginBottom: 12,
+  },
+  activateBusinessBtnText: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#fff',
+  },
+  showMoreBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 16,
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderWidth: 1,
+    borderColor: SCREEN_THEME.borderSoft,
+    marginBottom: 12,
+  },
+  showMoreBtnText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#21041B',
+  },
+  businessSectionContainer: {
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: SCREEN_THEME.borderSoft,
+    gap: 8,
+  },
+  businessSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  businessSectionTitle: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: SCREEN_THEME.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  hideBtn: {
+    alignItems: 'center',
+    paddingVertical: 10,
+    marginTop: 4,
+  },
+  hideBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: SCREEN_THEME.textMuted,
+  },
+  adminSection: {
+    backgroundColor: '#FFF8E1',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#F9C400',
+    marginBottom: 12,
+    gap: 8,
+  },
+  adminSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  adminSectionTitle: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#8A7A5A',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  adminActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  adminApproveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#2E7D32',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  adminRejectBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#C62828',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  adminBtnText: {
+    color: '#fff',
+    fontWeight: '900',
+    fontSize: 13,
+  },
+  adminBiznesPlusBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#607D8B',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginTop: 4,
+  },
+  adminBiznesPlusBtnActive: {
+    backgroundColor: '#1565C0',
+  },
+  bookingEmptyBlock: {
+    alignItems: 'center',
+    paddingVertical: 8,
+    gap: 12,
+  },
+  bookingEmptyText: {
+    fontSize: 13,
+    lineHeight: 20,
+    fontWeight: '600',
+    color: SCREEN_THEME.textSecondary,
+    textAlign: 'center',
+  },
+  bookingCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#7A1E5C',
+    borderRadius: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 13,
+    marginTop: 4,
+  },
+  bookingCtaText: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#fff',
+  },
+  complaintBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 14 },
+  complaintBtnText: { color: SCREEN_THEME.textMuted, fontSize: 12, fontWeight: '700' },
 });

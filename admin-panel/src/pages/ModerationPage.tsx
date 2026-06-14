@@ -7,6 +7,7 @@ import { RejectModal } from '../components/RejectModal';
 import { analyzeText } from '../services/aiAnalysisService';
 import { logDisagreement } from '../services/aiFeedbackService';
 import { addToYellowList, subscribeYellowList, removeFromYellowList, getServerNow, type YellowListEntry } from '../services/yellowListService';
+import { pardonUser, subscribeUserPardons } from '../services/violationService';
 import type { AnalysisResult, AiVerdict } from '../types/ai';
 import {
   deleteModerationItem,
@@ -71,6 +72,7 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
   const [massStrategy, setMassStrategy] = useState<MassAnalysisStrategy>('oldest-first');
   const [massProgress, setMassProgress] = useState({ current: 0, total: 0 });
   const massCancelRef = useRef(false);
+  const [batchProgress, setBatchProgress] = useState<{ current: number; total: number; label: string } | null>(null);
 
   // --- Yellow List state ---
   const [yellowList, setYellowList] = useState<Map<string, YellowListEntry>>(new Map());
@@ -82,6 +84,16 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
       for (const e of entries) map.set(e.uid, e);
       setYellowList(map);
     });
+    return unsub;
+  }, []);
+
+  // --- Violation / Pardon state ---
+  // pardons: uid → timestamp прощения. Нарушения до этого времени не учитываются.
+  const [pardons, setPardons] = useState<Map<string, number>>(new Map());
+  const [showViolatorsTab, setShowViolatorsTab] = useState(true);
+
+  useEffect(() => {
+    const unsub = subscribeUserPardons((map) => setPardons(map));
     return unsub;
   }, []);
 
@@ -99,20 +111,48 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
     'zhCLiQnSAlbkuHKLKKMCsfhZ4iX2',  // Elena Ferrara
   ]);
 
-  // Множество userId у которых есть хотя бы одна отклонённая заявка
-  const rejectedUserIds = useMemo(() => {
-    const set = new Set<string>();
+  // Карта userId → кол-во отклонённых заявок (только после последнего прощения)
+  const rejectedUserCount = useMemo(() => {
+    const map = new Map<string, number>();
     for (const item of items) {
-      if (item.status === 'rejected' && item.userId) set.add(item.userId);
+      if (item.status === 'rejected' && item.userId) {
+        const pardonTime = pardons.get(item.userId) ?? 0;
+        if (item.timestamp > pardonTime) {
+          map.set(item.userId, (map.get(item.userId) ?? 0) + 1);
+        }
+      }
     }
-    return set;
-  }, [items]);
+    return map;
+  }, [items, pardons]);
+
+  // Уровень нарушений: 0 = чисто, 1 = жёлтый (2 нарушения), 2 = красный (3+)
+  const getUserViolationLevel = (userId: string): 0 | 1 | 2 => {
+    if (!userId || TEST_BOT_UIDS.has(userId)) return 0;
+    const count = rejectedUserCount.get(userId) ?? 0;
+    if (count >= 3) return 2;
+    if (count >= 2) return 1;
+    return 0;
+  };
+
+  // Список нарушителей (2+ нарушений) для таблицы внизу
+  const violators = useMemo(() => {
+    const nameMap = new Map<string, string>();
+    for (const item of items) {
+      if (item.userId && item.userName) nameMap.set(item.userId, item.userName);
+    }
+    const result: Array<{ uid: string; name: string; count: number }> = [];
+    for (const [uid, count] of rejectedUserCount.entries()) {
+      if (count >= 2 && !TEST_BOT_UIDS.has(uid)) {
+        result.push({ uid, name: nameMap.get(uid) || uid, count });
+      }
+    }
+    return result.sort((a, b) => b.count - a.count);
+  }, [items, rejectedUserCount]);
 
   const isUserFlagged = (item: ModerationItem): boolean => {
     if (!item.userId) return false;
     if (TEST_BOT_UIDS.has(item.userId)) return false;
-    // Пользователь помечен если: у него есть отклонённая заявка ИЛИ AI пометил ИЛИ он в жёлтом списке
-    if (rejectedUserIds.has(item.userId)) return true;
+    if (getUserViolationLevel(item.userId) >= 1) return true;
     if (isUserInYellowList(item.userId)) return true;
     const aiResult = aiResults.get(item.path);
     return Boolean(aiResult && (aiResult.verdict === 'review' || aiResult.verdict === 'suspicious'));
@@ -152,6 +192,20 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
       setMessage(`Бан снят с ${name}.`);
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Ошибка снятия бана.');
+    }
+  };
+
+  const handlePardonUser = async (uid: string, name: string) => {
+    const count = rejectedUserCount.get(uid) ?? 0;
+    const confirmed = window.confirm(
+      `Снять все нарушения с "${name}"?\n\nТекущих нарушений: ${count}.\nВсе прошлые нарушения будут сброшены — счётчик обнулится.`
+    );
+    if (!confirmed) return;
+    try {
+      await pardonUser(uid, name, user.uid);
+      setMessage(`Нарушения пользователя "${name}" сброшены. Счётчик обнулён.`);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Ошибка сброса нарушений.');
     }
   };
 
@@ -344,13 +398,23 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
           }
         }
       }
-      setItems((current) => current.filter((candidate) => candidate.path !== item.path));
+      // delete — удаляем; approve/reject — обновляем статус, фильтр скроет сам
+      if (action === 'delete') {
+        setItems((current) => current.filter((candidate) => candidate.path !== item.path));
+      } else {
+        setItems((current) =>
+          current.map((candidate) =>
+            candidate.path === item.path ? { ...candidate, status: action } : candidate,
+          ),
+        );
+      }
       setSelectedPaths((current) => {
         const next = new Set(current);
         next.delete(item.path);
         return next;
       });
     } catch (error) {
+      // При ошибке сервера — НЕ удаляем карточку из UI, показываем ошибку
       setMessage(error instanceof Error ? error.message : 'Не удалось выполнить действие модерации.');
     } finally {
       setBusyActions((prev) => { const next = new Set(prev); next.delete(actionId); return next; });
@@ -366,8 +430,26 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
     });
   };
 
+  const BATCH_CONCURRENCY = 5;
+
+  const runBatch = async (
+    items: ModerationItem[],
+    action: 'approved' | 'rejected' | 'delete',
+    label: string,
+    options?: { reason?: string },
+  ) => {
+    setBatchProgress({ current: 0, total: items.length, label });
+    for (let i = 0; i < items.length; i += BATCH_CONCURRENCY) {
+      const chunk = items.slice(i, i + BATCH_CONCURRENCY);
+      await Promise.allSettled(
+        chunk.map((item) => runAction(item, action, { skipDeleteConfirm: true, reason: options?.reason })),
+      );
+      setBatchProgress({ current: Math.min(i + BATCH_CONCURRENCY, items.length), total: items.length, label });
+    }
+    setBatchProgress(null);
+  };
+
   const approveSelected = async () => {
-    // Фиксируем список на момент нажатия — не допускаем каскадного одобрения
     const itemsToApprove = [...approvableSelectedItems];
     if (!itemsToApprove.length) {
       setMessage('Нет выбранных записей для одобрения.');
@@ -375,13 +457,10 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
     }
     const confirmed = window.confirm(`Одобрить ${itemsToApprove.length} выбранных записей?`);
     if (!confirmed) return;
-    for (const item of itemsToApprove) {
-      await runAction(item, 'approved');
-    }
+    await runBatch(itemsToApprove, 'approved', 'Одобрение');
   };
 
   const deleteSelected = async () => {
-    // Фиксируем список на момент нажатия — не допускаем каскадного удаления
     const itemsToDelete = [...deletableSelectedItems];
     if (!itemsToDelete.length) {
       setMessage('Нет выбранных записей для удаления.');
@@ -389,9 +468,7 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
     }
     const confirmed = window.confirm(`Удалить ${itemsToDelete.length} выбранных записей?`);
     if (!confirmed) return;
-    for (const item of itemsToDelete) {
-      await runAction(item, 'delete', { skipDeleteConfirm: true });
-    }
+    await runBatch(itemsToDelete, 'delete', 'Удаление');
   };
 
   const openPreview = (item: ModerationItem, startIndex = 0) => {
@@ -428,6 +505,18 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
       </div>
 
       {message ? <p className="infoMessage">{message}</p> : null}
+
+      {batchProgress ? (
+        <div style={{ marginBottom: 16, padding: '12px 16px', background: '#1a2435', borderRadius: 10, border: '1px solid #253040' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 13, color: '#c8d6e8' }}>
+            <span>{batchProgress.label}...</span>
+            <span>{batchProgress.current} / {batchProgress.total}</span>
+          </div>
+          <div style={{ height: 6, background: '#253040', borderRadius: 3, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${(batchProgress.current / batchProgress.total) * 100}%`, background: '#4b7f9e', borderRadius: 3, transition: 'width 0.3s ease' }} />
+          </div>
+        </div>
+      ) : null}
 
       <div className="statsGrid">
         <article className="metric metric-primary"><span>Всего</span><strong>{summary.total}</strong></article>
@@ -555,7 +644,7 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
           <button
             type="button"
             className="smallButton"
-            disabled={!approvableSelectedItems.length || busyActions.size > 0}
+            disabled={!approvableSelectedItems.length || busyActions.size > 0 || !!batchProgress}
             onClick={() => void approveSelected()}
           >
             Одобрить все
@@ -563,7 +652,7 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
           <button
             type="button"
             className="smallButton dangerButton"
-            disabled={!rejectableSelectedItems.length || busyActions.size > 0}
+            disabled={!rejectableSelectedItems.length || busyActions.size > 0 || !!batchProgress}
             onClick={() => setRejectTarget({ kind: 'batch', items: [...rejectableSelectedItems] })}
           >
             Отклонить выбранные
@@ -571,7 +660,7 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
           <button
             type="button"
             className="smallButton dangerButton"
-            disabled={!deletableSelectedItems.length || busyActions.size > 0}
+            disabled={!deletableSelectedItems.length || busyActions.size > 0 || !!batchProgress}
             onClick={() => void deleteSelected()}
           >
             Удалить все
@@ -633,18 +722,52 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
                       {item.editedAt ? <small className="editedBadge">ред.</small> : null}
                     </strong>
                     <small>{item.subtitle || item.id}</small>
+                    {(item.photoUrl || item.photoUrls.length > 0) ? (
+                      <small
+                        title="До заявки прикріплено фото. Видалення заявки видалить і фото."
+                        style={{
+                          display: 'inline-block',
+                          marginTop: 4,
+                          padding: '2px 7px',
+                          borderRadius: 6,
+                          background: '#1a3a52',
+                          border: '1px solid #2e5f82',
+                          color: '#7ec8f0',
+                          fontSize: 11,
+                          fontWeight: 700,
+                          letterSpacing: 0.3,
+                        }}
+                      >
+                        📷 Фото
+                      </small>
+                    ) : null}
                   </td>
                   <td>{sectionLabel(item.section)}</td>
-                  <td className={isUserFlagged(item) ? 'ylFlaggedCell' : ''}>
+                  <td className={
+                    isUserInYellowList(item.userId) || getUserViolationLevel(item.userId) === 2
+                      ? 'ylFlaggedCell'
+                      : getUserViolationLevel(item.userId) === 1
+                      ? 'ylYellowCell'
+                      : ''
+                  }>
                     {isUserFlagged(item) ? (
                       <div className="ylFlaggedUser">
-                        <span className="ylWarningIcon">&#9888;</span>
-                        <strong className="ylFlaggedName">{item.userName || '-'}</strong>
+                        <span className={getUserViolationLevel(item.userId) === 1 && !isUserInYellowList(item.userId) ? 'ylYellowIcon' : 'ylWarningIcon'}>
+                          &#9888;
+                        </span>
+                        <strong className={getUserViolationLevel(item.userId) === 1 && !isUserInYellowList(item.userId) ? 'ylYellowName' : 'ylFlaggedName'}>
+                          {item.userName || '-'}
+                        </strong>
                         {isUserInYellowList(item.userId) ? (
                           <span className="ylBadge" title={`В жёлтом списке до ${new Date(yellowList.get(item.userId)!.bannedUntil).toLocaleDateString()}`}>&#128683; ЗАБАНЕН</span>
-                        ) : (
-                          <span className="ylSuspectBadge">ПОДОЗРЕНИЕ</span>
-                        )}
+                        ) : getUserViolationLevel(item.userId) === 2 ? (
+                          <>
+                            <span className="ylSuspectBadge">ПОДОЗРЕНИЕ</span>
+                            <span className="ylViolationCount">{rejectedUserCount.get(item.userId)} нарушений</span>
+                          </>
+                        ) : getUserViolationLevel(item.userId) === 1 ? (
+                          <span className="ylYellowBadge">&#9888; {rejectedUserCount.get(item.userId)} нарушения</span>
+                        ) : null}
                       </div>
                     ) : (
                       <strong>{item.userName || '-'}</strong>
@@ -659,7 +782,7 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
                       <div className="mediaGallery">
                         {item.mediaUrls.map((url, idx) => (
                           <button key={idx} type="button" className="mediaPreview" onClick={() => openPreview(item, idx)}>
-                            <img src={url} alt="" />
+                            <img src={url} alt="" loading="lazy" decoding="async" />
                           </button>
                         ))}
                       </div>
@@ -714,21 +837,45 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
                     >
                       Удалить
                     </button>
-                    {item.userId && isUserFlagged(item) ? (
+                    {item.userId && !TEST_BOT_UIDS.has(item.userId) ? (
                       isUserInYellowList(item.userId) ? (
-                        <button type="button" className="ylBtnBanned" disabled title={`В жёлтом списке до ${new Date(yellowList.get(item.userId)!.bannedUntil).toLocaleDateString()}`}>
-                          &#128683; ЗАБАНЕН
-                        </button>
+                        <>
+                          <button type="button" className="ylBtnBanned" disabled title={`В жёлтом списке до ${new Date(yellowList.get(item.userId)!.bannedUntil).toLocaleDateString()}`}>
+                            &#128683; ЗАБАНЕН
+                          </button>
+                          <button
+                            type="button"
+                            className="smallButton ylUnbanBtn"
+                            disabled={busyActions.size > 0}
+                            onClick={() => void handleRemoveFromYellowList(item.userId, item.userName || item.userId)}
+                            title="Снять бан с пользователя"
+                          >
+                            Снять бан
+                          </button>
+                        </>
                       ) : (
-                        <button
-                          type="button"
-                          className="ylBtnBan"
-                          disabled={busyActions.size > 0}
-                          onClick={() => void handleAddToYellowList(item)}
-                          title="Добавить в жёлтый список — бан на заявки 14 дней"
-                        >
-                          &#9888; ЗАБАНИТЬ
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            className="ylBtnBan"
+                            disabled={busyActions.size > 0}
+                            onClick={() => void handleAddToYellowList(item)}
+                            title="Добавить в жёлтый список — бан на заявки 14 дней"
+                          >
+                            &#9888; В жёлтый список
+                          </button>
+                          {(rejectedUserCount.get(item.userId) ?? 0) > 0 ? (
+                            <button
+                              type="button"
+                              className="smallButton ylPardonBtn"
+                              disabled={busyActions.size > 0}
+                              onClick={() => void handlePardonUser(item.userId, item.userName || item.userId)}
+                              title={`Сбросить счётчик нарушений (сейчас: ${rejectedUserCount.get(item.userId)})`}
+                            >
+                              &#10003; Снять грехи ({rejectedUserCount.get(item.userId)})
+                            </button>
+                          ) : null}
+                        </>
                       )
                     ) : null}
                   </td>
@@ -846,6 +993,67 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
         </article>
       ) : null}
 
+      {/* --- Таблица нарушителей (2+ нарушений) --- */}
+      {violators.length > 0 ? (
+        <article className="ylSection vlSection">
+          <div className="ylSectionHeader">
+            <span className="vlSectionTitle">&#9888; Нарушители ({violators.length})</span>
+            <button
+              type="button"
+              className="smallButton"
+              onClick={() => setShowViolatorsTab(!showViolatorsTab)}
+            >
+              {showViolatorsTab ? 'Свернуть' : 'Развернуть'}
+            </button>
+          </div>
+          {showViolatorsTab ? (
+            <div className="tableWrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Пользователь</th>
+                    <th>Нарушений</th>
+                    <th>Уровень</th>
+                    <th>Действия</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {violators.map((v) => {
+                    const level = getUserViolationLevel(v.uid);
+                    return (
+                      <tr key={v.uid} className={level === 2 ? 'ylBannedRow' : 'vlYellowRow'}>
+                        <td>
+                          <strong className={level === 2 ? 'ylFlaggedName' : 'ylYellowName'}>{v.name}</strong>
+                          <br /><small>{v.uid}</small>
+                        </td>
+                        <td><strong>{v.count}</strong></td>
+                        <td>
+                          {level === 2 ? (
+                            <span className="ylSuspectBadge">&#128308; ПОДОЗРЕНИЕ</span>
+                          ) : (
+                            <span className="ylYellowBadge">&#128993; ПРЕДУПРЕЖДЕНИЕ</span>
+                          )}
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="smallButton ylPardonBtn"
+                            onClick={() => void handlePardonUser(v.uid, v.name)}
+                            title="Сбросить счётчик нарушений"
+                          >
+                            &#10003; Снять все грехи
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+        </article>
+      ) : null}
+
       {editModalItem ? (
         <EditRequestModal
           item={editModalItem}
@@ -870,14 +1078,11 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
           onCancel={() => setRejectTarget(null)}
           onConfirm={async (reason) => {
             const target = rejectTarget;
+            setRejectTarget(null);
             if (target.kind === 'single') {
-              setRejectTarget(null);
               await runAction(target.item, 'rejected', { reason });
             } else {
-              await Promise.allSettled(
-                target.items.map((item) => runAction(item, 'rejected', { reason }))
-              );
-              setRejectTarget(null);
+              await runBatch(target.items, 'rejected', 'Отклонение', { reason });
             }
           }}
         />

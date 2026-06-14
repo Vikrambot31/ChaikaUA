@@ -1,4 +1,4 @@
-import type { AppRuleItem, AppRulesRuntimeState, AppRulesSection, AppRulesSnapshot } from '../../types/appRules';
+import type { AppRuleItem, AppRulesRuntimeState, AppRulesSection, AppRulesSnapshot, AppRulesZoneGroup, AppRuleZone } from '../../types/appRules';
 import { parseFirebaseRules } from './firebaseRulesParser';
 import { analyzePhotoPipeline } from './photoPipelineAnalyzer';
 import {
@@ -13,7 +13,7 @@ import { analyzeSecurityAndRuntimeCode } from './securityRulesAnalyzer';
 import { parseStorageRules } from './storageRulesParser';
 import { annotateDeclaredIndexItems, buildMissingIndexRuleItems } from './indexUsageAnalyzer';
 
-const CACHE_KEY = 'chaika:app_rules_snapshot:v1';
+const CACHE_KEY = 'chaika:app_rules_snapshot:v2';
 const CACHE_MAX_AGE_MS = 10 * 60 * 1000;
 const RUNTIME_TIMEOUT_MS = 2500;
 
@@ -140,6 +140,52 @@ const buildKnownMissingRuleItems = (generatedAt: number): AppRuleItem[] => [
   },
 ];
 
+// Fallback zone resolver for items where parsers didn't assign a zone
+const resolveZone = (item: AppRuleItem): AppRuleZone => {
+  if (item.zone) return item.zone;
+  if (item.source.kind === 'runtime_config') return 'monitor';
+  if (
+    (item.status === 'critical' || item.status === 'missing') &&
+    (item.risk === 'critical' || item.risk === 'high')
+  ) return 'action';
+  return 'reference';
+};
+
+export const buildZoneGroups = (items: AppRuleItem[]): AppRulesZoneGroup[] => {
+  const withZone = items.map((item) => ({ ...item, zone: resolveZone(item) }));
+  const actionItems = withZone.filter((item) => item.zone === 'action');
+  const monitorItems = withZone.filter((item) => item.zone === 'monitor');
+  const referenceItems = withZone.filter((item) => item.zone === 'reference');
+  const monitorWarnings = monitorItems.filter((item) => item.status === 'warning' || item.status === 'missing').length;
+
+  return [
+    {
+      zone: 'action',
+      label: 'ПОТРІБНА ДІЯ',
+      description: 'Реальні проблеми, які потребують уваги адміністратора. Зламане або відсутнє — тут.',
+      items: actionItems,
+      defaultOpen: true,
+      actionCount: actionItems.length,
+    },
+    {
+      zone: 'monitor',
+      label: 'МОНІТОРИНГ',
+      description: 'Живі runtime-перемикачі. Зараз в нормі, але зміна будь-якого може вплинути на всіх користувачів.',
+      items: monitorItems,
+      defaultOpen: monitorWarnings > 0,
+      actionCount: monitorWarnings,
+    },
+    {
+      zone: 'reference',
+      label: 'АРХІТЕКТУРА СИСТЕМИ',
+      description: 'Довідкові правила — завжди увімкнені за задумом дизайну. Розгорніть для аудиту структури.',
+      items: referenceItems,
+      defaultOpen: false,
+      actionCount: 0,
+    },
+  ];
+};
+
 const sortItems = (items: AppRuleItem[]): AppRuleItem[] => {
   const riskWeight: Record<AppRuleItem['risk'], number> = {
     critical: 0,
@@ -238,6 +284,7 @@ export const generateAppRulesSnapshot = async (): Promise<AppRulesSnapshot> => {
     sections: createSections(allItems, photo.pipeline),
     warnings,
     runtime,
+    zones: buildZoneGroups(allItems),
   };
 
   cacheSnapshot(snapshot);

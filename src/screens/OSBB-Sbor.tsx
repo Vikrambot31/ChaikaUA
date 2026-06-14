@@ -12,6 +12,7 @@ import { RATE_LIMITERS } from '../utils/rateLimiter';
 import { safeOpenExternalUrl } from '../utils/communicationActions';
 import type { DetailItemData } from '../utils/detailViewTypes';
 import MiniTabBar from '../components/MiniTabBar';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 type AppNav = NativeStackNavigationProp<Record<string, object | undefined>>;
 type Lang = 'ua' | 'ru' | 'en';
@@ -123,6 +124,7 @@ const OsbbSborScreen: React.FC = () => {
   const navLock = useRef(false);
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
   const text = UI_TEXT[language];
+  const { colors, isDark } = useAppTheme();
   const buildingId = useSelector((state: RootState) => state.osbb.buildingId);
   useOsbbMembership();
   const canManageCollections = useSelector(
@@ -206,13 +208,13 @@ const OsbbSborScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
         <View style={styles.headerRow}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <MaterialCommunityIcons name="arrow-left" size={24} color={SCREEN_THEME.textPrimary} />
           </TouchableOpacity>
-          <Text style={styles.screenTitle}>{text.title}</Text>
+          <Text style={[styles.screenTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{text.title}</Text>
           <View style={styles.backBtn} />
         </View>
 

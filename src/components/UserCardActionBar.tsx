@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { onValue, ref, runTransaction } from 'firebase/database';
 import { database } from '../firebase-config';
 import MiniUserAvatar from './MiniUserAvatar';
 import { useSoftToast } from '../hooks/useSoftToast';
 import { resolveUserAvatarMap } from '../utils/userAvatar';
+import { normaliseLikesSnapshot } from '../utils/likeUtils';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 const RTDB_FORBIDDEN_KEY_CHARS = /[.#$[\]/]/g;
 const toSafeRtdbKey = (value: string): string => (value ?? '').replace(RTDB_FORBIDDEN_KEY_CHARS, '_').trim();
@@ -34,6 +36,9 @@ type Props = {
   showContact?: boolean;
   showLikeAvatars?: boolean;
   contactLabel?: string;
+  shareMessage?: string;
+  isFav?: boolean;
+  onToggleFavorite?: () => void;
 };
 
 const labels = {
@@ -76,11 +81,15 @@ export default function UserCardActionBar({
   showContact = true,
   showLikeAvatars = false,
   contactLabel,
+  shareMessage,
+  isFav,
+  onToggleFavorite,
 }: Props) {
   const [localLikes, setLocalLikes] = useState<Record<string, true>>({});
   const [likeAvatarByUserId, setLikeAvatarByUserId] = useState<Record<string, string>>({});
   const [localBusy, setLocalBusy] = useState(false);
   const { showError, showInfo } = useSoftToast();
+  const { colors, isDark } = useAppTheme();
   const safeLikeId = useMemo(() => (likeId ? toSafeRtdbKey(likeId) : undefined), [likeId]);
   const canUseLocalLike = Boolean(likePath && safeLikeId && currentUserId && liked === undefined && likeCount === undefined && !onLike);
   const needsAuth = !currentUserId && !onLike;
@@ -88,8 +97,8 @@ export default function UserCardActionBar({
   useEffect(() => {
     if (!likePath || !safeLikeId || liked !== undefined || likeCount !== undefined) return;
     const unsubscribe = onValue(ref(database, `${likePath}/${safeLikeId}`), (snapshot) => {
-      const value = snapshot.val();
-      setLocalLikes(value && typeof value === 'object' ? value : {});
+      const { likeFlags } = normaliseLikesSnapshot(snapshot.val());
+      setLocalLikes(likeFlags);
     });
     return unsubscribe;
   }, [likeCount, safeLikeId, likePath, liked]);
@@ -133,13 +142,13 @@ export default function UserCardActionBar({
     if (nextLikes[currentUserId]) {
       delete nextLikes[currentUserId];
     } else {
-      nextLikes[currentUserId] = true;
+      nextLikes[currentUserId] = true; // optimistic flag; RTDB writes { t } via transaction
     }
 
     setLocalLikes(nextLikes);
     setLocalBusy(true);
     try {
-      await runTransaction(ref(database, `${likePath}/${safeLikeId}/${currentUserId}`), (current) => (current ? null : true));
+      await runTransaction(ref(database, `${likePath}/${safeLikeId}/${currentUserId}`), (current) => (current ? null : { t: Date.now() }));
     } catch {
       setLocalLikes(previousLikes);
       showError(t.saveFailed, t.retry);
@@ -164,6 +173,12 @@ export default function UserCardActionBar({
   };
 
   const likeDisabled = resolvedBusy || localBusy;
+  const profileColor = isDark ? colors.textPrimary : '#7A1E5C';
+  const contactColor = isDark ? colors.textPrimary : '#6B5BA8';
+  const disabledColor = isDark ? colors.textMuted : '#B0A090';
+  const buttonBorderColor = isDark ? 'rgba(255, 255, 255, 0.62)' : '#D4B9A8';
+  const contactBorderColor = isDark ? 'rgba(255, 255, 255, 0.46)' : 'rgba(141, 122, 184, 0.35)';
+  const contactBackgroundColor = isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(141, 122, 184, 0.20)';
 
   return (
     <View style={styles.row}>
@@ -178,16 +193,40 @@ export default function UserCardActionBar({
       ) : null}
 
       {showProfile ? (
-        <TouchableOpacity style={[styles.outlined, profileDisabled && styles.disabled]} onPress={(event) => { event.stopPropagation(); if (requireRegisteredUser()) onProfile?.(); }} disabled={profileDisabled} activeOpacity={0.8}>
-          <MaterialCommunityIcons name="badge-account-horizontal-outline" size={13} color={profileDisabled ? '#B0A090' : '#7A1E5C'} />
-          <Text style={[styles.outlinedText, profileDisabled && styles.disabledText]}>{t.profile}</Text>
+        <TouchableOpacity style={[styles.outlined, { borderColor: buttonBorderColor }, profileDisabled && styles.disabled]} onPress={(event) => { event.stopPropagation(); if (requireRegisteredUser()) onProfile?.(); }} disabled={profileDisabled} activeOpacity={0.8}>
+          <MaterialCommunityIcons name="badge-account-horizontal-outline" size={13} color={profileDisabled ? disabledColor : profileColor} />
+          <Text style={[styles.outlinedText, { color: profileDisabled ? disabledColor : profileColor }]}>{t.profile}</Text>
         </TouchableOpacity>
       ) : null}
 
       {showContact ? (
-        <TouchableOpacity style={[styles.outlined, resolvedContactDisabled && styles.disabled]} onPress={(event) => { event.stopPropagation(); if (requireRegisteredUser()) onContact?.(); }} disabled={resolvedContactDisabled} activeOpacity={0.8}>
-          <MaterialCommunityIcons name="message-text-outline" size={13} color={resolvedContactDisabled ? '#B0A090' : '#7A1E5C'} />
-          <Text style={[styles.outlinedText, resolvedContactDisabled && styles.disabledText]}>{contactLabel ?? t.contact}</Text>
+        <TouchableOpacity style={[styles.outlined, styles.contactOutlined, { backgroundColor: contactBackgroundColor, borderColor: contactBorderColor }, resolvedContactDisabled && styles.disabled]} onPress={(event) => { event.stopPropagation(); if (requireRegisteredUser()) onContact?.(); }} disabled={resolvedContactDisabled} activeOpacity={0.8}>
+          <MaterialCommunityIcons name="message-text-outline" size={13} color={resolvedContactDisabled ? disabledColor : contactColor} />
+          <Text style={[styles.outlinedText, styles.contactOutlinedText, { color: resolvedContactDisabled ? disabledColor : contactColor }]}>{contactLabel ?? t.contact}</Text>
+        </TouchableOpacity>
+      ) : null}
+
+      {shareMessage != null ? (
+        <TouchableOpacity
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          onPress={(event) => { event.stopPropagation(); void Share.share({ message: shareMessage }); }}
+          activeOpacity={0.7}
+        >
+          <MaterialCommunityIcons name="share-variant-outline" size={18} color="#9E8E80" />
+        </TouchableOpacity>
+      ) : null}
+
+      {onToggleFavorite != null ? (
+        <TouchableOpacity
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          onPress={(event) => { event.stopPropagation(); onToggleFavorite(); }}
+          activeOpacity={0.7}
+        >
+          <MaterialCommunityIcons
+            name={isFav ? 'bookmark' : 'bookmark-outline'}
+            size={20}
+            color={isFav ? '#C0533E' : '#9E8E80'}
+          />
         </TouchableOpacity>
       ) : null}
 
@@ -251,6 +290,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   outlinedText: { fontSize: 11, fontWeight: '800', color: '#7A1E5C' },
+  contactOutlined: {
+    backgroundColor: 'rgba(141, 122, 184, 0.20)',
+    borderColor: 'rgba(141, 122, 184, 0.35)',
+  },
+  contactOutlinedText: { color: '#6B5BA8' },
   like: {
     flexDirection: 'row',
     alignItems: 'center',

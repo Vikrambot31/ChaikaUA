@@ -2,7 +2,7 @@
   color-scheme: light;
   font-family: "Nunito", "Segoe UI", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   background: #eef3fb;
-  color: #25324a;
+  color: #e0e0e0;
 }
 
 * {
@@ -13,7 +13,8 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background: #eef3fb;
+  background: #1a1a2a;
+  color: #e0e0e0;
 }
 
 button {
@@ -37,7 +38,7 @@ select {
 }
 
 .loadingScreen {
-  color: #5d6f8b;
+  color: #aaa;
 }
 
 .loginPanel {
@@ -54,7 +55,7 @@ select {
 
 .loginText {
   margin-bottom: 24px;
-  color: #5d6f8b;
+  color: #aaa;
   line-height: 1.5;
 }
 
@@ -65,7 +66,7 @@ select {
 }
 
 .field span {
-  color: #5d6f8b;
+  color: #aaa;
   font-size: 13px;
   font-weight: 700;
 }
@@ -74,22 +75,22 @@ select {
   width: 100%;
   min-height: 44px;
   padding: 0 12px;
-  border: 1px solid #c9d9ef;
+  border: 1px solid #444;
   border-radius: 6px;
   outline: none;
-  background: #ffffff;
-  color: #25324a;
+  background: #2a2a3a;
+  color: #e0e0e0;
 }
 
 .field select {
   width: 100%;
   min-height: 44px;
   padding: 0 12px;
-  border: 1px solid #c9d9ef;
+  border: 1px solid #444;
   border-radius: 6px;
   outline: none;
-  background: #ffffff;
-  color: #25324a;
+  background: #2a2a3a;
+  color: #e0e0e0;
 }
 
 .field input:focus,
@@ -159,7 +160,7 @@ select {
 
 .eyebrow {
   margin: 0 0 8px;
-  color: #607594;
+  color: #aaa;
   font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
@@ -256,7 +257,7 @@ h3 {
 
 .viewModeButton.active {
   background: #ffffff;
-  color: #2f4f86;
+  color: #fff;
 }
 
 .navItem,
@@ -386,7 +387,8 @@ h3 {
 .main {
   min-width: 0;
   padding: 28px;
-  background: #eef3fb;
+  background: #1a1a2a;
+  color: #e0e0e0;
 }
 
 .headingWithHint {
@@ -414,6 +416,7 @@ h3 {
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  color: #fff;
 }
 
 .main[class*="page-"] h2::before {
@@ -487,13 +490,13 @@ h3 {
 .status.active {
   border-color: #53b97b;
   background: #e4f7eb;
-  color: #0f6a36;
+  color: #81c784;
 }
 
 .status.warning {
   border-color: #f1b27f;
   background: #fff2e9;
-  color: #d26a20;
+  color: #ffb366;
 }
 
 .grid {
@@ -606,10 +609,11 @@ h3 {
 .panel {
   min-height: 180px;
   padding: 18px;
-  border: 1px solid #d6e2f4;
+  border: 1px solid #333;
   border-radius: 12px;
-  background: #ffffff;
-  box-shadow: 0 8px 24px rgba(40, 74, 130, 0.08);
+  background: #242836;
+  color: #e0e0e0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
 }
 
 .dashboardGrid > .panel:nth-child(4n + 1),
@@ -633,7 +637,7 @@ h3 {
 }
 
 .panel p {
-  color: #5d6f8b;
+  color: #aaa;
   line-height: 1.55;
 }
 
@@ -676,7 +680,7 @@ h3 {
 .logItem small,
 td small {
   display: block;
-  color: #607594;
+  color: #aaa;
   font-size: 12px;
 }
 
@@ -800,14 +804,14 @@ td small {
 
 .releaseDetailMeta p {
   margin: 0;
-  color: #607594;
+  color: #aaa;
   word-break: break-word;
 }
 
 .releaseDetailMeta code,
 .releaseFilePath code {
   font-family: "Fira Mono", "Menlo", monospace;
-  color: #2a5a8c;
+  color: #aaa;
 }
 
 .releaseFiles {
@@ -836,12 +840,12 @@ td small {
 }
 
 .releaseScreenName {
-  color: #0f6a36;
+  color: #81c784;
   font-weight: 900;
 }
 
 .releaseCommitMsg {
-  color: #607594;
+  color: #aaa;
   font-size: 13px;
 }
 
@@ -857,7 +861,7 @@ td small {
   border-radius: 12px;
   outline: none;
   background: #ffffff;
-  color: #25324a;
+  color: #e0e0e0;
   font: inherit;
   resize: vertical;
 }
@@ -921,7 +925,7 @@ td small {
 
 .mutedText {
   margin-top: 10px;
-  color: #607594;
+  color: #aaa;
   font-size: 13px;
 }
 
@@ -938,7 +942,7 @@ td small {
   display: grid;
   place-items: center;
   cursor: pointer;
-  color: #5d6f8b;
+  color: #aaa;
   font-size: 12px;
   font-weight: 800;
   user-select: none;
@@ -1057,7 +1061,7 @@ td small {
   border: 2px solid #607594;
   border-radius: 8px;
   background: #ffffff;
-  color: #25324a;
+  color: #e0e0e0;
   cursor: pointer;
   font-size: 16px;
   line-height: 1;
@@ -1114,7 +1118,7 @@ td small {
   border-radius: 10px;
   background: #ffffff;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  color: #25324a;
+  color: #e0e0e0;
   z-index: 50;
   font-size: 13px;
   line-height: 1.4;
@@ -1146,7 +1150,7 @@ td small {
 }
 
 .aiPopover .provider {
-  color: #607594;
+  color: #aaa;
   font-size: 11px;
 }
 
@@ -1196,15 +1200,15 @@ td small {
   border-radius: 8px;
   margin: 0;
 }
-.editModalMeta dt { color: #607594; font-size: 12px; font-weight: 700; }
-.editModalMeta dd { margin: 0; color: #25324a; }
+.editModalMeta dt { color: #aaa; font-size: 12px; font-weight: 700; }
+.editModalMeta dd { margin: 0; color: #e0e0e0; }
 
 .editField {
   display: grid;
   gap: 6px;
 }
 .editField label {
-  color: #607594;
+  color: #aaa;
   font-size: 13px;
   font-weight: 700;
 }
@@ -1216,7 +1220,7 @@ td small {
   border-radius: 8px;
   outline: none;
   font: inherit;
-  color: #25324a;
+  color: #e0e0e0;
   background: #ffffff;
   transition: border-color 0.2s;
   box-sizing: border-box;
@@ -1239,7 +1243,7 @@ td small {
 }
 .aiSuggestionBlock .issue { color: #c95f0a; font-weight: 700; }
 .aiSuggestionBlock .suggestion {
-  color: #25324a;
+  color: #e0e0e0;
   padding: 8px;
   background: #ffffff;
   border: 1px solid #d6e2f4;
@@ -1265,8 +1269,8 @@ td small {
   background: #ffffff;
   border-radius: 4px;
 }
-.editHistoryItem .meta { color: #607594; font-size: 12px; font-weight: 700; }
-.editHistoryItem .diff { color: #25324a; font-size: 13px; }
+.editHistoryItem .meta { color: #aaa; font-size: 12px; font-weight: 700; }
+.editHistoryItem .diff { color: #e0e0e0; font-size: 13px; }
 .editHistoryItem .diff del { color: #ef5b5b; text-decoration: line-through; }
 .editHistoryItem .diff ins { color: #38d85b; text-decoration: none; }
 .editHistoryItem .aiTag {
@@ -1274,7 +1278,7 @@ td small {
   padding: 2px 6px;
   border-radius: 4px;
   background: #e8f4fd;
-  color: #27679b;
+  color: #aaa;
   font-size: 10px;
   font-weight: 700;
   margin-left: 6px;
@@ -1295,6 +1299,48 @@ td small {
   overflow: auto;
 }
 
+.feedBadge {
+  background: #e53935;
+  color: #fff;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.6;
+}
+
+.feedList {
+  display: grid;
+  gap: 8px;
+}
+
+.feedItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid #d6e2f4;
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+.feedItemHigh {
+  background: #fff8f0;
+  border-color: #f5cba0;
+}
+
+.feedIcon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.feedLabel {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 700;
+  color: #e0e0e0;
+}
+
 .logItem {
   display: grid;
   gap: 4px;
@@ -1305,7 +1351,7 @@ td small {
 }
 
 .logItem span {
-  color: #5d6f8b;
+  color: #aaa;
   font-size: 13px;
 }
 
@@ -1329,7 +1375,7 @@ td small {
 }
 
 .tableHeader span {
-  color: #607594;
+  color: #aaa;
   font-size: 13px;
   font-weight: 700;
 }
@@ -1360,7 +1406,7 @@ th {
 }
 
 td {
-  color: #2a3b55;
+  color: #aaa;
 }
 
 .pill {
@@ -1379,7 +1425,7 @@ td {
 .pill.good {
   border-color: #63ba86;
   background: #e8f8ee;
-  color: #0f6a36;
+  color: #81c784;
 }
 
 .pill.danger {
@@ -1499,7 +1545,7 @@ td {
 
 .details dt {
   margin-bottom: 4px;
-  color: #607594;
+  color: #aaa;
   font-size: 12px;
   font-weight: 700;
 }
@@ -1507,7 +1553,7 @@ td {
 .details dd {
   margin: 0;
   overflow-wrap: anywhere;
-  color: #25324a;
+  color: #e0e0e0;
 }
 
 .healthText {
@@ -1515,7 +1561,7 @@ td {
 }
 
 .healthText.ok {
-  color: #0f6a36;
+  color: #81c784;
   text-shadow: 0 0 0 transparent;
 }
 
@@ -1539,20 +1585,20 @@ td {
 
 .releaseDiagnosticsSwitch h3 {
   margin: 0;
-  color: #25324a;
+  color: #e0e0e0;
 }
 
 .releaseDiagnosticsSwitch p {
   max-width: 780px;
   margin: 6px 0 0;
-  color: #607594;
+  color: #aaa;
   line-height: 1.45;
 }
 
 .releaseDiagnosticsSwitch small {
   display: block;
   margin-top: 8px;
-  color: #2f4e72;
+  color: #aaa;
   font-weight: 800;
 }
 
@@ -1571,7 +1617,7 @@ td {
   border: 1px solid #d7dfeb;
   border-radius: 999px;
   background: #ffffff;
-  color: #607594;
+  color: #aaa;
   font-size: 12px;
   font-weight: 900;
 }
@@ -1583,7 +1629,7 @@ td {
 
 .releaseDiagnosticsState.disabled {
   border-color: #9cdab4;
-  color: #0f6a36;
+  color: #81c784;
 }
 
 .releaseDiagnosticsButton {
@@ -1622,12 +1668,12 @@ td {
 
 .liveDiagnosticsSub {
   margin: 6px 0 0;
-  color: #607594;
+  color: #aaa;
 }
 
 .liveDiagnosticsLastEvent {
   margin: 8px 0 0;
-  color: #2f4e72;
+  color: #aaa;
   font-size: 12px;
   font-weight: 800;
   word-break: break-word;
@@ -1643,7 +1689,7 @@ td {
   border-radius: 999px;
   border: 1px solid #d7dfeb;
   background: #ffffff;
-  color: #607594;
+  color: #aaa;
   font-weight: 900;
 }
 
@@ -1655,13 +1701,13 @@ td {
 }
 
 .deviceStatus small {
-  color: #607594;
+  color: #aaa;
   font-weight: 700;
 }
 
 .deviceStatus.online {
   border-color: #67c488;
-  color: #0f6a36;
+  color: #81c784;
 }
 
 .deviceStatus.online span {
@@ -1740,7 +1786,7 @@ td {
 .diagnosticFilters label {
   display: grid;
   gap: 6px;
-  color: #607594;
+  color: #aaa;
   font-size: 12px;
   font-weight: 900;
 }
@@ -1752,7 +1798,7 @@ td {
   border: 1px solid #c9d9ef;
   border-radius: 10px;
   background: #ffffff;
-  color: #25324a;
+  color: #e0e0e0;
 }
 
 .diagnosticSearch {
@@ -1778,7 +1824,7 @@ td {
   border-left-width: 5px;
   border-radius: 12px;
   background: #ffffff;
-  color: #25324a;
+  color: #e0e0e0;
   text-align: left;
   cursor: pointer;
 }
@@ -1810,7 +1856,7 @@ td {
 .diagnosticTime,
 .diagnosticLevel,
 .diagnosticDevice {
-  color: #607594;
+  color: #aaa;
   font-size: 12px;
   font-weight: 900;
 }
@@ -1826,7 +1872,7 @@ td {
 }
 
 .diagnosticMain small {
-  color: #607594;
+  color: #aaa;
 }
 
 .diagnosticMain span,
@@ -1842,7 +1888,7 @@ td {
 
 .archivePreview summary {
   cursor: pointer;
-  color: #27679b;
+  color: #aaa;
   font-weight: 900;
 }
 
@@ -1962,7 +2008,7 @@ td {
 .appRulesLead {
   max-width: 980px;
   margin: 8px 0 0;
-  color: #607594;
+  color: #aaa;
   line-height: 1.5;
 }
 
@@ -2013,7 +2059,7 @@ td {
 }
 
 .appRulesRiskBoardHeader strong {
-  color: #25324a;
+  color: #e0e0e0;
   font-size: 18px;
 }
 
@@ -2058,13 +2104,13 @@ td {
 }
 
 .appRulesRiskCard strong {
-  color: #25324a;
+  color: #e0e0e0;
   line-height: 1.25;
 }
 
 .appRulesRiskCard small {
   overflow-wrap: anywhere;
-  color: #607594;
+  color: #aaa;
   font-size: 12px;
   line-height: 1.35;
 }
@@ -2096,7 +2142,7 @@ td {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  color: #607594;
+  color: #aaa;
   font-size: 12px;
   font-weight: 800;
 }
@@ -2112,6 +2158,221 @@ td {
 .appRulesSections {
   display: grid;
   gap: 14px;
+}
+
+/* ── Zone panels (3-zone redesign) ── */
+
+.appRulesZones {
+  display: grid;
+  gap: 16px;
+}
+
+.appRulesZonePanel {
+  overflow: hidden;
+  border: 1px solid #d4e0ef;
+  border-left-width: 6px;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(40, 74, 130, 0.08);
+}
+
+/* Zone: action — red */
+.appRulesZonePanel.zone-action {
+  border-color: #f87171;
+  border-left-color: #dc2626;
+  box-shadow: 0 8px 32px rgba(220, 38, 38, 0.14);
+}
+
+.appRulesZonePanel.zone-action > summary {
+  background: linear-gradient(90deg, #fff1f2 0%, #fef2f2 60%, #ffffff 100%);
+}
+
+/* Zone: monitor — amber */
+.appRulesZonePanel.zone-monitor {
+  border-color: #fcd34d;
+  border-left-color: #d97706;
+  box-shadow: 0 8px 32px rgba(217, 119, 6, 0.10);
+}
+
+.appRulesZonePanel.zone-monitor > summary {
+  background: linear-gradient(90deg, #fffbeb 0%, #fefce8 60%, #ffffff 100%);
+}
+
+/* Zone: reference — neutral grey */
+.appRulesZonePanel.zone-reference {
+  border-color: #d1d5db;
+  border-left-color: #6b7280;
+  opacity: 0.9;
+}
+
+.appRulesZonePanel.zone-reference > summary {
+  background: linear-gradient(90deg, #f3f4f6 0%, #f9fafb 60%, #ffffff 100%);
+}
+
+/* Summary layout */
+.appRulesZonePanel > summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 72px;
+  padding: 14px 18px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.appRulesZonePanel > summary::-webkit-details-marker {
+  display: none;
+}
+
+.appRulesZoneSummaryLeft {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+}
+
+.appRulesZoneIcon {
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.appRulesZoneSummaryLeft > div {
+  display: grid;
+  gap: 4px;
+}
+
+.appRulesZoneLabel {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.zone-action-label {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.zone-monitor-label {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.zone-reference-label {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.appRulesZoneDescription {
+  display: block;
+  max-width: 640px;
+  color: #aaa;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.appRulesZoneSummaryRight {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.appRulesZoneActionBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.zone-action-badge {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.zone-monitor-badge {
+  background: #d97706;
+  color: #ffffff;
+}
+
+.appRulesZoneCleanBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #166534;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.appRulesZoneCount {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid #cbd8ea;
+  border-radius: 999px;
+  color: #aaa;
+  font-size: 12px;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Empty zone message */
+.appRulesZoneEmpty {
+  padding: 24px 18px;
+  color: #6b7280;
+  font-size: 14px;
+  font-style: italic;
+}
+
+/* Zone footer */
+.appRulesZoneFooter {
+  padding: 8px 18px 10px;
+  border-top: 1px solid #e9f0fa;
+  color: #aaa;
+  font-size: 11px;
+}
+
+/* BY DESIGN chip on table rows */
+.appRulesDesignLabel {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 4px;
+  background: #dbeafe;
+  color: #1e40af;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+/* Subdued rows for BY DESIGN reference items */
+.appRuleRow.design-by-design td {
+  background: #f8faff;
+  color: #7a8aaa;
+  border-color: #dde8f5;
+}
+
+.appRuleRow.design-by-design td:first-child {
+  border-left-color: #93c5fd;
+}
+
+.appRuleRow.design-by-design td strong {
+  color: #8899bb;
 }
 
 .appRulesSection {
@@ -2158,7 +2419,7 @@ td {
   border-left-width: 6px;
   border-radius: 12px;
   background: #f0fdf4;
-  color: #14532d;
+  color: #81c784;
 }
 
 .appRulesSectionHealth.health-watch {
@@ -2200,7 +2461,7 @@ td {
 .appRulesSection > summary strong {
   display: block;
   margin-bottom: 3px;
-  color: #25324a;
+  color: #e0e0e0;
   font-size: 18px;
 }
 
@@ -2209,7 +2470,7 @@ td {
   display: block;
   margin-top: 4px;
   overflow-wrap: anywhere;
-  color: #607594;
+  color: #aaa;
   font-size: 12px;
   line-height: 1.35;
 }
@@ -2219,7 +2480,7 @@ td {
   padding: 6px 10px;
   border: 1px solid #cbd8ea;
   border-radius: 999px;
-  color: #2f4e72;
+  color: #aaa;
   font-size: 12px;
   font-weight: 900;
 }
@@ -2263,12 +2524,12 @@ td {
 }
 
 .appRulesPipelineStep strong {
-  color: #25324a;
+  color: #e0e0e0;
 }
 
 .appRulesPipelineStep small {
   overflow-wrap: anywhere;
-  color: #607594;
+  color: #aaa;
   font-size: 11px;
 }
 
@@ -2317,7 +2578,7 @@ td {
 .appRulesTable th {
   padding: 13px 12px;
   background: #dbeafe;
-  color: #10233f;
+  color: #fff;
   font-size: 13px;
   font-weight: 900;
   text-transform: uppercase;
@@ -2328,7 +2589,7 @@ td {
   border-top: 1px solid #cbd8ea;
   border-bottom: 1px solid #cbd8ea;
   background: #ffffff;
-  color: #16233a;
+  color: #fff;
   font-weight: 700;
   vertical-align: top;
 }
@@ -2345,7 +2606,7 @@ td {
 }
 
 .appRulesTable td strong {
-  color: #0f172a;
+  color: #fff;
   font-size: 16px;
   font-weight: 900;
 }
@@ -2517,7 +2778,7 @@ td {
   padding: 8px 12px;
   border-bottom: 2px solid #d6e2f4;
   background: #f4f8ff;
-  color: #607594;
+  color: #aaa;
   font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
@@ -2530,7 +2791,7 @@ td {
   padding: 9px 12px;
   border-bottom: 1px solid #eef3fb;
   vertical-align: middle;
-  color: #25324a;
+  color: #e0e0e0;
 }
 
 .dataTable tr:last-child td {
@@ -2544,7 +2805,7 @@ td {
 .dataTable code {
   font-family: "Fira Mono", "Menlo", monospace;
   font-size: 11px;
-  color: #2a5a8c;
+  color: #aaa;
 }
 
 /* -- Guarantor Tree -------------------------------------------------------- */
@@ -2562,7 +2823,7 @@ td {
   margin-bottom: 10px;
   border: 0;
   background: transparent;
-  color: #27679b;
+  color: #aaa;
   cursor: pointer;
   font-weight: 900;
   padding: 0;
@@ -2594,7 +2855,7 @@ td {
   border: 1px solid #c9d9ef;
   border-radius: 12px;
   background: #ffffff;
-  color: #25324a;
+  color: #e0e0e0;
   font: inherit;
 }
 
@@ -2615,7 +2876,7 @@ td {
 .manual-root-result.granted {
   border-color: #9cdab4;
   background: #e8f8ee;
-  color: #0f6a36;
+  color: #81c784;
 }
 
 .manual-root-result.not_found,
@@ -2659,14 +2920,14 @@ td {
   min-height: 44px;
   border: 0;
   outline: none;
-  color: #25324a;
+  color: #e0e0e0;
 }
 
 .search-spinner {
   width: 16px;
   height: 16px;
   border: 2px solid #c9d9ef;
-  border-top-color: #27679b;
+  border-top-color: #aaa;
   border-radius: 999px;
   animation: spin 0.8s linear infinite;
 }
@@ -2694,7 +2955,7 @@ td {
   border: 0;
   border-bottom: 1px solid #eef3fb;
   background: #ffffff;
-  color: #25324a;
+  color: #e0e0e0;
   text-align: left;
   cursor: pointer;
 }
@@ -2712,14 +2973,14 @@ td {
 
 .search-item-phone,
 .search-item-uid {
-  color: #607594;
+  color: #aaa;
   font-size: 12px;
   font-weight: 800;
 }
 
 .search-dropdown-empty {
   padding: 12px;
-  color: #607594;
+  color: #aaa;
 }
 
 .chain-visualization {
@@ -2743,7 +3004,7 @@ td {
   min-width: 116px;
   border: 0;
   background: transparent;
-  color: #25324a;
+  color: #e0e0e0;
   cursor: pointer;
 }
 
@@ -2788,7 +3049,7 @@ td {
 
 .chain-label small,
 .chain-more {
-  color: #607594;
+  color: #aaa;
   font-size: 12px;
   font-weight: 800;
 }
@@ -2832,7 +3093,7 @@ td {
   border: 1px solid rgba(148, 163, 184, 0.34);
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.78);
-  color: #1f2a44;
+  color: #e0e0e0;
   font-weight: 800;
   box-shadow: 0 10px 26px rgba(38, 73, 121, 0.06);
 }
@@ -2881,7 +3142,7 @@ td {
   justify-content: space-between;
   gap: 14px;
   align-items: center;
-  color: #20304d;
+  color: #aaa;
 }
 
 .trust-stage-header div:first-child {
@@ -2908,7 +3169,7 @@ td {
   padding: 9px 12px;
   border-radius: 999px;
   background: rgba(236, 253, 245, 0.86);
-  color: #047857;
+  color: #81c784;
   font-size: 12px;
   font-weight: 900;
 }
@@ -2997,7 +3258,7 @@ td {
 .trust-person,
 .trust-root-node {
   border: 0;
-  color: #1f2a44;
+  color: #e0e0e0;
   cursor: pointer;
   font: inherit;
 }
@@ -3138,7 +3399,7 @@ td {
 }
 
 .root-copy small {
-  color: #047857;
+  color: #81c784;
   font-weight: 1000;
 }
 
@@ -3162,7 +3423,7 @@ td {
   border: 1px solid rgba(148, 163, 184, 0.34);
   border-radius: 12px;
   background: #ffffff;
-  color: #20304d;
+  color: #aaa;
   cursor: pointer;
   font-weight: 1000;
   box-shadow: 0 10px 24px rgba(38, 73, 121, 0.08);
@@ -3254,7 +3515,7 @@ td {
 
 .inspector-card dd {
   margin: 0;
-  color: #20304d;
+  color: #aaa;
   font-weight: 1000;
 }
 
@@ -3295,7 +3556,7 @@ td {
 .status-card.active {
   border: 1px solid #9cdab4;
   background: #e8f8ee;
-  color: #0f6a36;
+  color: #81c784;
 }
 
 .status-card.warning {
@@ -3346,7 +3607,7 @@ td {
   padding: 12px 16px;
   border: 0;
   background: #ffffff;
-  color: #25324a;
+  color: #e0e0e0;
   text-align: left;
   cursor: pointer;
 }
@@ -3358,7 +3619,7 @@ td {
   height: 34px;
   border-radius: 999px;
   background: #eef3fb;
-  color: #27679b;
+  color: #aaa;
   font-weight: 900;
 }
 
@@ -3377,12 +3638,12 @@ td {
 
 .accordion-header-info small,
 .accordion-child-info small {
-  color: #607594;
+  color: #aaa;
   font-size: 12px;
 }
 
 .accordion-level {
-  color: #2f4e72;
+  color: #aaa;
   font-size: 12px;
   font-weight: 900;
 }
@@ -3415,13 +3676,13 @@ td {
 
 .accordion-children-title {
   margin-bottom: 8px;
-  color: #25324a;
+  color: #e0e0e0;
   font-weight: 900;
 }
 
 .accordion-no-children {
   margin: 0;
-  color: #607594;
+  color: #aaa;
 }
 
 .accordion-children-list {
@@ -3440,7 +3701,7 @@ td {
   border: 1px solid #d6e2f4;
   border-radius: 12px;
   background: #f8fbff;
-  color: #25324a;
+  color: #e0e0e0;
   text-align: left;
   cursor: pointer;
 }
@@ -3469,7 +3730,7 @@ td {
   border: 1px solid #c9d9ef;
   border-radius: 14px;
   background: #ffffff;
-  color: #27679b;
+  color: #aaa;
   cursor: pointer;
   font-weight: 900;
 }
@@ -3599,7 +3860,7 @@ td {
 .daemonDot.offline { background: #9e9e9e; }
 
 .daemonLabel { font-size: 13px; font-weight: 700; }
-.daemonLabel.online  { color: #0f6a36; }
+.daemonLabel.online  { color: #81c784; }
 .daemonLabel.offline { color: #8a9ab0; }
 
 .daemonCmd { font-size: 12px; color: #8a9ab0; }
@@ -3610,7 +3871,7 @@ td {
   background: #eef3fb;
   font-family: "Fira Mono", "Consolas", monospace;
   font-size: 12px;
-  color: #25324a;
+  color: #e0e0e0;
 }
 
 /* ── Controls ── */
@@ -3688,8 +3949,8 @@ td {
   margin-bottom: 10px;
 }
 
-.diagProgressLabel { font-weight: 700; font-size: 14px; color: #25324a; }
-.diagProgressMeta  { font-size: 13px; color: #607594; }
+.diagProgressLabel { font-weight: 700; font-size: 14px; color: #e0e0e0; }
+.diagProgressMeta  { font-size: 13px; color: #aaa; }
 
 .diagProgressTrack {
   height: 8px;
@@ -3705,7 +3966,7 @@ td {
   transition: width 0.5s ease;
 }
 
-.diagProgressMsg { margin: 6px 0 0; font-size: 12px; color: #607594; }
+.diagProgressMsg { margin: 6px 0 0; font-size: 12px; color: #aaa; }
 
 /* ── Score / severity cards ── */
 .diagScoreGrid {
@@ -3757,7 +4018,7 @@ td {
   border-bottom: 2px solid transparent;
   border-radius: 8px 8px 0 0;
   background: transparent;
-  color: #607594;
+  color: #aaa;
   cursor: pointer;
   font-weight: 700;
   font-size: 13px;
@@ -3765,11 +4026,11 @@ td {
   margin-bottom: -2px;
 }
 
-.diagTab:hover:not(.active) { background: #f0f5fb; color: #25324a; }
+.diagTab:hover:not(.active) { background: #f0f5fb; color: #e0e0e0; }
 
 .diagTab.active {
   background: #ffffff;
-  color: #24618e;
+  color: #90caf9;
   border-color: #d6e2f4;
   border-bottom-color: #ffffff;
 }
@@ -3893,14 +4154,14 @@ td {
   border-radius: 8px;
   border: 1px solid #c9d9ef;
   background: #ffffff;
-  color: #24618e;
+  color: #90caf9;
   font-size: 12px;
   font-weight: 700;
   text-decoration: none;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
-.diagReportLink:hover { background: #24618e; color: #fff; border-color: #24618e; }
+.diagReportLink:hover { background: #24618e; color: #fff; border-color: #90caf9; }
 
 .diagReportLink.danger {
   color: #c62828;
@@ -3920,7 +4181,7 @@ td {
   cursor: pointer;
   font-size: 14px;
   font-weight: 700;
-  color: #24618e;
+  color: #90caf9;
   padding: 0 0 8px;
 }
 
@@ -3939,7 +4200,7 @@ td {
 }
 
 .diagHistoryLeft  { display: flex; align-items: center; gap: 10px; }
-.diagHistoryTime  { font-weight: 700; color: #25324a; }
+.diagHistoryTime  { font-weight: 700; color: #e0e0e0; }
 .diagHistoryDur   { color: #8a9ab0; font-size: 12px; }
 .diagHistoryRight { display: flex; gap: 10px; align-items: center; }
 
@@ -3973,7 +4234,7 @@ td {
   border: none;
   border-left: 1px solid #d6e2f4;
   background: #ffffff;
-  color: #607594;
+  color: #aaa;
   cursor: pointer;
   font-weight: 700;
   font-size: 13px;
@@ -4005,7 +4266,7 @@ td {
   border: 1px solid #c9d9ef;
   border-radius: 8px;
   background: #ffffff;
-  color: #25324a;
+  color: #e0e0e0;
   font-size: 12px;
   outline: none;
   transition: border-color 0.15s;
@@ -4022,15 +4283,15 @@ td {
   border: 1px solid #c9d9ef;
   border-radius: 8px;
   background: #fff;
-  color: #607594;
+  color: #aaa;
   cursor: pointer;
   font-size: 12px;
   font-weight: 700;
   transition: background 0.12s, color 0.12s;
 }
 
-.diagGroupByBtn.active { background: #24618e; color: #fff; border-color: #24618e; }
-.diagGroupByBtn.active.bugs { background: #0f6a36; border-color: #0f6a36; }
+.diagGroupByBtn.active { background: #24618e; color: #fff; border-color: #90caf9; }
+.diagGroupByBtn.active.bugs { background: #0f6a36; border-color: #81c784; }
 
 .diagFindingsCount { font-size: 12px; color: #8a9ab0; margin-bottom: 10px; }
 
@@ -4087,12 +4348,12 @@ td {
 .diagFindingFile {
   font-family: "Fira Mono", "Consolas", monospace;
   font-size: 12px;
-  color: #24618e;
+  color: #90caf9;
   margin-bottom: 3px;
 }
 
 .diagFindingWhy  { font-size: 12px; color: #455060; line-height: 1.45; }
-.diagFindingHint { font-size: 11px; color: #0f6a36; font-style: italic; margin-top: 3px; }
+.diagFindingHint { font-size: 11px; color: #81c784; font-style: italic; margin-top: 3px; }
 .diagFindingScanner { font-size: 11px; color: #9e9e9e; margin-left: auto; }
 
 /* Severity / class badges */
@@ -4110,7 +4371,7 @@ td {
 .sevBadge.HIGH     { background: #fff3e0; color: #e65100; }
 .sevBadge.MEDIUM   { background: #fff8e1; color: #f57f17; }
 .sevBadge.LOW      { background: #e3f2fd; color: #1565c0; }
-.sevBadge.INFO     { background: #f0f4fa; color: #607594; }
+.sevBadge.INFO     { background: #f0f4fa; color: #aaa; }
 
 .classTag {
   display: inline-flex;
@@ -4125,7 +4386,7 @@ td {
 .classTag.verified  { background: #e8f5e9; color: #2e7d32; }
 .classTag.heuristic { background: #fff8e1; color: #e65100; }
 
-.diagFindingRule { font-size: 12px; font-weight: 700; color: #25324a; }
+.diagFindingRule { font-size: 12px; font-weight: 700; color: #e0e0e0; }
 
 /* ── Shadow Deny ── */
 .diagShadowInfo {
@@ -4196,7 +4457,7 @@ td {
   border-radius: 8px;
   background: #f0f4fa;
   font-size: 12px;
-  color: #607594;
+  color: #aaa;
 }
 
 .diagDurationNote {
@@ -4339,6 +4600,82 @@ td {
   50% { opacity: 0.6; }
 }
 
+/* ── Уровень 1: жёлтый флаг (2 нарушения) ── */
+
+.ylYellowCell {
+  background: #2a1e00 !important;
+  border-left: 4px solid #e8a800 !important;
+}
+
+.ylYellowIcon {
+  font-size: 18px;
+  color: #e8a800;
+  text-shadow: 0 0 6px #cc880066;
+  line-height: 1;
+}
+
+.ylYellowName {
+  color: #e8a800 !important;
+  font-weight: 700 !important;
+  font-size: 14px !important;
+}
+
+.ylYellowBadge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #5a3d00;
+  border: 1px solid #e8a800;
+  color: #e8a800;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+/* Счётчик нарушений рядом с бейджем ПОДОЗРЕНИЕ */
+.ylViolationCount {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #330000;
+  color: #ff8888;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* Кнопка "Снять грехи" — зелёная */
+.ylPardonBtn {
+  border-color: #22aa44 !important;
+  background: #0a2a12 !important;
+  color: #44dd66 !important;
+  font-weight: 700 !important;
+}
+.ylPardonBtn:hover {
+  background: #0d3a18 !important;
+}
+.ylPardonBtn:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+/* ── Таблица нарушителей ── */
+
+.vlSection {
+  border-color: #e8a800 !important;
+  background: #1a1400 !important;
+}
+
+.vlSectionTitle {
+  font-size: 18px;
+  font-weight: 900;
+  color: #e8a800;
+}
+
+.vlYellowRow {
+  background: #1a1400 !important;
+}
+
 /* ===== Full Tree View ===== */
 .full-tree-container {
   display: grid;
@@ -4438,7 +4775,7 @@ td {
 .graph-card-name {
   font-size: 14px;
   font-weight: 900;
-  color: #1f2a44;
+  color: #e0e0e0;
   line-height: 1.2;
   word-break: break-word;
 }
@@ -4533,7 +4870,7 @@ td {
   padding: 10px 14px;
   border: none;
   background: transparent;
-  color: #1f2a44;
+  color: #e0e0e0;
   font-size: 13px;
   font-weight: 800;
   text-align: left;
@@ -4565,7 +4902,7 @@ td {
   border: 1px solid rgba(148, 163, 184, 0.4);
   border-radius: 10px;
   background: white;
-  color: #1f2a44;
+  color: #e0e0e0;
   font-weight: 900;
   cursor: pointer;
 }
@@ -4649,7 +4986,7 @@ td {
 .unlinked-card-info strong {
   font-size: 14px;
   font-weight: 900;
-  color: #1f2a44;
+  color: #e0e0e0;
 }
 
 .unlinked-card-info span {
@@ -4725,7 +5062,7 @@ td {
 
 .tree-stat-item strong {
   font-size: 24px;
-  color: #1f2a44;
+  color: #e0e0e0;
 }
 
 .tree-stat-item span {
@@ -4801,7 +5138,7 @@ td {
   border: 1px solid rgba(148, 163, 184, 0.4);
   border-radius: 10px;
   background: white;
-  color: #1f2a44;
+  color: #e0e0e0;
   font-weight: 800;
 }
 
@@ -4810,7 +5147,7 @@ td {
   border: 1px solid rgba(34, 197, 94, 0.4);
   border-radius: 10px;
   background: rgba(240, 253, 244, 0.8);
-  color: #047857;
+  color: #81c784;
   font-weight: 900;
   cursor: pointer;
 }

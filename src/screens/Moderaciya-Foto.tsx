@@ -11,7 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { get, ref } from 'firebase/database';
+import { get, onValue, ref } from 'firebase/database';
 import { useSelector } from 'react-redux';
 import MiniTabBar from '../components/MiniTabBar';
 import AppPhotoImage from '../components/AppPhotoImage';
@@ -26,6 +26,7 @@ import { lostFoundService, LostFoundItem } from '../services/lostFoundService';
 import { moderateOsbbNews, OsbbNewsItem } from '../services/osbbNews';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { logClientError } from '../utils/errorLogger';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 type Tab = 'requests' | 'photos' | 'buysell' | 'contacts' | 'jobs' | 'lostfound' | 'osbbnews';
 type Lang = 'ua' | 'ru' | 'en';
@@ -137,6 +138,7 @@ const isPublicGalleryPhoto = (photo: CommunityPhoto): boolean => {
 };
 
 const PhotoModerationScreen: React.FC = () => {
+  const { colors } = useAppTheme();
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ru') as Lang);
   const text = T[language];
 
@@ -154,6 +156,50 @@ const PhotoModerationScreen: React.FC = () => {
   const [lostfound, setLostfound] = useState<LostFoundItem[]>([]);
   const [osbbNews, setOsbbNews] = useState<ModerationOsbbNews[]>([]);
   const [previewPhoto, setPreviewPhoto] = useState<PreviewPhoto | null>(null);
+
+  // Real-time listener for community_photos — updates automatically when web admin panel approves/rejects
+  useEffect(() => {
+    const photosRef = ref(database, 'community_photos');
+    const unsubscribe = onValue(
+      photosRef,
+      (snapshot) => {
+        const value = snapshot.val() as Record<string, Record<string, unknown>> | null;
+        if (!value) {
+          setPhotos([]);
+          return;
+        }
+        const items: CommunityPhoto[] = Object.entries(value)
+          .map(([id, raw]) => {
+            if (!raw || typeof raw !== 'object') return null;
+            // Skip deferred photos (status='saved') — they haven't been submitted yet
+            if (raw.status === 'saved') return null;
+            return {
+              id,
+              title: String(raw.title ?? ''),
+              description: String(raw.description ?? ''),
+              imageUri: String(raw.thumbnailUrl ?? raw.imageUri ?? raw.downloadUrl ?? ''),
+              storagePath: raw.storagePath ? String(raw.storagePath) : undefined,
+              uploadedBy: String(raw.uploadedBy ?? raw.userName ?? ''),
+              userId: raw.userId ? String(raw.userId) : undefined,
+              createdAt: typeof raw.createdAt === 'number' ? raw.createdAt : typeof raw.uploadedAt === 'number' ? raw.uploadedAt : 0,
+              status: (raw.status === 'approved' || raw.status === 'rejected') ? raw.status : 'pending',
+              target: raw.target === 'my_photos' ? 'my_photos' : 'gallery_public',
+              sourceScreen: raw.sourceScreen ? String(raw.sourceScreen) : undefined,
+              sourceScreenLabel: raw.sourceScreenLabel ? String(raw.sourceScreenLabel) : undefined,
+              sourceFeature: raw.sourceFeature ? String(raw.sourceFeature) : undefined,
+              likes: typeof raw.likes === 'number' ? raw.likes : 0,
+              locationLabel: raw.locationLabel ? String(raw.locationLabel) : undefined,
+            } as CommunityPhoto;
+          })
+          .filter((p): p is CommunityPhoto => p !== null && isPublicGalleryPhoto(p));
+        setPhotos(items);
+      },
+      (error) => {
+        void logClientError('ModeraciyaFoto.photosRealtime', error, { firebasePath: 'community_photos', stage: 'realtime_listener' });
+      },
+    );
+    return unsubscribe;
+  }, []);
 
   const loadAll = useCallback(async () => {
     setRefreshing(true);
@@ -175,15 +221,6 @@ const PhotoModerationScreen: React.FC = () => {
           })));
         }
       })());
-
-      if (tab === 'photos' || tab === 'requests') {
-        loaders.push((async () => {
-          const photoRes = await photoAPI.getPhotosOnce();
-          if (photoRes.success && photoRes.data) {
-            setPhotos(photoRes.data.filter(isPublicGalleryPhoto));
-          }
-        })());
-      }
 
       if (tab === 'buysell') {
         loaders.push((async () => {
@@ -303,14 +340,17 @@ const PhotoModerationScreen: React.FC = () => {
     if (busyId) return;
     setBusyId(id);
     try {
-      await action();
+      const result = await action();
+      if (result && typeof result === 'object' && 'success' in result && !result.success) {
+        throw new Error((result as { error?: string }).error || text.actionFailed);
+      }
       await loadAll();
     } catch (e: unknown) {
       Alert.alert(text.errorTitle, e instanceof Error ? e.message : text.actionFailed);
     } finally {
       setBusyId(null);
     }
-  }, [busyId, loadAll]);
+  }, [busyId, loadAll, text.actionFailed]);
 
   const moderatePhoto = useCallback((id: string, status: 'approved' | 'rejected') =>
     modAction(id, () => photoAPI.moderatePhoto(id, status)),
@@ -356,17 +396,13 @@ const PhotoModerationScreen: React.FC = () => {
     modAction(id, () => contactsService.remove(id)),
   [modAction]);
 
-  const deleteJob = useCallback(async (id: string) => {
-    if (busyId) return;
-    setBusyId(id);
-    try { await jobService.remove(id); await loadAll(); } finally { setBusyId(null); }
-  }, [busyId, loadAll]);
+  const deleteJob = useCallback((id: string) =>
+    modAction(id, () => jobService.remove(id)),
+  [modAction]);
 
-  const deleteLostFound = useCallback(async (id: string) => {
-    if (busyId) return;
-    setBusyId(id);
-    try { await lostFoundService.remove(id); await loadAll(); } finally { setBusyId(null); }
-  }, [busyId, loadAll]);
+  const deleteLostFound = useCallback((id: string) =>
+    modAction(id, () => lostFoundService.remove(id)),
+  [modAction]);
 
   // Helpers
 
@@ -682,7 +718,7 @@ const PhotoModerationScreen: React.FC = () => {
     language === 'ua' ? tab.labelUa : language === 'en' ? tab.labelEn : tab.labelRu;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.appBg }]}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>{text.title}</Text>
@@ -751,7 +787,7 @@ const styles = StyleSheet.create({
   tabScroll: { flexGrow: 0, marginBottom: 8 },
   tabRow: { paddingHorizontal: 14, gap: 8 },
   tabBtn: { borderRadius: 14, paddingVertical: 9, paddingHorizontal: 14, backgroundColor: '#EFE6DC' },
-  tabBtnActive: { backgroundColor: '#7A1E5C' },
+  tabBtnActive: { backgroundColor: '#7d0e59' },
   tabBtnText: { color: '#5a2c2c', fontWeight: '800', fontSize: 13 },
   tabBtnTextActive: { color: '#fff' },
   content: { flex: 1 },

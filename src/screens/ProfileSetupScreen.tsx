@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -27,8 +27,10 @@ import {
   START_AVATARS,
   saveSelectedStartAvatar,
   saveTempProfileData,
+  getDefaultAvatarKey,
 } from '../utils/startAvatars';
 import { updateProfileRecord, uploadProfilePhoto } from '../services/authProfileService';
+import { useAppTheme } from '../hooks/useAppTheme';
 import { pickPhotoFromLibrary } from '../utils/photoPicker';
 
 const TEXT = {
@@ -57,6 +59,8 @@ const TEXT = {
     avatarError: 'Не вдалося обрати або зберегти фото. Спробуйте ще раз.',
     loginRequiredForPhoto: 'Щоб зберегти власне фото, спочатку потрібно увійти в акаунт.',
     saveError: 'Не вдалося зберегти дані. Спробуйте ще раз.',
+    quickSavedTitle: 'Дані збережено',
+    quickSavedMessage: 'Профіль буде завершено після реєстрації.',
   },
   ru: {
     title: 'Расскажите о себе',
@@ -83,6 +87,8 @@ const TEXT = {
     avatarError: 'Не удалось выбрать или сохранить фото. Попробуйте еще раз.',
     loginRequiredForPhoto: 'Чтобы сохранить свое фото, сначала нужно войти в аккаунт.',
     saveError: 'Не удалось сохранить данные. Попробуйте еще раз.',
+    quickSavedTitle: 'Данные сохранены',
+    quickSavedMessage: 'Профиль будет завершён после регистрации.',
   },
   en: {
     title: 'Tell us about yourself',
@@ -109,6 +115,8 @@ const TEXT = {
     avatarError: 'Could not choose or save the photo. Please try again.',
     loginRequiredForPhoto: 'To save your own photo, please sign in first.',
     saveError: 'Could not save data. Please try again.',
+    quickSavedTitle: 'Data saved',
+    quickSavedMessage: 'Your profile will be completed after registration.',
   },
 } as const;
 
@@ -118,6 +126,7 @@ export default function ProfileSetupScreen() {
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const user = useSelector(selectUser);
   const text = TEXT[language] ?? TEXT.ua;
+  const { colors, isDark } = useAppTheme();
 
   const [name, setName] = useState(user?.name || '');
   const [gender, setGender] = useState<'male' | 'female' | null>(user?.gender ?? null);
@@ -135,6 +144,15 @@ export default function ProfileSetupScreen() {
   const isAvatarDone = selectedKey !== '' || customAvatarUri !== '' || hasExistingAvatar;
   const isGenderDone = gender !== null;
   const isAgeDone = !isNaN(parsedAge) && parsedAge >= 14 && parsedAge <= 100;
+
+  // Auto-select avatar when gender + age are filled and user has no custom photo
+  useEffect(() => {
+    if (customAvatarUri) return;
+    const age = parseInt(ageText, 10);
+    if (gender && !isNaN(age) && age >= 14 && age <= 100) {
+      setSelectedKey(getDefaultAvatarKey(gender, age));
+    }
+  }, [gender, ageText, customAvatarUri]);
 
   const handleGenderSelect = (g: 'male' | 'female') => {
     setGender(g);
@@ -173,9 +191,9 @@ export default function ProfileSetupScreen() {
   const getMissingMessages = () => {
     const missing: string[] = [];
     if (!isNameDone) missing.push(`- ${text.missingName}`);
-    if (!isAvatarDone) missing.push(`- ${text.missingAvatar}`);
     if (!isGenderDone) missing.push(`- ${text.missingGender}`);
     if (!isAgeDone) missing.push(`- ${text.missingAge}`);
+    if (!isAvatarDone) missing.push(`- ${text.missingAvatar}`);
     return missing;
   };
 
@@ -187,33 +205,26 @@ export default function ProfileSetupScreen() {
       return;
     }
     void confirm().catch(() => {
-      Alert.alert(text.missingTitle, text.avatarError);
+      Alert.alert(text.missingTitle, text.saveError);
     });
   };
 
   const handleQuickRegistrationPress = async () => {
     if (saving) return;
-
-    // Only proceed if all fields are filled to preserve data
-    if (!isNameDone || !isGenderDone || !isAgeDone || !isAvatarDone) {
-      const missing = getMissingMessages();
-      Toast.show({
-        type: 'error',
-        text1: text.missingTitle,
-        text2: missing.join('\n'),
-      });
-      return;
-    }
-
     setSaving(true);
     try {
-      if (selectedKey) await saveSelectedStartAvatar(selectedKey);
-      await saveTempProfileData({
-        name: trimmedName,
-        gender: gender!,
-        age: parsedAge,
-        startAvatarKey: selectedKey,
-      });
+      // Save partial data only when enough fields are valid to avoid type errors
+      if (isNameDone && isGenderDone && isAgeDone) {
+        const avatarKey = selectedKey || getDefaultAvatarKey(gender!, parsedAge);
+        if (avatarKey) await saveSelectedStartAvatar(avatarKey);
+        await saveTempProfileData({
+          name: trimmedName,
+          gender: gender!,
+          age: parsedAge,
+          startAvatarKey: avatarKey,
+          ...(customAvatarUri ? { customAvatarUri } : {}),
+        });
+      }
       navigation.navigate('LoginScreen');
     } catch {
       Toast.show({ type: 'error', text1: text.missingTitle, text2: text.saveError });
@@ -230,7 +241,7 @@ export default function ProfileSetupScreen() {
 
     setSaving(true);
     try {
-      const uid = auth.currentUser?.uid || user?.id;
+      const uid = auth.currentUser?.uid;
       let nextPhotoURL = existingPhotoURL;
       let nextPhotoURLs = user?.photoURLs?.filter((url) => url.trim()) ?? (existingPhotoURL ? [existingPhotoURL] : []);
       let nextStartAvatarKey = user?.startAvatarKey ?? '';
@@ -290,7 +301,7 @@ export default function ProfileSetupScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           contentContainerStyle={styles.content}
@@ -298,7 +309,7 @@ export default function ProfileSetupScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.header}>
-            <Text style={styles.title}>{text.title}</Text>
+            <Text style={[styles.title, { color: isDark ? '#F5E8F0' : undefined }]}>{text.title}</Text>
             <Text style={styles.subtitle}>{text.subtitle}</Text>
           </View>
 
@@ -321,29 +332,6 @@ export default function ProfileSetupScreen() {
           {customAvatarUri ? (
             <Image source={{ uri: customAvatarUri }} style={styles.customAvatarPreview} resizeMode="cover" />
           ) : null}
-
-          {/* Avatar */}
-          {renderSectionLabel(text.temporaryAvatarSection, selectedKey !== '')}
-          <View style={styles.grid}>
-            {START_AVATARS.map((avatar) => {
-              const isSelected = avatar.key === selectedKey;
-              return (
-                <TouchableOpacity
-                  key={avatar.key}
-                  style={[styles.avatarCard, isSelected && styles.avatarCardSelected]}
-                  onPress={() => { setSelectedKey(avatar.key); setCustomAvatarUri(''); }}
-                  activeOpacity={0.86}
-                >
-                  <Image source={avatar.source} style={styles.avatarImage} resizeMode="cover" />
-                  {isSelected && (
-                    <View style={styles.selectedBadge}>
-                      <MaterialCommunityIcons name="check" size={15} color="#fff" />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
 
           {/* Gender */}
           {renderSectionLabel(text.genderSection, isGenderDone)}
@@ -472,7 +460,7 @@ const styles = StyleSheet.create({
   photoButton: {
     minHeight: 50,
     borderRadius: 14,
-    backgroundColor: SCREEN_THEME.woodGreenDark,
+    backgroundColor: '#7d0e59',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

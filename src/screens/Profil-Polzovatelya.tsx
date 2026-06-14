@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useAppTheme } from '../hooks/useAppTheme';
 import { Alert, Animated, Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
@@ -23,6 +24,15 @@ import { signOutPrimarySession } from '../services/authSessionService';
 import { subscribeCurrentUserSecurityRole, type SecurityRole } from '../services/securityRoles';
 import { pickUserAvatarUri } from '../utils/userAvatar';
 import { subscribeMyBonuses, BONUS_CAPS, type UserBonuses } from '../services/bonusService';
+import { subscribeToUserTicket, hasUnreadAdminReply } from '../services/supportService';
+import {
+  setHasContactRequest,
+  setHasSupportReply,
+  setHasSubscriptionChanged,
+  selectHasSupportReply,
+  selectHasSubscriptionChanged,
+} from '../redux/slices/notificationSlice';
+
 
 type AppNavigation = import('@react-navigation/native').NavigationProp<Record<string, object | undefined>>;
 
@@ -96,6 +106,8 @@ const UI_TEXT = {
     bonusBadgeAmbassador: 'Посол довіри',
     bonusNextBadge: (badge: string, points: number) => `До "${badge}" ще ${points} бонусів`,
     bonusMaxBadge: 'Максимальний статус',
+    seeMore: 'Більше',
+    seeLess: 'Згорнути',
   },
   ru: {
     guest: 'Гость',
@@ -166,6 +178,8 @@ const UI_TEXT = {
     bonusBadgeAmbassador: 'Посол доверия',
     bonusNextBadge: (badge: string, points: number) => `До "${badge}" ещё ${points} бонусов`,
     bonusMaxBadge: 'Максимальный статус',
+    seeMore: 'Больше',
+    seeLess: 'Свернуть',
   },
   en: {
     guest: 'Guest',
@@ -236,6 +250,8 @@ const UI_TEXT = {
     bonusBadgeAmbassador: 'Trust Ambassador',
     bonusNextBadge: (badge: string, points: number) => `${points} bonuses until "${badge}"`,
     bonusMaxBadge: 'Maximum status',
+    seeMore: 'More',
+    seeLess: 'Less',
   },
 } as const;
 
@@ -261,6 +277,7 @@ const ProfileScreen: React.FC = () => {
   const approvedRequests = useSelector((state: RootState) => state.requests?.approved ?? []);
   const helpRequests = useSelector((state: RootState) => state.helpRequests?.items ?? []);
   const [levelsOpen, setLevelsOpen] = useState(false);
+  const [settingsExpanded, setSettingsExpanded] = useState(false);
   const [moderationPinVisible, setModerationPinVisible] = useState(false);
   const [moderationPin, setModerationPin] = useState('');
   const [moderationPinError, setModerationPinError] = useState('');
@@ -270,6 +287,8 @@ const ProfileScreen: React.FC = () => {
   const [moderationUnlocked, setModerationUnlocked] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [bonuses, setBonuses] = useState<UserBonuses | null>(null);
+  const hasSupportReply = useSelector(selectHasSupportReply);
+  const hasSubscriptionChanged = useSelector(selectHasSubscriptionChanged);
   const isLoggedIn = Boolean(user?.id);
   const hasPrimaryModerationAccess = Boolean(
     user?.id &&
@@ -278,6 +297,7 @@ const ProfileScreen: React.FC = () => {
   );
   const uaTapCountRef = React.useRef(0);
   const pulseAnim = React.useRef(new Animated.Value(1)).current;
+  const subGlowAnim = React.useRef(new Animated.Value(0)).current;
 
   const handleLogout = useCallback(() => {
     Alert.alert(text.exitTitle, text.exitConfirm, [
@@ -324,9 +344,13 @@ const ProfileScreen: React.FC = () => {
   }, [user?.id]);
 
   useEffect(() => {
+    if (!user?.id) {
+      setBonuses(null);
+      return;
+    }
     const unsub = subscribeMyBonuses(setBonuses);
     return unsub;
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -348,6 +372,21 @@ const ProfileScreen: React.FC = () => {
 
   const hasUnreadPendingRequests = pendingRequestsCount > 0 && latestPendingRequestedAtMs > lastSeenPendingAtMs;
 
+  useEffect(() => {
+    dispatch(setHasContactRequest(hasUnreadPendingRequests));
+  }, [hasUnreadPendingRequests, dispatch]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      dispatch(setHasSupportReply(false));
+      return;
+    }
+    const unsub = subscribeToUserTicket(user.id, (ticket) => {
+      dispatch(setHasSupportReply(hasUnreadAdminReply(ticket)));
+    });
+    return unsub;
+  }, [user?.id, dispatch]);
+
   const markPendingRequestsSeen = useCallback(() => {
     if (!user?.id) return;
     const seenAt = Date.now();
@@ -356,15 +395,32 @@ const ProfileScreen: React.FC = () => {
   }, [user?.id]);
 
   useEffect(() => {
-    if (!hasUnreadPendingRequests) return;
+    const glow = Animated.loop(
+      Animated.sequence([
+        Animated.timing(subGlowAnim, { toValue: 1, duration: 1400, useNativeDriver: true }),
+        Animated.timing(subGlowAnim, { toValue: 0, duration: 1400, useNativeDriver: true }),
+      ])
+    );
+    glow.start();
+    return () => glow.stop();
+  }, [subGlowAnim]);
+
+  useEffect(() => {
+    if (!hasUnreadPendingRequests) {
+      pulseAnim.setValue(1);
+      return;
+    }
     const pulse = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 0.4, duration: 600, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1.04, duration: 600, useNativeDriver: true }),
         Animated.timing(pulseAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
       ])
     );
     pulse.start();
-    return () => pulse.stop();
+    return () => {
+      pulse.stop();
+      pulseAnim.setValue(1);
+    };
   }, [hasUnreadPendingRequests, pulseAnim]);
 
   useFocusEffect(
@@ -384,8 +440,9 @@ const ProfileScreen: React.FC = () => {
   }, [navigation]);
 
   const handleSupportPress = useCallback(() => {
+    dispatch(setHasSupportReply(false));
     navigation.navigate('SupportScreen');
-  }, [navigation]);
+  }, [navigation, dispatch]);
 
   const openServiceModerationPin = useCallback(() => {
     if (!hasPrimaryModerationAccess) {
@@ -451,8 +508,9 @@ const ProfileScreen: React.FC = () => {
     };
   }, [appRequests.length, approvedRequests.length, helpRequests.length, user?.daysUsed, user?.registeredAt]);
   const profileAvatarUri = useMemo(() => pickUserAvatarUri(user), [user]);
+  const { colors, isDark } = useAppTheme();
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View pointerEvents="none" style={styles.backgroundOrbs}>
         {LIGHT_ORBS.map((orb, index) => (
           <View
@@ -489,7 +547,7 @@ const ProfileScreen: React.FC = () => {
           </View>
         </TactileCard>
 
-        <Text style={styles.sectionLabel}>{text.sectionActivity}</Text>
+        <Text style={[styles.sectionLabel, { color: isDark ? '#F5E8F0' : undefined }]}>{text.sectionActivity}</Text>
         <View style={styles.statsRow}>
           {[
             { icon: 'clipboard-check-outline', value: String(activity.requestCount), label: text.requests, color: SCREEN_THEME.terracotta },
@@ -588,7 +646,7 @@ const ProfileScreen: React.FC = () => {
         </TactileCard>
 
         {/* Trust bonuses card */}
-        <TouchableOpacity
+        {isLoggedIn && (<TouchableOpacity
           activeOpacity={0.86}
           onPress={() => navigation.navigate('BonusWalletScreen')}
           style={styles.bonusCard}
@@ -640,9 +698,9 @@ const ProfileScreen: React.FC = () => {
               <MaterialCommunityIcons name="chevron-right" size={16} color={SCREEN_THEME.textSecondary} style={{ marginLeft: 'auto' }} />
             </View>
           ) : null}
-        </TouchableOpacity>
+        </TouchableOpacity>)}
 
-        <Text style={styles.sectionLabel}>{text.sectionSettings}</Text>
+        <Text style={[styles.sectionLabel, { color: isDark ? '#F5E8F0' : undefined }]}>{text.sectionSettings}</Text>
         <TactileCard elevated style={styles.card} pressable={false}>
           <View style={styles.cardHeader}>
             <TactileIcon icon="cog-outline" size={40} iconSize={18} backgroundColor="#403933" />
@@ -669,54 +727,84 @@ const ProfileScreen: React.FC = () => {
             <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('FavoritesScreen')} activeOpacity={0.84}>
-            <TactileIcon icon="bookmark-outline" size={40} iconSize={18} backgroundColor="#C77A5D" />
-            <Text style={styles.menuLabel}>{text.favorites}</Text>
-            <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
-          </TouchableOpacity>
+          {settingsExpanded && (
+            <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('FavoritesScreen')} activeOpacity={0.84}>
+              <TactileIcon icon="bookmark-outline" size={40} iconSize={18} backgroundColor="#C77A5D" />
+              <Text style={styles.menuLabel}>{text.favorites}</Text>
+              <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
+            </TouchableOpacity>
+          )}
 
+          <Animated.View style={hasUnreadPendingRequests ? { transform: [{ scale: pulseAnim }] } : undefined}>
           <TouchableOpacity
-            style={styles.menuItem}
+            style={[styles.menuItem, hasUnreadPendingRequests ? styles.contactRequestAlert : styles.contactRequestItem]}
             onPress={() => {
               markPendingRequestsSeen();
               navigation.navigate('ProfileRequestsScreen');
             }}
             activeOpacity={0.84}
           >
-            <TactileIcon icon="account-arrow-left-outline" size={40} iconSize={18} backgroundColor="#7A1E5C" />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.menuLabel}>{text.contactRequests}</Text>
-            </View>
             {hasUnreadPendingRequests ? (
-              <Animated.View style={[styles.requestsBadge, { opacity: pulseAnim }]}>
-                <Text style={styles.requestsBadgeText}>{pendingRequestsCount} {text.contactRequestsHint}</Text>
-              </Animated.View>
+              <>
+                <View style={styles.contactRequestGloss} />
+                <TactileIcon icon="account-arrow-left-outline" size={40} iconSize={18} backgroundColor="#420837" tint="#FFFFFF" />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.menuLabel, styles.contactRequestLabel]}>{text.contactRequests}</Text>
+                </View>
+                <View style={styles.requestsBadge}>
+                  <Text style={styles.requestsBadgeText}>{pendingRequestsCount} {text.contactRequestsHint}</Text>
+                </View>
+              </>
             ) : (
-              <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
+              <>
+                <TactileIcon icon="account-arrow-left-outline" size={40} iconSize={18} backgroundColor="#420837" tint="#FFFFFF" />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.menuLabel}>{text.contactRequests}</Text>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
+              </>
             )}
           </TouchableOpacity>
+          </Animated.View>
 
-          <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('MyRequestsScreen')} activeOpacity={0.84}>
-            <TactileIcon icon="clipboard-text-outline" size={40} iconSize={18} backgroundColor="#4B7F9E" />
-            <Text style={styles.menuLabel}>{text.myRequests}</Text>
-            <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
+          {settingsExpanded && (
+            <>
+              <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('MyRequestsScreen')} activeOpacity={0.84}>
+                <TactileIcon icon="clipboard-text-outline" size={40} iconSize={18} backgroundColor="#4B7F9E" />
+                <Text style={styles.menuLabel}>{text.myRequests}</Text>
+                <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('HelpHistoryScreen')} activeOpacity={0.84}>
+                <TactileIcon icon="history" size={40} iconSize={18} backgroundColor="#8A7AB1" />
+                <Text style={styles.menuLabel}>{text.helpHistory}</Text>
+                <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('AppMonitorScreen')} activeOpacity={0.84}>
+                <TactileIcon icon="monitor-dashboard" size={40} iconSize={18} backgroundColor="#4B7F9E" />
+                <Text style={styles.menuLabel}>{text.appMonitor}</Text>
+                <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
+              </TouchableOpacity>
+            </>
+          )}
+
+          <TouchableOpacity style={styles.settingsSeeMoreBtn} onPress={() => setSettingsExpanded(v => !v)} activeOpacity={0.8}>
+            <Text style={styles.settingsSeeMoreText}>{settingsExpanded ? text.seeLess : text.seeMore}</Text>
+            <MaterialCommunityIcons name={settingsExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={SCREEN_THEME.accentGold} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('HelpHistoryScreen')} activeOpacity={0.84}>
-            <TactileIcon icon="history" size={40} iconSize={18} backgroundColor="#8A7AB1" />
-            <Text style={styles.menuLabel}>{text.helpHistory}</Text>
-            <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => navigation.navigate('AppMonitorScreen')}
-            activeOpacity={0.84}
-          >
-            <TactileIcon icon="monitor-dashboard" size={40} iconSize={18} backgroundColor="#4B7F9E" />
-            <Text style={styles.menuLabel}>{text.appMonitor}</Text>
-            <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
-          </TouchableOpacity>
+          {plan === 'business_plus' ? (
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => navigation.navigate('BonusWalletScreen')}
+              activeOpacity={0.84}
+            >
+              <TactileIcon icon="wallet-outline" size={40} iconSize={18} backgroundColor="#D4A017" />
+              <Text style={styles.menuLabel}>{language === 'ua' ? 'Мої промо-кредити' : language === 'ru' ? 'Мои промо-кредиты' : 'My promo credits'}</Text>
+              <MaterialCommunityIcons name="chevron-right" size={20} color={SCREEN_THEME.textSecondary} />
+            </TouchableOpacity>
+          ) : null}
 
           {isAdmin ? (
             <>
@@ -781,7 +869,7 @@ const ProfileScreen: React.FC = () => {
           </View>
         </TactileCard>
 
-        <Text style={styles.sectionLabel}>{text.sectionServices}</Text>
+        <Text style={[styles.sectionLabel, { color: isDark ? '#F5E8F0' : undefined }]}>{text.sectionServices}</Text>
         <TactileCard elevated style={styles.card} pressable={false}>
           <View style={styles.cardHeader}>
             <TactileIcon icon="crown-outline" size={40} iconSize={18} backgroundColor="#403933" />
@@ -797,15 +885,41 @@ const ProfileScreen: React.FC = () => {
             ) : null}
           </View>
 
+          <View style={{ position: 'relative' }}>
+            <Animated.View style={[
+              styles.subscriptionButtonWrapper,
+              {
+                opacity: subGlowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.82, 1] }),
+              },
+            ]}>
+              <TactileButton
+                title={text.manageSubscription}
+                onPress={() => { dispatch(setHasSubscriptionChanged(false)); navigation.navigate('SubscriptionScreen'); }}
+                variant="primary"
+                style={styles.subscriptionButton}
+                textStyle={{ color: '#FFFFFF', letterSpacing: 0.5 }}
+                icon={<MaterialCommunityIcons name="crown" size={18} color="#C9A84C" />}
+              />
+            </Animated.View>
+            {hasSubscriptionChanged && (
+              <View style={styles.greenNotifDotButton} />
+            )}
+          </View>
+
         </TactileCard>
 
-        <TactileButton
-          title={language === 'ua' ? 'Служба підтримки' : language === 'ru' ? 'Служба поддержки' : 'Support service'}
-          onPress={handleSupportPress}
-          variant="secondary"
-          style={styles.supportButton}
-          icon={<MaterialCommunityIcons name="headset" size={22} color="#4E5F43" />}
-        />
+        <View style={{ position: 'relative' }}>
+          <TactileButton
+            title={language === 'ua' ? 'Служба підтримки' : language === 'ru' ? 'Служба поддержки' : 'Support service'}
+            onPress={handleSupportPress}
+            variant="secondary"
+            style={styles.supportButton}
+            icon={<MaterialCommunityIcons name="headset" size={22} color="#4E5F43" />}
+          />
+          {hasSupportReply && (
+            <View style={styles.greenNotifDotButton} />
+          )}
+        </View>
 
         <TactileButton
           title={isLoggedIn ? text.exit : text.login}
@@ -1185,6 +1299,19 @@ const styles = StyleSheet.create({
   },
   subscriptionPlan: { fontSize: 16, fontWeight: '900', color: '#7B69A8' },
   subscriptionExpiry: { marginTop: 4, fontSize: 12, fontWeight: '700', color: SCREEN_THEME.textSecondary },
+  subscriptionButtonWrapper: {
+    marginHorizontal: 16,
+    marginBottom: 14,
+    borderRadius: 16,
+    shadowColor: '#C9A84C',
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 10,
+  },
+  subscriptionButton: {
+    backgroundColor: '#111111',
+    borderColor: '#C9A84C',
+  },
   sectionLabel: {
     fontSize: 11,
     fontWeight: '800',
@@ -1236,7 +1363,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: '#D9C69E',
-    backgroundColor: '#FFF9EE',
+    backgroundColor: '#FBF8FD',
     paddingHorizontal: 14,
     fontSize: 18,
     fontWeight: '900',
@@ -1280,7 +1407,7 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   requestsBadge: {
-    backgroundColor: '#7A1E5C',
+    backgroundColor: '#C89000',
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -1289,6 +1416,78 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 11,
     fontWeight: '900',
+  },
+  contactRequestItem: {
+    backgroundColor: '#FFD400',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#F0B800',
+    marginHorizontal: 16,
+    marginVertical: 4,
+    overflow: 'hidden',
+  },
+  contactRequestAlert: {
+    backgroundColor: '#FFD400',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#F0B800',
+    marginHorizontal: 16,
+    marginVertical: 4,
+    shadowColor: '#C9A84C',
+    shadowOpacity: 0.45,
+    shadowRadius: 6,
+    shadowOffset: { width: 1, height: 5 },
+    overflow: 'hidden',
+  },
+  contactRequestGloss: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '45%',
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+  },
+  contactRequestLabel: {
+    color: '#3A2800',
+  },
+  settingsSeeMoreBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: SCREEN_THEME.borderSoft,
+  },
+  settingsSeeMoreText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#21041B',
+    letterSpacing: 0.5,
+  },
+  greenNotifDot: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#4CAF50',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  greenNotifDotButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#4CAF50',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
   },
 });
 

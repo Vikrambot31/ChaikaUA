@@ -10,14 +10,14 @@ import {
   View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useIsFocused } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { get, onValue, ref } from 'firebase/database';
 import { ensureFirebaseAuth } from '../firebase-auth-session';
-import { ContactReason, ProfileViewRequest, ViewRequestStatus, profilePermissionService } from '../services/profilePermissionService';
+import { ContactReason, ProfileViewRequest, ViewRequestContext, ViewRequestStatus, profilePermissionService } from '../services/profilePermissionService';
 import {
   PROFILE_REQUEST_CONTEXT_KEYS,
   getProfileRequestContextLabel,
@@ -32,6 +32,9 @@ import { database } from '../firebase-config';
 import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
 import UserCardActionBar from '../components/UserCardActionBar';
 import ScreenTooltip from '../components/ScreenTooltip';
+import HintBadge, { HINT_BADGE_LABELS } from '../components/HintBadge';
+import { reportBlockService } from '../services/reportBlockService';
+import { useTrainingMode } from '../hooks/useTrainingMode';
 import { PROFILE_REQUESTS_TOOLTIP } from '../utils/screenTooltips';
 import useSoftToast from '../hooks/useSoftToast';
 import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
@@ -46,12 +49,6 @@ const OUTGOING_STATUS: Record<string, Record<Lang, string>> = {
   approved_contact: { ua: 'Контакт відкрито',  ru: 'Контакт открыт',   en: 'Contact open'      },
   approved:         { ua: 'Прийнято',           ru: 'Принято',           en: 'Accepted'          },
   denied:           { ua: 'Поки без відповіді', ru: 'Пока без ответа',  en: 'No response yet'   },
-};
-
-const PENDING_HINT: Record<Lang, string> = {
-  ua: "Коли з'явиться значок телефону — користувач готовий з вами зв'язатися",
-  ru: 'Когда появится значок телефона — пользователь готов с вами связаться',
-  en: 'When a phone icon appears — the user is ready to contact you',
 };
 
 const ELAPSED_LABELS: Record<Lang, { min: string; hour: string; day: string; waiting: string }> = {
@@ -82,6 +79,20 @@ type StatusFilter = 'all' | ViewRequestStatus;
 type ContextFilter = 'all' | 'lyudi' | 'help' | 'sport' | 'buysell' | 'job';
 
 const ACCENT = '#7A1E5C';
+
+const getProfileRequestSourceLabel = (
+  sourceType: string | undefined,
+  context: ViewRequestContext,
+  language: Lang,
+  fallback: string,
+): string => {
+  const rawSource = sourceType?.trim();
+  const sourceKey = rawSource && PROFILE_REQUEST_CONTEXT_KEYS.includes(rawSource as ViewRequestContext)
+    ? rawSource
+    : context;
+  const label = getProfileRequestContextLabel(sourceKey, language).trim();
+  return label || fallback;
+};
 
 const UI = {
   ua: {
@@ -181,12 +192,12 @@ const UI = {
     notSpecified: 'не указано',
     contactOpened: 'Контакт открыт',
     contactOpenedByTopic: 'Контакт открыт по теме:',
-    requestDenied: 'Запит відхилено',
+    requestDenied: 'Запрос отклонён',
     approveAgainTitle: 'Одобрить контакт?',
     approveAgainBody: 'Этот запрос был отклонен. Хотите открыть контакт для этого пользователя?',
     approveAgainYes: 'Да, одобрить',
     approveSuccess: 'Контакт открыт',
-    denySuccess: 'Запит відхилено',
+    denySuccess: 'Запрос отклонён',
     errTitle: 'Ошибка',
     errBody: 'Не удалось ответить. Попробуйте снова.',
     loadErrBody: 'Не удалось загрузить запросы. Проверьте интернет и попробуйте снова.',
@@ -242,12 +253,12 @@ const UI = {
     notSpecified: 'not specified',
     contactOpened: 'Contact open',
     contactOpenedByTopic: 'Contact opened for topic:',
-    requestDenied: 'Запит відхилено',
+    requestDenied: 'Request denied',
     approveAgainTitle: 'Approve contact?',
     approveAgainBody: 'This request was denied. Do you want to open contact for this user?',
     approveAgainYes: 'Yes, approve',
     approveSuccess: 'Contact open',
-    denySuccess: 'Запит відхилено',
+    denySuccess: 'Request denied',
     errTitle: 'Error',
     errBody: 'Failed to respond. Please try again.',
     loadErrBody: 'Failed to load requests. Check your internet connection and try again.',
@@ -280,7 +291,7 @@ const normalizeIncomingRequests = (
       requesterUserId: typeof value.requesterUserId === 'string' ? value.requesterUserId : (typeof value.requesterId === 'string' ? value.requesterId : requesterId),
       requesterName: typeof value.requesterName === 'string' && value.requesterName.trim() ? value.requesterName : 'Unknown user',
       requesterPhotoURL: typeof value.requesterPhotoURL === 'string' ? value.requesterPhotoURL : '',
-      requestedAt: typeof value.requestedAt === 'string' ? value.requestedAt : new Date(0).toISOString(),
+      requestedAt: typeof value.requestedAt === 'string' ? value.requestedAt : typeof value.requestedAt === 'number' ? new Date(value.requestedAt).toISOString() : new Date(0).toISOString(),
       createdAt: typeof value.createdAt === 'string' ? value.createdAt : undefined,
       context: (value.context as ProfileViewRequest['context']) ?? 'lyudi',
       status: (value.status as ProfileViewRequest['status']) ?? 'pending',
@@ -311,7 +322,7 @@ const normalizeOutgoingRequests = (
       targetUserId,
       targetName: typeof value.targetName === 'string' ? value.targetName : '',
       targetPhotoURL: typeof value.targetPhotoURL === 'string' ? value.targetPhotoURL : '',
-      requestedAt: typeof value.requestedAt === 'string' ? value.requestedAt : new Date(0).toISOString(),
+      requestedAt: typeof value.requestedAt === 'string' ? value.requestedAt : typeof value.requestedAt === 'number' ? new Date(value.requestedAt).toISOString() : new Date(0).toISOString(),
       createdAt: typeof value.createdAt === 'string' ? value.createdAt : undefined,
       context: (value.context as ProfileViewRequest['context']) ?? 'lyudi',
       status: (value.status as ProfileViewRequest['status']) ?? 'pending',
@@ -333,6 +344,7 @@ export default function ProfileRequestsScreen() {
   const navLock = useRef(false);
   const user = useSelector(selectUser);
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
+  const training = useTrainingMode('profile_requests');
   const toast = useSoftToast();
   const t = UI[language];
   const [sessionUserId, setSessionUserId] = useState(user?.id ?? '');
@@ -349,8 +361,8 @@ export default function ProfileRequestsScreen() {
   const [showHidden, setShowHidden] = useState(false);
   const [hiddenKeys, setHiddenKeys] = useState<Record<string, boolean>>({});
   const [incomingPhones, setIncomingPhones] = useState<Record<string, string>>({});
-  const [incomingAges, setIncomingAges] = useState<Record<string, string>>({});
   const [incomingVotes, setIncomingVotes] = useState<Record<string, number>>({});
+  const [blockedUserIds, setBlockedUserIds] = useState<Set<string>>(new Set());
   const [seenContacts, setSeenContacts] = useState<Record<string, boolean>>({});
   const [clearingHistory, setClearingHistory] = useState(false);
   const [respondingRequestId, setRespondingRequestId] = useState<string | null>(null);
@@ -359,7 +371,6 @@ export default function ProfileRequestsScreen() {
     const uniqueRequesterIds = Array.from(new Set(incoming.map((item) => item.requesterId).filter(Boolean)));
     if (uniqueRequesterIds.length === 0) {
       setIncomingPhones({});
-      setIncomingAges({});
       setIncomingVotes({});
       return;
     }
@@ -367,20 +378,17 @@ export default function ProfileRequestsScreen() {
     const pairs = await Promise.all(
       uniqueRequesterIds.map(async (requesterId) => {
         try {
-          const [phoneSnap, ageSnap, votesSnap] = await Promise.all([
+          const [phoneSnap, votesSnap] = await Promise.all([
             get(ref(database, `users/${requesterId}/phone`)),
-            get(ref(database, `users/${requesterId}/age`)),
             get(ref(database, `users/${requesterId}/ratingVotes`)),
           ]);
           const rawPhone = phoneSnap.val();
-          const rawAge = ageSnap.val();
           const rawVotes = votesSnap.val();
           const phone = typeof rawPhone === 'string' ? rawPhone.trim() : '';
-          const age = rawAge !== null && rawAge !== undefined ? String(rawAge).trim() : '';
           const votes = typeof rawVotes === 'number' ? rawVotes : 0;
-          return [requesterId, phone, age, votes] as const;
+          return [requesterId, phone, votes] as const;
         } catch {
-          return [requesterId, '', '', 0] as const;
+          return [requesterId, '', 0] as const;
         }
       })
     );
@@ -390,14 +398,8 @@ export default function ProfileRequestsScreen() {
         return acc;
       }, {})
     );
-    setIncomingAges(
-      pairs.reduce<Record<string, string>>((acc, [requesterId, , age]) => {
-        if (age) acc[requesterId] = age;
-        return acc;
-      }, {})
-    );
     setIncomingVotes(
-      pairs.reduce<Record<string, number>>((acc, [requesterId, , , votes]) => {
+      pairs.reduce<Record<string, number>>((acc, [requesterId, , votes]) => {
         acc[requesterId] = votes;
         return acc;
       }, {})
@@ -528,6 +530,22 @@ export default function ProfileRequestsScreen() {
     })();
   }, []);
 
+  const isFocused = useIsFocused();
+
+  useEffect(() => {
+    if (!currentUserId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const blocked = await reportBlockService.loadBlockedUsers(currentUserId);
+        if (!cancelled) setBlockedUserIds(blocked);
+      } catch {
+        if (!cancelled) setBlockedUserIds(new Set());
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [currentUserId, isFocused]);
+
   const markSeen = useCallback(async (key: string) => {
     setSeenContacts((prev) => {
       const next = { ...prev, [key]: true };
@@ -549,8 +567,10 @@ export default function ProfileRequestsScreen() {
 
   const filteredRequests = requests.filter((item) => {
     const targetUserId = activeTab === 'outgoing' ? (item.targetUserId ?? '') : currentUserId;
+    const otherUserId = activeTab === 'outgoing' ? (item.targetUserId ?? '') : item.requesterId;
     const hiddenKey = profilePermissionService.requestKey(targetUserId, item.requesterId);
     const isHidden = Boolean(hiddenKeys[hiddenKey]);
+    if (blockedUserIds.has(otherUserId)) return false;
     if (activeTab === 'incoming') return !isHidden;
     if (activeTab === 'history' && !isHidden) return false;
     if (activeTab === 'outgoing' && !showHidden && isHidden) return false;
@@ -634,6 +654,24 @@ export default function ProfileRequestsScreen() {
     ]);
   }, [handleRespondToIncoming, respondingRequestId, t.approveAgainBody, t.approveAgainTitle, t.approveAgainYes, t.clearConfirmNo]);
 
+  const openContactCardChat = useCallback((item: ProfileViewRequest) => {
+    if (!currentUserId || !item.requesterId) return;
+    navigation.navigate('ContactCardChatScreen', {
+      request: {
+        ...item,
+        targetUserId: currentUserId,
+      },
+    });
+  }, [currentUserId, navigation]);
+
+  const openOutgoingContactCardChat = useCallback((item: ProfileViewRequest) => {
+    if (!currentUserId || !item.targetUserId) return;
+    void markSeen(`${item.requesterId}_${item.targetUserId}_${item.requestedAt}`);
+    navigation.navigate('ContactCardChatScreen', {
+      request: { ...item, targetUserId: item.targetUserId },
+    });
+  }, [currentUserId, navigation, markSeen]);
+
   const handleCall = async (phoneRaw?: string) => {
     await safeCallPhone(phoneRaw, language);
   };
@@ -691,7 +729,10 @@ export default function ProfileRequestsScreen() {
         storageKey={PROFILE_REQUESTS_TOOLTIP.storageKey}
         title={PROFILE_REQUESTS_TOOLTIP.title}
         items={PROFILE_REQUESTS_TOOLTIP.items}
+        language={language}
         accentColor={ACCENT}
+        forceVisible={training.showHint}
+        onClose={training.closeHint}
       />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back}>
@@ -699,6 +740,12 @@ export default function ProfileRequestsScreen() {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t.title}</Text>
         <View style={{ width: 40 }} />
+        <HintBadge
+          visible={training.isVisible}
+          onTap={training.openHint}
+          onDismiss={training.dismiss}
+          label={HINT_BADGE_LABELS[language]}
+        />
       </View>
 
       <View style={styles.tabsRow}>
@@ -797,20 +844,18 @@ export default function ProfileRequestsScreen() {
           renderItem={({ item }) => {
             if (activeTab === 'incoming') {
               const phone = item.status === 'approved' ? (item.requesterPhone?.trim() || incomingPhones[item.requesterId]) : undefined;
-              const age = incomingAges[item.requesterId];
               const votes = incomingVotes[item.requesterId] ?? 0;
               const reasonText = item.reason ? t.reasons[item.reason as ContactReason] : null;
-              const descriptionText = reasonText || item.sourceTitle || (age ? age : null);
               const isResponding = respondingRequestId === item.requesterId;
-              const topicText = reasonText || item.sourceTitle?.trim() || t.notSpecified;
-              const foundContactText = item.sourceTitle?.trim() || getProfileRequestContextLabel(item.context, language) || t.notSpecified;
-              const transitionScreenText = item.sourceType?.trim() || getProfileRequestContextLabel(item.context, language) || t.notSpecified;
+              const transitionScreenText = getProfileRequestSourceLabel(item.sourceType, item.context, language, t.notSpecified);
+              const sourceTitleText = item.sourceTitle?.trim();
+              const descriptionText = sourceTitleText || reasonText || transitionScreenText;
               const votesLabel = language === 'en' ? 'votes' : language === 'ru' ? 'голосов' : 'голосів';
               return (
                 <TouchableOpacity
                   style={styles.card}
-                  onPress={() => confirmApproveDeniedRequest(item.requesterId)}
-                  disabled={item.status !== 'denied' || Boolean(respondingRequestId)}
+                  onPress={() => openContactCardChat(item)}
+                  disabled={Boolean(respondingRequestId)}
                   activeOpacity={0.86}
                 >
                   {/* Top: avatar + info */}
@@ -848,21 +893,6 @@ export default function ProfileRequestsScreen() {
                           <Text style={styles.descriptionText} numberOfLines={2}>{descriptionText}</Text>
                         </View>
                       ) : null}
-                    </View>
-                  </View>
-
-                  <View style={styles.requestMetaBox}>
-                    <View style={styles.requestMetaRow}>
-                      <Text style={styles.requestMetaLabel}>{t.topicLabel}</Text>
-                      <Text style={styles.requestMetaValue}>{topicText}</Text>
-                    </View>
-                    <View style={styles.requestMetaRow}>
-                      <Text style={styles.requestMetaLabel}>{t.foundContactLabel}</Text>
-                      <Text style={styles.requestMetaValue}>{foundContactText}</Text>
-                    </View>
-                    <View style={styles.requestMetaRow}>
-                      <Text style={styles.requestMetaLabel}>{t.transitionScreenLabel}</Text>
-                      <Text style={styles.requestMetaValue}>{transitionScreenText}</Text>
                     </View>
                   </View>
 
@@ -909,14 +939,28 @@ export default function ProfileRequestsScreen() {
                           {item.status === 'approved' ? t.contactOpened : t.requestDenied}
                         </Text>
                       </View>
-                      <Text style={styles.responseStatusTopic}>
-                        {item.status === 'approved' ? t.contactOpenedByTopic : t.topicLabel} {topicText}
-                      </Text>
                       {item.status === 'denied' ? (
-                        <Text style={styles.responseStatusHint}>{t.approveAgainBody}</Text>
+                        <TouchableOpacity
+                          onPress={() => confirmApproveDeniedRequest(item.requesterId)}
+                          activeOpacity={0.85}
+                          disabled={Boolean(respondingRequestId)}
+                        >
+                          <Text style={[styles.responseStatusHint, styles.approveAgainInline]}>{t.approveAgainBody}</Text>
+                        </TouchableOpacity>
                       ) : null}
                     </View>
                   )}
+
+                  <View style={styles.chatOpenRow}>
+                    <MaterialCommunityIcons name="message-text-outline" size={16} color={ACCENT} />
+                    <Text style={styles.chatOpenText}>
+                      {language === 'en'
+                        ? 'Open card chat'
+                        : language === 'ru'
+                          ? '\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u0447\u0430\u0442 \u043f\u043e \u0442\u0435\u043c\u0435'
+                          : '\u0412\u0456\u0434\u043a\u0440\u0438\u0442\u0438 \u0447\u0430\u0442 \u043f\u043e \u0442\u0435\u043c\u0456'}
+                    </Text>
+                  </View>
 
                   <UserCardActionBar
                     avatarUri={item.requesterPhotoURL || avatarByUserId[item.requesterId] || ''}
@@ -963,13 +1007,10 @@ export default function ProfileRequestsScreen() {
             const viewedLabel = VIEWED_LABELS[language];
             const isViewedByTarget = Boolean(item.viewedAt);
 
-            const descText: string | null = item.status === 'pending'
-              ? PENDING_HINT[language]
-              : (item.reason ? t.reasons[item.reason as ContactReason] : item.sourceTitle ?? null);
             const reasonText = item.reason ? t.reasons[item.reason as ContactReason] : null;
-            const topicText = reasonText || item.sourceTitle?.trim() || t.notSpecified;
-            const foundContactText = item.sourceTitle?.trim() || getProfileRequestContextLabel(item.context, language) || t.notSpecified;
-            const transitionScreenText = item.sourceType?.trim() || getProfileRequestContextLabel(item.context, language) || t.notSpecified;
+            const transitionScreenText = getProfileRequestSourceLabel(item.sourceType, item.context, language, t.notSpecified);
+            const sourceTitleText = item.sourceTitle?.trim();
+            const descText: string | null = sourceTitleText || reasonText || transitionScreenText;
             const statusIcon = item.status === 'approved'
               ? 'check-circle'
               : item.status === 'denied'
@@ -982,8 +1023,14 @@ export default function ProfileRequestsScreen() {
                 : '#8A6D2A';
 
             const callLabel = language === 'en' ? 'Call' : language === 'ru' ? 'Позвонить' : 'Подзвонити';
+            const isChatEnabled = isOutgoing && item.status === 'approved';
             return (
-              <View style={[styles.card, !isOutgoing && item.status === 'denied' && styles.cardDimmed]}>
+              <TouchableOpacity
+                style={[styles.card, !isOutgoing && item.status === 'denied' && styles.cardDimmed]}
+                onPress={isChatEnabled ? () => openOutgoingContactCardChat(item) : undefined}
+                activeOpacity={isChatEnabled ? 0.86 : 1}
+                disabled={!isChatEnabled}
+              >
                 {/* Top: avatar + info */}
                 <View style={styles.cardIncoming}>
                   {photo ? (
@@ -1047,21 +1094,6 @@ export default function ProfileRequestsScreen() {
                   </View>
                 </View>
 
-                <View style={styles.requestMetaBox}>
-                  <View style={styles.requestMetaRow}>
-                    <Text style={styles.requestMetaLabel}>{t.topicLabel}</Text>
-                    <Text style={styles.requestMetaValue}>{topicText}</Text>
-                  </View>
-                  <View style={styles.requestMetaRow}>
-                    <Text style={styles.requestMetaLabel}>{t.foundContactLabel}</Text>
-                    <Text style={styles.requestMetaValue}>{foundContactText}</Text>
-                  </View>
-                  <View style={styles.requestMetaRow}>
-                    <Text style={styles.requestMetaLabel}>{t.transitionScreenLabel}</Text>
-                    <Text style={styles.requestMetaValue}>{transitionScreenText}</Text>
-                  </View>
-                </View>
-
                 <View style={[
                   styles.responseStatusBox,
                   item.status === 'approved'
@@ -1080,15 +1112,29 @@ export default function ProfileRequestsScreen() {
                       {outgoingStatusLabel}
                     </Text>
                   </View>
-                  <Text style={styles.responseStatusTopic}>
-                    {item.status === 'approved' ? t.contactOpenedByTopic : t.topicLabel} {topicText}
-                  </Text>
                   {item.status === 'pending' ? (
                     <Text style={styles.responseStatusHint}>
                       {isViewedByTarget ? viewedLabel.seen : viewedLabel.notSeen}
                     </Text>
                   ) : null}
                 </View>
+
+                {isChatEnabled ? (
+                  <TouchableOpacity
+                    style={styles.chatOpenRow}
+                    onPress={() => openOutgoingContactCardChat(item)}
+                    activeOpacity={0.85}
+                  >
+                    <MaterialCommunityIcons name="message-text-outline" size={16} color={ACCENT} />
+                    <Text style={styles.chatOpenText}>
+                      {language === 'en'
+                        ? 'Open card chat'
+                        : language === 'ru'
+                          ? '\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u0447\u0430\u0442 \u043f\u043e \u0442\u0435\u043c\u0435'
+                          : '\u0412\u0456\u0434\u043a\u0440\u0438\u0442\u0438 \u0447\u0430\u0442 \u043f\u043e \u0442\u0435\u043c\u0456'}
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
 
                 <UserCardActionBar
                   avatarUri={photo || ''}
@@ -1113,7 +1159,7 @@ export default function ProfileRequestsScreen() {
                   likePath="feed_likes/profile_requests"
                   likeId={`${displayId}_${sanitizeFirebaseKey(item.requestedAt)}`}
                 />
-              </View>
+              </TouchableOpacity>
             );
           }}
         />
@@ -1236,7 +1282,7 @@ const styles = StyleSheet.create({
     backgroundColor: ACCENT,
   },
   authGateButtonText: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
     fontSize: 15,
     fontWeight: '900',
   },
@@ -1371,17 +1417,19 @@ const styles = StyleSheet.create({
     color: '#3D5D87',
   },
   descriptionBox: {
-    borderWidth: 1,
-    borderColor: '#E0D5C8',
+    borderWidth: 0,
     borderRadius: 8,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    backgroundColor: '#FAF7F3',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    backgroundColor: ACCENT,
+    minHeight: 42,
+    justifyContent: 'center',
   },
   descriptionText: {
-    fontSize: 12,
-    color: '#7A6D64',
-    lineHeight: 17,
+    fontSize: 15,
+    color: '#fff',
+    lineHeight: 19,
+    fontWeight: '900',
   },
   requestMetaBox: {
     borderWidth: 1,
@@ -1399,17 +1447,16 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   requestMetaLabel: {
-    fontSize: 11,
+    fontSize: 22,
     fontWeight: '900',
     color: '#4A3D37',
-    minWidth: 104,
   },
   requestMetaValue: {
     flex: 1,
-    fontSize: 11,
+    fontSize: 22,
     fontWeight: '700',
     color: '#7A6D64',
-    lineHeight: 15,
+    lineHeight: 28,
   },
   responseActionsRow: {
     flexDirection: 'row',
@@ -1495,6 +1542,26 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     lineHeight: 15,
+  },
+  approveAgainInline: {
+    color: ACCENT,
+  },
+  chatOpenRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 10,
+    backgroundColor: '#F4E7F0',
+    borderWidth: 1,
+    borderColor: '#D9B6CD',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  chatOpenText: {
+    color: ACCENT,
+    fontSize: 12,
+    fontWeight: '900',
   },
   incomingActionsRow: {
     flexDirection: 'row',
@@ -1582,8 +1649,8 @@ const styles = StyleSheet.create({
     borderColor: '#D4C5B8',
   },
   descriptionHint: {
-    color: '#9A8A7E',
-    fontStyle: 'italic',
+    color: '#F8EAF4',
+    fontStyle: 'normal',
   },
   outgoingMetaRow: {
     flexDirection: 'row',

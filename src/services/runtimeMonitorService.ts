@@ -651,6 +651,17 @@ const createEntryFromTrace = ({
   };
 };
 
+// Strip digits/UUIDs/paths from rawMessage so two instances of the same
+// error (differing only by a uid, timestamp, or node key) collapse into
+// one fingerprint and get deduplicated instead of flooding the log.
+const normalizeMessageForFingerprint = (msg: string): string =>
+  msg
+    .toLowerCase()
+    .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '#uuid')
+    .replace(/\b\d{10,}\b/g, '#ts')
+    .replace(/\b\d+\b/g, '#n')
+    .slice(0, 120);
+
 const buildFingerprint = (entry: RuntimeMonitorEntry): string =>
   [
     entry.screen,
@@ -660,7 +671,7 @@ const buildFingerprint = (entry: RuntimeMonitorEntry): string =>
     entry.code ?? '',
     entry.action ?? '',
     entry.status ?? '',
-    entry.rawMessage,
+    normalizeMessageForFingerprint(entry.rawMessage),
   ].join('|');
 
 const appendEntry = async (entry: RuntimeMonitorEntry): Promise<void> => {

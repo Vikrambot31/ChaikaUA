@@ -1,7 +1,6 @@
 import React, { useRef, useState } from 'react';
 import {
   Animated,
-  Dimensions,
   FlatList,
   StyleSheet,
   Text,
@@ -10,8 +9,7 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SCREEN_THEME } from '../utils/screenTheme';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+import { SCREEN_W as SCREEN_WIDTH } from '../utils/webDimensions';
 
 type Slide = {
   id: string;
@@ -173,9 +171,13 @@ const OnboardingSlides: React.FC<Props> = ({ language = 'ua', onDone }) => {
           keyExtractor={(item) => item.id}
           horizontal
           pagingEnabled
-          scrollEnabled={false}
+          scrollEnabled
           showsHorizontalScrollIndicator={false}
           style={styles.flatList}
+          onMomentumScrollEnd={(e) => {
+            const index = Math.round(e.nativeEvent.contentOffset.x / e.nativeEvent.layoutMeasurement.width);
+            setActiveIndex(index);
+          }}
         />
 
         <View style={styles.dots}>

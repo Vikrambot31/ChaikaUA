@@ -62,7 +62,8 @@ export const sportsService = {
   getTodayEntries: async (sport: SportKey): Promise<SportTodayEntry[]> => {
     try {
       const snap = await get(ref(database, `sports/${sport}/days/${todayKey()}`));
-      return toList<SportTodayEntry>(snap.val()).sort((a, b) => a.time.localeCompare(b.time));
+      const toMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + (m || 0); };
+      return toList<SportTodayEntry>(snap.val()).sort((a, b) => toMin(a.time) - toMin(b.time));
     } catch (err) {
       console.error(`[sportsService] getTodayEntries failed for ${sport}:`, err);
       return [];
@@ -86,12 +87,18 @@ export const sportsService = {
   subscribePlayers: (sport: SportKey, onChange: (items: SportPlayer[]) => void): Unsubscribe => {
     return onValue(ref(database, `sports/${sport}/players`), (snap) => {
       onChange(toList<SportPlayer>(snap.val()).sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0)));
+    }, (error) => {
+      console.error('[subscribePlayers] RTDB error:', error.message);
+      onChange([]);
     });
   },
 
   subscribeTodayEntries: (sport: SportKey, onChange: (items: SportTodayEntry[]) => void): Unsubscribe => {
     return onValue(ref(database, `sports/${sport}/days/${todayKey()}`), (snap) => {
       onChange(toList<SportTodayEntry>(snap.val()).sort((a, b) => a.time.localeCompare(b.time)));
+    }, (error) => {
+      console.error('[subscribeTodayEntries] RTDB error:', error.message);
+      onChange([]);
     });
   },
 };

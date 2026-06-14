@@ -30,6 +30,8 @@ import { validateEmail } from '../utils/validators';
 import { formatCountdown, getRateLimitRetryAfterSeconds } from '../utils/userFacingErrors';
 import { resolveAppUserFromFirebase } from '../services/authProfileService';
 import { ensureFirebaseAuth } from '../firebase-auth-session';
+import { useAppTheme } from '../hooks/useAppTheme';
+import { isDevAdminMode, devAdminLogin } from '../utils/devAdminLogin';
 
 // RootState type for language selector
 interface LangState { language?: { current?: string } }
@@ -116,12 +118,15 @@ const UI_TEXT = {
     socialGeneric: 'Помилка соціального входу. Спробуйте ще раз пізніше.',
     appleLoginFailed: 'Не вдалося увійти через Apple. Спробуйте ще раз.',
     loginLocked: 'Забагато невдалих спроб. Спробуйте знову через 15 хвилин.',
+    loginRateLimitServer: 'Забагато спроб. Кнопка заблокована на',
     forgotPassword: 'Забули пароль?',
+    resetPasswordTitle: 'Готово',
     resetPasswordSent: 'Інструкцію для скидання пароля надіслано на ваш email.',
     resetPasswordNeedEmail: 'Введіть коректний email, щоб скинути пароль.',
     resetPasswordFailed: 'Не вдалося надіслати лист для скидання пароля.',
     inlineEmailError: 'Введіть коректний email.',
-    inlinePasswordError: 'Пароль має містити щонайменше 6 символів.',
+    inlinePasswordError: 'Пароль має містити щонайменше 8 символів.',
+    facebookPlayServicesNote: 'Вхід через Facebook буде доступний після підключення Google Play Services',
   },
   ru: {
     subtitle: 'Вход в аккаунт',
@@ -148,12 +153,15 @@ const UI_TEXT = {
     socialGeneric: 'Ошибка социального входа. Попробуйте позже.',
     appleLoginFailed: 'Не удалось войти через Apple. Попробуйте ещё раз.',
     loginLocked: 'Слишком много неудачных попыток. Попробуйте снова через 15 минут.',
+    loginRateLimitServer: 'Слишком много попыток. Кнопка заблокирована на',
     forgotPassword: 'Забыли пароль?',
+    resetPasswordTitle: 'Готово',
     resetPasswordSent: 'Инструкция по сбросу пароля отправлена на ваш email.',
     resetPasswordNeedEmail: 'Введите корректный email, чтобы сбросить пароль.',
     resetPasswordFailed: 'Не удалось отправить письмо для сброса пароля.',
     inlineEmailError: 'Введите корректный email.',
-    inlinePasswordError: 'Пароль должен содержать минимум 6 символов.',
+    inlinePasswordError: 'Пароль должен содержать минимум 8 символов.',
+    facebookPlayServicesNote: 'Вход через Facebook будет доступен после подключения Google Play Services',
   },
   en: {
     subtitle: 'Sign in to your account',
@@ -180,12 +188,15 @@ const UI_TEXT = {
     socialGeneric: 'Social sign-in error. Please try again later.',
     appleLoginFailed: 'Could not sign in with Apple. Please try again.',
     loginLocked: 'Too many failed attempts. Try again in 15 minutes.',
+    loginRateLimitServer: 'Too many attempts. Button locked for',
     forgotPassword: 'Forgot password?',
+    resetPasswordTitle: 'Done',
     resetPasswordSent: 'Password reset instructions were sent to your email.',
     resetPasswordNeedEmail: 'Enter a valid email so we can send a password reset link.',
     resetPasswordFailed: 'Could not send the password reset email.',
     inlineEmailError: 'Enter a valid email.',
-    inlinePasswordError: 'Password must be at least 6 characters.',
+    inlinePasswordError: 'Password must be at least 8 characters.',
+    facebookPlayServicesNote: 'Facebook sign-in will be available after connecting Google Play Services',
   },
 } as const;
 
@@ -203,15 +214,40 @@ const LoginScreen: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [emailTouched, setEmailTouched] = useState(false);
+  const [passwordTouched, setPasswordTouched] = useState(false);
   const [appleSignInAvailable, setAppleSignInAvailable] = useState(false);
   const [loginRateLimitUntil, setLoginRateLimitUntil] = useState(0);
   const [now, setNow] = useState(Date.now());
   const loading = useSelector(selectAuthLoading);
   const error = useSelector(selectAuthError);
 
+  // Dev admin login state (web preview only)
+  const [devPassword, setDevPassword] = useState('');
+  const [devLoading, setDevLoading] = useState(false);
+  const [devError, setDevError] = useState('');
+
+  const handleDevAdminLogin = useCallback(async () => {
+    if (!devPassword || devPassword.length < 6) {
+      setDevError('Enter admin password');
+      return;
+    }
+    setDevLoading(true);
+    setDevError('');
+    try {
+      await devAdminLogin(devPassword);
+      // onAuthStateChanged in App.tsx will handle the rest
+    } catch (err: any) {
+      setDevError(err?.message || 'Login failed');
+    } finally {
+      setDevLoading(false);
+    }
+  }, [devPassword]);
+
+  const { colors, isDark } = useAppTheme();
   const normalizedEmail = normalizeEmailText(email);
   const isEmailValid = validateEmail(normalizedEmail);
-  const isPasswordValid = password.length >= 6;
+  const isPasswordValid = password.length >= 8;
   const isFormValid = isEmailValid && isPasswordValid;
   const loginRateLimitSeconds = Math.max(0, Math.ceil((loginRateLimitUntil - now) / 1000));
 
@@ -271,10 +307,8 @@ const LoginScreen: React.FC = () => {
   );
 
   useEffect(() => {
-    if (error) {
-      dispatch(clearError());
-    }
-  }, [email, password, error, dispatch]);
+    dispatch(clearError());
+  }, [email, password, dispatch]);
 
   useEffect(() => {
     let active = true;
@@ -340,14 +374,15 @@ const LoginScreen: React.FC = () => {
     } catch (loginError) {
       const lock = await recordLoginFailure(normalizedEmail);
       const retryAfterSeconds = getRateLimitRetryAfterSeconds(loginError);
-      const message = retryAfterSeconds
-        ? `Слишком много попыток входа. Кнопка заблокирована на ${formatCountdown(retryAfterSeconds)}.`
-        : text.errorLogin;
       if (retryAfterSeconds) {
         setLoginRateLimitUntil(Date.now() + retryAfterSeconds * 1000);
       }
-      dispatch(setError(message));
-      Alert.alert(text.errorLoginTitle, lock.lockedUntil > Date.now() ? text.loginLocked : message);
+      const message = lock.lockedUntil > Date.now()
+        ? text.loginLocked
+        : retryAfterSeconds
+        ? `${text.loginRateLimitServer} ${formatCountdown(retryAfterSeconds)}.`
+        : text.errorLogin;
+      Alert.alert(text.errorLoginTitle, message);
     } finally {
       dispatch(setLoading(false));
     }
@@ -372,11 +407,22 @@ const LoginScreen: React.FC = () => {
   }, [dispatch, completeLogin, mapSocialAuthError, text]);
 
   const handleFacebookLogin = useCallback(async () => {
-    Alert.alert(
-      text.errorLoginTitle,
-      'Facebook вхід буде доступний після появи застосунку в Google Play Store. Будь ласка, використовуйте вхід через Email або Google.'
-    );
-  }, [text]);
+    dispatch(setLoading(true));
+    try {
+      const result = await socialAuthAPI.signInWithFacebook();
+      const socialUser = 'data' in result ? result.data : null;
+      if (!socialUser) {
+        const rawError = 'error' in result ? result.error : undefined;
+        Alert.alert(text.errorLoginTitle, mapSocialAuthError(rawError, 'facebook'));
+        return;
+      }
+      await completeLogin(socialUser, 'facebook', true);
+    } catch {
+      Alert.alert(text.errorLoginTitle, text.facebookLoginFailed);
+    } finally {
+      dispatch(setLoading(false));
+    }
+  }, [dispatch, completeLogin, mapSocialAuthError, text]);
 
   const handleAppleLogin = useCallback(async () => {
     dispatch(setLoading(true));
@@ -405,7 +451,7 @@ const LoginScreen: React.FC = () => {
     dispatch(setLoading(true));
     try {
       await sendPasswordResetEmail(auth, normalizedEmail);
-      Alert.alert(text.loginBtn, text.resetPasswordSent);
+      Alert.alert(text.resetPasswordTitle, text.resetPasswordSent);
     } catch {
       Alert.alert(text.errorTitle, text.resetPasswordFailed);
     } finally {
@@ -426,10 +472,10 @@ const LoginScreen: React.FC = () => {
   }, [dispatch, navigation, text]);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.logoContainer}>
-          <Text style={styles.appTitle}>Chaika Life</Text>
+          <Text style={[styles.appTitle, { color: isDark ? '#F5E8F0' : undefined }]}>Chaika Life</Text>
           <Text style={styles.appSubtitle}>{text.subtitle}</Text>
         </View>
 
@@ -440,16 +486,18 @@ const LoginScreen: React.FC = () => {
             placeholder={text.emailPlaceholder}
             value={email}
             onChangeText={(value) => setEmail(normalizeEmailText(value))}
+            onBlur={() => setEmailTouched(true)}
             keyboardType="email-address"
             autoCapitalize="none"
             editable={!loading}
           />
-          <FormFieldError visible={submitAttempted && !isEmailValid} error={text.inlineEmailError} />
+          <FormFieldError visible={(submitAttempted || emailTouched) && !isEmailValid} error={text.inlineEmailError} />
           <View style={styles.passwordRow}>
             <TactileInput
               placeholder={text.passwordPlaceholder}
               value={password}
               onChangeText={setPassword}
+              onBlur={() => setPasswordTouched(true)}
               secureTextEntry={!showPassword}
               editable={!loading}
             />
@@ -457,7 +505,7 @@ const LoginScreen: React.FC = () => {
               <Text style={styles.toggleText}>{showPassword ? text.hidePassword : text.showPassword}</Text>
             </TouchableOpacity>
           </View>
-          <FormFieldError visible={submitAttempted && !isPasswordValid} error={text.inlinePasswordError} />
+          <FormFieldError visible={(submitAttempted || passwordTouched) && !isPasswordValid} error={text.inlinePasswordError} />
           <TouchableOpacity onPress={() => void handleForgotPassword()} disabled={loading} style={styles.forgotPasswordWrap}>
             <Text style={styles.forgotPasswordText}>{text.forgotPassword}</Text>
           </TouchableOpacity>
@@ -466,7 +514,7 @@ const LoginScreen: React.FC = () => {
             <TactileButton
               title={loginRateLimitSeconds > 0 ? `${text.loginBtn} (${formatCountdown(loginRateLimitSeconds)})` : text.loginBtn}
               onPress={handleLogin}
-              disabled={!isFormValid || loading || loginRateLimitSeconds > 0}
+              disabled={loading || loginRateLimitSeconds > 0}
               variant="primary"
               style={styles.loginButtonStyle}
               textStyle={styles.loginButtonText}
@@ -488,8 +536,9 @@ const LoginScreen: React.FC = () => {
               title={text.facebookBtn}
               onPress={handleFacebookLogin}
               disabled={loading}
-              variant="social"
+              variant="secondary"
             />
+            <Text style={styles.facebookNoteText}>{text.facebookPlayServicesNote}</Text>
           </View>
 
           {Platform.OS === 'ios' && appleSignInAvailable ? (
@@ -503,6 +552,30 @@ const LoginScreen: React.FC = () => {
             </View>
           ) : null}
         </TactileCard>
+
+        {isDevAdminMode() ? (
+          <TactileCard elevated style={styles.devAdminCard} pressable={false}>
+            <Text style={styles.devAdminTitle}>DEV ADMIN LOGIN</Text>
+            <Text style={styles.devAdminHint}>vikramsave@ukr.net</Text>
+            {devError ? <Text style={styles.devAdminError}>{devError}</Text> : null}
+            <TactileInput
+              placeholder="Admin password"
+              value={devPassword}
+              onChangeText={setDevPassword}
+              secureTextEntry
+              editable={!devLoading}
+            />
+            <View style={styles.btnSpacing}>
+              <TactileButton
+                title={devLoading ? 'Signing in...' : 'Dev Admin Login'}
+                onPress={handleDevAdminLogin}
+                disabled={devLoading}
+                variant="primary"
+                style={{ backgroundColor: '#1B5E20' }}
+              />
+            </View>
+          </TactileCard>
+        ) : null}
 
         <View style={styles.signupRow}>
           <Text style={styles.signupText}>{text.noAccount}</Text>
@@ -535,16 +608,20 @@ const styles = StyleSheet.create({
     borderColor: SCREEN_THEME.terracottaDark,
   },
   loginButtonText: {
-    color: '#2F1C12',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '900',
     letterSpacing: 0.3,
   },
   loaderOverlay: { position: 'absolute', alignSelf: 'center', top: 12 },
+  facebookNoteText: { fontSize: 11, color: SCREEN_THEME.textSecondary, textAlign: 'center', marginTop: 4 },
   signupRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   signupText: { fontSize: 14, color: SCREEN_THEME.textSecondary },
   signupLink: { fontSize: 14, color: SCREEN_THEME.terracottaDark, fontWeight: '800' },
+  devAdminCard: { padding: 16, marginBottom: 16, borderWidth: 2, borderColor: '#1B5E20', backgroundColor: '#E8F5E9' },
+  devAdminTitle: { fontSize: 14, fontWeight: '900', color: '#1B5E20', textAlign: 'center', marginBottom: 4 },
+  devAdminHint: { fontSize: 12, color: '#2E7D32', textAlign: 'center', marginBottom: 8 },
+  devAdminError: { fontSize: 12, color: '#C62828', fontWeight: '600', marginBottom: 8 },
 });
 
 export default LoginScreen;
-

@@ -5,6 +5,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
 import MiniTabBar from '../components/MiniTabBar';
 import ScreenTooltip from '../components/ScreenTooltip';
+// HintBadge + useTrainingMode removed — unused after header refactor
 import { HELP_HISTORY_TOOLTIP } from '../utils/screenTooltips';
 import { COLORS, SIZES } from '../utils/constants';
 import { removeHelpRequest, selectAllHelpRequests, syncFromRequests } from '../redux/slices/helpRequestsSlice';
@@ -15,6 +16,7 @@ import type { DetailItemData } from '../utils/detailViewTypes';
 import type { HelpRequest } from '../types/app';
 import { normalizePhoneText } from '../utils/textUtils';
 import { requireAuthForDetails } from '../utils/authGuard';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 type Lang = 'ua' | 'ru' | 'en';
 type TabKey = 'active' | 'attention' | 'history';
@@ -159,6 +161,7 @@ const getStatusKey = (request: HelpRequest, nowTs: number): 'pending' | 'publish
 const HelpHistoryScreen: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
+  const { colors } = useAppTheme();
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
   const text = UI_TEXT[language];
   const user = useSelector(selectUser);
@@ -360,11 +363,12 @@ const HelpHistoryScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScreenTooltip
         storageKey={HELP_HISTORY_TOOLTIP.storageKey}
         title={HELP_HISTORY_TOOLTIP.title}
         items={HELP_HISTORY_TOOLTIP.items}
+        language={language}
         accentColor={COLORS.primary}
       />
       <FlatList
@@ -649,7 +653,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 40,
     borderRadius: 10,
-    backgroundColor: '#7A1E5C',
+    backgroundColor: '#7d0e59',
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
@@ -690,7 +694,7 @@ const styles = StyleSheet.create({
   },
   createButton: {
     marginTop: 14,
-    backgroundColor: '#7A1E5C',
+    backgroundColor: '#7d0e59',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 11,

@@ -8,6 +8,7 @@ import { openInGoogleMaps } from '../utils/googleMapsLink';
 import { getMapFocusPlaceParams } from '../utils/mapFocusParams';
 import MiniTabBar from '../components/MiniTabBar';
 import { LIGHT_ORBS, SCREEN_THEME } from '../utils/screenTheme';
+import { useAppTheme } from '../hooks/useAppTheme';
 import { chaykaPlaces } from '../services/chaykaPlacesData';
 import { Place, PlaceType } from '../types/app';
 import { RootState } from '../redux/store';
@@ -78,6 +79,7 @@ const UI_TEXT = {
 
 const TopCafeScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const { colors } = useAppTheme();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const text = UI_TEXT[language];
   const [ratings, setRatings] = useState<RatingsByPlace>({});
@@ -146,7 +148,7 @@ const TopCafeScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View style={styles.backgroundLayer}>
         {LIGHT_ORBS.map((orb, index) => (
           <View key={index} style={[styles.orb, orb]} />
@@ -260,7 +262,7 @@ const styles = StyleSheet.create({
   },
   cafeCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 18, padding: 16, marginBottom: 10, borderWidth: 1, borderColor: '#E4D0AB' },
   rank: { width: 44, height: 44, borderRadius: 16, backgroundColor: SCREEN_THEME.terracotta, alignItems: 'center', justifyContent: 'center', marginRight: 12, borderWidth: 1, borderColor: SCREEN_THEME.terracottaDark },
-  rankText: { color: '#FFF9EE', fontWeight: '900', fontSize: 16 },
+  rankText: { color: '#FBF8FD', fontWeight: '900', fontSize: 16 },
   info: { flex: 1 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
   cafeName: { fontSize: 16, fontWeight: '900', color: SCREEN_THEME.textPrimary, flex: 1 },

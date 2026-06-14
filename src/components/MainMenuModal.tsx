@@ -3,11 +3,14 @@ import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'rea
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useDispatch } from 'react-redux';
 import { COLORS } from '../utils/constants';
 import { useTranslation } from '../i18n/useTranslation';
 import { safeNavigate } from '../utils/safeNavigation';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import TactileIcon from './TactileIcon';
+import { setTheme } from '../redux/slices/themeSlice';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
 
@@ -27,6 +30,13 @@ interface MainMenuModalProps {
 const MainMenuModal: React.FC<MainMenuModalProps> = ({ visible, onClose }) => {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const { t } = useTranslation();
+  const dispatch = useDispatch();
+  const { isDark } = useAppTheme();
+
+  const themeLabel =
+    t.menu.title === 'Меню застосунку' ? 'Тема' :
+    t.menu.title === 'Меню приложения' ? 'Тема' :
+    'Theme';
 
   const MAIN_MENU_ITEMS: MenuItem[] = [
     { labelKey: 'home', icon: 'home', tab: 'HomeTab' },
@@ -147,6 +157,27 @@ const MainMenuModal: React.FC<MainMenuModalProps> = ({ visible, onClose }) => {
                 <MaterialCommunityIcons name="chevron-right" size={24} color={SCREEN_THEME.textMuted} />
               </TouchableOpacity>
             ))}
+
+            <View style={styles.sectionDivider} />
+
+            <View style={styles.themeRow}>
+              <TactileIcon icon="theme-light-dark" size={40} iconSize={20} backgroundColor={SCREEN_THEME.cardCream} tint={SCREEN_THEME.enamelBlueDark} />
+              <Text style={styles.menuItemLabel}>{themeLabel}</Text>
+              <View style={styles.themeToggle}>
+                <TouchableOpacity
+                  style={[styles.themeBtn, !isDark && styles.themeBtnActive]}
+                  onPress={() => dispatch(setTheme('light'))}
+                >
+                  <Text style={[styles.themeBtnText, !isDark && styles.themeBtnTextActive]}>☀️</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.themeBtn, isDark && styles.themeBtnActive]}
+                  onPress={() => dispatch(setTheme('dark'))}
+                >
+                  <Text style={[styles.themeBtnText, isDark && styles.themeBtnTextActive]}>🌙</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           </ScrollView>
         </View>
       </View>
@@ -171,7 +202,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   menuHeader: {
-    backgroundColor: '#B85042',
+    backgroundColor: '#420837',
     paddingHorizontal: 16,
     paddingVertical: 20,
     flexDirection: 'row',
@@ -193,7 +224,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 2,
-    backgroundColor: '#8F322A',
+    backgroundColor: '#2E0024',
   },
   menuHeaderGloss: {
     position: 'absolute',
@@ -249,6 +280,36 @@ const styles = StyleSheet.create({
     textShadowColor: SCREEN_THEME.embossDark,
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 1,
+  },
+  themeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  themeToggle: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  themeBtn: {
+    width: 40,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: SCREEN_THEME.cardCream,
+    borderWidth: 1,
+    borderColor: SCREEN_THEME.uiBorder,
+  },
+  themeBtnActive: {
+    backgroundColor: SCREEN_THEME.terracotta,
+    borderColor: SCREEN_THEME.terracottaDark,
+  },
+  themeBtnText: {
+    fontSize: 18,
+  },
+  themeBtnTextActive: {
+    // emoji renders the same, active state indicated by button background
   },
 });
 

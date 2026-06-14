@@ -212,6 +212,8 @@ export interface AudioAttachment {
   transcript?: string;
 }
 
+export type ProblemResolutionStatus = 'new' | 'in_progress' | 'resolved' | 'rejected';
+
 export interface Request {
   id: string;
   userId?: string;
@@ -220,7 +222,7 @@ export interface Request {
   description: string;
   isCensored: boolean;
   isApproved: boolean;
-  status?: 'pending' | 'approved' | 'rejected' | 'expired';
+  status?: 'pending' | 'approved' | 'rejected' | 'expired' | 'closed';
   createdAt: number;
   timestamp: number;
   text?: string;
@@ -236,6 +238,9 @@ export interface Request {
   moderatedBy?: string;
   moderationReason?: string;
   rejectionReason?: string;
+  resolutionStatus?: ProblemResolutionStatus;
+  resolutionStatusUpdatedAt?: number;
+  resolvedAt?: number;
   audio?: AudioAttachment;
   photoUri?: string;
   photoStoragePath?: string;
@@ -259,8 +264,10 @@ export interface HelpRequest {
   subcategory?: string;
   photoUri?: string;
   photoStoragePath?: string;
-  createdAt: Date;
-  expiresAt: Date;
+  userPhotoURL?: string;
+  startAvatarKey?: string;
+  createdAt: string; // ISO string — Redux requires serializable values
+  expiresAt: string; // ISO string — Redux requires serializable values
   isBurning: boolean;
   moderationStatus?: 'pending' | 'approved' | 'rejected' | 'expired';
   submittedForModerationAt?: string;
@@ -277,7 +284,7 @@ export interface CommunityPhoto {
   storagePath?: string;
   uploadedBy: string;
   userId?: string;
-  createdAt: Date;
+  createdAt: number;
   status: 'pending' | 'approved' | 'rejected';
   target?: 'gallery_public' | 'my_photos';
   sourceScreen?: string;
@@ -344,6 +351,7 @@ export interface RequestsState {
   loading: boolean;
   error: string | null;
   approved: Request[];
+  lastFetchedAt: number | null;
 }
 
 export interface HelpRequestsState {
@@ -409,6 +417,29 @@ export interface ElectricityState {
   error: string | null;
 }
 
+// --- Feature Ratings (оцінка функцій додатку) ---
+
+export type FeatureRating = {
+  screenId: string;
+  rating: number;           // середнє (usability + usefulness) / 2
+  ratingUsability: number;  // Зручно — легко знайти що потрібно (1-5)
+  ratingUsefulness: number; // Корисно — для життя на Чайці (1-5)
+  comment: string | null;
+  platform: 'android' | 'ios';
+  appVersion: string;
+  createdAt: number;
+};
+
+export type FeatureRatingSummary = {
+  avgRating: number;
+  avgUsability: number;
+  avgUsefulness: number;
+  totalVotes: number;
+  monthlyAvg: number;
+  monthlyVotes: number;
+  lastUpdated: number;
+};
+
 export interface OsbbState {
   buildingId: string | null;
   street: string | null;
@@ -417,4 +448,40 @@ export interface OsbbState {
   role: 'resident' | 'osbb_manager';
   isSetupDone: boolean;
   viewMode: 'extended' | 'simple';
+}
+
+export type ModerationVerdict = 'approve' | 'review' | 'suspicious';
+
+export interface CommentModeration {
+  verdict: ModerationVerdict;
+  confidence: number;
+  flags: string[];
+  provider: string;
+  model: string;
+}
+
+export type CommentStatus = 'visible' | 'hidden' | 'pending';
+
+export interface Comment {
+  id: string;
+  uid: string;
+  name: string;
+  text: string;
+  createdAt: number;
+  status: CommentStatus;
+  avatarKey?: string;
+  aiModeration?: CommentModeration | null;
+}
+
+export interface HelperOption {
+  uid: string;
+  name: string;
+  avatarKey?: string;
+  commentPreview: string;
+  selected: boolean;
+}
+
+export interface CloseRequestPayload {
+  requestId: string;
+  helperUids: string[];
 }

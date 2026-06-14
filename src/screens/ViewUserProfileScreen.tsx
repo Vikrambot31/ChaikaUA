@@ -14,6 +14,9 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationProp, useNavigation, useRoute } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import ContactReasonModal from '../components/ContactReasonModal';
+import ReportBlockMenu from '../components/ReportBlockMenu';
+import BlockReasonModal from '../components/BlockReasonModal';
+import { reportBlockService } from '../services/reportBlockService';
 import MiniUserAvatar from '../components/MiniUserAvatar';
 import { useContactRequest } from '../hooks/useContactRequest';
 import { pickUserAvatarUri } from '../utils/userAvatar';
@@ -23,6 +26,9 @@ import { LIGHT_ORBS, SCREEN_THEME } from '../utils/screenTheme';
 import {
   loadProfileRecord,
 } from '../services/authProfileService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { auth } from '../firebase-core';
+import { enqueueAndDrainAsync } from '../services/bonusQueue';
 import { profilePermissionService } from '../services/profilePermissionService';
 import { query, ref, get, orderByChild, equalTo } from 'firebase/database';
 import { database } from '../firebase-config';
@@ -30,6 +36,7 @@ import type { JobListing } from '../services/jobService';
 import { getDaysInApp } from '../utils/chaikaLevels';
 import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
 import { requireAuthForDetails } from '../utils/authGuard';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 const UI_TEXT = {
   ua: {
@@ -48,6 +55,13 @@ const UI_TEXT = {
     loading: 'Завантаження...',
     error: 'Помилка',
     errorLoadProfile: 'Не вдалося завантажити профіль',
+    days: 'днів',
+    likes: 'лайків',
+    thankAwarded: '+3 бонуси надіслано!',
+    thankAlready: 'Вже подяковано сьогодні',
+    thankError: 'Помилка. Спробуйте пізніше.',
+    thankSentLabel: 'Подяковано ✓',
+    thankBtnLabel: 'Подякувати +3',
   },
   ru: {
     title: 'Профиль пользователя',
@@ -65,6 +79,13 @@ const UI_TEXT = {
     loading: 'Загрузка...',
     error: 'Ошибка',
     errorLoadProfile: 'Не удалось загрузить профиль',
+    days: 'дней',
+    likes: 'лайков',
+    thankAwarded: '+3 бонуса отправлено!',
+    thankAlready: 'Уже поблагодарено сегодня',
+    thankError: 'Ошибка. Попробуйте позже.',
+    thankSentLabel: 'Поблагодарено ✓',
+    thankBtnLabel: 'Поблагодарить +3',
   },
   en: {
     title: 'User Profile',
@@ -82,6 +103,31 @@ const UI_TEXT = {
     loading: 'Loading...',
     error: 'Error',
     errorLoadProfile: 'Failed to load profile',
+    days: 'days',
+    likes: 'likes',
+    thankAwarded: '+3 bonuses sent!',
+    thankAlready: 'Already thanked today',
+    thankError: 'Error. Please try again.',
+    thankSentLabel: 'Thanked ✓',
+    thankBtnLabel: 'Thank +3',
+  },
+} as const;
+
+const ACTION_TEXT = {
+  ua: {
+    report: 'Поскаржитись',
+    block: 'Заблокувати',
+    unblock: 'Розблокувати',
+  },
+  ru: {
+    report: 'Пожаловаться',
+    block: 'Заблокировать',
+    unblock: 'Разблокировать',
+  },
+  en: {
+    report: 'Report',
+    block: 'Block',
+    unblock: 'Unblock',
   },
 } as const;
 
@@ -136,8 +182,10 @@ const ViewUserProfileScreen: React.FC = () => {
   const { language } = useTranslation();
   const text = UI_TEXT[language];
   const contactText = CONTACT_TEXT[language];
+  const actionText = ACTION_TEXT[language];
   const currentUser = useSelector((state: RootState) => state.auth.user);
   const { modalVisible, pending, currentTarget, openModal, closeModal, sendRequest } = useContactRequest();
+  const { colors } = useAppTheme();
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -151,8 +199,23 @@ const ViewUserProfileScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [jobListing, setJobListing] = useState<JobListing | null>(null);
   const [contactApproved, setContactApproved] = useState(false);
+  const [thankSent, setThankSent] = useState(false);
+  const [reportMenuVisible, setReportMenuVisible] = useState(false);
+  const [blockModalVisible, setBlockModalVisible] = useState(false);
+  const [blockLoading, setBlockLoading] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
   const isAuthenticated = Boolean(currentUser?.id);
   const isOwnProfile = Boolean(userId && currentUser?.id && userId === currentUser.id);
+
+  // Restore daily "already thanked" state from local storage (no server call)
+  useEffect(() => {
+    if (!userId || !currentUser?.id || isOwnProfile) return;
+    const key = `@profile_thanks_${currentUser.id}_${userId}`;
+    const today = new Date().toISOString().slice(0, 10);
+    AsyncStorage.getItem(key).then((stored) => {
+      if (stored === today) setThankSent(true);
+    }).catch(() => {});
+  }, [userId, currentUser?.id, isOwnProfile]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -176,6 +239,20 @@ const ViewUserProfileScreen: React.FC = () => {
     })();
     return () => { cancelled = true; };
   }, [isAuthenticated, userId, currentUser?.id, isOwnProfile]);
+
+  useEffect(() => {
+    if (!userId || !currentUser?.id || isOwnProfile) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const blocked = await reportBlockService.loadBlockedUsers(currentUser.id);
+        if (!cancelled) setIsBlocked(blocked.has(userId));
+      } catch {
+        if (!cancelled) setIsBlocked(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [userId, currentUser?.id, isOwnProfile]);
 
   useEffect(() => {
     const loadUserProfile = async () => {
@@ -238,25 +315,67 @@ const ViewUserProfileScreen: React.FC = () => {
     };
 
     void loadUserProfile();
-  }, [isAuthenticated, userId, text]);
+  }, [isAuthenticated, userId, language]);
 
   const genderLabel = getGenderShortLabel(gender);
   const ageGenderLabel = [
     typeof age === 'number' ? String(age) : '',
     genderLabel,
   ].filter(Boolean).join(' / ');
-  const daysInApp = getDaysInApp(registeredAt);
+  const daysInApp = registeredAt ? getDaysInApp(registeredAt) : 0;
   const profileMeta = [
     ageGenderLabel,
-    `${daysInApp} days`,
-    `${profileLikes} likes`,
+    `${daysInApp} ${text.days}`,
+    `${profileLikes} ${text.likes}`,
   ].filter(Boolean).join(' · ');
 
   const avatarUri = pickUserAvatarUri({ photoURL: profilePhotoURL, startAvatarKey: profileStartAvatarKey });
   const phoneVisible = isOwnProfile || contactApproved;
   const hasPhone = phoneVisible && Boolean(phone.trim());
-  const canRequestContact = Boolean(userId && userId !== currentUser?.id);
+  const canRequestContact = Boolean(userId && userId !== currentUser?.id && !contactApproved);
   const canContact = canRequestContact || hasPhone;
+
+  const handleThank = () => {
+    if (!userId || isOwnProfile) return;
+    const currentUid = auth.currentUser?.uid ?? currentUser?.id;
+    if (!currentUid) return;
+
+    // Check local daily rate limit — no server call needed
+    const key = `@profile_thanks_${currentUid}_${userId}`;
+    const today = new Date().toISOString().slice(0, 10);
+    AsyncStorage.getItem(key).then((stored) => {
+      if (stored === today) {
+        Alert.alert('', text.thankAlready);
+        setThankSent(true);
+        return;
+      }
+      // Optimistic UI — show success immediately, process in background
+      setThankSent(true);
+      AsyncStorage.setItem(key, today).catch(() => {});
+      Alert.alert('', text.thankAwarded);
+      enqueueAndDrainAsync('profile_thanks', { targetUid: userId });
+    }).catch(() => {
+      // If AsyncStorage fails, still proceed optimistically
+      setThankSent(true);
+      AsyncStorage.setItem(key, today).catch(() => {});
+      Alert.alert('', text.thankAwarded);
+      enqueueAndDrainAsync('profile_thanks', { targetUid: userId });
+    });
+  };
+
+  const handleSendRequest = async (reason: string) => {
+    await sendRequest(reason as Parameters<typeof sendRequest>[0]);
+    if (!currentUser?.id || !userId) return;
+    try {
+      const [status, privacyMode] = await Promise.all([
+        profilePermissionService.checkAccess(userId, currentUser.id),
+        profilePermissionService.getPrivacyMode(userId),
+      ]);
+      setContactApproved(status === 'approved' || privacyMode === 'open');
+    } catch {
+      // keep current state
+    }
+  };
 
   const handleCopyPhone = async () => {
     if (!phone) return;
@@ -284,9 +403,47 @@ const ViewUserProfileScreen: React.FC = () => {
     ]);
   };
 
+  const handleBlockConfirm = async (reason: string) => {
+    if (!userId) return;
+    setBlockLoading(true);
+    try {
+      await reportBlockService.setBlockWithReason(userId, reason);
+      setIsBlocked(true);
+      setBlockModalVisible(false);
+      Alert.alert('', isOwnProfile ? '' : language === 'en' ? 'User blocked' : language === 'ru' ? 'Пользователь заблокирован' : 'Користувача заблоковано');
+    } catch {
+      Alert.alert(text.error, language === 'en' ? 'Failed to block user' : language === 'ru' ? 'Не удалось заблокировать' : 'Не вдалося заблокувати');
+    } finally {
+      setBlockLoading(false);
+    }
+  };
+
+  const handleUnblock = () => {
+    if (!userId) return;
+    Alert.alert(
+      language === 'en' ? 'Unblock user' : language === 'ru' ? 'Разблокировать пользователя' : 'Розблокувати користувача',
+      language === 'en' ? 'Are you sure?' : language === 'ru' ? 'Вы уверены?' : 'Ви впевнені?',
+      [
+        { text: language === 'en' ? 'Cancel' : language === 'ru' ? 'Отмена' : 'Скасувати', style: 'cancel' },
+        {
+          text: language === 'en' ? 'Unblock' : language === 'ru' ? 'Разблокировать' : 'Розблокувати',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await reportBlockService.removeBlock(userId);
+              setIsBlocked(false);
+            } catch {
+              Alert.alert(text.error, language === 'en' ? 'Failed to unblock' : language === 'ru' ? 'Не удалось разблокировать' : 'Не вдалося розблокувати');
+            }
+          },
+        },
+      ],
+    );
+  };
+
   if (!isAuthenticated) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
         <View style={styles.centerContent}>
           <MaterialCommunityIcons name="lock-outline" size={42} color={SCREEN_THEME.terracotta} />
           <Text style={styles.loadingText}>
@@ -299,7 +456,7 @@ const ViewUserProfileScreen: React.FC = () => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={SCREEN_THEME.textPrimary} />
           <Text style={styles.loadingText}>{text.loading}</Text>
@@ -309,7 +466,7 @@ const ViewUserProfileScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View style={styles.backgroundLayer}>
         {LIGHT_ORBS.map((orb, index) => (
           <View key={index} style={[styles.orb, orb]} />
@@ -374,6 +531,17 @@ const ViewUserProfileScreen: React.FC = () => {
             <Text style={[styles.contactBtnText, !canContact && styles.disabledText]}>{contactText.contact}</Text>
           </TouchableOpacity>
 
+          {!isOwnProfile && isAuthenticated ? (
+            <TouchableOpacity
+              style={[styles.thankBtn, thankSent && styles.thankBtnDone]}
+              onPress={() => void handleThank()}
+              disabled={thankSent}
+              activeOpacity={0.86}
+            >
+              <Text style={styles.thankBtnText}>{thankSent ? text.thankSentLabel : text.thankBtnLabel}</Text>
+            </TouchableOpacity>
+          ) : null}
+
           <Text style={styles.inputLabel}>{text.cityLabel}</Text>
           <View style={styles.valueBox}>
             <Text style={styles.valueText}>{city || '—'}</Text>
@@ -390,12 +558,60 @@ const ViewUserProfileScreen: React.FC = () => {
             </View>
           </View>
         )}
+
+        {!isOwnProfile && isAuthenticated ? (
+          <TouchableOpacity
+            style={styles.reportBtn}
+            onPress={() => setReportMenuVisible(true)}
+            activeOpacity={0.86}
+          >
+            <MaterialCommunityIcons name="flag-outline" size={18} color="#B91C1C" />
+            <Text style={styles.reportBtnText}>{actionText.report}</Text>
+          </TouchableOpacity>
+        ) : null}
+
+        {!isOwnProfile && isAuthenticated ? (
+          <TouchableOpacity
+            style={isBlocked ? styles.unblockBtn : styles.blockBtn}
+            onPress={isBlocked ? handleUnblock : () => setBlockModalVisible(true)}
+            activeOpacity={0.86}
+          >
+            <MaterialCommunityIcons
+              name={isBlocked ? 'account-check-outline' : 'block-helper'}
+              size={18}
+              color={isBlocked ? '#2E7D4F' : '#B91C1C'}
+            />
+            <Text style={isBlocked ? styles.unblockBtnText : styles.blockBtnText}>
+              {isBlocked ? actionText.unblock : actionText.block}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
       </ScrollView>
+      <ReportBlockMenu
+        visible={reportMenuVisible}
+        onClose={() => setReportMenuVisible(false)}
+        listingId={userId}
+        reportedUserId={userId}
+        currentUserId={currentUser?.id || ''}
+        language={language as 'ua' | 'ru' | 'en'}
+        hideBlock
+        source="profile_report"
+        onBlock={() => {
+          setReportMenuVisible(false);
+        }}
+      />
+      <BlockReasonModal
+        visible={blockModalVisible}
+        loading={blockLoading}
+        userName={name}
+        onConfirm={handleBlockConfirm}
+        onClose={() => setBlockModalVisible(false)}
+      />
       <ContactReasonModal
         visible={modalVisible}
         pending={pending}
         target={currentTarget}
-        onSelect={(reason) => void sendRequest(reason)}
+        onSelect={(reason) => void handleSendRequest(reason)}
         onClose={closeModal}
       />
     </SafeAreaView>
@@ -541,6 +757,21 @@ const styles = StyleSheet.create({
   disabledText: {
     color: '#9F958E',
   },
+  thankBtn: {
+    alignItems: 'center',
+    backgroundColor: '#2E7D4F',
+    borderRadius: 16,
+    paddingVertical: 12,
+    marginTop: 8,
+  },
+  thankBtnDone: {
+    backgroundColor: '#7A9E85',
+  },
+  thankBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '900',
+  },
   metaText: {
     marginTop: 5,
     fontSize: 12,
@@ -588,6 +819,54 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     color: SCREEN_THEME.textPrimary,
     fontWeight: '500',
+  },
+  reportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#FFF0EE',
+    borderRadius: 16,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#F5D0CC',
+  },
+  reportBtnText: {
+    color: '#B91C1C',
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  blockBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#FFF0EE',
+    borderRadius: 16,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#F5D0CC',
+  },
+  blockBtnText: {
+    color: '#B91C1C',
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  unblockBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#EEF7F0',
+    borderRadius: 16,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#C8E6D0',
+  },
+  unblockBtnText: {
+    color: '#2E7D4F',
+    fontSize: 15,
+    fontWeight: '900',
   },
 });
 

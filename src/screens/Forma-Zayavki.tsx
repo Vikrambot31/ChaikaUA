@@ -1,9 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAppTheme } from '../hooks/useAppTheme';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   SafeAreaView,
   ScrollView,
@@ -26,9 +28,12 @@ import { checkYellowList } from '../utils/yellowListCheck';
 import { normalizePersonName, sanitizeStoredText } from '../utils/textUtils';
 import { normalizeUkrainianPhoneStrict, validateName, validatePhone } from '../utils/validators';
 import { useOperationTrace } from '../hooks/useOperationTrace';
+import { useTrainingMode } from '../hooks/useTrainingMode';
+import TrainingHint from '../components/TrainingHint';
+import HintBadge, { HINT_BADGE_LABELS } from '../components/HintBadge';
 
 type Lang = 'ua' | 'ru' | 'en';
-type RequestMode = 'need_help' | 'offer_help' | 'business';
+type RequestMode = 'need_help' | 'offer_help';
 type FieldKey = 'name' | 'phone' | 'helpType' | 'description';
 type FieldTone = 'idle' | 'valid' | 'error' | 'warning';
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
@@ -41,7 +46,6 @@ type FieldState = {
 const REQUEST_MODES = [
   { value: 'need_help', icon: 'hand-heart-outline', label: { ua: 'Прошу допомоги', ru: 'Прошу помощи', en: 'Need help' } },
   { value: 'offer_help', icon: 'account-heart-outline', label: { ua: 'Пропоную допомогу', ru: 'Предлагаю помощь', en: 'Offer help' } },
-  { value: 'business', icon: 'storefront-outline', label: { ua: 'Мій бізнес', ru: 'Мой бизнес', en: 'My business' } },
 ] as const satisfies ReadonlyArray<{
   value: RequestMode;
   icon: IconName;
@@ -55,6 +59,15 @@ const HELP_TYPES = [
   { value: 'transport', icon: 'car-outline', label: { ua: 'Транспорт', ru: 'Транспорт', en: 'Transport' } },
   { value: 'shopping', icon: 'cart-outline', label: { ua: 'Покупки', ru: 'Покупки', en: 'Shopping' } },
   { value: 'documents', icon: 'file-document-outline', label: { ua: 'Документи', ru: 'Документы', en: 'Documents' } },
+  { value: 'education', icon: 'school-outline', label: { ua: 'Освіта', ru: 'Образование', en: 'Education' } },
+  { value: 'legal', icon: 'gavel', label: { ua: 'Правова допомога', ru: 'Правовая помощь', en: 'Legal help' } },
+  { value: 'it', icon: 'laptop', label: { ua: 'IT підтримка', ru: 'IT поддержка', en: 'IT support' } },
+  { value: 'childcare', icon: 'baby-carriage', label: { ua: 'Догляд за дітьми', ru: 'Уход за детьми', en: 'Childcare' } },
+  { value: 'pet', icon: 'paw', label: { ua: 'Опіка за тваринами', ru: 'Уход за животными', en: 'Pet care' } },
+  { value: 'cooking', icon: 'chef-hat', label: { ua: 'Готування', ru: 'Готовка', en: 'Cooking' } },
+  { value: 'moving', icon: 'truck', label: { ua: 'Переїзд', ru: 'Переезд', en: 'Moving' } },
+  { value: 'garden', icon: 'flower-outline', label: { ua: 'Садівництво', ru: 'Садоводство', en: 'Gardening' } },
+  { value: 'cleaning', icon: 'spray-bottle', label: { ua: 'Прибирання', ru: 'Уборка', en: 'Cleaning' } },
   { value: 'other', icon: 'dots-horizontal-circle-outline', label: { ua: 'Інше', ru: 'Другое', en: 'Other' } },
 ] as const;
 
@@ -272,6 +285,12 @@ const TEXT_BY_LANG = {
   },
 } as const;
 
+const TRAINING_HINT: Record<Lang, string> = {
+  ua: 'Заповни імʼя та телефон, вибери тип допомоги, опиши ситуацію і натисни Надіслати.',
+  ru: 'Заполни имя и телефон, выбери тип помощи, опиши ситуацию и нажми Отправить.',
+  en: 'Fill in your name and phone, pick a help type, describe the situation and tap Send.',
+};
+
 const toneIcon: Record<FieldTone, IconName> = {
   idle: 'circle-outline',
   valid: 'check-circle',
@@ -432,11 +451,13 @@ const RequestFormScreen: React.FC = () => {
   const language = useSelector((state: RootState) => normalizeLanguage(state.language?.current)) as Lang;
   const user = useSelector((state: RootState) => state.auth.user);
   const { startOperation, trace } = useOperationTrace('Forma-Zayavki');
+  const training = useTrainingMode('forma_zayavki');
   const [requestMode, setRequestMode] = useState<RequestMode>('need_help');
   const [name, setName] = useState(user?.name ?? '');
   const [phone, setPhone] = useState(() => formatPhoneInput(user?.phone || '+38'));
   const [helpType, setHelpType] = useState('');
   const [description, setDescription] = useState('');
+  const [helpTypeMenuVisible, setHelpTypeMenuVisible] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submittedOnce, setSubmittedOnce] = useState(false);
@@ -516,11 +537,9 @@ const RequestFormScreen: React.FC = () => {
   const helpTypeReady = Boolean(helpType);
   const descriptionReady = Boolean(cleanDescription && cleanDescription.length >= MIN_DESCRIPTION_LENGTH);
   const formReady = nameReady && phoneReady && helpTypeReady && descriptionReady;
-  const descriptionPlaceholder = requestMode === 'business'
-    ? t.businessPlaceholder
-    : requestMode === 'offer_help'
-      ? t.offerPlaceholder
-      : t.descriptionPlaceholder;
+  const descriptionPlaceholder = requestMode === 'offer_help'
+    ? t.offerPlaceholder
+    : t.descriptionPlaceholder;
   const submitCategory = requestMode === 'need_help' ? helpType : requestMode;
   const submitSubcategory = requestMode === 'need_help' ? helpType : `${requestMode}:${helpType}`;
   const modeLabel = REQUEST_MODES.find((mode) => mode.value === requestMode)?.label[language] ?? '';
@@ -672,7 +691,7 @@ const RequestFormScreen: React.FC = () => {
         category: submitCategory,
         group: requestGroup,
         subcategory: submitSubcategory,
-        building: 'Чайка',
+        building: user?.houseNumber ? `Чайка, буд. ${user.houseNumber}` : 'Чайка',
         text: finalDescription,
         description: finalDescription,
         ...(requestPhoto ?? {}),
@@ -682,7 +701,6 @@ const RequestFormScreen: React.FC = () => {
         const friendlyError = getSubmitFailureMessage(result.error || t.sendFailed, t);
         setSubmitError(friendlyError);
         trace('api_call', 'fail', { reason: 'resultNotSuccess' });
-        Alert.alert(t.errorTitle, friendlyError);
         return;
       }
       trace('api_call', 'success');
@@ -719,9 +737,10 @@ const RequestFormScreen: React.FC = () => {
   const descriptionExtra = cleanDescription.length > 0 && cleanDescription.length < MIN_DESCRIPTION_LENGTH
     ? fillTemplate(t.descriptionLeft, { left: MIN_DESCRIPTION_LENGTH - cleanDescription.length })
     : undefined;
+  const { colors, isDark } = useAppTheme();
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <KeyboardAvoidingView
         style={styles.keyboard}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -733,12 +752,19 @@ const RequestFormScreen: React.FC = () => {
         >
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} activeOpacity={0.84}>
             <MaterialCommunityIcons name="arrow-left" size={20} color={SCREEN_THEME.textPrimary} />
-            <Text style={styles.backText}>{t.back}</Text>
+            <Text style={[styles.backText, { color: isDark ? '#F5E8F0' : undefined }]}>{t.back}</Text>
           </TouchableOpacity>
 
           <View style={styles.heroCard}>
             <Text style={styles.title}>{t.title}</Text>
-            <Text style={styles.subtitle}>{t.subtitle}</Text>
+            <View style={{ position: 'absolute', top: 12, right: 12, zIndex: 10 }}>
+              <HintBadge
+                visible={training.isVisible}
+                onTap={training.openHint}
+                onDismiss={training.dismiss}
+                label={HINT_BADGE_LABELS[language]}
+              />
+            </View>
           </View>
 
           {submitError ? (
@@ -800,37 +826,83 @@ const RequestFormScreen: React.FC = () => {
             <FieldMessage state={fieldStates.phone} visible={activeIssueKey === 'phone'} />
 
             <FieldHeader label={t.helpType} state={fieldStates.helpType} />
-            <View style={styles.helpTypeGrid}>
-              {HELP_TYPES.map((item) => {
-                const active = helpType === item.value;
-                return (
-                  <TouchableOpacity
-                    key={item.value}
-                    style={[
-                      styles.helpTypeChip,
-                      fieldStates.helpType.tone === 'error' && !helpType && styles.inputError,
-                      active && styles.helpTypeChipActive,
-                    ]}
-                    activeOpacity={0.86}
-                    disabled={submitting}
-                    onPress={() => {
-                      setHelpType(item.value);
-                      markTouched('helpType');
-                    }}
-                  >
-                    <MaterialCommunityIcons
-                      name={item.icon}
-                      size={17}
-                      color={active ? '#FFFFFF' : SCREEN_THEME.terracotta}
-                    />
-                    <Text style={[styles.helpTypeChipText, active && styles.helpTypeChipTextActive]} numberOfLines={1}>
-                      {item.label[language]}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+            <TouchableOpacity
+              style={[
+                styles.input,
+                styles.helpTypeSelector,
+                fieldStates.helpType.tone === 'error' && !helpType && styles.inputError,
+                !!helpType && styles.inputValid,
+              ]}
+              activeOpacity={0.86}
+              disabled={submitting}
+              onPress={() => {
+                markTouched('helpType');
+                setHelpTypeMenuVisible(true);
+              }}
+            >
+              {helpType ? (
+                <>
+                  <MaterialCommunityIcons
+                    name={HELP_TYPES.find((item) => item.value === helpType)?.icon ?? 'help-circle-outline'}
+                    size={18}
+                    color={SCREEN_THEME.terracotta}
+                  />
+                  <Text style={styles.helpTypeSelectorText}>
+                    {HELP_TYPES.find((item) => item.value === helpType)?.label[language] ?? ''}
+                  </Text>
+                </>
+              ) : (
+                <Text style={styles.helpTypeSelectorPlaceholder}>{t.chooseType}</Text>
+              )}
+              <MaterialCommunityIcons name="chevron-down" size={20} color={SCREEN_THEME.textSecondary} style={styles.helpTypeSelectorChevron} />
+            </TouchableOpacity>
             <FieldMessage state={fieldStates.helpType} visible={activeIssueKey === 'helpType'} />
+
+            <Modal
+              visible={helpTypeMenuVisible}
+              transparent
+              animationType="fade"
+              onRequestClose={() => setHelpTypeMenuVisible(false)}
+            >
+              <TouchableOpacity
+                style={styles.helpTypeOverlay}
+                activeOpacity={1}
+                onPress={() => setHelpTypeMenuVisible(false)}
+              >
+                <View style={styles.helpTypeModal}>
+                  {HELP_TYPES.map((item, index) => {
+                    const active = helpType === item.value;
+                    return (
+                      <TouchableOpacity
+                        key={item.value}
+                        style={[
+                          styles.helpTypeModalItem,
+                          index < HELP_TYPES.length - 1 && styles.helpTypeModalItemBorder,
+                          active && styles.helpTypeModalItemActive,
+                        ]}
+                        activeOpacity={0.86}
+                        onPress={() => {
+                          setHelpType(item.value);
+                          setHelpTypeMenuVisible(false);
+                        }}
+                      >
+                        <MaterialCommunityIcons
+                          name={item.icon}
+                          size={20}
+                          color={active ? '#FFFFFF' : SCREEN_THEME.terracotta}
+                        />
+                        <Text style={[styles.helpTypeModalItemText, active && styles.helpTypeModalItemTextActive]}>
+                          {item.label[language]}
+                        </Text>
+                        {active && (
+                          <MaterialCommunityIcons name="check" size={18} color="#FFFFFF" style={{ marginLeft: 'auto' }} />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </TouchableOpacity>
+            </Modal>
 
             <FieldHeader label={t.description} state={fieldStates.description} />
             <TextInput
@@ -879,6 +951,9 @@ const RequestFormScreen: React.FC = () => {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      {training.showHint && (
+        <TrainingHint text={TRAINING_HINT[language]} onDismiss={training.closeHint} />
+      )}
     </SafeAreaView>
   );
 };
@@ -989,35 +1064,63 @@ const styles = StyleSheet.create({
   inputError: { borderColor: '#B84A3A', backgroundColor: '#FFF7F5' },
   inputValid: { borderColor: '#2F7D50', backgroundColor: '#FBFFFC' },
   textArea: { minHeight: 118, paddingTop: 12, lineHeight: 21 },
-  helpTypeGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  helpTypeChip: {
-    minHeight: 42,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#D9BF91',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 10,
-    paddingVertical: 9,
+  helpTypeSelector: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    maxWidth: '48%',
+    gap: 8,
+    paddingVertical: 0,
   },
-  helpTypeChipActive: {
-    backgroundColor: SCREEN_THEME.terracotta,
-    borderColor: SCREEN_THEME.terracotta,
-  },
-  helpTypeChipText: {
+  helpTypeSelectorText: {
+    flex: 1,
     color: SCREEN_THEME.textPrimary,
-    fontSize: 13,
-    lineHeight: 16,
-    fontWeight: '900',
+    fontSize: 15,
+    fontWeight: '700',
   },
-  helpTypeChipTextActive: { color: '#FFFFFF' },
+  helpTypeSelectorPlaceholder: {
+    flex: 1,
+    color: SCREEN_THEME.textSecondary,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  helpTypeSelectorChevron: {
+    marginLeft: 'auto',
+  },
+  helpTypeOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  helpTypeModal: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E4D0AB',
+  },
+  helpTypeModalItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    backgroundColor: '#FFFFFF',
+  },
+  helpTypeModalItemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0E5CF',
+  },
+  helpTypeModalItemActive: {
+    backgroundColor: SCREEN_THEME.terracotta,
+  },
+  helpTypeModalItemText: {
+    color: SCREEN_THEME.textPrimary,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  helpTypeModalItemTextActive: {
+    color: '#FFFFFF',
+  },
   counterRow: {
     marginTop: 6,
     flexDirection: 'row',
@@ -1032,7 +1135,7 @@ const styles = StyleSheet.create({
     marginTop: 18,
     minHeight: 52,
     borderRadius: 16,
-    backgroundColor: SCREEN_THEME.terracotta,
+    backgroundColor: '#7d0e59',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

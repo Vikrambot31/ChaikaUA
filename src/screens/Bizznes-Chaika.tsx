@@ -6,14 +6,17 @@ import { NavigationProp, useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import MiniTabBar from '../components/MiniTabBar';
+import { FeatureRatingBanner } from '../components/FeatureRatingBanner';
 import MiniUserAvatar from '../components/MiniUserAvatar';
 import AppPhotoImage from '../components/AppPhotoImage';
 import { SCREEN_THEME } from '../utils/screenTheme';
+import { useAppTheme } from '../hooks/useAppTheme';
 import { normalizePhoneText, sanitizeStoredText } from '../utils/textUtils';
 import { RootState } from '../redux/store';
 import { getModerationUserMessage, showUserError } from '../utils/userFacingErrors';
 import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField';
-import { equalTo, get, limitToLast, onValue, orderByChild, push, query, ref, remove } from 'firebase/database';
+import UploadedPhotosGrid from '../components/UploadedPhotosGrid';
+import { equalTo, get, limitToLast, onValue, orderByChild, push, query, ref, remove, update } from 'firebase/database';
 import { database } from '../firebase-config';
 import { useContactRequest } from '../hooks/useContactRequest';
 import ContactReasonModal from '../components/ContactReasonModal';
@@ -31,10 +34,13 @@ import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 import { useOperationTrace } from '../hooks/useOperationTrace';
 import { createPendingModeration, type ModerationStatus } from '../utils/moderation';
 import { resolveMediaAccessUrls } from '../services/mediaAccess';
+import { VideoLoadingOverlay } from '../components/VideoLoadingOverlay';
 import { ensureFirebaseAuth, requireWriteSession } from '../firebase-auth-session';
 import { getBuildingsByStreet, getStreets } from '../data/buildings';
-import { subscribeActiveBonusPromotions, type BonusPromotion } from '../services/bonusService';
+import { subscribeActiveBonusPromotions, subscribeBiznesPlusPlaces, type BonusPromotion } from '../services/bonusService';
 import ScreenTooltip from '../components/ScreenTooltip';
+import HintBadge, { HINT_BADGE_LABELS } from '../components/HintBadge';
+import { useTrainingMode } from '../hooks/useTrainingMode';
 import { BUSINESS_CHAIKA_TOOLTIP } from '../utils/screenTooltips';
 
 const BIZ_LISTING_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -302,7 +308,8 @@ const biznesChaikaService = {
           ? Object.entries(raw as Record<string, any>)
               .map(([id, data]) => mapBizItem(id, data))
               .filter((item) => {
-                const expired = item.expiresAt && new Date(item.expiresAt).getTime() < now;
+                const expiresAtMs = item.expiresAt ? new Date(item.expiresAt).getTime() : NaN;
+                const expired = !isNaN(expiresAtMs) && expiresAtMs < now;
                 return item.moderationStatus === 'approved' && !expired;
               })
               .reverse()
@@ -438,6 +445,60 @@ const biznesChaikaService = {
       throw error;
     }
   },
+
+  async edit(id: string, fields: Partial<Omit<BizListing, 'id' | 'userId' | 'createdAt'>>): Promise<void> {
+    try {
+      const user = await requireWriteSession({
+        operation: 'edit',
+        screen: 'Bizznes-Chaika',
+      });
+      const snapshot = await get(ref(database, `${BIZ_LISTINGS_PATH}/${id}`));
+      const existing = snapshot.exists() ? snapshot.val() as Partial<BizListing> : null;
+      if (!existing || existing.userId !== user.uid) {
+        throw new Error('owner_required');
+      }
+      const EDIT_COOLDOWN_MS = 3 * 24 * 60 * 60 * 1000;
+      const lastEdited = (existing as any).lastEditedAt ? new Date((existing as any).lastEditedAt).getTime() : 0;
+      if (lastEdited && Date.now() - lastEdited < EDIT_COOLDOWN_MS) {
+        throw new Error('edit_cooldown');
+      }
+      if (existing.moderationStatus === 'pending') {
+        throw new Error('edit_while_pending');
+      }
+      const pendingModeration = createPendingModeration();
+      const patch: Record<string, unknown> = {};
+      if (fields.itemName !== undefined) patch.itemName = sanitizeStoredText(fields.itemName);
+      if (fields.contactName !== undefined) patch.contactName = sanitizeStoredText(fields.contactName);
+      if (fields.category !== undefined) patch.category = sanitizeStoredText(fields.category);
+      if (fields.condition !== undefined) patch.condition = sanitizeStoredText(fields.condition);
+      if (fields.price !== undefined) patch.price = normalizeStoredBizPrice(fields.price);
+      if (fields.description !== undefined) patch.description = sanitizeStoredText(fields.description);
+      if (fields.phone !== undefined) patch.phone = sanitizeStoredText(fields.phone);
+      if (fields.showPhone !== undefined) patch.showPhone = fields.showPhone;
+      if (fields.workFormat !== undefined) patch.workFormat = sanitizeStoredText(fields.workFormat);
+      if (fields.workHours !== undefined) patch.workHours = sanitizeStoredText(fields.workHours);
+      if (fields.locationArea !== undefined) patch.locationArea = sanitizeStoredText(fields.locationArea);
+      if (fields.locationStreet !== undefined) patch.locationStreet = sanitizeStoredText(fields.locationStreet);
+      if (fields.locationHouseNumber !== undefined) patch.locationHouseNumber = sanitizeStoredText(fields.locationHouseNumber);
+      if (fields.photoStoragePath !== undefined) {
+        patch.photoStoragePath = fields.photoStoragePath;
+        patch.photoUri = '';
+      }
+      if (fields.language !== undefined) patch.language = normalizeAppLang(fields.language, 'ua');
+      const descText = (patch.description as string) ?? existing.description ?? '';
+      const nameText = (patch.itemName as string) ?? existing.itemName ?? '';
+      const lang = (patch.language as AppLang) ?? existing.language ?? 'ua';
+      assertTextMatchesLanguage(`${nameText} ${descText}`.trim(), lang);
+      patch.moderationStatus = pendingModeration.moderationStatus;
+      patch.submittedForModerationAt = pendingModeration.submittedForModerationAt;
+      patch.lastEditedAt = new Date().toISOString();
+      patch.expiresAt = new Date(Date.now() + BIZ_LISTING_TTL_MS).toISOString();
+      await update(ref(database, `${BIZ_LISTINGS_PATH}/${id}`), patch);
+    } catch (error) {
+      console.error('[biznesChaikaService] edit failed:', error);
+      throw error;
+    }
+  },
 };
 
 const WORK_FORMAT_LABELS = {
@@ -478,6 +539,7 @@ const UI_TEXT = {
     contactNameLabel: 'Контактна особа',
     contactNamePlaceholder: 'Ім\'я людини для зв\'язку',
     photoLabel: 'Фото',
+    photoUploading: 'Дочекайтесь завершення завантаження фото.',
     addPhoto: 'Обрати з Моїх фотографій',
     removePhoto: 'Прибрати фото',
     descriptionLabel: 'Опис бізнесу',
@@ -571,6 +633,13 @@ const UI_TEXT = {
     live: 'НАЖИВО',
     liveCount: (count: number) => `всього ${count} бізнесів на Чайці`,
     topAnketyTitle: 'Топ бізнеси',
+    editBtn: 'Редагувати',
+    editTitle: 'Редагування бізнесу',
+    editSaveBtn: 'Зберегти зміни',
+    editSuccessTitle: 'Готово',
+    editSuccessMsg: 'Бізнес оновлено. Зміни надіслано на модерацію.',
+    editCooldownMsg: 'Редагувати можна раз на 3 дні. Спробуйте пізніше.',
+    editWhilePendingMsg: 'Бізнес зараз на модерації. Дочекайтесь результату.',
   },
   ru: {
     title: 'Бизнес на Чайке',
@@ -587,6 +656,7 @@ const UI_TEXT = {
     contactNameLabel: 'Контактное лицо',
     contactNamePlaceholder: 'Имя человека для связи',
     photoLabel: 'Фото',
+    photoUploading: 'Дождитесь завершения загрузки фото.',
     addPhoto: 'Выбрать из Моих фотографий',
     removePhoto: 'Убрать фото',
     descriptionLabel: 'Описание бизнеса',
@@ -680,6 +750,13 @@ const UI_TEXT = {
     live: 'В ЭФИРЕ',
     liveCount: (count: number) => `всего ${count} бизнесов на Чайке`,
     topAnketyTitle: 'Топ бизнесы',
+    editBtn: 'Редактировать',
+    editTitle: 'Редактирование бизнеса',
+    editSaveBtn: 'Сохранить изменения',
+    editSuccessTitle: 'Готово',
+    editSuccessMsg: 'Бизнес обновлен. Изменения отправлены на модерацию.',
+    editCooldownMsg: 'Редактировать можно раз в 3 дня. Попробуйте позже.',
+    editWhilePendingMsg: 'Бизнес на модерации. Дождитесь результата.',
   },
   en: {
     title: 'Business at Chaika',
@@ -696,6 +773,7 @@ const UI_TEXT = {
     contactNameLabel: 'Contact person',
     contactNamePlaceholder: 'Name of the person to contact',
     photoLabel: 'Photo',
+    photoUploading: 'Wait until the photo upload finishes.',
     addPhoto: 'Choose from My photos',
     removePhoto: 'Remove photo',
     descriptionLabel: 'Business description',
@@ -789,6 +867,13 @@ const UI_TEXT = {
     live: 'LIVE',
     liveCount: (count: number) => `${count} businesses at Chaika`,
     topAnketyTitle: 'Top businesses',
+    editBtn: 'Edit',
+    editTitle: 'Edit business',
+    editSaveBtn: 'Save changes',
+    editSuccessTitle: 'Done',
+    editSuccessMsg: 'Business updated. Changes sent for moderation.',
+    editCooldownMsg: 'You can edit once every 3 days. Try later.',
+    editWhilePendingMsg: 'Business is under moderation. Wait for the result.',
   },
 } as const;
 
@@ -796,11 +881,13 @@ const BiznesChaikaScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const navLock = useRef(false);
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
+  const training = useTrainingMode('business_chaika');
+  const { colors } = useAppTheme();
   const user = useSelector((state: RootState) => state.auth.user);
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const text = UI_TEXT[language];
   const toast = useSoftToast();
-  const { startOperation, trace } = useOperationTrace('Biznes-XXX');
+  const { startOperation, trace } = useOperationTrace('Bizznes-Chaika');
   const [itemName, setItemName] = useState('');
   const [category, setCategory] = useState('');
   const [condition, setCondition] = useState('');
@@ -834,6 +921,25 @@ const BiznesChaikaScreen: React.FC = () => {
   const [searchDescription, setSearchDescription] = useState('');
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [activePromotions, setActivePromotions] = useState<BonusPromotion[]>([]);
+  const [biznesPlusIds, setBiznesPlusIds] = useState<string[]>([]);
+  const [editingItem, setEditingItem] = useState<BizListing | null>(null);
+  const [editFormVisible, setEditFormVisible] = useState(false);
+  const [editItemName, setEditItemName] = useState('');
+  const [editContactName, setEditContactName] = useState('');
+  const [editCategory, setEditCategory] = useState('');
+  const [editCondition, setEditCondition] = useState('');
+  const [editPriceFrom, setEditPriceFrom] = useState('');
+  const [editPriceTo, setEditPriceTo] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editShowPhone, setEditShowPhone] = useState(true);
+  const [editWorkFormat, setEditWorkFormat] = useState('');
+  const [editWorkHours, setEditWorkHours] = useState('');
+  const [editLocationArea, setEditLocationArea] = useState('');
+  const [editLocationStreet, setEditLocationStreet] = useState('');
+  const [editLocationHouseNumber, setEditLocationHouseNumber] = useState('');
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [editSubmitAttempted, setEditSubmitAttempted] = useState(false);
   const blinkAnim = useRef(new Animated.Value(1)).current;
   const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestDraftRef = useRef({ itemName, category, condition, priceFrom, priceTo, description, phone, contactName, addFormVisible, isExtraExpanded, workFormat, workHours, locationArea, locationStreet, locationHouseNumber });
@@ -849,6 +955,11 @@ const BiznesChaikaScreen: React.FC = () => {
   const chaikaBuildingsInStreet = useMemo(
     () => (locationStreet ? getBuildingsByStreet(locationStreet) : []),
     [locationStreet],
+  );
+
+  const editBuildingsInStreet = useMemo(
+    () => (editLocationStreet ? getBuildingsByStreet(editLocationStreet) : []),
+    [editLocationStreet],
   );
 
   const handleLocationStreetChange = useCallback((street: string) => {
@@ -887,7 +998,11 @@ const BiznesChaikaScreen: React.FC = () => {
       closeMsg,
       [
         { text: language === 'ua' ? 'Ні' : language === 'ru' ? 'Нет' : 'No', style: 'cancel' },
-        { text: language === 'ua' ? 'Так' : language === 'ru' ? 'Да' : 'Yes', onPress: () => setAddFormVisible(false) },
+        { text: language === 'ua' ? 'Так' : language === 'ru' ? 'Да' : 'Yes', onPress: () => {
+          skipNextDraftFlushRef.current = true;
+          void AsyncStorage.removeItem(BIZ_DRAFT_KEY).catch(() => {});
+          setAddFormVisible(false);
+        }},
       ],
     );
   }, [category, condition, contactName, description, formPhotos.length, itemName, language, locationArea, locationHouseNumber, locationStreet, phone, priceFrom, priceTo, showPhoneOnCard, user?.phone, workFormat, workHours]);
@@ -940,6 +1055,10 @@ const BiznesChaikaScreen: React.FC = () => {
 
   useEffect(() => {
     return subscribeActiveBonusPromotions('business', setActivePromotions);
+  }, []);
+
+  useEffect(() => {
+    return subscribeBiznesPlusPlaces('business', setBiznesPlusIds);
   }, []);
 
   useEffect(() => {
@@ -1119,8 +1238,15 @@ const BiznesChaikaScreen: React.FC = () => {
         .map((promotion, index) => [promotion.targetId, index]),
     );
     return [...listings]
-      .filter((item) => !item.isArchived && (item.photoUri || item.photoStoragePath || promotedByListingId.has(item.id)))
+      .filter((item) => item.moderationStatus === 'approved' && !item.isArchived && (item.photoUri || item.photoStoragePath || promotedByListingId.has(item.id) || biznesPlusIds.includes(item.id)))
       .sort((a, b) => {
+        const aPlus = biznesPlusIds.indexOf(a.id);
+        const bPlus = biznesPlusIds.indexOf(b.id);
+        if (aPlus !== -1 || bPlus !== -1) {
+          if (aPlus === -1) return 1;
+          if (bPlus === -1) return -1;
+          return aPlus - bPlus;
+        }
         const aPromoted = promotedByListingId.get(a.id);
         const bPromoted = promotedByListingId.get(b.id);
         if (aPromoted !== undefined || bPromoted !== undefined) {
@@ -1131,7 +1257,7 @@ const BiznesChaikaScreen: React.FC = () => {
         return (b.createdAt || '').localeCompare(a.createdAt || '');
       })
       .slice(0, 10);
-  }, [activePromotions, listings]);
+  }, [activePromotions, biznesPlusIds, listings]);
 
   const hasAdvancedSearch = useMemo(
     () =>
@@ -1215,7 +1341,7 @@ const BiznesChaikaScreen: React.FC = () => {
 
     const trimmedItemName = itemName.trim();
 
-    if (!category || !condition || !description.trim() || !phone.trim() || !priceValid) {
+    if (!category || !condition || !description.trim() || !phone.trim()) {
       trace('validate', 'fail', { missing: 'requiredFields' });
       toast.showWarning(text.errorTitle, text.errorFill);
       return;
@@ -1238,6 +1364,12 @@ const BiznesChaikaScreen: React.FC = () => {
       return;
     }
     trace('validate', 'success');
+
+    const hasUploadingPhotos = formPhotos.some((p) => p.status === 'uploading');
+    if (hasUploadingPhotos) {
+      toast.showWarning(text.errorTitle, text.photoUploading);
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -1306,6 +1438,81 @@ const BiznesChaikaScreen: React.FC = () => {
     ]);
   };
 
+  const openEditForm = (item: BizListing) => {
+    setEditingItem(item);
+    setEditItemName(item.itemName);
+    setEditContactName(item.contactName || '');
+    setEditCategory(item.category);
+    setEditCondition(item.condition);
+    const parsedPrice = parseBizPriceRange(item.price);
+    setEditPriceFrom(parsedPrice.min ? String(parsedPrice.min) : '');
+    setEditPriceTo(parsedPrice.max && parsedPrice.max !== parsedPrice.min ? String(parsedPrice.max) : '');
+    setEditDescription(item.description);
+    setEditPhone(item.phone);
+    setEditShowPhone(item.showPhone !== false);
+    setEditWorkFormat(item.workFormat || '');
+    setEditWorkHours(item.workHours || '');
+    setEditLocationArea(item.locationArea || '');
+    setEditLocationStreet(item.locationStreet || '');
+    setEditLocationHouseNumber(item.locationHouseNumber || '');
+    setEditSubmitAttempted(false);
+    setEditFormVisible(true);
+  };
+
+  const handleEditSubmit = async () => {
+    if (!editingItem) return;
+    setEditSubmitAttempted(true);
+
+    const trimmedItemName = editItemName.trim();
+    if (!editCategory || !editCondition || !editDescription.trim() || !editPhone.trim()) {
+      toast.showWarning(text.errorTitle, text.errorFill);
+      return;
+    }
+    if (editPhone.replace(/\D/g, '').length < 7) {
+      toast.showWarning(text.errorTitle, text.errorPhone);
+      return;
+    }
+    const langError = getLanguageValidationError(`${editItemName.trim()} ${editDescription.trim()}`.trim(), language as 'ua' | 'ru' | 'en');
+    if (langError) {
+      toast.showWarning(text.errorTitle, langError);
+      return;
+    }
+
+    setEditSubmitting(true);
+    try {
+      const priceValue = buildBizPriceRange(editPriceFrom, editPriceTo);
+      await biznesChaikaService.edit(editingItem.id, {
+        itemName: trimmedItemName || getCategoryLabel(editCategory),
+        contactName: editContactName.trim(),
+        category: editCategory,
+        condition: editCondition,
+        price: priceValue,
+        description: editDescription.trim(),
+        phone: normalizePhoneText(editPhone),
+        showPhone: editShowPhone,
+        workFormat: editWorkFormat,
+        workHours: editWorkHours,
+        locationArea: editLocationArea,
+        locationStreet: editLocationStreet,
+        locationHouseNumber: editLocationHouseNumber,
+        language,
+      });
+      toast.showSuccess(text.editSuccessTitle, text.editSuccessMsg);
+      setEditFormVisible(false);
+      setEditingItem(null);
+    } catch (error: any) {
+      if (error?.message === 'edit_cooldown') {
+        toast.showWarning(text.errorTitle, text.editCooldownMsg);
+      } else if (error?.message === 'edit_while_pending') {
+        toast.showWarning(text.errorTitle, text.editWhilePendingMsg);
+      } else {
+        showUserError(language, 'send', error);
+      }
+    } finally {
+      setEditSubmitting(false);
+    }
+  };
+
   const mapToDetailData = (item: BizListing, ownerAvatarUri?: string): DetailItemData => {
     const categoryLabel = getCategoryLabel(item.category);
     const conditionLabel = text.conditionLabels[item.condition as keyof typeof text.conditionLabels] ?? item.condition;
@@ -1330,12 +1537,15 @@ const BiznesChaikaScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScreenTooltip
         storageKey={BUSINESS_CHAIKA_TOOLTIP.storageKey}
         title={BUSINESS_CHAIKA_TOOLTIP.title}
         items={BUSINESS_CHAIKA_TOOLTIP.items}
+        language={language}
         accentColor={SCREEN_THEME.woodGreen}
+        forceVisible={training.showHint}
+        onClose={training.closeHint}
       />
       <Modal visible={searchModalVisible} animationType="slide" transparent onRequestClose={() => setSearchModalVisible(false)}>
         <View style={styles.modalOverlay}>
@@ -1430,6 +1640,14 @@ const BiznesChaikaScreen: React.FC = () => {
       </Modal>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.headerCard}>
+          <View style={{ position: 'absolute', top: 12, right: 12, zIndex: 10 }}>
+            <HintBadge
+              visible={training.isVisible}
+              onTap={training.openHint}
+              onDismiss={training.dismiss}
+              label={HINT_BADGE_LABELS[language]}
+            />
+          </View>
           <Text style={styles.headerTitle}>{text.title}</Text>
           <Text style={styles.headerSubtitle}>{text.subtitle}</Text>
           <View style={styles.liveLine}>
@@ -1604,12 +1822,19 @@ const BiznesChaikaScreen: React.FC = () => {
                       likePath="feed_likes/biznes"
                       likeId={item.id}
                       showLikeAvatars
+                      shareMessage={[item.itemName, item.description].filter(Boolean).join('\n')}
                     />
                     {isOwn ? (
-                      <TouchableOpacity style={styles.kDeleteLink} onPress={() => handleDelete(item.id)} activeOpacity={0.8}>
-                        <MaterialCommunityIcons name="trash-can-outline" size={14} color="#C0392B" />
-                        <Text style={styles.kDeleteLinkText}>{text.deleteText}</Text>
-                      </TouchableOpacity>
+                      <View style={styles.kOwnActions}>
+                        <TouchableOpacity style={styles.kEditLink} onPress={() => openEditForm(item)} activeOpacity={0.8}>
+                          <MaterialCommunityIcons name="pencil-outline" size={14} color="#2D7E4D" />
+                          <Text style={styles.kEditLinkText}>{text.editBtn}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.kDeleteLink} onPress={() => handleDelete(item.id)} activeOpacity={0.8}>
+                          <MaterialCommunityIcons name="trash-can-outline" size={14} color="#C0392B" />
+                          <Text style={styles.kDeleteLinkText}>{text.deleteText}</Text>
+                        </TouchableOpacity>
+                      </View>
                     ) : null}
                   </View>
                 );
@@ -1617,6 +1842,8 @@ const BiznesChaikaScreen: React.FC = () => {
             )}
           </View>
         )}
+
+        <FeatureRatingBanner screenId="biznes" />
       </ScrollView>
       <View style={styles.addBar}>
         <TouchableOpacity style={styles.addBarBtn} onPress={() => {
@@ -1734,6 +1961,23 @@ const BiznesChaikaScreen: React.FC = () => {
 
               </View>
 
+              <Text style={styles.formLabel}>{text.photoLabel}</Text>
+              {user?.id ? (
+                <>
+                  <PhotoUploadField
+                    uid={user.id}
+                    userName={user?.name ?? ''}
+                    maxPhotos={5}
+                    storagePath={BIZ_PHOTO_STORAGE_PATH}
+                    onPhotosChange={setFormPhotos}
+                    metadata={{ sourceScreen: 'BizznesChaikaScreen', sourceScreenLabel: 'Додати бізнес' }}
+                  />
+                  <UploadedPhotosGrid />
+                </>
+              ) : (
+                <Text style={styles.signInNote}>{text.authRequired}</Text>
+              )}
+
               <TouchableOpacity
                 style={styles.interestingBtn}
                 onPress={() => setIsExtraExpanded((prev) => !prev)}
@@ -1756,19 +2000,6 @@ const BiznesChaikaScreen: React.FC = () => {
                     maxLength={60}
                   />
                   <InlineFieldHint message={text.contactNameHint} type={contactName.trim() ? 'success' : 'hint'} />
-
-                  <Text style={styles.formLabel}>{text.photoLabel}</Text>
-                  {user?.id ? (
-                    <PhotoUploadField
-                      uid={user.id}
-                      userName={user?.name ?? ''}
-                      maxPhotos={5}
-                      storagePath={BIZ_PHOTO_STORAGE_PATH}
-                      onPhotosChange={setFormPhotos}
-                    />
-                  ) : (
-                    <Text style={styles.signInNote}>{text.authRequired}</Text>
-                  )}
 
                   <View style={styles.toggleRow}>
                     <Text style={styles.formLabel}>{text.showPhoneToggle}</Text>
@@ -1837,7 +2068,7 @@ const BiznesChaikaScreen: React.FC = () => {
                 </View>
               ) : null}
 
-              <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} activeOpacity={0.85} disabled={submitting}>
+              <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} activeOpacity={0.85} disabled={submitting || formPhotos.some((p) => p.status === 'uploading')}>
                 {submitting ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
@@ -1845,6 +2076,131 @@ const BiznesChaikaScreen: React.FC = () => {
                 )}
               </TouchableOpacity>
             </ScrollView>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+      {/* Edit modal */}
+      <Modal visible={editFormVisible} transparent animationType="slide" onRequestClose={() => setEditFormVisible(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.sheetOverlay}>
+          <TouchableOpacity style={styles.sheetBackdrop} activeOpacity={1} onPress={() => setEditFormVisible(false)} />
+          <View style={styles.sheetWrapper}>
+            <View style={styles.sheet}>
+              <View style={styles.sheetHandle} />
+              <View style={styles.sheetHeader}>
+                <Text style={styles.sheetTitle}>{text.editTitle}</Text>
+                <TouchableOpacity onPress={() => setEditFormVisible(false)} style={styles.sheetCloseBtn} activeOpacity={0.7}>
+                  <Text style={styles.sheetCloseTxt}>✕</Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheetContent} style={styles.sheetScroll}>
+                <Text style={styles.formLabel}>{text.businessNameLabel}</Text>
+                <TextInput placeholder={text.businessNamePlaceholder} value={editItemName} onChangeText={setEditItemName} style={styles.input} placeholderTextColor="#A0938D" maxLength={80} />
+
+                <Text style={styles.formLabel}>{text.categoryLabel}</Text>
+                <View style={styles.pickerWrapper}>
+                  <Picker selectedValue={editCategory} onValueChange={setEditCategory} style={styles.picker}>
+                    <Picker.Item label={text.selectCategory} value="" />
+                    {BIZ_CATEGORY_VALUES.map((value) => (
+                      <Picker.Item key={`edit-cat-${value}`} label={getCategoryLabel(value)} value={value} />
+                    ))}
+                  </Picker>
+                </View>
+                <FormFieldError error={!editCategory && editSubmitAttempted ? text.errorFill : undefined} />
+
+                <Text style={styles.formLabel}>{text.conditionLabel}</Text>
+                <View style={styles.pickerWrapper}>
+                  <Picker selectedValue={editCondition} onValueChange={setEditCondition} style={styles.picker}>
+                    <Picker.Item label={text.selectCondition} value="" />
+                    {OFFER_TYPE_VALUES.map((value) => (
+                      <Picker.Item key={`edit-cond-${value}`} label={text.conditionLabels[value]} value={value} />
+                    ))}
+                  </Picker>
+                </View>
+                <FormFieldError error={!editCondition && editSubmitAttempted ? text.errorFill : undefined} />
+
+                <Text style={styles.formLabel}>{text.priceLabel}</Text>
+                <View style={styles.priceRangeRow}>
+                  <View style={styles.priceRangeField}>
+                    <Text style={styles.miniLabel}>{text.priceFromLabel}</Text>
+                    <TextInput placeholder="0" value={editPriceFrom} onChangeText={(v) => setEditPriceFrom(v.replace(',', '.').replace(/[^\d.]/g, ''))} keyboardType="decimal-pad" style={styles.input} placeholderTextColor="#A0938D" />
+                  </View>
+                  <View style={styles.priceRangeField}>
+                    <Text style={styles.miniLabel}>{text.priceToLabel}</Text>
+                    <TextInput placeholder="0" value={editPriceTo} onChangeText={(v) => setEditPriceTo(v.replace(',', '.').replace(/[^\d.]/g, ''))} keyboardType="decimal-pad" style={styles.input} placeholderTextColor="#A0938D" />
+                  </View>
+                </View>
+
+                <Text style={styles.formLabel}>{text.descriptionLabel}</Text>
+                <TextInput placeholder={text.descriptionLabel} value={editDescription} onChangeText={setEditDescription} style={[styles.input, styles.textarea]} placeholderTextColor="#A0938D" multiline maxLength={260} />
+                <FormFieldError error={editSubmitAttempted && !editDescription.trim() ? text.descriptionRequired : undefined} />
+
+                <Text style={styles.formLabel}>{text.phoneLabel}</Text>
+                <TextInput placeholder="+380..." value={editPhone} onChangeText={(v) => setEditPhone(normalizePhoneText(v))} keyboardType="phone-pad" style={styles.input} placeholderTextColor="#A0938D" />
+                <FormFieldError error={editSubmitAttempted && editPhone.replace(/\D/g, '').length < 7 ? text.errorPhone : undefined} />
+
+                <Text style={styles.formLabel}>{text.contactNameLabel}</Text>
+                <TextInput placeholder={text.contactNamePlaceholder} value={editContactName} onChangeText={setEditContactName} style={styles.input} placeholderTextColor="#A0938D" maxLength={60} />
+
+                <View style={styles.toggleRow}>
+                  <Text style={styles.formLabel}>{text.showPhoneToggle}</Text>
+                  <Switch value={editShowPhone} onValueChange={setEditShowPhone} trackColor={{ false: '#E8DDD3', true: '#6A8BA5' }} thumbColor={editShowPhone ? '#403933' : '#A0938D'} />
+                </View>
+
+                <Text style={styles.formLabel}>{text.workFormatLabel}</Text>
+                <View style={styles.pickerWrapper}>
+                  <Picker selectedValue={editWorkFormat} onValueChange={setEditWorkFormat} style={styles.picker}>
+                    <Picker.Item label={text.selectWorkFormat} value="" />
+                    {WORK_FORMAT_VALUES.map((value) => (
+                      <Picker.Item key={`edit-wf-${value}`} label={WORK_FORMAT_LABELS[value][language]} value={value} />
+                    ))}
+                  </Picker>
+                </View>
+
+                <Text style={styles.formLabel}>{text.workHoursLabel}</Text>
+                <View style={styles.pickerWrapper}>
+                  <Picker selectedValue={editWorkHours} onValueChange={setEditWorkHours} style={styles.picker}>
+                    <Picker.Item label={text.selectWorkHours} value="" />
+                    {WORK_HOURS_VALUES.map((value) => (
+                      <Picker.Item key={`edit-wh-${value}`} label={WORK_HOURS_LABELS[value][language]} value={value} />
+                    ))}
+                  </Picker>
+                </View>
+
+                <Text style={styles.formLabel}>{text.locationAreaLabel}</Text>
+                <View style={styles.pickerWrapper}>
+                  <Picker selectedValue={editLocationArea} onValueChange={setEditLocationArea} style={styles.picker}>
+                    <Picker.Item label={text.selectLocationArea} value="" />
+                    {LOCATION_AREA_VALUES.map((value) => (
+                      <Picker.Item key={`edit-la-${value}`} label={LOCATION_AREA_LABELS[value][language]} value={value} />
+                    ))}
+                  </Picker>
+                </View>
+
+                <Text style={styles.formLabel}>{text.locationStreetLabel}</Text>
+                <View style={styles.pickerWrapper}>
+                  <Picker selectedValue={editLocationStreet} onValueChange={(street: string) => { setEditLocationStreet(street); setEditLocationHouseNumber(''); }} style={styles.picker}>
+                    <Picker.Item label={text.selectLocationStreet} value="" />
+                    {chaikaStreets.map((street) => (
+                      <Picker.Item key={`edit-st-${street}`} label={street} value={street} />
+                    ))}
+                  </Picker>
+                </View>
+
+                <Text style={styles.formLabel}>{text.locationHouseLabel}</Text>
+                <View style={styles.pickerWrapper}>
+                  <Picker selectedValue={editLocationHouseNumber} onValueChange={setEditLocationHouseNumber} style={styles.picker} enabled={Boolean(editLocationStreet)}>
+                    <Picker.Item label={text.selectLocationHouse} value="" />
+                    {editBuildingsInStreet.map((building) => (
+                      <Picker.Item key={`edit-bld-${building.id}`} label={building.houseNumber} value={building.houseNumber} />
+                    ))}
+                  </Picker>
+                </View>
+
+                <TouchableOpacity style={styles.submitBtn} onPress={handleEditSubmit} activeOpacity={0.85} disabled={editSubmitting}>
+                  {editSubmitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>{text.editSaveBtn}</Text>}
+                </TouchableOpacity>
+              </ScrollView>
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -1857,6 +2213,7 @@ const BiznesChaikaScreen: React.FC = () => {
         onSelect={(reason) => void sendContactRequest(reason)}
         onClose={closeContactModal}
       />
+      <VideoLoadingOverlay visible={!listingsReady && listings.length === 0} />
     </SafeAreaView>
   );
 };
@@ -1924,7 +2281,7 @@ const styles = StyleSheet.create({
   textarea: { minHeight: 80, textAlignVertical: 'top' },
   pickerWrapper: { backgroundColor: '#F7F3EE', borderRadius: 16, borderWidth: 1, borderColor: '#E8DDD3', overflow: 'hidden' },
   picker: { color: SCREEN_THEME.textPrimary, height: 50 },
-  submitBtn: { backgroundColor: SCREEN_THEME.terracotta, borderRadius: 16, paddingVertical: 14, alignItems: 'center', marginTop: 14 },
+  submitBtn: { backgroundColor: '#7d0e59', borderRadius: 16, paddingVertical: 14, alignItems: 'center', marginTop: 14 },
   submitBtnText: { color: '#FFFFFF', fontWeight: '800' },
   topAnketySection: { marginBottom: 16 },
   topAnketyTitle: { fontSize: 14, fontWeight: '900', color: SCREEN_THEME.textPrimary, marginBottom: 8 },
@@ -2084,11 +2441,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 9,
     paddingVertical: 5,
-    backgroundColor: '#7A1E5C',
+    backgroundColor: 'rgba(141, 122, 184, 0.20)',
   },
   kDescText: {
     fontSize: 12,
-    color: '#fff',
+    color: SCREEN_THEME.textPrimary,
     lineHeight: 17,
     fontWeight: '800',
   },
@@ -2125,12 +2482,25 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: '#FFF3E0',
   },
+  kOwnActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 6,
+  },
+  kEditLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  kEditLinkText: { color: '#2D7E4D', fontSize: 11, fontWeight: '800' },
   kDeleteLink: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    alignSelf: 'flex-end',
-    marginTop: 6,
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
@@ -2186,7 +2556,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#E4D0AB',
   },
   addBarBtn: {
-    backgroundColor: SCREEN_THEME.woodGreenDark,
+    backgroundColor: '#7d0e59',
     borderRadius: 16,
     paddingVertical: 14,
     alignItems: 'center',

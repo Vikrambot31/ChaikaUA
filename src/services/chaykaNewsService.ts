@@ -50,8 +50,8 @@ const CHAYKA_NEWS_TIMEOUT_MS = 6500;
 const CHAYKA_NEWS_ACTIVE_LIMIT = 200;
 const CHAYKA_NEWS_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const CHAYKA_NEWS_POLL_MS = Math.max(
-  5000,
-  Number(process.env.EXPO_PUBLIC_CHAYKA_NEWS_POLL_MS || 7000) || 7000
+  30_000,
+  Number(process.env.EXPO_PUBLIC_CHAYKA_NEWS_POLL_MS || 60_000) || 60_000
 );
 const CHAYKA_NEWS_SOURCE_URLS = [
   process.env.EXPO_PUBLIC_CHAYKA_NEWS_URL,
@@ -154,15 +154,13 @@ export const loadChaykaNewsDetailed = async (): Promise<{ status: ChaykaNewsLoad
       await persistChaykaNewsCache(remote.items);
       return { status: 'remote', fromCache: false, items: remote.items };
     }
-
-    // Remote feed exists but is empty. Do not fall back to fake draft news.
-    return { status: 'empty', fromCache: false, items: [] };
+    // Remote returned 200 OK but items array is empty — still check database and cache.
   }
 
-  const databaseFeed = await loadChaykaNewsFromDatabase();
-  if (databaseFeed.length > 0) {
-    await persistChaykaNewsCache(databaseFeed);
-    return { status: 'remote', fromCache: false, items: databaseFeed };
+  const database = await loadChaykaNewsFromDatabase();
+  if (database.items.length > 0) {
+    await persistChaykaNewsCache(database.items);
+    return { status: 'remote', fromCache: false, items: database.items };
   }
 
   const cached = await loadChaykaNewsFromCache();
@@ -170,7 +168,10 @@ export const loadChaykaNewsDetailed = async (): Promise<{ status: ChaykaNewsLoad
     return { status: 'cache', fromCache: true, items: cached };
   }
 
-  return { status: 'unavailable', fromCache: false, items: [] };
+  // If at least one source was reachable (remote responded with 200, or DB connected but was empty)
+  // → data simply doesn't exist yet; show "no news" rather than a connection error.
+  const anyReachable = remote.status === 'success' || database.reachable;
+  return { status: anyReachable ? 'empty' : 'unavailable', fromCache: false, items: [] };
 };
 
 export const loadChaykaNews = async (): Promise<ChaykaNewsItem[]> => {
@@ -284,15 +285,15 @@ const mapDatabasePublication = ([id, item]: [string, RawChaykaNewsItem]): RawCha
   };
 };
 
-const loadChaykaNewsFromDatabase = async (): Promise<ChaykaNewsItem[]> => {
+const loadChaykaNewsFromDatabase = async (): Promise<{ items: ChaykaNewsItem[]; reachable: boolean }> => {
   try {
     const snapshot = await get(query(ref(database, CHAYKA_NEWS_DB_PATH), orderByChild('createdAt'), limitToLast(CHAYKA_NEWS_ACTIVE_LIMIT)));
     const raw = snapshot.val() as Record<string, RawChaykaNewsItem> | null;
-    if (!raw) return [];
+    if (!raw) return { items: [], reachable: true };
 
-    return normalizeChaykaNews(Object.entries(raw).map((entry) => mapDatabasePublication(entry)));
+    return { items: normalizeChaykaNews(Object.entries(raw).map((entry) => mapDatabasePublication(entry))), reachable: true };
   } catch {
-    return [];
+    return { items: [], reachable: false };
   }
 };
 

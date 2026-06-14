@@ -15,6 +15,8 @@ import type { NavigationProp } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from '../i18n/useTranslation';
 import { SCREEN_THEME } from '../utils/screenTheme';
+import { requireWriteSession } from '../firebase-auth-session';
+import { auth } from '../firebase-core';
 import { subscribeToAllAdTickets } from '../services/adService';
 import {
   adminGrantPromoCredits,
@@ -111,30 +113,49 @@ const PromoCreditsAdminScreen: React.FC = () => {
       return;
     }
 
-    setBusyTicketId(ticket.ticketId);
-    try {
-      const result = await adminGrantPromoCredits({
-        targetUid: ticket.userId,
-        amount: credits,
-        reason: `Promo credits top-up: ${credits} credits / ${ticket.expectedAmount || 0} ${ticket.currency || 'UAH'}`,
-        ticketId: ticket.ticketId,
-      });
-      Alert.alert(t.common.success, `${t.common.ok} ${credits}. ${t.bonus.balance}: ${result.newBalance}`);
-    } catch (error: any) {
-      Alert.alert(t.common.error, error?.message || '');
-    } finally {
-      setBusyTicketId(null);
-    }
+    const userName = ticket.userName || ticket.userId;
+    Alert.alert(
+      t.promoCredits.adminConfirmTitle,
+      t.promoCredits.adminConfirmMsg
+        .replace('{amount}', String(credits))
+        .replace('{name}', userName),
+      [
+        { text: t.common.cancel, style: 'cancel' },
+        {
+          text: t.common.ok,
+          onPress: async () => {
+            setBusyTicketId(ticket.ticketId);
+            try {
+              await requireWriteSession({ requireRealUser: true, operation: 'adminGrantPromoCredits', screen: 'PromoCreditsAdmin' });
+              await auth.currentUser?.getIdToken(true);
+              const result = await adminGrantPromoCredits({
+                targetUid: ticket.userId,
+                amount: credits,
+                reason: `Promo credits top-up: ${credits} credits / ${ticket.expectedAmount || 0} ${ticket.currency || 'UAH'}`,
+                ticketId: ticket.ticketId,
+              });
+              Alert.alert(t.common.success, `${credits} credits. ${t.bonus.balance}: ${result.newBalance}`);
+            } catch (error: any) {
+              Alert.alert(t.common.error, error?.message || '');
+            } finally {
+              setBusyTicketId(null);
+            }
+          },
+        },
+      ],
+    );
   };
 
   const moderatePromotion = async (promotion: BonusPromotion, action: 'approve' | 'reject') => {
     const reason = rejectReasons[promotion.id]?.trim();
     setBusyPromotionId(promotion.id);
     try {
+      await requireWriteSession({ requireRealUser: true, operation: 'adminModeratePromotion', screen: 'PromoCreditsAdmin' });
+      await auth.currentUser?.getIdToken(true);
       await adminModeratePromotion({
         promotionId: promotion.id,
         action,
-        reason: action === 'reject' ? reason || t.common.error : undefined,
+        reason: action === 'reject' ? reason || t.promoCredits.adminRejectReason : undefined,
       });
       Alert.alert(t.common.success, action === 'approve' ? t.bonus.boostProfile : t.common.cancel);
       if (action === 'reject') {
@@ -149,11 +170,12 @@ const PromoCreditsAdminScreen: React.FC = () => {
 
   const renderTicket = ({ item }: { item: AdTicket }) => {
     const isBusy = busyTicketId === item.ticketId;
+    const isPaid = item.status === 'paid';
     return (
       <View style={styles.ticketCard}>
         <View style={styles.ticketTop}>
           <View style={styles.ticketIcon}>
-            <MaterialCommunityIcons name="credit-card-plus-outline" size={22} color="#FFF9EE" />
+            <MaterialCommunityIcons name="credit-card-plus-outline" size={22} color="#FBF8FD" />
           </View>
           <View style={styles.ticketCopy}>
             <Text style={styles.ticketTitle}>{item.userName || item.userId}</Text>
@@ -170,21 +192,28 @@ const PromoCreditsAdminScreen: React.FC = () => {
           <Text style={styles.detailText}>Пакет: {item.packageId || '-'}</Text>
         </View>
 
-        <TouchableOpacity
-          style={[styles.grantButton, isBusy && styles.disabledButton]}
-          onPress={() => void grantCredits(item)}
-          disabled={isBusy}
-          activeOpacity={0.86}
-        >
-          {isBusy ? (
-            <ActivityIndicator color="#FFF9EE" />
-          ) : (
-            <>
-              <MaterialCommunityIcons name="check-decagram-outline" size={19} color="#FFF9EE" />
-              <Text style={styles.grantButtonText}>{t.promoCredits.chatAdmin}</Text>
-            </>
-          )}
-        </TouchableOpacity>
+        {isPaid ? (
+          <View style={styles.paidBadge}>
+            <MaterialCommunityIcons name="check-decagram" size={18} color="#2E6B38" />
+            <Text style={styles.paidBadgeText}>Оплачено</Text>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={[styles.grantButton, isBusy && styles.disabledButton]}
+            onPress={() => void grantCredits(item)}
+            disabled={isBusy}
+            activeOpacity={0.86}
+          >
+            {isBusy ? (
+              <ActivityIndicator color="#FBF8FD" />
+            ) : (
+              <>
+                <MaterialCommunityIcons name="check-decagram-outline" size={19} color="#FBF8FD" />
+                <Text style={styles.grantButtonText}>{t.promoCredits.adminGrantButton}</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
       </View>
     );
   };
@@ -198,7 +227,7 @@ const PromoCreditsAdminScreen: React.FC = () => {
       <View style={styles.ticketCard}>
         <View style={styles.ticketTop}>
           <View style={[styles.ticketIcon, styles.promotionIcon]}>
-            <MaterialCommunityIcons name="bullhorn-outline" size={22} color="#FFF9EE" />
+            <MaterialCommunityIcons name="bullhorn-outline" size={22} color="#FBF8FD" />
           </View>
           <View style={styles.ticketCopy}>
             <Text style={styles.ticketTitle}>{getPromotionTargetTitle(item)}</Text>
@@ -221,7 +250,7 @@ const PromoCreditsAdminScreen: React.FC = () => {
             <TextInput
               value={rejectReasons[item.id] || ''}
               onChangeText={(value) => setRejectReasons((prev) => ({ ...prev, [item.id]: value }))}
-              placeholder={t.common.error}
+              placeholder={t.promoCredits.adminRejectReason}
               placeholderTextColor={SCREEN_THEME.textMuted}
               style={styles.reasonInput}
               multiline
@@ -234,7 +263,7 @@ const PromoCreditsAdminScreen: React.FC = () => {
                 disabled={isBusy}
                 activeOpacity={0.86}
               >
-                <MaterialCommunityIcons name="close-circle-outline" size={18} color="#FFF9EE" />
+                <MaterialCommunityIcons name="close-circle-outline" size={18} color="#FBF8FD" />
                 <Text style={styles.grantButtonText}>{t.common.cancel}</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -244,10 +273,10 @@ const PromoCreditsAdminScreen: React.FC = () => {
                 activeOpacity={0.86}
               >
                 {isBusy ? (
-                  <ActivityIndicator color="#FFF9EE" />
+                  <ActivityIndicator color="#FBF8FD" />
                 ) : (
                   <>
-                    <MaterialCommunityIcons name="check-decagram-outline" size={18} color="#FFF9EE" />
+                    <MaterialCommunityIcons name="check-decagram-outline" size={18} color="#FBF8FD" />
                     <Text style={styles.grantButtonText}>{t.common.ok}</Text>
                   </>
                 )}
@@ -269,6 +298,11 @@ const PromoCreditsAdminScreen: React.FC = () => {
           <Text style={styles.headerTitle}>{t.promoCredits.title}</Text>
           <Text style={styles.headerSubtitle}>{t.promoCredits.topupTitle}</Text>
         </View>
+      </View>
+
+      <View style={styles.adminHint}>
+        <MaterialCommunityIcons name="information-outline" size={16} color={SCREEN_THEME.textSecondary} />
+        <Text style={styles.adminHintText}>{t.promoCredits.adminHint}</Text>
       </View>
 
       <View style={styles.tabRow}>
@@ -362,6 +396,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
+  adminHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 16,
+    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#F1E1BC',
+    borderRadius: 8,
+  },
+  adminHintText: {
+    flex: 1,
+    color: SCREEN_THEME.textSecondary,
+    fontSize: 12,
+    fontWeight: '700',
+  },
   tabRow: {
     flexDirection: 'row',
     gap: 8,
@@ -391,7 +442,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   tabTextActive: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
   },
   tabCount: {
     color: SCREEN_THEME.textMuted,
@@ -469,6 +520,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
+  paidBadge: {
+    minHeight: 42,
+    borderRadius: 8,
+    backgroundColor: '#E3F2E5',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 14,
+  },
+  paidBadgeText: {
+    color: '#2E6B38',
+    fontSize: 14,
+    fontWeight: '900',
+  },
   grantButton: {
     minHeight: 46,
     borderRadius: 8,
@@ -488,7 +554,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#E4D0AB',
-    backgroundColor: '#FFF9EE',
+    backgroundColor: '#FBF8FD',
     paddingHorizontal: 10,
     paddingVertical: 8,
     color: SCREEN_THEME.textPrimary,
@@ -522,7 +588,7 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   grantButtonText: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
     fontSize: 14,
     fontWeight: '900',
   },

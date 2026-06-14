@@ -25,11 +25,15 @@ import {
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { useTranslation } from '../i18n/useTranslation';
 import ScreenTooltip from '../components/ScreenTooltip';
+import HintBadge, { HINT_BADGE_LABELS } from '../components/HintBadge';
+import { useTrainingMode } from '../hooks/useTrainingMode';
 import { BONUS_WALLET_TOOLTIP } from '../utils/screenTooltips';
+import { getRequestTopicLabel } from '../data/categories';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 type AppNav = NavigationProp<Record<string, object | undefined>>;
 
-const WEEKLY_FREE_LIMIT = 250;
+const WEEKLY_FREE_LIMIT_FALLBACK = 250; // fallback if server hasn't written weeklyLimit yet
 const EMPTY_PROMO_CREDITS: PromoCredits = {
   balance: 0,
   lifetime: 0,
@@ -78,9 +82,32 @@ const formatDate = (timestamp: number, language: AppLanguage) => {
   return new Date(timestamp).toLocaleDateString(DATE_LOCALES[language]);
 };
 
-const formatDateTime = (timestamp: number, language: AppLanguage) => {
-  if (!timestamp) return '-';
-  return new Date(timestamp).toLocaleString(DATE_LOCALES[language]);
+const timeAgo = (timestamp: number): string => {
+  if (!timestamp) return '';
+  const diff = Date.now() - timestamp;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'тільки що';
+  if (mins < 60) return `${mins} хв тому`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} год тому`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days} дн тому`;
+  return formatDate(timestamp, 'ua');
+};
+
+const CATEGORY_SOURCE_KEYS = ['request_closed', 'request_respond', 'confirm_helper', 'gratitude'] as const;
+
+const getTransactionSource = (item: BonusTransaction, bonusText: BonusText, language: string): string => {
+  for (const prefix of CATEGORY_SOURCE_KEYS) {
+    if (item.note?.startsWith(`${prefix}:`)) {
+      const cat = item.note.slice(prefix.length + 1);
+      if (cat) return getRequestTopicLabel({ category: cat }, language as 'ua' | 'ru' | 'en');
+    }
+  }
+  const catLabelKey = item.category as keyof typeof bonusText;
+  const catLabel = bonusText[catLabelKey];
+  if (typeof catLabel === 'string' && catLabel) return catLabel;
+  return item.note || getTransactionTitle(item, bonusText);
 };
 
 const getStatusLabel = (status: string, bonusText: BonusText) => {
@@ -103,11 +130,15 @@ const getTransactionTitle = (item: BonusTransaction, bonusText: BonusText) => {
 const BonusWalletScreen: React.FC = () => {
   const navigation = useNavigation<AppNav>();
   const { t, language } = useTranslation();
+  const { colors, isDark } = useAppTheme();
+  const training = useTrainingMode('bonus_wallet');
   const [bonuses, setBonuses] = useState<UserBonuses | null>(null);
   const [promoCredits, setPromoCredits] = useState<PromoCredits>(EMPTY_PROMO_CREDITS);
   const [transactions, setTransactions] = useState<BonusTransaction[]>([]);
   const [promotions, setPromotions] = useState<BonusPromotion[]>([]);
   const [ready, setReady] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
+  const [showAllHistory, setShowAllHistory] = useState(false);
 
   const BADGE_LABELS: Record<string, string> = {
     newcomer: t.bonus.newcomer,
@@ -131,30 +162,37 @@ const BonusWalletScreen: React.FC = () => {
   };
 
   useEffect(() => {
-    let loaded = 0;
-    const markLoaded = () => {
-      loaded += 1;
-      if (loaded >= 4) setReady(true);
+    let active = true;
+    const loadedSources = new Set<string>();
+    const markLoaded = (source: string) => {
+      if (!active) return;
+      loadedSources.add(source);
+      if (loadedSources.size >= 2) setReady(true);
     };
 
     const unsubBonuses = subscribeMyBonuses((next) => {
       setBonuses(next);
-      markLoaded();
+      markLoaded('bonuses');
     });
     const unsubCredits = subscribeMyPromoCredits((next) => {
       setPromoCredits(next);
-      markLoaded();
+      markLoaded('credits');
     });
     const unsubTransactions = subscribeMyBonusTransactions((next) => {
       setTransactions(next);
-      markLoaded();
+      markLoaded('transactions');
     });
     const unsubPromotions = subscribeMyBonusPromotions((next) => {
       setPromotions(next);
-      markLoaded();
+      markLoaded('promotions');
     });
 
+    // Safety timeout: show UI even if some subscriptions never fire
+    const timeout = setTimeout(() => { if (active) setReady(true); }, 5000);
+
     return () => {
+      active = false;
+      clearTimeout(timeout);
       unsubBonuses();
       unsubCredits();
       unsubTransactions();
@@ -163,15 +201,16 @@ const BonusWalletScreen: React.FC = () => {
   }, []);
 
   const trustAvailable = bonuses?.available ?? bonuses?.total ?? 0;
-  const weeklyEarned = bonuses?.earned.weeklyTotal ?? 0;
-  const weeklyProgress = Math.min(100, (weeklyEarned / WEEKLY_FREE_LIMIT) * 100);
+  const weeklyEarned = bonuses?.earned?.weeklyTotal ?? 0;
+  const weeklyLimit = bonuses?.earned?.weeklyLimit ?? WEEKLY_FREE_LIMIT_FALLBACK;
+  const weeklyProgress = Math.min(100, (weeklyEarned / weeklyLimit) * 100);
   const totalProgress = Math.min(100, ((bonuses?.total ?? 0) / BONUS_CAPS.total) * 100);
   const activePromotions = useMemo(() => {
     const now = Date.now();
     return promotions.filter((item) =>
       item.status === 'active' &&
       item.expiresAt > now &&
-      (item.moderationStatus === 'approved' || item.moderationStatus === 'pending')
+      item.moderationStatus === 'approved'
     );
   }, [promotions]);
 
@@ -200,12 +239,15 @@ const BonusWalletScreen: React.FC = () => {
   }, [navigation]);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScreenTooltip
         storageKey={BONUS_WALLET_TOOLTIP.storageKey}
         title={BONUS_WALLET_TOOLTIP.title}
         items={BONUS_WALLET_TOOLTIP.items}
+        language={language}
         accentColor={SCREEN_THEME.woodGreen}
+        forceVisible={training.showHint}
+        onClose={training.closeHint}
       />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.headerRow}>
@@ -213,12 +255,20 @@ const BonusWalletScreen: React.FC = () => {
             <MaterialCommunityIcons name="arrow-left" size={24} color={SCREEN_THEME.textPrimary} />
           </TouchableOpacity>
           <View style={styles.headerCopy}>
-            <Text style={styles.headerTitle}>{t.bonus.walletTitle}</Text>
-            <Text style={styles.headerSubtitle}>{t.bonus.walletSubtitle}</Text>
+            <Text style={[styles.headerTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{t.bonus.walletTitle}</Text>
+            <Text style={[styles.headerSubtitle, { color: isDark ? '#F5E8F0' : undefined }]}>{t.bonus.walletSubtitle}</Text>
           </View>
           <TouchableOpacity onPress={openSupport} style={styles.iconButton} activeOpacity={0.82}>
             <MaterialCommunityIcons name="headset" size={23} color={SCREEN_THEME.textPrimary} />
           </TouchableOpacity>
+          <View style={{ position: 'absolute', top: 12, right: 12, zIndex: 10 }}>
+            <HintBadge
+              visible={training.isVisible}
+              onTap={training.openHint}
+              onDismiss={training.dismiss}
+              label={HINT_BADGE_LABELS[language]}
+            />
+          </View>
         </View>
 
         {!ready ? (
@@ -228,7 +278,7 @@ const BonusWalletScreen: React.FC = () => {
             <View style={styles.balanceGrid}>
               <View style={[styles.balancePanel, styles.trustPanel]}>
                 <View style={styles.panelIconRow}>
-                  <MaterialCommunityIcons name="hand-heart" size={22} color="#FFF9EE" />
+                  <MaterialCommunityIcons name="hand-heart" size={22} color="#FBF8FD" />
                   <Text style={styles.panelLabelLight}>{t.bonus.trustBonuses}</Text>
                 </View>
                 <Text style={styles.panelValueLight}>{trustAvailable}</Text>
@@ -245,38 +295,11 @@ const BonusWalletScreen: React.FC = () => {
               </View>
             </View>
 
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <MaterialCommunityIcons name="medal-outline" size={22} color={SCREEN_THEME.accentGold} />
-                <Text style={styles.cardTitle}>{BADGE_LABELS[bonuses?.badge || 'newcomer'] || t.bonus.newcomer}</Text>
-              </View>
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: `${totalProgress}%` }]} />
-              </View>
-              <View style={styles.progressMeta}>
-                <Text style={styles.metaText}>{bonuses?.total ?? 0} / {BONUS_CAPS.total}</Text>
-                <Text style={styles.metaText}>{t.bonus.spentLabel} {bonuses?.spent.total ?? 0}</Text>
-              </View>
-            </View>
-
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <MaterialCommunityIcons name="calendar-week" size={22} color={SCREEN_THEME.enamelBlue} />
-                <Text style={styles.cardTitle}>{t.bonus.weeklyLimit}</Text>
-              </View>
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFillBlue, { width: `${weeklyProgress}%` }]} />
-              </View>
-              <View style={styles.progressMeta}>
-                <Text style={styles.metaText}>{weeklyEarned} / {WEEKLY_FREE_LIMIT}</Text>
-                <Text style={styles.metaText}>{bonuses?.earned.weekKey || t.bonus.currentWeek}</Text>
-              </View>
-              <View style={styles.breakdownGrid}>
-                <Breakdown label={t.bonus.help} value={bonuses?.help.points ?? 0} />
-                <Breakdown label={t.bonus.thanks} value={bonuses?.gratitude.points ?? 0} />
-                <Breakdown label={t.bonus.invites} value={bonuses?.invites.points ?? 0} />
-                <Breakdown label={t.bonus.likes} value={bonuses?.likes.points ?? 0} />
-              </View>
+            {/* Badge — compact single line */}
+            <View style={styles.badgeRow}>
+              <MaterialCommunityIcons name="medal-outline" size={20} color={SCREEN_THEME.accentGold} />
+              <Text style={styles.badgeLabel}>{BADGE_LABELS[bonuses?.badge || 'newcomer'] || t.bonus.newcomer}</Text>
+              <Text style={styles.badgeMeta}>{bonuses?.total ?? 0} / {BONUS_CAPS.total}</Text>
             </View>
 
             <View style={styles.actionGrid}>
@@ -287,50 +310,115 @@ const BonusWalletScreen: React.FC = () => {
             </View>
 
             <TouchableOpacity style={styles.topupButton} onPress={openTopup} activeOpacity={0.86}>
-              <MaterialCommunityIcons name="credit-card-plus-outline" size={22} color="#FFF9EE" />
+              <MaterialCommunityIcons name="credit-card-plus-outline" size={22} color="#FBF8FD" />
               <View style={styles.topupCopy}>
                 <Text style={styles.topupTitle}>{t.promoCredits.topupTitle}</Text>
                 <Text style={styles.topupHint}>{t.promoCredits.topupDesc}</Text>
               </View>
-              <MaterialCommunityIcons name="chevron-right" size={22} color="#FFF9EE" />
+              <MaterialCommunityIcons name="chevron-right" size={22} color="#FBF8FD" />
             </TouchableOpacity>
 
-            <Section title={t.bonus.activePromotions} icon="pin">
-              {activePromotions.length === 0 ? (
-                <EmptyLine text={t.bonus.noActivePromotions} />
-              ) : activePromotions.map((item) => (
-                <View key={item.id} style={styles.listItem}>
-                  <MaterialCommunityIcons name="bullhorn-outline" size={21} color={SCREEN_THEME.terracotta} />
-                  <View style={styles.listCopy}>
-                    <Text style={styles.listTitle}>{getPromotionTitle(item)}</Text>
-                    <Text style={styles.listMeta}>
-                      {item.pointsSpent} {item.currency} · {t.bonus.until} {formatDate(item.expiresAt, language)} · {getStatusLabel(item.moderationStatus, t.bonus)}
-                    </Text>
+            {activePromotions.length > 0 && (
+              <Section title={t.bonus.activePromotions} icon="pin">
+                {activePromotions.map((item) => (
+                  <View key={item.id} style={styles.listItem}>
+                    <MaterialCommunityIcons name="bullhorn-outline" size={21} color={SCREEN_THEME.terracotta} />
+                    <View style={styles.listCopy}>
+                      <Text style={styles.listTitle}>{getPromotionTitle(item)}</Text>
+                      <Text style={styles.listMeta}>
+                        {item.pointsSpent} {item.currency} · {t.bonus.until} {formatDate(item.expiresAt, language)} · {getStatusLabel(item.moderationStatus, t.bonus)}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </Section>
+            )}
+
+            {/* Collapsible details: badge progress, weekly limit, history */}
+            <TouchableOpacity
+              style={styles.detailsToggle}
+              onPress={() => setShowDetails((prev) => !prev)}
+              activeOpacity={0.82}
+            >
+              <MaterialCommunityIcons
+                name={showDetails ? 'chevron-up' : 'chevron-down'}
+                size={20}
+                color={SCREEN_THEME.textSecondary}
+              />
+              <Text style={styles.detailsToggleText}>
+                {showDetails ? t.bonus.hideDetails : t.bonus.showDetails}
+              </Text>
+            </TouchableOpacity>
+
+            {showDetails && (
+              <>
+                <View style={styles.card}>
+                  <View style={styles.cardHeader}>
+                    <MaterialCommunityIcons name="medal-outline" size={22} color={SCREEN_THEME.accentGold} />
+                    <Text style={styles.cardTitle}>{BADGE_LABELS[bonuses?.badge || 'newcomer'] || t.bonus.newcomer}</Text>
+                  </View>
+                  <View style={styles.progressTrack}>
+                    <View style={[styles.progressFill, { width: `${totalProgress}%` }]} />
+                  </View>
+                  <View style={styles.progressMeta}>
+                    <Text style={styles.metaText}>{bonuses?.total ?? 0} / {BONUS_CAPS.total}</Text>
+                    <Text style={styles.metaText}>{t.bonus.spentLabel} {bonuses?.spent.total ?? 0}</Text>
                   </View>
                 </View>
-              ))}
-            </Section>
+
+                <View style={styles.card}>
+                  <View style={styles.cardHeader}>
+                    <MaterialCommunityIcons name="calendar-week" size={22} color={SCREEN_THEME.enamelBlue} />
+                    <Text style={styles.cardTitle}>{t.bonus.weeklyLimit}</Text>
+                  </View>
+                  <View style={styles.progressTrack}>
+                    <View style={[styles.progressFillBlue, { width: `${weeklyProgress}%` }]} />
+                  </View>
+                  <View style={styles.progressMeta}>
+                    <Text style={styles.metaText}>{weeklyEarned} / {weeklyLimit}</Text>
+                    <Text style={styles.metaText}>{bonuses?.earned.weekKey || t.bonus.currentWeek}</Text>
+                  </View>
+                  <View style={styles.breakdownGrid}>
+                    <Breakdown label={t.bonus.help} value={bonuses?.help.points ?? 0} />
+                    <Breakdown label={t.bonus.thanks} value={bonuses?.gratitude.points ?? 0} />
+                    <Breakdown label={t.bonus.invites} value={bonuses?.invites.points ?? 0} />
+                    <Breakdown label={t.bonus.likes} value={bonuses?.likes.points ?? 0} />
+                  </View>
+                </View>
+              </>
+            )}
 
             <Section title={t.bonus.recentHistory} icon="history">
               {transactions.length === 0 ? (
                 <EmptyLine text={t.bonus.emptyHistory} />
-              ) : transactions.slice(0, 12).map((item) => (
-                <View key={item.id} style={styles.listItem}>
-                  <MaterialCommunityIcons
-                    name={item.type === 'spend' ? 'arrow-up-circle' : item.type === 'topup' ? 'plus-circle' : 'arrow-down-circle'}
-                    size={21}
-                    color={item.type === 'spend' ? SCREEN_THEME.terracotta : SCREEN_THEME.woodGreen}
-                  />
-                  <View style={styles.listCopy}>
-                    <Text style={styles.listTitle}>{getTransactionTitle(item, t.bonus)}</Text>
-                    <Text style={styles.listMeta}>{formatDateTime(item.createdAt, language)} · {t.bonus.balanceAfter} {item.balanceAfter}</Text>
-                    {item.note ? <Text style={styles.listNote}>{item.note}</Text> : null}
-                  </View>
-                  <Text style={[styles.pointsDelta, item.type === 'spend' && styles.pointsDeltaSpend]}>
-                    {item.type === 'spend' ? '-' : '+'}{Math.abs(item.points)}
-                  </Text>
-                </View>
-              ))}
+              ) : (
+                <>
+                  {transactions.slice(0, showAllHistory ? 30 : 3).map((item) => (
+                    <View key={item.id} style={styles.historyItem}>
+                      <View style={styles.historyMain}>
+                        <Text style={[styles.historyDelta, item.type === 'spend' && styles.historyDeltaSpend]}>
+                          {item.type === 'spend' ? '-' : '+'}{Math.abs(item.points)}
+                        </Text>
+                        <View style={styles.historyCopy}>
+                          <Text style={styles.historySource} numberOfLines={1}>
+                            {getTransactionSource(item, t.bonus, language)}
+                          </Text>
+                          <Text style={styles.historyTime}>{timeAgo(item.createdAt)}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  ))}
+                  {transactions.length > 3 && !showAllHistory && (
+                    <TouchableOpacity
+                      style={styles.showAllButton}
+                      onPress={() => setShowAllHistory(true)}
+                      activeOpacity={0.82}
+                    >
+                      <Text style={styles.showAllText}>{t.bonus.allHistory} ({transactions.length})</Text>
+                    </TouchableOpacity>
+                  )}
+                </>
+              )}
             </Section>
           </>
         )}
@@ -460,7 +548,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   panelLabelLight: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
     fontSize: 12,
     fontWeight: '700',
   },
@@ -470,7 +558,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   panelValueLight: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
     fontSize: 38,
     fontWeight: '900',
   },
@@ -507,7 +595,7 @@ const styles = StyleSheet.create({
     height: 9,
     borderRadius: 5,
     overflow: 'hidden',
-    backgroundColor: 'rgba(123, 86, 56, 0.12)',
+    backgroundColor: 'rgba(128, 76, 110, 0.12)',
   },
   progressFill: {
     height: '100%',
@@ -592,7 +680,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   topupTitle: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
     fontSize: 15,
     fontWeight: '900',
   },
@@ -658,6 +746,42 @@ const styles = StyleSheet.create({
   pointsDeltaSpend: {
     color: SCREEN_THEME.terracottaDark,
   },
+  historyItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: SCREEN_THEME.borderSoft,
+  },
+  historyMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 12,
+  },
+  historyDelta: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: SCREEN_THEME.woodGreenDark,
+    minWidth: 48,
+  },
+  historyDeltaSpend: {
+    color: SCREEN_THEME.terracottaDark,
+  },
+  historyCopy: {
+    flex: 1,
+  },
+  historySource: {
+    color: SCREEN_THEME.textPrimary,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  historyTime: {
+    color: SCREEN_THEME.textMuted,
+    fontSize: 12,
+    marginTop: 2,
+  },
   emptyLine: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -669,6 +793,53 @@ const styles = StyleSheet.create({
     color: SCREEN_THEME.textSecondary,
     fontSize: 13,
     lineHeight: 18,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginTop: 12,
+    borderRadius: 8,
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderWidth: 1,
+    borderColor: SCREEN_THEME.borderSoft,
+  },
+  badgeLabel: {
+    flex: 1,
+    color: SCREEN_THEME.textPrimary,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  badgeMeta: {
+    color: SCREEN_THEME.textSecondary,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  detailsToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 14,
+    marginTop: 8,
+  },
+  detailsToggleText: {
+    color: SCREEN_THEME.textSecondary,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  showAllButton: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: SCREEN_THEME.borderSoft,
+  },
+  showAllText: {
+    color: SCREEN_THEME.enamelBlue,
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
 

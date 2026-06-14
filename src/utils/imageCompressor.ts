@@ -39,46 +39,37 @@ export async function compressImage(localUri: string, options: CompressOptions =
     console.log('[imageCompressor] compressImage start', { inputScheme, maxWidth, maxHeight, quality });
   }
 
-  // First pass: normalize format and get actual dimensions.
-  // This also handles content:// URIs - ImageManipulator produces file:// output.
-  const normalized = await ImageManipulator.manipulateAsync(
-    localUri,
-    [],
-    {
-      compress: 1,
-      format: ImageManipulator.SaveFormat.JPEG,
-      base64: false,
-    },
-  );
+  // Normalize to JPEG (also converts content:// to file://) and get dimensions.
+  // When no resize is needed, compress directly in this single call to avoid a second pass.
+  const probe = await ImageManipulator.manipulateAsync(localUri, [], {
+    compress: 1,
+    format: ImageManipulator.SaveFormat.JPEG,
+    base64: false,
+  });
+  const shouldResize = probe.width > maxWidth || probe.height > maxHeight;
 
-  const shouldResize = normalized.width > maxWidth || normalized.height > maxHeight;
-  const resizeRatio = shouldResize
-    ? Math.min(maxWidth / normalized.width, maxHeight / normalized.height)
-    : 1;
-  const actions = shouldResize
-    ? [{
-        resize: {
-          width: Math.round(normalized.width * resizeRatio),
-          height: Math.round(normalized.height * resizeRatio),
-        },
-      }]
-    : [];
-
-  const compressed = await ImageManipulator.manipulateAsync(
-    normalized.uri,
-    actions,
-    {
-      compress: quality,
-      format: ImageManipulator.SaveFormat.JPEG,
-      base64: false,
-    },
-  );
+  // When resize IS needed: second call with resize + compress (unavoidable — we need dimensions first).
+  // When resize is NOT needed: single call with just compress applied to the original URI directly.
+  const compressed = shouldResize
+    ? await ImageManipulator.manipulateAsync(
+        probe.uri,
+        [{ resize: {
+          width: Math.round(probe.width * Math.min(maxWidth / probe.width, maxHeight / probe.height)),
+          height: Math.round(probe.height * Math.min(maxWidth / probe.width, maxHeight / probe.height)),
+        }}],
+        { compress: quality, format: ImageManipulator.SaveFormat.JPEG, base64: false },
+      )
+    : await ImageManipulator.manipulateAsync(
+        localUri,
+        [],
+        { compress: quality, format: ImageManipulator.SaveFormat.JPEG, base64: false },
+      );
 
   if (__DEV__) {
     console.log('[imageCompressor] compressImage done', {
       inputScheme,
       outputScheme: compressed.uri.split(':')[0] || 'unknown',
-      originalDimensions: `${normalized.width}x${normalized.height}`,
+      originalDimensions: `${probe.width}x${probe.height}`,
       outputDimensions: `${compressed.width}x${compressed.height}`,
       resized: shouldResize,
     });

@@ -1,14 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useAppTheme } from '../hooks/useAppTheme';
 import MiniTabBar from '../components/MiniTabBar';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, SafeAreaView, ActivityIndicator, ScrollView } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationProp, ParamListBase, RouteProp } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
-import { get, ref } from 'firebase/database';
-import { database, firebaseChatAPI } from '../firebase-config';
+import { onValue, ref, set } from 'firebase/database';
+import { onAuthStateChanged } from 'firebase/auth';
+import type { User } from 'firebase/auth';
+import { auth, database, firebaseChatAPI } from '../firebase-config';
 import type { RootState } from '../redux/store';
-import type { Request } from '../types/app';
+import type { HelperOption, Request } from '../types/app';
 import AppPhotoImage from '../components/AppPhotoImage';
 import MiniUserAvatar from '../components/MiniUserAvatar';
 import { LIGHT_ORBS, SCREEN_THEME } from '../utils/screenTheme';
@@ -21,6 +24,7 @@ import { loadProfileRecord } from '../services/authProfileService';
 import {
   awardGratitudeBonus,
   awardHelpRespondBonus,
+  awardMilestoneBonus,
   checkIfHelped,
   closeRequestWithBonus,
   confirmHelperForRequest,
@@ -29,8 +33,13 @@ import {
   type HelpConfirmation,
   type HelpResponse,
 } from '../services/bonusService';
+import { tryBonusOrEnqueue } from '../services/bonusQueue';
 import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
 import ContactReasonModal from '../components/ContactReasonModal';
+import CommentSection from '../components/CommentSection';
+import HelperSelectionModal from '../components/HelperSelectionModal';
+import ContentComplaintModal from '../components/ContentComplaintModal';
+import { getCommentersForRequest } from '../services/commentService';
 import { useContactRequest } from '../hooks/useContactRequest';
 
 type RequestDetailParams = {
@@ -54,6 +63,7 @@ const UI_TEXT = {
     connectSentBody: 'Користувач побачить ваш запит і зможе відкрити доступ до контактів.',
     backToList: 'Повернутися до списку заявок',
     numberTitle: 'Номер',
+    justNow: 'щойно',
     minAgo: 'хв тому',
     hourAgo: 'год тому',
     dayAgo: 'д тому',
@@ -71,10 +81,10 @@ const UI_TEXT = {
       delivery: 'Доставка',
       other: 'Інше',
     },
-    iHelped: 'Я допоміг',
     alreadyHelped: 'Ви вже відгукнулись',
-    helpedSuccess: '+20 бонусів за допомогу!',
     helpError: 'Не вдалося надіслати відгук',
+    loginToContact: 'Увійдіть, щоб побачити контакт',
+    loginBtn: 'Увійти / Зареєструватись',
   },
   ru: {
     headerTitle: 'Детали заявки',
@@ -90,6 +100,7 @@ const UI_TEXT = {
     connectSentBody: 'Пользователь увидит ваш запрос и сможет открыть доступ к контактам.',
     backToList: 'Вернуться к списку заявок',
     numberTitle: 'Номер',
+    justNow: 'только что',
     minAgo: 'мин назад',
     hourAgo: 'ч назад',
     dayAgo: 'д назад',
@@ -107,10 +118,10 @@ const UI_TEXT = {
       delivery: 'Доставка',
       other: 'Другое',
     },
-    iHelped: 'Я помог',
     alreadyHelped: 'Вы уже откликнулись',
-    helpedSuccess: '+20 бонусов за помощь!',
     helpError: 'Не удалось отправить отклик',
+    loginToContact: 'Войдите, чтобы увидеть контакт',
+    loginBtn: 'Войти / Зарегистрироваться',
   },
   en: {
     headerTitle: 'Request Details',
@@ -126,6 +137,7 @@ const UI_TEXT = {
     connectSentBody: 'This user will see your request and can grant access to contacts.',
     backToList: 'Back to request list',
     numberTitle: 'Phone number',
+    justNow: 'just now',
     minAgo: 'min ago',
     hourAgo: 'h ago',
     dayAgo: 'd ago',
@@ -143,16 +155,66 @@ const UI_TEXT = {
       delivery: 'Delivery',
       other: 'Other',
     },
-    iHelped: 'I helped',
     alreadyHelped: 'You already responded',
-    helpedSuccess: '+20 bonuses for helping!',
     helpError: 'Could not send response',
+    loginToContact: 'Sign in to see contact info',
+    loginBtn: 'Sign in / Register',
   },
 } as const;
 
-const AVATAR_COLORS = ['#C77A5D', '#D8AF59', '#7E9D69', '#5F84B4', '#A56B55'];
-const RTDB_FORBIDDEN_KEY_CHARS = /[.#$[\]/]/g;
-const toSafeRtdbKey = (value: string): string => (value ?? '').replace(RTDB_FORBIDDEN_KEY_CHARS, '_').trim();
+const FUNCTION_ERROR_MESSAGES: Record<Lang, Record<string, string>> = {
+  ua: {
+    max_helpers_confirmed: 'Вже підтверджено 3 помічники для цієї заявки.',
+    flagged_for_review: 'Відмічено для перевірки модератором.',
+    help_not_confirmed: 'Спочатку підтвердіть допомогу цього користувача.',
+    helper_not_responded: 'Цей користувач не відгукнувся на заявку.',
+    request_not_found: 'Заявку не знайдено.',
+    only_author_can_confirm: 'Підтверджувати помічника може тільки автор.',
+    only_author_can_close: 'Закрити заявку може тільки автор.',
+    only_author_can_thank: 'Дякувати може тільки автор.',
+    auth_required: 'Необхідно авторизуватись.',
+    weekly_limit_help: 'Тижневий ліміт бонусів допомоги вичерпано.',
+    weekly_limit_total: 'Тижневий ліміт бонусів вичерпано.',
+    accrual_blocked: 'Нарахування бонусів тимчасово заблоковано для цього акаунту.',
+  },
+  ru: {
+    max_helpers_confirmed: 'Уже подтверждено 3 помощника для этой заявки.',
+    flagged_for_review: 'Помечено для проверки модератором.',
+    help_not_confirmed: 'Сначала подтвердите помощь этого пользователя.',
+    helper_not_responded: 'Этот пользователь не откликнулся на заявку.',
+    request_not_found: 'Заявка не найдена.',
+    only_author_can_confirm: 'Подтверждать помощника может только автор.',
+    only_author_can_close: 'Закрыть заявку может только автор.',
+    only_author_can_thank: 'Благодарить может только автор.',
+    auth_required: 'Необходимо авторизоваться.',
+    weekly_limit_help: 'Недельный лимит бонусов помощи исчерпан.',
+    weekly_limit_total: 'Недельный лимит бонусов исчерпан.',
+    accrual_blocked: 'Начисление бонусов временно заблокировано для этого аккаунта.',
+  },
+  en: {
+    max_helpers_confirmed: 'Already confirmed 3 helpers for this request.',
+    flagged_for_review: 'Flagged for moderator review.',
+    help_not_confirmed: 'Please confirm this helper first.',
+    helper_not_responded: 'This user has not responded to the request.',
+    request_not_found: 'Request not found.',
+    only_author_can_confirm: 'Only the author can confirm a helper.',
+    only_author_can_close: 'Only the author can close the request.',
+    only_author_can_thank: 'Only the author can send thanks.',
+    auth_required: 'Authentication required.',
+    weekly_limit_help: 'Weekly help bonus limit reached.',
+    weekly_limit_total: 'Weekly bonus limit reached.',
+    accrual_blocked: 'Bonus accrual is temporarily blocked for this account.',
+  },
+};
+
+const parseFunctionError = (error: unknown, fallback: string, language: Lang): string => {
+  const msg = String((error as any)?.message || '').toLowerCase().replace(/functions\//g, '');
+  return FUNCTION_ERROR_MESSAGES[language]?.[msg] || fallback;
+};
+
+const AVATAR_COLORS = ['#C77A5D', '#D88DB5', '#7E9D69', '#5F84B4', '#A56B55'];
+const toSafeRtdbKey = (value: string): string =>
+  (value ?? '').replace(/[.#$[\]/]/g, (c) => `_${c.charCodeAt(0).toString(16).toUpperCase()}_`).trim();
 
 const getGenderShortLabel = (gender?: string) => {
   if (gender === 'male') return 'M';
@@ -185,7 +247,8 @@ const HELP_FLOW_TEXT = {
     thanksSuccess: 'Подяку надіслано. +10 бонусів, якщо ліміти дозволяють.',
     closeSolved: 'Закрити як вирішену',
     closed: 'Заявку закрито',
-    closeSuccess: 'Заявку закрито. +5 бонусів, якщо ліміти дозволяють.',
+    alreadyClosed: 'Заявку вже закрито раніше.',
+    closeSuccess: 'Заявку закрито. +2 бонуси, якщо ліміти дозволяють.',
     helpersTitle: 'Помічники',
     helpersEmpty: 'Поки ніхто не відгукнувся.',
     flagged: 'Перевірка',
@@ -204,7 +267,8 @@ const HELP_FLOW_TEXT = {
     thanksSuccess: 'Благодарность отправлена. +10 бонусов, если лимиты позволяют.',
     closeSolved: 'Закрыть как решенную',
     closed: 'Заявка закрыта',
-    closeSuccess: 'Заявка закрыта. +5 бонусов, если лимиты позволяют.',
+    alreadyClosed: 'Заявка уже была закрыта ранее.',
+    closeSuccess: 'Заявка закрыта. +2 бонуса, если лимиты позволяют.',
     helpersTitle: 'Помощники',
     helpersEmpty: 'Пока никто не откликнулся.',
     flagged: 'Проверка',
@@ -223,7 +287,8 @@ const HELP_FLOW_TEXT = {
     thanksSuccess: 'Thanks sent. +10 bonuses if limits allow.',
     closeSolved: 'Close as solved',
     closed: 'Request closed',
-    closeSuccess: 'Request closed. +5 bonuses if limits allow.',
+    alreadyClosed: 'Request was already closed.',
+    closeSuccess: 'Request closed. +2 bonuses if limits allow.',
     helpersTitle: 'Helpers',
     helpersEmpty: 'No helpers have responded yet.',
     flagged: 'Review',
@@ -247,6 +312,7 @@ const RequestDetailScreen = ({
   const { request } = route.params;
   const [deleting, setDeleting] = useState(false);
   const [accessStatus, setAccessStatus] = useState<'pending' | 'approved' | 'denied' | null>(null);
+  const [accessLoading, setAccessLoading] = useState(true);
   const [profileName, setProfileName] = useState('');
   const [profileAge, setProfileAge] = useState<number | undefined>();
   const [profileGender, setProfileGender] = useState('');
@@ -258,7 +324,10 @@ const RequestDetailScreen = ({
   const [busyHelperUid, setBusyHelperUid] = useState<string | null>(null);
   const [thankedHelpers, setThankedHelpers] = useState<Record<string, boolean>>({});
   const [closingRequest, setClosingRequest] = useState(false);
-  const [requestSolved, setRequestSolved] = useState(false);
+  const [requestSolved, setRequestSolved] = useState(request.status === 'closed');
+  const [helperSelectionVisible, setHelperSelectionVisible] = useState(false);
+  const [complaintVisible, setComplaintVisible] = useState(false);
+  const [helperOptions, setHelperOptions] = useState<HelperOption[]>([]);
   const helperIds = useMemo(() => helpResponses.map((item) => item.helperUid).filter(Boolean), [helpResponses]);
   const avatarByUserId = useUserAvatarMap([request.userId, ...helperIds].filter(Boolean));
   const resolvedAvatarUri = (request.userId && avatarByUserId[request.userId]) || pickUserAvatarUri({ userPhotoURL: request.userPhotoURL, startAvatarKey: request.startAvatarKey }) || pickUserAvatarUri(request);
@@ -270,6 +339,7 @@ const RequestDetailScreen = ({
 
   const getTimeAgo = (timestamp: number) => {
     const diff = Date.now() - timestamp;
+    if (diff < 60000) return text.justNow;
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(diff / 3600000);
     const days = Math.floor(diff / 86400000);
@@ -282,6 +352,7 @@ const RequestDetailScreen = ({
     const loadAccess = async () => {
       if (!currentUser?.id || !request.userId || currentUser.id === request.userId) {
         setAccessStatus(null);
+        setAccessLoading(false);
         return;
       }
       try {
@@ -291,7 +362,9 @@ const RequestDetailScreen = ({
         ]);
         setAccessStatus(privacyMode === 'open' ? 'approved' : access);
       } catch {
-        setAccessStatus(null);
+        // keep existing accessStatus on network error
+      } finally {
+        setAccessLoading(false);
       }
     };
     void loadAccess();
@@ -329,29 +402,25 @@ const RequestDetailScreen = ({
   }, [request.userId]);
 
   useEffect(() => {
-    let cancelled = false;
+    if (!request.id) {
+      setRequestLikes(0);
+      return;
+    }
+    const likesRef = ref(database, `feed_likes/requests/${toSafeRtdbKey(request.id)}`);
+    const unsubscribe = onValue(likesRef, (snapshot) => {
+      const value = snapshot.val();
+      setRequestLikes(value && typeof value === 'object' ? Object.keys(value).length : 0);
+    }, () => { setRequestLikes(0); });
+    return unsubscribe;
+  }, [request.id]);
 
-    const loadRequestLikes = async () => {
-      if (!request.id) {
-        setRequestLikes(0);
-        return;
-      }
-
-      try {
-        const likesSnap = await get(ref(database, `feed_likes/requests/${toSafeRtdbKey(request.id)}`));
-        const likesValue = likesSnap.val();
-        if (!cancelled) {
-          setRequestLikes(likesValue && typeof likesValue === 'object' ? Object.keys(likesValue).length : 0);
-        }
-      } catch {
-        if (!cancelled) setRequestLikes(0);
-      }
-    };
-
-    void loadRequestLikes();
-    return () => {
-      cancelled = true;
-    };
+  useEffect(() => {
+    if (!request.id) return;
+    const statusRef = ref(database, `requests/${request.id}/status`);
+    const unsubStatus = onValue(statusRef, (snapshot) => {
+      setRequestSolved(snapshot.val() === 'closed');
+    }, () => {});
+    return unsubStatus;
   }, [request.id]);
 
   useEffect(() => {
@@ -404,13 +473,15 @@ const RequestDetailScreen = ({
   }, [currentUser, request.userId, request.name]);
 
   const phoneVisible = isOwnRequest || accessStatus === 'approved';
-  const hasPhone = phoneVisible && Boolean(request.phone?.trim());
+  // For own request: use real phone from auth profile (request.phone is always masked in RTDB)
+  const callPhone = isOwnRequest ? (currentUser?.phone || request.phone) : request.phone;
+  const hasPhone = phoneVisible && Boolean(callPhone?.trim());
   const canContact = canRequestContact || hasPhone;
 
   const handleCopyPhone = async () => {
-    if (!request.phone) return;
-    await Clipboard.setStringAsync(request.phone);
-    Alert.alert(text.numberTitle, request.phone);
+    if (!callPhone) return;
+    await Clipboard.setStringAsync(callPhone);
+    Alert.alert(text.numberTitle, callPhone);
   };
 
   const handleProfile = () => {
@@ -435,22 +506,21 @@ const RequestDetailScreen = ({
 
   const handleContact = () => {
     if (canRequestContact && request.userId) {
-      if (accessStatus === 'pending' || accessStatus === 'approved') return;
       void openModal({
         userId: request.userId,
         name: displayName,
         photoURL: resolvedAvatarUri,
         sourceType: 'help',
         sourceId: request.id,
-        sourceTitle: (request.text || request.description || '').slice(0, 60),
+        sourceTitle: (request.text || request.description || '').slice(0, 90),
       });
       return;
     }
 
     if (!hasPhone) return;
     Alert.alert(text.connect, displayName, [
-      { text: contactActionText.call, onPress: () => { void safeCallPhone(request.phone, language); } },
-      { text: contactActionText.viber, onPress: () => { void safeOpenViber(request.phone, language); } },
+      { text: contactActionText.call, onPress: () => { void safeCallPhone(callPhone, language); } },
+      { text: contactActionText.viber, onPress: () => { void safeOpenViber(callPhone, language); } },
       { text: text.cancel, style: 'cancel' },
     ]);
   };
@@ -464,8 +534,32 @@ const RequestDetailScreen = ({
     return () => { cancelled = true; };
   }, [currentUser?.id, request.id, isOwnRequest]);
 
+  const getAuthUserWithRetry = (): Promise<User | null> => {
+    const current = auth.currentUser;
+    if (current && !current.isAnonymous) return Promise.resolve(current);
+    // Firebase may fire onAuthStateChanged with null while restoring from AsyncStorage.
+    // Keep the listener active until a real (non-anonymous) user arrives or timeout.
+    return new Promise<User | null>((resolve) => {
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (!settled) { settled = true; unsub(); resolve(null); }
+      }, 10000);
+      const unsub = onAuthStateChanged(auth, (u) => {
+        if (!u) return;
+        if (!u.isAnonymous) {
+          if (!settled) { settled = true; clearTimeout(timer); unsub(); resolve(u); }
+        }
+      });
+    });
+  };
+
   const handleHelp = async () => {
     if (!request.id || helpStatus !== 'idle') return;
+    const authUser = await getAuthUserWithRetry();
+    if (!authUser || authUser.isAnonymous) {
+      Alert.alert(text.ok, FUNCTION_ERROR_MESSAGES[language].auth_required);
+      return;
+    }
     setHelpStatus('sending');
     try {
       const result = await awardHelpRespondBonus(request.id);
@@ -478,10 +572,11 @@ const RequestDetailScreen = ({
       } else {
         setHelpStatus('helped');
         Alert.alert(text.ok, helpText.respondSuccess);
+        awardMilestoneBonus('first_response').catch(() => {});
       }
-    } catch {
+    } catch (error) {
       setHelpStatus('idle');
-      Alert.alert(helpText.bonusError, text.helpError);
+      Alert.alert(text.ok, parseFunctionError(error, text.helpError, language));
     }
   };
 
@@ -492,16 +587,22 @@ const RequestDetailScreen = ({
 
   const handleConfirmHelper = async (helperUid: string) => {
     if (!request.id || busyHelperUid) return;
+    const authUser = await getAuthUserWithRetry();
+    if (!authUser || authUser.isAnonymous) {
+      Alert.alert(text.ok, FUNCTION_ERROR_MESSAGES[language].auth_required);
+      return;
+    }
     setBusyHelperUid(helperUid);
     try {
       const result = await confirmHelperForRequest(request.id, helperUid);
       if (result.ok) {
         Alert.alert(text.ok, helpText.confirmSuccess);
       } else {
-        Alert.alert(helpText.bonusError, result.status || helpText.bonusError);
+        const knownMsg = FUNCTION_ERROR_MESSAGES[language]?.[result.status || ''];
+        Alert.alert(text.ok, knownMsg || helpText.bonusError);
       }
-    } catch {
-      Alert.alert(helpText.bonusError, helpText.bonusError);
+    } catch (error) {
+      Alert.alert(text.ok, parseFunctionError(error, helpText.bonusError, language));
     } finally {
       setBusyHelperUid(null);
     }
@@ -509,30 +610,81 @@ const RequestDetailScreen = ({
 
   const handleThankHelper = async (helperUid: string) => {
     if (!request.id || busyHelperUid) return;
+    const authUser = await getAuthUserWithRetry();
+    if (!authUser || authUser.isAnonymous) {
+      Alert.alert(text.ok, FUNCTION_ERROR_MESSAGES[language].auth_required);
+      return;
+    }
     setBusyHelperUid(helperUid);
     try {
       const result = await awardGratitudeBonus(request.id, helperUid);
       setThankedHelpers((prev) => ({ ...prev, [helperUid]: true }));
       Alert.alert(text.ok, result.awarded ? helpText.thanksSuccess : helpText.thanked);
-    } catch {
-      Alert.alert(helpText.bonusError, helpText.bonusError);
+    } catch (error) {
+      Alert.alert(text.ok, parseFunctionError(error, helpText.bonusError, language));
     } finally {
       setBusyHelperUid(null);
     }
   };
 
-  const handleCloseSolved = async () => {
-    if (!request.id || closingRequest || requestSolved) return;
+  const closeRequestFireForget = async (helperUids?: string[]) => {
+    const uid = currentUser?.id;
+    if (!request.id || !uid) return;
     setClosingRequest(true);
     try {
-      const result = await closeRequestWithBonus(request.id);
+      await set(ref(database, `requests/${request.id}/status`), 'closed');
+      await set(ref(database, `bonus_triggers/close_request/${request.id}`), {
+        uid,
+        requestId: request.id,
+        timestamp: Date.now(),
+        ...(helperUids?.length ? { helperUids } : {}),
+      });
       setRequestSolved(true);
-      Alert.alert(text.ok, result.ok ? helpText.closeSuccess : helpText.closed);
-    } catch {
-      Alert.alert(helpText.bonusError, helpText.bonusError);
+      Alert.alert(text.ok, helpText.closeSuccess);
+    } catch (error) {
+      Alert.alert(text.ok, parseFunctionError(error, helpText.bonusError, language));
     } finally {
       setClosingRequest(false);
     }
+  };
+
+  const handleCloseSolved = async () => {
+    if (!request.id || closingRequest || requestSolved) return;
+    if (!currentUser?.id) {
+      tryBonusOrEnqueue(
+        { type: 'close_request', payload: { requestId: request.id } },
+        () => closeRequestWithBonus(request.id),
+      ).catch(() => {});
+      Alert.alert(text.ok, 'Дія буде виконана після відновлення сесії.');
+      return;
+    }
+
+    const allCommenters = await getCommentersForRequest(request.id);
+    const commenters = allCommenters.filter((c) => c.uid !== request.userId);
+    if (commenters.length === 0) {
+      closeRequestFireForget();
+    } else {
+      setHelperOptions(
+        commenters.map((c) => ({
+          uid: c.uid,
+          name: c.name,
+          avatarKey: c.avatarKey,
+          commentPreview: c.text,
+          selected: false,
+        })),
+      );
+      setHelperSelectionVisible(true);
+    }
+  };
+
+  const handleCloseWithHelpers = async (helperUids: string[]) => {
+    setHelperSelectionVisible(false);
+    closeRequestFireForget(helperUids);
+  };
+
+  const handleCloseNobody = async () => {
+    setHelperSelectionVisible(false);
+    closeRequestFireForget();
   };
 
   const handleDelete = () => {
@@ -565,9 +717,10 @@ const RequestDetailScreen = ({
     { category: request.category, group: request.group, subcategory: request.subcategory },
     language,
   );
+  const { colors, isDark } = useAppTheme();
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View style={styles.backgroundLayer}>
         {LIGHT_ORBS.map((orb, index) => (
           <View key={index} style={[styles.orb, orb]} />
@@ -577,7 +730,7 @@ const RequestDetailScreen = ({
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
           <MaterialCommunityIcons name="arrow-left" size={20} color={SCREEN_THEME.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{text.headerTitle}</Text>
+        <Text style={[styles.headerTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{text.headerTitle}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -623,7 +776,19 @@ const RequestDetailScreen = ({
 
         <View style={styles.card}>
           <Text style={styles.cardLabel}>{text.contact}</Text>
-          <Text style={styles.phoneText}>{phoneVisible ? (request.phone || '—') : '***'}</Text>
+          <Text style={styles.phoneText}>{phoneVisible ? (callPhone || '—') : '***'}</Text>
+          {!currentUser?.id ? (
+            <TouchableOpacity
+              onPress={() => navigation.navigate('LoginScreen', {})}
+              activeOpacity={0.82}
+              style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, marginBottom: 2 }}
+            >
+              <MaterialCommunityIcons name="lock-outline" size={14} color="#C77A5D" />
+              <Text style={{ color: '#C77A5D', fontSize: 13, marginLeft: 5, textDecorationLine: 'underline' }}>
+                {text.loginToContact}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
           <View style={styles.contactActions}>
             <TouchableOpacity
               style={[styles.smallAction, !canOpenProfile && styles.disabledContactAction]}
@@ -638,7 +803,7 @@ const RequestDetailScreen = ({
               <>
                 <TouchableOpacity
                   style={[styles.smallAction, !hasPhone && styles.disabledContactAction]}
-                  onPress={() => void safeCallPhone(request.phone, language)}
+                  onPress={() => void safeCallPhone(callPhone, language)}
                   disabled={!hasPhone}
                   activeOpacity={0.82}
                 >
@@ -647,7 +812,7 @@ const RequestDetailScreen = ({
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.smallAction, !hasPhone && styles.disabledContactAction]}
-                  onPress={() => void safeOpenViber(request.phone, language)}
+                  onPress={() => void safeOpenViber(callPhone, language)}
                   disabled={!hasPhone}
                   activeOpacity={0.82}
                 >
@@ -666,9 +831,9 @@ const RequestDetailScreen = ({
         </View>
 
         <TouchableOpacity
-          style={[styles.contactBtn, !canContact && styles.disabledContactAction]}
+          style={[styles.contactBtn, (!canContact || accessLoading) && styles.disabledContactAction]}
           onPress={handleContact}
-          disabled={!canContact}
+          disabled={!canContact || accessLoading}
           activeOpacity={0.86}
         >
           <Text style={[styles.contactBtnText, !canContact && styles.disabledContactText]}>{text.connect}</Text>
@@ -742,7 +907,7 @@ const RequestDetailScreen = ({
                       activeOpacity={0.82}
                     >
                       {isBusy ? (
-                        <ActivityIndicator size="small" color="#FFF9EE" />
+                        <ActivityIndicator size="small" color="#FBF8FD" />
                       ) : (
                         <Text style={styles.confirmHelperButtonText}>{helpText.confirmHelp} +20</Text>
                       )}
@@ -753,6 +918,12 @@ const RequestDetailScreen = ({
             })}
           </View>
         ) : null}
+
+        <CommentSection
+          requestId={request.id}
+          requestAuthorUid={request.userId || ''}
+          isRequestClosed={requestSolved || request.status === 'closed'}
+        />
 
         {!isOwnRequest && currentUser?.id ? (
           <TouchableOpacity
@@ -766,13 +937,13 @@ const RequestDetailScreen = ({
             activeOpacity={0.82}
           >
             {helpStatus === 'sending' ? (
-              <ActivityIndicator color="#FFF9EE" />
+              <ActivityIndicator color="#FBF8FD" />
             ) : (
               <>
                 <MaterialCommunityIcons
                   name={helpStatus === 'helped' || helpStatus === 'already' ? 'check-circle' : 'handshake'}
                   size={18}
-                  color="#FFF9EE"
+                  color="#FBF8FD"
                 />
                 <Text style={styles.helpButtonText}>
                   {helpStatus === 'helped' || helpStatus === 'already' ? helpText.responded : helpText.respond}
@@ -792,11 +963,11 @@ const RequestDetailScreen = ({
             activeOpacity={0.84}
           >
             {closingRequest ? (
-              <ActivityIndicator color="#FFF9EE" />
+              <ActivityIndicator color="#FBF8FD" />
             ) : (
               <>
-                <MaterialCommunityIcons name={requestSolved ? 'check-circle' : 'check-decagram-outline'} size={18} color="#FFF9EE" />
-                <Text style={styles.closeSolvedButtonText}>{requestSolved ? helpText.closed : `${helpText.closeSolved} +5`}</Text>
+                <MaterialCommunityIcons name={requestSolved ? 'check-circle' : 'check-decagram-outline'} size={18} color="#FBF8FD" />
+                <Text style={styles.closeSolvedButtonText}>{requestSolved ? helpText.closed : `${helpText.closeSolved} +2`}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -805,15 +976,20 @@ const RequestDetailScreen = ({
         {isOwnRequest ? (
           <TouchableOpacity style={[styles.deleteButton, deleting && styles.deleteButtonDisabled]} onPress={handleDelete} disabled={deleting}>
             {deleting ? (
-              <ActivityIndicator color="#FFF9EE" />
+              <ActivityIndicator color="#FBF8FD" />
             ) : (
               <>
-                <MaterialCommunityIcons name="trash-can-outline" size={18} color="#FFF9EE" />
+                <MaterialCommunityIcons name="trash-can-outline" size={18} color="#FBF8FD" />
                 <Text style={styles.deleteButtonText}>{text.delete}</Text>
               </>
             )}
           </TouchableOpacity>
         ) : null}
+
+        <TouchableOpacity style={styles.complaintBtn} onPress={() => setComplaintVisible(true)} activeOpacity={0.7}>
+          <MaterialCommunityIcons name="flag-outline" size={13} color={SCREEN_THEME.textMuted} />
+          <Text style={styles.complaintBtnText}>{language === 'ua' ? 'Поскаржитись' : language === 'ru' ? 'Пожаловаться' : 'Report'}</Text>
+        </TouchableOpacity>
 
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Text style={styles.backButtonText}>{text.backToList}</Text>
@@ -826,6 +1002,22 @@ const RequestDetailScreen = ({
         target={currentTarget}
         onSelect={(reason) => void handleSendContactRequest(reason)}
         onClose={closeModal}
+      />
+      <HelperSelectionModal
+        visible={helperSelectionVisible}
+        helpers={helperOptions}
+        onConfirm={handleCloseWithHelpers}
+        onNobodyHelped={handleCloseNobody}
+        onCancel={() => setHelperSelectionVisible(false)}
+      />
+      <ContentComplaintModal
+        visible={complaintVisible}
+        onClose={() => setComplaintVisible(false)}
+        contentId={request.id}
+        contentType="help-request"
+        contentTitle={getRequestTopicLabel({ category: request.category }, language)}
+        reportedUserId={request.userId}
+        language={language}
       />
     </SafeAreaView>
   );
@@ -878,7 +1070,7 @@ const styles = StyleSheet.create({
   smallActionAltText: { color: '#403933', fontSize: 12, fontWeight: '900' },
   disabledContactAction: { backgroundColor: '#E1D7CF' },
   disabledContactText: { color: '#9F958E' },
-  contactBtn: { alignItems: 'center', backgroundColor: '#7A1E5C', borderRadius: 16, paddingVertical: 14, marginBottom: 12 },
+  contactBtn: { alignItems: 'center', backgroundColor: '#7d0e59', borderRadius: 16, paddingVertical: 14, marginBottom: 12 },
   contactBtnText: { color: '#fff', fontSize: 15, fontWeight: '900' },
   actionButtonDisabled: { opacity: 0.7 },
   connectStatusText: { marginBottom: 10, textAlign: 'center', color: SCREEN_THEME.textSecondary, fontSize: 13, fontWeight: '700' },
@@ -901,7 +1093,7 @@ const styles = StyleSheet.create({
   helpPanelCount: {
     minWidth: 28,
     textAlign: 'center',
-    color: '#FFF9EE',
+    color: '#FBF8FD',
     backgroundColor: SCREEN_THEME.woodGreenDark,
     borderRadius: 999,
     overflow: 'hidden',
@@ -921,7 +1113,7 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingVertical: 10,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(123, 86, 56, 0.12)',
+    borderTopColor: 'rgba(128, 76, 110, 0.12)',
   },
   helperInfo: {
     flex: 1,
@@ -950,7 +1142,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   confirmHelperButtonText: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
     fontSize: 12,
     fontWeight: '900',
   },
@@ -987,7 +1179,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 9,
     paddingVertical: 5,
-    backgroundColor: '#FFF3CE',
+    backgroundColor: '#F5EEF9',
     borderWidth: 1,
     borderColor: '#E8C66F',
   },
@@ -1009,7 +1201,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   deleteButtonDisabled: { opacity: 0.72 },
-  deleteButtonText: { color: '#FFF9EE', fontSize: 15, fontWeight: '900' },
+  deleteButtonText: { color: '#FBF8FD', fontSize: 15, fontWeight: '900' },
   helpButton: {
     backgroundColor: '#2196F3',
     borderRadius: 18,
@@ -1027,7 +1219,7 @@ const styles = StyleSheet.create({
     borderColor: '#4CAF50',
   },
   helpButtonText: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
     fontSize: 15,
     fontWeight: '900',
   },
@@ -1049,12 +1241,14 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   closeSolvedButtonText: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
     fontSize: 15,
     fontWeight: '900',
   },
   backButton: { alignItems: 'center', paddingVertical: 12 },
   backButtonText: { color: SCREEN_THEME.textSecondary, fontSize: 14, fontWeight: '800' },
+  complaintBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 10 },
+  complaintBtnText: { color: SCREEN_THEME.textMuted, fontSize: 12, fontWeight: '700' },
 });
 
 export default RequestDetailScreen;

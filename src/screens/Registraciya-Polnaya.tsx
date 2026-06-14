@@ -1,6 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -12,12 +11,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
 import { NavigationProp, useNavigation, useRoute } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
-import { createUserWithEmailAndPassword, signInAnonymously, updateProfile } from 'firebase/auth';
-import { ref as dbRef, set as dbSet, get, orderByChild, query, equalTo } from 'firebase/database';
-import Toast from 'react-native-toast-message';
-import { auth, database } from '../firebase-config';
+import { auth } from '../firebase-config';
 import { isAnonymousFirebaseUser } from '../firebase-auth-session';
-import { setUser, setLoading, setError, clearError } from '../redux/slices/authSlice';
+import { clearError } from '../redux/slices/authSlice';
 import { selectAuthError, selectAuthLoading, selectUser } from '../redux/selectors';
 import { BUILDINGS, getBuildingsByStreet, getStreets } from '../data/buildings';
 import { SCREEN_THEME } from '../utils/screenTheme';
@@ -26,22 +22,17 @@ import TactileInput from '../components/TactileInput';
 import TactileButton from '../components/TactileButton';
 import FormSectionLabel from '../components/FormSectionLabel';
 import { normalizeEmailText, normalizePersonName, normalizePhoneText } from '../utils/textUtils';
-import { validateEmail, validateName, validatePassword, validatePhone } from '../utils/validators';
-import { getPasswordBreachCount } from '../utils/passwordBreachCheck';
+import { normalizeUkrainianPhoneStrict, validateEmail, validateName, validatePassword, validatePhone } from '../utils/validators';
 import { RootState } from '../redux/store';
-import { loadProfileRecord, mapFirebaseUserToAppUser } from '../services/authProfileService';
-import { clearSelectedStartAvatar, clearTempProfileData, getSelectedStartAvatar, loadTempProfileData } from '../utils/startAvatars';
-
-type QuickRegistrationParams = {
-  name?: string;
-  email?: string;
-  phone?: string;
-  redirectTo?: string;
-  redirectParams?: object;
-  redirectMode?: 'auth' | 'complete';
-};
+import { QuickRegistrationParams, useFullRegistration } from '../hooks/useFullRegistration';
+import { getRegistrationFullText } from './registrationFullText';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 const REGISTRATION_DRAFT_KEY = '@chaika:full-registration-draft:v1';
+const MAX_NAME_LENGTH = 80;
+const MAX_EMAIL_LENGTH = 120;
+const MAX_PHONE_LENGTH = 20;
+const MAX_PASSWORD_LENGTH = 128;
 
 const RegisterScreenFull: React.FC = () => {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
@@ -54,53 +45,8 @@ const RegisterScreenFull: React.FC = () => {
   const prefilledParams = (route.params ?? {}) as QuickRegistrationParams;
   const isCompletingExistingAccount = Boolean(auth.currentUser && !isAnonymousFirebaseUser(auth.currentUser) && currentUser?.registrationStatus === 'partial');
 
-  const text = language === 'ru'
-    ? {
-        error: 'Ошибка', success: 'Успешно', invalid: 'Заполните все поля корректно', done: 'Регистрация завершена',
-        title: 'Полная регистрация', subtitle: 'Создайте аккаунт и укажите адрес в ЖК Чайка',
-        personal: 'Личные данные', fullName: 'Полное имя', enterName: 'Введите имя', phone: 'Телефон',
-        password: 'Пароль', minPassword: 'Минимум 8 символов: буква, цифра и спецсимвол', confirmPassword: 'Подтвердите пароль', repeatPassword: 'Повторите пароль',
-        address: 'Адрес', street: 'Улица', streetPick: 'Выберите улицу...', house: 'Дом', housePick: 'Выберите дом...',
-        guarantor: 'Поручитель', guarantorPhone: 'Телефон человека, который вас пригласил', optionalPhone: '+380... (необязательно)',
-        agree: 'Я соглашаюсь с условиями использования', register: 'Зарегистрироваться', haveAccount: 'Уже есть аккаунт? ', login: 'Войти',
-        show: 'Показать', hide: 'Скрыть', emailInUse: 'Этот email уже используется. Попробуйте зарегистрироваться с новым email или войти через Google/Facebook.', invalidEmail: 'Некорректный email.', weakPassword: 'Пароль слишком простой.',
-        registerFailed: 'Не удалось зарегистрироваться. Попробуйте позже.',
-        passwordBreached: 'Этот пароль найден в утечках. Выберите другой, уникальный пароль.',
-        passwordCheckUnavailable: 'Не удалось выполнить проверку пароля на утечки. Попробуйте позже.',
-        referrerNotFound: 'Пользователь с таким номером телефона не найден в базе.',
-        quickReg: 'Быстрая регистрация', addressData: 'Адрес и данные',
-      }
-    : language === 'en'
-      ? {
-          error: 'Error', success: 'Success', invalid: 'Please fill in all fields correctly', done: 'Registration completed',
-          title: 'Full registration', subtitle: 'Create an account and specify your address in Chaika Life',
-          personal: 'Personal details', fullName: 'Full name', enterName: 'Enter your name', phone: 'Phone',
-          password: 'Password', minPassword: 'At least 8 chars: letter, digit & special char', confirmPassword: 'Confirm password', repeatPassword: 'Repeat password',
-          address: 'Address', street: 'Street', streetPick: 'Select a street...', house: 'Building', housePick: 'Select a building...',
-          guarantor: 'Referrer', guarantorPhone: 'Phone of the person who invited you', optionalPhone: '+380... (optional)',
-          agree: 'I agree to the terms of use', register: 'Register', haveAccount: 'Already have an account? ', login: 'Sign in',
-          show: 'Show', hide: 'Hide', emailInUse: 'This email is already in use. Try signing up with a new email or sign in with Google/Facebook.', invalidEmail: 'Invalid email.', weakPassword: 'Password is too weak.',
-          registerFailed: 'Could not register. Please try again later.',
-          passwordBreached: 'This password appears in known breaches. Choose a different, unique password.',
-          passwordCheckUnavailable: 'Could not check the password against breach databases. Please try again later.',
-          referrerNotFound: 'No user with this phone number found in the database.',
-          quickReg: 'Quick registration', addressData: 'Address & details',
-        }
-      : {
-          error: 'Помилка', success: 'Успішно', invalid: 'Заповніть усі поля коректно', done: 'Реєстрацію завершено',
-          title: 'Повна реєстрація', subtitle: 'Створіть акаунт і вкажіть адресу в ЖК Чайка',
-          personal: 'Особисті дані', fullName: 'Повне імʼя', enterName: 'Введіть імʼя', phone: 'Телефон',
-          password: 'Пароль', minPassword: 'Мінімум 8 символів: літера, цифра і спецсимвол', confirmPassword: 'Підтвердіть пароль', repeatPassword: 'Повторіть пароль',
-          address: 'Адреса', street: 'Вулиця', streetPick: 'Виберіть вулицю...', house: 'Будинок', housePick: 'Виберіть будинок...',
-          guarantor: 'Поручитель', guarantorPhone: 'Телефон людини, яка вас запросила', optionalPhone: '+380... (необовʼязково)',
-          agree: 'Я погоджуюсь з умовами використання', register: 'Зареєструватися', haveAccount: 'Вже є акаунт? ', login: 'Увійти',
-          show: 'Показати', hide: 'Сховати', emailInUse: 'Цей email вже використовується. Спробуйте зареєструватися з новим email або увійти через Google/Facebook.', invalidEmail: 'Некоректний email.', weakPassword: 'Пароль занадто простий.',
-          registerFailed: 'Не вдалося зареєструватися. Спробуйте пізніше.',
-          passwordBreached: 'Цей пароль знайдено у витоках. Оберіть інший, унікальний пароль.',
-          passwordCheckUnavailable: 'Не вдалося перевірити пароль на витоки. Спробуйте пізніше.',
-          referrerNotFound: 'Користувача з таким номером телефону не знайдено в базі.',
-          quickReg: 'Швидка реєстрація', addressData: 'Адреса і дані',
-        };
+  const { colors, isDark } = useAppTheme();
+  const text = useMemo(() => getRegistrationFullText(language), [language]);
 
   const [name, setName] = useState(() => normalizePersonName(prefilledParams.name || currentUser?.name || auth.currentUser?.displayName || ''));
   const [email, setEmail] = useState(() => normalizeEmailText(prefilledParams.email || currentUser?.email || auth.currentUser?.email || ''));
@@ -113,6 +59,7 @@ const RegisterScreenFull: React.FC = () => {
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [draftLoaded, setDraftLoaded] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -143,6 +90,10 @@ const RegisterScreenFull: React.FC = () => {
         if (typeof draft.agreeTerms === 'boolean') setAgreeTerms(draft.agreeTerms);
       } catch {
         await AsyncStorage.removeItem(REGISTRATION_DRAFT_KEY);
+      } finally {
+        if (active) {
+          setDraftLoaded(true);
+        }
       }
     };
 
@@ -154,19 +105,27 @@ const RegisterScreenFull: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    void AsyncStorage.setItem(
-      REGISTRATION_DRAFT_KEY,
-      JSON.stringify({
-        name,
-        email,
-        phone,
-        selectedStreet,
-        selectedBuildingId,
-        referrerPhone,
-        agreeTerms,
-      })
-    );
-  }, [agreeTerms, email, name, phone, referrerPhone, selectedBuildingId, selectedStreet]);
+    if (!draftLoaded) {
+      return undefined;
+    }
+
+    const saveTimer = setTimeout(() => {
+      void AsyncStorage.setItem(
+        REGISTRATION_DRAFT_KEY,
+        JSON.stringify({
+          name,
+          email,
+          phone,
+          selectedStreet,
+          selectedBuildingId,
+          referrerPhone,
+          agreeTerms,
+        })
+      );
+    }, 500);
+
+    return () => clearTimeout(saveTimer);
+  }, [agreeTerms, draftLoaded, email, name, phone, referrerPhone, selectedBuildingId, selectedStreet]);
 
   const streets = useMemo(() => getStreets(), []);
   const buildingsInStreet = useMemo(
@@ -178,9 +137,9 @@ const RegisterScreenFull: React.FC = () => {
     [selectedBuildingId]
   );
 
-  const normalizedName = normalizePersonName(name);
-  const normalizedEmail = normalizeEmailText(email);
-  const normalizedPhone = normalizePhoneText(phone);
+  const normalizedName = useMemo(() => normalizePersonName(name), [name]);
+  const normalizedEmail = useMemo(() => normalizeEmailText(email), [email]);
+  const normalizedPhone = useMemo(() => normalizeUkrainianPhoneStrict(phone) ?? normalizePhoneText(phone), [phone]);
   const isNameValid = validateName(normalizedName);
   const isEmailValid = validateEmail(normalizedEmail);
   const isPhoneValid = validatePhone(normalizedPhone);
@@ -198,134 +157,27 @@ const RegisterScreenFull: React.FC = () => {
     isGuarantorComplete &&
     agreeTerms;
 
-  const handleRegister = useCallback(async () => {
-    if (!isFormValid) {
-      Toast.show({
-        type: 'error',
-        text1: text.error,
-        text2: text.invalid,
-      });
-      return;
-    }
-
-    dispatch(setLoading(true));
-    try {
-      if (!isCompletingExistingAccount) {
-        const breachCount = await getPasswordBreachCount(password);
-        // If breach check is unavailable (null) — skip it and proceed with registration.
-        // Only block if password is confirmed breached (count > 0).
-        if (breachCount !== null && breachCount > 0) {
-          dispatch(setError(text.passwordBreached));
-          Toast.show({ type: 'error', text1: text.error, text2: text.passwordBreached });
-          return;
-        }
-      }
-
-      const authUser = isCompletingExistingAccount
-        ? auth.currentUser
-        : (await createUserWithEmailAndPassword(auth, normalizedEmail, password)).user;
-
-      if (!authUser) {
-        throw new Error('Authentication required');
-      }
-
-      await updateProfile(authUser, { displayName: normalizedName });
-
-      // Verify referrer AFTER creating account (Firebase Rules require auth != null)
-      let referrerVerified = true;
-      if (referrerPhone) {
-        const normalizedReferrer = normalizePhoneText(referrerPhone);
-        const referrerSnap = await get(query(dbRef(database, 'users'), orderByChild('phone'), equalTo(normalizedReferrer)));
-        const referrerSnapAlt = await get(query(dbRef(database, 'users'), orderByChild('phone'), equalTo(referrerPhone.trim())));
-        referrerVerified = referrerSnap.exists() || referrerSnapAlt.exists();
-        if (!referrerVerified) {
-          if (!isCompletingExistingAccount) {
-            try {
-              await authUser.delete();
-            } catch {
-              // delete failed (e.g. auth/requires-recent-login) — reset to anonymous session
-              await signInAnonymously(auth).catch(() => null);
-            }
-          }
-          Toast.show({ type: 'error', text1: text.error, text2: text.referrerNotFound });
-          return;
-        }
-      }
-
-      const uid = authUser.uid;
-      const selectedStartAvatar = await getSelectedStartAvatar();
-      const tempProfile = await loadTempProfileData();
-      const avatarUri = authUser.photoURL || selectedStartAvatar?.uri || (tempProfile ? `start-avatar://${tempProfile.startAvatarKey}` : '');
-      const avatarKey = selectedStartAvatar?.key || tempProfile?.startAvatarKey;
-      await dbSet(dbRef(database, `users/${uid}`), {
-        name: tempProfile?.name || normalizedName,
-        phone: normalizedPhone,
-        building: selectedBuilding?.street || '',
-        houseNumber: selectedBuilding?.houseNumber || '',
-        registeredAt: new Date().toISOString(),
-        registrationStatus: 'complete',
-        privacyVersion: 2,
-        addressProtected: true,
-        provider: currentUser?.provider || 'email',
-        providerId: uid,
-        photoURL: avatarUri,
-        ...(avatarKey ? { startAvatarKey: avatarKey } : {}),
-        ...(tempProfile?.gender ? { gender: tempProfile.gender } : {}),
-        ...(tempProfile?.age ? { age: tempProfile.age } : {}),
-        ...(referrerPhone ? { referrerPhone } : {}),
-      });
-      // NOTE: legacy referrals write removed — trust_tree (Cloud Functions) handles this now
-
-      dispatch(
-        setUser(
-          mapFirebaseUserToAppUser(
-            authUser,
-            await loadProfileRecord(uid),
-          )
-        )
-      );
-
-      await AsyncStorage.removeItem(REGISTRATION_DRAFT_KEY);
-      if (selectedStartAvatar) {
-        await clearSelectedStartAvatar();
-      }
-      await clearTempProfileData();
-      dispatch(setError(null));
-      Toast.show({
-        type: 'success',
-        text1: text.success,
-        text2: text.done,
-      });
-      if (route.params?.redirectTo) {
-        try {
-          navigation.reset({
-            index: 0,
-            routes: [{ name: route.params.redirectTo, params: route.params.redirectParams }],
-          });
-          return;
-        } catch {
-          // Invalid screen name, fall through to ProfileSetupScreen
-        }
-      }
-      navigation.reset({ index: 0, routes: [{ name: 'ProfileSetupScreen' }] });
-    } catch (err: unknown) {
-      const authErr = err as { code?: string };
-      let message = text.registerFailed;
-      if (authErr?.code === 'auth/email-already-in-use') message = text.emailInUse;
-      if (authErr?.code === 'auth/invalid-email') message = text.invalidEmail;
-      if (authErr?.code === 'auth/weak-password') message = text.weakPassword;
-      dispatch(setError(message));
-      Toast.show({ type: 'error', text1: text.error, text2: message });
-    } finally {
-      dispatch(setLoading(false));
-    }
-  }, [currentUser?.provider, dispatch, isCompletingExistingAccount, isFormValid, navigation, normalizedEmail, normalizedName, normalizedPhone, password, referrerPhone, route.params, text]);
+  const { handleRegister } = useFullRegistration({
+    currentProvider: currentUser?.provider,
+    draftKey: REGISTRATION_DRAFT_KEY,
+    isCompletingExistingAccount,
+    isFormValid,
+    navigation,
+    normalizedEmail,
+    normalizedName,
+    normalizedPhone,
+    password,
+    referrerPhone,
+    routeParams: route.params,
+    selectedBuilding,
+    text,
+  });
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <TactileCard elevated style={styles.headerCard} pressable={false}>
-          <Text style={styles.headerTitle}>{text.title}</Text>
+          <Text style={[styles.headerTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{text.title}</Text>
           <Text style={styles.headerSubtitle}>{text.subtitle}</Text>
           <View style={styles.modeSwitchRow}>
             <TouchableOpacity style={styles.modeSwitchButtonSecondary} onPress={() => navigation.navigate('LoginScreen')} disabled={loading} activeOpacity={0.8}>
@@ -351,11 +203,12 @@ const RegisterScreenFull: React.FC = () => {
               if (error) dispatch(clearError());
             }}
             editable={!loading}
+            maxLength={MAX_NAME_LENGTH}
           />
 
-          <FormSectionLabel label="Email" completed={isEmailValid} labelStyle={styles.label} containerStyle={styles.labelRow} />
+          <FormSectionLabel label={text.email} completed={isEmailValid} labelStyle={styles.label} containerStyle={styles.labelRow} />
           <TactileInput
-            placeholder="Email"
+            placeholder={text.email}
             value={email}
             onChangeText={(text) => {
               setEmail(normalizeEmailText(text));
@@ -364,6 +217,7 @@ const RegisterScreenFull: React.FC = () => {
             autoCapitalize="none"
             keyboardType="email-address"
             editable={!loading && !isCompletingExistingAccount}
+            maxLength={MAX_EMAIL_LENGTH}
           />
 
           <FormSectionLabel label={text.phone} completed={isPhoneValid} labelStyle={styles.label} containerStyle={styles.labelRow} />
@@ -376,6 +230,7 @@ const RegisterScreenFull: React.FC = () => {
             }}
             keyboardType="phone-pad"
             editable={!loading}
+            maxLength={MAX_PHONE_LENGTH}
           />
 
           {!isCompletingExistingAccount ? (
@@ -385,28 +240,37 @@ const RegisterScreenFull: React.FC = () => {
                 <TactileInput
                   placeholder={text.minPassword}
                   value={password}
-                  onChangeText={setPassword}
+                  onChangeText={(text) => { setPassword(text); if (error) dispatch(clearError()); }}
                   secureTextEntry={!showPassword}
                   editable={!loading}
+                  maxLength={MAX_PASSWORD_LENGTH}
                 />
                 <TouchableOpacity onPress={() => setShowPassword((value) => !value)} disabled={loading}>
                   <Text style={styles.toggleText}>{showPassword ? text.hide : text.show}</Text>
                 </TouchableOpacity>
               </View>
 
+              {password.length > 0 && !isPasswordValid ? (
+                <Text style={styles.fieldHint}>{text.minPassword}</Text>
+              ) : null}
+
               <FormSectionLabel label={text.confirmPassword} completed={isPasswordsMatch && confirmPassword.length > 0} labelStyle={styles.label} containerStyle={styles.labelRow} />
               <View style={styles.passwordWrap}>
                 <TactileInput
                   placeholder={text.repeatPassword}
                   value={confirmPassword}
-                  onChangeText={setConfirmPassword}
+                  onChangeText={(text) => { setConfirmPassword(text); if (error) dispatch(clearError()); }}
                   secureTextEntry={!showConfirmPassword}
                   editable={!loading}
+                  maxLength={MAX_PASSWORD_LENGTH}
                 />
                 <TouchableOpacity onPress={() => setShowConfirmPassword((value) => !value)} disabled={loading}>
                   <Text style={styles.toggleText}>{showConfirmPassword ? text.hide : text.show}</Text>
                 </TouchableOpacity>
               </View>
+              {confirmPassword.length > 0 && !isPasswordsMatch ? (
+                <Text style={styles.fieldHint}>{text.passwordMismatch}</Text>
+              ) : null}
             </>
           ) : null}
 
@@ -457,6 +321,7 @@ const RegisterScreenFull: React.FC = () => {
             onChangeText={(text) => setReferrerPhone(normalizePhoneText(text))}
             keyboardType="phone-pad"
             editable={!loading}
+            maxLength={MAX_PHONE_LENGTH}
           />
 
           <TouchableOpacity style={styles.termsContainer} onPress={() => setAgreeTerms((value) => !value)} disabled={loading} activeOpacity={0.7}>
@@ -469,18 +334,18 @@ const RegisterScreenFull: React.FC = () => {
 
           <View style={styles.btnSpacing}>
             <TactileButton
-              title={loading ? '' : text.register}
+              title={text.register}
               onPress={handleRegister}
               disabled={!isFormValid || loading}
+              loading={loading}
               variant="primary"
             />
-            {loading && <ActivityIndicator size="small" color="#FFFFFF" style={styles.loaderOverlay} />}
           </View>
         </TactileCard>
 
         <View style={styles.loginContainer}>
           <Text style={styles.loginText}>{text.haveAccount}</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('LoginScreen')} disabled={loading}>
+          <TouchableOpacity onPress={() => navigation.navigate('LoginScreen')}>
             <Text style={styles.loginLink}>{text.login}</Text>
           </TouchableOpacity>
         </View>
@@ -547,8 +412,8 @@ const styles = StyleSheet.create({
   termsText: { flex: 1, fontSize: 13, color: SCREEN_THEME.textPrimary, fontWeight: '600', lineHeight: 18 },
   termsCheckDot: { width: 14, height: 14, borderRadius: 7, backgroundColor: '#2EB85C' },
   errorText: { fontSize: 12, color: '#D05B4D', marginBottom: 8, fontWeight: '700' },
+  fieldHint: { fontSize: 12, color: '#D05B4D', marginTop: 4, marginBottom: 6, fontWeight: '600' },
   btnSpacing: { marginTop: 10 },
-  loaderOverlay: { position: 'absolute', alignSelf: 'center', top: 12 },
   loginContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   loginText: { fontSize: 14, color: SCREEN_THEME.textSecondary, fontWeight: '600' },
   loginLink: { fontSize: 14, color: SCREEN_THEME.terracottaDark, fontWeight: '800' },

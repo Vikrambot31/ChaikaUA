@@ -6,6 +6,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ExpoLinking from 'expo-linking';
 import { useSelector } from 'react-redux';
+import { type RootState } from '../redux/store';
 import Toast from 'react-native-toast-message';
 
 import { COLORS } from '../utils/constants';
@@ -71,8 +72,13 @@ import DetalPredlozheniyaSalonaScreen from '../screens/Detal-Predlozheniya-Salon
 import SportNaChaykeScreen from '../screens/Sport-Na-Chayke';
 import SportDetailScreen from '../screens/Sport-Detal';
 import EdaNaChaykeScreen from '../screens/Eda-Na-Chayke';
+import BusinessClaimScreen from '../screens/BusinessClaimScreen';
+import BusinessPlusSubscriptionScreen from '../screens/BusinessPlusSubscriptionScreen';
+import BusinessMenuEditorScreen from '../screens/BusinessMenuEditorScreen';
+import BusinessPromoEditorScreen from '../screens/BusinessPromoEditorScreen';
 import SpisokPokupokScreen from '../screens/Spisok-Pokupok';
 import ProfileRequestsScreen from '../screens/ProfileRequestsScreen';
+import ContactCardChatScreen from '../screens/ContactCardChatScreen';
 import AppVersionInfoScreen from '../screens/AppVersionInfoScreen';
 import SupportScreen from '../screens/SupportScreen';
 import BonusWalletScreen from '../screens/BonusWalletScreen';
@@ -80,6 +86,8 @@ import PromoCreditsTopupScreen from '../screens/PromoCreditsTopupScreen';
 import PromoCreditsAdminScreen from '../screens/PromoCreditsAdminScreen';
 import BonusPromotionPurchaseScreen from '../screens/BonusPromotionPurchaseScreen';
 import FavoritesScreen from '../screens/FavoritesScreen';
+import EditContactListingScreen from '../screens/EditContactListingScreen';
+import InboxScreen from '../screens/InboxScreen';
 import CrashDiagnosticsScreen from '../screens/CrashDiagnosticsScreen';
 import AppMonitorScreen from '../screens/AppMonitorScreen';
 import type { Request, Place } from '../types/app';
@@ -121,7 +129,7 @@ export type RootStackParamList = {
   OnlineChatTab: undefined;
   OnlineChatList: undefined;
   RequestDetail: { request: Request };
-  ItemDetailScreen: { item: DetailItemData };
+  ItemDetailScreen: { item: DetailItemData; feedScreen?: string };
   RequestsTab: undefined;
   ListScreen: undefined;
   PlaceDetailsPanel: { place: Place };
@@ -204,6 +212,9 @@ export type RootStackParamList = {
   EdaNaChaykeScreen: undefined;
   SpisokPokupokScreen: undefined;
   ProfileRequestsScreen: undefined;
+  ContactCardChatScreen: {
+    request: import('../services/profilePermissionService').ProfileViewRequest & { targetUserId: string };
+  };
   MyPhotosScreen: undefined;
   MyApprovedPhotosScreen: undefined;
   PhotoUploadScreen: undefined;
@@ -212,12 +223,18 @@ export type RootStackParamList = {
   AppVersionInfoScreen: undefined;
   AppMonitorScreen: undefined;
   ViewUserProfile: { userId: string };
-  SupportScreen: undefined;
+  SupportScreen: { prefillMessage?: string } | undefined;
+  BusinessClaimScreen: { item: DetailItemData };
+  BusinessPlusSubscriptionScreen: undefined;
+  BusinessMenuEditorScreen: { placeId: string; placeName: string };
+  BusinessPromoEditorScreen: { placeId: string; placeName: string };
   BonusWalletScreen: undefined;
   PromoCreditsTopupScreen: undefined;
   PromoCreditsAdminScreen: undefined;
-  BonusPromotionPurchaseScreen: { initialPromoType?: string } | undefined;
+  BonusPromotionPurchaseScreen: { initialPromoType?: string; initialTargetId?: string } | undefined;
   FavoritesScreen: undefined;
+  EditContactListingScreen: { itemId: string; initialData: import('../utils/detailViewTypes').DetailItemData };
+  InboxScreen: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -287,6 +304,8 @@ const linking: LinkingOptions<RootStackParamList> = {
       PromoCreditsAdminScreen: 'screen/admin/promo-credits',
       BonusPromotionPurchaseScreen: 'screen/bonus-promotion',
       CreateBuySellScreen: 'screen/buy-sell/create',
+      InboxScreen: 'screen/inbox',
+      ContactCardChatScreen: 'screen/contact-card-chat',
     },
   },
 };
@@ -381,19 +400,28 @@ const ROUTE_FILE_MAP: Record<string, string> = {
   EdaNaChaykeScreen: 'Eda-Na-Chayke.tsx',
   SpisokPokupokScreen: 'Spisok-Pokupok.tsx',
   ProfileRequestsScreen: 'ProfileRequestsScreen.tsx',
+  ContactCardChatScreen: 'ContactCardChatScreen.tsx',
   MyPhotosScreen: 'photo-module/MyPhotosScreen.tsx',
   MyApprovedPhotosScreen: 'MyApprovedPhotosScreen.tsx',
   AppVersionInfoScreen: 'AppVersionInfoScreen.tsx',
   AppMonitorScreen: 'AppMonitorScreen.tsx',
   ViewUserProfile: 'ViewUserProfileScreen.tsx',
   SupportScreen: 'SupportScreen.tsx',
+  BusinessClaimScreen: 'BusinessClaimScreen.tsx',
+  BusinessPlusSubscriptionScreen: 'BusinessPlusSubscriptionScreen.tsx',
+  BusinessMenuEditorScreen: 'BusinessMenuEditorScreen.tsx',
+  BusinessPromoEditorScreen: 'BusinessPromoEditorScreen.tsx',
+  InboxScreen: 'InboxScreen.tsx',
 };
 
 function ScreenFileInfoOverlay() {
   const [visibleFile, setVisibleFile] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const isAuthenticated = useSelector(selectIsAuthenticated);
+  const language = useSelector((state: RootState) => state.language?.current ?? 'ua');
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const infoText = language === 'en' ? 'Info' : language === 'ru' ? 'Инфо' : 'Інфо';
 
   useEffect(() => () => {
     if (hideTimer.current) {
@@ -436,7 +464,7 @@ function ScreenFileInfoOverlay() {
         </View>
       ) : null}
       <TouchableOpacity onPress={handlePress} style={styles.infoButton} activeOpacity={0.85}>
-        <Text style={styles.infoButtonText}>Info</Text>
+        <Text style={styles.infoButtonText}>{infoText}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -454,6 +482,7 @@ function GuardedScreen({
 
   const [roleStatus, setRoleStatus] = useState<'loading' | 'allowed' | 'denied'>('loading');
   const deniedToastShownRef = useRef(false);
+  const deniedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const navigation = useNavigation();
 
@@ -480,8 +509,27 @@ function GuardedScreen({
   useEffect(() => {
     if (mode !== 'auth' && mode !== 'complete') return;
     if (!isBootstrapped) return;
-    setRoleStatus(isAuthenticated ? 'allowed' : 'denied');
+    if (isAuthenticated) {
+      if (deniedTimerRef.current !== null) {
+        clearTimeout(deniedTimerRef.current);
+        deniedTimerRef.current = null;
+      }
+      setRoleStatus('allowed');
+    } else {
+      deniedTimerRef.current = setTimeout(() => {
+        deniedTimerRef.current = null;
+        setRoleStatus('denied');
+      }, 600);
+    }
   }, [mode, isAuthenticated, isBootstrapped]);
+
+  useEffect(() => {
+    return () => {
+      if (deniedTimerRef.current !== null) {
+        clearTimeout(deniedTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (roleStatus === 'denied') {
@@ -597,7 +645,6 @@ function OnlineChatNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="OnlineChatList" component={OnlineChatScreen} />
-      <Stack.Screen name="RequestDetail" component={RequestDetailScreen as React.ComponentType<{}>} />
     </Stack.Navigator>
   );
 }
@@ -794,6 +841,7 @@ function AuthNavigation() {
       <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="MainTabs">
         <Stack.Screen name="MainTabs" component={MainTabNavigator} />
         <Stack.Screen name="OnlineChatTab" component={OnlineChatNavigator} />
+        <Stack.Screen name="RequestDetail" component={RequestDetailScreen as React.ComponentType<{}>} />
         <Stack.Screen name="RequestsTab" component={RequestTopicScreen} />
         <Stack.Screen name="ListScreen" component={ListScreen} />
         <Stack.Screen name="PlaceDetailsPanel" component={PlaceDetailsPanel as React.ComponentType<unknown>} />
@@ -872,6 +920,7 @@ function AuthNavigation() {
         <Stack.Screen name="EdaNaChaykeScreen" component={EdaNaChaykeScreen} />
         <Stack.Screen name="SpisokPokupokScreen" component={SpisokPokupokScreen} />
         <Stack.Screen name="ProfileRequestsScreen" component={ProfileRequestsScreen} />
+        <Stack.Screen name="ContactCardChatScreen" component={ContactCardChatScreen} />
         <Stack.Screen name="MyPhotosScreen" component={MyPhotosScreen} options={{ headerShown: false }} />
         <Stack.Screen name="MyApprovedPhotosScreen" component={MyApprovedPhotosScreen} options={{ headerShown: false }} />
         <Stack.Screen name="AppVersionInfoScreen" component={AppVersionInfoScreen} />
@@ -882,6 +931,12 @@ function AuthNavigation() {
         <Stack.Screen name="PromoCreditsAdminScreen" component={withGuard(PromoCreditsAdminScreen, 'admin')} />
         <Stack.Screen name="BonusPromotionPurchaseScreen" component={withGuard(BonusPromotionPurchaseScreen, 'auth')} />
         <Stack.Screen name="FavoritesScreen" component={FavoritesScreen} />
+        <Stack.Screen name="EditContactListingScreen" component={withGuard(EditContactListingScreen, 'auth')} />
+        <Stack.Screen name="InboxScreen" component={InboxScreen} />
+        <Stack.Screen name="BusinessClaimScreen" component={withGuard(BusinessClaimScreen, 'auth')} />
+        <Stack.Screen name="BusinessPlusSubscriptionScreen" component={withGuard(BusinessPlusSubscriptionScreen, 'auth')} />
+        <Stack.Screen name="BusinessMenuEditorScreen" component={withGuard(BusinessMenuEditorScreen, 'auth')} />
+        <Stack.Screen name="BusinessPromoEditorScreen" component={withGuard(BusinessPromoEditorScreen, 'auth')} />
       </Stack.Navigator>
       <ScreenFileInfoOverlay />
     </NavigationContainer>

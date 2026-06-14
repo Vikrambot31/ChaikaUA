@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, TextInput, View, TextInputProps } from 'react-native';
 import { SCREEN_THEME } from '../utils/screenTheme';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 type TactileInputProps = TextInputProps & {
   error?: boolean;
@@ -11,13 +12,15 @@ export default function TactileInput({
   style,
   ...rest
 }: TactileInputProps) {
+  const { colors } = useAppTheme();
+
   return (
-    <View style={styles.outer}>
+    <View style={[styles.outer, { backgroundColor: colors.inputBg, borderColor: colors.uiBorder }]}>
       <View style={styles.insetTop} />
       <View style={styles.insetBottom} />
       <TextInput
-        style={[styles.input, error && styles.inputError, style]}
-        placeholderTextColor={SCREEN_THEME.textMuted}
+        style={[styles.input, { color: colors.textPrimary }, error && styles.inputError, style]}
+        placeholderTextColor={colors.placeholder}
         underlineColorAndroid="transparent"
         {...rest}
       />

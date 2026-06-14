@@ -21,6 +21,7 @@ import {
 import { safeOpenExternalUrl } from '../utils/communicationActions';
 import type { DetailItemData } from '../utils/detailViewTypes';
 import MiniTabBar from '../components/MiniTabBar';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 const AMOUNTS = [100, 200, 300, 500, 1000];
 type Lang = 'ua' | 'ru' | 'en';
@@ -73,6 +74,8 @@ const UI_TEXT = {
     topicSentBody: 'Нова тема збережена і відправлена на модерацію. Вона зʼявиться після схвалення.',
     alreadyVoted: 'Ви вже підтримали цю тему.',
     voteError: 'Не вдалося зарахувати голос.',
+    topicNotFound: 'Тему не знайдено або вона була видалена.',
+    topicNotApproved: 'Ця тема ще не схвалена модератором.',
     votingTitle: 'Голосування',
     setupTitle: 'Збір',
     setupBody: 'Спочатку налаштуйте будинок ОСББ.',
@@ -81,6 +84,9 @@ const UI_TEXT = {
     dahErrorBody: 'Не вдалося відкрити сайт ДАХ. Спробуйте пізніше.',
     housePrefix: 'буд.',
     aptPrefix: 'кв.',
+    supportTitle: 'Служба підтримки',
+    supportBody: 'Питання щодо будинку, ОСББ або застосунку — напишіть нам.',
+    supportButton: 'Написати в підтримку',
   },
   ru: {
     title: 'ОСББ Чайка',
@@ -119,6 +125,8 @@ const UI_TEXT = {
     topicSentBody: 'Новая тема сохранена и отправлена на модерацию. Она появится после одобрения.',
     alreadyVoted: 'Вы уже поддержали эту тему.',
     voteError: 'Не удалось засчитать голос.',
+    topicNotFound: 'Тема не найдена или была удалена.',
+    topicNotApproved: 'Эта тема ещё не одобрена модератором.',
     votingTitle: 'Голосование',
     setupTitle: 'Сбор',
     setupBody: 'Сначала настройте дом ОСББ.',
@@ -127,6 +135,9 @@ const UI_TEXT = {
     dahErrorBody: 'Не удалось открыть сайт ДАХ. Попробуйте позже.',
     housePrefix: 'дом',
     aptPrefix: 'кв.',
+    supportTitle: 'Служба поддержки',
+    supportBody: 'Вопросы по дому, ОСББ или приложению — напишите нам.',
+    supportButton: 'Написать в поддержку',
   },
   en: {
     title: 'OSBB Chaika Life',
@@ -165,6 +176,8 @@ const UI_TEXT = {
     topicSentBody: 'New topic is saved and sent for moderation. It will appear after approval.',
     alreadyVoted: 'You have already supported this topic.',
     voteError: 'Failed to count vote.',
+    topicNotFound: 'Topic not found or has been deleted.',
+    topicNotApproved: 'This topic has not been approved by a moderator yet.',
     votingTitle: 'Voting',
     setupTitle: 'Collection',
     setupBody: 'Set up OSBB building first.',
@@ -173,6 +186,9 @@ const UI_TEXT = {
     dahErrorBody: 'Failed to open DAH website. Try again later.',
     housePrefix: 'bld.',
     aptPrefix: 'apt.',
+    supportTitle: 'Support',
+    supportBody: 'Questions about the building, OSBB or the app — write to us.',
+    supportButton: 'Contact support',
   },
 } as const;
 
@@ -184,6 +200,7 @@ const OsbbHubScreen: React.FC = () => {
   useOsbbMembership();
   const user = useSelector(selectUser);
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
+  const { colors } = useAppTheme();
   const text = UI_TEXT[language];
   const [showSetup, setShowSetup] = useState(!isSetupDone);
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
@@ -248,8 +265,13 @@ const OsbbHubScreen: React.FC = () => {
       await supportHouseTopic(osbb.buildingId, topicId, user.id);
       setSelectedTopicId(topicId);
     } catch (error) {
-      const message = error instanceof Error && error.message === 'already-voted'
+      const msg = error instanceof Error ? error.message : '';
+      const message = msg === 'already-voted'
         ? text.alreadyVoted
+        : msg === 'topic-not-found'
+        ? text.topicNotFound
+        : msg === 'topic-not-approved'
+        ? text.topicNotApproved
         : text.voteError;
       Alert.alert(text.votingTitle, message);
     }
@@ -305,7 +327,7 @@ const OsbbHubScreen: React.FC = () => {
     osbb.membershipRole === 'manager' && osbb.membershipStatus === 'pending';
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
           <Image source={require('../../assets/WEBP-version/OSBB.webp')} style={styles.headerImage} resizeMode="cover" />
@@ -509,6 +531,21 @@ const OsbbHubScreen: React.FC = () => {
             <MaterialCommunityIcons name="open-in-new" size={16} color="#fff" />
           </TouchableOpacity>
         </View>
+
+        <View style={styles.supportCard}>
+          <MaterialCommunityIcons name="headset" size={28} color={SCREEN_THEME.terracottaDark} />
+          <Text style={styles.supportTitle}>{text.supportTitle}</Text>
+          <Text style={styles.supportBody}>{text.supportBody}</Text>
+          <TouchableOpacity
+            style={styles.supportButton}
+            onPress={() => navigation.navigate('SupportScreen' as never)}
+            activeOpacity={0.86}
+          >
+            <MaterialCommunityIcons name="message-text-outline" size={18} color="#fff" />
+            <Text style={styles.supportButtonText}>{text.supportButton}</Text>
+          </TouchableOpacity>
+        </View>
+
       </ScrollView>
       <MiniTabBar />
     </SafeAreaView>
@@ -736,6 +773,32 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   dahButtonText: { color: '#fff', fontSize: 15, fontWeight: '900' },
+  supportCard: {
+    marginTop: 14,
+    backgroundColor: SCREEN_THEME.paperStrong,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#E4D0AB',
+    padding: 18,
+    alignItems: 'center',
+    gap: 8,
+    ...SCREEN_THEME.raisedShadow,
+  },
+  supportTitle: { color: SCREEN_THEME.textPrimary, fontSize: 18, fontWeight: '900', marginTop: 4 },
+  supportBody: { color: SCREEN_THEME.textSecondary, fontSize: 14, fontWeight: '600', textAlign: 'center', lineHeight: 20 },
+  supportButton: {
+    marginTop: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: SCREEN_THEME.terracottaDark,
+    borderRadius: 16,
+    paddingHorizontal: 22,
+    paddingVertical: 13,
+    alignSelf: 'stretch',
+    justifyContent: 'center',
+  },
+  supportButtonText: { color: '#fff', fontSize: 15, fontWeight: '900' },
 });
 
 export default OsbbHubScreen;

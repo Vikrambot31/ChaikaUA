@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as FileSystem from 'expo-file-system';
 import {
-  ActivityIndicator,
+  Animated,
   Image,
   ImageProps,
   NativeSyntheticEvent,
@@ -21,6 +21,42 @@ const createStorageRef = firebaseStorage.ref;
 const storageUrlResolver = (firebaseStorage as Record<string, unknown>)[['get', 'DownloadURL'].join('')] as (
   refValue: ReturnType<typeof createStorageRef>,
 ) => Promise<string>;
+
+// ─── Disk cache size limit ────────────────────────────────────────────────────
+// photo-cache/ is capped at 50 MB. After each download the oldest files are
+// removed (by modificationTime) until the total is back under the limit.
+// Eviction runs in the background and never blocks rendering.
+const MAX_DISK_CACHE_BYTES = 50 * 1024 * 1024; // 50 MB
+
+const evictCacheIfNeeded = async (dir: string): Promise<void> => {
+  try {
+    const names = await FileSystem.readDirectoryAsync(dir);
+    type FileEntry = { path: string; size: number; modTime: number };
+    const entries: FileEntry[] = [];
+    let total = 0;
+    for (const name of names) {
+      const path = `${dir}${name}`;
+      const info = await FileSystem.getInfoAsync(path, { size: true });
+      if (!info.exists) continue;
+      const size = 'size' in info && typeof info.size === 'number' ? info.size : 0;
+      const modTime = 'modificationTime' in info && typeof info.modificationTime === 'number'
+        ? info.modificationTime
+        : 0;
+      total += size;
+      entries.push({ path, size, modTime });
+    }
+    if (total <= MAX_DISK_CACHE_BYTES) return;
+    // Sort oldest first, delete until under limit
+    entries.sort((a, b) => a.modTime - b.modTime);
+    for (const entry of entries) {
+      if (total <= MAX_DISK_CACHE_BYTES) break;
+      await FileSystem.deleteAsync(entry.path, { idempotent: true });
+      total -= entry.size;
+    }
+  } catch {
+    // Cache eviction must never break the app.
+  }
+};
 
 // ─── TZ_4.3 — 30-min in-memory URL cache ─────────────────────────────────────
 // Avoids repeated getDownloadURL calls when multiple components render the same
@@ -43,6 +79,10 @@ const setCachedUrl = (path: string, url: string): void => {
   _urlCache.set(path, { url, expiresAt: Date.now() + URL_CACHE_TTL_MS });
 };
 
+const invalidateCachedUrl = (path: string): void => {
+  _urlCache.delete(path);
+};
+
 type ImageErrorEvent = NativeSyntheticEvent<{ error?: string }>;
 
 type Props = {
@@ -57,6 +97,7 @@ type Props = {
   safetyStatus?: string;
   moderationStatus?: string;
   onError?: (event: ImageErrorEvent) => void;
+  onLoadFailed?: () => void;
 };
 
 const isHttpsUri = (value: unknown): value is string =>
@@ -74,16 +115,16 @@ const isLikelyStoragePath = (value: unknown): value is string => {
 
 const stripQuery = (value: string): string => value.split('?')[0];
 
-const getCacheFilePath = async (storagePath: string): Promise<string> => {
+const getCacheFilePath = async (storagePath: string): Promise<{ filePath: string; dir: string }> => {
   const root = FileSystem.cacheDirectory || FileSystem.documentDirectory;
-  if (!root) return '';
+  if (!root) return { filePath: '', dir: '' };
   const dir = `${root}photo-cache/`;
   await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
   const cleanPath = storagePath.split('?')[0]?.split('#')[0] || storagePath;
   const extMatch = cleanPath.match(/\.([a-zA-Z0-9]{2,5})$/);
   const ext = extMatch?.[1]?.toLowerCase() || 'jpg';
   const safeName = storagePath.replace(/[^a-zA-Z0-9_-]+/g, '_');
-  return `${dir}${safeName}.${ext === 'jpeg' ? 'jpg' : ext}`;
+  return { filePath: `${dir}${safeName}.${ext === 'jpeg' ? 'jpg' : ext}`, dir };
 };
 
 const getUriDiagnostics = (value: unknown): Record<string, unknown> => {
@@ -146,6 +187,7 @@ const AppPhotoImage: React.FC<Props> = ({
   safetyStatus,
   moderationStatus,
   onError,
+  onLoadFailed,
 }) => {
   const isPendingModeration = safetyStatus === 'pending' || moderationStatus === 'pending';
   const startAvatar = useMemo(() => getStartAvatarByUri(uri), [uri]);
@@ -157,6 +199,18 @@ const AppPhotoImage: React.FC<Props> = ({
   const [resolvedImageUri, setResolvedImageUri] = useState('');
   const [localImageUri, setLocalImageUri] = useState('');
   const [resolving, setResolving] = useState(false);
+  const shimmerAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!resolving) { shimmerAnim.setValue(0); return; }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(shimmerAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.timing(shimmerAnim, { toValue: 0, duration: 700, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [resolving, shimmerAnim]);
   const finalImageUri = useMemo(() => {
     if (isFileUri(localImageUri)) return localImageUri.trim();
     if (isHttpsUri(resolvedImageUri)) return resolvedImageUri.trim();
@@ -231,7 +285,7 @@ const AppPhotoImage: React.FC<Props> = ({
       setLocalImageUri('');
 
       try {
-        const targetPath = await getCacheFilePath(path);
+        const { filePath: targetPath, dir: cacheDir } = await getCacheFilePath(path);
         if (!targetPath) return;
         const existing = await FileSystem.getInfoAsync(targetPath);
         if (existing.exists && (!('size' in existing) || typeof existing.size !== 'number' || existing.size > 0)) {
@@ -245,6 +299,8 @@ const AppPhotoImage: React.FC<Props> = ({
         if (cancelled) return;
         if (downloaded.uri) {
           setLocalImageUri(downloaded.uri);
+          // Evict oldest cached files if disk cache exceeds 50 MB (background).
+          void evictCacheIfNeeded(cacheDir);
         }
       } catch (downloadError) {
         if (cancelled) return;
@@ -302,7 +358,8 @@ const AppPhotoImage: React.FC<Props> = ({
         });
         setResolvedImageUri('');
         setLocalImageUri('');
-        setFailureReason('Не удалось получить ссылку на фото. Проверьте интернет.');
+        onLoadFailed?.();
+        setFailureReason('Не вдалося отримати посилання на фото. Перевірте інтернет.');
         await recordRuntimeTrace({
           screen: 'AppPhotoImage',
           action: 'photo_storage_path_resolve',
@@ -531,10 +588,12 @@ const AppPhotoImage: React.FC<Props> = ({
       <View style={[styles.container, style]}>
         <Image
           source={startAvatar.source}
-          style={StyleSheet.absoluteFill}
+          style={{ width: '100%', height: '100%' }}
           resizeMode={resizeMode}
           onError={(event) => {
+            if (preferredPath) invalidateCachedUrl(preferredPath);
             setFailed(true);
+            onLoadFailed?.();
             onError?.(event);
           }}
         />
@@ -561,7 +620,9 @@ const AppPhotoImage: React.FC<Props> = ({
               storagePath: toDebugString(storagePath).slice(0, 180),
               error: event.nativeEvent?.error,
             });
+            if (preferredPath) invalidateCachedUrl(preferredPath);
             setFailed(true);
+            onLoadFailed?.();
             setFailureReason('Фото временно недоступно. Попробуйте обновить экран.');
             void recordRuntimeTrace({
               screen: 'AppPhotoImage',
@@ -584,16 +645,17 @@ const AppPhotoImage: React.FC<Props> = ({
             onError?.(event);
           }}
         />
+      ) : resolving ? (
+        <Animated.View
+          style={[
+            styles.shimmer,
+            { opacity: shimmerAnim.interpolate({ inputRange: [0, 1], outputRange: [0.45, 0.9] }) },
+          ]}
+        />
       ) : (
         <View style={styles.fallback}>
-          {resolving ? (
-            <ActivityIndicator size="small" color="#5E5E5E" />
-          ) : (
-            <>
-              <MaterialCommunityIcons name="image-off-outline" size={22} color="#6B625B" />
-              <Text style={styles.fallbackText}>{failureReason || fallbackText}</Text>
-            </>
-          )}
+          <MaterialCommunityIcons name="image-off-outline" size={22} color="#6B625B" />
+          <Text style={styles.fallbackText}>{failureReason || fallbackText}</Text>
         </View>
       )}
       {showDebugInfo ? (
@@ -614,6 +676,10 @@ const styles = StyleSheet.create({
   container: {
     overflow: 'hidden',
     backgroundColor: '#E7DDD0',
+  },
+  shimmer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#D8D8D8',
   },
   fallback: {
     ...StyleSheet.absoluteFillObject,

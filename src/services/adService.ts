@@ -93,6 +93,9 @@ export const subscribeToAdMessages = (
   );
   return onValue(q, (snap) => {
     callback(snap.exists() ? snapshotToMessages(snap) : []);
+  }, (error) => {
+    console.error('[subscribeToAdMessages] RTDB error:', error.message);
+    callback([]);
   });
 };
 
@@ -108,6 +111,9 @@ export const subscribeToAllAdTickets = (
     });
     tickets.sort((a, b) => b.updatedAt - a.updatedAt);
     callback(tickets);
+  }, (error) => {
+    console.error('[subscribeToAllAdTickets] RTDB error:', error.message);
+    callback([]);
   });
 };
 

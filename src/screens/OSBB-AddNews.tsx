@@ -21,6 +21,7 @@ import { selectIsOsbbManager } from '../redux/slices/osbbSlice';
 import { useOsbbMembership } from '../hooks/useOsbbMembership';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { addOsbbNews, updateOsbbNews } from '../services/osbbNews';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 type AppNav = NativeStackNavigationProp<Record<string, object | undefined>>;
 type Lang = 'ua' | 'ru' | 'en';
@@ -141,6 +142,7 @@ const OsbbAddNewsScreen: React.FC = () => {
   const buildingId = useSelector((state: RootState) => state.osbb.buildingId);
   const isManager = useSelector(selectIsOsbbManager);
   useOsbbMembership();
+  const { colors, isDark } = useAppTheme();
   const t = UI_TEXT[language];
 
   const [priority, setPriority] = useState<NewsPriority>(editItem?.priority ?? 'info');
@@ -196,13 +198,13 @@ const OsbbAddNewsScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={styles.header}>
           <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.75}>
             <MaterialCommunityIcons name="arrow-left" size={24} color={SCREEN_THEME.textPrimary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{isEditMode ? t.headerEdit : t.headerAdd}</Text>
+          <Text style={[styles.headerTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{isEditMode ? t.headerEdit : t.headerAdd}</Text>
           <View style={styles.backBtn} />
         </View>
 

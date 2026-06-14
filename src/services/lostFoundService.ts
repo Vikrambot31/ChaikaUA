@@ -16,6 +16,7 @@ export interface LostFoundItem {
   phone: string;
   category: string;
   description?: string;
+  locationText?: string;
   photoUri: string;
   photoStoragePath?: string;
   moderationStatus: ModerationStatus;
@@ -44,6 +45,7 @@ const mapLostFoundItem = (id: string, data: any, now: number, isArchived?: boole
   phone: data.phone || '',
   category: data.category || '',
   description: data.description || '',
+  locationText: data.locationText || '',
   photoUri: data.photoUri || data.photoStoragePath || '',
   photoStoragePath: data.photoStoragePath || data.photoUri || '',
   moderationStatus: isArchived ? 'approved' : (data.moderationStatus || 'pending'),
@@ -187,6 +189,7 @@ export const lostFoundService = {
         phone: sanitizeStoredText(item.phone),
         category: sanitizeStoredText(item.category),
         description: sanitizeStoredText(item.description || ''),
+        locationText: sanitizeStoredText(item.locationText || ''),
         userId: user.uid,
         photoStoragePath,
         photoUri: '',

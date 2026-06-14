@@ -1,4 +1,4 @@
-import { get, limitToFirst, query, ref } from 'firebase/database';
+import { get, ref } from 'firebase/database';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { database, firebaseApp } from '../firebase/firebase';
 import { resolveMediaUrl } from './mediaService';
@@ -112,6 +112,12 @@ const functions = LOCAL_MODE ? null : getFunctions(firebaseApp);
 const getString = (value: unknown): string => typeof value === 'string' ? value : '';
 
 const getNumber = (value: unknown): number => Number.isFinite(value) ? Number(value) : 0;
+
+const getTimestampFromIso = (value: unknown): number | undefined => {
+  if (typeof value !== 'string' || !value) return undefined;
+  const ts = Date.parse(value);
+  return Number.isFinite(ts) && ts > 0 ? ts : undefined;
+};
 
 const getStatus = (config: SectionConfig, value: Record<string, unknown>): ModerationStatus => {
   const raw = value[config.statusField];
@@ -245,7 +251,7 @@ const normalizeItem = (
     mediaUrls: [],
     ...priority,
     raw: value,
-    editedAt: getNumber(value.editedAt) || undefined,
+    editedAt: getNumber(value.editedAt) || getTimestampFromIso(value.lastEditedAt) || undefined,
     editedBy: getString(value.editedBy) || undefined,
     editHistory: Array.isArray(value.editHistory) ? value.editHistory as EditHistoryEntry[] : undefined,
   };
@@ -283,7 +289,7 @@ export const loadModerationItems = async (): Promise<ModerationItem[]> => {
   const results = await Promise.allSettled(
     MODERATION_SECTIONS.map(async (config) => ({
       config,
-      snapshot: await get(query(ref(database, config.path), limitToFirst(500))),
+      snapshot: await get(ref(database, config.path)),
     })),
   );
 
@@ -305,10 +311,6 @@ export const loadModerationItems = async (): Promise<ModerationItem[]> => {
       return [normalizeItem(config, id, `${config.path}/${id}`, value as Record<string, unknown>)];
     });
 
-    if (entries.length >= 500) {
-      console.warn(`[moderationService] Раздел "${config.label}" вернул 500 записей — возможна трункация. Часть данных может быть не загружена.`);
-    }
-
     return entries;
   });
 
@@ -318,7 +320,7 @@ export const loadModerationItems = async (): Promise<ModerationItem[]> => {
   );
 
   // Resolve media URLs in batches to avoid Storage rate limiting
-  const MEDIA_BATCH_SIZE = 10;
+  const MEDIA_BATCH_SIZE = 25;
   const resolvedItems: ModerationItem[] = [];
   for (let i = 0; i < items.length; i += MEDIA_BATCH_SIZE) {
     const batch = items.slice(i, i + MEDIA_BATCH_SIZE);

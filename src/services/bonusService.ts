@@ -20,6 +20,7 @@ export type UserBonuses = {
   earned: {
     total: number;
     weeklyTotal: number;
+    weeklyLimit: number;
     weekKey: string;
     weeklyByCategory: Record<string, number>;
   };
@@ -101,6 +102,7 @@ const EMPTY_BONUSES: UserBonuses = {
   earned: {
     total: 0,
     weeklyTotal: 0,
+    weeklyLimit: 250,
     weekKey: '',
     weeklyByCategory: {},
   },
@@ -122,12 +124,17 @@ const EMPTY_PROMO_CREDITS: PromoCredits = {
   updatedAt: 0,
 };
 
+const toSafeNumber = (value: unknown, fallback = 0): number => {
+  const next = Number(value ?? fallback);
+  return Number.isFinite(next) ? next : fallback;
+};
+
 const normalizeCategory = (value: unknown): BonusCategory => {
   if (value && typeof value === 'object') {
     const v = value as Record<string, unknown>;
     return {
-      count: Number(v.count || 0),
-      points: Number(v.points || 0),
+      count: toSafeNumber(v.count),
+      points: toSafeNumber(v.points),
     };
   }
   return { count: 0, points: 0 };
@@ -138,11 +145,11 @@ const normalizeBonuses = (raw: unknown): UserBonuses => {
   const data = raw as Record<string, unknown>;
   const earnedRaw = data.earned && typeof data.earned === 'object' ? data.earned as Record<string, unknown> : {};
   const spentRaw = data.spent && typeof data.spent === 'object' ? data.spent as Record<string, unknown> : {};
-  const earnedTotal = Number(earnedRaw.total || data.total || 0);
-  const spentTotal = Number(spentRaw.total || 0);
+  const earnedTotal = toSafeNumber(earnedRaw.total || data.total);
+  const spentTotal = toSafeNumber(spentRaw.total);
   return {
-    total: Number(data.total || earnedTotal || 0),
-    available: Number(data.available ?? Math.max(0, earnedTotal - spentTotal)),
+    total: toSafeNumber(data.total || earnedTotal),
+    available: toSafeNumber(data.available, Math.max(0, earnedTotal - spentTotal)),
     invites: normalizeCategory(data.invites),
     likes: normalizeCategory(data.likes),
     help: normalizeCategory(data.help),
@@ -150,24 +157,25 @@ const normalizeBonuses = (raw: unknown): UserBonuses => {
     activity: normalizeCategory(data.activity),
     earned: {
       total: earnedTotal,
-      weeklyTotal: Number(earnedRaw.weeklyTotal || 0),
+      weeklyTotal: toSafeNumber(earnedRaw.weeklyTotal),
+      weeklyLimit: toSafeNumber(earnedRaw.weeklyLimit) || 250,
       weekKey: typeof earnedRaw.weekKey === 'string' ? earnedRaw.weekKey : '',
       weeklyByCategory: earnedRaw.weeklyByCategory && typeof earnedRaw.weeklyByCategory === 'object'
         ? Object.fromEntries(
           Object.entries(earnedRaw.weeklyByCategory as Record<string, unknown>)
-            .map(([key, value]) => [key, Number(value || 0)])
+            .map(([key, value]) => [key, toSafeNumber(value)])
         )
         : {},
     },
     spent: {
       total: spentTotal,
-      contactsTop: Number(spentRaw.contactsTop || spentRaw.contacts_top || 0),
-      businessTop: Number(spentRaw.businessTop || spentRaw.business_top || 0),
-      beautyTop: Number(spentRaw.beautyTop || spentRaw.beauty_top || 0),
-      kidsTop: Number(spentRaw.kidsTop || spentRaw.kids_top || 0),
+      contactsTop: toSafeNumber(spentRaw.contactsTop || spentRaw.contacts_top),
+      businessTop: toSafeNumber(spentRaw.businessTop || spentRaw.business_top),
+      beautyTop: toSafeNumber(spentRaw.beautyTop || spentRaw.beauty_top),
+      kidsTop: toSafeNumber(spentRaw.kidsTop || spentRaw.kids_top),
     },
     badge: typeof data.badge === 'string' ? data.badge : 'newcomer',
-    updatedAt: Number(data.updatedAt || 0),
+    updatedAt: toSafeNumber(data.updatedAt),
   };
 };
 
@@ -176,12 +184,12 @@ const normalizePromoCredits = (raw: unknown): PromoCredits => {
   const data = raw as Record<string, unknown>;
   const spentRaw = data.spent && typeof data.spent === 'object' ? data.spent as Record<string, unknown> : {};
   return {
-    balance: Number(data.balance || 0),
-    lifetime: Number(data.lifetime || 0),
+    balance: toSafeNumber(data.balance),
+    lifetime: toSafeNumber(data.lifetime),
     spent: {
-      total: Number(spentRaw.total || 0),
+      total: toSafeNumber(spentRaw.total),
     },
-    updatedAt: Number(data.updatedAt || 0),
+    updatedAt: toSafeNumber(data.updatedAt),
   };
 };
 
@@ -192,12 +200,12 @@ const normalizeTransaction = (id: string, raw: unknown): BonusTransaction => {
     type: String(data.type || ''),
     currency: String(data.currency || ''),
     category: String(data.category || ''),
-    points: Number(data.points || 0),
-    balanceAfter: Number(data.balanceAfter || 0),
+    points: toSafeNumber(data.points),
+    balanceAfter: toSafeNumber(data.balanceAfter),
     sourceId: String(data.sourceId || ''),
     sourceType: String(data.sourceType || ''),
     status: String(data.status || ''),
-    createdAt: Number(data.createdAt || 0),
+    createdAt: toSafeNumber(data.createdAt),
     createdBy: String(data.createdBy || ''),
     note: String(data.note || ''),
   };
@@ -212,11 +220,11 @@ const normalizePromotion = (id: string, raw: unknown): BonusPromotion => {
     targetType: String(data.targetType || ''),
     targetId: String(data.targetId || ''),
     screen: String(data.screen || ''),
-    pointsSpent: Number(data.pointsSpent || 0),
+    pointsSpent: toSafeNumber(data.pointsSpent),
     status: String(data.status || ''),
-    startsAt: Number(data.startsAt || 0),
-    expiresAt: Number(data.expiresAt || 0),
-    createdAt: Number(data.createdAt || 0),
+    startsAt: toSafeNumber(data.startsAt),
+    expiresAt: toSafeNumber(data.expiresAt),
+    createdAt: toSafeNumber(data.createdAt),
     moderationStatus: String(data.moderationStatus || ''),
     badge: String(data.badge || ''),
   };
@@ -245,6 +253,9 @@ export const subscribeMyBonuses = (
   }
   return onValue(ref(database, `user_bonuses/${uid}`), (snapshot) => {
     onChanged(normalizeBonuses(snapshot.val()));
+  }, (error) => {
+    console.error('[subscribeMyBonuses] RTDB error:', error.message);
+    onChanged(EMPTY_BONUSES);
   });
 };
 
@@ -258,6 +269,9 @@ export const subscribeMyPromoCredits = (
   }
   return onValue(ref(database, `promo_credits/${uid}`), (snapshot) => {
     onChanged(normalizePromoCredits(snapshot.val()));
+  }, (error) => {
+    console.error('[subscribeMyPromoCredits] RTDB error:', error.message);
+    onChanged(EMPTY_PROMO_CREDITS);
   });
 };
 
@@ -282,6 +296,9 @@ export const subscribeMyBonusTransactions = (
     });
     items.sort((a, b) => b.createdAt - a.createdAt);
     onChanged(items);
+  }, (error) => {
+    console.error('[subscribeMyBonusTransactions] RTDB error:', error.message);
+    onChanged([]);
   });
 };
 
@@ -305,6 +322,9 @@ export const subscribeMyBonusPromotions = (
     });
     items.sort((a, b) => b.createdAt - a.createdAt);
     onChanged(items);
+  }, (error) => {
+    console.error('[subscribeMyBonusPromotions] RTDB error:', error.message);
+    onChanged([]);
   });
 };
 
@@ -321,6 +341,7 @@ export const subscribeActiveBonusPromotions = (
     orderByChild('screen'),
     equalTo(screen),
   );
+  const MAX_ACTIVE = 30;
   return onValue(promotionsQuery, (snapshot) => {
     const now = Date.now();
     const items: BonusPromotion[] = [];
@@ -331,7 +352,38 @@ export const subscribeActiveBonusPromotions = (
       }
     });
     items.sort((a, b) => b.createdAt - a.createdAt);
-    onChanged(items);
+    onChanged(items.slice(0, MAX_ACTIVE));
+  }, (error) => {
+    console.error('[subscribeActiveBonusPromotions] RTDB error:', error.message);
+    onChanged([]);
+  });
+};
+
+// Subscribes to Business+ active entities for a given feed screen.
+// Returns entity IDs sorted by activatedAt DESC (newest payer = position 1).
+export const subscribeBiznesPlusPlaces = (
+  screen: string,
+  onChanged: (entityIds: string[]) => void,
+): (() => void) => {
+  const q = query(
+    ref(database, 'business_plus_active'),
+    orderByChild('screen'),
+    equalTo(screen),
+  );
+  return onValue(q, (snapshot) => {
+    const now = Date.now();
+    const items: { id: string; activatedAt: number }[] = [];
+    snapshot.forEach((child) => {
+      const val = child.val() as { screen: string; activatedAt: number; expiresAt: number };
+      if (!val.expiresAt || val.expiresAt > now) {
+        items.push({ id: child.key!, activatedAt: val.activatedAt || 0 });
+      }
+    });
+    items.sort((a, b) => b.activatedAt - a.activatedAt);
+    onChanged(items.map((i) => i.id));
+  }, (error) => {
+    console.error('[subscribeBiznesPlusPlaces] RTDB error:', error.message);
+    onChanged([]);
   });
 };
 
@@ -389,6 +441,9 @@ export const subscribeHelpResponses = (
     });
     items.sort((a, b) => a.at - b.at);
     onChanged(items);
+  }, (error) => {
+    console.error('[subscribeHelpResponses] RTDB error:', error.message);
+    onChanged([]);
   });
 };
 
@@ -407,6 +462,9 @@ export const subscribeHelpConfirmations = (
     });
     items.sort((a, b) => a.at - b.at);
     onChanged(items);
+  }, (error) => {
+    console.error('[subscribeHelpConfirmations] RTDB error:', error.message);
+    onChanged([]);
   });
 };
 
@@ -433,7 +491,7 @@ type OfferHelpResponse = {
 };
 
 export const offerHelp = async (requestId: string): Promise<OfferHelpResponse> => {
-  const callable = httpsCallable<{ requestId: string }, OfferHelpResponse>(functions, 'offerHelp');
+  const callable = httpsCallable<{ requestId: string }, OfferHelpResponse>(functions, 'awardHelpRespondBonus');
   const result = await callable({ requestId });
   return result.data;
 };
@@ -465,12 +523,13 @@ export const confirmHelperForRequest = async (
 
 export const closeRequestWithBonus = async (
   requestId: string,
+  helperUids?: string[],
 ): Promise<{ ok: boolean; status: string; points?: number }> => {
-  const callable = httpsCallable<{ requestId: string }, { ok: boolean; status: string; points?: number }>(
+  const callable = httpsCallable<{ requestId: string; helperUids?: string[] }, { ok: boolean; status: string; points?: number }>(
     functions,
     'closeRequestWithBonus',
   );
-  const result = await callable({ requestId });
+  const result = await callable({ requestId, helperUids });
   return result.data;
 };
 
@@ -519,6 +578,24 @@ export const adminModeratePromotion = async ({
     { ok: boolean; action: 'approve' | 'reject' }
   >(functions, 'adminModeratePromotion');
   const result = await callable({ promotionId, action, reason });
+  return result.data;
+};
+
+export const awardProfileThanksBonus = async (targetUid: string): Promise<{ ok: boolean; awarded: boolean; points?: number }> => {
+  const callable = httpsCallable<{ targetUid: string }, { ok: boolean; awarded: boolean; points?: number }>(functions, 'awardProfileThanksBonus');
+  const result = await callable({ targetUid });
+  return result.data;
+};
+
+export const awardDailyLoginBonus = async (): Promise<{ ok: boolean; awarded: boolean }> => {
+  const callable = httpsCallable<object, { ok: boolean; awarded: boolean }>(functions, 'awardDailyLoginBonus');
+  const result = await callable({});
+  return result.data;
+};
+
+export const awardMilestoneBonus = async (milestone: 'profile_complete' | 'first_request' | 'first_response'): Promise<{ ok: boolean; awarded: boolean; points?: number }> => {
+  const callable = httpsCallable<{ milestone: string }, { ok: boolean; awarded: boolean; points?: number }>(functions, 'awardMilestoneBonus');
+  const result = await callable({ milestone });
   return result.data;
 };
 

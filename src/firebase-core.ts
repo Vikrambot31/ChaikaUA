@@ -99,10 +99,13 @@ if (Platform.OS !== 'web') {
       persistence: getReactNativePersistence(AsyncStorage) as never,
     });
   } catch (e) {
-    // Falls back to in-memory persistence — auth state will not survive app restarts.
-    // This is a known limitation when the RN persistence module cannot be loaded.
-    console.warn('[firebase-core] AsyncStorage auth persistence unavailable, using in-memory:', e);
+    // getAuth() returns the existing instance if auth was already initialized (e.g. HMR),
+    // which already has AsyncStorage persistence — no data loss in that case.
+    // Only if the persistence module truly failed to load will the session not survive restarts.
     authInstance = getAuth(firebaseApp);
+    if (!String(e).includes('already-initialized')) {
+      console.warn('[firebase-core] AsyncStorage auth persistence unavailable, using in-memory:', e);
+    }
   }
 } else {
   authInstance = getAuth(firebaseApp);

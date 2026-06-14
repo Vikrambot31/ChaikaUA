@@ -10,7 +10,7 @@ import { useViewMode, type ViewMode } from '../contexts/ViewModeContext';
 import { useDashboardContext } from '../contexts/DashboardContext';
 import type { DashboardStats } from '../services/dashboardService';
 
-export type AdminPageKey = 'dashboard' | 'moderation' | 'archive' | 'invite_access' | 'guarantor_tree' | 'access_control' | 'security' | 'errors' | 'photo_approval' | 'releases' | 'ai_diagnostics' | 'app_rules' | 'support' | 'bonus_credits' | 'ad_chat';
+export type AdminPageKey = 'dashboard' | 'moderation' | 'archive' | 'invite_access' | 'guarantor_tree' | 'access_control' | 'security' | 'errors' | 'photo_approval' | 'releases' | 'ai_diagnostics' | 'ai_control' | 'app_rules' | 'support' | 'bonus_credits' | 'ad_chat' | 'premium' | 'business_plus' | 'feature_ratings' | 'top_listings' | 'reports' | 'user_blocks';
 
 type AppShellProps = {
   children: ReactNode;
@@ -78,6 +78,11 @@ const navItems: Array<{ key: AdminPageKey; label: string; hint: string }> = [
     hint: 'Глубокий AI-аудит проекта: Upload, Firebase, Runtime, Performance, Observability, Crash Safety. Запуск, live-прогресс, отчёты.',
   },
   {
+    key: 'ai_control',
+    label: 'AI Control',
+    hint: 'Настройка AI-провайдера, автономный режим, лог действий и бюджет токенов.',
+  },
+  {
     key: 'app_rules',
     label: 'Серверні правила',
     hint: 'Живая карта текущих правил: Firebase Rules, Storage Rules, runtime-конфиги, upload pipeline, доступ, модерация и риски.',
@@ -97,6 +102,36 @@ const navItems: Array<{ key: AdminPageKey; label: string; hint: string }> = [
     label: 'Рекламний чат',
     hint: 'Звернення з питань реклами та промо-кредитів: перегляд, відповідь, закриття.',
   },
+  {
+    key: 'premium',
+    label: 'Premium підписки',
+    hint: 'Управління Premium-підписками: активація, продовження, скасування, статистика.',
+  },
+  {
+    key: 'business_plus',
+    label: 'Бізнес+ картки',
+    hint: 'Заявки власників закладів та модерація контенту меню, акцій і фото для Бізнес+ карток.',
+  },
+  {
+    key: 'feature_ratings',
+    label: 'Оцінка функцій',
+    hint: 'Оцінки та коментарі користувачів по розділах додатку: середній рейтинг, тренди, зворотний зв\'язок.',
+  },
+  {
+    key: 'top_listings',
+    label: 'Місця від юзерів',
+    hint: 'Модерація пропозицій "додати місце" з екранів Їжа на Чайці, Салони Краси, Все для Дітей. Записи зберігаються у food_top_listings, beauty_top_listings, children_top_listings.',
+  },
+  {
+    key: 'reports',
+    label: 'Скарги',
+    hint: 'Жалоби користувачів Kontakt-XXX: спам, фейки, неприйнятний контент. Паттерни блокувань та бан порушників.',
+  },
+  {
+    key: 'user_blocks',
+    label: 'Блокування',
+    hint: 'Причини блокувань від користувачів з профілю. AI-аналіз та перегляд статусу.',
+  },
 ];
 
 const navItemIcons: Record<AdminPageKey, string> = {
@@ -111,10 +146,17 @@ const navItemIcons: Record<AdminPageKey, string> = {
   photo_approval: '\u{2705}',
   releases: '\u{1F4E6}',
   ai_diagnostics: '\u{1F9E0}',
+  ai_control: '\u{1F916}',
   app_rules: '\u{1F4CB}',
   support: '\u{1F3A7}',
   bonus_credits: '\u{1F4B0}',
   ad_chat: '\u{1F4E2}',
+  premium: '\u2B50',
+  business_plus: '🏪',
+  feature_ratings: '\u2B50',
+  top_listings: '📍',
+  reports: '\u{1F6A9}',
+  user_blocks: '\u{1F512}',
 };
 
 type AttentionLevel = 'low' | 'medium' | 'high';
@@ -163,6 +205,10 @@ const getAttentionMeter = (page: AdminPageKey, stats: DashboardStats): Attention
     return attentionMeter('low', 0, 0, 4, 'Безопасность без срочных факторов');
   }
 
+  if (page === 'ai_control') {
+    return attentionMeter('low', 0, 0, 4, 'AI-провайдер настроен');
+  }
+
   if (page === 'errors' || page === 'ai_diagnostics') {
     if (stats.permissionDenied24h > 10) return attentionMeter('high', 3, 1, 0, `${stats.permissionDenied24h} permission_denied за 24ч`);
     if (stats.permissionDenied24h > 0) return attentionMeter('medium', 1, 2, 1, `${stats.permissionDenied24h} permission_denied за 24ч`);
@@ -177,10 +223,24 @@ const getAttentionMeter = (page: AdminPageKey, stats: DashboardStats): Attention
 
   if (page === 'dashboard') {
     const critical = stats.blockedDevices + (stats.rulesEnforcementLevel === 'OPEN' ? 1 : 0);
-    const warning = stats.pending + stats.pendingInviteRequests + stats.pendingPhotos + stats.permissionDenied24h;
+    const warning = stats.pending + stats.pendingInviteRequests + stats.pendingPhotos + stats.permissionDenied24h + (stats.pendingReports ?? 0);
     if (critical > 0) return attentionMeter('high', 3, 1, 0, `${critical} критических факторов`);
     if (warning > 0) return attentionMeter('medium', 1, 2, 1, `${warning} факторов внимания`);
     return attentionMeter('low', 0, 0, 4, 'Сводка без срочных факторов');
+  }
+
+  if (page === 'reports') {
+    const pr = stats.pendingReports ?? 0;
+    if (pr > 10) return attentionMeter('high', 3, 1, 0, `${pr} жалоб ожидают рассмотрения`);
+    if (pr > 0) return attentionMeter('medium', 1, 2, 1, `${pr} жалоб ожидают рассмотрения`);
+    return attentionMeter('low', 0, 0, 4, 'Нет жалоб для рассмотрения');
+  }
+
+  if (page === 'user_blocks') {
+    const pb = stats.pendingBlockReports ?? 0;
+    if (pb > 5) return attentionMeter('high', 3, 1, 0, `${pb} блокировок ожидають розгляду`);
+    if (pb > 0) return attentionMeter('medium', 1, 2, 1, `${pb} блокировок ожидають розгляду`);
+    return attentionMeter('low', 0, 0, 4, 'Немає блокувань для розгляду');
   }
 
   return attentionMeter('low', 0, 0, 4, 'Нет срочных факторов');

@@ -244,6 +244,33 @@ export type InviteFieldError = {
   retryAfterSeconds?: number;
 };
 
+const INVITE_MESSAGES = {
+  ua: {
+    retryLater: 'Спробуйте повторити трохи пізніше.',
+    retryMinutes: (minutes: number) => `Наступна заявка можлива через ${minutes} хв.`,
+    retryHours: (hours: number, minutes: number) => `Наступна заявка можлива через ${hours} год${minutes ? ` ${minutes} хв` : ''}.`,
+    sponsorNotFound: 'Поручителя не знайдено. Перевірте номер.',
+    sponsorPhoneInvalid: 'Телефон поручителя має бути у форматі +380XXXXXXXXX.',
+    reasonInvalid: 'Напишіть причину від 20 до 280 символів.',
+  },
+  ru: {
+    retryLater: 'Попробуйте повторить немного позже.',
+    retryMinutes: (minutes: number) => `Следующая заявка возможна через ${minutes} мин.`,
+    retryHours: (hours: number, minutes: number) => `Следующая заявка возможна через ${hours} ч${minutes ? ` ${minutes} мин` : ''}.`,
+    sponsorNotFound: 'Поручитель не найден. Проверьте номер.',
+    sponsorPhoneInvalid: 'Телефон поручителя должен быть в формате +380XXXXXXXXX.',
+    reasonInvalid: 'Напишите причину от 20 до 280 символов.',
+  },
+  en: {
+    retryLater: 'Try again a little later.',
+    retryMinutes: (minutes: number) => `The next request is available in ${minutes} min.`,
+    retryHours: (hours: number, minutes: number) => `The next request is available in ${hours} h${minutes ? ` ${minutes} min` : ''}.`,
+    sponsorNotFound: 'Sponsor not found. Check the number.',
+    sponsorPhoneInvalid: 'The sponsor phone must be in +380XXXXXXXXX format.',
+    reasonInvalid: 'Write a reason from 20 to 280 characters.',
+  },
+} as const;
+
 export const readUserFacingErrorCode = (error: unknown): string => {
   if (!error || typeof error !== 'object') return '';
   const record = error as Record<string, unknown>;
@@ -266,14 +293,15 @@ export const readUserFacingErrorDetails = (error: unknown): Record<string, unkno
   return {};
 };
 
-export const formatRetryAfter = (seconds?: number): string => {
+export const formatRetryAfter = (seconds?: number, language: AppLanguage = 'ua'): string => {
+  const text = INVITE_MESSAGES[language] ?? INVITE_MESSAGES.ua;
   const value = Math.max(0, Math.ceil(Number(seconds || 0)));
-  if (!Number.isFinite(value) || value <= 0) return 'Спробуйте повторити трохи пізніше.';
+  if (!Number.isFinite(value) || value <= 0) return text.retryLater;
   const minutes = Math.max(1, Math.ceil(value / 60));
-  if (minutes < 60) return `Следующая заявка возможна через ${minutes} мин.`;
+  if (minutes < 60) return text.retryMinutes(minutes);
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
-  return `Следующая заявка возможна через ${hours} ч${rest ? ` ${rest} мин` : ''}.`;
+  return text.retryHours(hours, rest);
 };
 
 export const formatCountdown = (seconds?: number): string => {
@@ -293,34 +321,35 @@ export const getRateLimitRetryAfterSeconds = (error: unknown): number | undefine
   return Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0 ? Math.ceil(retryAfterSeconds) : undefined;
 };
 
-export const mapInviteCFErrorToField = (error: unknown): InviteFieldError => {
+export const mapInviteCFErrorToField = (error: unknown, language: AppLanguage = 'ua'): InviteFieldError => {
   const code = readUserFacingErrorCode(error);
   const details = readUserFacingErrorDetails(error);
   const field = String(details.field || '').toLowerCase();
   const reason = String(details.reason || details.code || '').toLowerCase();
   const retryAfterSeconds = Number(details.retryAfterSeconds || details.retry_after_seconds || 0);
+  const text = INVITE_MESSAGES[language] ?? INVITE_MESSAGES.ua;
 
   if (code.includes('resource-exhausted')) {
     return {
       field: null,
-      message: formatRetryAfter(retryAfterSeconds),
+      message: formatRetryAfter(retryAfterSeconds, language),
       retryAfterSeconds: Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0 ? retryAfterSeconds : undefined,
     };
   }
 
   if (code.includes('not-found') && reason === 'sponsor_not_found') {
-    return { field: 'sponsorPhone', message: 'Поручитель не найден. Проверьте номер.' };
+    return { field: 'sponsorPhone', message: text.sponsorNotFound };
   }
 
   if (code.includes('invalid-argument') && (field === 'sponsor_phone' || field === 'sponsorphone')) {
-    return { field: 'sponsorPhone', message: 'Телефон поручителя должен быть в формате +380XXXXXXXXX.' };
+    return { field: 'sponsorPhone', message: text.sponsorPhoneInvalid };
   }
 
   if (code.includes('invalid-argument') && field === 'text') {
-    return { field: 'text', message: 'Напишите причину от 20 до 280 символов.' };
+    return { field: 'text', message: text.reasonInvalid };
   }
 
-  return { field: null, message: getUserErrorMessage('ru', 'send', error) };
+  return { field: null, message: getUserErrorMessage(language, 'send', error) };
 };
 
 export const getModerationUserMessage = (

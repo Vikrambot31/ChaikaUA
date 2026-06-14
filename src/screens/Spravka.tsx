@@ -6,6 +6,7 @@ import MiniTabBar from '../components/MiniTabBar';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import TactileIcon from '../components/TactileIcon';
 import { APP_VERSION } from '../utils/constants';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 interface LangState {
   language?: { current?: string };
@@ -65,14 +66,15 @@ const UI_TEXT = {
 const HelpScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const language = useSelector((state: LangState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
+  const { colors, isDark } = useAppTheme();
   const text = UI_TEXT[language];
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.headerCard}>
-          <Text style={styles.headerTitle}>{text.headerTitle}</Text>
+          <Text style={[styles.headerTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{text.headerTitle}</Text>
           <Text style={styles.headerSubtitle}>{text.headerSubtitle}</Text>
         </View>
 

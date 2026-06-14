@@ -33,10 +33,12 @@ import { query, ref, get, orderByChild, equalTo } from 'firebase/database';
 import { database } from '../firebase-config';
 import type { JobListing } from '../services/jobService';
 import MiniUserAvatar from '../components/MiniUserAvatar';
-import { getStartAvatarByKey, saveSelectedStartAvatar, START_AVATARS, START_AVATAR_URI_PREFIX } from '../utils/startAvatars';
+import { getStartAvatarByKey, START_AVATARS, START_AVATAR_URI_PREFIX } from '../utils/startAvatars';
 import { pickPhotoFromLibrary } from '../utils/photoPicker';
 import useSoftToast from '../hooks/useSoftToast';
+import { useAppTheme } from '../hooks/useAppTheme';
 import { subscribeToUserTicket, hasUnreadAdminReply } from '../services/supportService';
+import { awardMilestoneBonus } from '../services/bonusService';
 
 const UI_TEXT = {
   ua: {
@@ -149,15 +151,16 @@ const EditProfileScreen: React.FC<{ navigation: { goBack: () => void; navigate: 
   const dispatch = useDispatch();
   const { t, language } = useTranslation();
   const { showInfo } = useSoftToast();
+  const { colors } = useAppTheme();
   const text = UI_TEXT[language];
   const guarantorLabel = language === 'en' ? 'Guarantor' : 'Поручитель';
 
   const [name, setName] = useState(user?.name || '');
   const [phone, setPhone] = useState(user?.phone || '');
   const [city, setCity] = useState(user?.city || '');
-  const [houseNumber, setHouseNumber] = useState('');
-  const [profession, setProfession] = useState('');
-  const [about, setAbout] = useState('');
+  const [houseNumber, setHouseNumber] = useState(user?.houseNumber || '');
+  const [profession, setProfession] = useState(user?.profession || '');
+  const [about, setAbout] = useState(user?.about || '');
   const [loading, setLoading] = useState(false);
   const [avatarSaving, setAvatarSaving] = useState(false);
   const [showTemporaryAvatars, setShowTemporaryAvatars] = useState(false);
@@ -169,9 +172,9 @@ const EditProfileScreen: React.FC<{ navigation: { goBack: () => void; navigate: 
     name: user?.name || '',
     phone: user?.phone || '',
     city: user?.city || '',
-    houseNumber: '',
-    profession: '',
-    about: '',
+    houseNumber: user?.houseNumber || '',
+    profession: user?.profession || '',
+    about: user?.about || '',
   }));
   const [supportUnread, setSupportUnread] = useState(false);
 
@@ -273,7 +276,9 @@ const EditProfileScreen: React.FC<{ navigation: { goBack: () => void; navigate: 
     setAbout(savedSnapshot.about);
   };
 
-  const currentAvatarUri = startAvatarKey ? `${START_AVATAR_URI_PREFIX}${startAvatarKey}` : photoURL;
+  // Real photos take precedence over temporary avatars
+  const hasRealPhoto = photoURL && !photoURL.startsWith(START_AVATAR_URI_PREFIX);
+  const currentAvatarUri = hasRealPhoto ? photoURL : (startAvatarKey ? `${START_AVATAR_URI_PREFIX}${startAvatarKey}` : photoURL);
   const currentStartAvatar = startAvatarKey ? getStartAvatarByKey(startAvatarKey) : undefined;
 
   const showCurrentAvatarHint = () => {
@@ -295,27 +300,22 @@ const EditProfileScreen: React.FC<{ navigation: { goBack: () => void; navigate: 
   }) => {
     const uid = auth.currentUser?.uid || user?.id;
     if (!uid) {
-      if (nextStartAvatarKey) {
-        await saveSelectedStartAvatar(nextStartAvatarKey);
-      }
-      setPhotoURL(nextPhotoURL);
-      setPhotoStoragePaths(nextPhotoStoragePaths);
-      setStartAvatarKey(nextStartAvatarKey);
-      Alert.alert(text.avatarSavedTitle, text.avatarSavedBody);
+      Alert.alert(t.profile.errorTitle, text.avatarError);
       return;
     }
 
     if (manageLoading) setAvatarSaving(true);
     try {
-      if (auth.currentUser && !isStartAvatarUri(nextPhotoURL)) {
-        await firebaseUpdateProfile(auth.currentUser, { photoURL: nextPhotoURL || null });
-      }
+      // RTDB first — if this fails, Auth photoURL stays unchanged (no desync)
       await updateProfileRecord(uid, {
         photoURL: nextPhotoURL,
         photoURLs: nextPhotoURLs,
         photoStoragePaths: nextPhotoStoragePaths,
         startAvatarKey: nextStartAvatarKey,
       });
+      if (auth.currentUser && !isStartAvatarUri(nextPhotoURL)) {
+        await firebaseUpdateProfile(auth.currentUser, { photoURL: nextPhotoURL || null });
+      }
       setPhotoURL(nextPhotoURL);
       setPhotoStoragePaths(nextPhotoStoragePaths);
       setStartAvatarKey(nextStartAvatarKey);
@@ -339,7 +339,7 @@ const EditProfileScreen: React.FC<{ navigation: { goBack: () => void; navigate: 
     setAvatarSaving(true);
     try {
       const picked = await pickPhotoFromLibrary({ allowsEditing: true, quality: 0.86 });
-      if (!picked) {
+      if (!picked || !picked.uri) {
         return;
       }
       const uploaded = await uploadProfilePhoto(picked.uri);
@@ -391,12 +391,8 @@ const EditProfileScreen: React.FC<{ navigation: { goBack: () => void; navigate: 
     const normalizedAbout = sanitizeStoredText(about);
 
     try {
-      // BUG-8.5: success path only runs when auth is confirmed; no silent fail
       if (auth.currentUser) {
-        await firebaseUpdateProfile(auth.currentUser, {
-          displayName: normalizedName,
-        });
-
+        // RTDB first — if this fails, Auth stays unchanged (no desync)
         await updateProfileRecord(auth.currentUser.uid, {
           name: normalizedName,
           phone: normalizedPhone,
@@ -404,6 +400,10 @@ const EditProfileScreen: React.FC<{ navigation: { goBack: () => void; navigate: 
           houseNumber: normalizedHouseNumber,
           profession: normalizedProfession,
           about: normalizedAbout,
+        });
+
+        await firebaseUpdateProfile(auth.currentUser, {
+          displayName: normalizedName,
         });
 
         if (user) {
@@ -431,6 +431,7 @@ const EditProfileScreen: React.FC<{ navigation: { goBack: () => void; navigate: 
           profession: normalizedProfession,
           about: normalizedAbout,
         });
+        awardMilestoneBonus('profile_complete').catch(() => {});
         Alert.alert(t.profile.successTitle, t.profile.successMessage);
         navigation.goBack();
       } else {
@@ -444,7 +445,7 @@ const EditProfileScreen: React.FC<{ navigation: { goBack: () => void; navigate: 
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View style={styles.backgroundLayer}>
         {LIGHT_ORBS.map((orb, index) => (
           <View key={index} style={[styles.orb, orb]} />
@@ -479,9 +480,6 @@ const EditProfileScreen: React.FC<{ navigation: { goBack: () => void; navigate: 
                 backgroundColor="#6A8BA5"
               />
             )}
-            <View style={styles.heroAvatarBadge}>
-              <MaterialCommunityIcons name="information-outline" size={16} color="#FFF9EE" />
-            </View>
           </TouchableOpacity>
           <Text style={styles.title}>{t.profile.editProfile}</Text>
           <Text style={styles.subtitle}>{text.subtitle}</Text>
@@ -545,7 +543,7 @@ const EditProfileScreen: React.FC<{ navigation: { goBack: () => void; navigate: 
             activeOpacity={0.88}
           >
             {loading ? (
-              <ActivityIndicator color="#FFF9EE" />
+              <ActivityIndicator color="#FBF8FD" />
             ) : (
               <>
                 <TactileIcon
@@ -553,7 +551,7 @@ const EditProfileScreen: React.FC<{ navigation: { goBack: () => void; navigate: 
                   size={42}
                   iconSize={18}
                   backgroundColor="#7A4B36"
-                  tint="#FFF3CE"
+                  tint="#F5EEF9"
                   style={styles.saveIcon}
                 />
                 <Text style={styles.saveButtonText}>{t.profile.save}</Text>
@@ -608,7 +606,7 @@ const EditProfileScreen: React.FC<{ navigation: { goBack: () => void; navigate: 
             activeOpacity={0.88}
           >
             {loading ? (
-              <ActivityIndicator color="#FFF9EE" />
+              <ActivityIndicator color="#FBF8FD" />
             ) : (
               <>
                 <TactileIcon
@@ -616,7 +614,7 @@ const EditProfileScreen: React.FC<{ navigation: { goBack: () => void; navigate: 
                   size={42}
                   iconSize={18}
                   backgroundColor="#7A4B36"
-                  tint="#FFF3CE"
+                  tint="#F5EEF9"
                   style={styles.saveIcon}
                 />
                 <Text style={styles.saveButtonText}>{t.profile.save}</Text>
@@ -670,7 +668,7 @@ const EditProfileScreen: React.FC<{ navigation: { goBack: () => void; navigate: 
             disabled={avatarSaving}
             activeOpacity={0.88}
           >
-            <MaterialCommunityIcons name="camera-plus-outline" size={20} color="#FFF9EE" />
+            <MaterialCommunityIcons name="camera-plus-outline" size={20} color="#FBF8FD" />
             <Text style={styles.avatarActionText}>{text.uploadAvatar}</Text>
           </TouchableOpacity>
 
@@ -809,19 +807,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 5 },
     elevation: 5,
   },
-  heroAvatarBadge: {
-    position: 'absolute',
-    right: 2,
-    bottom: 2,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: SCREEN_THEME.terracotta,
-    borderWidth: 2,
-    borderColor: '#FFFDF6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   title: {
     fontSize: 26,
     fontWeight: '900',
@@ -911,9 +896,9 @@ const styles = StyleSheet.create({
     marginTop: 18,
     minHeight: 58,
     borderRadius: 20,
-    backgroundColor: SCREEN_THEME.terracotta,
+    backgroundColor: '#7d0e59',
     borderWidth: 1,
-    borderColor: SCREEN_THEME.terracottaDark,
+    borderColor: '#7d0e59',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -926,7 +911,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
   },
   saveButtonText: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
     fontSize: 16,
     fontWeight: '900',
   },
@@ -981,9 +966,9 @@ const styles = StyleSheet.create({
   avatarActionButton: {
     minHeight: 52,
     borderRadius: 18,
-    backgroundColor: SCREEN_THEME.terracotta,
+    backgroundColor: '#7d0e59',
     borderWidth: 1,
-    borderColor: SCREEN_THEME.terracottaDark,
+    borderColor: '#7d0e59',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -991,7 +976,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   avatarActionText: {
-    color: '#FFF9EE',
+    color: '#FBF8FD',
     fontSize: 15,
     fontWeight: '900',
   },
@@ -1044,7 +1029,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: SCREEN_THEME.terracotta,
+    backgroundColor: '#7d0e59',
     alignItems: 'center',
     justifyContent: 'center',
   },

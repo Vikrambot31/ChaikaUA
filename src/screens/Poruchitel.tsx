@@ -23,6 +23,7 @@ import {
   getMyTrustChain,
   getMyTrustNode,
   listMySponsorConfirmations,
+  subscribeMyConfirmations,
   subscribeMyInviteAccessStatus,
   subscribeMyTrustNode,
   type InviteRequestSnapshot,
@@ -35,6 +36,7 @@ import {
   subscribeMyBonuses,
   type UserBonuses,
 } from '../services/bonusService';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 type Lang = 'ua' | 'ru' | 'en';
 type AppNav = NavigationProp<Record<string, object | undefined>>;
@@ -66,6 +68,8 @@ const UI_TEXT = {
     statusDenied: 'Заявку відхилено',
     statusManualReview: 'Заявка на ручній модерації',
     statusDisabled: 'Система заявок вимкнена',
+    statusCancelled: 'Заявку скасовано',
+    statusTemporaryAccess: 'Тимчасовий доступ',
     bonusTitle: 'Бонуси за довіру',
     noTrustNode: 'Ви поки не в дереві довіри. Подайте заявку або зареєструйтеся з поручителем.',
     retry: 'Спробувати ще раз',
@@ -97,6 +101,8 @@ const UI_TEXT = {
     statusDenied: 'Заявка отклонена',
     statusManualReview: 'Заявка на ручной модерации',
     statusDisabled: 'Система заявок отключена',
+    statusCancelled: 'Заявка отменена',
+    statusTemporaryAccess: 'Временный доступ',
     bonusTitle: 'Бонусы за доверие',
     noTrustNode: 'Вы пока не в дереве доверия. Подайте заявку или зарегистрируйтесь с поручителем.',
     retry: 'Попробовать еще раз',
@@ -128,6 +134,8 @@ const UI_TEXT = {
     statusDenied: 'Request was denied',
     statusManualReview: 'Request is under manual review',
     statusDisabled: 'Invite system is disabled',
+    statusCancelled: 'Request was cancelled',
+    statusTemporaryAccess: 'Temporary access',
     bonusTitle: 'Trust bonuses',
     noTrustNode: 'You are not yet in the trust tree. Submit a request or register with a sponsor.',
     retry: 'Try again',
@@ -142,6 +150,8 @@ const STATUS_ICON: Record<string, { name: React.ComponentProps<typeof MaterialCo
   needs_manual_review: { name: 'account-search', color: '#2196F3' },
   denied: { name: 'close-circle', color: '#F44336' },
   auto_denied: { name: 'close-circle', color: '#F44336' },
+  cancelled: { name: 'cancel', color: '#9E9E9E' },
+  temporary_access: { name: 'timer-outline', color: '#8BC34A' },
   none: { name: 'help-circle-outline', color: '#9E9E9E' },
   disabled: { name: 'power-plug-off', color: '#9E9E9E' },
 };
@@ -154,6 +164,8 @@ const getStatusText = (status: string, t: (typeof UI_TEXT)[Lang]): string => {
     needs_manual_review: t.statusManualReview,
     denied: t.statusDenied,
     auto_denied: t.statusDenied,
+    cancelled: t.statusCancelled,
+    temporary_access: t.statusTemporaryAccess,
     disabled: t.statusDisabled,
     none: t.statusNone,
   };
@@ -165,6 +177,7 @@ const PoruchitelScreen: React.FC = () => {
   const user = useSelector(selectUser);
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
   const text = UI_TEXT[language];
+  const { colors, isDark } = useAppTheme();
 
   const [trustNode, setTrustNode] = useState<TrustTreeNode | null>(null);
   const [chain, setChain] = useState<TrustChainLink[]>([]);
@@ -176,6 +189,7 @@ const PoruchitelScreen: React.FC = () => {
   const [confirmationsLoading, setConfirmationsLoading] = useState(false);
   const [busyConfirmationId, setBusyConfirmationId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState('');
+  const [confirmActionError, setConfirmActionError] = useState(false);
 
   const load = React.useCallback(async () => {
     setLoadError('');
@@ -183,14 +197,14 @@ const PoruchitelScreen: React.FC = () => {
     try {
       const [node, childrenResult, statusResult] = await Promise.all([
         getMyTrustNode(),
-        getMyInvitedChildren(),
+        getMyInvitedChildren().catch(() => [] as TrustTreeChild[]),
         getMyInviteRequestStatus().catch(() => null),
       ]);
       setTrustNode(node);
       setChildren(childrenResult);
       setInviteStatus(statusResult);
       if (node && node.rootPath.length > 0) {
-        const chainResult = await getMyTrustChain();
+        const chainResult = await getMyTrustChain(node).catch(() => [] as TrustChainLink[]);
         setChain(chainResult);
       } else {
         setChain([]);
@@ -208,13 +222,16 @@ const PoruchitelScreen: React.FC = () => {
 
   // Realtime: re-fetch when trust_tree or invite status changes
   useEffect(() => {
-    const unsubTrust = subscribeMyTrustNode((node) => {
-      setTrustNode(node);
-      if (node && node.rootPath.length > 0) {
-        void getMyTrustChain().then(setChain).catch(() => setChain([]));
-      }
-      void getMyInvitedChildren().then(setChildren).catch(() => setChildren([]));
-    });
+    const unsubTrust = subscribeMyTrustNode(
+      (node) => {
+        setTrustNode(node);
+        if (node && node.rootPath.length > 0) {
+          void getMyTrustChain(node).then(setChain).catch(() => setChain([]));
+        }
+        void getMyInvitedChildren().then(setChildren).catch(() => setChildren([]));
+      },
+      () => { setLoadError(text.loadError); },
+    );
     const unsubAccess = subscribeMyInviteAccessStatus(() => {
       void getMyInviteRequestStatus().then(setInviteStatus).catch(() => undefined);
     });
@@ -247,13 +264,23 @@ const PoruchitelScreen: React.FC = () => {
     void loadConfirmations();
   }, [loadConfirmations]);
 
+  // Realtime: reload confirmations when sponsor_confirmations changes for this user
+  useEffect(() => {
+    const unsub = subscribeMyConfirmations(
+      () => { void loadConfirmations(); },
+      () => { setConfirmations([]); },
+    );
+    return unsub;
+  }, [loadConfirmations]);
+
   const respondToConfirmation = async (confirmationId: string, decision: 'approve' | 'deny') => {
+    setConfirmActionError(false);
     setBusyConfirmationId(confirmationId);
     try {
       if (decision === 'approve') await approveSponsorConfirmation(confirmationId);
       else await denySponsorConfirmation(confirmationId);
     } catch {
-      setLoadError(text.loadError);
+      setConfirmActionError(true);
       setBusyConfirmationId(null);
       return;
     }
@@ -268,14 +295,14 @@ const PoruchitelScreen: React.FC = () => {
     : '';
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.headerRow}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <MaterialCommunityIcons name="arrow-left" size={24} color={SCREEN_THEME.textPrimary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{text.title}</Text>
+          <Text style={[styles.headerTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{text.title}</Text>
           <View style={styles.backBtn} />
         </View>
 
@@ -363,6 +390,15 @@ const PoruchitelScreen: React.FC = () => {
             <Text style={styles.sectionTitle}>{text.confirmations}</Text>
             <View style={styles.confirmationsCard}>
               <Text style={styles.confirmationHint}>{text.confirmationHint}</Text>
+              {confirmActionError ? (
+                <View style={styles.confirmErrorRow}>
+                  <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#B84A3A" />
+                  <Text style={styles.confirmErrorText}>{text.loadError}</Text>
+                  <TouchableOpacity onPress={() => { setConfirmActionError(false); void loadConfirmations(); }} activeOpacity={0.82}>
+                    <Text style={styles.retryButtonText}>{text.retry}</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
               {confirmationsLoading ? (
                 <ActivityIndicator size="small" color={SCREEN_THEME.terracotta} style={{ marginTop: 12 }} />
               ) : confirmations.length === 0 ? (
@@ -372,7 +408,9 @@ const PoruchitelScreen: React.FC = () => {
                   <View style={styles.cardInfo}>
                     <Text style={styles.cardName}>{item.requesterPhoneMasked || item.requesterUid}</Text>
                     {item.comment ? <Text style={styles.cardPhone}>{item.comment}</Text> : null}
-                    <Text style={styles.cardPhone}>{text.expiresAt}: {new Date(item.expiresAt).toLocaleString()}</Text>
+                    {item.expiresAt > 0 ? (
+                      <Text style={styles.cardPhone}>{text.expiresAt}: {new Date(item.expiresAt).toLocaleString(language === 'ru' ? 'ru-RU' : language === 'en' ? 'en-GB' : 'uk-UA')}</Text>
+                    ) : null}
                   </View>
                   <View style={styles.confirmationActions}>
                     <TouchableOpacity
@@ -680,7 +718,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#E4D0AB',
-    backgroundColor: '#FFF9EE',
+    backgroundColor: '#FBF8FD',
     paddingHorizontal: 10,
   },
   denyButtonText: {
@@ -691,6 +729,19 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     opacity: 0.55,
+  },
+  confirmErrorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+    flexWrap: 'wrap',
+  },
+  confirmErrorText: {
+    flex: 1,
+    color: '#A44333',
+    fontSize: 12,
+    fontWeight: '700',
   },
 });
 

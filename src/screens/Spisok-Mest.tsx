@@ -29,6 +29,7 @@ import MiniTabBar from '../components/MiniTabBar';
 import type { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import TactileIcon from '../components/TactileIcon';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 const FILTER_TYPES: PlaceType[] = [
   PlaceType.SHOP,
@@ -114,6 +115,7 @@ const UI_TEXT = {
 } as const;
 
 const ListScreen: React.FC = () => {
+  const { colors } = useAppTheme();
   const dispatch = useDispatch();
   const { loadPlaces } = usePlaces();
   const places = useSelector((state: RootState) => selectFilteredPlaces(state));
@@ -142,6 +144,7 @@ const ListScreen: React.FC = () => {
 
   const handleClearFilters = useCallback(() => {
     setSearch('');
+    setTypeSearch('');
     setSelectedTypes(FILTER_TYPES);
     dispatch(clearFilters());
   }, [dispatch]);
@@ -162,20 +165,25 @@ const ListScreen: React.FC = () => {
     const query = typeSearch.trim().toLowerCase();
     if (!query) return places;
     const typeAliases: Record<string, string> = {
-      shop: 'магазин товары',
-      school: 'школы школа',
-      kindergarten: 'детские сады детский сад дети',
+      shop: 'магазин магазины товары shop shops store stores',
+      school: 'школы школа school schools',
+      kindergarten: 'детские сады детский сад дети kindergarten kindergartens',
       cafe: 'кафе',
-      restaurant: 'рестораны ресторан',
-      salon: 'салоны салон',
-      service: 'частные услуги услуги сервис',
-      pharmacy: 'аптеки аптека',
+      restaurant: 'рестораны ресторан restaurant restaurants',
+      salon: 'салоны салон salon salons',
+      service: 'частные услуги услуги сервис service services',
+      pharmacy: 'аптеки аптека pharmacy pharmacies',
     };
     return places.filter((place) => {
-      const bucket = typeAliases[place.type] ?? '';
-      return bucket.includes(query) || place.type.includes(query);
+      const typeLabel = text.filterLabels[place.type] ?? '';
+      const bucket = [
+        place.type,
+        typeLabel,
+        typeAliases[place.type] ?? '',
+      ].join(' ').toLowerCase();
+      return bucket.includes(query);
     });
-  }, [places, typeSearch]);
+  }, [places, text.filterLabels, typeSearch]);
 
   const showSkeleton = loading && visiblePlaces.length === 0;
   const renderPlace = useCallback(
@@ -184,7 +192,7 @@ const ListScreen: React.FC = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View style={styles.headerCard}>
         <Text style={styles.headerTitle}>{text.headerTitle}</Text>
         <Text style={styles.headerSubtitle}>
@@ -397,7 +405,7 @@ const styles = StyleSheet.create({
     color: SCREEN_THEME.textPrimary,
     fontSize: SIZES.fontRegular,
     borderWidth: 1,
-    borderColor: '#E1CFAB',
+    borderColor: SCREEN_THEME.uiBorder,
   },
   typeSearchInput: {
     marginTop: 10,
@@ -463,7 +471,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#E1CFAB',
+    borderColor: SCREEN_THEME.uiBorder,
   },
   emptyActionText: {
     color: SCREEN_THEME.terracottaDark,

@@ -1,12 +1,11 @@
 ﻿import React, { useMemo, useRef, useState } from 'react';
-import { Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { SCREEN_W as width } from '../utils/webDimensions';
 
 type InviteAccessIntroSlidesProps = {
   onDone: () => void;
 };
-
-const { width } = Dimensions.get('window');
 
 const SLIDES = [
   require('../../assets/Poruchitel3-1.png'),

@@ -7,7 +7,6 @@ import {
   loadFraudFlags,
   loadBonusBlocks,
   grantPromoCredits,
-  adjustPromoCredits,
   adjustTrustBonuses,
   blockUser,
   moderatePromotion,
@@ -18,13 +17,24 @@ import {
   type FraudFlag,
   type BonusBlock,
 } from '../services/bonusAdminService';
+import {
+  subscribeToAllPremiumSubscriptions,
+  activatePremiumManual,
+  cancelPremiumSubscription,
+  setAutoRenew,
+  loadUserProfiles,
+  type PremiumSubscription,
+  type UserProfile,
+} from '../services/premiumAdminService';
 
-type TabKey = 'users' | 'promotions' | 'fraud';
+type TabKey = 'users' | 'promotions' | 'fraud' | 'subscriptions' | 'system';
 
 const TABS: Array<{ key: TabKey; label: string }> = [
   { key: 'users', label: 'Користувачі' },
   { key: 'promotions', label: 'Промоції' },
   { key: 'fraud', label: 'Фрод-моніторинг' },
+  { key: 'subscriptions', label: '⭐ Підписки' },
+  { key: 'system', label: '📚 Система бонусів' },
 ];
 
 const formatDate = (ts: number): string => {
@@ -46,6 +56,8 @@ const shortUid = (uid: string): string =>
 function UsersTab() {
   const [bonuses, setBonuses] = useState<UserBonusInfo[]>([]);
   const [promoCredits, setPromoCredits] = useState<UserPromoInfo[]>([]);
+  const [userProfiles, setUserProfiles] = useState<Record<string, UserProfile>>({});
+  const [loadError, setLoadError] = useState('');
   const [search, setSearch] = useState('');
   const [expandedUid, setExpandedUid] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<BonusTransaction[]>([]);
@@ -53,13 +65,28 @@ function UsersTab() {
   const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
-    const unsub1 = subscribeToAllBonuses(setBonuses);
-    const unsub2 = subscribeToAllPromoCredits(setPromoCredits);
+    const handleError = (err: Error) => setLoadError(err.message);
+    const unsub1 = subscribeToAllBonuses((data) => {
+      setBonuses(data);
+      const uids = data.map((b) => b.uid);
+      if (uids.length > 0) {
+        loadUserProfiles(uids).then((profiles) =>
+          setUserProfiles((prev) => ({ ...prev, ...profiles })),
+        );
+      }
+    }, handleError);
+    const unsub2 = subscribeToAllPromoCredits(setPromoCredits, handleError);
     return () => { unsub1(); unsub2(); };
   }, []);
 
   const filteredBonuses = search
-    ? bonuses.filter((b) => b.uid.toLowerCase().includes(search.toLowerCase()))
+    ? bonuses.filter((b) => {
+        const q = search.toLowerCase();
+        const prof = userProfiles[b.uid];
+        return b.uid.toLowerCase().includes(q) ||
+          (prof?.name ?? '').toLowerCase().includes(q) ||
+          (prof?.phone ?? '').includes(q);
+      })
     : bonuses;
 
   const filteredPromo = search
@@ -135,6 +162,11 @@ function UsersTab() {
 
   return (
     <div>
+      {loadError && (
+        <div style={{ background: '#2a1a1a', color: '#ef9a9a', padding: '8px 12px', borderRadius: 6, marginBottom: 12, fontSize: 13 }}>
+          ⚠️ Помилка завантаження: {loadError}
+        </div>
+      )}
       {/* Search */}
       <div style={s.searchRow}>
         <input
@@ -156,6 +188,8 @@ function UsersTab() {
           <table style={s.table}>
             <thead>
               <tr>
+                <th style={s.th}>Ім'я</th>
+                <th style={s.th}>Телефон</th>
                 <th style={s.th}>UID</th>
                 <th style={s.th}>Баланс</th>
                 <th style={s.th}>Бейдж</th>
@@ -164,9 +198,11 @@ function UsersTab() {
             </thead>
             <tbody>
               {filteredBonuses.length === 0 && (
-                <tr><td colSpan={4} style={s.emptyCell}>Немає даних</td></tr>
+                <tr><td colSpan={6} style={s.emptyCell}>Немає даних</td></tr>
               )}
-              {filteredBonuses.map((b) => (
+              {filteredBonuses.map((b) => {
+                const prof = userProfiles[b.uid];
+                return (
                 <>
                   <tr
                     key={b.uid}
@@ -177,6 +213,8 @@ function UsersTab() {
                     }}
                     onClick={() => handleExpand(b.uid)}
                   >
+                    <td style={{ ...s.td, fontWeight: 600 }}>{prof?.name || shortUid(b.uid)}</td>
+                    <td style={{ ...s.td, fontFamily: 'monospace', fontSize: 12 }}>{prof?.phone || ''}</td>
                     <td style={s.td} title={b.uid}>{shortUid(b.uid)}</td>
                     <td style={s.td}>{b.balance}</td>
                     <td style={s.td}>{b.badge || '-'}</td>
@@ -184,7 +222,7 @@ function UsersTab() {
                   </tr>
                   {expandedUid === b.uid && (
                     <tr key={b.uid + '_detail'}>
-                      <td colSpan={4} style={s.detailCell}>
+                      <td colSpan={6} style={s.detailCell}>
                         <UserDetail
                           uid={b.uid}
                           promo={promoMap.get(b.uid)}
@@ -199,7 +237,8 @@ function UsersTab() {
                     </tr>
                   )}
                 </>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -343,11 +382,12 @@ function UserDetail({
 
 function PromotionsTab() {
   const [promotions, setPromotions] = useState<BonusPromotion[]>([]);
+  const [loadError, setLoadError] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
-    const unsub = subscribeToPromotions(setPromotions);
+    const unsub = subscribeToPromotions(setPromotions, (err) => setLoadError(err.message));
     return unsub;
   }, []);
 
@@ -372,6 +412,11 @@ function PromotionsTab() {
 
   return (
     <div>
+      {loadError && (
+        <div style={{ background: '#2a1a1a', color: '#ef9a9a', padding: '8px 12px', borderRadius: 6, marginBottom: 12, fontSize: 13 }}>
+          ⚠️ Помилка завантаження: {loadError}
+        </div>
+      )}
       {/* Filter */}
       <div style={s.searchRow}>
         <select
@@ -472,6 +517,7 @@ function FraudTab() {
   const [fraudFlags, setFraudFlags] = useState<FraudFlag[]>([]);
   const [blocks, setBlocks] = useState<Record<string, BonusBlock>>({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
@@ -483,6 +529,8 @@ function FraudTab() {
           setFraudFlags(flags);
           setBlocks(bl);
         }
+      } catch (err) {
+        if (!cancelled) setLoadError(err instanceof Error ? err.message : 'Помилка завантаження');
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -509,6 +557,10 @@ function FraudTab() {
 
   if (loading) {
     return <div style={{ padding: 20, color: '#888' }}>Завантаження...</div>;
+  }
+
+  if (loadError) {
+    return <div style={{ padding: 20, color: '#ef9a9a' }}>⚠️ {loadError}</div>;
   }
 
   const blockedEntries = Object.entries(blocks);
@@ -540,11 +592,11 @@ function FraudTab() {
               <td style={{
                 ...s.td,
                 fontWeight: 600,
-                color: f.score >= 0.8 ? '#e74c3c' : f.score >= 0.5 ? '#e67e22' : '#27ae60',
+                color: f.riskScore >= 0.8 ? '#e74c3c' : f.riskScore >= 0.5 ? '#e67e22' : '#27ae60',
               }}>
-                {f.score.toFixed(2)}
+                {f.riskScore?.toFixed(2) ?? '-'}
               </td>
-              <td style={s.td}>{f.reasons?.join(', ') || '-'}</td>
+              <td style={s.td}>{f.reason || '-'}</td>
               <td style={s.td}>{formatDate(f.at)}</td>
             </tr>
           ))}
@@ -592,6 +644,509 @@ function FraudTab() {
   );
 }
 
+// ── Subscriptions Tab ──
+
+const subStatusLabels: Record<string, string> = {
+  active: 'Активна',
+  trial: 'Пробний',
+  expired: 'Завершена',
+  free: 'Безкоштовна',
+};
+
+const subStatusColors: Record<string, { bg: string; fg: string }> = {
+  active:  { bg: '#d4edda', fg: '#155724' },
+  trial:   { bg: '#cce5ff', fg: '#004085' },
+  expired: { bg: '#f8d7da', fg: '#721c24' },
+  free:    { bg: '#e2e3e5', fg: '#383d41' },
+};
+
+const paymentLabels: Record<string, string> = {
+  monobank_manual: 'Monobank',
+  trial: 'Пробний',
+};
+
+function daysLeft(expiresAt: string | null): number | null {
+  if (!expiresAt) return null;
+  const ms = new Date(expiresAt).getTime() - Date.now();
+  return Math.ceil(ms / 86400000);
+}
+
+function SubscriptionsTab() {
+  const [subs, setSubs] = useState<PremiumSubscription[]>([]);
+  const [profiles, setProfiles] = useState<Record<string, UserProfile>>({});
+  const [loadError, setLoadError] = useState('');
+  const [filter, setFilter] = useState<string>('all');
+  const [search, setSearch] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
+  const [activateModal, setActivateModal] = useState<{ uid: string; name: string } | null>(null);
+  const [modalMonths, setModalMonths] = useState<1 | 3 | 6 | 12>(1);
+  const [modalNotes, setModalNotes] = useState('');
+
+  useEffect(() => {
+    return subscribeToAllPremiumSubscriptions((data) => {
+      setSubs(data);
+      // Fetch names/phones for all uids we don't know yet
+      const unknown = data.map((s) => s.uid).filter((uid) => !profiles[uid]);
+      if (unknown.length > 0) {
+        loadUserProfiles(unknown).then((p) =>
+          setProfiles((prev) => ({ ...prev, ...p })),
+        );
+      }
+    }, (err) => setLoadError(err.message));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const filtered = subs.filter((sub) => {
+    const matchStatus = filter === 'all' || sub.status === filter;
+    const prof = profiles[sub.uid];
+    const q = search.toLowerCase();
+    const matchSearch = !search ||
+      sub.uid.toLowerCase().includes(q) ||
+      (prof?.name ?? '').toLowerCase().includes(q) ||
+      (prof?.phone ?? '').includes(q);
+    return matchStatus && matchSearch;
+  });
+
+  const activeCount = subs.filter((s) => s.status === 'active').length;
+  const trialCount  = subs.filter((s) => s.status === 'trial').length;
+  const expiringCount = subs.filter((s) => {
+    const d = daysLeft(s.expiresAt);
+    return d !== null && d <= 7 && d > 0 && (s.status === 'active' || s.status === 'trial');
+  }).length;
+
+  const handleActivate = async () => {
+    if (!activateModal) return;
+    setActionLoading(true);
+    try {
+      await activatePremiumManual(activateModal.uid, modalMonths, modalNotes);
+      alert(`Premium активовано на ${modalMonths} міс.`);
+      setActivateModal(null);
+      setModalNotes('');
+      setModalMonths(1);
+    } catch (e) {
+      alert('Помилка: ' + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleCancel = async (uid: string, name: string) => {
+    if (!window.confirm(`Відключити Premium для ${name || uid}?`)) return;
+    setActionLoading(true);
+    try {
+      await cancelPremiumSubscription(uid);
+      alert('Підписку відключено');
+    } catch (e) {
+      alert('Помилка: ' + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleAutoRenew = async (uid: string, current: boolean, name: string) => {
+    const next = !current;
+    setActionLoading(true);
+    try {
+      await setAutoRenew(uid, next);
+      alert(`Авторенewал ${next ? 'увімкнено' : 'вимкнено'} для ${name || uid}`);
+    } catch (e) {
+      alert('Помилка: ' + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  return (
+    <div>
+      {loadError && (
+        <div style={{ background: '#2a1a1a', color: '#ef9a9a', padding: '8px 12px', borderRadius: 6, marginBottom: 12, fontSize: 13 }}>
+          ⚠️ Помилка завантаження: {loadError}
+        </div>
+      )}
+      {/* Stats */}
+      <div style={s.statsRow}>
+        <div style={{ ...s.statCard, borderColor: '#27ae60' }}>
+          <div style={s.statNum}>{activeCount}</div>
+          <div style={s.statLabel}>Активних</div>
+        </div>
+        <div style={{ ...s.statCard, borderColor: '#2980b9' }}>
+          <div style={s.statNum}>{trialCount}</div>
+          <div style={s.statLabel}>Пробних</div>
+        </div>
+        <div style={{ ...s.statCard, borderColor: '#e67e22' }}>
+          <div style={s.statNum}>{expiringCount}</div>
+          <div style={s.statLabel}>Закінчується ≤7 днів</div>
+        </div>
+        <div style={{ ...s.statCard, borderColor: '#888' }}>
+          <div style={s.statNum}>{subs.length}</div>
+          <div style={s.statLabel}>Всього записів</div>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div style={s.searchRow}>
+        <input
+          style={s.searchInput}
+          placeholder="Пошук за UID..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <select
+          style={s.filterSelect}
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+        >
+          <option value="all">Всі статуси</option>
+          <option value="active">Активні</option>
+          <option value="trial">Пробний</option>
+          <option value="expired">Завершені</option>
+        </select>
+        <span style={s.searchCount}>{filtered.length} підписок</span>
+      </div>
+
+      {/* Table */}
+      <table style={s.table}>
+        <thead>
+          <tr>
+            <th style={s.th}>Ім'я</th>
+            <th style={s.th}>Телефон</th>
+            <th style={s.th}>UID</th>
+            <th style={s.th}>Статус</th>
+            <th style={s.th}>Оплата</th>
+            <th style={s.th}>Дата оплати</th>
+            <th style={s.th}>Діє до</th>
+            <th style={s.th}>Залишилось</th>
+            <th style={s.th}>Авто</th>
+            <th style={s.th}>Нотатки</th>
+            <th style={s.th}>Дії</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filtered.length === 0 && (
+            <tr><td colSpan={11} style={s.emptyCell}>Підписок немає</td></tr>
+          )}
+          {filtered.map((sub) => {
+            const days = daysLeft(sub.expiresAt);
+            const isExpiringSoon = days !== null && days <= 7 && days > 0;
+            const rowBg = isExpiringSoon ? '#fff8e1' : undefined;
+            const prof = profiles[sub.uid];
+            const displayName = prof?.name || '—';
+            const displayPhone = prof?.phone || '—';
+            return (
+              <tr key={sub.uid} style={{ ...s.tr, backgroundColor: rowBg }}>
+                <td style={{ ...s.td, fontWeight: 600 }}>{displayName}</td>
+                <td style={{ ...s.td, fontFamily: 'monospace', fontSize: 12 }}>{displayPhone}</td>
+                <td style={{ ...s.td, fontSize: 11, color: '#999' }} title={sub.uid}>{shortUid(sub.uid)}</td>
+                <td style={s.td}>
+                  <span style={{
+                    ...s.statusBadge,
+                    backgroundColor: subStatusColors[sub.status]?.bg || '#eee',
+                    color: subStatusColors[sub.status]?.fg || '#333',
+                  }}>
+                    {subStatusLabels[sub.status] || sub.status}
+                  </span>
+                </td>
+                <td style={s.td}>{paymentLabels[sub.paymentMethod ?? ''] || sub.paymentMethod || '-'}</td>
+                <td style={s.td}>{sub.activatedAt ? formatDate(new Date(sub.activatedAt).getTime()) : '-'}</td>
+                <td style={s.td}>{sub.expiresAt ? formatDate(new Date(sub.expiresAt).getTime()) : '-'}</td>
+                <td style={{
+                  ...s.td,
+                  fontWeight: 600,
+                  color: days === null ? '#999' : days <= 3 ? '#e74c3c' : days <= 7 ? '#e67e22' : '#27ae60',
+                }}>
+                  {days === null ? '-' : days <= 0 ? 'Завершено' : `${days} дн.`}
+                </td>
+                <td style={{ ...s.td, textAlign: 'center' as const }}>
+                  <button
+                    title={sub.autoRenew ? 'Авторенewал увімкнено — натисніть щоб вимкнути' : 'Авторенewал вимкнено — натисніть щоб увімкнути'}
+                    style={{
+                      ...s.toggleBtn,
+                      backgroundColor: sub.autoRenew ? '#27ae60' : '#ccc',
+                    }}
+                    disabled={actionLoading}
+                    onClick={() => handleAutoRenew(sub.uid, sub.autoRenew, displayName)}
+                  >
+                    {sub.autoRenew ? '✓ Авто' : '✗ Авто'}
+                  </button>
+                </td>
+                <td style={{ ...s.td, maxWidth: 120 }} title={sub.notes ?? ''}>{sub.notes || '-'}</td>
+                <td style={s.td}>
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' as const }}>
+                    <button
+                      style={s.smallBtn}
+                      disabled={actionLoading}
+                      onClick={() => setActivateModal({ uid: sub.uid, name: displayName })}
+                    >
+                      Включити
+                    </button>
+                    {(sub.status === 'active' || sub.status === 'trial') && (
+                      <button
+                        style={{ ...s.smallBtn, backgroundColor: '#e74c3c' }}
+                        disabled={actionLoading}
+                        onClick={() => handleCancel(sub.uid, displayName)}
+                      >
+                        Відключити
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+
+      {/* Activate Modal */}
+      {activateModal && (
+        <div style={s.modalOverlay} onClick={() => setActivateModal(null)}>
+          <div style={s.modal} onClick={(e) => e.stopPropagation()}>
+            <div style={s.modalTitle}>⭐ Включити Premium</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: '#333' }}>{activateModal.name}</div>
+            <div style={s.modalUid}>UID: {activateModal.uid}</div>
+            <div style={s.modalField}>
+              <label style={s.modalLabel}>Термін підписки:</label>
+              <select
+                style={s.filterSelect}
+                value={modalMonths}
+                onChange={(e) => setModalMonths(Number(e.target.value) as 1 | 3 | 6 | 12)}
+              >
+                <option value={1}>1 місяць — 39 грн</option>
+                <option value={3}>3 місяці — 117 грн</option>
+                <option value={6}>6 місяців — 234 грн</option>
+                <option value={12}>12 місяців — 468 грн</option>
+              </select>
+            </div>
+            <div style={s.modalField}>
+              <label style={s.modalLabel}>Нотатка (скрін, дата платежу):</label>
+              <textarea
+                style={s.modalTextarea}
+                value={modalNotes}
+                onChange={(e) => setModalNotes(e.target.value)}
+                placeholder="напр. Скрін otrimano 07.06, сума 39 грн"
+                rows={3}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button
+                style={{ ...s.actionBtn, backgroundColor: '#888' }}
+                onClick={() => setActivateModal(null)}
+              >
+                Скасувати
+              </button>
+              <button
+                style={s.actionBtn}
+                disabled={actionLoading}
+                onClick={handleActivate}
+              >
+                {actionLoading ? 'Зачекайте...' : 'Активувати'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── System Documentation Tab ──
+
+function BonusSystemDocsTab() {
+  return (
+    <div style={s.docsContainer}>
+      <div style={s.docsSection}>
+        <h2 style={s.docsTitle}>🏆 Система бонусов доверия</h2>
+        <p style={s.docsText}>
+          Бонусы доверия (Trust-бонусы) — это основная валюта Чайки, которая отражает уровень активности и надежности пользователя в сообществе.
+        </p>
+      </div>
+
+      {/* Types of Bonuses */}
+      <div style={s.docsSection}>
+        <h3 style={s.docsSubtitle}>💰 Типы бонусов</h3>
+
+        <div style={s.bonusCard}>
+          <div style={s.bonusAmount}>+10</div>
+          <div style={s.bonusTitle}>Первая заявка</div>
+          <div style={s.bonusDesc}>Один раз за регистрацию, когда вы впервые создали заявку о помощи</div>
+        </div>
+
+        <div style={s.bonusCard}>
+          <div style={s.bonusAmount}>+30</div>
+          <div style={s.bonusTitle}>Профиль заполнен</div>
+          <div style={s.bonusDesc}>Один раз, когда вы полностью заполнили профиль (имя, телефон, город, фото, и прочее)</div>
+        </div>
+
+        <div style={s.bonusCard}>
+          <div style={s.bonusAmount}>+10</div>
+          <div style={s.bonusTitle}>Первый ответ</div>
+          <div style={s.bonusDesc}>Один раз за первый раз, когда вы помогли кому-то, ответив на их заявку</div>
+        </div>
+
+        <div style={s.bonusCard}>
+          <div style={s.bonusAmount}>+5</div>
+          <div style={s.bonusTitle}>Ответ на помощь</div>
+          <div style={s.bonusDesc}>Каждый раз, когда вы помогаете кому-то, отвечая на их заявку (ограничение: 5 в неделю)</div>
+        </div>
+
+        <div style={s.bonusCard}>
+          <div style={s.bonusAmount}>+20</div>
+          <div style={s.bonusTitle}>Подтверждение помощи</div>
+          <div style={s.bonusDesc}>Когда автор заявки подтвердил, что вы действительно помогли (ограничение: 20 в неделю)</div>
+        </div>
+
+        <div style={s.bonusCard}>
+          <div style={s.bonusAmount}>+10</div>
+          <div style={s.bonusTitle}>Благодарность</div>
+          <div style={s.bonusDesc}>Когда автор заявки благодарит вас за помощь (ограничение: 10 в неделю)</div>
+        </div>
+
+        <div style={s.bonusCard}>
+          <div style={s.bonusAmount}>+5</div>
+          <div style={s.bonusTitle}>Закрытие заявки</div>
+          <div style={s.bonusDesc}>Когда автор закрывает заявку как решённую</div>
+        </div>
+      </div>
+
+      {/* How it works */}
+      <div style={s.docsSection}>
+        <h3 style={s.docsSubtitle}>🔄 Как это работает</h3>
+
+        <div style={s.flowBox}>
+          <div style={s.flowStep}>
+            <div style={s.stepNum}>1</div>
+            <div style={s.stepTitle}>Вы создаёте заявку</div>
+            <div style={s.stepText}>Опубликуйте запрос о помощи → +10 бонусов (один раз)</div>
+          </div>
+
+          <div style={s.flowArrow}>↓</div>
+
+          <div style={s.flowStep}>
+            <div style={s.stepNum}>2</div>
+            <div style={s.stepTitle}>Кто-то вам отвечает</div>
+            <div style={s.stepText}>Пользователь предлагает помощь → Им +5 бонусов</div>
+          </div>
+
+          <div style={s.flowArrow}>↓</div>
+
+          <div style={s.flowStep}>
+            <div style={s.stepNum}>3</div>
+            <div style={s.stepTitle}>Вы подтверждаете помощь</div>
+            <div style={s.stepText}>Нажимаете "Помощь получена" → Помощнику +20 бонусов, вам +5</div>
+          </div>
+
+          <div style={s.flowArrow}>↓</div>
+
+          <div style={s.flowStep}>
+            <div style={s.stepNum}>4</div>
+            <div style={s.stepTitle}>Вы закрываете заявку</div>
+            <div style={s.stepText}>Нажимаете "Закрыть как решённую" → Вам +5 бонусов</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Weekly limits */}
+      <div style={s.docsSection}>
+        <h3 style={s.docsSubtitle}>📅 Еженедельные ограничения</h3>
+        <p style={s.docsText}>
+          Система отслеживает ваши действия по неделям (понедельник-воскресенье, UTC+2) чтобы предотвратить злоупотребления.
+        </p>
+
+        <div style={s.limitBox}>
+          <div style={s.limitRow}>
+            <div style={s.limitLabel}>Ответов на помощь</div>
+            <div style={s.limitValue}>5 в неделю × 5 бонусов = макс. 25 в неделю</div>
+          </div>
+          <div style={s.limitRow}>
+            <div style={s.limitLabel}>Подтверждений помощи</div>
+            <div style={s.limitValue}>20 в неделю × 20 бонусов = макс. 400 в неделю</div>
+          </div>
+          <div style={s.limitRow}>
+            <div style={s.limitLabel}>Благодарностей</div>
+            <div style={s.limitValue}>10 в неделю × 10 бонусов = макс. 100 в неделю</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Spending */}
+      <div style={s.docsSection}>
+        <h3 style={s.docsSubtitle}>💸 На что потратить бонусы</h3>
+
+        <div style={s.spendingCard}>
+          <div style={s.spendingAmount}>50 бонусов</div>
+          <div style={s.spendingTitle}>Поднять в топ (24 часа)</div>
+          <div style={s.spendingDesc}>Ваша заявка будет видна всем в начале списка</div>
+        </div>
+
+        <div style={s.spendingCard}>
+          <div style={s.spendingAmount}>100 бонусов</div>
+          <div style={s.spendingTitle}>Выделить профиль</div>
+          <div style={s.spendingDesc}>Ваш профиль будет выделен в поиске помощников</div>
+        </div>
+
+        <div style={s.spendingCard}>
+          <div style={s.spendingAmount}>30 бонусов</div>
+          <div style={s.spendingTitle}>Отправить сообщение</div>
+          <div style={s.spendingDesc}>Напрямую написать человеку, которому нужна помощь</div>
+        </div>
+      </div>
+
+      {/* Safety & Fraud Prevention */}
+      <div style={s.docsSection}>
+        <h3 style={s.docsSubtitle}>🛡️ Защита от мошенничества</h3>
+        <p style={s.docsText}>
+          Система автоматически отслеживает подозрительную активность:
+        </p>
+
+        <div style={s.safetyBox}>
+          <div style={s.safetyItem}>
+            <strong>Кольцевые схемы:</strong> Если один и тот же человек много раз помогает вам и вы ему, система отметит это как потенциальное мошенничество
+          </div>
+          <div style={s.safetyItem}>
+            <strong>Частые повторения:</strong> Часто один и тот же пользователь отвечает на все ваши заявки — система это видит
+          </div>
+          <div style={s.safetyItem}>
+            <strong>Блокировка:</strong> Если система обнаружит мошенничество, доступ к бонусам может быть заблокирован
+          </div>
+          <div style={s.safetyItem}>
+            <strong>Ручная модерация:</strong> Админ может вручную заблокировать или разблокировать пользователя
+          </div>
+        </div>
+      </div>
+
+      {/* FAQ */}
+      <div style={s.docsSection}>
+        <h3 style={s.docsSubtitle}>❓ Часто задаваемые вопросы</h3>
+
+        <div style={s.faqItem}>
+          <div style={s.faqQuestion}>Что случится, если я потрачу все бонусы?</div>
+          <div style={s.faqAnswer}>Вы можете продолжать зарабатывать бонусы и снова тратить их. Баланс не может быть отрицательным — система просто не позволит потратить больше, чем есть.</div>
+        </div>
+
+        <div style={s.faqItem}>
+          <div style={s.faqQuestion}>Сколько бонусов я могу заработать за неделю?</div>
+          <div style={s.faqAnswer}>Теоретический максимум: 10 (первый запрос) + 30 (профиль) + 10 (первый ответ) + 25 (5 ответов) + 400 (20 подтверждений) + 100 (10 благодарностей) + 5 (закрытие) = 580 бонусов в неделю, но это при активной работе.</div>
+        </div>
+
+        <div style={s.faqItem}>
+          <div style={s.faqQuestion}>Почему я не получил ожидаемые бонусы?</div>
+          <div style={s.faqAnswer}>
+            Возможные причины:<br/>
+            • Вы уже получили одноразовый бонус (первая заявка, профиль)<br/>
+            • Вы достигли еженедельного лимита<br/>
+            • Система обнаружила подозрительную активность<br/>
+            • Ошибка в сети (попробуйте позже)
+          </div>
+        </div>
+
+        <div style={s.faqItem}>
+          <div style={s.faqQuestion}>Может ли админ изменить мои бонусы?</div>
+          <div style={s.faqAnswer}>Да, админ может вручную добавить или отнять бонусы за некорректное поведение или в качестве бонуса за активность. Все изменения логируются.</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ──
 
 export function BonusCreditsPage() {
@@ -623,6 +1178,8 @@ export function BonusCreditsPage() {
         {activeTab === 'users' && <UsersTab />}
         {activeTab === 'promotions' && <PromotionsTab />}
         {activeTab === 'fraud' && <FraudTab />}
+        {activeTab === 'subscriptions' && <SubscriptionsTab />}
+        {activeTab === 'system' && <BonusSystemDocsTab />}
       </div>
     </div>
   );
@@ -776,6 +1333,15 @@ const s: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     fontSize: 12,
   },
+  toggleBtn: {
+    padding: '3px 8px',
+    borderRadius: 4,
+    border: 'none',
+    color: '#fff',
+    cursor: 'pointer',
+    fontWeight: 600,
+    fontSize: 11,
+  },
   detailTxTitle: {
     fontSize: 13,
     fontWeight: 600,
@@ -788,5 +1354,306 @@ const s: Record<string, React.CSSProperties> = {
     padding: '2px 8px',
     borderRadius: 4,
     display: 'inline-block',
+  },
+  statsRow: {
+    display: 'flex',
+    gap: 12,
+    marginBottom: 16,
+    flexWrap: 'wrap' as const,
+  },
+  statCard: {
+    flex: '1 1 100px',
+    minWidth: 100,
+    padding: '10px 14px',
+    borderRadius: 8,
+    border: '2px solid #ccc',
+    backgroundColor: '#fff',
+    textAlign: 'center' as const,
+  },
+  statNum: {
+    fontSize: 26,
+    fontWeight: 700,
+    color: '#1a1a2e',
+  },
+  statLabel: {
+    fontSize: 11,
+    color: '#888',
+    marginTop: 2,
+  },
+  modalOverlay: {
+    position: 'fixed' as const,
+    inset: 0,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+  },
+  modal: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 24,
+    width: 380,
+    maxWidth: '90vw',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: 14,
+    boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 700,
+    color: '#1a1a2e',
+  },
+  modalUid: {
+    fontSize: 12,
+    color: '#888',
+    fontFamily: 'monospace',
+    wordBreak: 'break-all' as const,
+  },
+  modalField: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: 4,
+  },
+  modalLabel: {
+    fontSize: 13,
+    fontWeight: 600,
+    color: '#555',
+  },
+  modalTextarea: {
+    padding: '8px 10px',
+    borderRadius: 6,
+    border: '1px solid #ccc',
+    fontSize: 13,
+    resize: 'vertical' as const,
+    fontFamily: 'inherit',
+  },
+
+  // ── Bonus System Docs ──
+  docsContainer: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: 24,
+    padding: '0',
+    background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+    color: '#e0e0e0',
+  },
+
+  docsSection: {
+    padding: '24px',
+    borderRadius: 12,
+    background: 'rgba(255, 255, 255, 0.03)',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
+    backdropFilter: 'blur(10px)',
+  },
+
+  docsTitle: {
+    fontSize: 28,
+    fontWeight: 700,
+    color: '#fff',
+    margin: '0 0 12px 0',
+    background: 'linear-gradient(135deg, #4da6ff, #66d9ff)',
+    WebkitBackgroundClip: 'text' as const,
+    WebkitTextFillColor: 'transparent',
+  },
+
+  docsSubtitle: {
+    fontSize: 20,
+    fontWeight: 700,
+    color: '#4da6ff',
+    margin: '0 0 16px 0',
+  },
+
+  docsText: {
+    fontSize: 14,
+    lineHeight: 1.6,
+    color: '#b0b0b0',
+    margin: '0',
+  },
+
+  bonusCard: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: 8,
+    padding: '16px 20px',
+    marginBottom: 12,
+    background: 'linear-gradient(135deg, rgba(77, 166, 255, 0.08), rgba(102, 217, 255, 0.05))',
+    border: '1px solid rgba(77, 166, 255, 0.2)',
+    borderRadius: 8,
+    transition: 'all 0.2s',
+  },
+
+  bonusAmount: {
+    fontSize: 24,
+    fontWeight: 700,
+    color: '#66d9ff',
+    textShadow: '0 0 20px rgba(102, 217, 255, 0.4)',
+  },
+
+  bonusTitle: {
+    fontSize: 16,
+    fontWeight: 600,
+    color: '#fff',
+  },
+
+  bonusDesc: {
+    fontSize: 13,
+    color: '#a0a0a0',
+    lineHeight: 1.5,
+  },
+
+  flowBox: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: 12,
+    padding: '20px',
+    background: 'rgba(102, 217, 255, 0.05)',
+    border: '1px solid rgba(102, 217, 255, 0.15)',
+    borderRadius: 8,
+  },
+
+  flowStep: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: 8,
+    padding: '16px',
+    background: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 6,
+    borderLeft: '4px solid #66d9ff',
+  },
+
+  flowArrow: {
+    textAlign: 'center' as const,
+    color: '#66d9ff',
+    fontSize: 20,
+    fontWeight: 700,
+  },
+
+  stepNum: {
+    display: 'inline-flex',
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'linear-gradient(135deg, #4da6ff, #66d9ff)',
+    color: '#fff',
+    fontWeight: 700,
+    fontSize: 18,
+    borderRadius: '50%',
+  },
+
+  stepTitle: {
+    fontSize: 15,
+    fontWeight: 600,
+    color: '#fff',
+  },
+
+  stepText: {
+    fontSize: 13,
+    color: '#a0a0a0',
+    lineHeight: 1.5,
+  },
+
+  limitBox: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: 12,
+    padding: '16px',
+    background: 'rgba(255, 165, 0, 0.08)',
+    border: '1px solid rgba(255, 165, 0, 0.2)',
+    borderRadius: 8,
+  },
+
+  limitRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '12px',
+    background: 'rgba(255, 255, 255, 0.03)',
+    borderRadius: 4,
+  },
+
+  limitLabel: {
+    fontSize: 14,
+    fontWeight: 600,
+    color: '#ffa500',
+  },
+
+  limitValue: {
+    fontSize: 13,
+    color: '#b0b0b0',
+    textAlign: 'right' as const,
+  },
+
+  spendingCard: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: 8,
+    padding: '16px 20px',
+    marginBottom: 12,
+    background: 'linear-gradient(135deg, rgba(76, 175, 80, 0.08), rgba(102, 217, 255, 0.05))',
+    border: '1px solid rgba(76, 175, 80, 0.2)',
+    borderRadius: 8,
+  },
+
+  spendingAmount: {
+    fontSize: 18,
+    fontWeight: 700,
+    color: '#4caf50',
+  },
+
+  spendingTitle: {
+    fontSize: 15,
+    fontWeight: 600,
+    color: '#fff',
+  },
+
+  spendingDesc: {
+    fontSize: 13,
+    color: '#a0a0a0',
+    lineHeight: 1.5,
+  },
+
+  safetyBox: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: 12,
+    padding: '16px',
+    background: 'rgba(244, 67, 54, 0.08)',
+    border: '1px solid rgba(244, 67, 54, 0.2)',
+    borderRadius: 8,
+  },
+
+  safetyItem: {
+    fontSize: 13,
+    color: '#b0b0b0',
+    lineHeight: 1.6,
+    paddingLeft: 12,
+    borderLeft: '3px solid #f44336',
+  },
+
+  faqItem: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: 8,
+    padding: '16px',
+    marginBottom: 12,
+    background: 'rgba(156, 39, 176, 0.08)',
+    border: '1px solid rgba(156, 39, 176, 0.2)',
+    borderRadius: 8,
+  },
+
+  faqQuestion: {
+    fontSize: 14,
+    fontWeight: 700,
+    color: '#9c27b0',
+  },
+
+  faqAnswer: {
+    fontSize: 13,
+    color: '#a0a0a0',
+    lineHeight: 1.6,
+    whiteSpace: 'pre-wrap' as const,
   },
 };

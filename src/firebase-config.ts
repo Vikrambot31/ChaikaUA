@@ -11,11 +11,15 @@ import { uniqueId } from './utils/cryptoId';
 import { uploadPhotoToNamespace } from './services/photoUploadService';
 import { canPublishImage } from './utils/imageSafety';
 import { safePromiseTimeout } from './utils/safePromiseTimeout';
+import { assertCommunityPhotoMonthlyLimit, findCurrentMonthCommunityPhotoByStoragePath } from './utils/communityPhotoLimits';
 import { auth, database, storage } from './firebase-core';
 import { ensureFirebaseAuth, isModeratorUser, requireWriteSession } from './firebase-auth-session';
-import { Request as AppRequest, CommunityPhoto as AppPhoto, AudioAttachment } from './types/app';
+import { Request as AppRequest, CommunityPhoto as AppPhoto, AudioAttachment, type ProblemResolutionStatus } from './types/app';
 import { resolveMediaAccessUrls } from './services/mediaAccess';
 import { assertTextMatchesLanguage, normalizeAppLang } from './utils/contentLanguageGuard';
+import { addWeightedRating, replaceWeightedRating } from './utils/monthlyRating';
+import { getCurrentAppVersion } from './services/appVersion';
+import type { FeatureRating, FeatureRatingSummary } from './types/app';
 
 
 export { auth, database, storage };
@@ -140,6 +144,9 @@ interface DbRequestValue {
   photoStoragePath?: unknown;
   userPhotoURL?: unknown;
   startAvatarKey?: unknown;
+  resolutionStatus?: unknown;
+  resolutionStatusUpdatedAt?: unknown;
+  resolvedAt?: unknown;
   sourceItemId?: unknown;
   sourceType?: unknown;
   sourceCategory?: unknown;
@@ -233,6 +240,7 @@ interface AddRequestPayload {
   photoStoragePath?: string;
   userPhotoURL?: string;
   startAvatarKey?: string;
+  resolutionStatus?: ProblemResolutionStatus;
 }
 
 /** The payload accepted by photoAPI.addPhoto. */
@@ -248,6 +256,8 @@ interface AddPhotoPayload {
   sourceFeature?: string;
   locationLabel?: string;
   locationType?: 'building' | 'place';
+  category?: string;
+  moderationDeferred?: boolean;
 }
 
 /** Options accepted by firebaseChatAPI.getRequestsPaginated. */
@@ -405,6 +415,13 @@ const deleteStoragePathQuietly = async (storagePath: string): Promise<void> => {
   }
 };
 
+const normalizeProblemResolutionStatus = (value: unknown): ProblemResolutionStatus | undefined => {
+  if (value === 'new' || value === 'in_progress' || value === 'resolved' || value === 'rejected') {
+    return value;
+  }
+  return undefined;
+};
+
 /**
  * Maps a raw Firebase RTDB request node to a typed AppRequest.
  * All field reads are guarded against missing / wrongly-typed data.
@@ -481,7 +498,7 @@ const mapDbRequestToAppRequest = (id: string, value: unknown): AppRequest => {
     isCensored: Boolean(v?.isCensored),
     isApproved,
     status:
-      status === 'approved' || status === 'rejected' || status === 'pending'
+      status === 'approved' || status === 'rejected' || status === 'pending' || status === 'closed'
         ? status
         : 'pending',
     createdAt,
@@ -504,6 +521,11 @@ const mapDbRequestToAppRequest = (id: string, value: unknown): AppRequest => {
         : typeof v?.reason === 'string'
           ? v.reason
           : undefined,
+    resolutionStatus: normalizeProblemResolutionStatus(v?.resolutionStatus),
+    resolutionStatusUpdatedAt:
+      typeof v?.resolutionStatusUpdatedAt === 'number' ? v.resolutionStatusUpdatedAt : undefined,
+    resolvedAt:
+      typeof v?.resolvedAt === 'number' ? v.resolvedAt : undefined,
     audio,
     photoUri: typeof v?.photoUri === 'string' ? v.photoUri : undefined,
     photoStoragePath: typeof v?.photoStoragePath === 'string' ? v.photoStoragePath : undefined,
@@ -602,7 +624,7 @@ const mapDbPhotoToAppPhoto = (id: string, value: unknown): AppPhoto => {
         : typeof v?.uploadedByEmail === 'string' && v.uploadedByEmail
           ? v.uploadedByEmail
         : 'Anonymous',
-    createdAt: new Date(createdAt),
+    createdAt: new Date(createdAt).getTime(),
     status,
     target: v?.target === 'my_photos' ? 'my_photos' : 'gallery_public',
     sourceScreen:
@@ -726,7 +748,7 @@ export const firebaseChatAPI = {
   /** Submits a new help-request for moderation. */
   addRequest: async (
     requestData: AddRequestPayload,
-  ): Promise<ApiResult<{ id: string | null }> | FailResult> => {
+  ): Promise<ApiResult<{ id: string | null; createdAt?: number }> | FailResult> => {
     try {
       const user: FirebaseUser = await requireWriteSession({
         operation: 'create',
@@ -768,6 +790,7 @@ export const firebaseChatAPI = {
 
       // Electricity status reports are factual community data — auto-approve immediately.
       const nowIso = new Date().toISOString();
+      const nowMs = Date.now();
 
       const newRequest = {
         userId: user.uid,
@@ -803,9 +826,9 @@ export const firebaseChatAPI = {
           ? { moderatedAt: nowIso, moderatedBy: 'auto' }
           : { submittedForModerationAt: nowIso }),
         ...moderationMeta,
-        timestamp: Date.now(),
-        createdAt: Date.now(),
-        expires_at: Date.now() + getRequestExpiryTtlMs(requestData),
+        timestamp: nowMs,
+        createdAt: nowMs,
+        expires_at: nowMs + getRequestExpiryTtlMs(requestData),
         ...(requestData.audio ? { audio: requestData.audio } : {}),
         ...(requestData.photoStoragePath || requestData.photoUri
           ? {
@@ -818,6 +841,12 @@ export const firebaseChatAPI = {
           : {}),
         ...(typeof requestData.startAvatarKey === 'string' && requestData.startAvatarKey.trim().length > 0
           ? { startAvatarKey: normalizeText(requestData.startAvatarKey, 120) }
+          : {}),
+        ...(category === 'problem'
+          ? {
+              resolutionStatus: requestData.resolutionStatus || 'new',
+              resolutionStatusUpdatedAt: nowMs,
+            }
           : {}),
       };
 
@@ -832,7 +861,7 @@ export const firebaseChatAPI = {
         id: pushResult.key,
         category: newRequest.category,
       });
-      return { success: true, data: { id: pushResult.key } };
+      return { success: true, data: { id: pushResult.key, createdAt: nowMs } };
     } catch (error: unknown) {
       void logClientError('firebaseChatAPI.addRequest', error);
       return {
@@ -874,6 +903,32 @@ export const firebaseChatAPI = {
       return { success: true, data: requests };
     } catch (error: unknown) {
       void logClientError('firebaseChatAPI.getRequestsOnce', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  },
+
+  /** Fetches one request by id and maps it to the public request card shape. */
+  getRequestById: async (requestId: string): Promise<ApiResult<AppRequest | null>> => {
+    try {
+      await ensureFirebaseAuth();
+      const safeId = normalizeText(requestId, 160);
+      if (!safeId) {
+        throw new Error('Invalid request id');
+      }
+      const snapshot = await get(ref(database, `requests/${safeId}`));
+      if (!snapshot.exists()) {
+        return { success: true, data: null };
+      }
+      const request = mapDbRequestToAppRequest(safeId, snapshot.val());
+      if (request.category === 'app_suggestion') {
+        return { success: true, data: null };
+      }
+      return { success: true, data: request };
+    } catch (error: unknown) {
+      void logClientError('firebaseChatAPI.getRequestById', error, { requestId });
       return {
         success: false,
         error: error instanceof Error ? error.message : String(error),
@@ -964,7 +1019,7 @@ export const firebaseChatAPI = {
           requestsQuery,
           orderByChild('status'),
           equalTo('approved'),
-          limitToLast(Math.max(limit * 4, 200)),
+          limitToLast(Math.max(limit * 2, 50)),
         );
       } else if (category) {
         requestsQuery = query(
@@ -1261,6 +1316,8 @@ export const photoAPI = {
         photoData.locationType === 'place'
           ? photoData.locationType
           : undefined;
+      const normalizedCategory = normalizeText(photoData.category || '', 80);
+      const isDeferred = Boolean(photoData.moderationDeferred);
 
       const resolvedStoragePath =
         photoData.storagePath ||
@@ -1273,6 +1330,36 @@ export const photoAPI = {
       }
 
       const now = Date.now();
+      const existingPhoto = await findCurrentMonthCommunityPhotoByStoragePath(user.uid, resolvedStoragePath);
+      if (existingPhoto) {
+        await update(ref(database, `community_photos/${existingPhoto.id}`), {
+          title: normalizedTitle,
+          description: normalizedDescription,
+          imageUri: effectiveImageUri,
+          ...(effectiveImageUri.startsWith('https://') ? { downloadUrl: effectiveImageUri } : {}),
+          uploadedBy: normalizedUploadedBy,
+          ...(normalizedUploadedByEmail ? { uploadedByEmail: normalizedUploadedByEmail } : {}),
+          target: photoData.target || 'gallery_public',
+          status: isDeferred ? 'saved' : 'pending',
+          moderationStatus: isDeferred ? 'not_submitted' : 'pending',
+          ...(normalizedSourceScreen ? { sourceScreen: normalizedSourceScreen } : {}),
+          ...(normalizedSourceScreenLabel ? { sourceScreenLabel: normalizedSourceScreenLabel } : {}),
+          ...(normalizedSourceFeature ? { sourceFeature: normalizedSourceFeature } : {}),
+          storagePath: resolvedStoragePath,
+          updatedAt: now,
+          ...(normalizedCategory ? { category: normalizedCategory } : {}),
+          ...(normalizedLocationLabel
+            ? {
+                locationLabel: normalizedLocationLabel,
+                ...(normalizedLocationType ? { locationType: normalizedLocationType } : {}),
+              }
+            : {}),
+        });
+        void logClientEvent('photo_metadata_updated', { title: normalizedTitle });
+        return { success: true };
+      }
+
+      await assertCommunityPhotoMonthlyLimit(user.uid, 1);
       try {
         await push(ref(database, 'community_photos'), {
           title: normalizedTitle,
@@ -1283,7 +1370,8 @@ export const photoAPI = {
           ...(normalizedUploadedByEmail ? { uploadedByEmail: normalizedUploadedByEmail } : {}),
           createdAt: now,
           uploadedAt: now,
-          status: 'pending',
+          status: isDeferred ? 'saved' : 'pending',
+          moderationStatus: isDeferred ? 'not_submitted' : 'pending',
           target: photoData.target || 'gallery_public',
           ...(normalizedSourceScreen ? { sourceScreen: normalizedSourceScreen } : {}),
           ...(normalizedSourceScreenLabel ? { sourceScreenLabel: normalizedSourceScreenLabel } : {}),
@@ -1292,6 +1380,7 @@ export const photoAPI = {
           likes: 0,
           userId: user.uid,
           storagePath: resolvedStoragePath,
+          ...(normalizedCategory ? { category: normalizedCategory } : {}),
           ...(normalizedLocationLabel
             ? {
                 locationLabel: normalizedLocationLabel,
@@ -1325,6 +1414,10 @@ export const photoAPI = {
   ): Promise<ApiVoidResult> => {
     try {
       const user: FirebaseUser = await ensureFirebaseAuth();
+      const isModerator = await isModeratorUser();
+      if (!isModerator) {
+        throw new Error('permission_denied: moderator role required');
+      }
       if (!photoId || (status !== 'approved' && status !== 'rejected')) {
         throw new Error('Invalid moderation payload');
       }
@@ -1338,11 +1431,14 @@ export const photoAPI = {
           }
         : {};
 
+      let photoSnapshot: Record<string, unknown> | null = null;
+
       if (status === 'approved') {
         try {
           const snapshot = await get(ref(database, `community_photos/${photoId}`));
-          const current = snapshot.val() as { safetyStatus?: string } | null;
-          if (current?.safetyStatus && canPublishImage(current.safetyStatus)) {
+          const current = snapshot.val() as Record<string, unknown> | null;
+          photoSnapshot = current;
+          if (current?.safetyStatus && canPublishImage(current.safetyStatus as string)) {
             safetyUpdate.safetyStatus = current.safetyStatus as 'passed' | 'manual_reviewed';
           }
         } catch (error: unknown) {
@@ -1354,19 +1450,38 @@ export const photoAPI = {
         }
       }
 
+      const moderationFields = {
+        status,
+        moderatedAt: Date.now(),
+        moderatedBy: user.uid,
+        moderationReason: status === 'rejected' ? 'default_rejected' : null,
+        rejectionReason: status === 'rejected' ? 'default_rejected' : null,
+        ...safetyUpdate,
+      };
+
       try {
-        await update(ref(database, `community_photos/${photoId}`), {
-          status,
-          moderatedAt: Date.now(),
-          moderatedBy: user.uid,
-          moderationReason: status === 'rejected' ? 'default_rejected' : null,
-          rejectionReason: status === 'rejected' ? 'default_rejected' : null,
-          ...safetyUpdate,
-        });
+        await update(ref(database, `community_photos/${photoId}`), moderationFields);
       } catch (error: unknown) {
         void logClientError('photoAPI.moderatePhoto.updatePhotoStatus', error, {
           firebasePath: `community_photos/${photoId}`,
           stage: 'write_photo_moderation',
+        });
+        throw error;
+      }
+
+      try {
+        if (status === 'approved' && photoSnapshot) {
+          await set(dbRef(database, `community_photos_public/${photoId}`), {
+            ...photoSnapshot,
+            ...moderationFields,
+          });
+        } else if (status === 'rejected') {
+          await remove(dbRef(database, `community_photos_public/${photoId}`));
+        }
+      } catch (error: unknown) {
+        void logClientError('photoAPI.moderatePhoto.syncPublicCollection', error, {
+          firebasePath: `community_photos_public/${photoId}`,
+          stage: 'sync_public_collection',
         });
         throw error;
       }
@@ -1399,6 +1514,7 @@ export const photoAPI = {
 
       await deleteStoragePathQuietly(storagePath);
       await remove(ref(database, `community_photos/${photoId}`));
+      await remove(dbRef(database, `community_photos_public/${photoId}`));
       return { success: true };
     } catch (error: unknown) {
       void logClientError('photoAPI.deletePhoto', error);
@@ -1504,9 +1620,6 @@ const signInWithGoogleMobile = async (): Promise<FirebaseUser> => {
 
   try {
     await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-    if (GoogleSignin.signOut && (!GoogleSignin.hasPreviousSignIn || GoogleSignin.hasPreviousSignIn())) {
-      await GoogleSignin.signOut();
-    }
     const userInfo = await GoogleSignin.signIn();
     const idToken = userInfo?.idToken || userInfo?.data?.idToken;
     if (!idToken) {
@@ -1850,6 +1963,168 @@ export const socialAuthAPI = {
         success: false,
         error: error instanceof Error ? error.message : String(error),
       };
+    }
+  },
+};
+
+// ─── Feature Ratings API ──────────────────────────────────────────────────────
+
+const getMonthStartTimestamp = (): number => {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+};
+
+export const featureRatingAPI = {
+
+  /** Check if user can rate this screen (once per calendar month per screen). */
+  canRate: async (screenId: string): Promise<ApiResult<boolean>> => {
+    try {
+      const user: FirebaseUser = await ensureFirebaseAuth();
+      // Anonymous Firebase users cannot rate
+      if (!user?.uid || user.isAnonymous) return { success: true, data: false };
+
+      const snapshot = await get(ref(database, `feature_ratings/${screenId}/${user.uid}`));
+      if (!snapshot.exists()) return { success: true, data: true };
+
+      const data = snapshot.val() as { createdAt?: number } | null;
+      const createdAt = typeof data?.createdAt === 'number' ? data.createdAt : 0;
+      const canRate = createdAt < getMonthStartTimestamp();
+      return { success: true, data: canRate };
+    } catch (error: unknown) {
+      void logClientError('featureRatingAPI.canRate', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  },
+
+  /** Submit a rating and atomically update the summary. */
+  submitRating: async (
+    screenId: string,
+    ratingUsability: number,
+    ratingUsefulness: number,
+    comment?: string,
+  ): Promise<ApiVoidResult> => {
+    try {
+      const valid = (v: number) => Number.isInteger(v) && v >= 1 && v <= 5;
+      if (!valid(ratingUsability) || !valid(ratingUsefulness)) {
+        return { success: false, error: 'Ratings must be integers 1-5' };
+      }
+
+      const rating = Math.round((ratingUsability + ratingUsefulness) / 2 * 10) / 10;
+      // requireWriteSession rejects anonymous Firebase users by default
+      const sessionUser: FirebaseUser = await requireWriteSession({
+        operation: 'feature_rating_submit',
+        screen: screenId,
+      });
+      const uid = sessionUser.uid;
+
+      // 1. Read existing entry (to decide add vs replace)
+      const existingSnap = await get(ref(database, `feature_ratings/${screenId}/${uid}`));
+      const prev = existingSnap.exists()
+        ? (existingSnap.val() as { rating?: number; ratingUsability?: number; ratingUsefulness?: number; createdAt?: number })
+        : null;
+
+      // 2. Read current summary
+      const summarySnap = await get(ref(database, `feature_ratings_summary/${screenId}`));
+      const cur: FeatureRatingSummary = summarySnap.exists()
+        ? (summarySnap.val() as FeatureRatingSummary)
+        : { avgRating: 0, avgUsability: 0, avgUsefulness: 0, totalVotes: 0, monthlyAvg: 0, monthlyVotes: 0, lastUpdated: 0 };
+
+      // 3. Recalculate summary
+      const now = Date.now();
+      const monthStart = getMonthStartTimestamp();
+      const isReplace = prev !== null;
+      const wasThisMonth = isReplace && typeof prev.createdAt === 'number' && prev.createdAt >= monthStart;
+
+      const calcAgg = (curAvg: number, curVotes: number, newVal: number, prevVal?: number) =>
+        isReplace && prevVal && prevVal >= 1 && prevVal <= 5
+          ? replaceWeightedRating({ rating: curAvg, votes: curVotes }, newVal, prevVal)
+          : addWeightedRating({ rating: curAvg, votes: curVotes }, newVal);
+
+      const totalAgg         = calcAgg(cur.avgRating,    cur.totalVotes,    rating,           prev?.rating);
+      const usabilityAgg     = calcAgg(cur.avgUsability,  cur.totalVotes,    ratingUsability,  prev?.ratingUsability);
+      const usefulnessAgg    = calcAgg(cur.avgUsefulness, cur.totalVotes,    ratingUsefulness, prev?.ratingUsefulness);
+
+      const monthlyAgg = wasThisMonth
+        ? replaceWeightedRating({ rating: cur.monthlyAvg, votes: cur.monthlyVotes }, rating, prev?.rating)
+        : addWeightedRating({ rating: cur.monthlyAvg, votes: cur.monthlyVotes }, rating);
+
+      const round2 = (v: number) => Math.round(v * 100) / 100;
+      const newSummary: FeatureRatingSummary = {
+        avgRating:    round2(totalAgg.rating),
+        avgUsability: round2(usabilityAgg.rating),
+        avgUsefulness: round2(usefulnessAgg.rating),
+        totalVotes:   totalAgg.votes,
+        monthlyAvg:   round2(monthlyAgg.rating),
+        monthlyVotes: monthlyAgg.votes,
+        lastUpdated:  now,
+      };
+
+      // 4. Build rating record
+      const ratingRecord: FeatureRating = {
+        screenId,
+        rating,
+        ratingUsability,
+        ratingUsefulness,
+        comment: comment?.trim() || null,
+        platform: Platform.OS === 'ios' ? 'ios' : 'android',
+        appVersion: getCurrentAppVersion(),
+        createdAt: now,
+      };
+
+      // 5. Atomic multi-path update
+      const updates: Record<string, unknown> = {
+        [`feature_ratings/${screenId}/${uid}`]: ratingRecord,
+        [`feature_ratings_summary/${screenId}`]: newSummary,
+      };
+
+      await update(ref(database), updates);
+      return { success: true };
+    } catch (error: unknown) {
+      void logClientError('featureRatingAPI.submitRating', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  },
+
+  /** Get summaries for all screens (admin panel). */
+  getAllSummaries: async (): Promise<ApiResult<Record<string, FeatureRatingSummary>>> => {
+    try {
+      await ensureFirebaseAuth();
+      const snapshot = await get(ref(database, 'feature_ratings_summary'));
+      const data = snapshot.val() as Record<string, FeatureRatingSummary> | null;
+      return { success: true, data: data || {} };
+    } catch (error: unknown) {
+      void logClientError('featureRatingAPI.getAllSummaries', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  },
+
+  /** Get recent comments for a screen (admin panel). */
+  getComments: async (screenId: string, limit = 20): Promise<ApiResult<FeatureRating[]>> => {
+    try {
+      await ensureFirebaseAuth();
+      const q = query(
+        ref(database, `feature_ratings/${screenId}`),
+        orderByChild('createdAt'),
+        limitToLast(limit),
+      );
+      const snapshot = await get(q);
+      const comments: FeatureRating[] = [];
+
+      if (snapshot.exists()) {
+        snapshot.forEach((child) => {
+          const val = child.val() as FeatureRating | null;
+          if (val && typeof val.rating === 'number') {
+            comments.push({ ...val, screenId });
+          }
+        });
+      }
+
+      // Sort newest first
+      comments.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      return { success: true, data: comments };
+    } catch (error: unknown) {
+      void logClientError('featureRatingAPI.getComments', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   },
 };

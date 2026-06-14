@@ -4,6 +4,7 @@ import {
   Dimensions,
   Image,
   ImageSourcePropType,
+  Platform,
   SafeAreaView,
   ScrollView,
   StatusBar,
@@ -34,18 +35,23 @@ import type { Request as AppRequest } from '../types/app';
 import { logClientError } from '../utils/errorLogger';
 import { pickUserAvatarUri } from '../utils/userAvatar';
 import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 const ONBOARDING_KEY = '@chaika:onboarding_done';
 const INTRO_VIDEO_KEY = '@chaika:intro_video_shown';
 
 const MAX_FEED_ITEMS = 5;
 
-const SCREEN_W = Dimensions.get('window').width;
+const SCREEN_W = Platform.OS === 'web'
+  ? Math.min(Dimensions.get('window').width, 430)
+  : Dimensions.get('window').width;
 const IS_NARROW_SCREEN = SCREEN_W < 360;
 const GRID_HORIZONTAL_PADDING = 16;
 const GRID_CELL_W = Math.floor((SCREEN_W - GRID_HORIZONTAL_PADDING * 2) / 2) - 4;
 const BTN_ASPECT = 138 / 150;
-const BTN_W = Math.round(GRID_CELL_W * (IS_NARROW_SCREEN ? 0.79 : 0.85));
+// On web reduce button artwork size so 4 buttons + rest of content fit on screen
+const BTN_SCALE = Platform.OS === 'web' ? 0.58 : (IS_NARROW_SCREEN ? 0.79 : 0.85);
+const BTN_W = Math.round(GRID_CELL_W * BTN_SCALE);
 const BTN_H = Math.round(BTN_W * BTN_ASPECT);
 const PANEL2_H = Math.round((SCREEN_W - GRID_HORIZONTAL_PADDING * 2) * 1080 / 713);
 const PANEL2_IMAGE = require('../../assets/WEBP-version/Panel2.webp');
@@ -70,6 +76,7 @@ type TopInfoItem = {
 
 type LiveFeedItem = {
   id: string;
+  createdAt: number;
   icon: React.ComponentProps<typeof MaterialCommunityIcons>['name'];
   iconColor: string;
   iconBg: string;
@@ -518,6 +525,7 @@ const getFeedBadge = (params: {
 
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
+  const { colors, isDark } = useAppTheme();
   const [menuVisible, setMenuVisible] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showIntroVideo, setShowIntroVideo] = useState(false);
@@ -579,10 +587,13 @@ const HomeScreen: React.FC = () => {
 
     for (const hr of helpRequests) {
       const previewText = normalizeFeedText(hr.description) || feedText.help;
-      const visual = getFeedVisual({ category: 'help', group: 'help', urgent: hr.isBurning });
-      const badge = getFeedBadge({ category: 'help', group: 'help', urgent: hr.isBurning });
+      const timeRemaining = new Date(hr.expiresAt).getTime() - Date.now();
+      const isUrgent = hr.isBurning && timeRemaining < 4 * 60 * 60 * 1000;
+      const visual = getFeedVisual({ category: 'help', group: 'help', urgent: isUrgent });
+      const badge = getFeedBadge({ category: 'help', group: 'help', urgent: isUrgent });
       items.push({
         id: `help-${hr.id}`,
+        createdAt: new Date(hr.createdAt).getTime(),
         icon: visual.icon,
         iconColor: visual.iconColor,
         iconBg: visual.iconBg,
@@ -595,7 +606,7 @@ const HomeScreen: React.FC = () => {
         name: hr.name,
         text: previewText.slice(0, 72),
         screen: 'HelpNeighborsScreen',
-        urgent: hr.isBurning,
+        urgent: isUrgent,
       });
     }
 
@@ -614,6 +625,7 @@ const HomeScreen: React.FC = () => {
       });
       items.push({
         id: `req-${req.id}`,
+        createdAt: req.createdAt,
         icon: visual.icon,
         iconColor: visual.iconColor,
         iconBg: visual.iconBg,
@@ -634,6 +646,7 @@ const HomeScreen: React.FC = () => {
       const badge = getFeedBadge({ category: 'electricity' });
       items.push({
         id: `elec-${report.id}`,
+        createdAt: report.createdAt instanceof Date ? report.createdAt.getTime() : Number(report.createdAt),
         icon: report.status === 'on' ? 'lightning-bolt' : 'flash-off',
         iconColor: report.status === 'on' ? visual.iconColor : SCREEN_THEME.enamelBlueDark,
         iconBg: report.status === 'on' ? visual.iconBg : 'rgba(95, 132, 180, 0.14)',
@@ -648,8 +661,8 @@ const HomeScreen: React.FC = () => {
       });
     }
 
-    // Sort by id (Firebase push IDs are chronological), newest first
-    items.sort((a, b) => b.id.localeCompare(a.id));
+    // Sort by createdAt timestamp, newest first
+    items.sort((a, b) => b.createdAt - a.createdAt);
 
     return items.slice(0, MAX_FEED_ITEMS);
   }, [avatarByUserId, helpRequests, liveRequests, electricityReports, feedText, language]);
@@ -657,7 +670,7 @@ const HomeScreen: React.FC = () => {
   const handleOnboardingDone = () => {
     setShowOnboarding(false);
     void AsyncStorage.setItem(ONBOARDING_KEY, '1');
-    navigation.navigate('ProfileSetupScreen' as never);
+    navigation.navigate('ProfileSetupScreen');
   };
 
   const BUTTONS: HomeButtonConfig[] = [
@@ -672,7 +685,7 @@ const HomeScreen: React.FC = () => {
     { id: 'kids', icon: 'baby-face-outline', titleKey: 'kidsHub', subtitleKey: 'kidsHubSub', screen: 'VseDlyaDeteyScreen' },
     { id: 'coffee-dating', icon: 'coffee-outline', titleKey: 'coffeeDating', subtitleKey: 'coffeeDatingSub', screen: 'KontaktiChaikyScreen' },
     { id: 'news', icon: 'newspaper-variant-outline', titleKey: 'importantNews', subtitleKey: 'importantNewsSub', screen: 'ImportantNewsScreen' },
-    { id: 'telegram', icon: 'send-circle-outline', titleKey: 'viberGroup', subtitleKey: 'viberGroupSub', url: 'https://t.me/Chaika_ua_APP' },
+    { id: 'telegram', icon: 'send-circle-outline', titleKey: 'telegramGroup', subtitleKey: 'telegramGroupSub', url: 'https://t.me/Chaika_ua_APP' },
     { id: 'problem', icon: 'home-alert-outline', titleKey: 'tellProblem', subtitleKey: 'tellProblemSub', screen: 'ChaikaProblemsScreen' },
     { id: 'lost', icon: 'magnify', titleKey: 'whoLost', subtitleKey: 'whoLostSub', screen: 'LostAndFoundScreen' },
   ];
@@ -723,8 +736,8 @@ const HomeScreen: React.FC = () => {
   const panelBodyHeight = Math.max(videoNaturalH, 190);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={SCREEN_THEME.appBg} />
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.appBg} />
       {showOnboarding && <OnboardingSlides language={language} onDone={handleOnboardingDone} />}
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -738,9 +751,9 @@ const HomeScreen: React.FC = () => {
           </TouchableOpacity>
 
           <View style={styles.headerCenter}>
-            <Text style={styles.brandTitle}>{t.mainScreen.brandTitle}</Text>
-            <Text style={styles.brandBeta}>(beta версія)</Text>
-            <Text style={styles.brandSubtitle}>{t.mainScreen.brandSubtitle}</Text>
+            <Text style={[styles.brandTitle, { color: colors.textPrimary }]}>{t.mainScreen.brandTitle}</Text>
+            <Text style={[styles.brandBeta, { color: colors.textSecondary }]}>(beta версія)</Text>
+            <Text style={[styles.brandSubtitle, { color: colors.textSecondary }]}>{t.mainScreen.brandSubtitle}</Text>
           </View>
 
           <View style={styles.logoWrap}>
@@ -753,7 +766,7 @@ const HomeScreen: React.FC = () => {
           onPress={() => navigation.navigate('MainTabs', { screen: 'ProfileTab' })}
           activeOpacity={0.78}
         >
-          <Text style={styles.homeLevelText}>
+          <Text style={[styles.homeLevelText, { color: colors.textSecondary }]}>
             {t.mainScreen.yourLevel} {activity.currentLevel.level} ({getLevelName(activity.currentLevel, language).toLowerCase()})
           </Text>
           <View style={styles.homeLevelTrack}>
@@ -772,7 +785,7 @@ const HomeScreen: React.FC = () => {
               <View style={[styles.btnShadow, { width: BTN_W, height: BTN_H }]}>
                 <Image source={cfg.artwork} style={{ width: BTN_W, height: BTN_H }} resizeMode="contain" />
               </View>
-              <Text style={styles.gridBtnLabel} numberOfLines={2}>{t.mainScreen[cfg.labelKey]}</Text>
+              <Text style={[styles.gridBtnLabel, { color: isDark ? '#FFFFFF' : '#241A11' }]} numberOfLines={2}>{t.mainScreen[cfg.labelKey]}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -1199,7 +1212,7 @@ const styles = StyleSheet.create({
     left: 0,
     width: '100%',
     height: PANEL2_H,
-    zIndex: 2,
+    zIndex: 5,
   },
   chatListWrap: {
     position: 'absolute',

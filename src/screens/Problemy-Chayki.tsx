@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useAppTheme } from '../hooks/useAppTheme';
+import { ActivityIndicator, Alert, FlatList, SafeAreaView, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSelector } from 'react-redux';
 import { Picker } from '@react-native-picker/picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -25,8 +26,10 @@ import { useContactRequest } from '../hooks/useContactRequest';
 import ContactReasonModal from '../components/ContactReasonModal';
 import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
 import type { DetailItemData } from '../utils/detailViewTypes';
+import type { ProblemResolutionStatus } from '../types/app';
 import { getRequestTopicLabel } from '../data/categories';
 import { getFirstDoneRequestPhoto, getRequiredPhotoLabel, hasPhotoUploadInProgress, validateSubmissionRequirements } from '../utils/submissionRequirements';
+import { VideoLoadingOverlay } from '../components/VideoLoadingOverlay';
 import { checkYellowList } from '../utils/yellowListCheck';
 import { useUserAvatarMap } from '../hooks/useUserAvatarMap';
 
@@ -43,6 +46,9 @@ type Problem = {
   avatarUri?: string;
   photoUri?: string;
   photoStoragePath?: string;
+  resolutionStatus: ProblemResolutionStatus;
+  resolutionStatusUpdatedAt?: number;
+  resolvedAt?: number;
   votes: number;
   hasVoted: boolean;
 };
@@ -137,6 +143,13 @@ const CLEAN_PROBLEMS_TEXT = {
     problemLimitBody: 'Дозволяється лише 3 повідомлення про проблеми на день.',
     sortByDate: 'За датою',
     sortByVotes: 'За рейтингом',
+    searchPlaceholder: 'Пошук за назвою, вулицею або будинком',
+    resolvedThisMonth: 'Вирішено за місяць',
+    statusNew: 'Нова',
+    statusInProgress: 'В роботі',
+    statusResolved: 'Вирішено',
+    statusRejected: 'Відхилено',
+    noResults: 'Нічого не знайдено',
   },
   ru: {
     all: 'Все',
@@ -180,6 +193,13 @@ const CLEAN_PROBLEMS_TEXT = {
     problemLimitBody: 'Допускается не более 3 сообщений о проблемах в день.',
     sortByDate: 'По дате',
     sortByVotes: 'По рейтингу',
+    searchPlaceholder: 'Поиск по названию, улице или дому',
+    resolvedThisMonth: 'Решено за месяц',
+    statusNew: 'Новая',
+    statusInProgress: 'В работе',
+    statusResolved: 'Решено',
+    statusRejected: 'Отклонено',
+    noResults: 'Ничего не найдено',
   },
   en: {
     all: 'All',
@@ -223,6 +243,13 @@ const CLEAN_PROBLEMS_TEXT = {
     problemLimitBody: 'Only 3 problem reports are allowed per day.',
     sortByDate: 'By date',
     sortByVotes: 'By rating',
+    searchPlaceholder: 'Search title, street, or building',
+    resolvedThisMonth: 'Resolved this month',
+    statusNew: 'New',
+    statusInProgress: 'In progress',
+    statusResolved: 'Resolved',
+    statusRejected: 'Rejected',
+    noResults: 'Nothing found',
   },
 } as const;
 
@@ -244,6 +271,13 @@ const normalizeCategory = (v: string): number =>
 const normalizeProblemCategoryKey = (value: string): string => {
   const index = normalizeCategory(value);
   return index >= 0 ? PROBLEM_CATEGORY_KEYS[index] : value;
+};
+
+const normalizeResolutionStatus = (value: unknown): ProblemResolutionStatus => {
+  if (value === 'in_progress' || value === 'resolved' || value === 'rejected') {
+    return value;
+  }
+  return 'new';
 };
 
 const toClean = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
@@ -302,6 +336,7 @@ const navigation = useNavigation<NavigationProp<Record<string, object | undefine
 const navLock = useRef(false);
 const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const user = useSelector((state: RootState) => state.auth.user);
+  const { colors } = useAppTheme();
 const text = CLEAN_PROBLEMS_TEXT[language];
   const requiredPhotoLabel = getRequiredPhotoLabel(language);
   const streetLabel = text.street;
@@ -327,6 +362,7 @@ const text = CLEAN_PROBLEMS_TEXT[language];
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [filter, setFilter] = useState<string>(text.all);
+  const [searchQuery, setSearchQuery] = useState('');
   const [category, setCategory] = useState<string>(text.yard);
   const [street, setStreet] = useState<string>(streets[0] || '');
   const houses = useMemo(
@@ -418,6 +454,9 @@ const text = CLEAN_PROBLEMS_TEXT[language];
             avatarUri: pickUserAvatarUri(v),
             photoUri: toClean(v.photoUri),
             photoStoragePath: toClean(v.photoStoragePath),
+            resolutionStatus: normalizeResolutionStatus(v.resolutionStatus),
+            resolutionStatusUpdatedAt: toTimestampMs(v.resolutionStatusUpdatedAt) ?? undefined,
+            resolvedAt: toTimestampMs(v.resolvedAt) ?? undefined,
             createdAtMs:
               toTimestampMs(v.createdAt)
               ?? toTimestampMs(v.created_at)
@@ -532,18 +571,27 @@ const text = CLEAN_PROBLEMS_TEXT[language];
   );
 
   const visible = useMemo(() => {
+    const normalizedSearch = searchQuery.trim().toLowerCase();
     const filtered = items.filter((item) => {
       if (filter === text.all) return true;
       const fi = normalizeCategory(filter);
       const ii = normalizeCategory(item.category);
       if (fi !== -1 && ii !== -1) return fi === ii;
       return item.category === filter;
+    }).filter((item) => {
+      if (!normalizedSearch) return true;
+      return [
+        item.title,
+        item.street,
+        item.house,
+        getRequestTopicLabel({ category: 'problem', subcategory: item.category }, language),
+      ].some((value) => String(value || '').toLowerCase().includes(normalizedSearch));
     });
     if (sortMode === 'votes') {
       return [...filtered].sort((a, b) => b.votes - a.votes);
     }
     return filtered; // вже відсортовано за датою (push ID)
-  }, [filter, items, sortMode, text.all]);
+  }, [filter, items, language, searchQuery, sortMode, text.all]);
 
   const counters = useMemo(() => {
     const now = new Date();
@@ -551,16 +599,27 @@ const text = CLEAN_PROBLEMS_TEXT[language];
     const sevenDaysStart = todayStart - (6 * 24 * 60 * 60 * 1000);
     let today = 0;
     let last7Days = 0;
+    let resolvedThisMonth = 0;
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
     for (const item of rawItems) {
       if (!item.createdAtMs) continue;
       if (item.createdAtMs >= todayStart) today += 1;
       if (item.createdAtMs >= sevenDaysStart) last7Days += 1;
+      if (item.resolutionStatus === 'resolved' && (item.resolvedAt ?? item.resolutionStatusUpdatedAt ?? 0) >= monthStart) {
+        resolvedThisMonth += 1;
+      }
     }
-    return { today, last7Days };
+    return { today, last7Days, resolvedThisMonth };
   }, [rawItems]);
 
   const todayLabel = text.today;
   const weekLabel = text.last7Days;
+  const getResolutionLabel = useCallback((status: ProblemResolutionStatus) => {
+    if (status === 'in_progress') return text.statusInProgress;
+    if (status === 'resolved') return text.statusResolved;
+    if (status === 'rejected') return text.statusRejected;
+    return text.statusNew;
+  }, [text.statusInProgress, text.statusNew, text.statusRejected, text.statusResolved]);
 
   const handleAddRequestPress = useCallback(() => {
     if (!user?.id) {
@@ -706,7 +765,7 @@ const text = CLEAN_PROBLEMS_TEXT[language];
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       {/* FlatList replaces the outer ScrollView for virtualized rendering of problem cards */}
       <FlatList
         keyboardShouldPersistTaps="handled"
@@ -728,6 +787,10 @@ const text = CLEAN_PROBLEMS_TEXT[language];
                 <View style={styles.counterItem}>
                   <Text style={styles.counterValue}>{counters.last7Days}</Text>
                   <Text style={styles.counterLabel}>{weekLabel}</Text>
+                </View>
+                <View style={styles.counterItem}>
+                  <Text style={styles.counterValue}>{counters.resolvedThisMonth}</Text>
+                  <Text style={styles.counterLabel}>{text.resolvedThisMonth}</Text>
                 </View>
               </View>
             </View>
@@ -820,6 +883,16 @@ const text = CLEAN_PROBLEMS_TEXT[language];
               </TouchableOpacity>
             </View>
 
+            <TextInput
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder={text.searchPlaceholder}
+              placeholderTextColor="#9A8F80"
+              style={styles.searchInput}
+              returnKeyType="search"
+              clearButtonMode="while-editing"
+            />
+
             {/* Horizontal category filter — kept as-is inside the header */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
               {categories.map((currentCategory) => (
@@ -862,6 +935,21 @@ const text = CLEAN_PROBLEMS_TEXT[language];
                 <View style={[styles.copy, !hasPhoto && styles.copyNoPhoto]}>
                   <View style={styles.itemTitleBox}>
                     <Text style={styles.itemTitle} numberOfLines={2}>{problem.title}</Text>
+                  </View>
+                  <View style={[
+                    styles.statusBadge,
+                    problem.resolutionStatus === 'in_progress' && styles.statusBadgeInProgress,
+                    problem.resolutionStatus === 'resolved' && styles.statusBadgeResolved,
+                    problem.resolutionStatus === 'rejected' && styles.statusBadgeRejected,
+                  ]}>
+                    <Text style={[
+                      styles.statusBadgeText,
+                      problem.resolutionStatus === 'in_progress' && styles.statusBadgeTextInProgress,
+                      problem.resolutionStatus === 'resolved' && styles.statusBadgeTextResolved,
+                      problem.resolutionStatus === 'rejected' && styles.statusBadgeTextRejected,
+                    ]}>
+                      {getResolutionLabel(problem.resolutionStatus)}
+                    </Text>
                   </View>
 
                   <View style={styles.addressRow}>
@@ -912,6 +1000,13 @@ const text = CLEAN_PROBLEMS_TEXT[language];
                       </>
                     )}
                   </TouchableOpacity>
+                  <TouchableOpacity
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    onPress={(e) => { e.stopPropagation(); void Share.share({ message: [problem.title, problem.street, problem.house].filter(Boolean).join(', ') }); }}
+                    activeOpacity={0.7}
+                  >
+                    <MaterialCommunityIcons name="share-variant-outline" size={20} color={SCREEN_THEME.textSecondary} />
+                  </TouchableOpacity>
                 </View>
               </View>
             </View>
@@ -925,7 +1020,7 @@ const text = CLEAN_PROBLEMS_TEXT[language];
           ) : (
             <View style={styles.emptyState}>
               <TactileIcon icon={loadError ? 'alert-circle-outline' : 'checkbox-marked-circle-outline'} size={54} iconSize={26} backgroundColor="#403933" />
-              <Text style={styles.emptyTitle}>{loadError ? text.loadErrorTitle : text.emptyTitle}</Text>
+              <Text style={styles.emptyTitle}>{loadError ? text.loadErrorTitle : searchQuery.trim() ? text.noResults : text.emptyTitle}</Text>
               <Text style={styles.emptySub}>{loadError ? text.loadErrorSubtitle : text.emptySubtitle}</Text>
             </View>
           )
@@ -939,6 +1034,7 @@ const text = CLEAN_PROBLEMS_TEXT[language];
         onClose={closeContactModal}
       />
       <MiniTabBar />
+      <VideoLoadingOverlay visible={loading} />
     </SafeAreaView>
   );
 }
@@ -972,7 +1068,7 @@ const styles = StyleSheet.create({
   },
   counterItem: {
     flex: 1,
-    backgroundColor: '#F3ECE4',
+    backgroundColor: '#7d0e59',
     borderRadius: 12,
     paddingVertical: 10,
     paddingHorizontal: 12,
@@ -980,18 +1076,18 @@ const styles = StyleSheet.create({
     borderColor: '#E4D0AB',
   },
   counterValue: {
-    color: SCREEN_THEME.terracottaDark,
+    color: '#FFFFFF',
     fontSize: 22,
     fontWeight: '900',
   },
   counterLabel: {
     marginTop: 2,
-    color: SCREEN_THEME.textSecondary,
+    color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '700',
   },
   publishToggleBtn: {
-    backgroundColor: SCREEN_THEME.terracottaDark,
+    backgroundColor: '#7d0e59',
     borderRadius: 16,
     paddingVertical: 13,
     alignItems: 'center',
@@ -1009,35 +1105,46 @@ const styles = StyleSheet.create({
   formTitle: { fontSize: 14, fontWeight: '800', color: SCREEN_THEME.textPrimary, marginBottom: 8 },
   fieldLabel: { marginTop: 10, marginBottom: 4, color: SCREEN_THEME.textSecondary, fontSize: 12, fontWeight: '700' },
   input: {
-    backgroundColor: '#F3ECE4',
+    backgroundColor: '#7d0e59',
     borderRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 12,
+    color: '#FFFFFF',
+  },
+  searchInput: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
     color: SCREEN_THEME.textPrimary,
+    borderWidth: 1,
+    borderColor: '#E4D0AB',
+    marginTop: 10,
+    marginBottom: 2,
   },
   pickerWrapper: {
-    backgroundColor: '#F3ECE4',
+    backgroundColor: '#7d0e59',
     borderRadius: 14,
     borderWidth: 2,
     borderColor: '#1E1A17',
     overflow: 'hidden',
   },
-  picker: { color: SCREEN_THEME.textPrimary, height: 50 },
+  picker: { color: '#FFFFFF', height: 50 },
   filters: { gap: 8, paddingVertical: 10 },
-  filter: { borderRadius: 999, backgroundColor: '#F3ECE4', paddingHorizontal: 12, paddingVertical: 8 },
+  filter: { borderRadius: 999, backgroundColor: '#7d0e59', paddingHorizontal: 12, paddingVertical: 8 },
   filterActive: { backgroundColor: SCREEN_THEME.terracotta },
-  filterText: { color: SCREEN_THEME.terracottaDark, fontWeight: '700', fontSize: 12 },
+  filterText: { color: '#FFFFFF', fontWeight: '700', fontSize: 12 },
   filterTextActive: { color: '#FFFFFF' },
   addBtn: {
     marginTop: 8,
-    backgroundColor: SCREEN_THEME.terracotta,
+    backgroundColor: '#7d0e59',
     borderRadius: 16,
     paddingVertical: 12,
     alignItems: 'center',
   },
   photoBtn: {
     marginTop: 4,
-    backgroundColor: '#8C6A46',
+    backgroundColor: '#7d0e59',
     borderRadius: 16,
     paddingVertical: 12,
     alignItems: 'center',
@@ -1096,6 +1203,42 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   itemTitle: { fontSize: 20, lineHeight: 24, fontWeight: '900', color: '#fff' },
+  statusBadge: {
+    alignSelf: 'flex-start',
+    marginTop: 6,
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    backgroundColor: '#EEF3F5',
+    borderWidth: 1,
+    borderColor: '#C9D7DD',
+  },
+  statusBadgeInProgress: {
+    backgroundColor: '#FFF4D8',
+    borderColor: '#E7C66A',
+  },
+  statusBadgeResolved: {
+    backgroundColor: '#EAF6EE',
+    borderColor: '#9BC8A8',
+  },
+  statusBadgeRejected: {
+    backgroundColor: '#FBE9E7',
+    borderColor: '#D7A09A',
+  },
+  statusBadgeText: {
+    color: '#496674',
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  statusBadgeTextInProgress: {
+    color: '#7A5A00',
+  },
+  statusBadgeTextResolved: {
+    color: '#276A3B',
+  },
+  statusBadgeTextRejected: {
+    color: '#983A32',
+  },
   addressRow: {
     marginTop: 5,
     flexDirection: 'row',
@@ -1215,7 +1358,7 @@ const styles = StyleSheet.create({
     gap: 5,
     paddingVertical: 8,
     borderRadius: 999,
-    backgroundColor: '#F3ECE4',
+    backgroundColor: '#7d0e59',
     borderWidth: 1,
     borderColor: '#E4D0AB',
   },
@@ -1226,7 +1369,7 @@ const styles = StyleSheet.create({
   sortBtnText: {
     fontSize: 12,
     fontWeight: '800',
-    color: SCREEN_THEME.terracottaDark,
+    color: '#FFFFFF',
   },
   sortBtnTextActive: {
     color: '#FFFFFF',
@@ -1240,11 +1383,11 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: '#E4D0AB',
-    backgroundColor: '#F3ECE4',
+    backgroundColor: '#7d0e59',
   },
   guestPhotoBtnText: {
     fontSize: 14,
     fontWeight: '700',
-    color: SCREEN_THEME.textSecondary,
+    color: '#FFFFFF',
   },
 });

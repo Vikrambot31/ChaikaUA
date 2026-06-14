@@ -1,6 +1,6 @@
 import React from 'react';
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { NavigationProp, useNavigation } from '@react-navigation/native';
+import { NavigationProp, RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { Place, PlaceType } from '../types/app';
 import TactileIcon from '../components/TactileIcon';
@@ -10,11 +10,13 @@ import { openInGoogleMaps } from '../utils/googleMapsLink';
 import { getMapFocusPlaceParams } from '../utils/mapFocusParams';
 
 interface PlaceDetailsPanelProps {
-  place: Place | null;
-  visible: boolean;
-  onClose: () => void;
+  place?: Place | null;
+  visible?: boolean;
+  onClose?: () => void;
   onOpenInApp?: () => void;
 }
+
+type PlaceDetailsRoute = RouteProp<Record<string, { place?: Place } | undefined>, string>;
 
 const UI_TEXT = {
   ua: {
@@ -81,34 +83,47 @@ const TYPE_ICONS: Record<PlaceType, React.ComponentProps<typeof TactileIcon>['ic
 
 const PlaceDetailsPanel: React.FC<PlaceDetailsPanelProps> = ({ place, visible, onClose, onOpenInApp }) => {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
+  const route = useRoute<PlaceDetailsRoute>();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const text = UI_TEXT[language];
+  const resolvedPlace = place ?? route.params?.place ?? null;
+  const resolvedVisible = visible ?? Boolean(resolvedPlace);
+  const handleClose = () => {
+    if (onClose) {
+      onClose();
+      return;
+    }
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    }
+  };
 
-  if (!visible || !place) return null;
+  if (!resolvedVisible || !resolvedPlace) return null;
 
-  const handleOpenInGoogle = () => openInGoogleMaps(place.name, place.address);
+  const handleOpenInGoogle = () => openInGoogleMaps(resolvedPlace.name, resolvedPlace.address);
   const handleOpenInApp = () => {
     if (onOpenInApp) {
       onOpenInApp();
       return;
     }
-    navigation.navigate('MainTabs', { screen: 'MapTab', params: getMapFocusPlaceParams(place) });
-    onClose();
+    navigation.navigate('MainTabs', { screen: 'MapTab', params: getMapFocusPlaceParams(resolvedPlace) });
+    if (onClose) {
+      onClose();
+    }
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={resolvedVisible} transparent animationType="fade" onRequestClose={handleClose}>
       <View style={styles.overlay}>
         <View style={styles.sheet}>
           <View style={styles.topRow}>
-            <TactileIcon icon={TYPE_ICONS[place.type]} size={42} iconSize={18} backgroundColor="#3B352E" />
+            <TactileIcon icon={TYPE_ICONS[resolvedPlace.type]} size={42} iconSize={18} backgroundColor="#3B352E" />
             <View style={styles.titleBlock}>
-              <Text style={styles.title} numberOfLines={1}>{place.name}</Text>
-              <Text style={styles.type}>{text.typeNames[place.type]}</Text>
+              <Text style={styles.title} numberOfLines={1}>{resolvedPlace.name}</Text>
+              <Text style={styles.type}>{text.typeNames[resolvedPlace.type]}</Text>
             </View>
           </View>
-          <Text style={styles.address} numberOfLines={2}>{place.address}</Text>
-          <Text style={styles.question}>{text.chooseAction}</Text>
+          <Text style={styles.address} numberOfLines={2}>{resolvedPlace.address}</Text>
           <View style={styles.actions}>
             <TouchableOpacity style={styles.ghostButton} onPress={handleOpenInApp} activeOpacity={0.85}>
               <Text style={styles.ghostText}>{text.openInApp}</Text>
@@ -145,7 +160,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 18, fontWeight: '900', color: SCREEN_THEME.textPrimary },
   type: { marginTop: 2, color: SCREEN_THEME.textSecondary, fontSize: 12, fontWeight: '800' },
   address: { marginTop: 8, color: SCREEN_THEME.textSecondary, lineHeight: 18 },
-  question: { marginTop: 10, color: SCREEN_THEME.textSecondary, fontSize: 13 },
   actions: { marginTop: 12, flexDirection: 'row', gap: 10 },
   mainButton: {
     flex: 1,
@@ -156,13 +170,13 @@ const styles = StyleSheet.create({
   },
   ghostButton: {
     flex: 1,
-    backgroundColor: '#F3ECE4',
+    backgroundColor: '#7d0e59',
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',
   },
   mainText: { color: '#fff', fontWeight: '800' },
-  ghostText: { color: SCREEN_THEME.terracottaDark, fontWeight: '700' },
+  ghostText: { color: '#FFFFFF', fontWeight: '700' },
 });
 
 export default PlaceDetailsPanel;

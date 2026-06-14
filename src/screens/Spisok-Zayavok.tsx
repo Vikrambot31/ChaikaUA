@@ -48,6 +48,7 @@ const UI_TEXT = {
     createRequest: 'Створити нову заявку',
     loadingError: 'Помилка завантаження',
     retry: 'Повторити',
+    loadMore: 'Завантажити ще',
     approveBtn: 'Схвалити',
     rejectBtn: 'Відхилити',
     deleteBtn: 'Видалити',
@@ -69,6 +70,7 @@ const UI_TEXT = {
     createRequest: 'Создать новую заявку',
     loadingError: 'Ошибка загрузки',
     retry: 'Повторить',
+    loadMore: 'Загрузить ещё',
     approveBtn: 'Одобрить',
     rejectBtn: 'Отклонить',
     deleteBtn: 'Удалить',
@@ -90,6 +92,7 @@ const UI_TEXT = {
     createRequest: 'Create new request',
     loadingError: 'Loading error',
     retry: 'Retry',
+    loadMore: 'Load more',
     approveBtn: 'Approve',
     rejectBtn: 'Reject',
     deleteBtn: 'Delete',
@@ -231,7 +234,7 @@ const RequestsScreen: React.FC = () => {
             category: toStr(raw.category) || undefined,
             address: toStr(raw.address) || toStr(raw.location) || undefined,
             sourceScreen,
-            createdAt: toNumber(raw.createdAt) || toNumber(raw.uploadedAt),
+            createdAt: toTimestamp(raw.createdAt) || toTimestamp(raw.uploadedAt),
             status: 'pending',
           };
         })
@@ -415,7 +418,7 @@ const RequestsScreen: React.FC = () => {
             price: priceText || undefined,
             address: toStr(raw.address) || toStr(raw.serviceArea) || undefined,
             sourceScreen: 'LocalBusinessScreen',
-            createdAt: toTimestamp(raw.updatedAt) || toTimestamp(raw.createdAt),
+            createdAt: toTimestamp(raw.createdAt) || toTimestamp(raw.submittedForModerationAt),
             status: 'pending',
           };
         })
@@ -524,7 +527,49 @@ const RequestsScreen: React.FC = () => {
       mounted = false;
       active = false;
     };
-  }, [user?.id, user?.email, loadPage, loadPendingPhotos, loadPendingLostFound, loadPendingBuySell, loadPendingContacts, loadPendingLocalBusiness, loadPendingAppSuggestions]);
+  }, [user?.id, user?.email, loadPage, loadPendingPhotos, loadPendingLostFound, loadPendingBuySell, loadPendingContacts, loadPendingLocalBusiness, loadPendingBiznesChaika, loadPendingAppSuggestions]);
+
+  // When a non-'all' filter is selected, load all remaining pages so filter works on complete data
+  const loadAllRequests = useCallback(async () => {
+    let cursor: number | null = null;
+    let accumulated: Request[] = [];
+    let iterations = 0;
+    const MAX_ITERATIONS = 50; // safety cap (~1000 items)
+
+    setLoadingMore(true);
+    try {
+      while (iterations < MAX_ITERATIONS) {
+        const result = await firebaseChatAPI.getRequestsPaginated({ limit: PAGE_SIZE + 1, cursorBefore: cursor });
+        if (!isRequestsPageResult(result) || !result.success || !result.data) break;
+        const pageItems = (result.data as Request[])
+          .map((item) => ({
+            ...item,
+            createdAt: typeof item.createdAt === 'number' ? item.createdAt : new Date(item.createdAt).getTime(),
+          }))
+          .sort((a, b) => b.createdAt - a.createdAt);
+        const page = pageItems.slice(0, PAGE_SIZE);
+        accumulated = [...accumulated, ...page];
+        const moreAvailable = pageItems.length > PAGE_SIZE && page.length > 0;
+        cursor = moreAvailable ? (page[page.length - 1].timestamp ?? null) : null;
+        if (!moreAvailable || cursor === null) break;
+        iterations++;
+      }
+      if (accumulated.length > 0) {
+        setRequests(accumulated);
+        setHasMore(false);
+        setNextCursor(null);
+      }
+    } finally {
+      setLoadingMore(false);
+    }
+  }, []);
+
+  // When user applies a non-'all' filter, load all pages so filter works on complete data
+  useEffect(() => {
+    if (statusFilter !== 'all' && hasMore && !loading && !loadingMore) {
+      void loadAllRequests();
+    }
+  }, [statusFilter, hasMore, loading, loadingMore, loadAllRequests]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -536,12 +581,13 @@ const RequestsScreen: React.FC = () => {
         isModerator ? loadPendingBuySell() : Promise.resolve(),
         isModerator ? loadPendingContacts() : Promise.resolve(),
         isModerator ? loadPendingLocalBusiness() : Promise.resolve(),
+        isModerator ? loadPendingBiznesChaika() : Promise.resolve(),
         isModerator ? loadPendingAppSuggestions() : Promise.resolve(),
       ]);
     } finally {
       setRefreshing(false);
     }
-  }, [isModerator, loadPage, loadPendingPhotos, loadPendingLostFound, loadPendingBuySell, loadPendingContacts, loadPendingLocalBusiness, loadPendingAppSuggestions]);
+  }, [isModerator, loadPage, loadPendingPhotos, loadPendingLostFound, loadPendingBuySell, loadPendingContacts, loadPendingLocalBusiness, loadPendingBiznesChaika, loadPendingAppSuggestions]);
 
   const handleLoadMore = useCallback(async () => {
     if (loading || loadingMore || !hasMore || !nextCursor) return;
@@ -1248,7 +1294,13 @@ const RequestsScreen: React.FC = () => {
         onPress={() => { if (navLock.current) return; navLock.current = true; navigation.navigate('RequestDetail', { request }); setTimeout(() => { navLock.current = false; }, 800); }}
         onDelete={isOwn ? () => void removeRequest(request.id) : undefined}
         onProfile={isOther ? () => { if (navLock.current) return; navLock.current = true; navigation.navigate('ViewUserProfile', { userId: request.userId as string }); setTimeout(() => { navLock.current = false; }, 800); } : undefined}
-        onContact={isOther ? () => openContactModal({ userId: request.userId as string, name: request.name ?? 'Unknown', sourceType: 'help', sourceId: request.id, sourceTitle: request.description?.slice(0, 60) }) : undefined}
+        onContact={isOther ? () => openContactModal({
+          userId: request.userId as string,
+          name: request.name ?? 'Unknown',
+          sourceType: 'help',
+          sourceId: request.id,
+          sourceTitle: (request.text || request.description || '').slice(0, 90),
+        }) : undefined}
         onApprove={isModerator ? () => void moderate(request.id, 'approved') : undefined}
         onReject={isModerator ? () => void moderate(request.id, 'rejected') : undefined}
         onModDelete={isModerator ? () => void removeRequest(request.id) : undefined}
@@ -1290,7 +1342,7 @@ const RequestsScreen: React.FC = () => {
         <View style={[styles.loadMoreWrap, { paddingBottom: Math.max(insets.bottom, 10) + 8 }]}>
           <TouchableOpacity style={styles.retryBtn} onPress={() => void handleLoadMore()} activeOpacity={0.85} disabled={loadingMore}>
             <MaterialCommunityIcons name={loadingMore ? 'timer-sand' : 'chevron-down'} size={18} color="#FFFFFF" />
-            <Text style={styles.retryBtnText}>{loadingMore ? '...' : text.retry}</Text>
+            <Text style={styles.retryBtnText}>{loadingMore ? '...' : text.loadMore}</Text>
           </TouchableOpacity>
         </View>
       ) : null}
@@ -1395,7 +1447,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   createButton: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: '#7d0e59',
     borderRadius: 16,
     paddingVertical: 14,
     flexDirection: 'row',
@@ -1408,12 +1460,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 3,
   },
-  secondaryHeaderButton: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E8DDD3',
-  },
   createButtonText: { color: '#FFFFFF', fontWeight: '800', fontSize: SIZES.fontRegular },
+  secondaryHeaderButton: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: COLORS.primary },
   secondaryHeaderButtonText: { color: COLORS.primary },
   listContent: { paddingHorizontal: 16, paddingVertical: 12, paddingBottom: 18 },
   loadingContainer: { marginVertical: 16 },
