@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   FlatList,
   StyleSheet,
   Text,
@@ -36,6 +37,7 @@ const MIN_COMMENT_LENGTH = 3;
 const COMMENT_COUNTER_THRESHOLD = 200;
 const COOLDOWN_MS = 15000;
 const MAX_USER_COMMENTS_WHEN_OTHERS_EXIST = 2;
+const INITIAL_VISIBLE = 3;
 
 const CommentSection: React.FC<Props> = ({ requestId, requestAuthorUid, isRequestClosed, collectionPath = COMMENTS_PATH, contactSourceType = 'help' }) => {
   const { t } = useTranslation();
@@ -51,7 +53,12 @@ const CommentSection: React.FC<Props> = ({ requestId, requestAuthorUid, isReques
   const [hasPending, setHasPending] = useState(false);
   const [avatarMap, setAvatarMap] = useState<Record<string, string>>({});
   const [limitReached, setLimitReached] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [newBadgeCount, setNewBadgeCount] = useState(0);
   const { modalVisible, pending, currentTarget, openModal, closeModal, sendRequest } = useContactRequest();
+  const flatListRef = useRef<FlatList>(null);
+  const seenCountRef = useRef(-1); // -1 = not yet initialized
+  const badgeAnim = useRef(new Animated.Value(0)).current;
 
   const commentUids = useMemo(
     () => [...new Set(comments.map((c) => c.uid))].sort().join(','),
@@ -81,9 +88,30 @@ const CommentSection: React.FC<Props> = ({ requestId, requestAuthorUid, isReques
         ownConsecutiveComments += 1;
       }
       setLimitReached(ownConsecutiveComments >= MAX_USER_COMMENTS_WHEN_OTHERS_EXIST);
+
+      // New comments badge: track count after first load
+      const visibleCount = visibleComments.length;
+      if (seenCountRef.current === -1) {
+        seenCountRef.current = visibleCount;
+      } else if (visibleCount > seenCountRef.current) {
+        const diff = visibleCount - seenCountRef.current;
+        setNewBadgeCount(diff);
+        Animated.spring(badgeAnim, { toValue: 1, useNativeDriver: true, tension: 120, friction: 7 }).start();
+      }
     }, collectionPath);
     return unsubscribe;
   }, [requestId, currentUser?.id, collectionPath]);
+
+  const handleShowNew = () => {
+    seenCountRef.current = comments.filter((c) => c.status !== 'pending').length;
+    setNewBadgeCount(0);
+    Animated.timing(badgeAnim, { toValue: 0, duration: 150, useNativeDriver: true }).start();
+    setExpanded(true);
+    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+  };
+
+  const visibleComments = expanded ? comments : comments.slice(-INITIAL_VISIBLE);
+  const hiddenCount = Math.max(0, comments.length - INITIAL_VISIBLE);
 
   const charCount = inputText.length;
   const isOverLimit = charCount > MAX_COMMENT_LENGTH;
@@ -212,13 +240,32 @@ const CommentSection: React.FC<Props> = ({ requestId, requestAuthorUid, isReques
         {t.comments.title} ({comments.length})
       </Text>
 
+      {!expanded && hiddenCount > 0 && (
+        <TouchableOpacity style={styles.showMoreBtn} onPress={() => setExpanded(true)} activeOpacity={0.7}>
+          <MaterialCommunityIcons name="chevron-up" size={16} color={ACCENT} />
+          <Text style={styles.showMoreText}>{t.comments.showMore.replace('{{count}}', String(hiddenCount))}</Text>
+        </TouchableOpacity>
+      )}
+
       <FlatList
-        data={comments}
+        ref={flatListRef}
+        data={visibleComments}
         renderItem={renderComment}
         keyExtractor={(item) => item.id}
         ListEmptyComponent={renderEmpty}
         scrollEnabled={false}
       />
+
+      {newBadgeCount > 0 && (
+        <Animated.View style={[styles.newBadgeWrap, { opacity: badgeAnim, transform: [{ scale: badgeAnim }] }]}>
+          <TouchableOpacity style={styles.newBadgeBtn} onPress={handleShowNew} activeOpacity={0.85}>
+            <MaterialCommunityIcons name="arrow-down" size={14} color="#fff" />
+            <Text style={styles.newBadgeText}>
+              {t.comments.newBadge.replace('{{count}}', String(newBadgeCount))}
+            </Text>
+          </TouchableOpacity>
+        </Animated.View>
+      )}
 
       {!isRequestClosed && (
         <View style={styles.inputRow}>
@@ -415,6 +462,37 @@ const styles = StyleSheet.create({
     color: '#D32F2F',
     marginTop: 2,
     fontStyle: 'italic',
+  },
+  showMoreBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+    marginBottom: 4,
+  },
+  showMoreText: {
+    fontSize: 13,
+    color: ACCENT,
+    fontWeight: '600',
+  },
+  newBadgeWrap: {
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  newBadgeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: ACCENT,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  newBadgeText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });
 

@@ -3746,6 +3746,37 @@ exports.aiAutoModerateScheduled = functionsV1.pubsub
               });
               totalApproved++;
 
+              // Push notification to other thread participants (comments only)
+              if (section.nested && item.parentId) {
+                try {
+                  const threadSnap = await db.ref(`${section.path}/${item.parentId}`).once('value');
+                  const thread = threadSnap.val() || {};
+                  const participantUids = new Set();
+                  Object.values(thread).forEach((c) => {
+                    if (c && c.uid && c.uid !== item.uid && c.status === 'visible') {
+                      participantUids.add(c.uid);
+                    }
+                  });
+                  for (const uid of participantUids) {
+                    // Check per-user comments notification preference
+                    const prefSnap = await db.ref(`user_roles/${uid}/notifPrefs/comments`).once('value');
+                    const commentsEnabled = prefSnap.val() !== false; // default true if not set
+                    if (!commentsEnabled) continue;
+                    await sendUserNotification(uid, {
+                      title: item.name || 'Чайка',
+                      body: String(item.text || '').slice(0, 100),
+                    }, {
+                      type: 'comment',
+                      category: 'comments',
+                      requestId: item.parentId,
+                      commentId: item.id,
+                    });
+                  }
+                } catch (notifErr) {
+                  console.error('[aiAutoMod] comment push notification error:', notifErr?.message);
+                }
+              }
+
             } else if (result.verdict === 'suspicious' && result.confidence >= autoRejectThreshold) {
               // Авто-отклонение
               const updateData = {
