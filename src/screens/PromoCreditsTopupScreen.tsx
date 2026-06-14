@@ -34,6 +34,7 @@ import ScreenTooltip from '../components/ScreenTooltip';
 import HintBadge, { HINT_BADGE_LABELS } from '../components/HintBadge';
 import { useTrainingMode } from '../hooks/useTrainingMode';
 import { PROMO_CREDITS_TOPUP_TOOLTIP } from '../utils/screenTooltips';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 type AppNav = NavigationProp<Record<string, object | undefined>>;
 
@@ -82,6 +83,7 @@ const PromoCreditsTopupScreen: React.FC = () => {
   const [sending, setSending] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
+  const { colors, isDark } = useAppTheme();
   const selectedPackage = PACKAGES.find((item) => item.id === selectedPackageId) || PACKAGES[1];
 
   useEffect(() => {
@@ -194,14 +196,14 @@ const PromoCreditsTopupScreen: React.FC = () => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
         <ActivityIndicator size="large" color={SCREEN_THEME.terracotta} style={{ flex: 1 }} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScreenTooltip
         storageKey={PROMO_CREDITS_TOPUP_TOOLTIP.storageKey}
         title={PROMO_CREDITS_TOPUP_TOOLTIP.title}
@@ -216,7 +218,7 @@ const PromoCreditsTopupScreen: React.FC = () => {
           <MaterialCommunityIcons name="arrow-left" size={22} color={SCREEN_THEME.textPrimary} />
         </TouchableOpacity>
         <View style={styles.headerCopy}>
-          <Text style={styles.headerTitle}>{t.promoCredits.topupTitle}</Text>
+          <Text style={[styles.headerTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{t.promoCredits.topupTitle}</Text>
           <Text style={styles.headerSubtitle}>{t.promoCredits.topupDesc}</Text>
         </View>
         <HintBadge

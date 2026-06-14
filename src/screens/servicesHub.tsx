@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useAppTheme } from '../hooks/useAppTheme';
 import { Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -118,6 +119,7 @@ const UI_TEXT: Record<'ua' | 'ru' | 'en', SectionedItems> = {
 const ServicesHubScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
+  const { colors, isDark } = useAppTheme();
   const text = UI_TEXT[language];
   const [marketExpanded, setMarketExpanded] = useState(false);
   const [frequentExpanded, setFrequentExpanded] = useState(false);
@@ -154,7 +156,7 @@ const ServicesHubScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.75}>
           <MaterialCommunityIcons name="arrow-left" size={22} color={SCREEN_THEME.textPrimary} />
@@ -163,9 +165,9 @@ const ServicesHubScreen: React.FC = () => {
       </View>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Image source={require('../../assets/WEBP-version/Service.webp')} style={styles.headerImage} resizeMode="cover" />
-        <Text style={styles.pageTitle}>{text.headerTitle}</Text>
+        <Text style={[styles.pageTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{text.headerTitle}</Text>
 
-        <Text style={styles.sectionLabel}>{text.sectionMarket}</Text>
+        <Text style={[styles.sectionLabel, { color: isDark ? '#F5E8F0' : undefined }]}>{text.sectionMarket}</Text>
         <View style={styles.list}>
           {text.market.filter(i => i.screen !== 'AnnouncementsScreen' && i.screen !== 'JobSearchScreen' && i.screen !== 'BuySellScreen').map(renderItem)}
           {marketExpanded && text.market.filter(i => i.screen === 'JobSearchScreen' || i.screen === 'BuySellScreen' || i.screen === 'AnnouncementsScreen').map(renderItem)}
@@ -175,10 +177,10 @@ const ServicesHubScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.sectionLabel}>{text.sectionCommunity}</Text>
+        <Text style={[styles.sectionLabel, { color: isDark ? '#F5E8F0' : undefined }]}>{text.sectionCommunity}</Text>
         <View style={styles.list}>{text.community.map(renderItem)}</View>
 
-        <Text style={styles.sectionLabel}>{text.sectionFrequent}</Text>
+        <Text style={[styles.sectionLabel, { color: isDark ? '#F5E8F0' : undefined }]}>{text.sectionFrequent}</Text>
         <View style={styles.list}>
           {text.frequent.filter(i => i.screen === 'ImportantNewsScreen' || i.screen === 'ElectricityStatusScreen' || i.screen === 'FotoRayonaScreen').map(renderItem)}
           {frequentExpanded && [soulPhotosItem, ...text.frequent.filter(i => i.screen !== 'ImportantNewsScreen' && i.screen !== 'ElectricityStatusScreen' && i.screen !== 'FotoRayonaScreen')].map(renderItem)}
@@ -245,7 +247,7 @@ const styles = StyleSheet.create({
   seeMoreText: {
     fontSize: 13,
     fontWeight: '800',
-    color: SCREEN_THEME.accentGold,
+    color: '#21041B',
     letterSpacing: 0.5,
   },
 });

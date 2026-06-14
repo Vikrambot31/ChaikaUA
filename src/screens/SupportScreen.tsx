@@ -24,6 +24,7 @@ import {
   subscribeToUserTicket,
   subscribeToTicketMessages,
   createTicket,
+  closeSupportTicketForNewChat,
   sendUserMessage,
   markTicketReadByUser,
   hasUnreadAdminReply,
@@ -33,6 +34,7 @@ import { ensureFirebaseAuth } from '../firebase-auth-session';
 import { useTrainingMode } from '../hooks/useTrainingMode';
 import TrainingHint from '../components/TrainingHint';
 import HintBadge, { HINT_BADGE_LABELS } from '../components/HintBadge';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 const UI_TEXT = {
   ua: {
@@ -45,6 +47,8 @@ const UI_TEXT = {
     statusClosed: 'Закрито',
     ticketClosed: 'Звернення закрито. Ви можете створити нове.',
     newTicket: 'Нове звернення',
+    openNewChat: 'Відкрити новий чат',
+    openNewChatError: 'Не вдалося відкрити новий чат',
     accountNotice: 'Щоб писати в службу підтримки, спочатку потрібно отримати статус користувача з акаунтом. Для цього пройдіть реєстрацію.',
     noConnection: "Немає з'єднання з Інтернетом",
     sendError: 'Не вдалося відправити повідомлення',
@@ -62,6 +66,8 @@ const UI_TEXT = {
     statusClosed: 'Закрыто',
     ticketClosed: 'Обращение закрыто. Вы можете создать новое.',
     newTicket: 'Новое обращение',
+    openNewChat: 'Открыть новый чат',
+    openNewChatError: 'Не удалось открыть новый чат',
     accountNotice: 'Чтобы писать в службу поддержки, сначала нужно получить статус пользователя с аккаунтом. Для этого пройдите регистрацию.',
     noConnection: 'Нет подключения к Интернету',
     sendError: 'Не удалось отправить сообщение',
@@ -79,6 +85,8 @@ const UI_TEXT = {
     statusClosed: 'Closed',
     ticketClosed: 'This ticket is closed. You can create a new one.',
     newTicket: 'New ticket',
+    openNewChat: 'Open new chat',
+    openNewChatError: 'Failed to open new chat',
     accountNotice: 'To write to support, you first need user-with-account status. Please complete registration.',
     noConnection: 'No internet connection',
     sendError: 'Failed to send message',
@@ -134,11 +142,13 @@ const SupportScreen: React.FC = () => {
   const training = useTrainingMode('support');
   const catLabels = CATEGORY_LABELS[language] || CATEGORY_LABELS.ua;
 
+  const { colors, isDark } = useAppTheme();
   const [ticket, setTicket] = useState<SupportTicket | null>(null);
   const [messages, setMessages] = useState<SupportMessage[]>([]);
   const [messageText, setMessageText] = useState(route.params?.prefillMessage ?? '');
   const [selectedCategory, setSelectedCategory] = useState<SupportCategory | null>(null);
   const [sending, setSending] = useState(false);
+  const [startingNewChat, setStartingNewChat] = useState(false);
   const [loading, setLoading] = useState(true);
   const [supportUserId, setSupportUserId] = useState<string | null>(null);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
@@ -204,6 +214,7 @@ const SupportScreen: React.FC = () => {
   const isClosed = ticket?.status === 'closed';
   const canSend =
     !sending &&
+    !startingNewChat &&
     isOnline &&
     Boolean(user?.id) &&
     Boolean(supportUserId) &&
@@ -228,7 +239,25 @@ const SupportScreen: React.FC = () => {
     } finally {
       setSending(false);
     }
-  }, [canSend, user?.name, ticket, selectedCategory, messageText, text.sendError]);
+  }, [canSend, user?.name, ticket, selectedCategory, messageText, text.sendError, text.sendErrorBody]);
+
+  const handleOpenNewChat = useCallback(async () => {
+    if (!ticket || startingNewChat) return;
+
+    setStartingNewChat(true);
+    try {
+      await closeSupportTicketForNewChat(ticket.ticketId);
+      setTicket(null);
+      setMessages([]);
+      setSelectedCategory(null);
+      setMessageText('');
+      setShowCategoryPicker(true);
+    } catch (e: any) {
+      Alert.alert(text.openNewChatError, e?.message || text.sendErrorBody);
+    } finally {
+      setStartingNewChat(false);
+    }
+  }, [ticket, startingNewChat, text.openNewChatError, text.sendErrorBody]);
 
   const formatTime = (ts: number) => {
     const d = new Date(ts);
@@ -254,20 +283,20 @@ const SupportScreen: React.FC = () => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
         <ActivityIndicator size="large" color={SCREEN_THEME.terracotta} style={{ flex: 1 }} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={navigation.goBack} activeOpacity={0.7}>
           <MaterialCommunityIcons name="arrow-left" size={22} color={SCREEN_THEME.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{text.title}</Text>
+        <Text style={[styles.headerTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{text.title}</Text>
         <HintBadge
           visible={training.isVisible}
           onTap={training.openHint}
@@ -325,10 +354,32 @@ const SupportScreen: React.FC = () => {
         </View>
       ) : (
         <View style={styles.ticketInfo}>
-          <Text style={styles.ticketCategory}>{catLabels[ticket.category]}</Text>
-          <View style={[styles.statusBadge, isClosed ? styles.statusClosed : styles.statusOpen]}>
-            <Text style={styles.statusText}>{isClosed ? text.statusClosed : text.statusOpen}</Text>
+          <View style={styles.ticketMeta}>
+            <Text style={styles.ticketCategory}>{catLabels[ticket.category]}</Text>
+            <View style={[styles.statusBadge, isClosed ? styles.statusClosed : styles.statusOpen]}>
+              <Text style={styles.statusText}>{isClosed ? text.statusClosed : text.statusOpen}</Text>
+            </View>
           </View>
+          {!isClosed && (
+            <TouchableOpacity
+              style={[
+                styles.openNewChatBtn,
+                (!isOnline || startingNewChat) && styles.openNewChatBtnDisabled,
+              ]}
+              onPress={handleOpenNewChat}
+              disabled={!isOnline || startingNewChat}
+              activeOpacity={0.75}
+            >
+              {startingNewChat ? (
+                <ActivityIndicator size="small" color="#FFF" />
+              ) : (
+                <MaterialCommunityIcons name="chat-plus-outline" size={16} color="#FFF" />
+              )}
+              <Text style={styles.openNewChatText} numberOfLines={2}>
+                {text.openNewChat}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
@@ -366,7 +417,7 @@ const SupportScreen: React.FC = () => {
             onChangeText={setMessageText}
             maxLength={MAX_MESSAGE_LENGTH}
             multiline
-            editable={!sending}
+            editable={!sending && !startingNewChat}
           />
           <TouchableOpacity
             style={[styles.sendBtn, !canSend && styles.sendBtnDisabled]}
@@ -493,19 +544,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 10,
     paddingHorizontal: 16,
     paddingVertical: 10,
+  },
+  ticketMeta: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   ticketCategory: {
     fontSize: 14,
     fontWeight: '600',
     color: SCREEN_THEME.textPrimary,
     flex: 1,
+    minWidth: 0,
   },
   statusBadge: {
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
+    flexShrink: 0,
   },
   statusOpen: {
     backgroundColor: '#D4EDDA',
@@ -517,6 +578,30 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#333',
+  },
+  openNewChatBtn: {
+    minHeight: 40,
+    maxWidth: 150,
+    flexShrink: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#C8A45A',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  openNewChatBtnDisabled: {
+    backgroundColor: '#A0AEC0',
+  },
+  openNewChatText: {
+    color: '#FFF',
+    fontWeight: '700',
+    fontSize: 12,
+    lineHeight: 14,
+    textAlign: 'center',
+    flexShrink: 1,
   },
   // Messages
   messagesList: {

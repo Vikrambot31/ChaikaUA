@@ -20,6 +20,7 @@ import { logFoodEvent } from '../services/foodAnalytics';
 import { ShoppingCategory, ShoppingItem, Place } from '../types/app';
 import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 type Lang = 'ua' | 'ru' | 'en';
 type AppNavigation = NavigationProp<Record<string, object | undefined>>;
@@ -121,6 +122,7 @@ const UI_TEXT = {
 
 export default function SpisokPokupokScreen() {
   const navigation = useNavigation<AppNavigation>();
+  const { colors } = useAppTheme();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as Lang;
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
 
@@ -264,7 +266,7 @@ export default function SpisokPokupokScreen() {
   if (!isLoaded) return null;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.hero}>

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useAppTheme } from '../hooks/useAppTheme';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import {
   FlatList,
@@ -80,6 +81,7 @@ const HelpNeighborsScreen: React.FC = () => {
   const navLock = useRef(false);
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const user = useSelector((state: RootState) => state.auth.user);
+  const { colors, isDark } = useAppTheme();
   const text = UI_TEXT[language];
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const [showHelpSplash, setShowHelpSplash] = useState(false);
@@ -168,7 +170,7 @@ const HelpNeighborsScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       {showHelpSplash ? (
         <TouchableOpacity style={styles.splashContainer} onPress={() => { void dismissSplash(); }} activeOpacity={1}>
           <Image source={require('../../assets/WEBP-version/dopomoga1.webp')} style={styles.splashImage} resizeMode="cover" />
@@ -203,7 +205,7 @@ const HelpNeighborsScreen: React.FC = () => {
               </TouchableOpacity>
 
               <View style={styles.listHeader}>
-                <Text style={styles.listTitle}>{text.listTitle}</Text>
+                <Text style={[styles.listTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{text.listTitle}</Text>
                 <View style={styles.listCountBadge}>
                   <Text style={styles.listCount}>{burningRequests.length}</Text>
                 </View>

@@ -26,6 +26,7 @@ import InlineFieldHint from '../components/InlineFieldHint';
 import { useSoftToast } from '../hooks/useSoftToast';
 import { useOperationTrace } from '../hooks/useOperationTrace';
 import { getUserCommunityPhotosForMonth, COMMUNITY_PHOTO_MONTHLY_REVIEW_LIMIT } from '../utils/communityPhotoLimits';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 const UI_TEXT = {
   ua: {
@@ -202,6 +203,7 @@ const PLACE_LOCATIONS: PhotoLocation[] = chaykaPlaces.map((p) => ({
 }));
 
 const PhotoUploadScreen: React.FC = () => {
+  const { colors } = useAppTheme();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const user = useSelector((state: RootState) => state.auth.user);
   const text = UI_TEXT[language];
@@ -402,7 +404,7 @@ const PhotoUploadScreen: React.FC = () => {
   const needsLocationList = selectedCategory === 'building' || selectedCategory === 'place';
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={styles.headerCard}>
           <Text style={styles.headerTitle}>{text.headerTitle}</Text>

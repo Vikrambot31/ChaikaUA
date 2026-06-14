@@ -23,6 +23,7 @@ import ScreenTooltip from '../components/ScreenTooltip';
 import HintBadge, { HINT_BADGE_LABELS } from '../components/HintBadge';
 import { useTrainingMode } from '../hooks/useTrainingMode';
 import { BONUS_PROMOTION_PURCHASE_TOOLTIP } from '../utils/screenTooltips';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 type AppNav = NavigationProp<Record<string, object | undefined>>;
 type RouteParams = {
@@ -158,6 +159,7 @@ const BonusPromotionPurchaseScreen: React.FC = () => {
   const navigation = useNavigation<AppNav>();
   const route = useRoute<RouteProp<RouteParams, 'BonusPromotionPurchaseScreen'>>();
   const { t, language } = useTranslation();
+  const { colors, isDark } = useAppTheme();
   const training = useTrainingMode('bonus_promotion_purchase');
   const user = useSelector(selectUser);
   const initialPromoType = route.params?.initialPromoType || 'contacts_top';
@@ -272,7 +274,7 @@ const BonusPromotionPurchaseScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScreenTooltip
         storageKey={BONUS_PROMOTION_PURCHASE_TOOLTIP.storageKey}
         title={BONUS_PROMOTION_PURCHASE_TOOLTIP.title}
@@ -287,8 +289,8 @@ const BonusPromotionPurchaseScreen: React.FC = () => {
           <MaterialCommunityIcons name="arrow-left" size={22} color={SCREEN_THEME.textPrimary} />
         </TouchableOpacity>
         <View style={styles.headerCopy}>
-          <Text style={styles.headerTitle}>{t.bonus.activePromotions}</Text>
-          <Text style={styles.headerSubtitle}>{t.promoCredits.topupDesc}</Text>
+          <Text style={[styles.headerTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{t.bonus.activePromotions}</Text>
+          <Text style={[styles.headerSubtitle, { color: isDark ? '#F5E8F0' : undefined }]}>{t.promoCredits.topupDesc}</Text>
         </View>
         <HintBadge
           visible={training.isVisible}

@@ -29,6 +29,7 @@ import HintBadge, { HINT_BADGE_LABELS } from '../components/HintBadge';
 import { useTrainingMode } from '../hooks/useTrainingMode';
 import { BONUS_WALLET_TOOLTIP } from '../utils/screenTooltips';
 import { getRequestTopicLabel } from '../data/categories';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 type AppNav = NavigationProp<Record<string, object | undefined>>;
 
@@ -129,6 +130,7 @@ const getTransactionTitle = (item: BonusTransaction, bonusText: BonusText) => {
 const BonusWalletScreen: React.FC = () => {
   const navigation = useNavigation<AppNav>();
   const { t, language } = useTranslation();
+  const { colors, isDark } = useAppTheme();
   const training = useTrainingMode('bonus_wallet');
   const [bonuses, setBonuses] = useState<UserBonuses | null>(null);
   const [promoCredits, setPromoCredits] = useState<PromoCredits>(EMPTY_PROMO_CREDITS);
@@ -237,7 +239,7 @@ const BonusWalletScreen: React.FC = () => {
   }, [navigation]);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScreenTooltip
         storageKey={BONUS_WALLET_TOOLTIP.storageKey}
         title={BONUS_WALLET_TOOLTIP.title}
@@ -253,8 +255,8 @@ const BonusWalletScreen: React.FC = () => {
             <MaterialCommunityIcons name="arrow-left" size={24} color={SCREEN_THEME.textPrimary} />
           </TouchableOpacity>
           <View style={styles.headerCopy}>
-            <Text style={styles.headerTitle}>{t.bonus.walletTitle}</Text>
-            <Text style={styles.headerSubtitle}>{t.bonus.walletSubtitle}</Text>
+            <Text style={[styles.headerTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{t.bonus.walletTitle}</Text>
+            <Text style={[styles.headerSubtitle, { color: isDark ? '#F5E8F0' : undefined }]}>{t.bonus.walletSubtitle}</Text>
           </View>
           <TouchableOpacity onPress={openSupport} style={styles.iconButton} activeOpacity={0.82}>
             <MaterialCommunityIcons name="headset" size={23} color={SCREEN_THEME.textPrimary} />

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useAppTheme } from '../hooks/useAppTheme';
 import { Alert, Animated, Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
@@ -501,8 +502,9 @@ const ProfileScreen: React.FC = () => {
     };
   }, [appRequests.length, approvedRequests.length, helpRequests.length, user?.daysUsed, user?.registeredAt]);
   const profileAvatarUri = useMemo(() => pickUserAvatarUri(user), [user]);
+  const { colors, isDark } = useAppTheme();
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View pointerEvents="none" style={styles.backgroundOrbs}>
         {LIGHT_ORBS.map((orb, index) => (
           <View
@@ -539,7 +541,7 @@ const ProfileScreen: React.FC = () => {
           </View>
         </TactileCard>
 
-        <Text style={styles.sectionLabel}>{text.sectionActivity}</Text>
+        <Text style={[styles.sectionLabel, { color: isDark ? '#F5E8F0' : undefined }]}>{text.sectionActivity}</Text>
         <View style={styles.statsRow}>
           {[
             { icon: 'clipboard-check-outline', value: String(activity.requestCount), label: text.requests, color: SCREEN_THEME.terracotta },
@@ -692,7 +694,7 @@ const ProfileScreen: React.FC = () => {
           ) : null}
         </TouchableOpacity>)}
 
-        <Text style={styles.sectionLabel}>{text.sectionSettings}</Text>
+        <Text style={[styles.sectionLabel, { color: isDark ? '#F5E8F0' : undefined }]}>{text.sectionSettings}</Text>
         <TactileCard elevated style={styles.card} pressable={false}>
           <View style={styles.cardHeader}>
             <TactileIcon icon="cog-outline" size={40} iconSize={18} backgroundColor="#403933" />
@@ -850,7 +852,7 @@ const ProfileScreen: React.FC = () => {
           </View>
         </TactileCard>
 
-        <Text style={styles.sectionLabel}>{text.sectionServices}</Text>
+        <Text style={[styles.sectionLabel, { color: isDark ? '#F5E8F0' : undefined }]}>{text.sectionServices}</Text>
         <TactileCard elevated style={styles.card} pressable={false}>
           <View style={styles.cardHeader}>
             <TactileIcon icon="crown-outline" size={40} iconSize={18} backgroundColor="#403933" />
@@ -1410,7 +1412,7 @@ const styles = StyleSheet.create({
   settingsSeeMoreText: {
     fontSize: 13,
     fontWeight: '800',
-    color: SCREEN_THEME.accentGold,
+    color: '#21041B',
     letterSpacing: 0.5,
   },
   greenNotifDot: {

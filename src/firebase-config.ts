@@ -993,7 +993,7 @@ export const firebaseChatAPI = {
           requestsQuery,
           orderByChild('status'),
           equalTo('approved'),
-          limitToLast(Math.max(limit * 4, 200)),
+          limitToLast(Math.max(limit * 2, 50)),
         );
       } else if (category) {
         requestsQuery = query(

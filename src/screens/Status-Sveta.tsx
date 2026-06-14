@@ -36,6 +36,7 @@ import type { AppDispatch } from '../redux/store';
 import type { Request as AppRequest } from '../types/app';
 import { createPendingModeration } from '../utils/moderation';
 import { showUserError } from '../utils/userFacingErrors';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 const RATE_LIMIT_KEY = 'electricity_report_timestamps';
 const MAX_PER_DAY = 2;
@@ -230,6 +231,7 @@ const ElectricityStatusScreen: React.FC = () => {
   const [liveElectricityRequests, setLiveElectricityRequests] = useState<AppRequest[]>([]);
   const user = useSelector(selectUser);
 
+  const { colors } = useAppTheme();
   const streets = useMemo(() => getStreets(), []);
   const buildingIdByAddress = useMemo(() => {
     const map = new Map<string, string>();
@@ -467,7 +469,7 @@ const ElectricityStatusScreen: React.FC = () => {
 
   if (error) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
         <View style={styles.errorContainer}>
           <TactileIcon icon="alert-circle" size={56} iconSize={28} backgroundColor={COLORS.error} />
           <Text style={styles.errorText}>{error}</Text>
@@ -478,7 +480,7 @@ const ElectricityStatusScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.headerImageFrame}>
           <Image

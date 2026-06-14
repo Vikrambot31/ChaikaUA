@@ -4,6 +4,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { SCREEN_THEME } from '../utils/screenTheme';
+import { useAppTheme } from '../hooks/useAppTheme';
 import type { RootState } from '../redux/store';
 import { sportsService, SportKey, SportTodayEntry } from '../services/sportsService';
 import { useTrainingMode } from '../hooks/useTrainingMode';
@@ -137,6 +138,7 @@ const SportNaChaykeScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as Lang;
   const text = UI_TEXT[language];
+  const { colors, isDark } = useAppTheme();
   const training = useTrainingMode('sport_na_chayke');
   const feedText = SPORT_FEED_TEXT[language];
   const blinkAnim = useRef(new Animated.Value(1)).current;
@@ -198,7 +200,7 @@ const SportNaChaykeScreen: React.FC = () => {
   }, [todayEntriesBySport, text.sports]);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
           <HintBadge
@@ -220,7 +222,7 @@ const SportNaChaykeScreen: React.FC = () => {
           <Text style={styles.subtitle}>{text.subtitle}</Text>
         </View>
 
-        <Text style={styles.sectionTitle}>{feedText.gamesTitle}</Text>
+        <Text style={[styles.sectionTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{feedText.gamesTitle}</Text>
         <View style={styles.gamesList}>
           {upcomingGames.length === 0 ? (
             <View style={styles.emptyCard}>
@@ -257,7 +259,7 @@ const SportNaChaykeScreen: React.FC = () => {
           ))}
         </View>
 
-        <Text style={styles.sectionTitle}>{feedText.sportsTitle}</Text>
+        <Text style={[styles.sectionTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{feedText.sportsTitle}</Text>
         <View style={styles.list}>
           {SPORTS.map((sport) => (
             <TouchableOpacity

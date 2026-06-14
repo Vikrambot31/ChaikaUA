@@ -26,6 +26,7 @@ import UserCardActionBar from '../components/UserCardActionBar';
 import GuestRegisterBanner from '../components/GuestRegisterBanner';
 import { useGuestGuard } from '../hooks/useGuestGuard';
 import { VideoLoadingOverlay } from '../components/VideoLoadingOverlay';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 const TWO_MONTHS_MS = 60 * 24 * 60 * 60 * 1000;
 type AppLanguage = 'ua' | 'ru' | 'en';
@@ -425,6 +426,7 @@ const JobSearchScreen: React.FC = () => {
   const user = useSelector((state: RootState) => state.auth.user);
   const { guard: guestGuard, bannerVisible: guestBannerVisible, hideBanner: hideGuestBanner } = useGuestGuard();
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
+  const { colors } = useAppTheme();
   const text = UI_TEXT[language];
   const requiredPhotoLabel = getRequiredPhotoLabel(language);
   const [listingKind, setListingKind] = useState<JobListingKind>('resume');
@@ -782,7 +784,7 @@ const JobSearchScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <Modal visible={searchModalVisible} animationType="slide" transparent onRequestClose={() => setSearchModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalSheet}>
@@ -1358,7 +1360,7 @@ const styles = StyleSheet.create({
   moderationBadge: { color: '#8A5A00', backgroundColor: '#FFF2C7', borderRadius: 999, paddingHorizontal: 9, paddingVertical: 5, fontSize: 11, fontWeight: '900' },
   listingAbout: { color: SCREEN_THEME.textPrimary, backgroundColor: 'rgba(141, 122, 184, 0.20)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 7, lineHeight: 18, marginBottom: 8, fontWeight: '800', overflow: 'hidden' },
   showMoreButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 18, paddingVertical: 13, marginBottom: 10, borderWidth: 1, borderColor: '#E4D0AB' },
-  showMoreText: { fontSize: 15, fontWeight: '900', color: SCREEN_THEME.textSecondary },
+  showMoreText: { fontSize: 15, fontWeight: '900', color: '#21041B' },
   emptyState: { alignItems: 'center', paddingVertical: 32 },
   emptyTitle: { fontSize: 18, fontWeight: '800', color: SCREEN_THEME.textPrimary, marginTop: 14 },
   emptySub: { color: SCREEN_THEME.textSecondary, marginTop: 6, textAlign: 'center' },

@@ -34,6 +34,7 @@ import { get, ref } from 'firebase/database';
 import { database } from '../firebase-config';
 import { requireAuthForDetails } from '../utils/authGuard';
 import { PremiumGate } from '../components/PremiumGate';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 const CACHE_KEY = '@chaika:community_users_cache_v1';
 const PRIMARY = '#7A1E5C';
@@ -240,6 +241,7 @@ export default function TopGirlsBoysScreen() {
   const [statusFilter, setStatusFilter] = useState<PersonStatusFilter>('all');
   const [visibleCount, setVisibleCount] = useState(4);
   const [bonusByUserId, setBonusByUserId] = useState<Record<string, number>>({});
+  const { colors } = useAppTheme();
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const [permModal, setPermModal] = useState<{
     visible: boolean;
@@ -477,7 +479,7 @@ export default function TopGirlsBoysScreen() {
   }, [user?.id, user?.name, user?.photoURL, permModal.targetId, filteredRanked, language, text.errorTitle, text.requestFailed]);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back}>
           <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
@@ -784,6 +786,6 @@ const styles = StyleSheet.create({
   showMoreText: {
     fontSize: 15,
     fontWeight: '900',
-    color: SCREEN_THEME.textSecondary,
+    color: '#21041B',
   },
 });

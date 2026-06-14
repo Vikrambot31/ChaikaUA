@@ -30,6 +30,7 @@ import { useSoftToast } from '../hooks/useSoftToast';
 import ScreenTooltip from '../components/ScreenTooltip';
 // HintBadge + useTrainingMode removed — unused after header refactor
 import { OSBB_FINANCE_TOOLTIP } from '../utils/screenTooltips';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -372,6 +373,7 @@ const OsbbFinansyScreen: React.FC = () => {
   );
 
   const t = UI_TEXT[language];
+  const { colors, isDark } = useAppTheme();
 
   // ---------------------------------------------------------------------------
   // State
@@ -478,7 +480,7 @@ const OsbbFinansyScreen: React.FC = () => {
   // Main render
   // ---------------------------------------------------------------------------
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScreenTooltip
         storageKey={OSBB_FINANCE_TOOLTIP.storageKey}
         title={OSBB_FINANCE_TOOLTIP.title}
@@ -502,7 +504,7 @@ const OsbbFinansyScreen: React.FC = () => {
               color={SCREEN_THEME.textPrimary}
             />
           </TouchableOpacity>
-          <Text style={styles.screenTitle}>{t.screenTitle}</Text>
+          <Text style={[styles.screenTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{t.screenTitle}</Text>
           <View style={styles.backBtn} />
         </View>
 

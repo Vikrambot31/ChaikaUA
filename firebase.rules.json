@@ -407,7 +407,7 @@
     "sponsor_confirmations": {
       ".read": "auth != null",
       ".write": false,
-      ".indexOn": ["sponsorUid"]
+      ".indexOn": ["sponsorUid", "status"]
     },
 
     "feature_flags": {
@@ -542,6 +542,7 @@
     "user_access": {
       ".read": "auth != null && auth.token.admin === true",
       ".write": "auth != null && auth.token.admin === true",
+      ".indexOn": ["status"],
       "$uid": {
         ".read": "auth != null && (auth.uid === $uid || auth.token.admin === true)"
       }

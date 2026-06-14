@@ -23,6 +23,7 @@ import type { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import type { DetailItemData } from '../utils/detailViewTypes';
 import { normalizeUkrainianPhoneStrict, validatePhone } from '../utils/validators';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 type Lang = 'ua' | 'ru' | 'en';
 
@@ -111,6 +112,7 @@ export default function BusinessClaimScreen({
   const currentUser = useSelector((state: RootState) => state.auth.user);
   const text = UI_TEXT[language];
 
+  const { colors, isDark } = useAppTheme();
   const [name, setName] = useState(currentUser?.name ?? '');
   const [phone, setPhone] = useState(currentUser?.phone ?? '');
   const [comment, setComment] = useState('');
@@ -163,13 +165,13 @@ export default function BusinessClaimScreen({
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.8}>
           <MaterialCommunityIcons name="chevron-left" size={22} color="#403933" />
           <Text style={styles.backText}>{text.back}</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{text.title}</Text>
+        <Text style={[styles.headerTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{text.title}</Text>
         <View style={styles.headerSpacer} />
       </View>
 

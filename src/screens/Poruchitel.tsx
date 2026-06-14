@@ -36,6 +36,7 @@ import {
   subscribeMyBonuses,
   type UserBonuses,
 } from '../services/bonusService';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 type Lang = 'ua' | 'ru' | 'en';
 type AppNav = NavigationProp<Record<string, object | undefined>>;
@@ -176,6 +177,7 @@ const PoruchitelScreen: React.FC = () => {
   const user = useSelector(selectUser);
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
   const text = UI_TEXT[language];
+  const { colors, isDark } = useAppTheme();
 
   const [trustNode, setTrustNode] = useState<TrustTreeNode | null>(null);
   const [chain, setChain] = useState<TrustChainLink[]>([]);
@@ -293,14 +295,14 @@ const PoruchitelScreen: React.FC = () => {
     : '';
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.headerRow}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <MaterialCommunityIcons name="arrow-left" size={24} color={SCREEN_THEME.textPrimary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{text.title}</Text>
+          <Text style={[styles.headerTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{text.title}</Text>
           <View style={styles.backBtn} />
         </View>
 

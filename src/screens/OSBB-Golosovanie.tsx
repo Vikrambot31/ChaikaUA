@@ -28,6 +28,7 @@ import {
   osbbVotingService,
 } from '../services/osbbVotingService';
 import { useOsbbMembership } from '../hooks/useOsbbMembership';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -309,6 +310,7 @@ const OsbbGolosuvannyaScreen: React.FC = () => {
   const t = UI_TEXT[language];
   const toast = useSoftToast();
 
+  const { colors, isDark } = useAppTheme();
   const [activeTab, setActiveTab] = useState<OsbbVoteStatus>('active');
   const [newQuestion, setNewQuestion] = useState('');
   const [votes, setVotes] = useState<OsbbVoteItem[]>([]);
@@ -407,7 +409,7 @@ const OsbbGolosuvannyaScreen: React.FC = () => {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <MaterialCommunityIcons name="arrow-left" size={24} color={SCREEN_THEME.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.screenTitle}>{t.screenTitle}</Text>
+        <Text style={[styles.screenTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{t.screenTitle}</Text>
         <View style={styles.backBtn} />
       </View>
 
@@ -461,7 +463,7 @@ const OsbbGolosuvannyaScreen: React.FC = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <FlatList
         data={displayed}
         keyExtractor={(item) => item.id}

@@ -22,6 +22,7 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
 import type { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import type { BusinessPromotion } from '../utils/detailViewTypes';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 const MAX_PROMOS = 3;
 
@@ -123,6 +124,7 @@ export default function BusinessPromoEditorScreen({
   const { placeId, placeName } = route.params;
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
   const currentUser = useSelector((state: RootState) => state.auth.user);
+  const { colors, isDark } = useAppTheme();
   const text = UI_TEXT[language];
 
   // Raw date strings as typed by user (DD.MM.YYYY)
@@ -212,7 +214,7 @@ export default function BusinessPromoEditorScreen({
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
         <View style={styles.center}>
           <ActivityIndicator size="large" color={SCREEN_THEME.terracotta} />
         </View>
@@ -221,13 +223,13 @@ export default function BusinessPromoEditorScreen({
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.8}>
           <MaterialCommunityIcons name="chevron-left" size={22} color="#403933" />
           <Text style={styles.backText}>{text.back}</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>{placeName}</Text>
+        <Text style={[styles.headerTitle, { color: isDark ? '#F5E8F0' : undefined }]} numberOfLines={1}>{placeName}</Text>
         <View style={styles.headerSpacer} />
       </View>
 

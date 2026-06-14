@@ -36,6 +36,7 @@ import { SCREEN_THEME } from '../utils/screenTheme';
 import { logClientError } from '../utils/errorLogger';
 import { VideoLoadingOverlay } from '../components/VideoLoadingOverlay';
 import { getUserCommunityPhotosForMonth, COMMUNITY_PHOTO_MONTHLY_REVIEW_LIMIT } from '../utils/communityPhotoLimits';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 const SCREEN_ID = 'SoulPhotosScreen';
 const STORAGE_PATH = 'community_photos';
@@ -301,6 +302,7 @@ export default function SoulPhotosScreen() {
   const { bannerVisible: guestBannerVisible, hideBanner: hideGuestBanner, guard: guestGuard } = useGuestGuard();
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
 
+  const { colors, isDark } = useAppTheme();
   const [remotePhotos, setRemotePhotos] = useState<SoulPhoto[]>([]);
   const [pickedPhotos, setPickedPhotos] = useState<Record<string, UploadedPhoto>>({});
   const [description, setDescription] = useState('');
@@ -737,8 +739,8 @@ export default function SoulPhotosScreen() {
       <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} activeOpacity={0.78}>
         <MaterialCommunityIcons name="arrow-left" size={22} color={SCREEN_THEME.textPrimary} />
       </TouchableOpacity>
-      <Text style={styles.title}>{text.title}</Text>
-      <Text style={styles.subtitle}>{text.approvedNote}</Text>
+      <Text style={[styles.title, { color: isDark ? '#F5E8F0' : undefined }]}>{text.title}</Text>
+      <Text style={[styles.subtitle, { color: isDark ? '#F5E8F0' : undefined }]}>{text.approvedNote}</Text>
       {categoryTabs}
     </View>
   );
@@ -888,7 +890,7 @@ export default function SoulPhotosScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <FlatList
         style={styles.photoList}
         data={data}

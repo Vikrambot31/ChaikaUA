@@ -32,6 +32,7 @@ import type { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { logClientError } from '../utils/errorLogger';
 import { VideoLoadingOverlay } from '../components/VideoLoadingOverlay';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 const SCREEN_ID = 'FotoRayonaScreen';
 const PHOTO_UPLOAD_SCREEN_ID = 'PhotoUploadScreen';
@@ -191,6 +192,7 @@ export default function FotoRayonaScreen() {
   const { guard: guestGuard, bannerVisible: guestBannerVisible, hideBanner: hideGuestBanner } = useGuestGuard();
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
 
+  const { colors, isDark } = useAppTheme();
   const [remotePhotos, setRemotePhotos] = useState<SoulPhoto[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -417,8 +419,8 @@ export default function FotoRayonaScreen() {
       <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} activeOpacity={0.78}>
         <MaterialCommunityIcons name="arrow-left" size={22} color={SCREEN_THEME.textPrimary} />
       </TouchableOpacity>
-      <Text style={styles.title}>{text.title}</Text>
-      <Text style={styles.subtitle}>{text.approvedNote}</Text>
+      <Text style={[styles.title, { color: isDark ? '#F5E8F0' : undefined }]}>{text.title}</Text>
+      <Text style={[styles.subtitle, { color: isDark ? '#F5E8F0' : undefined }]}>{text.approvedNote}</Text>
     </View>
   );
 
@@ -478,7 +480,7 @@ export default function FotoRayonaScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <FlatList
         style={styles.photoList}
         data={data}

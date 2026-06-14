@@ -6,14 +6,16 @@ import { FeatureRatingBanner } from '../components/FeatureRatingBanner';
 import { useTranslation } from '../i18n/useTranslation';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import TactileIcon from '../components/TactileIcon';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 const AnnouncementsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
+  const { colors } = useAppTheme();
   const { t } = useTranslation();
   const text = t.announcements;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <TouchableOpacity style={styles.backButton} activeOpacity={0.82} onPress={() => navigation.goBack()}>
           <Text style={styles.backButtonText}>‹ {text.back}</Text>

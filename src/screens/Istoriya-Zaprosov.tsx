@@ -16,6 +16,7 @@ import type { DetailItemData } from '../utils/detailViewTypes';
 import type { HelpRequest } from '../types/app';
 import { normalizePhoneText } from '../utils/textUtils';
 import { requireAuthForDetails } from '../utils/authGuard';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 type Lang = 'ua' | 'ru' | 'en';
 type TabKey = 'active' | 'attention' | 'history';
@@ -160,6 +161,7 @@ const getStatusKey = (request: HelpRequest, nowTs: number): 'pending' | 'publish
 const HelpHistoryScreen: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
+  const { colors } = useAppTheme();
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
   const text = UI_TEXT[language];
   const user = useSelector(selectUser);
@@ -361,7 +363,7 @@ const HelpHistoryScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScreenTooltip
         storageKey={HELP_HISTORY_TOOLTIP.storageKey}
         title={HELP_HISTORY_TOOLTIP.title}

@@ -32,6 +32,7 @@ import { foodTopService, type FoodTopListing } from '../services/foodTopService'
 import { FoodCategory, FoodOffer, Place } from '../types/app';
 import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
+import { useAppTheme } from '../hooks/useAppTheme';
 import { getMapFocusPlaceParams } from '../utils/mapFocusParams';
 import AppPhotoImage from '../components/AppPhotoImage';
 import { FeatureRatingBanner } from '../components/FeatureRatingBanner';
@@ -313,6 +314,7 @@ const formatOfferDate = (timestamp?: number) => {
 
 export default function EdaNaChaykeScreen() {
   const navigation = useNavigation<AppNavigation>();
+  const { colors } = useAppTheme();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as Lang;
   const user = useSelector((state: RootState) => state.auth.user);
   const isAdmin = user?.email === 'vikramsave@ukr.net';
@@ -911,7 +913,7 @@ export default function EdaNaChaykeScreen() {
   // --- EAT MODE ---
   if (mode === 'eat') {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
         {renderTopFoodForm()}
         <ScrollView ref={scrollRef} contentContainerStyle={[styles.content, styles.contentWithAddBar]} showsVerticalScrollIndicator={false}>
           {/* Header */}
@@ -1717,7 +1719,7 @@ const styles = StyleSheet.create({
   showMoreText: {
     fontSize: 15,
     fontWeight: '900',
-    color: SCREEN_THEME.textSecondary,
+    color: '#21041B',
   },
 
   // Empty state

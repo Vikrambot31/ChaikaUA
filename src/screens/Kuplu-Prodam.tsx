@@ -23,6 +23,7 @@ import { requireAuthForDetails } from '../utils/authGuard';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { VideoLoadingOverlay } from '../components/VideoLoadingOverlay';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 export const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000;
 
@@ -295,6 +296,7 @@ const BuySellScreen: React.FC = () => {
   const user = useSelector((state: RootState) => state.auth.user);
   const { guard: guestGuard, bannerVisible: guestBannerVisible, hideBanner: hideGuestBanner } = useGuestGuard();
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
+  const { colors } = useAppTheme();
   const text = UI_TEXT[language];
   const [listings, setListings] = useState<BuySellListing[]>([]);
   const [listingsReady, setListingsReady] = useState(false);
@@ -462,7 +464,7 @@ const BuySellScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <Modal visible={searchModalVisible} animationType="slide" transparent onRequestClose={() => setSearchModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalSheet}>
@@ -840,7 +842,7 @@ const styles = StyleSheet.create({
   listingPhoto: { width: '100%', height: 220, borderRadius: 16, marginBottom: 8, backgroundColor: '#F0EDE8' },
   moderationInfo: { color: '#5F5043', backgroundColor: '#FFF8EA', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 8, fontSize: 12, lineHeight: 17, fontWeight: '700' },
   showMoreButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 18, paddingVertical: 13, marginBottom: 10, borderWidth: 1, borderColor: '#E4D0AB' },
-  showMoreText: { fontSize: 15, fontWeight: '900', color: SCREEN_THEME.textSecondary },
+  showMoreText: { fontSize: 15, fontWeight: '900', color: '#21041B' },
   addBar: {
     paddingHorizontal: 16,
     paddingVertical: 10,

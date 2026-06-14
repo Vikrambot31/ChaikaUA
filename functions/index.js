@@ -353,7 +353,9 @@ exports.processCloseBonusTrigger = functionsV1.database
       console.error(`[processCloseBonusTrigger] ${requestId}:`, error?.message || error);
     } finally {
       // Cleanup: trigger node has served its purpose
-      await snapshot.ref.remove().catch(() => {});
+      await snapshot.ref.remove().catch((e) => {
+        console.error('[processCloseBonusTrigger] cleanup remove failed:', e?.message);
+      });
     }
   });
 
@@ -2779,6 +2781,13 @@ async function getAiRuntimeConfig(db) {
       baseUrl: rc.baseUrl || AI_BASE_URL_DEFAULT,
       budgetDaily: Number(rc.budgetDaily) || AI_BUDGET_DAILY_DEFAULT,
       budgetMonthly: Number(rc.budgetMonthly) || AI_BUDGET_MONTHLY_DEFAULT,
+      fallback: {
+        enabled: rc.fallback?.enabled === true,
+        provider: rc.fallback?.provider || '',
+        apiKey: rc.fallback?.apiKey || '',
+        model: rc.fallback?.model || '',
+        baseUrl: rc.fallback?.baseUrl || '',
+      },
     };
   } catch (_err) {
     // Если RTDB недоступна — используем env vars
@@ -2789,6 +2798,13 @@ async function getAiRuntimeConfig(db) {
       baseUrl: AI_BASE_URL_DEFAULT,
       budgetDaily: AI_BUDGET_DAILY_DEFAULT,
       budgetMonthly: AI_BUDGET_MONTHLY_DEFAULT,
+      fallback: {
+        enabled: false,
+        provider: '',
+        apiKey: '',
+        model: '',
+        baseUrl: '',
+      },
     };
   }
   _aiConfigCacheTime = now;
@@ -2846,18 +2862,28 @@ async function analyzeTextInternal(db, aiConfig, section, text, userId = null) {
         if (r && r.status === 'rejected') rejected++;
       });
       if (total > 0) userHistoryBlock = `\nИстория: всего ${total}, одобрено ${approved}, отклонено ${rejected}`;
-    } catch (_) {}
+    } catch (e) {
+      console.error('[aiModerateContent] user history fetch failed:', e?.message);
+    }
   }
 
   const userPrompt = buildAiUserPrompt(section, '', text, userHistoryBlock);
 
   let parsed = null;
+  let rawMeta = {};
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const raw = await callAiProvider(aiConfig, AI_SYSTEM_PROMPT, userPrompt);
+      const raw = await callAiProviderWithFallback(aiConfig, AI_SYSTEM_PROMPT, userPrompt);
+      rawMeta = {
+        providerUsed: raw.__providerUsed || aiConfig.provider,
+        modelUsed: raw.__modelUsed || aiConfig.model,
+        fallbackUsed: Boolean(raw.__fallbackUsed),
+      };
       parsed = parseAiJsonResponse(raw);
       if (parsed) break;
-    } catch (_) {}
+    } catch (e) {
+      console.error('[aiModerateContent] AI call failed:', e?.message);
+    }
   }
 
   if (!parsed) return null;
@@ -2877,20 +2903,24 @@ async function analyzeTextInternal(db, aiConfig, section, text, userId = null) {
     flags: parsed.flags,
     section,
     cachedAt: Date.now(),
-    provider: aiConfig.provider,
-    model: aiConfig.model,
+    provider: rawMeta.providerUsed || aiConfig.provider,
+    model: rawMeta.modelUsed || aiConfig.model,
+    fallbackUsed: Boolean(rawMeta.fallbackUsed),
     tokensUsed: parsed.tokensUsed,
-  }).catch(() => {});
+  }).catch((e) => {
+    console.error('[aiModerateContent] cache write failed:', e?.message);
+  });
 
   return {
     verdict: parsed.verdict,
     confidence: parsed.confidence,
     explanation: parsed.explanation,
     flags: parsed.flags || [],
-    provider: aiConfig.provider,
-    model: aiConfig.model,
+    provider: rawMeta.providerUsed || aiConfig.provider,
+    model: rawMeta.modelUsed || aiConfig.model,
     tokensUsed: parsed.tokensUsed,
     cached: false,
+    fallbackUsed: Boolean(rawMeta.fallbackUsed),
   };
 }
 
@@ -3136,7 +3166,7 @@ async function callOpenCode(config, systemPrompt, userPrompt) {
       model: config.model,
       messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
       temperature: 0.1,
-      max_tokens: 300,
+      max_tokens: 900,
     }),
   });
   if (!response.ok) {
@@ -3153,6 +3183,48 @@ function callAiProvider(config, systemPrompt, userPrompt) {
     case 'deepseek': return callDeepSeek(config, systemPrompt, userPrompt);
     case 'opencode':
     default: return callOpenCode(config, systemPrompt, userPrompt);
+  }
+}
+
+function isFallbackEligibleAiError(error) {
+  const message = String((error && error.message) || error || '').toLowerCase();
+  return (
+    message.includes(' 429') ||
+    message.includes('rate') ||
+    message.includes('quota') ||
+    message.includes('limit') ||
+    message.includes('timeout') ||
+    message.includes('econn') ||
+    message.includes(' 500') ||
+    message.includes(' 502') ||
+    message.includes(' 503') ||
+    message.includes(' 504')
+  );
+}
+
+async function callAiProviderWithFallback(config, systemPrompt, userPrompt) {
+  try {
+    const raw = await callAiProvider(config, systemPrompt, userPrompt);
+    raw.__providerUsed = config.provider;
+    raw.__modelUsed = config.model;
+    raw.__fallbackUsed = false;
+    return raw;
+  } catch (primaryError) {
+    const fallback = config.fallback || {};
+    const fallbackReady = fallback.enabled && fallback.provider && fallback.model && isConfiguredAiApiKey(fallback.apiKey);
+    const sameProviderAndModel = fallback.provider === config.provider && fallback.model === config.model;
+
+    if (!fallbackReady || sameProviderAndModel || !isFallbackEligibleAiError(primaryError)) {
+      throw primaryError;
+    }
+
+    console.warn(`[AI] Primary provider failed, trying fallback: ${config.provider}/${config.model} -> ${fallback.provider}/${fallback.model}. Reason: ${primaryError?.message || primaryError}`);
+    const raw = await callAiProvider(fallback, systemPrompt, userPrompt);
+    raw.__providerUsed = fallback.provider;
+    raw.__modelUsed = fallback.model;
+    raw.__fallbackUsed = true;
+    raw.__primaryError = String(primaryError?.message || primaryError).slice(0, 240);
+    return raw;
   }
 }
 
@@ -3367,9 +3439,15 @@ exports.adminAnalyzeContent = functionsV1.https.onCall(async (data, context) => 
     // 6. Вызов AI с retry
     let parsed = null;
     let rawResponse = null;
+    let providerUsed = aiConfig.provider;
+    let modelUsed = aiConfig.model;
+    let fallbackUsed = false;
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        rawResponse = await callAiProvider(aiConfig, AI_SYSTEM_PROMPT, userPrompt);
+        rawResponse = await callAiProviderWithFallback(aiConfig, AI_SYSTEM_PROMPT, userPrompt);
+        providerUsed = rawResponse.__providerUsed || aiConfig.provider;
+        modelUsed = rawResponse.__modelUsed || aiConfig.model;
+        fallbackUsed = Boolean(rawResponse.__fallbackUsed);
         parsed = parseAiJsonResponse(rawResponse);
         if (parsed) break;
       } catch (err) {
@@ -3406,8 +3484,9 @@ exports.adminAnalyzeContent = functionsV1.https.onCall(async (data, context) => 
       section,
       category,
       cachedAt: Date.now(),
-      provider: aiConfig.provider,
-      model: aiConfig.model,
+      provider: providerUsed,
+      model: modelUsed,
+      fallbackUsed,
       tokensUsed: parsed.tokensUsed,
     });
 
@@ -3424,9 +3503,10 @@ exports.adminAnalyzeContent = functionsV1.https.onCall(async (data, context) => 
       flags: parsed.flags,
       moderatorUid: actor.uid,
       timestamp: Date.now(),
-      provider: aiConfig.provider,
-      model: aiConfig.model,
+      provider: providerUsed,
+      model: modelUsed,
       tokensUsed: parsed.tokensUsed,
+      fallbackUsed,
       cached: false,
       latency: Date.now() - startTime,
       autoApproved: false,
@@ -3438,9 +3518,10 @@ exports.adminAnalyzeContent = functionsV1.https.onCall(async (data, context) => 
       confidence: parsed.confidence,
       explanation: parsed.explanation,
       flags: parsed.flags,
-      provider: aiConfig.provider,
-      model: aiConfig.model,
+      provider: providerUsed,
+      model: modelUsed,
       tokensUsed: parsed.tokensUsed,
+      fallbackUsed,
       cached: false,
     };
   } catch (error) {
@@ -3794,10 +3875,17 @@ exports.aiAutoReplySupport = functionsV1.database
     const db = admin.database();
 
     try {
-      // Проверяем флаг автономности
+      const aiConfig = await getAiRuntimeConfig(db);
+      const hasRuntimeAiKey = isConfiguredAiApiKey(aiConfig.apiKey);
+
+      // Проверяем флаг автономности. Если RTDB-конфиг еще не создан,
+      // но ключ уже задан в env функций, поддержка должна отвечать сразу.
       const autonomousSnap = await db.ref('ai_config/autonomous').once('value');
-      const autonomous = autonomousSnap.val() || {};
-      if (!autonomous.enabled || !autonomous.supportReplies) return null;
+      const autonomous = autonomousSnap.val();
+      const supportRepliesEnabled = autonomousSnap.exists()
+        ? autonomous?.enabled === true && autonomous?.supportReplies === true
+        : hasRuntimeAiKey;
+      if (!supportRepliesEnabled) return null;
 
       // Читаем тикет
       const ticketSnap = await db.ref(`support_tickets/${ticketId}`).once('value');
@@ -3812,8 +3900,10 @@ exports.aiAutoReplySupport = functionsV1.database
       // Отмечаем что обрабатываем (предотвращаем двойную обработку)
       await db.ref(`support_tickets/${ticketId}`).update({ aiProcessing: true });
 
-      const aiConfig = await getAiRuntimeConfig(db);
-      if (!isConfiguredAiApiKey(aiConfig.apiKey)) return null;
+      if (!hasRuntimeAiKey) {
+        await db.ref(`support_tickets/${ticketId}`).update({ aiProcessing: false });
+        return null;
+      }
 
       const userText = String(message.text || '').trim();
       const category = String(ticket.category || '');
@@ -3824,14 +3914,16 @@ exports.aiAutoReplySupport = functionsV1.database
       let parsed = null;
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
-          const raw = await callAiProvider(aiConfig, SUPPORT_SYSTEM_PROMPT, userPrompt);
+          const raw = await callAiProviderWithFallback(aiConfig, SUPPORT_SYSTEM_PROMPT, userPrompt);
           const content = raw?.choices?.[0]?.message?.content || '';
           const jsonMatch = String(content).match(/\{[\s\S]*\}/);
           if (jsonMatch) {
             parsed = JSON.parse(jsonMatch[0]);
             if (parsed && parsed.suggestedReply) break;
           }
-        } catch (_) {}
+        } catch (e) {
+          console.error('[aiAutoReplySupport] AI call failed:', e?.message);
+        }
       }
 
       if (!parsed || !parsed.suggestedReply) {
@@ -3846,6 +3938,8 @@ exports.aiAutoReplySupport = functionsV1.database
       if (requiresHuman || !SUPPORT_AUTO_CATEGORIES.has(detectedCategory)) {
         // Эскалация — критическая тема или средняя сложность
         const urgency = SUPPORT_CRITICAL_CATEGORIES.has(detectedCategory) ? 'high' : 'medium';
+        const replyRef = db.ref(`support_messages/${ticketId}`).push();
+        const replyText = parsed.suggestedReply;
 
         await db.ref('ai_queue/support_escalations').push({
           ticketId,
@@ -3860,11 +3954,25 @@ exports.aiAutoReplySupport = functionsV1.database
           requiresHuman,
         });
 
+        await replyRef.set({
+          ticketId,
+          senderId: 'ai-assistant',
+          senderRole: 'admin',
+          text: replyText,
+          isAiReply: true,
+          requiresHumanReview: true,
+          timestamp: now,
+        });
+
         await db.ref(`support_tickets/${ticketId}`).update({
+          aiReplied: true,
+          aiRepliedAt: now,
           aiProcessing: false,
           aiEscalated: true,
           aiEscalatedAt: now,
           aiCategory: detectedCategory,
+          lastAdminMessage: replyText.slice(0, 100),
+          updatedAt: now,
         });
 
         // Telegram уведомление для критических тем
@@ -3874,8 +3982,20 @@ exports.aiAutoReplySupport = functionsV1.database
             await sendTelegramMessage(
               `${emoji} КРИТИЧНИЙ ТИКЕТ [${detectedCategory.toUpperCase()}]\n👤 ${userName}\n💬 ${userText.slice(0, 200)}`,
             );
-          } catch (_) {}
+          } catch (e) {
+            console.error('[aiAutoReplySupport] Telegram send failed:', e?.message);
+          }
         }
+
+        await db.ref('ai_queue/log').push({
+          action: 'support_escalated_reply',
+          ticketId,
+          category: detectedCategory,
+          urgency,
+          provider: aiConfig.provider,
+          model: aiConfig.model,
+          timestamp: now,
+        });
 
       } else {
         // Авто-ответ для простых категорий
@@ -3910,7 +4030,9 @@ exports.aiAutoReplySupport = functionsV1.database
 
     } catch (err) {
       console.error('[aiAutoReplySupport] error:', err?.message);
-      await db.ref(`support_tickets/${ticketId}`).update({ aiProcessing: false }).catch(() => {});
+      await db.ref(`support_tickets/${ticketId}`).update({ aiProcessing: false }).catch((e) => {
+        console.error('[aiAutoReplySupport] aiProcessing reset failed:', e?.message);
+      });
       await writeOpsError('aiAutoReplySupport', err, { ticketId });
     }
 
@@ -3958,7 +4080,9 @@ exports.aiAutoTriageReports = functionsV1.database
             if (r && r.createdAt > oneDayAgo) recentCount++;
           });
           if (recentCount > 5) isSerialReporter = true;
-        } catch (_) {}
+        } catch (e) {
+          console.error('[aiAutoTriageReports] serial reporter check failed:', e?.message);
+        }
       }
 
       if (isSerialReporter) {
@@ -3992,7 +4116,7 @@ serious — серьёзное нарушение (насилие, мошенн�
       let aiVerdict = null;
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
-          const raw = await callAiProvider(aiConfig, reportSystemPrompt, reportText);
+          const raw = await callAiProviderWithFallback(aiConfig, reportSystemPrompt, reportText);
           const content = raw?.choices?.[0]?.message?.content || '';
           const jsonMatch = String(content).match(/\{[\s\S]*\}/);
           if (jsonMatch) {
@@ -4002,7 +4126,9 @@ serious — серьёзное нарушение (насилие, мошенн�
               break;
             }
           }
-        } catch (_) {}
+        } catch (e) {
+          console.error('[aiAutoTriageReports] AI call failed:', e?.message);
+        }
       }
 
       if (!aiVerdict) return null;
@@ -4049,7 +4175,9 @@ serious — серьёзное нарушение (насилие, мошенн�
             await sendTelegramMessage(
               `🚨 СЕРЙОЗНА СКАРГА [${reason}]\n${description.slice(0, 200)}\nAI: ${aiVerdict.reason}`,
             );
-          } catch (_) {}
+          } catch (e) {
+            console.error('[aiAutoTriageReports] Telegram send failed:', e?.message);
+          }
         }
 
         await db.ref('ai_queue/log').push({
@@ -4270,7 +4398,9 @@ exports.aiAutoModeratePhotos = functionsV1.pubsub
               const raw = await callVisionProvider(vProvider, vModel, vApiKey, base64, contentType);
               parsed = parseAiJsonResponse(raw);
               if (parsed) break;
-            } catch (_) {}
+            } catch (e) {
+              console.error('[aiAutoModerateCommunityPhotos] Vision API call failed:', e?.message);
+            }
           }
 
           if (!parsed) continue;
@@ -4312,7 +4442,9 @@ exports.aiAutoModeratePhotos = functionsV1.pubsub
               try {
                 const emoji = parsed.verdict === 'nsfw' ? '\u{1F534}' : '\u{26A0}';
                 await sendTelegramMessage(`${emoji} ФОТО ЗАБЛОКОВАНО [${parsed.verdict.toUpperCase()}]\nPath: ${storagePath.slice(0, 100)}\nAI: ${(parsed.explanation || '').slice(0, 150)}`);
-              } catch (_) {}
+              } catch (e) {
+                console.error('[aiAutoModerateCommunityPhotos] Telegram send failed:', e?.message);
+              }
             }
 
           } else {
@@ -4576,7 +4708,7 @@ JSON формат:
 
     let rawResponse = null;
     try {
-      rawResponse = await callAiProvider(aiConfig, SUGGEST_SYSTEM_PROMPT, userPrompt);
+      rawResponse = await callAiProviderWithFallback(aiConfig, SUGGEST_SYSTEM_PROMPT, userPrompt);
     } catch (err) {
       console.error('[adminSuggestFix] AI API error:', err?.message);
       return { suggestions: [] };

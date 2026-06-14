@@ -38,6 +38,14 @@ export type AiVisionConfig = {
   apiKey: string; // если пустой — используется основной apiKey
 };
 
+export type AiFallbackConfig = {
+  enabled: boolean;
+  provider: AiProvider;
+  model: string;
+  apiKey: string;
+  baseUrl: string;
+};
+
 export type AiConfig = {
   provider: AiProvider;
   model: string;
@@ -48,6 +56,7 @@ export type AiConfig = {
   autonomous: AiAutonomousConfig;
   thresholds: AiThresholdsConfig;
   vision: AiVisionConfig;
+  fallback?: AiFallbackConfig;
   updatedAt?: number;
   updatedBy?: string;
 };
@@ -75,6 +84,13 @@ export const DEFAULT_AI_CONFIG: AiConfig = {
     provider: 'claude',
     model: 'claude-haiku-4-5-20251001',
     apiKey: '',
+  },
+  fallback: {
+    enabled: false,
+    provider: 'openai',
+    model: 'gpt-4.1-nano',
+    apiKey: '',
+    baseUrl: '',
   },
 };
 

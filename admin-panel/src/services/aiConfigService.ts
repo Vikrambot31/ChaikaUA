@@ -11,7 +11,24 @@ import { DEFAULT_AI_CONFIG } from '../types/ai-config';
 
 const AI_CONFIG_PATH = 'ai_config';
 const AI_LOG_PATH = 'ops/ai_analysis';
+const AI_QUEUE_LOG_PATH = 'ai_queue/log';
 const AI_USAGE_PATH = 'ops/ai_usage/_meta';
+
+export type AiConfigState = {
+  config: AiConfig;
+  exists: boolean;
+};
+
+function mergeAiConfig(val: Partial<AiConfig> | null | undefined): AiConfig {
+  return {
+    ...DEFAULT_AI_CONFIG,
+    ...(val || {}),
+    autonomous: { ...DEFAULT_AI_CONFIG.autonomous, ...(val?.autonomous || {}) },
+    thresholds: { ...DEFAULT_AI_CONFIG.thresholds, ...(val?.thresholds || {}) },
+    vision: { ...DEFAULT_AI_CONFIG.vision, ...((val as Record<string, unknown> | null | undefined)?.vision as Record<string, unknown> || {}) },
+    fallback: { ...DEFAULT_AI_CONFIG.fallback!, ...((val as Record<string, unknown> | null | undefined)?.fallback as Record<string, unknown> || {}) },
+  };
+}
 
 // ---- Load / Save config ----
 
@@ -20,13 +37,16 @@ export async function loadAiConfig(): Promise<AiConfig> {
   const db = getDatabase(firebaseApp);
   const snap = await get(ref(db, AI_CONFIG_PATH));
   if (!snap.exists()) return { ...DEFAULT_AI_CONFIG };
-  const val = snap.val() as Partial<AiConfig>;
+  return mergeAiConfig(snap.val() as Partial<AiConfig>);
+}
+
+export async function loadAiConfigState(): Promise<AiConfigState> {
+  if (LOCAL_MODE) return { config: { ...DEFAULT_AI_CONFIG }, exists: true };
+  const db = getDatabase(firebaseApp);
+  const snap = await get(ref(db, AI_CONFIG_PATH));
   return {
-    ...DEFAULT_AI_CONFIG,
-    ...val,
-    autonomous: { ...DEFAULT_AI_CONFIG.autonomous, ...(val.autonomous || {}) },
-    thresholds: { ...DEFAULT_AI_CONFIG.thresholds, ...(val.thresholds || {}) },
-    vision: { ...DEFAULT_AI_CONFIG.vision, ...((val as Record<string, unknown>).vision as Record<string, unknown> || {}) },
+    config: snap.exists() ? mergeAiConfig(snap.val() as Partial<AiConfig>) : { ...DEFAULT_AI_CONFIG },
+    exists: snap.exists(),
   };
 }
 
@@ -41,24 +61,22 @@ export async function saveAiConfig(config: AiConfig, adminUid: string): Promise<
 }
 
 export function subscribeToAiConfig(callback: (config: AiConfig) => void): () => void {
+  return subscribeToAiConfigState(({ config }) => callback(config));
+}
+
+export function subscribeToAiConfigState(callback: (state: AiConfigState) => void): () => void {
   if (LOCAL_MODE) {
-    callback({ ...DEFAULT_AI_CONFIG });
+    callback({ config: { ...DEFAULT_AI_CONFIG }, exists: true });
     return () => {};
   }
   const db = getDatabase(firebaseApp);
   const configRef = ref(db, AI_CONFIG_PATH);
   const listener = onValue(configRef, (snap) => {
     if (!snap.exists()) {
-      callback({ ...DEFAULT_AI_CONFIG });
+      callback({ config: { ...DEFAULT_AI_CONFIG }, exists: false });
       return;
     }
-    const val = snap.val() as Partial<AiConfig>;
-    callback({
-      ...DEFAULT_AI_CONFIG,
-      ...val,
-      autonomous: { ...DEFAULT_AI_CONFIG.autonomous, ...(val.autonomous || {}) },
-      thresholds: { ...DEFAULT_AI_CONFIG.thresholds, ...(val.thresholds || {}) },
-    });
+    callback({ config: mergeAiConfig(snap.val() as Partial<AiConfig>), exists: true });
   });
   return () => off(configRef, 'value', listener);
 }
@@ -111,11 +129,31 @@ export async function loadAiUsageStats(): Promise<AiUsageStats | null> {
 export async function loadAiLog(limit = 50): Promise<AiLogEntry[]> {
   if (LOCAL_MODE) return [];
   const db = getDatabase(firebaseApp);
-  const snap = await get(ref(db, AI_LOG_PATH));
-  if (!snap.exists()) return [];
+  const [analysisSnap, queueSnap] = await Promise.all([
+    get(ref(db, AI_LOG_PATH)),
+    get(ref(db, AI_QUEUE_LOG_PATH)),
+  ]);
   const entries: AiLogEntry[] = [];
-  snap.forEach((child) => {
-    entries.push({ id: child.key || '', ...(child.val() as Omit<AiLogEntry, 'id'>) });
+  analysisSnap.forEach((child) => {
+    const val = child.val() as Omit<AiLogEntry, 'id'>;
+    entries.push({ id: child.key || '', ...val });
+  });
+  queueSnap.forEach((child) => {
+    const val = child.val() as Partial<AiLogEntry> & { action?: string };
+    entries.push({
+      id: child.key || '',
+      timestamp: Number(val.timestamp || 0),
+      type: (val.type || val.action || 'test') as AiLogEntry['type'],
+      section: val.section,
+      verdict: val.verdict,
+      confidence: val.confidence,
+      provider: val.provider || '',
+      model: val.model || '',
+      tokensUsed: Number(val.tokensUsed || 0),
+      cached: Boolean(val.cached),
+      autoAction: typeof val.action === 'string' && val.action.startsWith('auto_'),
+      moderatorUid: val.moderatorUid,
+    });
   });
   entries.sort((a, b) => b.timestamp - a.timestamp);
   return entries.slice(0, limit);
@@ -135,6 +173,7 @@ export type { EscalationItem, AiQueueLastRun, SupportEscalationItem, ReportEscal
 
 const AI_ESCALATIONS_PATH = 'ai_queue/escalations';
 const AI_QUEUE_LAST_RUN_PATH = 'ai_queue/last_run';
+const AI_PHOTO_QUEUE_LAST_RUN_PATH = 'ai_queue/photo_last_run';
 
 export async function loadEscalations(statusFilter: 'pending' | 'all' = 'pending'): Promise<EscalationItem[]> {
   if (LOCAL_MODE) return [];
@@ -192,6 +231,13 @@ export async function loadQueueLastRun(): Promise<AiQueueLastRun | null> {
   if (LOCAL_MODE) return null;
   const db = getDatabase(firebaseApp);
   const snap = await get(ref(db, AI_QUEUE_LAST_RUN_PATH));
+  return snap.exists() ? (snap.val() as AiQueueLastRun) : null;
+}
+
+export async function loadPhotoQueueLastRun(): Promise<AiQueueLastRun | null> {
+  if (LOCAL_MODE) return null;
+  const db = getDatabase(firebaseApp);
+  const snap = await get(ref(db, AI_PHOTO_QUEUE_LAST_RUN_PATH));
   return snap.exists() ? (snap.val() as AiQueueLastRun) : null;
 }
 

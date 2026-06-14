@@ -33,6 +33,7 @@ import type { JobListing } from '../services/jobService';
 import { getDaysInApp } from '../utils/chaikaLevels';
 import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
 import { requireAuthForDetails } from '../utils/authGuard';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 const UI_TEXT = {
   ua: {
@@ -162,6 +163,7 @@ const ViewUserProfileScreen: React.FC = () => {
   const contactText = CONTACT_TEXT[language];
   const currentUser = useSelector((state: RootState) => state.auth.user);
   const { modalVisible, pending, currentTarget, openModal, closeModal, sendRequest } = useContactRequest();
+  const { colors } = useAppTheme();
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -363,7 +365,7 @@ const ViewUserProfileScreen: React.FC = () => {
 
   if (!isAuthenticated) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
         <View style={styles.centerContent}>
           <MaterialCommunityIcons name="lock-outline" size={42} color={SCREEN_THEME.terracotta} />
           <Text style={styles.loadingText}>
@@ -376,7 +378,7 @@ const ViewUserProfileScreen: React.FC = () => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={SCREEN_THEME.textPrimary} />
           <Text style={styles.loadingText}>{text.loading}</Text>
@@ -386,7 +388,7 @@ const ViewUserProfileScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View style={styles.backgroundLayer}>
         {LIGHT_ORBS.map((orb, index) => (
           <View key={index} style={[styles.orb, orb]} />

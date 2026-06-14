@@ -14,6 +14,7 @@ import { createPendingModeration } from '../utils/moderation';
 import { APP_BUILD_DATE, APP_VERSION } from '../utils/constants';
 import { showUserError } from '../utils/userFacingErrors';
 import { appSuggestionsService } from '../services/appSuggestionsService';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 const SUGGESTIONS_ARCHIVE_KEY = '@chaika:app_feature_suggestions_moderation_v1';
 const SUGGESTION_MAX_LENGTH = 200;
@@ -123,6 +124,7 @@ const AppInfoScreen: React.FC = () => {
   const dispatch = useDispatch();
   const currentLang = useSelector((state: RootState) => state.language?.current ?? 'ua');
   const authUser = useSelector((state: RootState) => state.auth.user);
+  const { colors, isDark } = useAppTheme();
   const [suggestion, setSuggestion] = useState('');
   const text = suggestionText[language];
   const training = useTrainingMode('_global');
@@ -182,10 +184,10 @@ const AppInfoScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.headerCard}>
-          <Text style={styles.headerTitle}>{t.appInfo.title}</Text>
+          <Text style={[styles.headerTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{t.appInfo.title}</Text>
           <Text style={styles.headerSubtitle}>
             {language === 'ua'
               ? 'Що вміє Chaika Life і як він допомагає мешканцям'

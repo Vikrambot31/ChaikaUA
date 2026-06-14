@@ -6,6 +6,7 @@ import MiniTabBar from '../components/MiniTabBar';
 import { useTranslation } from '../i18n/useTranslation';
 import TactileIcon from '../components/TactileIcon';
 import { LIGHT_ORBS, SCREEN_THEME } from '../utils/screenTheme';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 const APP_URL = 'https://chaika-life.netlify.app/';
 const QR_IMAGE_URL = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(APP_URL)}`;
@@ -14,6 +15,7 @@ export default function QRCodeScreen() {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const { t } = useTranslation();
   const copy = t.qrCode;
+  const { colors, isDark } = useAppTheme();
   const [qrError, setQrError] = useState(false);
 
   const onShare = async () => {
@@ -33,7 +35,7 @@ export default function QRCodeScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View style={styles.backgroundLayer}>
         {LIGHT_ORBS.map((orb, index) => (
           <View key={index} style={[styles.orb, orb]} />
@@ -44,7 +46,7 @@ export default function QRCodeScreen() {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <MaterialCommunityIcons name="arrow-left" size={20} color={SCREEN_THEME.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{copy.title}</Text>
+        <Text style={[styles.headerTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{copy.title}</Text>
         <View style={styles.headerSpacer} />
       </View>
 

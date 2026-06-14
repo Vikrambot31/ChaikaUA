@@ -29,6 +29,7 @@ import MiniTabBar from '../components/MiniTabBar';
 import type { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import TactileIcon from '../components/TactileIcon';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 const FILTER_TYPES: PlaceType[] = [
   PlaceType.SHOP,
@@ -114,6 +115,7 @@ const UI_TEXT = {
 } as const;
 
 const ListScreen: React.FC = () => {
+  const { colors } = useAppTheme();
   const dispatch = useDispatch();
   const { loadPlaces } = usePlaces();
   const places = useSelector((state: RootState) => selectFilteredPlaces(state));
@@ -190,7 +192,7 @@ const ListScreen: React.FC = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View style={styles.headerCard}>
         <Text style={styles.headerTitle}>{text.headerTitle}</Text>
         <Text style={styles.headerSubtitle}>

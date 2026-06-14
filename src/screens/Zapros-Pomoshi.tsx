@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useAppTheme } from '../hooks/useAppTheme';
 import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { NavigationProp, RouteProp, useNavigation, useRoute } from '@react-navigation/native';
@@ -482,8 +483,10 @@ const HelpRequestScreen: React.FC = () => {
     }
   };
 
+  const { colors } = useAppTheme();
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View style={styles.backgroundLayer}>
         {LIGHT_ORBS.map((orb, index) => (
           <View key={index} style={[styles.orb, orb]} />

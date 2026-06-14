@@ -15,6 +15,7 @@ import {
 import type { PersistedState } from 'redux-persist/es/types';
 import authReducer from './slices/authSlice';
 import { normalizeLanguage } from './slices/languageSlice';
+import themeReducer from './slices/themeSlice';
 import placesReducer from './slices/placesSlice';
 import requestsReducer from './slices/requestsSlice';
 import electricityReducer from './slices/electricitySlice';
@@ -49,7 +50,7 @@ const sanitizeObject = (state: PersistedState): PersistedState =>
     : {}) as PersistedState;
 
 const persistMigrations = {
-  1: (state: PersistedState) => sanitizeObject(state),
+  1: (state: PersistedState) => sanitizeObject(state) as PersistedState,
   4: (state: PersistedState) => {
     const next = sanitizeObject(state) as PersistedState & Record<string, unknown>;
     if ('current' in next) {
@@ -170,6 +171,17 @@ const persistedSubscriptionReducer = persistReducer(
   subscriptionReducer
 );
 
+const persistedThemeReducer = persistReducer(
+  {
+    key: 'theme',
+    storage: AsyncStorage,
+    version: 1,
+    migrate: createMigrate(persistMigrations, { debug: false }),
+    whitelist: ['current'],
+  },
+  themeReducer
+);
+
 // ОСББ — зберігаємо вибір будинку та роль між сесіями
 const persistedOsbbReducer = persistReducer(
   {
@@ -194,6 +206,7 @@ export const store = configureStore({
     osbb: persistedOsbbReducer,
     network: networkReducer,
     notifications: notificationReducer,
+    theme: persistedThemeReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

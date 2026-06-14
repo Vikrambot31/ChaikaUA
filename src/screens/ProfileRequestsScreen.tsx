@@ -634,6 +634,16 @@ export default function ProfileRequestsScreen() {
     ]);
   }, [handleRespondToIncoming, respondingRequestId, t.approveAgainBody, t.approveAgainTitle, t.approveAgainYes, t.clearConfirmNo]);
 
+  const openContactCardChat = useCallback((item: ProfileViewRequest) => {
+    if (!currentUserId || !item.requesterId) return;
+    navigation.navigate('ContactCardChatScreen', {
+      request: {
+        ...item,
+        targetUserId: currentUserId,
+      },
+    });
+  }, [currentUserId, navigation]);
+
   const handleCall = async (phoneRaw?: string) => {
     await safeCallPhone(phoneRaw, language);
   };
@@ -812,13 +822,12 @@ export default function ProfileRequestsScreen() {
               const transitionScreenText = getProfileRequestSourceLabel(item.sourceType, item.context, language, t.notSpecified);
               const sourceTitleText = item.sourceTitle?.trim();
               const descriptionText = reasonText || sourceTitleText || transitionScreenText;
-              const topicText = reasonText || sourceTitleText || transitionScreenText;
               const votesLabel = language === 'en' ? 'votes' : language === 'ru' ? 'голосов' : 'голосів';
               return (
                 <TouchableOpacity
                   style={styles.card}
-                  onPress={() => confirmApproveDeniedRequest(item.requesterId)}
-                  disabled={item.status !== 'denied' || Boolean(respondingRequestId)}
+                  onPress={() => openContactCardChat(item)}
+                  disabled={Boolean(respondingRequestId)}
                   activeOpacity={0.86}
                 >
                   {/* Top: avatar + info */}
@@ -856,13 +865,6 @@ export default function ProfileRequestsScreen() {
                           <Text style={styles.descriptionText} numberOfLines={2}>{descriptionText}</Text>
                         </View>
                       ) : null}
-                    </View>
-                  </View>
-
-                  <View style={styles.requestMetaBox}>
-                    <View style={styles.requestMetaRow}>
-                      <Text style={styles.requestMetaLabel}>{t.topicLabel}</Text>
-                      <Text style={styles.requestMetaValue}>{topicText}</Text>
                     </View>
                   </View>
 
@@ -910,10 +912,27 @@ export default function ProfileRequestsScreen() {
                         </Text>
                       </View>
                       {item.status === 'denied' ? (
-                        <Text style={styles.responseStatusHint}>{t.approveAgainBody}</Text>
+                        <TouchableOpacity
+                          onPress={() => confirmApproveDeniedRequest(item.requesterId)}
+                          activeOpacity={0.85}
+                          disabled={Boolean(respondingRequestId)}
+                        >
+                          <Text style={[styles.responseStatusHint, styles.approveAgainInline]}>{t.approveAgainBody}</Text>
+                        </TouchableOpacity>
                       ) : null}
                     </View>
                   )}
+
+                  <View style={styles.chatOpenRow}>
+                    <MaterialCommunityIcons name="message-text-outline" size={16} color={ACCENT} />
+                    <Text style={styles.chatOpenText}>
+                      {language === 'en'
+                        ? 'Open card chat'
+                        : language === 'ru'
+                          ? '\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u0447\u0430\u0442 \u043f\u043e \u0442\u0435\u043c\u0435'
+                          : '\u0412\u0456\u0434\u043a\u0440\u0438\u0442\u0438 \u0447\u0430\u0442 \u043f\u043e \u0442\u0435\u043c\u0456'}
+                    </Text>
+                  </View>
 
                   <UserCardActionBar
                     avatarUri={item.requesterPhotoURL || avatarByUserId[item.requesterId] || ''}
@@ -964,7 +983,6 @@ export default function ProfileRequestsScreen() {
             const transitionScreenText = getProfileRequestSourceLabel(item.sourceType, item.context, language, t.notSpecified);
             const sourceTitleText = item.sourceTitle?.trim();
             const descText: string | null = reasonText || sourceTitleText || transitionScreenText;
-            const topicText = reasonText || sourceTitleText || transitionScreenText;
             const statusIcon = item.status === 'approved'
               ? 'check-circle'
               : item.status === 'denied'
@@ -1039,13 +1057,6 @@ export default function ProfileRequestsScreen() {
                         </Text>
                       </View>
                     ) : null}
-                  </View>
-                </View>
-
-                <View style={styles.requestMetaBox}>
-                  <View style={styles.requestMetaRow}>
-                    <Text style={styles.requestMetaLabel}>{t.topicLabel}</Text>
-                    <Text style={styles.requestMetaValue}>{topicText}</Text>
                   </View>
                 </View>
 
@@ -1480,6 +1491,26 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     lineHeight: 15,
+  },
+  approveAgainInline: {
+    color: ACCENT,
+  },
+  chatOpenRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 10,
+    backgroundColor: '#F4E7F0',
+    borderWidth: 1,
+    borderColor: '#D9B6CD',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  chatOpenText: {
+    color: ACCENT,
+    fontSize: 12,
+    fontWeight: '900',
   },
   incomingActionsRow: {
     flexDirection: 'row',

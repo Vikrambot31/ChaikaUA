@@ -19,6 +19,7 @@ import {
   submitBuildingRating,
 } from '../services/buildingRatingService';
 import { useBuildingRatings } from '../hooks/useBuildingRatings';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 type Building = {
   id: string;
@@ -150,6 +151,7 @@ function StarRow({ value }: { value: number | null }) {
 
 export default function RatingScreen() {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
+  const { colors, isDark } = useAppTheme();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const isAuthenticated = useSelector(selectIsAuthenticated);
   const isBootstrapped = useSelector(selectAuthBootstrapped);
@@ -290,7 +292,7 @@ export default function RatingScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View style={styles.backgroundLayer}>
         {LIGHT_ORBS.map((orb, index) => (
           <View key={index} style={[styles.orb, orb]} />
@@ -300,7 +302,7 @@ export default function RatingScreen() {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
           <MaterialCommunityIcons name="arrow-left" size={20} color={SCREEN_THEME.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.title}>{t.ratingScreen.title}</Text>
+        <Text style={[styles.title, { color: isDark ? '#F5E8F0' : undefined }]}>{t.ratingScreen.title}</Text>
         <View style={styles.headerSpacer} />
       </View>
       <>
@@ -482,6 +484,7 @@ export default function RatingScreen() {
 export function BuildingRatingDetailScreen() {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const route = useRoute<RouteProp<{ BuildingRatingDetailScreen: { buildingId: string } }, 'BuildingRatingDetailScreen'>>();
+  const { colors, isDark } = useAppTheme();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const isAuthenticated = useSelector(selectIsAuthenticated);
   const isBootstrapped = useSelector(selectAuthBootstrapped);
@@ -583,7 +586,7 @@ export function BuildingRatingDetailScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View style={styles.backgroundLayer}>
         {LIGHT_ORBS.map((orb, index) => (
           <View key={index} style={[styles.orb, orb]} />
@@ -593,7 +596,7 @@ export function BuildingRatingDetailScreen() {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
           <MaterialCommunityIcons name="arrow-left" size={20} color={SCREEN_THEME.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.title} numberOfLines={1}>{t.ratingScreen.title}</Text>
+        <Text style={[styles.title, { color: isDark ? '#F5E8F0' : undefined }]} numberOfLines={1}>{t.ratingScreen.title}</Text>
         <TouchableOpacity
           onPress={() => navigation.navigate('MainTabs', { screen: 'MapTab', params: { focusBuildingId: building.id } })}
           style={styles.headerButton}
@@ -801,5 +804,5 @@ const styles = StyleSheet.create({
   detailCard: { backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 22, padding: 16, marginTop: 14, marginBottom: 14, borderWidth: 1, borderColor: '#E4D0AB' },
   detailStatRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#EFE0C1' },
   showMoreButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: SCREEN_THEME.paperStrong, borderRadius: 18, paddingVertical: 13, marginHorizontal: 16, marginBottom: 10, borderWidth: 1, borderColor: '#E4D0AB' },
-  showMoreText: { fontSize: 15, fontWeight: '900', color: SCREEN_THEME.textSecondary },
+  showMoreText: { fontSize: 15, fontWeight: '900', color: '#21041B' },
 });

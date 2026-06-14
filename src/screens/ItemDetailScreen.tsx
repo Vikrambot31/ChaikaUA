@@ -28,6 +28,7 @@ import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
 import type { DetailItemData, BusinessMenuItem, BusinessPromotion } from '../utils/detailViewTypes';
 import { requireAuthForDetails } from '../utils/authGuard';
 import { SCREEN_THEME } from '../utils/screenTheme';
+import { useAppTheme } from '../hooks/useAppTheme';
 import WhoLikedMeInlineSection from '../components/WhoLikedMeInlineSection';
 import CommentSection from '../components/CommentSection';
 import { COMMENTS_PATH, CONTACT_COMMENTS_PATH } from '../services/commentService';
@@ -152,6 +153,7 @@ export default function ItemDetailScreen({
 }) {
   const dispatch = useDispatch();
   const { width: windowWidth } = useWindowDimensions();
+  const { colors } = useAppTheme();
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
   const currentUser = useSelector((state: RootState) => state.auth.user);
   const isBusinessPlus = useSelector(selectIsBusinessPlus);
@@ -468,7 +470,7 @@ export default function ItemDetailScreen({
         : '\u0423\u0432\u0456\u0439\u0442\u0438 / \u0417\u0430\u0440\u0435\u0454\u0441\u0442\u0440\u0443\u0432\u0430\u0442\u0438\u0441\u044c';
 
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
         <View style={styles.header}>
           <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.8}>
             <MaterialCommunityIcons name="chevron-left" size={22} color="#403933" />
@@ -494,7 +496,7 @@ export default function ItemDetailScreen({
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.8}>
           <MaterialCommunityIcons name="chevron-left" size={22} color="#403933" />
@@ -1080,7 +1082,7 @@ const styles = StyleSheet.create({
   showMoreBtnText: {
     fontSize: 14,
     fontWeight: '800',
-    color: SCREEN_THEME.enamelBlueDark,
+    color: '#21041B',
   },
   businessSectionContainer: {
     backgroundColor: '#FBF7F2',

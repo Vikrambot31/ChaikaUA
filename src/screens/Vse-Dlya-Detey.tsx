@@ -28,6 +28,7 @@ import { CHILDREN_SCREEN_BLACKLIST, childInfoSeed, getActiveOffers } from '../se
 import { ChildCategory, ChildFeature, ChildOffer, Place, PlaceType } from '../types/app';
 import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
+import { useAppTheme } from '../hooks/useAppTheme';
 import { subscribeActiveBonusPromotions, subscribeBiznesPlusPlaces, type BonusPromotion } from '../services/bonusService';
 import { safeCallPhone, safeOpenExternalUrl } from '../utils/communicationActions';
 import { selectUserId } from '../redux/selectors';
@@ -451,6 +452,7 @@ export default function VseDlyaDeteyScreen() {
   const navigation = useNavigation<AppNavigation>();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as Lang;
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
+  const { colors, isDark } = useAppTheme();
   const training = useTrainingMode('vse_dlya_detey');
   const user = useSelector((state: RootState) => state.auth.user);
   const currentUserId = useSelector(selectUserId);
@@ -856,7 +858,7 @@ export default function VseDlyaDeteyScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScrollView ref={scrollRef} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} activeOpacity={0.8}>
@@ -932,7 +934,7 @@ export default function VseDlyaDeteyScreen() {
         </View>
 
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>{text.actualTitle}</Text>
+          <Text style={[styles.sectionTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{text.actualTitle}</Text>
         </View>
         {activeOffers.length > 0 ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.offersRow}>
@@ -946,7 +948,7 @@ export default function VseDlyaDeteyScreen() {
         )}
 
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>{text.categoriesTitle}</Text>
+          <Text style={[styles.sectionTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{text.categoriesTitle}</Text>
         </View>
         <View style={styles.categoryGrid}>
           {CATEGORIES.map((category) => {
@@ -988,7 +990,7 @@ export default function VseDlyaDeteyScreen() {
           }}
         >
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>{isEventsCategory ? text.eventsListTitle : text.allPlacesTitle}</Text>
+            <Text style={[styles.sectionTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{isEventsCategory ? text.eventsListTitle : text.allPlacesTitle}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 }}>
               <Text style={styles.resultCount}>{isEventsCategory ? activeOffers.length : filteredPlaces.length}</Text>
               <TouchableOpacity style={styles.addPlaceButton} activeOpacity={0.88} onPress={openBusinessForm}>
@@ -1577,7 +1579,7 @@ const styles = StyleSheet.create({
   showMoreText: {
     fontSize: 15,
     fontWeight: '900',
-    color: SCREEN_THEME.textSecondary,
+    color: '#21041B',
   },
   addPlaceButton: {
     flexDirection: 'row',

@@ -124,7 +124,12 @@ export const childrenTopService = {
       language,
     };
     assertTextMatchesLanguage(`${sanitized.title} ${sanitized.description}`.trim(), language);
-    const newRef = await push(ref(database, PATH), sanitized);
-    return newRef.key!;
+    try {
+      const newRef = await push(ref(database, PATH), sanitized);
+      return newRef.key!;
+    } catch (error) {
+      console.error('[childrenTopService] add failed:', error);
+      throw error;
+    }
   },
 };

@@ -30,6 +30,7 @@ import { useTrainingMode } from '../hooks/useTrainingMode';
 import TrainingHint from '../components/TrainingHint';
 import HintBadge, { HINT_BADGE_LABELS } from '../components/HintBadge';
 import BetaAgreementModal from '../components/BetaAgreementModal';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 const BETA_AGREEMENT_KEY = '@chaika:beta_agreement_accepted_v1';
 
@@ -116,6 +117,7 @@ export default function SubscriptionScreen() {
   const daysLeft = useSelector(selectDaysLeft);
   const trialUsed = useSelector(selectTrialUsed);
 
+  const { colors, isDark } = useAppTheme();
   const [loading, setLoading] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<Plan>('monthly');
   const isSubmitting = useRef(false);
@@ -326,13 +328,13 @@ export default function SubscriptionScreen() {
   const currentPrice = selectedPlan === 'yearly' ? text.priceYearly : text.priceMonthly;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} activeOpacity={0.82} onPress={() => navigation.goBack()}>
           <MaterialCommunityIcons name="arrow-left" size={20} color={SCREEN_THEME.terracottaDark} />
           <Text style={styles.back}>{text.back}</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>{text.title}</Text>
+        <Text style={[styles.title, { color: isDark ? '#F5E8F0' : undefined }]}>{text.title}</Text>
         <HintBadge
           visible={training.isVisible}
           onTap={training.openHint}

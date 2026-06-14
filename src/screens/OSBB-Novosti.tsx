@@ -18,6 +18,7 @@ import { useOsbbMembership } from '../hooks/useOsbbMembership';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { OsbbNewsItem, subscribeOsbbNews } from '../services/osbbNews';
 import { VideoLoadingOverlay } from '../components/VideoLoadingOverlay';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 type AppNav = NativeStackNavigationProp<Record<string, object | undefined>>;
 type Lang = 'ua' | 'ru' | 'en';
@@ -145,6 +146,7 @@ const OsbbNovostyScreen: React.FC = () => {
   const buildingId = useSelector((state: RootState) => state.osbb.buildingId);
   useOsbbMembership();
   const isManager = useSelector(selectIsOsbbManager);
+  const { colors, isDark } = useAppTheme();
   const t = UI_TEXT[language];
 
   const [news, setNews] = useState<NewsItem[]>([]);
@@ -179,7 +181,7 @@ const OsbbNovostyScreen: React.FC = () => {
   ), [expandedId, isManager, language, navigation]);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <FlatList
         data={news}
         keyExtractor={(item) => item.id}
@@ -189,7 +191,7 @@ const OsbbNovostyScreen: React.FC = () => {
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
               <MaterialCommunityIcons name="arrow-left" size={24} color={SCREEN_THEME.textPrimary} />
             </TouchableOpacity>
-            <Text style={styles.screenTitle}>{t.screenTitle}</Text>
+            <Text style={[styles.screenTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{t.screenTitle}</Text>
             <View style={styles.backBtn} />
           </View>
         }
@@ -312,7 +314,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   expandRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  expandText: { fontSize: 13, fontWeight: '800', color: SCREEN_THEME.enamelBlue },
+  expandText: { fontSize: 13, fontWeight: '800', color: '#21041B' },
   loadingCard: {
     height: 200,
     justifyContent: 'center',

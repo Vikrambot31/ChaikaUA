@@ -21,6 +21,7 @@ import { selectUser } from '../redux/slices/authSlice';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { useTranslation } from '../i18n/useTranslation';
 import { database } from '../firebase-core';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 type Plan = 'monthly' | 'yearly';
 
@@ -70,6 +71,7 @@ export default function BusinessPlusSubscriptionScreen() {
   const daysLeft = useSelector(selectDaysLeft);
   const currentUser = useSelector(selectUser);
 
+  const { colors, isDark } = useAppTheme();
   const [selectedPlan, setSelectedPlan] = useState<Plan>('monthly');
   const [businessEmail, setBusinessEmail] = useState('');
   const [emailError, setEmailError] = useState('');
@@ -235,13 +237,13 @@ export default function BusinessPlusSubscriptionScreen() {
   const currentPrice = selectedPlan === 'yearly' ? text.priceYearly : text.priceMonthly;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} activeOpacity={0.82} onPress={() => navigation.goBack()}>
           <MaterialCommunityIcons name="arrow-left" size={20} color={SCREEN_THEME.terracottaDark} />
           <Text style={styles.back}>{text.back}</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>{text.title}</Text>
+        <Text style={[styles.title, { color: isDark ? '#F5E8F0' : undefined }]}>{text.title}</Text>
         <View style={styles.headerSpacer} />
       </View>
 

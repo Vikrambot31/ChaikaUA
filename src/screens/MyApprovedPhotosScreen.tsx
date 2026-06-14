@@ -24,6 +24,7 @@ import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField'
 import AppPhotoImage from '../components/AppPhotoImage';
 import type { RootState } from '../redux/store';
 import { safeLogError } from '../utils/errorLogger';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 type Lang = 'ua' | 'ru' | 'en';
 type AppNav = NavigationProp<Record<string, object | undefined>>;
@@ -134,6 +135,7 @@ export default function MyApprovedPhotosScreen() {
   const navigation = useNavigation<AppNav>();
   const user = useSelector(selectUser);
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
+  const { colors } = useAppTheme();
   const text = UI_TEXT[language];
   const statusLabel = STATUS_LABEL_BY_LANG[language];
   const [photos, setPhotos] = useState<PhotoRecord[]>([]);
@@ -252,7 +254,7 @@ export default function MyApprovedPhotosScreen() {
   ];
 
   return (
-    <SafeAreaView style={styles.root}>
+    <SafeAreaView style={[styles.root, { backgroundColor: colors.appBg }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} activeOpacity={0.7}>
           <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />

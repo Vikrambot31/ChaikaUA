@@ -21,6 +21,7 @@ import {
 import { safeOpenExternalUrl } from '../utils/communicationActions';
 import type { DetailItemData } from '../utils/detailViewTypes';
 import MiniTabBar from '../components/MiniTabBar';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 const AMOUNTS = [100, 200, 300, 500, 1000];
 type Lang = 'ua' | 'ru' | 'en';
@@ -199,6 +200,7 @@ const OsbbHubScreen: React.FC = () => {
   useOsbbMembership();
   const user = useSelector(selectUser);
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
+  const { colors } = useAppTheme();
   const text = UI_TEXT[language];
   const [showSetup, setShowSetup] = useState(!isSetupDone);
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
@@ -325,7 +327,7 @@ const OsbbHubScreen: React.FC = () => {
     osbb.membershipRole === 'manager' && osbb.membershipStatus === 'pending';
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
           <Image source={require('../../assets/WEBP-version/OSBB.webp')} style={styles.headerImage} resizeMode="cover" />

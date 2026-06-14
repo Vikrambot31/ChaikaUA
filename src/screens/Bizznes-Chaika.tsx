@@ -10,6 +10,7 @@ import { FeatureRatingBanner } from '../components/FeatureRatingBanner';
 import MiniUserAvatar from '../components/MiniUserAvatar';
 import AppPhotoImage from '../components/AppPhotoImage';
 import { SCREEN_THEME } from '../utils/screenTheme';
+import { useAppTheme } from '../hooks/useAppTheme';
 import { normalizePhoneText, sanitizeStoredText } from '../utils/textUtils';
 import { RootState } from '../redux/store';
 import { getModerationUserMessage, showUserError } from '../utils/userFacingErrors';
@@ -881,6 +882,7 @@ const BiznesChaikaScreen: React.FC = () => {
   const navLock = useRef(false);
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const training = useTrainingMode('business_chaika');
+  const { colors } = useAppTheme();
   const user = useSelector((state: RootState) => state.auth.user);
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const text = UI_TEXT[language];
@@ -1535,7 +1537,7 @@ const BiznesChaikaScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScreenTooltip
         storageKey={BUSINESS_CHAIKA_TOOLTIP.storageKey}
         title={BUSINESS_CHAIKA_TOOLTIP.title}

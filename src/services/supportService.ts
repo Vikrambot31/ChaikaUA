@@ -110,7 +110,8 @@ export const subscribeToUserTicket = (
       ticketUnsub = onValue(
         ref(database, `${TICKETS_PATH}/${ticketId}`),
         (ticketSnap) => {
-          callback(snapshotToTicket(ticketSnap));
+          const ticket = snapshotToTicket(ticketSnap);
+          callback(ticket?.status === 'open' ? ticket : null);
         },
         () => {
           // Read error on ticket node — surface as no ticket
@@ -195,6 +196,18 @@ export const createTicket = async (
 };
 
 // ── Send message ──
+
+export const closeSupportTicketForNewChat = async (ticketId: string): Promise<void> => {
+  await requireWriteSession({
+    operation: 'open_new_support_chat',
+    screen: 'SupportScreen',
+  });
+
+  await update(ref(database, `${TICKETS_PATH}/${ticketId}`), {
+    status: 'closed',
+    updatedAt: Date.now(),
+  });
+};
 
 export const sendUserMessage = async (
   ticketId: string,

@@ -13,6 +13,13 @@ import {
   type SupportCategory,
   type SupportStats,
 } from '../services/supportService';
+import {
+  subscribeToAiConfigState,
+  subscribeToSupportEscalations,
+  resolveSupportEscalation,
+  type SupportEscalationItem,
+} from '../services/aiConfigService';
+import { DEFAULT_AI_CONFIG, type AiConfig } from '../types/ai-config';
 
 const PAGE_SIZE = 20;
 
@@ -311,6 +318,95 @@ function ChatPanel({
 
 // ── Main page ──
 
+function AiSupportPanel({
+  config,
+  configExists,
+  escalations,
+  tickets,
+  onOpenTicket,
+  onResolve,
+}: {
+  config: AiConfig;
+  configExists: boolean;
+  escalations: SupportEscalationItem[];
+  tickets: SupportTicket[];
+  onOpenTicket: (item: SupportEscalationItem) => void;
+  onResolve: (id: string) => void;
+}) {
+  const primaryReady = configExists && config.apiKey.trim().length >= 8 && config.model.trim().length > 0;
+  const supportActive = primaryReady && config.autonomous.enabled && config.autonomous.supportReplies;
+  const fallbackReady = Boolean(
+    config.fallback?.enabled &&
+    config.fallback.apiKey.trim().length >= 8 &&
+    config.fallback.model.trim().length > 0,
+  );
+  const statusText = supportActive ? 'ИИ-ответы работают' : primaryReady ? 'ИИ на паузе для поддержки' : 'ИИ не подключен';
+  const statusColor = supportActive ? '#0f7a43' : primaryReady ? '#9a5b00' : '#9b1c31';
+  const statusBg = supportActive ? '#e7f7ee' : primaryReady ? '#fff4dc' : '#fde8ec';
+
+  return (
+    <div style={aiPanelStyles.wrapper}>
+      <div style={{ ...aiPanelStyles.statusBox, backgroundColor: statusBg, borderColor: statusColor }}>
+        <div style={{ ...aiPanelStyles.statusText, color: statusColor }}>{statusText}</div>
+        <div style={aiPanelStyles.modelLine}>
+          Текст: {config.provider} / {config.model}
+          {fallbackReady ? ` | авто-резерв: ${config.fallback?.provider} / ${config.fallback?.model}` : ''}
+        </div>
+      </div>
+
+      <div style={aiPanelStyles.attentionBox}>
+        <div style={aiPanelStyles.attentionHeader}>
+          <div>
+            <div style={aiPanelStyles.attentionTitle}>Нужно мое личное внимание</div>
+            <div style={aiPanelStyles.attentionSub}>
+              {escalations.length > 0
+                ? `ИИ остановил ${escalations.length} ответ(ов) и ждет администратора`
+                : 'Нет ожидающих AI-сигналов'}
+            </div>
+          </div>
+          <span style={aiPanelStyles.counter}>{escalations.length}</span>
+        </div>
+
+        {escalations.length > 0 && (
+          <div style={aiPanelStyles.escalationList}>
+            {escalations.slice(0, 4).map((item) => {
+              const ticketExists = tickets.some((t) => t.ticketId === item.ticketId);
+              return (
+                <div key={item.id} style={aiPanelStyles.escalationItem}>
+                  <div style={aiPanelStyles.escalationMeta}>
+                    <strong>{item.userName || 'Пользователь'}</strong>
+                    <span>{item.urgency} / {item.category}</span>
+                  </div>
+                  <div style={aiPanelStyles.escalationText}>{item.userMessage}</div>
+                  {item.aiDraftReply && (
+                    <div style={aiPanelStyles.draftText}>Черновик ИИ: {item.aiDraftReply}</div>
+                  )}
+                  <div style={aiPanelStyles.escalationActions}>
+                    <button
+                      type="button"
+                      style={{ ...aiPanelStyles.actionBtn, opacity: ticketExists ? 1 : 0.55 }}
+                      onClick={() => onOpenTicket(item)}
+                    >
+                      Открыть чат
+                    </button>
+                    <button
+                      type="button"
+                      style={aiPanelStyles.secondaryBtn}
+                      onClick={() => onResolve(item.id)}
+                    >
+                      Закрыть сигнал
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function SupportPage() {
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
@@ -320,6 +416,9 @@ export function SupportPage() {
   const [page, setPage] = useState(0);
   const [sending, setSending] = useState(false);
   const [stats, setStats] = useState<SupportStats>({ total: 0, open: 0, today: 0 });
+  const [aiConfig, setAiConfig] = useState<AiConfig>(DEFAULT_AI_CONFIG);
+  const [aiConfigExists, setAiConfigExists] = useState(false);
+  const [aiEscalations, setAiEscalations] = useState<SupportEscalationItem[]>([]);
 
   const selectedTicketIdRef = useRef<string | null>(null);
   selectedTicketIdRef.current = selectedTicket?.ticketId || null;
@@ -336,6 +435,19 @@ export function SupportPage() {
         if (updated) setSelectedTicket(updated);
       }
     });
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    const unsub = subscribeToAiConfigState(({ config, exists }) => {
+      setAiConfig(config);
+      setAiConfigExists(exists);
+    });
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    const unsub = subscribeToSupportEscalations(setAiEscalations);
     return unsub;
   }, []);
 
@@ -359,6 +471,25 @@ export function SupportPage() {
   const handleSelect = (t: SupportTicket) => {
     setSelectedTicket(t);
   };
+
+  const handleOpenAiEscalation = useCallback((item: SupportEscalationItem) => {
+    const ticket = tickets.find((t) => t.ticketId === item.ticketId);
+    if (!ticket) {
+      alert('Тикет уже не найден или еще не загружен в списке поддержки.');
+      return;
+    }
+    setStatusFilter('all');
+    setCategoryFilter('');
+    setSelectedTicket(ticket);
+  }, [tickets]);
+
+  const handleResolveAiEscalation = useCallback(async (id: string) => {
+    try {
+      await resolveSupportEscalation(id);
+    } catch (e) {
+      alert('Не удалось закрыть AI-сигнал: ' + (e instanceof Error ? e.message : String(e)));
+    }
+  }, []);
 
   const handleSendReply = async (text: string) => {
     if (!selectedTicket) return;
@@ -385,6 +516,15 @@ export function SupportPage() {
   return (
     <div style={pageStyles.container}>
       <h2 style={pageStyles.title}>🎧 Служба Підтримки</h2>
+
+      <AiSupportPanel
+        config={aiConfig}
+        configExists={aiConfigExists}
+        escalations={aiEscalations}
+        tickets={tickets}
+        onOpenTicket={handleOpenAiEscalation}
+        onResolve={handleResolveAiEscalation}
+      />
 
       <div style={pageStyles.layout}>
         {/* Left: ticket list */}
@@ -482,6 +622,138 @@ const pageStyles: Record<string, React.CSSProperties> = {
     borderRadius: 8,
     fontSize: 14,
     color: '#333',
+  },
+};
+
+const aiPanelStyles: Record<string, React.CSSProperties> = {
+  wrapper: {
+    display: 'grid',
+    gridTemplateColumns: 'minmax(300px, 0.85fr) minmax(420px, 1.4fr)',
+    gap: 12,
+    alignItems: 'stretch',
+  },
+  statusBox: {
+    border: '2px solid',
+    borderRadius: 10,
+    padding: '14px 16px',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    minHeight: 82,
+  },
+  statusText: {
+    fontSize: 30,
+    fontWeight: 800,
+    lineHeight: '34px',
+  },
+  modelLine: {
+    marginTop: 8,
+    fontSize: 13,
+    color: '#263238',
+    overflowWrap: 'anywhere',
+  },
+  attentionBox: {
+    border: '1px solid #d7dce5',
+    borderRadius: 10,
+    backgroundColor: '#fff',
+    minHeight: 82,
+    overflow: 'hidden',
+  },
+  attentionHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    padding: '12px 14px',
+    borderBottom: '1px solid #edf0f5',
+    backgroundColor: '#f7f9fc',
+  },
+  attentionTitle: {
+    fontSize: 18,
+    fontWeight: 800,
+    color: '#1f2937',
+  },
+  attentionSub: {
+    marginTop: 2,
+    fontSize: 13,
+    color: '#667085',
+  },
+  counter: {
+    minWidth: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#111827',
+    color: '#fff',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: 18,
+    fontWeight: 800,
+  },
+  escalationList: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+    gap: 10,
+    padding: 12,
+    maxHeight: 260,
+    overflowY: 'auto',
+  },
+  escalationItem: {
+    border: '1px solid #e4e7ec',
+    borderRadius: 8,
+    padding: 10,
+    backgroundColor: '#fff',
+  },
+  escalationMeta: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: 8,
+    fontSize: 12,
+    color: '#475467',
+    marginBottom: 6,
+  },
+  escalationText: {
+    fontSize: 13,
+    color: '#1f2937',
+    lineHeight: '18px',
+    maxHeight: 54,
+    overflow: 'hidden',
+  },
+  draftText: {
+    marginTop: 8,
+    padding: 8,
+    borderRadius: 6,
+    backgroundColor: '#f2f4f7',
+    fontSize: 12,
+    lineHeight: '17px',
+    color: '#344054',
+    maxHeight: 70,
+    overflow: 'hidden',
+  },
+  escalationActions: {
+    display: 'flex',
+    gap: 8,
+    marginTop: 10,
+  },
+  actionBtn: {
+    padding: '7px 10px',
+    borderRadius: 7,
+    border: 'none',
+    backgroundColor: '#3a5a9a',
+    color: '#fff',
+    fontWeight: 700,
+    fontSize: 12,
+    cursor: 'pointer',
+  },
+  secondaryBtn: {
+    padding: '7px 10px',
+    borderRadius: 7,
+    border: '1px solid #cfd6e4',
+    backgroundColor: '#fff',
+    color: '#344054',
+    fontWeight: 700,
+    fontSize: 12,
+    cursor: 'pointer',
   },
 };
 

@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAppTheme } from '../hooks/useAppTheme';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -736,9 +737,10 @@ const RequestFormScreen: React.FC = () => {
   const descriptionExtra = cleanDescription.length > 0 && cleanDescription.length < MIN_DESCRIPTION_LENGTH
     ? fillTemplate(t.descriptionLeft, { left: MIN_DESCRIPTION_LENGTH - cleanDescription.length })
     : undefined;
+  const { colors, isDark } = useAppTheme();
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <KeyboardAvoidingView
         style={styles.keyboard}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -750,7 +752,7 @@ const RequestFormScreen: React.FC = () => {
         >
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} activeOpacity={0.84}>
             <MaterialCommunityIcons name="arrow-left" size={20} color={SCREEN_THEME.textPrimary} />
-            <Text style={styles.backText}>{t.back}</Text>
+            <Text style={[styles.backText, { color: isDark ? '#F5E8F0' : undefined }]}>{t.back}</Text>
           </TouchableOpacity>
 
           <View style={styles.heroCard}>

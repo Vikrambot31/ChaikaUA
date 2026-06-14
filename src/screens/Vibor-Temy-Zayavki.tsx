@@ -8,6 +8,7 @@ import { ensureFirebaseAuth } from '../firebase-auth-session';
 import { safeNavigate } from '../utils/safeNavigation';
 import { RootState } from '../redux/store';
 import { LIGHT_ORBS, SCREEN_THEME } from '../utils/screenTheme';
+import { useAppTheme } from '../hooks/useAppTheme';
 import TactileIcon from '../components/TactileIcon';
 import { openRequestFormWithLimitCheck } from '../utils/requestFormLimitGuard';
 import MiniUserAvatar from '../components/MiniUserAvatar';
@@ -116,6 +117,7 @@ const isCreatedToday = (value: string | number | Date | undefined) => {
 const RequestTopicScreen: React.FC = () => {
   const navigation =
     useNavigation<NavigationProp<Record<string, object | undefined>>>();
+  const { colors } = useAppTheme();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const text = UI_TEXT[language];
   const currentUser = useSelector((state: RootState) => state.auth.user) as User | null;
@@ -238,7 +240,7 @@ const RequestTopicScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View pointerEvents="none" style={styles.backgroundOrbs}>
         {LIGHT_ORBS.map((orb, index) => (
           <View
@@ -553,7 +555,7 @@ const styles = StyleSheet.create({
   seeMoreText: {
     fontSize: 13,
     fontWeight: '800',
-    color: SCREEN_THEME.accentGold,
+    color: '#21041B',
     letterSpacing: 0.5,
   },
 });

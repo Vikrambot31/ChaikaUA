@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useAppTheme } from '../hooks/useAppTheme';
 import {
   ActivityIndicator,
   Alert,
@@ -473,8 +474,10 @@ const LostAndFoundScreen: React.FC = () => {
     navigation.navigate('ItemDetailScreen', { item: mapToDetailData(item) });
   };
 
+  const { colors, isDark } = useAppTheme();
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       {/* FlatList replaces the outer ScrollView for virtualized rendering of lost/found cards */}
       <FlatList
         contentContainerStyle={styles.content}
@@ -491,7 +494,7 @@ const LostAndFoundScreen: React.FC = () => {
             </View>
 
             <View style={styles.listHeader}>
-              <Text style={styles.listTitle}>{text.listTitle}</Text>
+              <Text style={[styles.listTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{text.listTitle}</Text>
               <Text style={styles.listCount}>{filteredItems.length}</Text>
             </View>
 

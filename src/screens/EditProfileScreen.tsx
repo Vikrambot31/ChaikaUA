@@ -36,6 +36,7 @@ import MiniUserAvatar from '../components/MiniUserAvatar';
 import { getStartAvatarByKey, START_AVATARS, START_AVATAR_URI_PREFIX } from '../utils/startAvatars';
 import { pickPhotoFromLibrary } from '../utils/photoPicker';
 import useSoftToast from '../hooks/useSoftToast';
+import { useAppTheme } from '../hooks/useAppTheme';
 import { subscribeToUserTicket, hasUnreadAdminReply } from '../services/supportService';
 import { awardMilestoneBonus } from '../services/bonusService';
 
@@ -150,6 +151,7 @@ const EditProfileScreen: React.FC<{ navigation: { goBack: () => void; navigate: 
   const dispatch = useDispatch();
   const { t, language } = useTranslation();
   const { showInfo } = useSoftToast();
+  const { colors } = useAppTheme();
   const text = UI_TEXT[language];
   const guarantorLabel = language === 'en' ? 'Guarantor' : 'Поручитель';
 
@@ -443,7 +445,7 @@ const EditProfileScreen: React.FC<{ navigation: { goBack: () => void; navigate: 
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View style={styles.backgroundLayer}>
         {LIGHT_ORBS.map((orb, index) => (
           <View key={index} style={[styles.orb, orb]} />

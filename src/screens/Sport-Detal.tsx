@@ -4,6 +4,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { RouteProp, useRoute } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { SCREEN_THEME } from '../utils/screenTheme';
+import { useAppTheme } from '../hooks/useAppTheme';
 import type { RootState } from '../redux/store';
 import { sportsService, SportKey, SportPlayer, SportTodayEntry } from '../services/sportsService';
 import ContactReasonModal from '../components/ContactReasonModal';
@@ -77,6 +78,7 @@ const SportDetailScreen: React.FC = () => {
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as Lang;
   const user = useSelector((state: RootState) => state.auth.user);
   const text = UI_TEXT[language];
+  const { colors, isDark } = useAppTheme();
   const title = route.params?.sportTitle || 'Спорт';
   const [todayPlayers, setTodayPlayers] = useState<SportTodayEntry[]>([]);
   const [players, setPlayers] = useState<SportPlayer[]>([]);
@@ -162,7 +164,7 @@ const SportDetailScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
           <MaterialCommunityIcons name="trophy-outline" size={38} color="#FFFFFF" />
@@ -182,7 +184,7 @@ const SportDetailScreen: React.FC = () => {
           <Text style={styles.actionText}>{text.rating}</Text>
         </TouchableOpacity>
 
-        <Text style={styles.sectionTitle}>{text.activePlayers}</Text>
+        <Text style={[styles.sectionTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{text.activePlayers}</Text>
         {loading ? (
           <ActivityIndicator size="small" color={SCREEN_THEME.terracottaDark} />
         ) : players.length === 0 ? (
@@ -197,7 +199,7 @@ const SportDetailScreen: React.FC = () => {
           </TouchableOpacity>
         ))}
 
-        <Text style={styles.sectionTitle}>{text.chooseTime}</Text>
+        <Text style={[styles.sectionTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{text.chooseTime}</Text>
         {showTimeSlots ? (
           <View style={styles.timeGrid}>
             {TIME_SLOTS.map((time) => (
@@ -216,7 +218,7 @@ const SportDetailScreen: React.FC = () => {
           </TouchableOpacity>
         )}
 
-        <Text style={styles.sectionTitle}>{text.todayList}</Text>
+        <Text style={[styles.sectionTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{text.todayList}</Text>
         {loading ? (
           <ActivityIndicator size="small" color={SCREEN_THEME.terracottaDark} />
         ) : todayPlayers.length === 0 ? (

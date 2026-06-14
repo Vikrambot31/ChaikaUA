@@ -8,6 +8,7 @@ import { useSelector } from 'react-redux';
 import type { RootState } from '../redux/store';
 import MiniTabBar from '../components/MiniTabBar';
 import { LIGHT_ORBS, SCREEN_THEME } from '../utils/screenTheme';
+import { useAppTheme } from '../hooks/useAppTheme';
 import { chaykaPlaces } from '../services/chaykaPlacesData';
 import { Place, PlaceType } from '../types/app';
 import StarRatingModal from '../components/StarRatingModal';
@@ -93,6 +94,7 @@ const getPlaceRating = (place: Place, ratings: RatingsByPlace): RatingAggregate 
 
 const TopStoresScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const { colors } = useAppTheme();
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
   const text = UI_TEXT[language];
   const [ratings, setRatings] = useState<RatingsByPlace>({});
@@ -161,7 +163,7 @@ const TopStoresScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View style={styles.backgroundLayer}>
         {LIGHT_ORBS.map((orb, index) => (
           <View key={index} style={[styles.orb, orb]} />

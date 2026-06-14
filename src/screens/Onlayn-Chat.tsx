@@ -46,6 +46,7 @@ import { requireAuthForDetails } from '../utils/authGuard';
 import GuestRegisterBanner from '../components/GuestRegisterBanner';
 import { useGuestGuard } from '../hooks/useGuestGuard';
 import { VideoLoadingOverlay } from '../components/VideoLoadingOverlay';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 type ChatRequest = ChatRequestLike;
 
@@ -414,6 +415,7 @@ const OnlineChatScreen = () => {
   const navLock = useRef(false);
   const language = useSelector((state: RootState) => normalizeLanguage(state.language?.current)) as 'ua' | 'ru' | 'en';
   const currentUser = useSelector((state: RootState) => state.auth.user);
+  const { colors, isDark } = useAppTheme();
   const { guard: guestGuard, bannerVisible: guestBannerVisible, hideBanner: hideGuestBanner } = useGuestGuard();
   const { modalVisible: contactModalVisible, pending: contactPending, currentTarget: contactTarget, openModal: openContactModal, closeModal: closeContactModal, sendRequest: sendContactRequest } = useContactRequest();
   const text = UI_TEXT[language];
@@ -693,7 +695,7 @@ const OnlineChatScreen = () => {
     : text.allLabel;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View pointerEvents="none" style={styles.backgroundOrbs}>
         {LIGHT_ORBS.map((orb, index) => (
           <View
@@ -715,7 +717,7 @@ const OnlineChatScreen = () => {
       </View>
 
       <TactileCard elevated style={styles.headerCard} pressable={false}>
-        <Text style={styles.headerTitle}>{text.title}</Text>
+        <Text style={[styles.headerTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{text.title}</Text>
       </TactileCard>
 
       {loading ? (

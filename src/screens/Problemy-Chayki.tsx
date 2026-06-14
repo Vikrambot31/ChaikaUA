@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useAppTheme } from '../hooks/useAppTheme';
 import { ActivityIndicator, Alert, FlatList, SafeAreaView, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSelector } from 'react-redux';
 import { Picker } from '@react-native-picker/picker';
@@ -335,6 +336,7 @@ const navigation = useNavigation<NavigationProp<Record<string, object | undefine
 const navLock = useRef(false);
 const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const user = useSelector((state: RootState) => state.auth.user);
+  const { colors } = useAppTheme();
 const text = CLEAN_PROBLEMS_TEXT[language];
   const requiredPhotoLabel = getRequiredPhotoLabel(language);
   const streetLabel = text.street;
@@ -763,7 +765,7 @@ const text = CLEAN_PROBLEMS_TEXT[language];
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       {/* FlatList replaces the outer ScrollView for virtualized rendering of problem cards */}
       <FlatList
         keyboardShouldPersistTaps="handled"

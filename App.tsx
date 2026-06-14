@@ -56,6 +56,7 @@ import { initFreezeWatchdog } from './src/services/freezeWatchdogService';
 import { isSafePromiseTimeoutError, safePromiseTimeout } from './src/utils/safePromiseTimeout';
 import { UploadQueue } from './src/photo-module';
 import { LOCAL_MODE, getCurrentLocalUser } from './src/local/LOCAL_MODE';
+import { isDevAdminMode, tryDevAdminAutoLogin } from './src/utils/devAdminLogin';
 import { awardDailyLoginBonus } from './src/services/bonusService';
 import type { User } from './src/types/app';
 
@@ -355,6 +356,13 @@ function AppWithAuthSync({ remoteConfigSnapshot, onRemoteConfigSnapshot }: AppWi
     let unsubscribe: (() => void) | null = null;
 
     const startAuthSync = async () => {
+      // DEV: auto-login as admin on web preview if credentials are saved
+      if (isDevAdminMode()) {
+        try {
+          await tryDevAdminAutoLogin();
+        } catch { /* will show login screen if auto-login fails */ }
+      }
+
       try {
         await bootstrapAuth({ timeoutMs: AUTH_BOOTSTRAP_TIMEOUT_MS, force: authRetryKey > 0 });
       } catch (error) {

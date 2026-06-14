@@ -8,6 +8,7 @@ import { openInGoogleMaps } from '../utils/googleMapsLink';
 import { getMapFocusPlaceParams } from '../utils/mapFocusParams';
 import MiniTabBar from '../components/MiniTabBar';
 import { LIGHT_ORBS, SCREEN_THEME } from '../utils/screenTheme';
+import { useAppTheme } from '../hooks/useAppTheme';
 import { chaykaPlaces } from '../services/chaykaPlacesData';
 import { Place, PlaceType } from '../types/app';
 import { RootState } from '../redux/store';
@@ -78,6 +79,7 @@ const UI_TEXT = {
 
 const TopCafeScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const { colors } = useAppTheme();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const text = UI_TEXT[language];
   const [ratings, setRatings] = useState<RatingsByPlace>({});
@@ -146,7 +148,7 @@ const TopCafeScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View style={styles.backgroundLayer}>
         {LIGHT_ORBS.map((orb, index) => (
           <View key={index} style={[styles.orb, orb]} />

@@ -26,6 +26,7 @@ import { normalizeUkrainianPhoneStrict, validateEmail, validateName, validatePas
 import { RootState } from '../redux/store';
 import { QuickRegistrationParams, useFullRegistration } from '../hooks/useFullRegistration';
 import { getRegistrationFullText } from './registrationFullText';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 const REGISTRATION_DRAFT_KEY = '@chaika:full-registration-draft:v1';
 const MAX_NAME_LENGTH = 80;
@@ -44,6 +45,7 @@ const RegisterScreenFull: React.FC = () => {
   const prefilledParams = (route.params ?? {}) as QuickRegistrationParams;
   const isCompletingExistingAccount = Boolean(auth.currentUser && !isAnonymousFirebaseUser(auth.currentUser) && currentUser?.registrationStatus === 'partial');
 
+  const { colors, isDark } = useAppTheme();
   const text = useMemo(() => getRegistrationFullText(language), [language]);
 
   const [name, setName] = useState(() => normalizePersonName(prefilledParams.name || currentUser?.name || auth.currentUser?.displayName || ''));
@@ -172,10 +174,10 @@ const RegisterScreenFull: React.FC = () => {
   });
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <TactileCard elevated style={styles.headerCard} pressable={false}>
-          <Text style={styles.headerTitle}>{text.title}</Text>
+          <Text style={[styles.headerTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{text.title}</Text>
           <Text style={styles.headerSubtitle}>{text.subtitle}</Text>
           <View style={styles.modeSwitchRow}>
             <TouchableOpacity style={styles.modeSwitchButtonSecondary} onPress={() => navigation.navigate('LoginScreen')} disabled={loading} activeOpacity={0.8}>

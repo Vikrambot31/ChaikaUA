@@ -16,6 +16,7 @@ import { showUserError } from '../utils/userFacingErrors';
 import { useOperationTrace } from '../hooks/useOperationTrace';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { ITEM_CATEGORY_VALUES, ITEM_CONDITION_VALUES, THREE_MONTHS_MS, UI_TEXT } from './Kuplu-Prodam';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 const DRAFT_KEY = '@chaika:buy_sell_draft';
 
@@ -24,6 +25,7 @@ const CreateBuySellScreen: React.FC = () => {
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const user = useSelector((state: RootState) => state.auth.user);
   const text = UI_TEXT[language];
+  const { colors } = useAppTheme();
   const { startOperation, trace } = useOperationTrace('CreateBuySellScreen');
   const allowLeaveRef = useRef(false);
   const draftHadPhotos = useRef(false);
@@ -243,7 +245,7 @@ const CreateBuySellScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.keyboard}>
         <View style={styles.header}>
           <TouchableOpacity style={styles.backBtn} onPress={requestClose} activeOpacity={0.8}>

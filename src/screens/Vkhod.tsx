@@ -30,6 +30,8 @@ import { validateEmail } from '../utils/validators';
 import { formatCountdown, getRateLimitRetryAfterSeconds } from '../utils/userFacingErrors';
 import { resolveAppUserFromFirebase } from '../services/authProfileService';
 import { ensureFirebaseAuth } from '../firebase-auth-session';
+import { useAppTheme } from '../hooks/useAppTheme';
+import { isDevAdminMode, devAdminLogin } from '../utils/devAdminLogin';
 
 // RootState type for language selector
 interface LangState { language?: { current?: string } }
@@ -220,6 +222,29 @@ const LoginScreen: React.FC = () => {
   const loading = useSelector(selectAuthLoading);
   const error = useSelector(selectAuthError);
 
+  // Dev admin login state (web preview only)
+  const [devPassword, setDevPassword] = useState('');
+  const [devLoading, setDevLoading] = useState(false);
+  const [devError, setDevError] = useState('');
+
+  const handleDevAdminLogin = useCallback(async () => {
+    if (!devPassword || devPassword.length < 6) {
+      setDevError('Enter admin password');
+      return;
+    }
+    setDevLoading(true);
+    setDevError('');
+    try {
+      await devAdminLogin(devPassword);
+      // onAuthStateChanged in App.tsx will handle the rest
+    } catch (err: any) {
+      setDevError(err?.message || 'Login failed');
+    } finally {
+      setDevLoading(false);
+    }
+  }, [devPassword]);
+
+  const { colors, isDark } = useAppTheme();
   const normalizedEmail = normalizeEmailText(email);
   const isEmailValid = validateEmail(normalizedEmail);
   const isPasswordValid = password.length >= 8;
@@ -447,10 +472,10 @@ const LoginScreen: React.FC = () => {
   }, [dispatch, navigation, text]);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.logoContainer}>
-          <Text style={styles.appTitle}>Chaika Life</Text>
+          <Text style={[styles.appTitle, { color: isDark ? '#F5E8F0' : undefined }]}>Chaika Life</Text>
           <Text style={styles.appSubtitle}>{text.subtitle}</Text>
         </View>
 
@@ -528,6 +553,30 @@ const LoginScreen: React.FC = () => {
           ) : null}
         </TactileCard>
 
+        {isDevAdminMode() ? (
+          <TactileCard elevated style={styles.devAdminCard} pressable={false}>
+            <Text style={styles.devAdminTitle}>DEV ADMIN LOGIN</Text>
+            <Text style={styles.devAdminHint}>vikramsave@ukr.net</Text>
+            {devError ? <Text style={styles.devAdminError}>{devError}</Text> : null}
+            <TactileInput
+              placeholder="Admin password"
+              value={devPassword}
+              onChangeText={setDevPassword}
+              secureTextEntry
+              editable={!devLoading}
+            />
+            <View style={styles.btnSpacing}>
+              <TactileButton
+                title={devLoading ? 'Signing in...' : 'Dev Admin Login'}
+                onPress={handleDevAdminLogin}
+                disabled={devLoading}
+                variant="primary"
+                style={{ backgroundColor: '#1B5E20' }}
+              />
+            </View>
+          </TactileCard>
+        ) : null}
+
         <View style={styles.signupRow}>
           <Text style={styles.signupText}>{text.noAccount}</Text>
           <TouchableOpacity onPress={() => void handleQuickRegister()} disabled={loading}>
@@ -569,6 +618,10 @@ const styles = StyleSheet.create({
   signupRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   signupText: { fontSize: 14, color: SCREEN_THEME.textSecondary },
   signupLink: { fontSize: 14, color: SCREEN_THEME.terracottaDark, fontWeight: '800' },
+  devAdminCard: { padding: 16, marginBottom: 16, borderWidth: 2, borderColor: '#1B5E20', backgroundColor: '#E8F5E9' },
+  devAdminTitle: { fontSize: 14, fontWeight: '900', color: '#1B5E20', textAlign: 'center', marginBottom: 4 },
+  devAdminHint: { fontSize: 12, color: '#2E7D32', textAlign: 'center', marginBottom: 8 },
+  devAdminError: { fontSize: 12, color: '#C62828', fontWeight: '600', marginBottom: 8 },
 });
 
 export default LoginScreen;

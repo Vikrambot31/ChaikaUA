@@ -349,6 +349,7 @@ export interface RequestsState {
   loading: boolean;
   error: string | null;
   approved: Request[];
+  lastFetchedAt: number | null;
 }
 
 export interface HelpRequestsState {

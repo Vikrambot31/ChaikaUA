@@ -124,7 +124,12 @@ export const foodTopService = {
       language,
     };
     assertTextMatchesLanguage(`${sanitized.title} ${sanitized.description}`.trim(), language);
-    const newRef = await push(ref(database, PATH), sanitized);
-    return newRef.key!;
+    try {
+      const newRef = await push(ref(database, PATH), sanitized);
+      return newRef.key!;
+    } catch (error) {
+      console.error('[foodTopService] add failed:', error);
+      throw error;
+    }
   },
 };

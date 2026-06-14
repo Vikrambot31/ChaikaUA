@@ -12,6 +12,7 @@ import { RootState } from '../redux/store';
 import { setFCMToken } from '../redux/slices/authSlice';
 import { fcmAPI } from '../firebase-config';
 import { DEFAULT_NOTIFICATION_PREFS, NotificationPrefs, loadNotificationPrefs, saveNotificationPrefs } from '../utils/notificationPrefs';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 type AppNavigation = import('@react-navigation/native').NavigationProp<Record<string, object | undefined>>;
 type Language = 'ua' | 'ru' | 'en';
@@ -141,6 +142,7 @@ export default function NotificationSettingsScreen() {
   const [permissionGranted, setPermissionGranted] = useState(false);
 
   const text = useMemo(() => SCREEN_TEXT[language] ?? SCREEN_TEXT.ua, [language]);
+  const { colors, isDark } = useAppTheme();
 
   useEffect(() => {
     const load = async () => {
@@ -214,7 +216,7 @@ export default function NotificationSettingsScreen() {
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View style={styles.backgroundLayer}>
         {LIGHT_ORBS.map((orb, index) => (
           <View key={index} style={[styles.orb, orb]} />
@@ -225,7 +227,7 @@ export default function NotificationSettingsScreen() {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <MaterialCommunityIcons name="arrow-left" size={20} color={SCREEN_THEME.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{text.title}</Text>
+        <Text style={[styles.headerTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{text.title}</Text>
         <View style={styles.headerSpacer} />
       </View>
 

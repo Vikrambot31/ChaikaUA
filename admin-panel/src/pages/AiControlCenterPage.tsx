@@ -9,10 +9,11 @@ import {
   loadAiLog,
   loadAiUsageStats,
   maskApiKey,
-  subscribeToAiConfig,
+  subscribeToAiConfigState,
   subscribeToEscalations,
   resolveEscalation,
   loadQueueLastRun,
+  loadPhotoQueueLastRun,
   subscribeToSupportEscalations,
   subscribeToReportEscalations,
   resolveSupportEscalation,
@@ -38,6 +39,7 @@ export const AiControlCenterPage = ({ user }: Props) => {
   const [tab, setTab] = useState<Tab>('model');
   const [config, setConfig] = useState<AiConfig>(DEFAULT_AI_CONFIG);
   const [savedConfig, setSavedConfig] = useState<AiConfig>(DEFAULT_AI_CONFIG);
+  const [configExists, setConfigExists] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveOk, setSaveOk] = useState(false);
@@ -50,16 +52,18 @@ export const AiControlCenterPage = ({ user }: Props) => {
   const [escalations, setEscalations] = useState<EscalationItem[]>([]);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
   const [lastRun, setLastRun] = useState<AiQueueLastRun | null>(null);
+  const [photoLastRun, setPhotoLastRun] = useState<AiQueueLastRun | null>(null);
   const [supportEscalations, setSupportEscalations] = useState<SupportEscalationItem[]>([]);
   const [reportEscalations, setReportEscalations] = useState<ReportEscalationItem[]>([]);
   const [escalationFilter, setEscalationFilter] = useState<'all' | 'content' | 'support' | 'reports'>('all');
 
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 5000);
-    const unsub = subscribeToAiConfig((cfg) => {
+    const unsub = subscribeToAiConfigState(({ config: cfg, exists }) => {
       clearTimeout(timer);
       setConfig(cfg);
       setSavedConfig(cfg);
+      setConfigExists(exists);
       setLoading(false);
     });
     return () => { unsub(); clearTimeout(timer); };
@@ -68,6 +72,7 @@ export const AiControlCenterPage = ({ user }: Props) => {
   useEffect(() => {
     const unsub = subscribeToEscalations(setEscalations);
     void loadQueueLastRun().then(setLastRun);
+    void loadPhotoQueueLastRun().then(setPhotoLastRun);
     return unsub;
   }, []);
 
@@ -78,6 +83,162 @@ export const AiControlCenterPage = ({ user }: Props) => {
   }, []);
 
   const hasChanges = JSON.stringify(config) !== JSON.stringify(savedConfig);
+  const hasApiKey = config.apiKey.trim().length >= 8;
+  const isMainVisionCompatible = config.provider === config.vision.provider;
+  const hasVisionKey = config.vision.apiKey.trim().length >= 8;
+  const visionReady = hasVisionKey || (hasApiKey && isMainVisionCompatible);
+  const fallbackReady = Boolean(config.fallback?.enabled && config.fallback.apiKey.trim().length >= 8 && config.fallback.model.trim());
+  const autonomousEnabledCount = Object.entries(config.autonomous)
+    .filter(([key, value]) => key !== 'enabled' && value)
+    .length;
+  const totalEscalations = escalations.length + supportEscalations.length + reportEscalations.length;
+  const aiDisconnected = !configExists || !hasApiKey || !config.model.trim();
+  const aiPaused = !aiDisconnected && (!config.autonomous.enabled || autonomousEnabledCount === 0);
+  const aiWorking = !aiDisconnected && config.autonomous.enabled && autonomousEnabledCount > 0;
+  const aiState = aiDisconnected
+    ? {
+      title: 'ИИ не подключен',
+      subtitle: 'Нет сохранённого конфига, ключа или модели',
+      color: '#ef5350',
+      background: 'linear-gradient(135deg, #3a1515 0%, #1a1a2a 100%)',
+      border: '#ef5350',
+    }
+    : aiPaused
+      ? {
+        title: 'ИИ на паузе',
+        subtitle: 'Модель подключена, но автономные режимы выключены',
+        color: '#ffd54f',
+        background: 'linear-gradient(135deg, #3a2f12 0%, #1a1a2a 100%)',
+        border: '#8d6e00',
+      }
+      : aiWorking && lastRun
+        ? {
+          title: 'ИИ работает',
+          subtitle: 'Автономная модерация активна',
+          color: '#69f0ae',
+          background: 'linear-gradient(135deg, #0d3b24 0%, #1a1a2a 100%)',
+          border: '#2e7d32',
+        }
+        : {
+          title: 'ИИ спит',
+          subtitle: 'Модель подключена, ждёт ближайший scheduled-прогон',
+          color: '#90caf9',
+          background: 'linear-gradient(135deg, #102b3f 0%, #1a1a2a 100%)',
+          border: '#1976d2',
+        };
+
+  const modeBadges = [
+    { label: 'Текст', enabled: config.autonomous.enabled && config.autonomous.textModeration, value: `${config.provider} / ${config.model || 'модель не выбрана'}${fallbackReady ? ` -> ${config.fallback?.provider} / ${config.fallback?.model}` : ''}` },
+    { label: 'Фото', enabled: config.autonomous.enabled && config.autonomous.photoModeration && visionReady, value: visionReady ? `${config.vision.provider} / ${config.vision.model}` : 'не подключена' },
+    { label: 'Поддержка', enabled: config.autonomous.enabled && config.autonomous.supportReplies, value: config.autonomous.supportReplies ? `${config.provider} / ${config.model}` : 'на паузе' },
+    { label: 'Жалобы', enabled: config.autonomous.enabled && config.autonomous.reportsTriage, value: config.autonomous.reportsTriage ? `${config.provider} / ${config.model}` : 'на паузе' },
+  ];
+
+  const applySafeTemplate = () => {
+    setConfig((c) => ({
+      ...c,
+      provider: 'opencode',
+      model: AI_PROVIDER_DEFAULT_MODELS.opencode,
+      baseUrl: c.baseUrl || 'https://opencode.ai/zen/v1',
+      budgetDaily: c.budgetDaily || 5000,
+      budgetMonthly: c.budgetMonthly || 100000,
+      autonomous: {
+        enabled: false,
+        textModeration: false,
+        photoModeration: false,
+        supportReplies: false,
+        reportsTriage: false,
+      },
+      thresholds: {
+        autoApprove: 0.90,
+        autoReject: 0.95,
+        escalateBelow: 0.65,
+      },
+      vision: {
+        ...c.vision,
+        provider: 'openai',
+        model: c.vision.model || 'gpt-4o-mini',
+      },
+    }));
+  };
+
+  const statusItems = [
+    { label: 'RTDB конфиг', ok: configExists, detail: configExists ? 'создан' : 'не создан' },
+    { label: 'API key', ok: hasApiKey, detail: hasApiKey ? maskApiKey(config.apiKey) : 'не заполнен' },
+    { label: 'Модель', ok: Boolean(config.model.trim()), detail: config.model || 'не выбрана' },
+    { label: 'Автономность', ok: config.autonomous.enabled && autonomousEnabledCount > 0, detail: config.autonomous.enabled ? `${autonomousEnabledCount} режима` : 'выключена' },
+    { label: 'Vision', ok: visionReady, detail: visionReady ? `${config.vision.provider}/${config.vision.model}` : 'нужен ключ OpenAI/Claude' },
+    { label: 'Резерв', ok: fallbackReady, detail: fallbackReady ? `${config.fallback?.provider}/${config.fallback?.model}` : 'не настроен' },
+    { label: 'Эскалации', ok: totalEscalations === 0, detail: `${totalEscalations} pending` },
+  ];
+
+  const renderStatusPanel = () => (
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+      gap: 10,
+      marginBottom: 24,
+    }}>
+      {statusItems.map((item) => (
+        <div key={item.label} style={{
+          padding: '10px 12px',
+          borderRadius: 8,
+          border: `1px solid ${item.ok ? '#2e7d32' : '#6a4b00'}`,
+          background: item.ok ? '#102414' : '#2a2110',
+        }}>
+          <div style={{ fontSize: 11, color: item.ok ? '#81c784' : '#ffd54f', fontWeight: 800, textTransform: 'uppercase' }}>{item.label}</div>
+          <div style={{ marginTop: 4, color: '#e0e0e0', fontSize: 13, overflowWrap: 'anywhere' }}>{item.detail}</div>
+        </div>
+      ))}
+    </div>
+  );
+
+  const renderAiHero = () => (
+    <div style={{
+      marginBottom: 24,
+      padding: '22px 24px',
+      borderRadius: 10,
+      border: `2px solid ${aiState.border}`,
+      background: aiState.background,
+      boxShadow: `0 0 0 1px ${aiState.border}22, 0 16px 40px #00000033`,
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 18, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ color: aiState.color, fontSize: 38, lineHeight: 1, fontWeight: 900, letterSpacing: 0 }}>
+            {aiState.title}
+          </div>
+          <div style={{ marginTop: 8, color: '#e0e0e0', fontSize: 17, fontWeight: 700 }}>
+            Рабочая модель: {hasApiKey ? `${config.provider} / ${config.model || 'не выбрана'}` : 'не подключена'}
+          </div>
+          {fallbackReady && (
+            <div style={{ marginTop: 6, color: '#ffd54f', fontSize: 15, fontWeight: 800 }}>
+              Авто-резерв при лимитах: {config.fallback?.provider} / {config.fallback?.model}
+            </div>
+          )}
+          <div style={{ marginTop: 6, color: '#aaa', fontSize: 13 }}>
+            {aiState.subtitle}
+            {lastRun ? ` · последний текстовый прогон: ${formatDate(lastRun.timestamp)}` : ''}
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(120px, 1fr))', gap: 8, minWidth: 280 }}>
+          {modeBadges.map((mode) => (
+            <div key={mode.label} style={{
+              padding: '9px 10px',
+              borderRadius: 8,
+              border: `1px solid ${mode.enabled ? '#2e7d32' : '#555'}`,
+              background: mode.enabled ? '#0f2a18' : '#20202d',
+            }}>
+              <div style={{ color: mode.enabled ? '#69f0ae' : '#888', fontSize: 11, fontWeight: 900, textTransform: 'uppercase' }}>
+                {mode.enabled ? 'работает' : 'спит'}
+              </div>
+              <div style={{ color: '#fff', fontSize: 14, fontWeight: 800, marginTop: 2 }}>{mode.label}</div>
+              <div style={{ color: '#aaa', fontSize: 11, marginTop: 2, overflowWrap: 'anywhere' }}>{mode.value}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 
   const handleSave = async () => {
     setSaving(true);
@@ -721,6 +882,45 @@ export const AiControlCenterPage = ({ user }: Props) => {
       <p style={{ color: '#aaa', marginBottom: 28, fontSize: 16 }}>
         Управление AI-провайдером и автономным режимом модерации
       </p>
+
+      {renderAiHero()}
+      {renderStatusPanel()}
+
+      {!configExists && (
+        <div style={{
+          marginBottom: 20,
+          padding: '14px 16px',
+          borderRadius: 8,
+          background: '#2a2110',
+          border: '1px solid #6a4b00',
+          color: '#ffd54f',
+          display: 'flex',
+          justifyContent: 'space-between',
+          gap: 16,
+          alignItems: 'center',
+        }}>
+          <div>
+            <strong>AI config ещё не создан.</strong>
+            <div style={{ marginTop: 4, fontSize: 13, color: '#e0c56a' }}>
+              Можно применить безопасный шаблон, затем добавить API key и сохранить.
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={applySafeTemplate}
+            style={{ padding: '8px 14px', borderRadius: 6, border: '1px solid #8d6e00', background: '#3a2f12', color: '#ffd54f', cursor: 'pointer', fontWeight: 700 }}
+          >
+            Безопасный шаблон
+          </button>
+        </div>
+      )}
+
+      {(lastRun || photoLastRun) && (
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 20, color: '#aaa', fontSize: 12 }}>
+          {lastRun && <span>Текстовый прогон: {formatDate(lastRun.timestamp)} · ✓{lastRun.totalApproved} ✕{lastRun.totalRejected} ⚡{lastRun.totalEscalated}</span>}
+          {photoLastRun && <span>Фото-прогон: {formatDate(photoLastRun.timestamp)} · ✓{photoLastRun.totalApproved} ✕{photoLastRun.totalRejected} ⚡{photoLastRun.totalEscalated}</span>}
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: 4, marginBottom: 28, borderBottom: '1px solid #333', paddingBottom: 0 }}>
         {tabs.map(({ key, label, badge }) => (

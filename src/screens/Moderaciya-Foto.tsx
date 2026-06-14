@@ -26,6 +26,7 @@ import { lostFoundService, LostFoundItem } from '../services/lostFoundService';
 import { moderateOsbbNews, OsbbNewsItem } from '../services/osbbNews';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { logClientError } from '../utils/errorLogger';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 type Tab = 'requests' | 'photos' | 'buysell' | 'contacts' | 'jobs' | 'lostfound' | 'osbbnews';
 type Lang = 'ua' | 'ru' | 'en';
@@ -137,6 +138,7 @@ const isPublicGalleryPhoto = (photo: CommunityPhoto): boolean => {
 };
 
 const PhotoModerationScreen: React.FC = () => {
+  const { colors } = useAppTheme();
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ru') as Lang);
   const text = T[language];
 
@@ -716,7 +718,7 @@ const PhotoModerationScreen: React.FC = () => {
     language === 'ua' ? tab.labelUa : language === 'en' ? tab.labelEn : tab.labelRu;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.appBg }]}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>{text.title}</Text>

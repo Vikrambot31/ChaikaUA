@@ -78,6 +78,7 @@ import BusinessMenuEditorScreen from '../screens/BusinessMenuEditorScreen';
 import BusinessPromoEditorScreen from '../screens/BusinessPromoEditorScreen';
 import SpisokPokupokScreen from '../screens/Spisok-Pokupok';
 import ProfileRequestsScreen from '../screens/ProfileRequestsScreen';
+import ContactCardChatScreen from '../screens/ContactCardChatScreen';
 import AppVersionInfoScreen from '../screens/AppVersionInfoScreen';
 import SupportScreen from '../screens/SupportScreen';
 import BonusWalletScreen from '../screens/BonusWalletScreen';
@@ -86,6 +87,7 @@ import PromoCreditsAdminScreen from '../screens/PromoCreditsAdminScreen';
 import BonusPromotionPurchaseScreen from '../screens/BonusPromotionPurchaseScreen';
 import FavoritesScreen from '../screens/FavoritesScreen';
 import EditContactListingScreen from '../screens/EditContactListingScreen';
+import InboxScreen from '../screens/InboxScreen';
 import CrashDiagnosticsScreen from '../screens/CrashDiagnosticsScreen';
 import AppMonitorScreen from '../screens/AppMonitorScreen';
 import type { Request, Place } from '../types/app';
@@ -210,6 +212,9 @@ export type RootStackParamList = {
   EdaNaChaykeScreen: undefined;
   SpisokPokupokScreen: undefined;
   ProfileRequestsScreen: undefined;
+  ContactCardChatScreen: {
+    request: import('../services/profilePermissionService').ProfileViewRequest & { targetUserId: string };
+  };
   MyPhotosScreen: undefined;
   MyApprovedPhotosScreen: undefined;
   PhotoUploadScreen: undefined;
@@ -229,6 +234,7 @@ export type RootStackParamList = {
   BonusPromotionPurchaseScreen: { initialPromoType?: string; initialTargetId?: string } | undefined;
   FavoritesScreen: undefined;
   EditContactListingScreen: { itemId: string; initialData: import('../utils/detailViewTypes').DetailItemData };
+  InboxScreen: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -298,6 +304,8 @@ const linking: LinkingOptions<RootStackParamList> = {
       PromoCreditsAdminScreen: 'screen/admin/promo-credits',
       BonusPromotionPurchaseScreen: 'screen/bonus-promotion',
       CreateBuySellScreen: 'screen/buy-sell/create',
+      InboxScreen: 'screen/inbox',
+      ContactCardChatScreen: 'screen/contact-card-chat',
     },
   },
 };
@@ -392,6 +400,7 @@ const ROUTE_FILE_MAP: Record<string, string> = {
   EdaNaChaykeScreen: 'Eda-Na-Chayke.tsx',
   SpisokPokupokScreen: 'Spisok-Pokupok.tsx',
   ProfileRequestsScreen: 'ProfileRequestsScreen.tsx',
+  ContactCardChatScreen: 'ContactCardChatScreen.tsx',
   MyPhotosScreen: 'photo-module/MyPhotosScreen.tsx',
   MyApprovedPhotosScreen: 'MyApprovedPhotosScreen.tsx',
   AppVersionInfoScreen: 'AppVersionInfoScreen.tsx',
@@ -402,6 +411,7 @@ const ROUTE_FILE_MAP: Record<string, string> = {
   BusinessPlusSubscriptionScreen: 'BusinessPlusSubscriptionScreen.tsx',
   BusinessMenuEditorScreen: 'BusinessMenuEditorScreen.tsx',
   BusinessPromoEditorScreen: 'BusinessPromoEditorScreen.tsx',
+  InboxScreen: 'InboxScreen.tsx',
 };
 
 function ScreenFileInfoOverlay() {
@@ -910,6 +920,7 @@ function AuthNavigation() {
         <Stack.Screen name="EdaNaChaykeScreen" component={EdaNaChaykeScreen} />
         <Stack.Screen name="SpisokPokupokScreen" component={SpisokPokupokScreen} />
         <Stack.Screen name="ProfileRequestsScreen" component={ProfileRequestsScreen} />
+        <Stack.Screen name="ContactCardChatScreen" component={ContactCardChatScreen} />
         <Stack.Screen name="MyPhotosScreen" component={MyPhotosScreen} options={{ headerShown: false }} />
         <Stack.Screen name="MyApprovedPhotosScreen" component={MyApprovedPhotosScreen} options={{ headerShown: false }} />
         <Stack.Screen name="AppVersionInfoScreen" component={AppVersionInfoScreen} />
@@ -921,6 +932,7 @@ function AuthNavigation() {
         <Stack.Screen name="BonusPromotionPurchaseScreen" component={withGuard(BonusPromotionPurchaseScreen, 'auth')} />
         <Stack.Screen name="FavoritesScreen" component={FavoritesScreen} />
         <Stack.Screen name="EditContactListingScreen" component={withGuard(EditContactListingScreen, 'auth')} />
+        <Stack.Screen name="InboxScreen" component={InboxScreen} />
         <Stack.Screen name="BusinessClaimScreen" component={withGuard(BusinessClaimScreen, 'auth')} />
         <Stack.Screen name="BusinessPlusSubscriptionScreen" component={withGuard(BusinessPlusSubscriptionScreen, 'auth')} />
         <Stack.Screen name="BusinessMenuEditorScreen" component={withGuard(BusinessMenuEditorScreen, 'auth')} />

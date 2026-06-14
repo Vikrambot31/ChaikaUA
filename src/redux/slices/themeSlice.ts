@@ -12,11 +12,11 @@ export function normalizeTheme(value: unknown): AppTheme {
   if (typeof value === 'string' && (VALID_THEMES as string[]).includes(value)) {
     return value as AppTheme;
   }
-  return 'light';
+  return 'dark';
 }
 
 const initialState: ThemeState = {
-  current: 'light',
+  current: 'dark',
 };
 
 const themeSlice = createSlice({

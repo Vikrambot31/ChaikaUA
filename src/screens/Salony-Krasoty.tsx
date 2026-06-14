@@ -27,6 +27,7 @@ import { beautyInfoSeed, getActiveBeautyOffers } from '../services/beautySeed';
 import { BeautyCategory, BeautyFeature, BeautyOffer, Place } from '../types/app';
 import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
+import { useAppTheme } from '../hooks/useAppTheme';
 import { subscribeActiveBonusPromotions, subscribeBiznesPlusPlaces, type BonusPromotion } from '../services/bonusService';
 import UserCardActionBar from '../components/UserCardActionBar';
 import { toggleFavorite, getFavorites, type FavoriteSource } from '../services/favoritesService';
@@ -366,6 +367,7 @@ const TRAINING_HINT: Record<Lang, string> = {
 
 export default function SalonyKrasotyScreen() {
   const navigation = useNavigation<AppNavigation>();
+  const { colors, isDark } = useAppTheme();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as Lang;
   const user = useSelector((state: RootState) => state.auth.user);
   const currentUserEmail = user?.email;
@@ -686,7 +688,7 @@ export default function SalonyKrasotyScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScrollView ref={scrollRef} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} activeOpacity={0.8}>
@@ -718,7 +720,7 @@ export default function SalonyKrasotyScreen() {
         </View>
 
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>{text.actualTitle}</Text>
+          <Text style={[styles.sectionTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{text.actualTitle}</Text>
         </View>
         {activeOffers.length > 0 ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.offersRow}>
@@ -732,7 +734,7 @@ export default function SalonyKrasotyScreen() {
         )}
 
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>{text.categoriesTitle}</Text>
+          <Text style={[styles.sectionTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{text.categoriesTitle}</Text>
         </View>
         <View style={styles.categoryGrid}>
           {CATEGORIES.map((category) => {
@@ -774,7 +776,7 @@ export default function SalonyKrasotyScreen() {
           }}
         >
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>{text.allPlacesTitle}</Text>
+            <Text style={[styles.sectionTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{text.allPlacesTitle}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 }}>
               <Text style={styles.resultCount}>{filteredPlaces.length}</Text>
               <TouchableOpacity style={styles.addPlaceButton} activeOpacity={0.88} onPress={openBusinessForm}>
@@ -1302,7 +1304,7 @@ const styles = StyleSheet.create({
   showMoreText: {
     fontSize: 15,
     fontWeight: '900',
-    color: SCREEN_THEME.textSecondary,
+    color: '#21041B',
   },
   addPlaceButton: {
     flexDirection: 'row',

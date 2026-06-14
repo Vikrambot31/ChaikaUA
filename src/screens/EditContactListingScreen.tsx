@@ -29,6 +29,7 @@ import PhotoUploadField, { type UploadedPhoto } from '../components/PhotoUploadF
 import AppPhotoImage from '../components/AppPhotoImage';
 import MiniTabBar from '../components/MiniTabBar';
 import { SCREEN_THEME } from '../utils/screenTheme';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 type Lang = 'ua' | 'ru' | 'en';
 
@@ -204,6 +205,7 @@ export default function EditContactListingScreen({
   const { itemId, initialData } = route.params;
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
   const user = useSelector((state: RootState) => state.auth.user);
+  const { colors, isDark } = useAppTheme();
   const text = UI_TEXT[language];
   const toast = useSoftToast();
 
@@ -327,13 +329,13 @@ export default function EditContactListingScreen({
     : '#78716C';
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.8}>
           <MaterialCommunityIcons name="chevron-left" size={22} color="#403933" />
           <Text style={styles.backText}>{text.back}</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{text.header}</Text>
+        <Text style={[styles.headerTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{text.header}</Text>
         <View style={styles.headerSpacer} />
       </View>
 

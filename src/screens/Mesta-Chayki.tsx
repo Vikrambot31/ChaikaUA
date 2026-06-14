@@ -21,6 +21,7 @@ import FeedLikeButton from '../components/FeedLikeButton';
 import { toggleFavorite, getFavorites, type FavoriteSource } from '../services/favoritesService';
 import { useSoftToast } from '../hooks/useSoftToast';
 import { selectUserId } from '../redux/selectors';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 const REAL_CHAIKA_STORES: Place[] = [
   { id: 'store-real-fora', name: 'Фора', address: 'вулиця Михайла Грушевського, 12', latitude: 50.43898, longitude: 30.28264, type: PlaceType.SHOP, rating: 0, reviews: 0, createdAt: new Date('2026-04-22T09:00:00Z').valueOf() },
@@ -356,6 +357,7 @@ const PlacesScreen: React.FC = () => {
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as Lang;
   const userId = useSelector((state: RootState) => state.auth?.user?.id);
   const currentUserId = useSelector(selectUserId);
+  const { colors } = useAppTheme();
   const text = UI_TEXT[language];
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [showAllItems, setShowAllItems] = useState(false);
@@ -643,7 +645,7 @@ const PlacesScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View style={styles.backgroundLayer}>
         {LIGHT_ORBS.map((orb, index) => (
           <View key={index} style={[styles.orb, orb]} />
@@ -877,7 +879,7 @@ const styles = StyleSheet.create({
   showMoreText: {
     fontSize: 15,
     fontWeight: '900',
-    color: SCREEN_THEME.textSecondary,
+    color: '#21041B',
   },
   emptyCard: {
     backgroundColor: SCREEN_THEME.paperStrong,

@@ -30,6 +30,7 @@ import {
   getDefaultAvatarKey,
 } from '../utils/startAvatars';
 import { updateProfileRecord, uploadProfilePhoto } from '../services/authProfileService';
+import { useAppTheme } from '../hooks/useAppTheme';
 import { pickPhotoFromLibrary } from '../utils/photoPicker';
 
 const TEXT = {
@@ -125,6 +126,7 @@ export default function ProfileSetupScreen() {
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const user = useSelector(selectUser);
   const text = TEXT[language] ?? TEXT.ua;
+  const { colors, isDark } = useAppTheme();
 
   const [name, setName] = useState(user?.name || '');
   const [gender, setGender] = useState<'male' | 'female' | null>(user?.gender ?? null);
@@ -299,7 +301,7 @@ export default function ProfileSetupScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           contentContainerStyle={styles.content}
@@ -307,7 +309,7 @@ export default function ProfileSetupScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.header}>
-            <Text style={styles.title}>{text.title}</Text>
+            <Text style={[styles.title, { color: isDark ? '#F5E8F0' : undefined }]}>{text.title}</Text>
             <Text style={styles.subtitle}>{text.subtitle}</Text>
           </View>
 

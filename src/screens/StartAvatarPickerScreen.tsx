@@ -22,6 +22,7 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { saveSelectedStartAvatar, START_AVATARS } from '../utils/startAvatars';
 import { updateProfileRecord } from '../services/authProfileService';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 const TEXT = {
   ua: {
@@ -62,6 +63,7 @@ export default function StartAvatarPickerScreen() {
   const dispatch = useDispatch();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const user = useSelector(selectUser);
+  const { colors, isDark } = useAppTheme();
   const text = TEXT[language] ?? TEXT.ua;
   const [selectedKey, setSelectedKey] = useState('');
   const [saving, setSaving] = useState(false);
@@ -101,13 +103,13 @@ export default function StartAvatarPickerScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} activeOpacity={0.8}>
             <MaterialCommunityIcons name="arrow-left" size={22} color={SCREEN_THEME.textPrimary} />
           </TouchableOpacity>
-          <Text style={styles.title}>{text.title}</Text>
+          <Text style={[styles.title, { color: isDark ? '#F5E8F0' : undefined }]}>{text.title}</Text>
           <Text style={styles.subtitle}>{text.subtitle}</Text>
         </View>
 

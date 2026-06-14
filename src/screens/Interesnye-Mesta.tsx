@@ -8,6 +8,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import MiniTabBar from '../components/MiniTabBar';
 import TactileIcon from '../components/TactileIcon';
 import { LIGHT_ORBS, SCREEN_THEME } from '../utils/screenTheme';
+import { useAppTheme } from '../hooks/useAppTheme';
 import { chaykaPlaces } from '../services/chaykaPlacesData';
 import { Place, PlaceType } from '../types/app';
 import { RootState } from '../redux/store';
@@ -85,6 +86,7 @@ export default function InterestingPlacesScreen() {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as 'ua' | 'ru' | 'en';
   const text = UI_TEXT[language];
+  const { colors } = useAppTheme();
   const currentUserId = useSelector(selectUserId);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const { showSuccess } = useSoftToast();
@@ -117,7 +119,7 @@ export default function InterestingPlacesScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View style={styles.backgroundLayer}>
         {LIGHT_ORBS.map((orb, index) => (
           <View key={index} style={[styles.orb, orb]} />

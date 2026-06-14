@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useAppTheme } from '../hooks/useAppTheme';
 import { openInGoogleMaps } from '../utils/googleMapsLink';
 import MapView, { Marker, Region, PROVIDER_GOOGLE } from 'react-native-maps';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -186,6 +187,7 @@ const MapScreen: React.FC = () => {
   const [filtersVisible, setFiltersVisible] = useState(false);
   const [mapReady, setMapReady] = useState(false);
   const [mapLoadFailed, setMapLoadFailed] = useState(false);
+  const { colors, isDark } = useAppTheme();
   const mapFallbackText = MAP_FALLBACK_TEXT[language];
   const placeLabels = PLACE_TYPE_LABELS[language];
   const fallbackFocusedPlace = useMemo<Place | null>(() => {
@@ -546,7 +548,7 @@ const MapScreen: React.FC = () => {
         <View style={styles.resultsHeader}>
           <View style={styles.resultsHeaderLeft}>
             <TactileIcon icon="format-list-bulleted" size={38} iconSize={17} backgroundColor="#403933" />
-            <Text style={styles.resultsTitle}>{text.found}</Text>
+            <Text style={[styles.resultsTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{text.found}</Text>
           </View>
           <View style={styles.resultsCount}>
             <Text style={styles.resultsCountText}>{activePlaces.length}</Text>
@@ -558,7 +560,7 @@ const MapScreen: React.FC = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View pointerEvents="none" style={styles.backgroundOrbs}>
         {LIGHT_ORBS.map((orb, index) => (
           <View
@@ -1001,7 +1003,7 @@ const styles = StyleSheet.create({
   showMoreText: {
     fontSize: 15,
     fontWeight: '900',
-    color: SCREEN_THEME.textSecondary,
+    color: '#21041B',
   },
   emptyContainer: {
     height: 300,

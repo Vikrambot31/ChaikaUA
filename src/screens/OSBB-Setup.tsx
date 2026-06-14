@@ -23,6 +23,7 @@ import { SCREEN_THEME } from '../utils/screenTheme';
 import { logClientError } from '../utils/errorLogger';
 import InlineFieldHint from '../components/InlineFieldHint';
 import { useSoftToast } from '../hooks/useSoftToast';
+import { useAppTheme } from '../hooks/useAppTheme';
 
 interface Props {
   onDone?: () => void;
@@ -116,6 +117,7 @@ const OsbbSetupScreen: React.FC<Props> = ({ onDone }) => {
   const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
   const text = UI_TEXT[language];
   const toast = useSoftToast();
+  const { colors } = useAppTheme();
   const [selectedStreet, setSelectedStreet] = useState<string | null>(null);
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null);
   const [selectedHouseNumber, setSelectedHouseNumber] = useState<string | null>(null);
@@ -181,7 +183,7 @@ const OsbbSetupScreen: React.FC<Props> = ({ onDone }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={styles.header}>
