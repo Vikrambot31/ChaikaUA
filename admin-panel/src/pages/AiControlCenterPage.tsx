@@ -237,6 +237,62 @@ export const AiControlCenterPage = ({ user }: Props) => {
         </div>
       </div>
 
+      {/* ---- Vision AI (фото-модерация) ---- */}
+      <div style={{ marginTop: 32, paddingTop: 24, borderTop: '1px solid #444' }}>
+        <h3 style={{ marginBottom: 16 }}>Vision AI (фото-модерация)</h3>
+        <p style={{ fontSize: 12, color: '#888', marginBottom: 16 }}>
+          Отдельный провайдер для анализа фотографий. Поддерживаются только Claude и OpenAI (Vision API).
+        </p>
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 13 }}>Vision-провайдер</label>
+          <select
+            value={config.vision.provider}
+            onChange={(e) => setConfig((c) => ({
+              ...c,
+              vision: { ...c.vision, provider: e.target.value as 'claude' | 'openai' },
+            }))}
+            style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid #444', background: '#2a2a3a', color: '#e0e0e0', fontSize: 14 }}
+          >
+            <option value="claude">Claude (Anthropic)</option>
+            <option value="openai">OpenAI</option>
+          </select>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 13 }}>Vision-модель</label>
+          <input
+            type="text"
+            value={config.vision.model}
+            onChange={(e) => setConfig((c) => ({
+              ...c,
+              vision: { ...c.vision, model: e.target.value },
+            }))}
+            placeholder={config.vision.provider === 'claude' ? 'claude-haiku-4-5-20251001' : 'gpt-4o-mini'}
+            style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid #444', background: '#2a2a3a', color: '#e0e0e0', fontSize: 14, boxSizing: 'border-box' }}
+          />
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 13 }}>
+            Vision API Ключ <span style={{ fontWeight: 400, color: '#888' }}>(если пустой — используется основной ключ)</span>
+          </label>
+          <input
+            type="password"
+            value={config.vision.apiKey}
+            onChange={(e) => setConfig((c) => ({
+              ...c,
+              vision: { ...c.vision, apiKey: e.target.value },
+            }))}
+            placeholder="sk-... (необязательно)"
+            style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid #444', background: '#2a2a3a', color: '#e0e0e0', fontSize: 14, boxSizing: 'border-box' }}
+          />
+          {savedConfig.vision?.apiKey && (
+            <p style={{ fontSize: 11, color: '#888', marginTop: 4 }}>Сохранённый: {maskApiKey(savedConfig.vision.apiKey)}</p>
+          )}
+        </div>
+      </div>
+
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 24 }}>
         <button
           type="button"

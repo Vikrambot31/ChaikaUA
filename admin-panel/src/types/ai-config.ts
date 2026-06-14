@@ -32,6 +32,12 @@ export type AiThresholdsConfig = {
   escalateBelow: number; // 0.50–0.75: эскалация человеку
 };
 
+export type AiVisionConfig = {
+  provider: 'claude' | 'openai';
+  model: string;
+  apiKey: string; // если пустой — используется основной apiKey
+};
+
 export type AiConfig = {
   provider: AiProvider;
   model: string;
@@ -41,6 +47,7 @@ export type AiConfig = {
   budgetMonthly: number;
   autonomous: AiAutonomousConfig;
   thresholds: AiThresholdsConfig;
+  vision: AiVisionConfig;
   updatedAt?: number;
   updatedBy?: string;
 };
@@ -63,6 +70,11 @@ export const DEFAULT_AI_CONFIG: AiConfig = {
     autoApprove: 0.90,
     autoReject: 0.95,
     escalateBelow: 0.65,
+  },
+  vision: {
+    provider: 'claude',
+    model: 'claude-haiku-4-5-20251001',
+    apiKey: '',
   },
 };
 

@@ -4118,6 +4118,269 @@ exports.aiCloseStaleAiTickets = functionsV1.pubsub
   });
 
 // =============================================================
+//  aiAutoModeratePhotos — Vision AI модерация фото (каждые 15 мин)
+// =============================================================
+
+const VISION_SYSTEM_PROMPT = `You are a content moderator for a community photo sharing app "Chaika Life" (neighborhood in Kyiv, Ukraine).
+Analyze the image and classify it.
+
+Categories:
+- safe: normal community photo (landscape, pets, events, buildings, people in public settings, nature, neighborhood)
+- review: unclear, low quality, or ambiguous content that needs human review
+- nsfw: explicit sexual or nude content
+- violence: violent, disturbing, or graphic imagery
+- spam: promotional graphics, text-heavy marketing images, screenshots of ads, QR codes
+- personal_data: visible documents, IDs, bank cards, phone numbers, addresses, private information
+
+Return ONLY JSON (no markdown):
+{"verdict":"safe","confidence":0.0-0.99,"explanation":"1 sentence in Russian","flags":[]}`;
+
+async function callVisionClaude(apiKey, model, base64, contentType) {
+  const mediaType = contentType.includes('png') ? 'image/png' : contentType.includes('webp') ? 'image/webp' : 'image/jpeg';
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model,
+      max_tokens: 300,
+      system: VISION_SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: [
+        { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
+        { type: 'text', text: 'Analyze this image.' },
+      ] }],
+      temperature: 0.1,
+    }),
+  });
+  if (!response.ok) {
+    const errText = await response.text().catch(() => '');
+    throw new Error(`Claude Vision API ${response.status}: ${errText.slice(0, 200)}`);
+  }
+  const data = await response.json();
+  return {
+    choices: [{ message: { content: (data.content && data.content[0] && data.content[0].text) || '' } }],
+    usage: { total_tokens: ((data.usage && data.usage.input_tokens) || 0) + ((data.usage && data.usage.output_tokens) || 0) },
+  };
+}
+
+async function callVisionOpenAI(apiKey, model, base64, contentType) {
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: 'system', content: VISION_SYSTEM_PROMPT },
+        { role: 'user', content: [
+          { type: 'image_url', image_url: { url: `data:${contentType};base64,${base64}` } },
+          { type: 'text', text: 'Analyze this image.' },
+        ] },
+      ],
+      max_tokens: 300,
+      temperature: 0.1,
+    }),
+  });
+  if (!response.ok) {
+    const errText = await response.text().catch(() => '');
+    throw new Error(`OpenAI Vision API ${response.status}: ${errText.slice(0, 200)}`);
+  }
+  return response.json();
+}
+
+async function callVisionProvider(provider, model, apiKey, base64, contentType) {
+  switch (provider) {
+    case 'openai': return callVisionOpenAI(apiKey, model, base64, contentType);
+    case 'claude':
+    default: return callVisionClaude(apiKey, model, base64, contentType);
+  }
+}
+
+const PHOTO_SAFE_VERDICTS = new Set(['safe']);
+const PHOTO_REJECT_VERDICTS = new Set(['nsfw', 'violence', 'personal_data']);
+
+exports.aiAutoModeratePhotos = functionsV1.pubsub
+  .schedule('every 15 minutes')
+  .timeZone('Europe/Kiev')
+  .onRun(async (_context) => {
+    const db = admin.database();
+
+    try {
+      const autonomousSnap = await db.ref('ai_config/autonomous').once('value');
+      const autonomous = autonomousSnap.val() || {};
+      if (!autonomous.enabled || !autonomous.photoModeration) return null;
+
+      // Читаем vision конфиг
+      const aiConfig = await getAiRuntimeConfig(db);
+      const visionSnap = await db.ref('ai_config/vision').once('value');
+      const vision = visionSnap.val() || {};
+      const vProvider = vision.provider || 'claude';
+      const vModel = vision.model || 'claude-haiku-4-5-20251001';
+      const vApiKey = vision.apiKey || aiConfig.apiKey;
+
+      if (!isConfiguredAiApiKey(vApiKey)) {
+        console.warn('[aiAutoModeratePhotos] Vision API key not configured');
+        return null;
+      }
+
+      // Читаем пороги
+      const threshSnap = await db.ref('ai_config/thresholds').once('value');
+      const thresh = threshSnap.val() || {};
+      const approveThreshold = Number(thresh.autoApprove) || 0.90;
+      const rejectThreshold = Number(thresh.autoReject) || 0.95;
+
+      // Обрабатываем pending community_photos
+      const photosSnap = await db.ref('community_photos')
+        .orderByChild('status')
+        .equalTo('pending')
+        .limitToFirst(5)
+        .once('value');
+
+      if (!photosSnap.exists()) return null;
+
+      const photos = [];
+      photosSnap.forEach((child) => {
+        const val = child.val();
+        if (!val.ai_auto_processed) photos.push({ id: child.key, ...val });
+      });
+
+      if (photos.length === 0) return null;
+
+      const bucket = admin.storage().bucket();
+      let totalProcessed = 0, totalApproved = 0, totalRejected = 0, totalEscalated = 0;
+
+      for (const photo of photos) {
+        try {
+          const storagePath = photo.storagePath || photo.photoStoragePath || photo.imageStoragePath || photo.imageUri || photo.photoUri || '';
+          if (!storagePath) continue;
+
+          const file = bucket.file(storagePath);
+          const [exists] = await file.exists();
+          if (!exists) continue;
+
+          const [buffer] = await file.download();
+          if (buffer.length > 5 * 1024 * 1024) continue; // >5MB пропускаем
+
+          const base64 = buffer.toString('base64');
+          const [metadata] = await file.getMetadata();
+          const contentType = metadata?.contentType || 'image/jpeg';
+
+          // Вызываем Vision API
+          let parsed = null;
+          for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+              const raw = await callVisionProvider(vProvider, vModel, vApiKey, base64, contentType);
+              parsed = parseAiJsonResponse(raw);
+              if (parsed) break;
+            } catch (_) {}
+          }
+
+          if (!parsed) continue;
+          if (parsed.confidence >= 1.0) { parsed.confidence = 0.8; parsed.verdict = 'review'; }
+
+          totalProcessed++;
+          const now = Date.now();
+
+          if (PHOTO_SAFE_VERDICTS.has(parsed.verdict) && parsed.confidence >= approveThreshold) {
+            // Авто-одобрение безопасного фото
+            await db.ref(`community_photos/${photo.id}`).update({
+              status: 'approved',
+              ai_auto_processed: true,
+              ai_verdict: parsed.verdict,
+              ai_confidence: parsed.confidence,
+              ai_provider: `${vProvider}/${vModel}`,
+              moderatedAt: now,
+              moderatedBy: 'ai-vision',
+              moderationReason: `Vision AI: safe (${Math.round(parsed.confidence * 100)}%)`,
+            });
+            totalApproved++;
+
+          } else if (PHOTO_REJECT_VERDICTS.has(parsed.verdict) && parsed.confidence >= rejectThreshold) {
+            // Авто-отклонение опасного контента
+            await db.ref(`community_photos/${photo.id}`).update({
+              status: 'rejected',
+              ai_auto_processed: true,
+              ai_verdict: parsed.verdict,
+              ai_confidence: parsed.confidence,
+              ai_provider: `${vProvider}/${vModel}`,
+              moderatedAt: now,
+              moderatedBy: 'ai-vision',
+              moderationReason: `Vision AI: ${parsed.verdict} — ${(parsed.explanation || '').slice(0, 200)}`,
+            });
+            totalRejected++;
+
+            // Telegram для NSFW/violence
+            if (parsed.verdict === 'nsfw' || parsed.verdict === 'violence') {
+              try {
+                const emoji = parsed.verdict === 'nsfw' ? '\u{1F534}' : '\u{26A0}';
+                await sendTelegramMessage(`${emoji} ФОТО ЗАБЛОКОВАНО [${parsed.verdict.toUpperCase()}]\nPath: ${storagePath.slice(0, 100)}\nAI: ${(parsed.explanation || '').slice(0, 150)}`);
+              } catch (_) {}
+            }
+
+          } else {
+            // Эскалация — неуверенный результат
+            await db.ref('ai_queue/escalations').push({
+              itemPath: `community_photos/${photo.id}`,
+              section: 'communityPhotos',
+              statusField: 'status',
+              approvedStatus: 'approved',
+              rejectedStatus: 'rejected',
+              itemId: photo.id,
+              textPreview: `[PHOTO] ${parsed.verdict}: ${parsed.explanation || ''}`.slice(0, 400),
+              userId: photo.userId || null,
+              ai_verdict: parsed.verdict,
+              ai_confidence: parsed.confidence,
+              ai_explanation: parsed.explanation || '',
+              ai_flags: parsed.flags || [],
+              provider: `${vProvider}/${vModel}`,
+              model: vModel,
+              createdAt: now,
+              status: 'pending',
+            });
+            await db.ref(`community_photos/${photo.id}`).update({
+              ai_auto_processed: true,
+              ai_escalated: true,
+            });
+            totalEscalated++;
+          }
+
+          await db.ref('ai_queue/log').push({
+            action: PHOTO_SAFE_VERDICTS.has(parsed.verdict) && parsed.confidence >= approveThreshold ? 'photo_auto_approve'
+              : PHOTO_REJECT_VERDICTS.has(parsed.verdict) && parsed.confidence >= rejectThreshold ? 'photo_auto_reject'
+              : 'photo_escalation',
+            section: 'communityPhotos',
+            itemId: photo.id,
+            verdict: parsed.verdict,
+            confidence: parsed.confidence,
+            provider: vProvider,
+            model: vModel,
+            tokensUsed: parsed.tokensUsed || 0,
+            timestamp: now,
+          });
+
+          // Пауза между фото (Vision API rate limits)
+          await new Promise((r) => setTimeout(r, 1000));
+        } catch (err) {
+          console.error(`[aiAutoModeratePhotos] Error on ${photo.id}:`, err?.message);
+        }
+      }
+
+      console.log(`[aiAutoModeratePhotos] Done: processed=${totalProcessed} approved=${totalApproved} rejected=${totalRejected} escalated=${totalEscalated}`);
+
+      await db.ref('ai_queue/photo_last_run').set({
+        timestamp: Date.now(),
+        totalProcessed,
+        totalApproved,
+        totalRejected,
+        totalEscalated,
+      });
+    } catch (err) {
+      console.error('[aiAutoModeratePhotos] Fatal:', err?.message, err?.stack);
+      await writeOpsError('aiAutoModeratePhotos', err, {});
+    }
+
+    return null;
+  });
+
+// =============================================================
 //  Admin Edit Content Item — редактирование заявок модератором
 // =============================================================
 

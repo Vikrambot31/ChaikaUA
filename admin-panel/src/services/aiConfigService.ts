@@ -26,6 +26,7 @@ export async function loadAiConfig(): Promise<AiConfig> {
     ...val,
     autonomous: { ...DEFAULT_AI_CONFIG.autonomous, ...(val.autonomous || {}) },
     thresholds: { ...DEFAULT_AI_CONFIG.thresholds, ...(val.thresholds || {}) },
+    vision: { ...DEFAULT_AI_CONFIG.vision, ...((val as Record<string, unknown>).vision as Record<string, unknown> || {}) },
   };
 }
 
