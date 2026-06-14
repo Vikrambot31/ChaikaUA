@@ -6,11 +6,13 @@ import {
   deleteReportedListing,
   banReportedUser,
   loadBlockStats,
+  fetchUserDisplayName,
   type ReportRecord,
   type ReportStatus,
   type ReportReason,
   type BlockStatsEntry,
 } from '../services/reportsModerationService';
+import { addToYellowList, removeFromYellowList } from '../services/yellowListService';
 
 type Tab = 'reports' | 'blocks';
 
@@ -123,7 +125,8 @@ export const ReportsModerationPage = () => {
     if (!confirm(`Забанить пользователя ${report.reportedUserId} на 14 дней и удалить все анкеты?`)) return;
     setActionInProgress(report.id);
     try {
-      await banReportedUser(report.id, report.reportedUserId, adminUid, report.reportedUserId);
+      const name = await fetchUserDisplayName(report.reportedUserId);
+      await banReportedUser(report.id, report.reportedUserId, adminUid, name);
       setReports((prev) => prev.filter((r) => r.id !== report.id));
     } catch (err) {
       console.error('[ReportsModerationPage] banUser error:', err);
@@ -137,10 +140,10 @@ export const ReportsModerationPage = () => {
     if (!adminUid) return;
     if (!confirm(`Забанить пользователя ${entry.userId} (заблокирован ${entry.blockCount} раз)?`)) return;
     try {
-      const { addToYellowList } = await import('../services/yellowListService');
+      const name = await fetchUserDisplayName(entry.userId);
       await addToYellowList({
         uid: entry.userId,
-        displayName: entry.userId,
+        displayName: name,
         reason: `Blocked by ${entry.blockCount} users`,
         bannedBy: adminUid,
         itemPath: 'user_block_list',
@@ -151,6 +154,17 @@ export const ReportsModerationPage = () => {
     } catch (err) {
       console.error('[ReportsModerationPage] banFromBlocks error:', err);
       alert('Ошибка при бане');
+    }
+  };
+
+  const handleUnban = async (userId: string) => {
+    if (!confirm(`Разбанить пользователя ${userId}?`)) return;
+    try {
+      await removeFromYellowList(userId);
+      alert('Пользователь разбанен');
+    } catch (err) {
+      console.error('[ReportsModerationPage] unban error:', err);
+      alert('Ошибка при разбане');
     }
   };
 
@@ -317,13 +331,20 @@ export const ReportsModerationPage = () => {
                       {entry.blockedBy.slice(0, 5).map((uid) => uid.slice(0, 8)).join(', ')}
                       {entry.blockedBy.length > 5 && ` (+${entry.blockedBy.length - 5})`}
                     </td>
-                    <td style={{ padding: '8px 6px' }}>
+                    <td style={{ padding: '8px 6px', display: 'flex', gap: 4 }}>
                       <button
                         type="button"
                         onClick={() => void handleBanFromBlockStats(entry)}
                         style={{ background: '#b71c1c', color: '#fff', border: 'none', borderRadius: 4, padding: '4px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
                       >
                         Бан 14д
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleUnban(entry.userId)}
+                        style={{ background: '#2e7d32', color: '#fff', border: 'none', borderRadius: 4, padding: '4px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+                      >
+                        Разбан
                       </button>
                     </td>
                   </tr>

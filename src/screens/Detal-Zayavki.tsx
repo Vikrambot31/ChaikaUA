@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useAppTheme } from '../hooks/useAppTheme';
 import MiniTabBar from '../components/MiniTabBar';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, SafeAreaView, ActivityIndicator, ScrollView } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
@@ -37,6 +38,7 @@ import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
 import ContactReasonModal from '../components/ContactReasonModal';
 import CommentSection from '../components/CommentSection';
 import HelperSelectionModal from '../components/HelperSelectionModal';
+import ContentComplaintModal from '../components/ContentComplaintModal';
 import { getCommentersForRequest } from '../services/commentService';
 import { useContactRequest } from '../hooks/useContactRequest';
 
@@ -324,6 +326,7 @@ const RequestDetailScreen = ({
   const [closingRequest, setClosingRequest] = useState(false);
   const [requestSolved, setRequestSolved] = useState(request.status === 'closed');
   const [helperSelectionVisible, setHelperSelectionVisible] = useState(false);
+  const [complaintVisible, setComplaintVisible] = useState(false);
   const [helperOptions, setHelperOptions] = useState<HelperOption[]>([]);
   const helperIds = useMemo(() => helpResponses.map((item) => item.helperUid).filter(Boolean), [helpResponses]);
   const avatarByUserId = useUserAvatarMap([request.userId, ...helperIds].filter(Boolean));
@@ -714,9 +717,10 @@ const RequestDetailScreen = ({
     { category: request.category, group: request.group, subcategory: request.subcategory },
     language,
   );
+  const { colors, isDark } = useAppTheme();
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View style={styles.backgroundLayer}>
         {LIGHT_ORBS.map((orb, index) => (
           <View key={index} style={[styles.orb, orb]} />
@@ -726,7 +730,7 @@ const RequestDetailScreen = ({
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
           <MaterialCommunityIcons name="arrow-left" size={20} color={SCREEN_THEME.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{text.headerTitle}</Text>
+        <Text style={[styles.headerTitle, { color: isDark ? '#F5E8F0' : undefined }]}>{text.headerTitle}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -982,6 +986,11 @@ const RequestDetailScreen = ({
           </TouchableOpacity>
         ) : null}
 
+        <TouchableOpacity style={styles.complaintBtn} onPress={() => setComplaintVisible(true)} activeOpacity={0.7}>
+          <MaterialCommunityIcons name="flag-outline" size={13} color={SCREEN_THEME.textMuted} />
+          <Text style={styles.complaintBtnText}>{language === 'ua' ? 'Поскаржитись' : language === 'ru' ? 'Пожаловаться' : 'Report'}</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Text style={styles.backButtonText}>{text.backToList}</Text>
         </TouchableOpacity>
@@ -1000,6 +1009,15 @@ const RequestDetailScreen = ({
         onConfirm={handleCloseWithHelpers}
         onNobodyHelped={handleCloseNobody}
         onCancel={() => setHelperSelectionVisible(false)}
+      />
+      <ContentComplaintModal
+        visible={complaintVisible}
+        onClose={() => setComplaintVisible(false)}
+        contentId={request.id}
+        contentType="help-request"
+        contentTitle={getRequestTopicLabel({ category: request.category }, language)}
+        reportedUserId={request.userId}
+        language={language}
       />
     </SafeAreaView>
   );
@@ -1229,6 +1247,8 @@ const styles = StyleSheet.create({
   },
   backButton: { alignItems: 'center', paddingVertical: 12 },
   backButtonText: { color: SCREEN_THEME.textSecondary, fontSize: 14, fontWeight: '800' },
+  complaintBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 10 },
+  complaintBtnText: { color: SCREEN_THEME.textMuted, fontSize: 12, fontWeight: '700' },
 });
 
 export default RequestDetailScreen;

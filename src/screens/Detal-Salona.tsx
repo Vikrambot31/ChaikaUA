@@ -15,6 +15,7 @@ import { ref, get, set, remove, getDatabase } from 'firebase/database';
 import { BeautyCategory, BeautyFeature, BeautyOffer, Place } from '../types/app';
 import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
+import { useAppTheme } from '../hooks/useAppTheme';
 import { safeCallPhone, safeOpenExternalUrl } from '../utils/communicationActions';
 import { getActiveBeautyOffers } from '../services/beautySeed';
 import { database } from '../firebase-core';
@@ -27,6 +28,7 @@ import { getMapFocusPlaceParams } from '../utils/mapFocusParams';
 import CommentSection from '../components/CommentSection';
 import { COMMENTS_PATH } from '../services/commentService';
 import type { DetailItemData } from '../utils/detailViewTypes';
+import ContentComplaintModal from '../components/ContentComplaintModal';
 
 type Lang = 'ua' | 'ru' | 'en';
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
@@ -241,6 +243,7 @@ function formatOfferDate(timestamp?: number): string {
 export default function DetalSalonaScreen() {
   const navigation = useNavigation<AppNavigation>();
   const route = useRoute<RouteParams>();
+  const { colors } = useAppTheme();
   const place: Place = route.params.place;
   const info = place.beautyInfo;
   const category: BeautyCategory = info?.category ?? 'hair';
@@ -252,6 +255,7 @@ export default function DetalSalonaScreen() {
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [showBusinessSection, setShowBusinessSection] = useState(false);
+  const [complaintVisible, setComplaintVisible] = useState(false);
   const [claimStatus, setClaimStatus] = useState<'none' | 'pending' | 'approved' | 'rejected'>('none');
   const [isBiznesPlusActive, setIsBiznesPlusActive] = useState(false);
 
@@ -437,7 +441,7 @@ export default function DetalSalonaScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
         {/* Header */}
@@ -660,7 +664,20 @@ export default function DetalSalonaScreen() {
           collectionPath={COMMENTS_PATH}
         />
 
+        <TouchableOpacity style={styles.complaintBtn} onPress={() => setComplaintVisible(true)} activeOpacity={0.7}>
+          <MaterialCommunityIcons name="flag-outline" size={13} color={SCREEN_THEME.textMuted} />
+          <Text style={styles.complaintBtnText}>{language === 'ua' ? 'Поскаржитись' : language === 'ru' ? 'Пожаловаться' : 'Report'}</Text>
+        </TouchableOpacity>
+
       </ScrollView>
+      <ContentComplaintModal
+        visible={complaintVisible}
+        onClose={() => setComplaintVisible(false)}
+        contentId={place.id}
+        contentType="salon"
+        contentTitle={place.name}
+        language={language}
+      />
     </SafeAreaView>
   );
 }
@@ -947,7 +964,7 @@ const styles = StyleSheet.create({
   showMoreBtnText: {
     fontSize: 14,
     fontWeight: '800',
-    color: SCREEN_THEME.enamelBlueDark,
+    color: '#21041B',
   },
   businessSectionContainer: {
     backgroundColor: SCREEN_THEME.paperStrong,
@@ -1069,4 +1086,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#fff',
   },
+  complaintBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 14 },
+  complaintBtnText: { color: SCREEN_THEME.textMuted, fontSize: 12, fontWeight: '700' },
 });

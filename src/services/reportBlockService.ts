@@ -12,6 +12,15 @@ export interface ReportParams {
   source: string;
 }
 
+export interface ContentReportParams {
+  contentId: string;
+  contentType: string;
+  contentTitle?: string;
+  reportedUserId?: string;
+  reason: ReportReason;
+  description: string;
+}
+
 export const reportBlockService = {
   async writeReport(params: ReportParams): Promise<string> {
     const user = await requireWriteSession({
@@ -45,6 +54,25 @@ export const reportBlockService = {
       screen: 'Kontakt-XXX',
     });
     await remove(ref(database, `user_block_list/${user.uid}/${blockedUserId}`));
+  },
+
+  async writeContentReport(params: ContentReportParams): Promise<void> {
+    const user = await requireWriteSession({
+      operation: 'content_report',
+      screen: params.contentType,
+    });
+    await push(ref(database, 'reports'), {
+      reporterId: user.uid,
+      reportedUserId: params.reportedUserId || '',
+      reportedListingId: params.contentId,
+      reason: params.reason,
+      description: params.description,
+      source: params.contentType,
+      contentTitle: params.contentTitle || '',
+      contentType: params.contentType,
+      createdAt: new Date().toISOString(),
+      status: 'pending',
+    });
   },
 
   async loadBlockedUsers(userId: string): Promise<Set<string>> {

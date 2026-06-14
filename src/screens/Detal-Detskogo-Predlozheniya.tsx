@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   SafeAreaView,
   ScrollView,
@@ -13,12 +13,14 @@ import { useSelector } from 'react-redux';
 import { ChildOffer, Place } from '../types/app';
 import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
+import { useAppTheme } from '../hooks/useAppTheme';
 import { safeCallPhone, safeOpenExternalUrl } from '../utils/communicationActions';
 import { chaykaPlaces } from '../services/chaykaPlacesData';
 import { childInfoSeed } from '../services/childrenSeed';
 import { openInGoogleMaps } from '../utils/googleMapsLink';
 import CommentSection from '../components/CommentSection';
 import { COMMENTS_PATH } from '../services/commentService';
+import ContentComplaintModal from '../components/ContentComplaintModal';
 
 type Lang = 'ua' | 'ru' | 'en';
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
@@ -120,7 +122,9 @@ export default function DetalDetskogoPredlozheniyaScreen() {
   const offer: ChildOffer = route.params.offer;
 
   const language = useSelector((s: RootState) => s.language?.current ?? 'ua') as Lang;
+  const [complaintVisible, setComplaintVisible] = useState(false);
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
+  const { colors } = useAppTheme();
 
   const place = useMemo<Place | undefined>(
     () => chaykaPlaces.find((p) => p.id === offer.placeId),
@@ -150,7 +154,7 @@ export default function DetalDetskogoPredlozheniyaScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
         {/* Header */}
@@ -260,7 +264,20 @@ export default function DetalDetskogoPredlozheniyaScreen() {
           collectionPath={COMMENTS_PATH}
         />
 
+        <TouchableOpacity style={styles.complaintBtn} onPress={() => setComplaintVisible(true)} activeOpacity={0.7}>
+          <MaterialCommunityIcons name="flag-outline" size={13} color={SCREEN_THEME.textMuted} />
+          <Text style={styles.complaintBtnText}>{language === 'ua' ? 'Поскаржитись' : language === 'ru' ? 'Пожаловаться' : 'Report'}</Text>
+        </TouchableOpacity>
+
       </ScrollView>
+      <ContentComplaintModal
+        visible={complaintVisible}
+        onClose={() => setComplaintVisible(false)}
+        contentId={offer.id}
+        contentType="kids-offer"
+        contentTitle={offer.title}
+        language={language}
+      />
     </SafeAreaView>
   );
 }
@@ -412,6 +429,8 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#fff',
   },
+  complaintBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 14 },
+  complaintBtnText: { color: SCREEN_THEME.textMuted, fontSize: 12, fontWeight: '700' },
   actionBtnTextAlt: {
     color: SCREEN_THEME.enamelBlueDark,
   },

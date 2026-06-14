@@ -67,6 +67,16 @@ const normalizeReport = (key: string, raw: unknown): ReportRecord | null => {
   };
 };
 
+// ─── User helpers ──────────────────────────────────────────────────────────
+
+export const fetchUserDisplayName = async (uid: string): Promise<string> => {
+  try {
+    const snap = await get(ref(database, `users/${uid}/name`));
+    if (snap.exists() && typeof snap.val() === 'string') return snap.val() as string;
+  } catch { /* fallback to uid */ }
+  return uid;
+};
+
 // ─── Reports CRUD ───────────────────────────────────────────────────────────
 
 export const loadReports = async (statusFilter?: ReportStatus): Promise<ReportRecord[]> => {

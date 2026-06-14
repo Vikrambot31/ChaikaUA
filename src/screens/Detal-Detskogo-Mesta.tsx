@@ -15,6 +15,7 @@ import { ref, get, set, remove, getDatabase } from 'firebase/database';
 import { ChildCategory, ChildFeature, ChildOffer, Place, PlaceType } from '../types/app';
 import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
+import { useAppTheme } from '../hooks/useAppTheme';
 import { safeCallPhone, safeOpenExternalUrl } from '../utils/communicationActions';
 import { getActiveOffers } from '../services/childrenSeed';
 import { database } from '../firebase-core';
@@ -26,6 +27,7 @@ import {
 import { getMapFocusPlaceParams } from '../utils/mapFocusParams';
 import CommentSection from '../components/CommentSection';
 import { COMMENTS_PATH } from '../services/commentService';
+import ContentComplaintModal from '../components/ContentComplaintModal';
 import type { DetailItemData } from '../utils/detailViewTypes';
 
 type Lang = 'ua' | 'ru' | 'en';
@@ -313,9 +315,11 @@ export default function DetalDetskogoMestaScreen() {
   const currentUser = useSelector((s: RootState) => s.auth.user);
   const isBusinessPlus = useSelector(selectIsBusinessPlus);
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
+  const { colors, isDark } = useAppTheme();
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [showBusinessSection, setShowBusinessSection] = useState(false);
   const [claimStatus, setClaimStatus] = useState<'none' | 'pending' | 'approved' | 'rejected'>('none');
+  const [complaintVisible, setComplaintVisible] = useState(false);
   const [isBiznesPlusActive, setIsBiznesPlusActive] = useState(false);
 
   const isAuthenticated = Boolean(currentUser?.id);
@@ -531,7 +535,7 @@ export default function DetalDetskogoMestaScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
         {/* 10.1 Header */}
@@ -551,7 +555,7 @@ export default function DetalDetskogoMestaScreen() {
         {/* Address */}
         <View style={styles.addressRow}>
           <MaterialCommunityIcons name="map-marker-outline" size={18} color={SCREEN_THEME.textMuted} />
-          <Text style={styles.addressText}>{place.address}</Text>
+          <Text style={[styles.addressText, { color: isDark ? '#F5E8F0' : undefined }]}>{place.address}</Text>
         </View>
 
         {/* Badges */}
@@ -759,7 +763,20 @@ export default function DetalDetskogoMestaScreen() {
           collectionPath={COMMENTS_PATH}
         />
 
+        <TouchableOpacity style={styles.complaintBtn} onPress={() => setComplaintVisible(true)} activeOpacity={0.7}>
+          <MaterialCommunityIcons name="flag-outline" size={13} color={SCREEN_THEME.textMuted} />
+          <Text style={styles.complaintBtnText}>{language === 'ua' ? 'Поскаржитись' : language === 'ru' ? 'Пожаловаться' : 'Report'}</Text>
+        </TouchableOpacity>
+
       </ScrollView>
+      <ContentComplaintModal
+        visible={complaintVisible}
+        onClose={() => setComplaintVisible(false)}
+        contentId={place.id}
+        contentType="kids-place"
+        contentTitle={place.name}
+        language={language}
+      />
     </SafeAreaView>
   );
 }
@@ -1064,7 +1081,7 @@ const styles = StyleSheet.create({
   showMoreBtnText: {
     fontSize: 14,
     fontWeight: '800',
-    color: SCREEN_THEME.enamelBlueDark,
+    color: '#21041B',
   },
   businessSectionContainer: {
     backgroundColor: SCREEN_THEME.paperStrong,
@@ -1186,4 +1203,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#fff',
   },
+  complaintBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 14 },
+  complaintBtnText: { color: SCREEN_THEME.textMuted, fontSize: 12, fontWeight: '700' },
 });
