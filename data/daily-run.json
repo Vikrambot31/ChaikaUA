@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-06-15",
+      "publishedAt": "2026-06-15T13:44:13.199Z",
+      "key": "places-Coffee ART-ANMI SOUL-2026-06-15"
+    },
+    {
       "type": "news",
       "date": "2026-06-15",
       "publishedAt": "2026-06-15T09:55:47.615Z",
@@ -593,12 +599,6 @@
       "date": "2026-04-27",
       "publishedAt": "2026-04-27T06:24:29.539Z",
       "key": "https://bigkyiv.com.ua/na-berestejskomu-prospekti-stalasya-dtp-za-uchastyu-vantazhivky-ruh-uskladneno/"
-    },
-    {
-      "type": "places",
-      "date": "2026-04-26",
-      "publishedAt": "2026-04-26T08:48:30.011Z",
-      "key": "places-BALCONE COFFEE-Coffee ART-2026-04-26"
     }
   ]
 }
