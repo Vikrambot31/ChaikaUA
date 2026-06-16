@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://bigkyiv.com.ua/pid-chas-rosijskoyi-ataky-na-stolyczyu-postrazhdala-budivlya-avarijnoyi-sluzhby-kyyivteploenergo/",
+    "title": "Під час російської атаки на столицю постраждала будівля аварійної служби «Київтеплоенерго»",
+    "shortText": "Під час атаки пошкоджено будівлю аварійної служби «Київтеплоенерго». Для ірпінян це означає можливі затримки з опаленням та гарячою водою взимку. #ЖКЧайка #Ірпінь #КиївськаОбласть #Теплопостачання",
+    "sourceName": "bigkyiv.com.ua",
+    "sourceUrl": "https://bigkyiv.com.ua/pid-chas-rosijskoyi-ataky-na-stolyczyu-postrazhdala-budivlya-avarijnoyi-sluzhby-kyyivteploenergo/",
+    "publishedAt": "2026-06-16T09:21:03.971Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-Coffee ART-ANMI SOUL-2026-06-15",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ Coffee ART — вулиця Валерія Лобановського, 25 ☕ ANMI SOUL — вулиця Валерія Лобановського, 18 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/na-berestejskomu-prospekti-stalasya-dtp-za-uchastyu-vantazhivky-ruh-uskladneno/",
-    "title": "На Берестейському проспекті сталася ДТП за участю вантажівки: рух ускладнено",
-    "shortText": "На Берестейському проспекті ДТП з вантажівкою — утворився великий затор в напрямку метро «Шулявська». Мешканцям Чайки варто планувати маршрути з запасом часу. #ЖКЧайка #Ірпінь #КиївськаОбласть #ДТП",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/na-berestejskomu-prospekti-stalasya-dtp-za-uchastyu-vantazhivky-ruh-uskladneno/",
-    "publishedAt": "2026-04-27T06:24:29.539Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]

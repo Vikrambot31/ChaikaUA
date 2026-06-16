@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-06-16",
+      "publishedAt": "2026-06-16T09:21:03.972Z",
+      "key": "https://bigkyiv.com.ua/pid-chas-rosijskoyi-ataky-na-stolyczyu-postrazhdala-budivlya-avarijnoyi-sluzhby-kyyivteploenergo/"
+    },
+    {
       "type": "places",
       "date": "2026-06-15",
       "publishedAt": "2026-06-15T13:44:13.199Z",
@@ -593,12 +599,6 @@
       "date": "2026-04-27",
       "publishedAt": "2026-04-27T10:04:09.806Z",
       "key": "places-Coffee ART-ANMI SOUL-2026-04-27"
-    },
-    {
-      "type": "news",
-      "date": "2026-04-27",
-      "publishedAt": "2026-04-27T06:24:29.539Z",
-      "key": "https://bigkyiv.com.ua/na-berestejskomu-prospekti-stalasya-dtp-za-uchastyu-vantazhivky-ruh-uskladneno/"
     }
   ]
 }
