@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://www.pravda.com.ua/news/2026/06/17/8039731/",
+    "title": "Більшість українців хочуть перезавантаження влади після війни, заміни Зеленського очікують 67% – опитування",
+    "shortText": "67% українців хочуть змін на посту президента після закінчення війни. Для Ірпеня це означає, що громада активно обговорює майбутнє країни та очікує оновлення керівництва. #ЖКЧайка #Ірпінь #КиївськаОбласть #Політика",
+    "sourceName": "www.pravda.com.ua",
+    "sourceUrl": "https://www.pravda.com.ua/news/2026/06/17/8039731/",
+    "publishedAt": "2026-06-17T08:55:38.126Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-06-16",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ ANMI SOUL — вулиця Валерія Лобановського, 18 ☕ White Rabbit Coffee and Friends — вулиця Валерія Лобановського, 26 к2 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/de-u-kyyevi-sogodni-obmezhuvatymut-ruh-yaki-dilyanky-krashhe-obyizhdzhaty-3/",
-    "title": "Де у Києві сьогодні обмежуватимуть рух: які ділянки краще об’їжджати",
-    "shortText": "28–29 квітня в Києві ремонтуватимуть дороги — очікуйте затримок на Берестейському проспекті та вулиці Оноре де Бальзака. Для мешканців Чайки це означає ускладнення при їзді до столиці та назад. #ЖКЧайка #Ірпінь #КиївськаОбласть #Дорожниробіти",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/de-u-kyyevi-sogodni-obmezhuvatymut-ruh-yaki-dilyanky-krashhe-obyizhdzhaty-3/",
-    "publishedAt": "2026-04-28T06:26:20.129Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]
