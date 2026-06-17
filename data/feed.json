@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-White Rabbit Coffee and Friends-Chaykava-2026-06-17",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ White Rabbit Coffee and Friends — вулиця Валерія Лобановського, 26 к2 ☕ Chaykava — вулиця Українського Відродження #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-06-17T12:08:24.445Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://www.pravda.com.ua/news/2026/06/17/8039731/",
     "title": "Більшість українців хочуть перезавантаження влади після війни, заміни Зеленського очікують 67% – опитування",
     "shortText": "67% українців хочуть змін на посту президента після закінчення війни. Для Ірпеня це означає, що громада активно обговорює майбутнє країни та очікує оновлення керівництва. #ЖКЧайка #Ірпінь #КиївськаОбласть #Політика",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-04-28",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ ANMI SOUL — вулиця Валерія Лобановського, 18 ☕ White Rabbit Coffee and Friends — вулиця Валерія Лобановського, 26 к2 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-04-28T10:04:43.815Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
