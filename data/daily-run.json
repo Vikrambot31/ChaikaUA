@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-06-18",
+      "publishedAt": "2026-06-18T08:39:32.965Z",
+      "key": "https://bigkyiv.com.ua/naslidky-nichnoyi-ataky-zafiksovani-u-dvoh-rajonah-kyyivshhyni/"
+    },
+    {
       "type": "places",
       "date": "2026-06-17",
       "publishedAt": "2026-06-17T12:08:24.445Z",
@@ -593,12 +599,6 @@
       "date": "2026-04-29",
       "publishedAt": "2026-04-29T09:55:40.789Z",
       "key": "places-White Rabbit Coffee and Friends-Chaykava-2026-04-29"
-    },
-    {
-      "type": "news",
-      "date": "2026-04-29",
-      "publishedAt": "2026-04-29T06:19:55.230Z",
-      "key": "https://bigkyiv.com.ua/u-kilkoh-rajonah-kyyeva-sogodni-obmezhuvatymut-ruh-yaki-dilyanky-krashhe-obyizhdzhaty/"
     }
   ]
 }
