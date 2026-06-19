@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-06-19",
+      "publishedAt": "2026-06-19T09:02:04.931Z",
+      "key": "https://bigkyiv.com.ua/pid-kyyevom-lunatymut-vybuhy-mistyan-zaklykayut-zberigaty-spokij/"
+    },
+    {
       "type": "places",
       "date": "2026-06-18",
       "publishedAt": "2026-06-18T11:43:01.513Z",
@@ -593,12 +599,6 @@
       "date": "2026-04-30",
       "publishedAt": "2026-04-30T09:56:53.034Z",
       "key": "places-Chaykava-NOVUS-2026-04-30"
-    },
-    {
-      "type": "news",
-      "date": "2026-04-30",
-      "publishedAt": "2026-04-30T06:23:57.443Z",
-      "key": "https://bigkyiv.com.ua/u-czentri-stolyczi-sogodni-obmezhat-ruh/"
     }
   ]
 }
