@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-06-19",
+      "publishedAt": "2026-06-19T11:57:28.718Z",
+      "key": "places-NOVUS-Grano Bakery-2026-06-19"
+    },
+    {
       "type": "news",
       "date": "2026-06-19",
       "publishedAt": "2026-06-19T09:02:04.931Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-01",
       "publishedAt": "2026-05-01T06:33:17.550Z",
       "key": "https://bigkyiv.com.ua/na-sumshhyni-vorozhyj-dron-poczilyv-v-avtobus-ye-postrazhdali/"
-    },
-    {
-      "type": "places",
-      "date": "2026-04-30",
-      "publishedAt": "2026-04-30T09:56:53.034Z",
-      "key": "places-Chaykava-NOVUS-2026-04-30"
     }
   ]
 }
