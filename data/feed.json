@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://www.pravda.com.ua/news/2026/06/20/8040254/",
+    "title": "У Броварах внаслідок ДТП загинула 2-річна дитина, ще дев'ятеро людей травмовані – поліція",
+    "shortText": "У Броварах сталася ДТП з двома загиблими та дев'ятьма травмованими. Для мешканців Бучанського району це нагадування про важливість безпеки на дорогах та уважності за кермом. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
+    "sourceName": "www.pravda.com.ua",
+    "sourceUrl": "https://www.pravda.com.ua/news/2026/06/20/8040254/",
+    "publishedAt": "2026-06-20T07:45:10.865Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-NOVUS-Grano Bakery-2026-06-19",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "🛒 NOVUS — вулиця Авіаконструктора Антонова 🛒 Grano Bakery — вулиця Валерія Лобановського, 35 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/na-sumshhyni-vorozhyj-dron-poczilyv-v-avtobus-ye-postrazhdali/",
-    "title": "На Сумщині ворожий дрон поцілив в автобус: є постраждалі",
-    "shortText": "Росіяни атакують цивільний транспорт по всій Україні — дрони влучають в автобуси й машини. Для мешканців Чайки це нагадує про важливість безпеки й обережності на дорогах. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/na-sumshhyni-vorozhyj-dron-poczilyv-v-avtobus-ye-postrazhdali/",
-    "publishedAt": "2026-05-01T06:33:17.550Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]

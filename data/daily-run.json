@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-06-20",
+      "publishedAt": "2026-06-20T07:45:10.866Z",
+      "key": "https://www.pravda.com.ua/news/2026/06/20/8040254/"
+    },
+    {
       "type": "places",
       "date": "2026-06-19",
       "publishedAt": "2026-06-19T11:57:28.718Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-01",
       "publishedAt": "2026-05-01T09:24:38.390Z",
       "key": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-05-01"
-    },
-    {
-      "type": "news",
-      "date": "2026-05-01",
-      "publishedAt": "2026-05-01T06:33:17.550Z",
-      "key": "https://bigkyiv.com.ua/na-sumshhyni-vorozhyj-dron-poczilyv-v-avtobus-ye-postrazhdali/"
     }
   ]
 }
