@@ -19,6 +19,7 @@ import Toast from 'react-native-toast-message';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../redux/store';
 import { auth } from '../firebase-config';
+import { isAnonymousFirebaseUser } from '../firebase-auth-session';
 import { setUser } from '../redux/slices/authSlice';
 import { selectUser } from '../redux/selectors';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -165,6 +166,10 @@ export default function ProfileSetupScreen() {
 
   const handlePickAvatarPhoto = async () => {
     if (saving) return;
+    if (!auth.currentUser?.uid || isAnonymousFirebaseUser(auth.currentUser)) {
+      Alert.alert(text.missingTitle, text.loginRequiredForPhoto);
+      return;
+    }
     try {
       const picked = await pickPhotoFromLibrary({ allowsEditing: true, quality: 0.86 });
       if (!picked) return;
@@ -325,12 +330,38 @@ export default function ProfileSetupScreen() {
             autoCorrect={false}
           />
 
+          {/* Avatar section */}
+          {renderSectionLabel(text.avatarSection, isAvatarDone)}
+
           <TouchableOpacity style={styles.photoButton} onPress={() => void handlePickAvatarPhoto()} activeOpacity={0.86}>
             <MaterialCommunityIcons name="image-plus" size={20} color="#fff" />
             <Text style={styles.photoButtonText}>{text.uploadAvatar}</Text>
           </TouchableOpacity>
           {customAvatarUri ? (
             <Image source={{ uri: customAvatarUri }} style={styles.customAvatarPreview} resizeMode="cover" />
+          ) : null}
+
+          {!customAvatarUri ? (
+            <>
+              <Text style={styles.orText}>{text.temporaryAvatarSection}</Text>
+              <View style={styles.grid}>
+                {START_AVATARS.map((avatar) => (
+                  <TouchableOpacity
+                    key={avatar.key}
+                    style={[styles.avatarCard, selectedKey === avatar.key && styles.avatarCardSelected]}
+                    onPress={() => { setSelectedKey(avatar.key); setCustomAvatarUri(''); }}
+                    activeOpacity={0.82}
+                  >
+                    <Image source={avatar.source} style={styles.avatarImage} resizeMode="cover" />
+                    {selectedKey === avatar.key ? (
+                      <View style={styles.selectedBadge}>
+                        <MaterialCommunityIcons name="check" size={14} color="#fff" />
+                      </View>
+                    ) : null}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </>
           ) : null}
 
           {/* Gender */}
@@ -477,6 +508,7 @@ const styles = StyleSheet.create({
     borderColor: '#2F8F46',
     marginBottom: 18,
   },
+  orText: { color: SCREEN_THEME.textSecondary, fontSize: 14, fontWeight: '700', textAlign: 'center', marginBottom: 10 },
   inputError: { borderColor: SCREEN_THEME.terracotta },
   errorText: { color: SCREEN_THEME.terracotta, fontSize: 13, marginBottom: 8, marginTop: -12 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center', marginBottom: 20 },

@@ -244,8 +244,13 @@ const RegisterScreenFull: React.FC = () => {
                   secureTextEntry={!showPassword}
                   editable={!loading}
                   maxLength={MAX_PASSWORD_LENGTH}
+                  style={styles.passwordInput}
                 />
-                <TouchableOpacity onPress={() => setShowPassword((value) => !value)} disabled={loading}>
+                <TouchableOpacity
+                  style={styles.passwordToggle}
+                  onPress={() => setShowPassword((value) => !value)}
+                  disabled={loading}
+                >
                   <Text style={styles.toggleText}>{showPassword ? text.hide : text.show}</Text>
                 </TouchableOpacity>
               </View>
@@ -263,8 +268,13 @@ const RegisterScreenFull: React.FC = () => {
                   secureTextEntry={!showConfirmPassword}
                   editable={!loading}
                   maxLength={MAX_PASSWORD_LENGTH}
+                  style={styles.passwordInput}
                 />
-                <TouchableOpacity onPress={() => setShowConfirmPassword((value) => !value)} disabled={loading}>
+                <TouchableOpacity
+                  style={styles.passwordToggle}
+                  onPress={() => setShowConfirmPassword((value) => !value)}
+                  disabled={loading}
+                >
                   <Text style={styles.toggleText}>{showConfirmPassword ? text.hide : text.show}</Text>
                 </TouchableOpacity>
               </View>
@@ -388,8 +398,10 @@ const styles = StyleSheet.create({
   sectionRow: { marginTop: 8, marginBottom: 10 },
   label: { fontSize: 13, fontWeight: '700', color: SCREEN_THEME.textPrimary, marginBottom: 6, marginTop: 4 },
   labelRow: { marginBottom: 6, marginTop: 4 },
-  passwordWrap: { gap: 6 },
-  toggleText: { color: SCREEN_THEME.terracottaDark, fontWeight: '700', marginTop: 4 },
+  passwordWrap: { position: 'relative' },
+  passwordInput: { paddingRight: 92 },
+  passwordToggle: { position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' },
+  toggleText: { color: SCREEN_THEME.terracottaDark, fontWeight: '700' },
   pickerContainer: {
     backgroundColor: '#F7F3EE',
     borderRadius: 16,

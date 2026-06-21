@@ -126,7 +126,8 @@ const UI_TEXT = {
     resetPasswordFailed: 'Не вдалося надіслати лист для скидання пароля.',
     inlineEmailError: 'Введіть коректний email.',
     inlinePasswordError: 'Пароль має містити щонайменше 8 символів.',
-    facebookPlayServicesNote: 'Вхід через Facebook буде доступний після підключення Google Play Services',
+    facebookPlayServicesNote: '',
+    socialServerError: 'Сервіс тимчасово недоступний. Спробуйте увійти через email або іншим способом.',
   },
   ru: {
     subtitle: 'Вход в аккаунт',
@@ -161,7 +162,8 @@ const UI_TEXT = {
     resetPasswordFailed: 'Не удалось отправить письмо для сброса пароля.',
     inlineEmailError: 'Введите корректный email.',
     inlinePasswordError: 'Пароль должен содержать минимум 8 символов.',
-    facebookPlayServicesNote: 'Вход через Facebook будет доступен после подключения Google Play Services',
+    facebookPlayServicesNote: '',
+    socialServerError: 'Сервис временно недоступен. Попробуйте войти через email или другим способом.',
   },
   en: {
     subtitle: 'Sign in to your account',
@@ -196,7 +198,8 @@ const UI_TEXT = {
     resetPasswordFailed: 'Could not send the password reset email.',
     inlineEmailError: 'Enter a valid email.',
     inlinePasswordError: 'Password must be at least 8 characters.',
-    facebookPlayServicesNote: 'Facebook sign-in will be available after connecting Google Play Services',
+    facebookPlayServicesNote: '',
+    socialServerError: 'Service temporarily unavailable. Try signing in with email or another method.',
   },
 } as const;
 
@@ -254,11 +257,12 @@ const LoginScreen: React.FC = () => {
   const mapSocialAuthError = useCallback(
     (rawError: string | undefined, provider: 'google' | 'facebook' | 'apple') => {
       const raw = (rawError || '').toLowerCase();
-      if (raw.includes('canceled')) return text.socialCanceled;
+      if (raw.includes('canceled') || raw.includes('cancelled')) return text.socialCanceled;
       if (raw.includes('in progress')) return text.socialInProgress;
       if (raw.includes('apple sign-in is not available')) return text.appleLoginFailed;
       if (raw.includes('play services')) return text.playServicesMissing;
-      if (raw.includes('invalid-credential') || raw.includes('access token missing') || raw.includes('access_denied')) return text.socialConfigError;
+      if (raw.includes('something went wrong') || raw.includes('server error') || raw.includes('network')) return text.socialServerError;
+      if (raw.includes('invalid-credential') || raw.includes('access token missing') || raw.includes('access_denied')) return text.socialServerError;
       if (raw.includes('token refresh failed') || raw.includes('sha fingerprints')) return text.socialConfigError;
       if (raw.includes('not configured') || raw.includes('developer_error') || raw.includes('id token missing')) return text.socialConfigError;
       if (provider === 'google') return text.googleLoginFailed;
@@ -500,8 +504,13 @@ const LoginScreen: React.FC = () => {
               onBlur={() => setPasswordTouched(true)}
               secureTextEntry={!showPassword}
               editable={!loading}
+              style={styles.passwordInput}
             />
-            <TouchableOpacity onPress={() => setShowPassword(!showPassword)} disabled={loading}>
+            <TouchableOpacity
+              style={styles.passwordToggle}
+              onPress={() => setShowPassword(!showPassword)}
+              disabled={loading}
+            >
               <Text style={styles.toggleText}>{showPassword ? text.hidePassword : text.showPassword}</Text>
             </TouchableOpacity>
           </View>
@@ -538,7 +547,6 @@ const LoginScreen: React.FC = () => {
               disabled={loading}
               variant="secondary"
             />
-            <Text style={styles.facebookNoteText}>{text.facebookPlayServicesNote}</Text>
           </View>
 
           {Platform.OS === 'ios' && appleSignInAvailable ? (
@@ -596,8 +604,10 @@ const styles = StyleSheet.create({
   appSubtitle: { fontSize: 14, color: SCREEN_THEME.textSecondary, marginTop: 4, fontWeight: '600' },
   formCard: { padding: 20, marginBottom: 20 },
   errorBannerText: { fontSize: 13, color: '#C62828', fontWeight: '600', marginBottom: 12 },
-  passwordRow: { marginBottom: 10, gap: 6 },
-  toggleText: { color: SCREEN_THEME.terracottaDark, fontWeight: '700', marginTop: 6 },
+  passwordRow: { marginBottom: 10, position: 'relative' },
+  passwordInput: { paddingRight: 92 },
+  passwordToggle: { position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' },
+  toggleText: { color: SCREEN_THEME.terracottaDark, fontWeight: '700' },
   forgotPasswordWrap: { alignSelf: 'flex-end', marginBottom: 4 },
   forgotPasswordText: { color: SCREEN_THEME.terracottaDark, fontSize: 13, fontWeight: '700' },
   btnSpacing: { marginTop: 12 },

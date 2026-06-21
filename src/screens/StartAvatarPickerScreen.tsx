@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -72,6 +72,7 @@ export default function StartAvatarPickerScreen() {
     () => START_AVATARS.find((avatar) => avatar.key === selectedKey),
     [selectedKey],
   );
+  const hasRegisteredSession = Boolean(auth.currentUser && !isAnonymousFirebaseUser(auth.currentUser));
 
   const confirm = async () => {
     if (!selectedAvatar || saving) return;
@@ -171,10 +172,14 @@ export default function StartAvatarPickerScreen() {
                   }));
                   return;
                 }
+                if (!hasRegisteredSession) {
+                  navigation.navigate('RegisterScreenFull', {});
+                  return;
+                }
                 navigation.navigate('MainTabs');
               }}
             >
-              <Text style={styles.modalOkText}>OK</Text>
+              <Text style={styles.modalOkText}>{hasRegisteredSession ? 'OK' : text.register}</Text>
             </TouchableOpacity>
           </View>
         </View>
