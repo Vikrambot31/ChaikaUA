@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-06-21",
+      "publishedAt": "2026-06-21T10:57:53.563Z",
+      "key": "places-Кав'ярня ХЛІБ та КАВА-Мозаїка Espresso bar-2026-06-21"
+    },
+    {
       "type": "news",
       "date": "2026-06-21",
       "publishedAt": "2026-06-21T08:23:18.009Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-03",
       "publishedAt": "2026-05-03T06:23:22.693Z",
       "key": "https://bigkyiv.com.ua/ruh-berestejskym-prospektom-galmuvatyme-kilka-dniv-cherez-remont-dorogy/"
-    },
-    {
-      "type": "places",
-      "date": "2026-05-02",
-      "publishedAt": "2026-05-02T08:56:18.814Z",
-      "key": "places-BALCONE COFFEE-Coffee ART-2026-05-02"
     }
   ]
 }
