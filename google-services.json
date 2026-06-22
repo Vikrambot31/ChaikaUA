@@ -1,0 +1,56 @@
+{
+  "project_info": {
+    "project_number": "1027130010906",
+    "firebase_url": "https://chaikaua-3cd9d-default-rtdb.firebaseio.com",
+    "project_id": "chaikaua-3cd9d",
+    "storage_bucket": "chaikaua-3cd9d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1027130010906:android:2dc0016a5adf39195410a3",
+        "android_client_info": {
+          "package_name": "com.chaikaua.mobile"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1027130010906-elhn0d4vlrtna1pm6cs2b8fk84k3loe3.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.chaikaua.mobile",
+            "certificate_hash": "055daab93274b09876d07aa9d78fdb868a186399"
+          }
+        },
+        {
+          "client_id": "1027130010906-pcv4dthimome2r4icp5b0o2uebd7n2sr.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.chaikaua.mobile",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "1027130010906-j9cltoe87n0hcupluudtb80avn2a09c5.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDzXB_hrn9D3a1SsgtbHhBhpGGkkXMRrYc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1027130010906-j9cltoe87n0hcupluudtb80avn2a09c5.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

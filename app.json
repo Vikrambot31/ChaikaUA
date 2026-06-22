@@ -20,9 +20,9 @@
     ],
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "icon": "./assets/WEBP-version/Logo-Chaika LIFE-box.webp",
+    "icon": "./assets/Logo-Chaika LIFE-box.png",
     "splash": {
-      "image": "./assets/WEBP-version/logo-8.webp",
+      "image": "./assets/logo-8.png",
       "backgroundColor": "#F7F3EE"
     },
     "android": {
@@ -38,11 +38,11 @@
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.REQUEST_INSTALL_PACKAGES"
       ],
-      "googleServicesFile": "./android/app/google-services.json",
-      "icon": "./assets/WEBP-version/Logo-Chaika LIFE-box.webp",
+      "googleServicesFile": "./google-services.json",
+      "icon": "./assets/Logo-Chaika LIFE-box.png",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/WEBP-version/Logo-Chaika LIFE-box.webp",
-        "monochromeImage": "./assets/WEBP-version/Logo-Chaika LIFE-box.webp",
+        "foregroundImage": "./assets/Logo-Chaika LIFE-box.png",
+        "monochromeImage": "./assets/Logo-Chaika LIFE-box.png",
         "backgroundColor": "#F7F3EE"
       },
       "versionCode": 434
@@ -50,7 +50,7 @@
     "ios": {
       "bundleIdentifier": "com.chaikaua.mobile",
       "supportsTablet": true,
-      "icon": "./assets/WEBP-version/Logo-Chaika LIFE-box.webp",
+      "icon": "./assets/Logo-Chaika LIFE-box.png",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Р вЂќР С•Р Т‘Р В°РЎвЂљР С”РЎС“ Р С—Р С•РЎвЂљРЎР‚РЎвЂ“Р В±Р ВµР Р… Р Т‘Р С•РЎРѓРЎвЂљРЎС“Р С— Р Т‘Р С• Р С–Р ВµР С•Р В»Р С•Р С”Р В°РЎвЂ РЎвЂ“РЎвЂ” Р Т‘Р В»РЎРЏ Р С—Р С•РЎв‚¬РЎС“Р С”РЎС“ РЎРѓРЎС“РЎРѓРЎвЂ“Р Т‘РЎвЂ“Р Р† РЎвЂљР В° Р СРЎвЂ“РЎРѓРЎвЂ РЎРЉ Р С—Р С•РЎР‚РЎС“РЎвЂЎ",
         "NSMicrophoneUsageDescription": "Р вЂќР С•Р Т‘Р В°РЎвЂљР С”РЎС“ Р С—Р С•РЎвЂљРЎР‚РЎвЂ“Р В±Р ВµР Р… Р Т‘Р С•РЎРѓРЎвЂљРЎС“Р С— Р Т‘Р С• Р СРЎвЂ“Р С”РЎР‚Р С•РЎвЂћР С•Р Р…Р В° Р Т‘Р В»РЎРЏ Р В·Р В°Р С—Р С‘РЎРѓРЎС“ Р С–Р С•Р В»Р С•РЎРѓР С•Р Р†Р С‘РЎвЂ¦ Р С—Р С•Р Р†РЎвЂ“Р Т‘Р С•Р СР В»Р ВµР Р…РЎРЉ",
@@ -68,7 +68,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/WEBP-version/logo-chaika-intro.webp",
+          "icon": "./assets/logo-chaika-intro.png",
           "color": "#F7F3EE",
           "sounds": []
         }
