@@ -65,7 +65,6 @@ module.exports = ({ config }) => {
         android: {
           compileSdkVersion: 35,
           targetSdkVersion: 35,
-          buildToolsVersion: '35.0.0',
         },
       }],
       ...(facebookPlugin ? [facebookPlugin] : []),
