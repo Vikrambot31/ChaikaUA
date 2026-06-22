@@ -39,7 +39,7 @@
     "build:apk": "eas build --platform android --profile preview --local",
     "build:apk:cloud": "eas build --platform android --profile preview",
     "build:production": "eas build --platform android --profile production",
-    "postinstall": "node scripts/patch-expo-modules-agp8.js && node scripts/patch-cli-status-page.js && node scripts/patch-android-native-crash-fixes.js",
+    "postinstall": "node scripts/patch-expo-modules-agp8.js && node scripts/patch-cli-status-page.js && node scripts/patch-android-native-crash-fixes.js && node scripts/patch-expo-permissions-sdk35.js",
     "facebook:keyhash:debug": "node scripts/get-facebook-keyhash.js",
     "facebook:keyhash:eas": "eas credentials --platform android"
   },
