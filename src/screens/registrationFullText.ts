@@ -44,6 +44,9 @@ export type RegistrationFullText = {
   quickReg: string;
   addressData: string;
   passwordMismatch: string;
+  facebookRegister: string;
+  facebookRegisterFailed: string;
+  facebookRegisterCanceled: string;
 };
 
 const TEXTS: Record<RegistrationLanguage, RegistrationFullText> = {
@@ -91,6 +94,9 @@ const TEXTS: Record<RegistrationLanguage, RegistrationFullText> = {
     quickReg: 'Швидка реєстрація',
     addressData: 'Адреса і дані',
     passwordMismatch: 'Паролі не збігаються',
+    facebookRegister: 'Register with Facebook',
+    facebookRegisterFailed: 'Facebook registration failed. Please try again.',
+    facebookRegisterCanceled: 'Facebook registration was canceled.',
   },
   ru: {
     error: 'Ошибка',
@@ -136,6 +142,9 @@ const TEXTS: Record<RegistrationLanguage, RegistrationFullText> = {
     quickReg: 'Быстрая регистрация',
     addressData: 'Адрес и данные',
     passwordMismatch: 'Пароли не совпадают',
+    facebookRegister: 'Register with Facebook',
+    facebookRegisterFailed: 'Facebook registration failed. Please try again.',
+    facebookRegisterCanceled: 'Facebook registration was canceled.',
   },
   en: {
     error: 'Error',
@@ -181,6 +190,9 @@ const TEXTS: Record<RegistrationLanguage, RegistrationFullText> = {
     quickReg: 'Quick registration',
     addressData: 'Address and details',
     passwordMismatch: 'Passwords do not match',
+    facebookRegister: 'Register with Facebook',
+    facebookRegisterFailed: 'Facebook registration failed. Please try again.',
+    facebookRegisterCanceled: 'Facebook registration was canceled.',
   },
 };
 

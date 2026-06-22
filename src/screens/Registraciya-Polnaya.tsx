@@ -1,5 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
+  ActivityIndicator,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -11,9 +13,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
 import { NavigationProp, useNavigation, useRoute } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
-import { auth } from '../firebase-config';
+import { auth, socialAuthAPI } from '../firebase-config';
 import { isAnonymousFirebaseUser } from '../firebase-auth-session';
-import { clearError } from '../redux/slices/authSlice';
+import { clearError, setLoading, setUser } from '../redux/slices/authSlice';
 import { selectAuthError, selectAuthLoading, selectUser } from '../redux/selectors';
 import { BUILDINGS, getBuildingsByStreet, getStreets } from '../data/buildings';
 import { SCREEN_THEME } from '../utils/screenTheme';
@@ -27,6 +29,7 @@ import { RootState } from '../redux/store';
 import { QuickRegistrationParams, useFullRegistration } from '../hooks/useFullRegistration';
 import { getRegistrationFullText } from './registrationFullText';
 import { useAppTheme } from '../hooks/useAppTheme';
+import { resolveAppUserFromFirebase } from '../services/authProfileService';
 
 const REGISTRATION_DRAFT_KEY = '@chaika:full-registration-draft:v1';
 const MAX_NAME_LENGTH = 80;
@@ -173,6 +176,46 @@ const RegisterScreenFull: React.FC = () => {
     text,
   });
 
+  const handleFacebookRegistration = useCallback(async () => {
+    dispatch(setLoading(true));
+    try {
+      const result = await socialAuthAPI.signInWithFacebook();
+      const facebookUser = 'data' in result ? result.data : null;
+
+      if (!facebookUser) {
+        const rawError = 'error' in result ? result.error : '';
+        const message = rawError.toLowerCase().includes('cancel')
+          ? text.facebookRegisterCanceled
+          : text.facebookRegisterFailed;
+        Alert.alert(text.error, message);
+        return;
+      }
+
+      const appUser = await resolveAppUserFromFirebase(facebookUser, {
+        ensureProfile: true,
+        provider: 'facebook',
+      });
+
+      dispatch(setUser({
+        ...appUser,
+        registrationStatus: 'partial',
+        isActive: false,
+        provider: 'facebook',
+      }));
+      dispatch(clearError());
+
+      setName(normalizePersonName(appUser.name || facebookUser.displayName || ''));
+      setEmail(normalizeEmailText(appUser.email || facebookUser.email || ''));
+      setPhone(normalizePhoneText(appUser.phone || facebookUser.phoneNumber || ''));
+      setPassword('');
+      setConfirmPassword('');
+    } catch {
+      Alert.alert(text.error, text.facebookRegisterFailed);
+    } finally {
+      dispatch(setLoading(false));
+    }
+  }, [dispatch, text]);
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -189,6 +232,18 @@ const RegisterScreenFull: React.FC = () => {
               <Text style={styles.modeSwitchHintLight}>{text.addressData}</Text>
             </TouchableOpacity>
           </View>
+
+          {!isCompletingExistingAccount ? (
+            <View style={styles.socialRegisterWrap}>
+              <TactileButton
+                title={text.facebookRegister}
+                onPress={handleFacebookRegistration}
+                disabled={loading}
+                variant="secondary"
+              />
+              {loading ? <ActivityIndicator size="small" color={SCREEN_THEME.terracottaDark} style={styles.socialRegisterLoader} /> : null}
+            </View>
+          ) : null}
         </TactileCard>
 
         <TactileCard elevated style={styles.formCard} pressable={false}>
@@ -393,6 +448,8 @@ const styles = StyleSheet.create({
   modeSwitchButtonTextPrimary: { fontSize: 13, fontWeight: '900', color: '#FFFFFF', textAlign: 'center' },
   modeSwitchHint: { marginTop: 4, fontSize: 11, color: SCREEN_THEME.textSecondary, textAlign: 'center', fontWeight: '600' },
   modeSwitchHintLight: { marginTop: 4, fontSize: 11, color: 'rgba(255,255,255,0.88)', textAlign: 'center', fontWeight: '600' },
+  socialRegisterWrap: { alignSelf: 'stretch', marginTop: 14 },
+  socialRegisterLoader: { marginTop: 8 },
   formCard: { padding: 16, marginBottom: 16 },
   sectionTitle: { fontSize: 16, fontWeight: '900', color: SCREEN_THEME.textPrimary, marginTop: 8, marginBottom: 10 },
   sectionRow: { marginTop: 8, marginBottom: 10 },
