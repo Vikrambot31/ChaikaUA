@@ -3,7 +3,7 @@
     "name": "Chaika Life",
     "slug": "chaika-ua",
     "scheme": "chaikaua",
-    "version": "1.1.434",
+    "version": "1.1.435",
     "runtimeVersion": {
       "policy": "appVersion"
     },
@@ -45,7 +45,7 @@
         "monochromeImage": "./assets/Logo-Chaika LIFE-box.png",
         "backgroundColor": "#F7F3EE"
       },
-      "versionCode": 434
+      "versionCode": 435
     },
     "ios": {
       "bundleIdentifier": "com.chaikaua.mobile",

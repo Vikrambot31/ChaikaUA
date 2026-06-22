@@ -60,6 +60,14 @@ module.exports = ({ config }) => {
       ...(config.plugins || []),
       'expo-secure-store',
       'expo-apple-authentication',
+      // Google Play requires targetSdkVersion >= 35 (enforced from Aug 2025)
+      ['expo-build-properties', {
+        android: {
+          compileSdkVersion: 35,
+          targetSdkVersion: 35,
+          buildToolsVersion: '35.0.0',
+        },
+      }],
       ...(facebookPlugin ? [facebookPlugin] : []),
     ],
     extra: {
