@@ -485,6 +485,7 @@ function GuardedScreen({
   const deniedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const navigation = useNavigation();
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (mode !== 'admin' && mode !== 'moderator') {
@@ -546,8 +547,8 @@ function GuardedScreen({
       if (!deniedToastShownRef.current) {
         Toast.show({
           type: 'error',
-          text1: 'Доступ закрито',
-          text2: 'Невірна роль',
+          text1: t.common.accessDenied,
+          text2: t.common.invalidRole,
         });
         deniedToastShownRef.current = true;
       }

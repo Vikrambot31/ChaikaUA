@@ -18,6 +18,8 @@ export const translations = {
       tryAgain: 'Спробувати ще раз',
       logout: 'Вийти',
       language: 'Мова',
+      accessDenied: 'Доступ закрито',
+      invalidRole: 'Невірна роль',
     },
     home: {
       welcome: 'Вітаємо у Чайці!',
@@ -548,6 +550,8 @@ export const translations = {
       tryAgain: 'Попробовать',
       logout: 'Выйти',
       language: 'Язык',
+      accessDenied: 'Доступ закрыт',
+      invalidRole: 'Неверная роль',
     },
     home: {
       welcome: 'Добро пожаловать в Чайку!',
@@ -1078,6 +1082,8 @@ export const translations = {
       tryAgain: 'Try again',
       logout: 'Logout',
       language: 'Language',
+      accessDenied: 'Access denied',
+      invalidRole: 'Invalid role',
     },
     home: {
       welcome: 'Welcome to Chaika Life!',
