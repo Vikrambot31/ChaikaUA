@@ -108,9 +108,8 @@ export const useFullRegistration = ({
         try {
           breachCount = await getPasswordBreachCount(password);
         } catch {
-          dispatch(setError(text.passwordCheckUnavailable));
-          Toast.show({ type: 'error', text1: text.error, text2: text.passwordCheckUnavailable });
-          return;
+          // HIBP unavailable — log and continue, do not block registration
+          console.warn('[Registration] HIBP check unavailable, skipping');
         }
 
         if (breachCount !== null && breachCount > 0) {
@@ -120,7 +119,7 @@ export const useFullRegistration = ({
         }
       }
 
-      if (referrerPhone && !isCompletingExistingAccount) {
+      if (referrerPhone) {
         const normalizedReferrer = normalizePhoneText(referrerPhone);
         const referrerSnap = await get(query(dbRef(database, 'users'), orderByChild('phone'), equalTo(normalizedReferrer)));
         const referrerSnapAlt = await get(query(dbRef(database, 'users'), orderByChild('phone'), equalTo(referrerPhone.trim())));
@@ -142,19 +141,6 @@ export const useFullRegistration = ({
       }
 
       await updateProfile(authUser, { displayName: normalizedName });
-
-      if (referrerPhone && isCompletingExistingAccount) {
-        const normalizedReferrer = normalizePhoneText(referrerPhone);
-        const referrerSnap = await get(query(dbRef(database, 'users'), orderByChild('phone'), equalTo(normalizedReferrer)));
-        const referrerSnapAlt = await get(query(dbRef(database, 'users'), orderByChild('phone'), equalTo(referrerPhone.trim())));
-        const referrerVerified = referrerSnap.exists() || referrerSnapAlt.exists();
-
-        if (!referrerVerified) {
-          dispatch(setError(text.referrerNotFound));
-          Toast.show({ type: 'error', text1: text.error, text2: text.referrerNotFound });
-          return;
-        }
-      }
 
       const uid = authUser.uid;
       const selectedStartAvatar = await getSelectedStartAvatar();

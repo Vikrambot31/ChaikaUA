@@ -12,7 +12,9 @@ import { Platform } from 'react-native';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase-core';
 
+// sessionStorage: cleared when browser tab is closed, password never persists to disk
 const STORAGE_KEY = 'dev_admin_credentials';
+const storage = typeof sessionStorage !== 'undefined' ? sessionStorage : localStorage;
 const ADMIN_EMAIL = 'vikramsave@ukr.net';
 
 export const isDevAdminMode = (): boolean =>
@@ -23,7 +25,7 @@ export const tryDevAdminAutoLogin = async (): Promise<boolean> => {
   if (!isDevAdminMode()) return false;
 
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    const saved = storage.getItem(STORAGE_KEY);
     if (!saved) return false;
 
     const { email, password } = JSON.parse(saved);
@@ -35,7 +37,7 @@ export const tryDevAdminAutoLogin = async (): Promise<boolean> => {
   } catch (error) {
     console.warn('[DevAdmin] Auto-login failed:', error);
     // Clear invalid credentials
-    localStorage.removeItem(STORAGE_KEY);
+    storage.removeItem(STORAGE_KEY);
     return false;
   }
 };
@@ -44,7 +46,7 @@ export const tryDevAdminAutoLogin = async (): Promise<boolean> => {
 export const devAdminLogin = async (password: string): Promise<void> => {
   const credential = await signInWithEmailAndPassword(auth, ADMIN_EMAIL, password);
   if (credential.user) {
-    localStorage.setItem(
+    storage.setItem(
       STORAGE_KEY,
       JSON.stringify({ email: ADMIN_EMAIL, password }),
     );
@@ -54,16 +56,14 @@ export const devAdminLogin = async (password: string): Promise<void> => {
 
 /** Clear saved dev credentials. */
 export const clearDevAdminCredentials = (): void => {
-  if (typeof localStorage !== 'undefined') {
-    localStorage.removeItem(STORAGE_KEY);
-  }
+  storage.removeItem(STORAGE_KEY);
 };
 
 /** Get saved admin email (for display). */
 export const getSavedDevAdminEmail = (): string | null => {
   if (!isDevAdminMode()) return null;
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    const saved = storage.getItem(STORAGE_KEY);
     if (!saved) return null;
     return JSON.parse(saved).email || null;
   } catch {
