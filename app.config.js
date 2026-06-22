@@ -2,6 +2,29 @@
 // Keeps Firebase keys out of the static app.json file.
 require('dotenv').config({ quiet: true });
 
+// Fix FCM manifest merger conflict: react-native-firebase_messaging and expo-notifications
+// both define com.google.firebase.messaging.default_notification_color.
+// Adding tools:replace resolves the duplicate attribute error.
+const withFcmManifestFix = (config) => {
+  const { withAndroidManifest } = require('@expo/config-plugins');
+  return withAndroidManifest(config, (androidConfig) => {
+    const manifest = androidConfig.modResults;
+    const application = manifest.manifest.application?.[0];
+    if (!application) return androidConfig;
+    application.$ = application.$ || {};
+    application.$['xmlns:tools'] = 'http://schemas.android.com/tools';
+    const metaDataArray = application['meta-data'] || [];
+    for (const item of metaDataArray) {
+      if (item.$?.['android:name'] === 'com.google.firebase.messaging.default_notification_color') {
+        item.$['tools:replace'] = 'android:resource';
+        break;
+      }
+    }
+    application['meta-data'] = metaDataArray;
+    return androidConfig;
+  });
+};
+
 const CANONICAL_FIREBASE_DATABASE_URL = 'https://chaikaua-3cd9d-default-rtdb.firebaseio.com';
 const CANONICAL_FIREBASE_STORAGE_BUCKET = 'chaikaua-3cd9d.firebasestorage.app';
 
@@ -31,7 +54,7 @@ module.exports = ({ config }) => {
       ]
     : null;
 
-  return {
+  const baseConfig = {
     ...config,
     plugins: [
       ...(config.plugins || []),
@@ -68,4 +91,5 @@ module.exports = ({ config }) => {
       serviceModerationPin: process.env.SERVICE_MODERATION_PIN || '',
     },
   };
+  return withFcmManifestFix(baseConfig);
 };
