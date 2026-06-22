@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-06-22",
+      "publishedAt": "2026-06-22T13:24:22.116Z",
+      "key": "places-Мозаїка Espresso bar-#МОЖЕКАВИ?-2026-06-22"
+    },
+    {
       "type": "news",
       "date": "2026-06-22",
       "publishedAt": "2026-06-22T09:42:31.803Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-04",
       "publishedAt": "2026-05-04T06:35:15.965Z",
       "key": "https://bigkyiv.com.ua/pid-kyyevom-vodij-legkovyka-zbyv-ditej-na-samokati-odyn-z-hlopchykiv-zagynuv/"
-    },
-    {
-      "type": "places",
-      "date": "2026-05-03",
-      "publishedAt": "2026-05-03T09:11:31.210Z",
-      "key": "places-Coffee ART-ANMI SOUL-2026-05-03"
     }
   ]
 }
