@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-#МОЖЕКАВИ?-Fora-2026-06-23",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ #МОЖЕКАВИ? — вулиця Валерія Лобановського, 29 🛒 Fora — вулиця Грушевського, 12 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-06-23T10:52:00.548Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/na-podoli-chastkovo-obmezhyly-ruh/",
     "title": "На Подолі частково обмежили рух",
     "shortText": "На Подолі в Києві частково обмежили рух вулицею Нижній Вал до 17:00. Для ірпінян це означає затримки при проїзді до столиці цим маршрутом. #ЖКЧайка #Ірпінь #КиївськаОбласть #ДорожнаСитуація",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-05-04",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ ANMI SOUL — вулиця Валерія Лобановського, 18 ☕ White Rabbit Coffee and Friends — вулиця Валерія Лобановського, 26 к2 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-05-04T10:04:31.425Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]

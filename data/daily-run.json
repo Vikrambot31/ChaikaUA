@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-06-23",
+      "publishedAt": "2026-06-23T10:52:00.549Z",
+      "key": "places-#МОЖЕКАВИ?-Fora-2026-06-23"
+    },
+    {
       "type": "news",
       "date": "2026-06-23",
       "publishedAt": "2026-06-23T07:42:27.873Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-05",
       "publishedAt": "2026-05-05T06:11:32.125Z",
       "key": "https://bigkyiv.com.ua/troye-lyudej-postrazhdaly-na-kyyivshhyni-vnaslidok-vorozhoyi-ataky/"
-    },
-    {
-      "type": "places",
-      "date": "2026-05-04",
-      "publishedAt": "2026-05-04T10:04:31.426Z",
-      "key": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-05-04"
     }
   ]
 }
