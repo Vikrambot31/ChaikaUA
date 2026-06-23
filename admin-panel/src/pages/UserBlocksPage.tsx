@@ -187,15 +187,22 @@ export const UserBlocksPage = () => {
                     <AiAnalysisButton
                       item={item}
                       onResult={(path, result) => {
-                        void update(ref(database, `${path}/aiResult`), {
-                          verdict: result.verdict,
-                          confidence: result.confidence,
-                          explanation: result.explanation,
-                          flags: result.flags,
-                          provider: result.provider,
-                          model: result.model,
-                          analyzedAt: new Date().toISOString(),
-                        });
+                        void (async () => {
+                          try {
+                            await update(ref(database, `${path}/aiResult`), {
+                              verdict: result.verdict,
+                              confidence: result.confidence,
+                              explanation: result.explanation,
+                              flags: result.flags,
+                              provider: result.provider,
+                              model: result.model,
+                              analyzedAt: new Date().toISOString(),
+                            });
+                          } catch (err) {
+                            console.error('[UserBlocksPage] AI result save error:', err);
+                            alert('Помилка збереження результату AI');
+                          }
+                        })();
                       }}
                     />
                   </td>
