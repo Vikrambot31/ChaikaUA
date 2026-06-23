@@ -9,6 +9,7 @@ type AppRulesToolbarProps = {
   riskFilter: AppRuleRisk | 'all';
   viewMode: AppRulesViewMode;
   refreshing: boolean;
+  compact?: boolean;
   onSearchChange: (value: string) => void;
   onStatusFilterChange: (value: AppRuleStatus | 'all') => void;
   onRiskFilterChange: (value: AppRuleRisk | 'all') => void;
@@ -25,6 +26,7 @@ export const AppRulesToolbar = ({
   riskFilter,
   viewMode,
   refreshing,
+  compact = false,
   onSearchChange,
   onStatusFilterChange,
   onRiskFilterChange,
@@ -42,40 +44,50 @@ export const AppRulesToolbar = ({
         placeholder="Фото, auth, storage, moderationStatus, app_control..."
       />
     </label>
-    <label className="field">
-      <span>Режим</span>
-      <select value={viewMode} onChange={(event) => onViewModeChange(event.target.value as AppRulesViewMode)}>
-        <option value="problems">Тільки проблеми</option>
-        <option value="all">Всі правила</option>
-      </select>
-    </label>
-    <label className="field">
-      <span>Статус</span>
-      <select value={statusFilter} onChange={(event) => onStatusFilterChange(event.target.value as AppRuleStatus | 'all')}>
-        <option value="all">Всі</option>
-        <option value="critical">Критично</option>
-        <option value="warning">Попередження</option>
-        <option value="missing">Правило не знайдено</option>
-        <option value="active">Активно</option>
-        <option value="info">Інфо</option>
-      </select>
-    </label>
-    <label className="field">
-      <span>Риск</span>
-      <select value={riskFilter} onChange={(event) => onRiskFilterChange(event.target.value as AppRuleRisk | 'all')}>
-        <option value="all">Всі</option>
-        <option value="critical">Critical</option>
-        <option value="high">High</option>
-        <option value="medium">Medium</option>
-        <option value="low">Low</option>
-      </select>
-    </label>
+
+    {!compact && (
+      <label className="field">
+        <span>Режим</span>
+        <select value={viewMode} onChange={(event) => onViewModeChange(event.target.value as AppRulesViewMode)}>
+          <option value="problems">Тільки проблеми</option>
+          <option value="all">Всі правила</option>
+        </select>
+      </label>
+    )}
+
+    {!compact && (
+      <label className="field">
+        <span>Статус</span>
+        <select value={statusFilter} onChange={(event) => onStatusFilterChange(event.target.value as AppRuleStatus | 'all')}>
+          <option value="all">Всі</option>
+          <option value="critical">Критично</option>
+          <option value="warning">Попередження</option>
+          <option value="missing">Правило не знайдено</option>
+          <option value="active">Активно</option>
+          <option value="info">Інфо</option>
+        </select>
+      </label>
+    )}
+
+    {!compact && (
+      <label className="field">
+        <span>Риск</span>
+        <select value={riskFilter} onChange={(event) => onRiskFilterChange(event.target.value as AppRuleRisk | 'all')}>
+          <option value="all">Всі</option>
+          <option value="critical">Critical</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </select>
+      </label>
+    )}
+
     <div className="appRulesActions">
       <button type="button" className="smallButton" disabled={refreshing} onClick={onRefresh}>
         {refreshing ? 'Оновлення...' : 'Оновити'}
       </button>
-      <button type="button" className="smallButton" disabled={!snapshot} onClick={onExportJson}>JSON</button>
-      <button type="button" className="smallButton" disabled={!snapshot} onClick={onExportMarkdown}>Markdown</button>
+      {!compact && <button type="button" className="smallButton" disabled={!snapshot} onClick={onExportJson}>JSON</button>}
+      {!compact && <button type="button" className="smallButton" disabled={!snapshot} onClick={onExportMarkdown}>Markdown</button>}
     </div>
   </article>
 );

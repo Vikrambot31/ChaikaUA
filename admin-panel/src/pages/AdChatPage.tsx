@@ -13,6 +13,7 @@ import {
   type AdCategory,
   type AdStats,
 } from '../services/adService';
+import { useViewMode } from '../contexts/ViewModeContext';
 
 const PAGE_SIZE = 20;
 
@@ -303,6 +304,8 @@ function ChatPanel({
 // ── Main page ──
 
 export function AdChatPage() {
+  const { viewMode } = useViewMode();
+  const isSimpleMode = viewMode === 'simple';
   const [tickets, setTickets] = useState<AdTicket[]>([]);
   const [selectedTicket, setSelectedTicket] = useState<AdTicket | null>(null);
   const [messages, setMessages] = useState<AdMessage[]>([]);
@@ -409,15 +412,15 @@ export function AdChatPage() {
           )}
         </div>
       </div>
-
-      {/* Stats bar */}
-      <div style={pageStyles.statsBar}>
+      {!isSimpleMode && (
+        <div style={pageStyles.statsBar}>
         <span>Всього звернень: <strong>{stats.total}</strong></span>
         <span style={{ margin: '0 16px' }}>|</span>
         <span>Відкритих: <strong>{stats.open}</strong></span>
         <span style={{ margin: '0 16px' }}>|</span>
         <span>За сьогодні: <strong>{stats.today}</strong></span>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

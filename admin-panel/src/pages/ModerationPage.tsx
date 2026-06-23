@@ -4,6 +4,7 @@ import { InfoHint } from '../components/InfoHint';
 import { AiAnalysisButton } from '../components/AiAnalysisButton';
 import { EditRequestModal } from '../components/EditRequestModal';
 import { RejectModal } from '../components/RejectModal';
+import { useViewMode } from '../contexts/ViewModeContext';
 import { analyzeText } from '../services/aiAnalysisService';
 import { logDisagreement } from '../services/aiFeedbackService';
 import { addToYellowList, subscribeYellowList, removeFromYellowList, getServerNow, type YellowListEntry } from '../services/yellowListService';
@@ -42,6 +43,8 @@ const sectionLabel = (key: ModerationSectionKey): string =>
   MODERATION_SECTIONS.find((section) => section.key === key)?.label || key;
 
 export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveMode = false }: ModerationPageProps) => {
+  const { viewMode } = useViewMode();
+  const isSimpleMode = viewMode === 'simple';
   const [items, setItems] = useState<ModerationItem[]>([]);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(initialStatusFilter);
   const [sectionFilter, setSectionFilter] = useState<'all' | ModerationSectionKey>('all');
@@ -245,6 +248,14 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
     }
     return { approve, review, suspicious, total: aiResults.size };
   }, [aiResults]);
+
+  useEffect(() => {
+    if (!isSimpleMode) return;
+    setPriorityFilter('all');
+    setAiVerdictFilter('all');
+    setDateFrom('');
+    setDateTo('');
+  }, [isSimpleMode]);
 
   // Масс-анализ
   const startMassAnalysis = async () => {
@@ -526,7 +537,7 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
         <article className="metric metric-info"><span>Просрочены</span><strong>{summary.expired}</strong></article>
       </div>
 
-      {aiStats.total > 0 ? (
+      {!isSimpleMode && aiStats.total > 0 ? (
         <div className="statsGrid">
           <article className="metric metric-success"><span>AI: к одобрению</span><strong>{aiStats.approve}</strong></article>
           <article className="metric metric-warning"><span>AI: проверить</span><strong>{aiStats.review}</strong></article>
@@ -580,6 +591,7 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
             placeholder="Название, имя, userId, email, deviceId"
           />
         </label>
+        {!isSimpleMode && (
         <label className="field">
           <span>Приоритет</span>
           <select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value as PriorityFilter)}>
@@ -589,6 +601,8 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
             <option value="low">Низкие</option>
           </select>
         </label>
+        )}
+        {!isSimpleMode && (
         <label className="field">
           <span>AI вердикт</span>
           <select value={aiVerdictFilter} onChange={(event) => setAiVerdictFilter(event.target.value as AiVerdictFilter)}>
@@ -598,14 +612,19 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
             <option value="suspicious">AI: подозрительно</option>
           </select>
         </label>
+        )}
+        {!isSimpleMode && (
         <label className="field">
           <span>Дата от</span>
           <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
         </label>
+        )}
+        {!isSimpleMode && (
         <label className="field">
           <span>Дата до</span>
           <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
         </label>
+        )}
         <label className="field">
           <span>Сортировка</span>
           <select value={sortOrder} onChange={(event) => setSortOrder(event.target.value as 'newest' | 'oldest')}>
@@ -665,6 +684,8 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
           >
             Удалить все
           </button>
+          {!isSimpleMode && (
+            <>
           <span className="batchSeparator" />
           <select
             value={massStrategy}
@@ -688,6 +709,8 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
               Отмена
             </button>
           ) : null}
+            </>
+          )}
         </div>
         <div className="tableWrap">
           <table>
@@ -700,7 +723,7 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
                 <th>Время</th>
                 <th>Статус</th>
                 <th>Медиа</th>
-                <th>AI</th>
+                {!isSimpleMode && <th>AI</th>}
                 <th>Действия</th>
               </tr>
             </thead>
@@ -794,9 +817,11 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
                       <span title={`Медиа есть (${item.photoUrls.length} шт.), но не загрузилось из Storage`}>&#9888; Медиа недоступно</span>
                     ) : '-'}
                   </td>
+                  {!isSimpleMode && (
                   <td>
                     <AiAnalysisButton item={item} onResult={onAiResult} />
                   </td>
+                  )}
                   <td className="moderationActions">
                     {item.status !== 'rejected' && item.status !== 'expired' ? (
                       <button
@@ -882,7 +907,7 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
                 </tr>
               ))}
               {!loading && !filteredItems.length ? (
-                <tr><td colSpan={9}>Записей по фильтру не найдено.</td></tr>
+                <tr><td colSpan={isSimpleMode ? 8 : 9}>Записей по фильтру не найдено.</td></tr>
               ) : null}
             </tbody>
           </table>

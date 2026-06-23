@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { LiveDiagnosticsPanel } from '../components/LiveDiagnosticsPanel';
 import { useReleases } from '../hooks/useReleases';
+import { useViewMode } from '../contexts/ViewModeContext';
 import {
   setRuntimeDiagnosticsControl,
   subscribeRuntimeDiagnosticsControl,
@@ -9,6 +10,8 @@ import { getScreenNameForFile } from '../services/releasesService';
 
 export const ReleasesPage = () => {
   const { releases, loading, error, updateSummary, updateControl, refresh } = useReleases();
+  const { viewMode } = useViewMode();
+  const isSimpleMode = viewMode === 'simple';
   const [expandedKey, setExpandedKey] = useState<string | null>(releases[0]?.versionKey ?? null);
   const [summaryInputs, setSummaryInputs] = useState<Record<string, string>>({});
   const [controlInputs, setControlInputs] = useState<Record<string, {
@@ -151,6 +154,7 @@ export const ReleasesPage = () => {
         </button>
       </div>
 
+      {!isSimpleMode && (
       <section className="releaseDiagnosticsSwitch">
         <div>
           <p className="eyebrow">APK runtime mode</p>
@@ -186,7 +190,8 @@ export const ReleasesPage = () => {
         </div>
       </section>
 
-      <LiveDiagnosticsPanel />
+      )}
+      {!isSimpleMode && <LiveDiagnosticsPanel />}
 
       {error ? (
         <div className="releaseError">
@@ -231,6 +236,8 @@ export const ReleasesPage = () => {
             return (
               <div className="releaseDetail">
                 <h3>Детали: v{r.version}</h3>
+                {!isSimpleMode && (
+                  <>
                 <div className="releaseDetailMeta">
                   <p><strong>Коммит:</strong> {r.commitHash || '—'}</p>
                   <p><strong>Сборка:</strong> {r.buildStamp || '—'}</p>
@@ -259,6 +266,8 @@ export const ReleasesPage = () => {
                   })}
                 </div>
 
+                  </>
+                )}
                 <div className="releaseSummaryEdit">
                   <h4>Описание (для отображения)</h4>
                   <textarea
@@ -280,6 +289,7 @@ export const ReleasesPage = () => {
                     <p className="releaseSaveError">{saveError.message}</p>
                   )}
                 </div>
+                {!isSimpleMode && (
                 <div className="releaseSummaryEdit">
                   <h4>Force update / тестирование</h4>
                   {(() => {
@@ -332,6 +342,7 @@ export const ReleasesPage = () => {
                     );
                   })()}
                 </div>
+                )}
               </div>
             );
           })() : null}

@@ -270,6 +270,7 @@ export const AppShell = ({ children, user, role, activePage, onNavigate, photoPe
   const connected = useFirebaseConnection();
   const { viewMode, setViewMode } = useViewMode();
   const { stats, error: dashboardError } = useDashboardContext();
+  const isFullMode = viewMode === 'full';
   if (dashboardError && !dashboardError.toLowerCase().includes('permission_denied') && !dashboardError.toLowerCase().includes('permission denied')) {
     console.error('[AppShell] dashboard error:', dashboardError);
   }
@@ -285,7 +286,7 @@ export const AppShell = ({ children, user, role, activePage, onNavigate, photoPe
   );
 
   return (
-  <div className="shell">
+  <div className={`shell shell-${viewMode}`}>
     <aside className="sidebar">
       <div>
         <p className="eyebrow">Chaika Life</p>
@@ -300,6 +301,7 @@ export const AppShell = ({ children, user, role, activePage, onNavigate, photoPe
       <nav className="nav">
         {navItems.map((item) => {
           const meter = getAttentionMeter(item.key, stats);
+          const showAttentionMeter = isFullMode || meter.level !== 'low';
           return (
             <div key={item.key} className="navItemRow">
               <div className="navItemStack">
@@ -325,16 +327,18 @@ export const AppShell = ({ children, user, role, activePage, onNavigate, photoPe
                     )}
                   </span>
                 </button>
-                <div className={`attentionMeter attention-${meter.level}`} title={meter.label} aria-label={meter.label}>
-                  <div className="attentionDots">{renderAttentionDots(meter)}</div>
-                  <div className="attentionTrack" aria-hidden="true">
-                    <span className="attentionTrackRed" />
-                    <span className="attentionTrackYellow" />
-                    <span className="attentionTrackGreen" />
+                {showAttentionMeter && (
+                  <div className={`attentionMeter attention-${meter.level}`} title={meter.label} aria-label={meter.label}>
+                    <div className="attentionDots">{renderAttentionDots(meter)}</div>
+                    <div className="attentionTrack" aria-hidden="true">
+                      <span className="attentionTrackRed" />
+                      <span className="attentionTrackYellow" />
+                      <span className="attentionTrackGreen" />
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
-              <InfoHint text={item.hint} />
+              {isFullMode && <InfoHint text={item.hint} />}
             </div>
           );
         })}
@@ -346,7 +350,7 @@ export const AppShell = ({ children, user, role, activePage, onNavigate, photoPe
             <span>Выйти</span>
           </span>
         </button>
-        <InfoHint text="Завершает текущую админ-сессию." />
+        {isFullMode && <InfoHint text="Завершает текущую админ-сессию." />}
       </div>
     </aside>
     <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>

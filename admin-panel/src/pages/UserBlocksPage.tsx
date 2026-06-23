@@ -7,6 +7,7 @@ import {
 import { AiAnalysisButton } from '../components/AiAnalysisButton';
 import type { ModerationItem } from '../services/moderationService';
 import { useAuthAccess } from '../hooks/useAuthAccess';
+import { useViewMode } from '../contexts/ViewModeContext';
 import { get, ref, update } from 'firebase/database';
 import { database } from '../firebase/firebase';
 
@@ -58,6 +59,8 @@ const toModerationItem = (report: BlockReport): ModerationItem => ({
 
 export const UserBlocksPage = () => {
   const access = useAuthAccess();
+  const { viewMode } = useViewMode();
+  const isSimpleMode = viewMode === 'simple';
   const adminUid = access.status === 'allowed' ? access.user.uid : '';
 
   const [reports, setReports] = useState<BlockReport[]>([]);
@@ -152,7 +155,7 @@ export const UserBlocksPage = () => {
               <th style={{ padding: '8px 6px' }}>Кого заблокували</th>
               <th style={{ padding: '8px 6px' }}>Причина</th>
               <th style={{ padding: '8px 6px' }}>Статус</th>
-              <th style={{ padding: '8px 6px' }}>AI</th>
+              {!isSimpleMode && <th style={{ padding: '8px 6px' }}>AI</th>}
               <th style={{ padding: '8px 6px' }}>Дії</th>
             </tr>
           </thead>
@@ -183,8 +186,9 @@ export const UserBlocksPage = () => {
                       {STATUS_LABELS[r.status] || r.status}
                     </span>
                   </td>
-                  <td style={{ padding: '8px 6px' }}>
-                    <AiAnalysisButton
+                  {!isSimpleMode && (
+                    <td style={{ padding: '8px 6px' }}>
+                      <AiAnalysisButton
                       item={item}
                       onResult={(path, result) => {
                         void (async () => {
@@ -205,7 +209,8 @@ export const UserBlocksPage = () => {
                         })();
                       }}
                     />
-                  </td>
+                    </td>
+                  )}
                   <td style={{ padding: '8px 6px' }}>
                     {r.status === 'pending' ? (
                       <button

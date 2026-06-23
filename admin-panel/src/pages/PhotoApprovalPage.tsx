@@ -8,6 +8,7 @@ import {
   resolvePhotoUrl,
   type PhotoRecord,
 } from '../services/photoApprovalService';
+import { useViewMode } from '../contexts/ViewModeContext';
 
 const PhotoThumb = ({
   photo,
@@ -100,6 +101,8 @@ const getStatusLabel = (status: PhotoRecord['status']): string => {
 };
 
 export const PhotoApprovalPage = () => {
+  const { viewMode } = useViewMode();
+  const isSimpleMode = viewMode === 'simple';
   const { photos: allPhotos, loading, error, refresh } = usePhotoApproval();
   const [localPhotos, setLocalPhotos] = useState<PhotoRecord[] | null>(null);
   const [actionError, setActionError] = useState('');
@@ -114,6 +117,10 @@ export const PhotoApprovalPage = () => {
 
   const photos = localPhotos ?? allPhotos;
   const [uidFilter, setUidFilter] = useState('');
+
+  useEffect(() => {
+    if (isSimpleMode && selectedIds.length > 0) setSelectedIds([]);
+  }, [isSimpleMode, selectedIds.length]);
 
   const handleRefresh = async () => {
     setLocalPhotos(null);
@@ -446,7 +453,7 @@ export const PhotoApprovalPage = () => {
         ))}
       </div>
 
-      {shown.length > 0 ? (
+      {!isSimpleMode && shown.length > 0 ? (
         <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
           <button
             type="button"
@@ -557,7 +564,7 @@ export const PhotoApprovalPage = () => {
           <table>
             <thead>
               <tr>
-                <th style={{ width: 44 }}>Выбор</th>
+                {!isSimpleMode && <th style={{ width: 44 }}>Р’С‹Р±РѕСЂ</th>}
                 <th style={{ width: 88 }}>Фото</th>
                 <th>Детали</th>
                 <th style={{ minWidth: 210 }}>Экран-источник</th>
@@ -574,14 +581,16 @@ export const PhotoApprovalPage = () => {
                 const rowBusy = bulkBusy || busyId === p.id;
                 return (
                   <tr key={p.id}>
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.includes(p.id)}
-                        onChange={() => toggleSelect(p.id)}
-                        disabled={rowBusy}
-                      />
-                    </td>
+                    {!isSimpleMode && (
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(p.id)}
+                          onChange={() => toggleSelect(p.id)}
+                          disabled={rowBusy}
+                        />
+                      </td>
+                    )}
                     <td>
                       <PhotoThumb photo={p} onOpenLightbox={setLightboxUrl} />
                     </td>

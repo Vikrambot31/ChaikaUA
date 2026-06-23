@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useAuthAccess } from '../hooks/useAuthAccess';
+import { useViewMode } from '../contexts/ViewModeContext';
 import {
   loadReports,
   dismissReport,
@@ -45,6 +46,8 @@ const formatDate = (iso: string): string => {
 
 export const ReportsModerationPage = () => {
   const access = useAuthAccess();
+  const { viewMode } = useViewMode();
+  const isSimpleMode = viewMode === 'simple';
   const adminUid = access.status === 'allowed' ? access.user.uid : '';
 
   const [tab, setTab] = useState<Tab>('reports');
@@ -171,12 +174,18 @@ export const ReportsModerationPage = () => {
   // ─── Render ───────────────────────────────────────────────
   const pendingCount = reports.filter((r) => r.status === 'pending').length;
 
+  useEffect(() => {
+    if (isSimpleMode && tab === 'blocks') setTab('reports');
+  }, [isSimpleMode, tab]);
+
   return (
     <div style={{ padding: 24, maxWidth: 1200 }}>
       <h2 style={{ color: '#e0e0e0', marginBottom: 4 }}>Скарги та безпека</h2>
-      <p style={{ color: '#888', fontSize: 13, marginBottom: 16 }}>
-        Жалобы пользователей Kontakt-XXX и паттерны блокировок
-      </p>
+      {!isSimpleMode && (
+        <p style={{ color: '#888', fontSize: 13, marginBottom: 16 }}>
+          {"\u0416\u0430\u043b\u043e\u0431\u044b \u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u0435\u0439 Kontakt-XXX \u0438 \u043f\u0430\u0442\u0442\u0435\u0440\u043d\u044b \u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u043e\u043a"}
+        </p>
+      )}
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
@@ -192,7 +201,8 @@ export const ReportsModerationPage = () => {
         >
           Жалобы {pendingCount > 0 && <span style={{ background: '#e53935', color: '#fff', borderRadius: 10, padding: '1px 7px', fontSize: 11, marginLeft: 6 }}>{pendingCount}</span>}
         </button>
-        <button
+        {!isSimpleMode && (
+          <button
           type="button"
           onClick={() => setTab('blocks')}
           style={{
@@ -202,8 +212,9 @@ export const ReportsModerationPage = () => {
             fontWeight: 700, fontSize: 14,
           }}
         >
-          Паттерны блокировок
+          {"\u041f\u0430\u0442\u0442\u0435\u0440\u043d\u044b \u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u043e\u043a"}
         </button>
+        )}
       </div>
 
       {/* ─── REPORTS TAB ─────────────────────────────────────── */}

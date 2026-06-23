@@ -20,6 +20,7 @@ import {
   type SupportEscalationItem,
 } from '../services/aiConfigService';
 import { DEFAULT_AI_CONFIG, type AiConfig } from '../types/ai-config';
+import { useViewMode } from '../contexts/ViewModeContext';
 
 const PAGE_SIZE = 20;
 
@@ -408,6 +409,8 @@ function AiSupportPanel({
 }
 
 export function SupportPage() {
+  const { viewMode } = useViewMode();
+  const isSimpleMode = viewMode === 'simple';
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
   const [messages, setMessages] = useState<SupportMessage[]>([]);
@@ -516,15 +519,16 @@ export function SupportPage() {
   return (
     <div style={pageStyles.container}>
       <h2 style={pageStyles.title}>🎧 Служба Підтримки</h2>
-
-      <AiSupportPanel
-        config={aiConfig}
-        configExists={aiConfigExists}
-        escalations={aiEscalations}
-        tickets={tickets}
-        onOpenTicket={handleOpenAiEscalation}
-        onResolve={handleResolveAiEscalation}
-      />
+      {!isSimpleMode && (
+        <AiSupportPanel
+          config={aiConfig}
+          configExists={aiConfigExists}
+          escalations={aiEscalations}
+          tickets={tickets}
+          onOpenTicket={handleOpenAiEscalation}
+          onResolve={handleResolveAiEscalation}
+        />
+      )}
 
       <div style={pageStyles.layout}>
         {/* Left: ticket list */}
@@ -558,15 +562,15 @@ export function SupportPage() {
           )}
         </div>
       </div>
-
-      {/* Stats bar */}
-      <div style={pageStyles.statsBar}>
+      {!isSimpleMode && (
+        <div style={pageStyles.statsBar}>
         <span>Всього звернень: <strong>{stats.total}</strong></span>
         <span style={{ margin: '0 16px' }}>|</span>
         <span>Відкритих: <strong>{stats.open}</strong></span>
         <span style={{ margin: '0 16px' }}>|</span>
         <span>За сьогодні: <strong>{stats.today}</strong></span>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -9,6 +9,7 @@ import {
   type TopListingRecord,
   type TopListingStatus,
 } from '../services/topListingsAdminService';
+import { useViewMode } from '../contexts/ViewModeContext';
 
 const COLLECTIONS: Array<{ key: TopListingCollection; label: string }> = [
   { key: 'food_top_listings', label: 'Їжа на Чайці' },
@@ -109,6 +110,8 @@ type CollectionState = {
 };
 
 export const TopListingsModerationPage = () => {
+  const { viewMode } = useViewMode();
+  const isSimpleMode = viewMode === 'simple';
   const [activeCollection, setActiveCollection] = useState<TopListingCollection>('food_top_listings');
   const [collectionData, setCollectionData] = useState<Record<TopListingCollection, CollectionState>>({
     food_top_listings: { items: [], loading: false, error: '' },
@@ -124,6 +127,10 @@ export const TopListingsModerationPage = () => {
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [rejectTarget, setRejectTarget] = useState<TopListingRecord | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+
+  useEffect(() => {
+    if (isSimpleMode && selectedIds.length > 0) setSelectedIds([]);
+  }, [isSimpleMode, selectedIds.length]);
 
   const loadCollection = async (collection: TopListingCollection) => {
     setCollectionData((prev) => ({
@@ -543,7 +550,7 @@ export const TopListingsModerationPage = () => {
       </div>
 
       {/* Bulk action toolbar */}
-      {shown.length > 0 ? (
+      {!isSimpleMode && shown.length > 0 ? (
         <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
           <button
             type="button"
@@ -625,7 +632,7 @@ export const TopListingsModerationPage = () => {
           <table>
             <thead>
               <tr>
-                <th style={{ width: 44 }}>Вибір</th>
+                {!isSimpleMode && <th style={{ width: 44 }}>Р’РёР±С–СЂ</th>}
                 <th style={{ width: 80 }}>Фото</th>
                 <th>Назва / Опис</th>
                 <th style={{ minWidth: 120 }}>Статус</th>
@@ -640,14 +647,16 @@ export const TopListingsModerationPage = () => {
                 const rowBusy = bulkBusy || busyId === r.id;
                 return (
                   <tr key={r.id}>
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.includes(r.id)}
-                        onChange={() => toggleSelect(r.id)}
-                        disabled={rowBusy}
-                      />
-                    </td>
+                    {!isSimpleMode && (
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(r.id)}
+                          onChange={() => toggleSelect(r.id)}
+                          disabled={rowBusy}
+                        />
+                      </td>
+                    )}
                     <td>
                       <PhotoThumb record={r} onOpenLightbox={setLightboxUrl} />
                     </td>

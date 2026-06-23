@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { User } from 'firebase/auth';
 import { InfoHint } from '../components/InfoHint';
+import { useViewMode } from '../contexts/ViewModeContext';
 import { useSecurityControl } from '../hooks/useSecurityControl';
 import {
   getModeratorRoles,
@@ -80,6 +81,8 @@ type UserLastSeenRow = {
 };
 
 export const SecurityPage = ({ user }: SecurityPageProps) => {
+  const { viewMode } = useViewMode();
+  const isSimpleMode = viewMode === 'simple';
   const { config, devices, logs, errors } = useSecurityControl();
   const [minimumVersion, setMinimumVersion] = useState('');
   const [busyAction, setBusyAction] = useState<string | null>(null);
@@ -205,7 +208,7 @@ export const SecurityPage = ({ user }: SecurityPageProps) => {
         <article className="metric metric-primary"><span>Всего устройств</span><strong>{devices.length}</strong></article>
         <article className="metric metric-success"><span>Онлайн</span><strong>{onlineCount}</strong></article>
         <article className="metric metric-danger"><span>Заблокировано</span><strong>{blockedCount}</strong></article>
-        <article className="metric metric-violet"><span>Записей в журнале</span><strong>{logs.length}</strong></article>
+        {!isSimpleMode && <article className="metric metric-violet"><span>Записей в журнале</span><strong>{logs.length}</strong></article>}
       </div>
 
       <div className="grid securityGrid">
@@ -227,6 +230,8 @@ export const SecurityPage = ({ user }: SecurityPageProps) => {
                   />
                 ))}
               </div>
+              {!isSimpleMode && (
+                <>
               <div className="inlineEdit">
                 <label className="field">
                   <span>Минимальная обязательная версия</span>
@@ -245,12 +250,15 @@ export const SecurityPage = ({ user }: SecurityPageProps) => {
                 <div><dt>Обновлено</dt><dd>{dateTime(config.updated_at)}</dd></div>
                 <div><dt>Кем обновлено</dt><dd>{config.updated_by || '-'}</dd></div>
               </dl>
+                </>
+              )}
             </>
           ) : (
             <p>Загрузка конфигурации...</p>
           )}
         </article>
 
+        {!isSimpleMode && (
         <article className="panel">
           <div className="headingWithHint">
             <h3>Последние события безопасности</h3>
@@ -267,9 +275,11 @@ export const SecurityPage = ({ user }: SecurityPageProps) => {
             {!logs.length ? <p>Журнал безопасности пуст.</p> : null}
           </div>
         </article>
+        )}
       </div>
 
       {/* ── Moderator Online Status ──────────────────────────────────────── */}
+      {!isSimpleMode && (
       <article className="panel" style={{ marginBottom: 20 }}>
         <div className="headingWithHint" style={{ marginBottom: 12 }}>
           <h3 style={{ margin: 0 }}>Онлайн-статус модераторов</h3>
@@ -321,6 +331,7 @@ export const SecurityPage = ({ user }: SecurityPageProps) => {
           </div>
         )}
       </article>
+      )}
 
       <article className="panel tablePanel">
         <div className="headingWithHint">

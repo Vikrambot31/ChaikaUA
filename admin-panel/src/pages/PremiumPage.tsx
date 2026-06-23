@@ -10,6 +10,7 @@ import {
   type UserSearchResult,
   type UserProfile,
 } from '../services/premiumAdminService';
+import { useViewMode } from '../contexts/ViewModeContext';
 
 type MonthsOption = 1 | 3 | 6 | 12;
 
@@ -288,6 +289,8 @@ function ActivateModal({ uid, name, onClose, onActivated }: ActivateModalProps) 
 }
 
 export function PremiumPage() {
+  const { viewMode } = useViewMode();
+  const isSimpleMode = viewMode === 'simple';
   const [subscriptions, setSubscriptions] = useState<PremiumSubscription[]>([]);
   const [profiles, setProfiles] = useState<Record<string, UserProfile>>({});
   const [search, setSearch] = useState('');
@@ -356,14 +359,14 @@ export function PremiumPage() {
       </h2>
 
       <UserSearchBlock onActivate={openActivate} />
-
-      {/* Summary stats */}
-      <div style={{ display: 'flex', gap: 14, marginBottom: 20, flexWrap: 'wrap' }}>
+      {!isSimpleMode && (
+        <div style={{ display: 'flex', gap: 14, marginBottom: 20, flexWrap: 'wrap' }}>
         <StatCard label="Активних" value={totalActive} color="#43a047" />
         <StatCard label="Пробних" value={totalTrial} color="#fb8c00" />
         <StatCard label="Закінчується 7 днів" value={expiringThisWeek} color="#ffa726" />
         <StatCard label="Всього записів" value={subscriptions.length} color="#5c6bc0" />
-      </div>
+        </div>
+      )}
 
       {actionError && (
         <div style={{

@@ -50,6 +50,7 @@ import {
   type AppVersionRegistry,
 } from '../services/apkVersionService';
 import { useAuthAccess } from '../hooks/useAuthAccess';
+import { useViewMode } from '../contexts/ViewModeContext';
 
 type AccessControlPageProps = {
   role: SecurityRole;
@@ -111,6 +112,8 @@ const modeLabel = (mode: InviteAccessMode): string => {
 };
 
 export const AccessControlPage = ({ role, onNavigateToInvites }: AccessControlPageProps) => {
+  const { viewMode } = useViewMode();
+  const isSimpleMode = viewMode === 'simple';
   const [state, setState] = useState<InviteAccessState>(emptyState);
   const [requestFilter, setRequestFilter] = useState<RequestFilter>('needs_manual_review');
   const [loading, setLoading] = useState(true);
@@ -478,6 +481,7 @@ export const AccessControlPage = ({ role, onNavigateToInvites }: AccessControlPa
 
       {message && <p className="infoMessage">{message}</p>}
 
+      {!isSimpleMode && (
       <article
         className="panel"
         style={{
@@ -594,8 +598,9 @@ export const AccessControlPage = ({ role, onNavigateToInvites }: AccessControlPa
           </div>
         </div>
       </article>
+      )}
 
-      {emergencyModalOpen && (
+      {!isSimpleMode && emergencyModalOpen && (
         <div
           role="dialog"
           aria-modal="true"
@@ -704,6 +709,7 @@ export const AccessControlPage = ({ role, onNavigateToInvites }: AccessControlPa
       </div>
 
       {/* ── APK Version Tracking ──────────────────────────────────────────── */}
+      {!isSimpleMode && (
       <article className="panel" style={{ marginBottom: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
           <div className="headingWithHint">
@@ -846,6 +852,7 @@ export const AccessControlPage = ({ role, onNavigateToInvites }: AccessControlPa
           </div>
         )}
       </article>
+      )}
 
       <div className="grid accessControlGrid">
 
@@ -975,6 +982,7 @@ export const AccessControlPage = ({ role, onNavigateToInvites }: AccessControlPa
         </article>
 
         {/* ── Tier Explanation ───────────────────────────────────────────── */}
+        {!isSimpleMode && (
         <article className="panel">
           <div className="headingWithHint">
             <h3>Уровни доступа</h3>
@@ -1011,6 +1019,7 @@ export const AccessControlPage = ({ role, onNavigateToInvites }: AccessControlPa
             </ul>
           </div>
         </article>
+        )}
 
         {/* ── Requests Table ─────────────────────────────────────────────── */}
         <article className="panel" style={{ gridColumn: '1 / -1' }}>
@@ -1179,6 +1188,7 @@ export const AccessControlPage = ({ role, onNavigateToInvites }: AccessControlPa
         {/* ══════════════════════════════════════════════════════════════════ */}
         {/* ── Монитор блокировок заявок ─────────────────────────────────── */}
         {/* ══════════════════════════════════════════════════════════════════ */}
+        {!isSimpleMode && (
         <article className="panel" style={{ marginTop: 32 }}>
           <div className="headingWithHint" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <h3>Монитор блокировок заявок</h3>
@@ -1295,10 +1305,12 @@ export const AccessControlPage = ({ role, onNavigateToInvites }: AccessControlPa
             </p>
           )}
         </article>
+        )}
 
         {/* ══════════════════════════════════════════════════════════════════ */}
         {/* ── Rules Consistency Audit ───────────────────────────────────── */}
         {/* ══════════════════════════════════════════════════════════════════ */}
+        {!isSimpleMode && (
         <article className="panel" style={{ marginTop: 24 }}>
           <h3>Аудит Rules — publish-коллекции</h3>
           {rulesAudit.length > 0 ? (
@@ -1346,6 +1358,7 @@ export const AccessControlPage = ({ role, onNavigateToInvites }: AccessControlPa
             </div>
           )}
         </article>
+        )}
       </div>
     </section>
   );

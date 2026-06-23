@@ -10,6 +10,7 @@ import {
 } from '../services/appRules/appRulesService';
 import type { AppRuleRisk, AppRuleStatus, AppRulesSnapshot, AppRulesZoneGroup } from '../types/appRules';
 import type { SecurityRole } from '../services/authService';
+import { useViewMode } from '../contexts/ViewModeContext';
 
 const REFRESH_INTERVAL_MS = 2 * 60 * 1000;
 
@@ -72,13 +73,15 @@ type AppRulesPageProps = {
 };
 
 const AppRulesContent = () => {
+  const { viewMode: adminViewMode } = useViewMode();
+  const isSimpleMode = adminViewMode === 'simple';
   const [snapshot, setSnapshot] = useState<AppRulesSnapshot | null>(() => loadCachedAppRulesSnapshot());
   const [refreshing, setRefreshing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<AppRuleStatus | 'all'>('all');
   const [riskFilter, setRiskFilter] = useState<AppRuleRisk | 'all'>('all');
-  const [viewMode, setViewMode] = useState<AppRulesViewMode>('problems');
+  const [rulesViewMode, setRulesViewMode] = useState<AppRulesViewMode>('problems');
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
@@ -109,8 +112,8 @@ const AppRulesContent = () => {
   );
 
   const filteredZones = useMemo(
-    () => rawZones.map((group) => filterZoneGroup(group, search, statusFilter, riskFilter, viewMode)),
-    [rawZones, search, statusFilter, riskFilter, viewMode],
+    () => rawZones.map((group) => filterZoneGroup(group, search, statusFilter, riskFilter, rulesViewMode)),
+    [rawZones, search, statusFilter, riskFilter, rulesViewMode],
   );
 
   const actionZone = useMemo(() => filteredZones.find((g) => g.zone === 'action'), [filteredZones]);
@@ -125,6 +128,13 @@ const AppRulesContent = () => {
     () => filteredZones.reduce((sum, g) => sum + g.items.length, 0),
     [filteredZones],
   );
+
+  useEffect(() => {
+    if (!isSimpleMode) return;
+    setStatusFilter('all');
+    setRiskFilter('all');
+    setRulesViewMode('problems');
+  }, [isSimpleMode]);
 
   const exportJson = () => {
     if (!snapshot) return;
@@ -150,10 +160,12 @@ const AppRulesContent = () => {
         <div>
           <p className="eyebrow">Жива документація</p>
           <h2>Серверні правила та діагностика</h2>
+          {!isSimpleMode && (
           <p className="appRulesLead">
             Правила розділені на 3 зони: що потребує дії прямо зараз, що потрібно моніторити,
             і що працює за задумом архітектури (не потребує уваги).
           </p>
+          )}
         </div>
         <span className={snapshot?.syncStatus === 'ready' ? 'status active' : 'status warning'}>
           {snapshot?.syncStatus === 'ready' ? 'СИНХРОНІЗОВАНО' : refreshing ? 'ОНОВЛЕННЯ' : 'ЧАСТКОВІ ДАНІ'}
@@ -178,14 +190,18 @@ const AppRulesContent = () => {
           <span>🟡 Моніторинг</span>
           <strong>{monitorZone?.items.length ?? 0}</strong>
         </article>
+        {!isSimpleMode && (
         <article className="metric metric-primary">
           <span>📋 Архітектура</span>
           <strong>{referenceZone?.items.length ?? 0}</strong>
         </article>
+        )}
+        {!isSimpleMode && (
         <article className="metric metric-primary">
           <span>Всього правил</span>
           <strong>{totalItems}</strong>
         </article>
+        )}
       </div>
 
       <AppRulesToolbar
@@ -193,23 +209,26 @@ const AppRulesContent = () => {
         search={search}
         statusFilter={statusFilter}
         riskFilter={riskFilter}
-        viewMode={viewMode}
+        viewMode={rulesViewMode}
         refreshing={refreshing}
         onSearchChange={setSearch}
         onStatusFilterChange={setStatusFilter}
         onRiskFilterChange={setRiskFilter}
-        onViewModeChange={setViewMode}
+        onViewModeChange={setRulesViewMode}
+        compact={isSimpleMode}
         onRefresh={() => void refresh()}
         onExportJson={exportJson}
         onExportMarkdown={exportMarkdown}
       />
 
+      {!isSimpleMode && (
       <div className="appRulesSyncMeta">
         <span>Оновлено: {snapshot ? new Date(snapshot.generatedAt).toLocaleString() : 'завантаження...'}</span>
         <span>Авто-оновлення: кожні {Math.round(REFRESH_INTERVAL_MS / 60000)} хв.</span>
         <span>Показано: {filteredCount} з {totalItems}</span>
         <span>Джерел: {snapshot?.sources?.length ?? 0}</span>
       </div>
+      )}
 
       {/* 3 Zone panels */}
       <div className="appRulesZones">
@@ -219,7 +238,7 @@ const AppRulesContent = () => {
         {monitorZone ? (
           <AppRulesZonePanel group={monitorZone} updatedAt={snapshot?.generatedAt ?? null} search={search} />
         ) : null}
-        {referenceZone ? (
+        {!isSimpleMode && referenceZone ? (
           <AppRulesZonePanel group={referenceZone} updatedAt={snapshot?.generatedAt ?? null} search={search} />
         ) : null}
       </div>

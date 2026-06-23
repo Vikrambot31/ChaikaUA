@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuthAccess } from '../hooks/useAuthAccess';
+import { useViewMode } from '../contexts/ViewModeContext';
 import {
   subscribeToBusinessPlusClaims,
   subscribeToBusinessPlusCards,
@@ -961,6 +962,8 @@ function SubscriptionsTab() {
 
 export function BusinessPlusModerationPage() {
   const access = useAuthAccess();
+  const { viewMode } = useViewMode();
+  const isSimpleMode = viewMode === 'simple';
   const [activeTab, setActiveTab] = useState<Tab>('claims');
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
   const [claimsCount, setClaimsCount] = useState(0);
@@ -986,9 +989,11 @@ export function BusinessPlusModerationPage() {
         <h2 style={{ color: '#1a1a2e', fontSize: 22, fontWeight: 900, margin: 0 }}>
           🏪 Бізнес+ картки
         </h2>
-        <p style={{ color: '#777', fontSize: 14, margin: '4px 0 0' }}>
-          Заявки власників та модерація контенту меню/акцій/фото
-        </p>
+        {!isSimpleMode && (
+          <p style={{ color: '#777', fontSize: 14, margin: '4px 0 0' }}>
+            {"\u0417\u0430\u044f\u0432\u043a\u0438 \u0432\u043b\u0430\u0441\u043d\u0438\u043a\u043e\u0432 \u0438 \u043c\u043e\u0434\u0435\u0440\u0430\u0446\u0438\u044f \u043a\u043e\u043d\u0442\u0435\u043d\u0442\u0430 \u043c\u0435\u043d\u044e/\u0430\u043a\u0446\u0438\u0439/\u0444\u043e\u0442\u043e"}
+          </p>
+        )}
       </div>
 
       {/* Tabs */}

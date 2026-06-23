@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useViewMode } from '../contexts/ViewModeContext';
 import { InfoHint } from '../components/InfoHint';
 import { useErrorMonitor } from '../hooks/useErrorMonitor';
 
@@ -27,6 +28,8 @@ const buildHourlyBuckets = (timestamps: number[]): { label: string; count: numbe
 
 export const ErrorMonitorPage = () => {
   const { dedupedRuntimeErrors, userReports, error } = useErrorMonitor();
+  const { viewMode } = useViewMode();
+  const isSimpleMode = viewMode === 'simple';
   const [mode, setMode] = useState<'runtime' | 'reports'>('runtime');
   const [search, setSearch] = useState('');
   const [versionFilter, setVersionFilter] = useState('');
@@ -87,6 +90,12 @@ export const ErrorMonitorPage = () => {
 
   const maxBucket = Math.max(...hourlyBuckets.map((b) => b.count), 1);
 
+  useEffect(() => {
+    if (!isSimpleMode) return;
+    setVersionFilter('');
+    setSeverityFilter('');
+  }, [isSimpleMode]);
+
   return (
     <section>
       <div className="pageHeader">
@@ -109,6 +118,7 @@ export const ErrorMonitorPage = () => {
       </div>
 
       {/* Error trend chart — hourly buckets for last 24 h */}
+      {!isSimpleMode && (
       <article className="panel" style={{ marginBottom: '1.5rem' }}>
         <div className="tableHeader">
           <div className="headingWithHint">
@@ -147,6 +157,7 @@ export const ErrorMonitorPage = () => {
           ))}
         </div>
       </article>
+      )}
 
       <div className="filtersRow errorFiltersRow">
         <label className="field">
@@ -156,7 +167,7 @@ export const ErrorMonitorPage = () => {
             <option value="reports">Отчеты пользователей</option>
           </select>
         </label>
-        {mode === 'runtime' && (
+        {!isSimpleMode && mode === 'runtime' && (
           <label className="field">
             <span>Версия приложения</span>
             <select value={versionFilter} onChange={(event) => setVersionFilter(event.target.value)}>
@@ -167,7 +178,7 @@ export const ErrorMonitorPage = () => {
             </select>
           </label>
         )}
-        {mode === 'runtime' && (
+        {!isSimpleMode && mode === 'runtime' && (
           <label className="field">
             <span>Тип</span>
             <select value={severityFilter} onChange={(event) => setSeverityFilter(event.target.value)}>

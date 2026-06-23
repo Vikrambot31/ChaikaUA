@@ -19,6 +19,7 @@ import {
   resolveSupportEscalation,
   resolveReportEscalation,
 } from '../services/aiConfigService';
+import { useViewMode } from '../contexts/ViewModeContext';
 
 type Tab = 'model' | 'autonomous' | 'escalations' | 'log' | 'stats';
 
@@ -36,6 +37,8 @@ const formatDate = (ts: number) =>
   new Date(ts).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
 export const AiControlCenterPage = ({ user }: Props) => {
+  const { viewMode } = useViewMode();
+  const isSimpleMode = viewMode === 'simple';
   const [tab, setTab] = useState<Tab>('model');
   const [config, setConfig] = useState<AiConfig>(DEFAULT_AI_CONFIG);
   const [savedConfig, setSavedConfig] = useState<AiConfig>(DEFAULT_AI_CONFIG);
@@ -303,6 +306,10 @@ export const AiControlCenterPage = ({ user }: Props) => {
     const s = await loadAiUsageStats();
     setStats(s);
   }, []);
+
+  useEffect(() => {
+    if (isSimpleMode && tab !== 'escalations') setTab('escalations');
+  }, [isSimpleMode, tab]);
 
   useEffect(() => {
     if (tab === 'log') void loadLog();
@@ -875,6 +882,7 @@ export const AiControlCenterPage = ({ user }: Props) => {
     { key: 'log', label: 'Лог действий' },
     { key: 'stats', label: 'Статистика' },
   ];
+  const visibleTabs = isSimpleMode ? tabs.filter((item) => item.key === 'escalations') : tabs;
 
   return (
     <div style={{ padding: '24px 32px', color: '#e0e0e0', background: '#1a1a2a', minHeight: '100vh' }}>
@@ -886,7 +894,7 @@ export const AiControlCenterPage = ({ user }: Props) => {
       {renderAiHero()}
       {renderStatusPanel()}
 
-      {!configExists && (
+      {!isSimpleMode && !configExists && (
         <div style={{
           marginBottom: 20,
           padding: '14px 16px',
@@ -915,7 +923,7 @@ export const AiControlCenterPage = ({ user }: Props) => {
         </div>
       )}
 
-      {(lastRun || photoLastRun) && (
+      {!isSimpleMode && (lastRun || photoLastRun) && (
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 20, color: '#aaa', fontSize: 12 }}>
           {lastRun && <span>Текстовый прогон: {formatDate(lastRun.timestamp)} · ✓{lastRun.totalApproved} ✕{lastRun.totalRejected} ⚡{lastRun.totalEscalated}</span>}
           {photoLastRun && <span>Фото-прогон: {formatDate(photoLastRun.timestamp)} · ✓{photoLastRun.totalApproved} ✕{photoLastRun.totalRejected} ⚡{photoLastRun.totalEscalated}</span>}
@@ -923,7 +931,7 @@ export const AiControlCenterPage = ({ user }: Props) => {
       )}
 
       <div style={{ display: 'flex', gap: 4, marginBottom: 28, borderBottom: '1px solid #333', paddingBottom: 0 }}>
-        {tabs.map(({ key, label, badge }) => (
+        {visibleTabs.map(({ key, label, badge }) => (
           <button
             key={key}
             type="button"
@@ -949,11 +957,11 @@ export const AiControlCenterPage = ({ user }: Props) => {
         ))}
       </div>
 
-      {tab === 'model' && renderTabModel()}
-      {tab === 'autonomous' && renderTabAutonomous()}
+      {!isSimpleMode && tab === 'model' && renderTabModel()}
+      {!isSimpleMode && tab === 'autonomous' && renderTabAutonomous()}
       {tab === 'escalations' && renderTabEscalations()}
-      {tab === 'log' && renderTabLog()}
-      {tab === 'stats' && renderTabStats()}
+      {!isSimpleMode && tab === 'log' && renderTabLog()}
+      {!isSimpleMode && tab === 'stats' && renderTabStats()}
     </div>
   );
 };

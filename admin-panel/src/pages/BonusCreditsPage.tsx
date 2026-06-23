@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useViewMode } from '../contexts/ViewModeContext';
 import {
   subscribeToAllBonuses,
   subscribeToAllPromoCredits,
@@ -1150,7 +1151,13 @@ function BonusSystemDocsTab() {
 // ── Main Page ──
 
 export function BonusCreditsPage() {
+  const { viewMode } = useViewMode();
   const [activeTab, setActiveTab] = useState<TabKey>('users');
+  const visibleTabs = viewMode === 'simple' ? TABS.filter((tab) => tab.key !== 'system') : TABS;
+
+  useEffect(() => {
+    if (viewMode === 'simple' && activeTab === 'system') setActiveTab('users');
+  }, [activeTab, viewMode]);
 
   return (
     <div style={s.container}>
@@ -1158,7 +1165,7 @@ export function BonusCreditsPage() {
 
       {/* Tabs */}
       <div style={s.tabs}>
-        {TABS.map((tab) => (
+        {visibleTabs.map((tab) => (
           <button
             key={tab.key}
             style={{
