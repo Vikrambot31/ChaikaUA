@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://bigkyiv.com.ua/na-podoli-chastkovo-obmezhyly-ruh/",
+    "title": "На Подолі частково обмежили рух",
+    "shortText": "На Подолі в Києві частково обмежили рух вулицею Нижній Вал до 17:00. Для ірпінян це означає затримки при проїзді до столиці цим маршрутом. #ЖКЧайка #Ірпінь #КиївськаОбласть #ДорожнаСитуація",
+    "sourceName": "bigkyiv.com.ua",
+    "sourceUrl": "https://bigkyiv.com.ua/na-podoli-chastkovo-obmezhyly-ruh/",
+    "publishedAt": "2026-06-23T07:42:27.872Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-Мозаїка Espresso bar-#МОЖЕКАВИ?-2026-06-22",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ Мозаїка Espresso bar — вулиця Валерія Лобановського ☕ #МОЖЕКАВИ? — вулиця Валерія Лобановського, 29 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/pid-kyyevom-vodij-legkovyka-zbyv-ditej-na-samokati-odyn-z-hlopchykiv-zagynuv/",
-    "title": "Під Києвом водій легковика збив дітей на самокаті: один з хлопчиків загинув",
-    "shortText": "Під Києвом водій збив дітей на електросамокаті — один хлопчик загинув. Для мешканців Чайки це нагадування про небезпеку на дорогах і важливість безпеки дітей. #ЖКЧайка #Ірпінь #КиївськаОбласть #БезпекаДорожнуху",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/pid-kyyevom-vodij-legkovyka-zbyv-ditej-na-samokati-odyn-z-hlopchykiv-zagynuv/",
-    "publishedAt": "2026-05-04T06:35:15.965Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]

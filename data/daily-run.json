@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-06-23",
+      "publishedAt": "2026-06-23T07:42:27.873Z",
+      "key": "https://bigkyiv.com.ua/na-podoli-chastkovo-obmezhyly-ruh/"
+    },
+    {
       "type": "places",
       "date": "2026-06-22",
       "publishedAt": "2026-06-22T13:24:22.116Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-04",
       "publishedAt": "2026-05-04T10:04:31.426Z",
       "key": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-05-04"
-    },
-    {
-      "type": "news",
-      "date": "2026-05-04",
-      "publishedAt": "2026-05-04T06:35:15.965Z",
-      "key": "https://bigkyiv.com.ua/pid-kyyevom-vodij-legkovyka-zbyv-ditej-na-samokati-odyn-z-hlopchykiv-zagynuv/"
     }
   ]
 }
