@@ -25,6 +25,37 @@ const withFcmManifestFix = (config) => {
   });
 };
 
+const withFirebaseCrashlyticsGradle = (config) => {
+  const { withAppBuildGradle, withProjectBuildGradle } = require('@expo/config-plugins');
+  const crashlyticsClasspath = "classpath 'com.google.firebase:firebase-crashlytics-gradle:2.9.9'";
+  const crashlyticsPlugin = "apply plugin: 'com.google.firebase.crashlytics'";
+
+  const withProjectPlugin = withProjectBuildGradle(config, (gradleConfig) => {
+    if (gradleConfig.modResults.language !== 'groovy') return gradleConfig;
+    let contents = gradleConfig.modResults.contents;
+    if (!contents.includes(crashlyticsClasspath)) {
+      contents = contents.replace(
+        /classpath 'com\.google\.gms:google-services:[^']+'/,
+        (match) => `${match}\n        ${crashlyticsClasspath}`
+      );
+      gradleConfig.modResults.contents = contents;
+    }
+    return gradleConfig;
+  });
+
+  return withAppBuildGradle(withProjectPlugin, (gradleConfig) => {
+    if (gradleConfig.modResults.language !== 'groovy') return gradleConfig;
+    let contents = gradleConfig.modResults.contents;
+    if (!contents.includes(crashlyticsPlugin)) {
+      contents = contents.replace(
+        /apply plugin: 'com\.google\.gms\.google-services'\s*$/,
+        (match) => `${match}\n${crashlyticsPlugin}`
+      );
+      gradleConfig.modResults.contents = contents;
+    }
+    return gradleConfig;
+  });
+};
 const CANONICAL_FIREBASE_DATABASE_URL = 'https://chaikaua-3cd9d-default-rtdb.firebaseio.com';
 const CANONICAL_FIREBASE_STORAGE_BUCKET = 'chaikaua-3cd9d.firebasestorage.app';
 
@@ -82,7 +113,7 @@ module.exports = ({ config }) => {
       firebaseAppId: envOrConfig('FIREBASE_APP_ID', currentExtra, 'firebaseAppId'),
       firebaseMeasurementId: envOrConfig('FIREBASE_MEASUREMENT_ID', currentExtra, 'firebaseMeasurementId'),
       googleWebClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || currentExtra.googleWebClientId,
-      // Explicit dev/prod split — falls back to the single key if not set
+      // Explicit dev/prod split - falls back to the single key if not set
       googleWebClientIdDev:
         process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID_DEV ||
         process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
@@ -98,5 +129,6 @@ module.exports = ({ config }) => {
       serviceModerationPin: process.env.SERVICE_MODERATION_PIN || '',
     },
   };
-  return withFcmManifestFix(baseConfig);
+  return withFirebaseCrashlyticsGradle(withFcmManifestFix(baseConfig));
 };
+

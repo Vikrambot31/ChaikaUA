@@ -15,6 +15,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "1027130010906-1142hnbqa2h1ti3d8c1h5qh9cgqa8ugi.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.chaikaua.mobile",
+            "certificate_hash": "6ee550169bd6514b7be6f49e8483ba89f6ffcb52"
+          }
+        },
+        {
           "client_id": "1027130010906-elhn0d4vlrtna1pm6cs2b8fk84k3loe3.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
