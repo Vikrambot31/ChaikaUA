@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-06-24",
+      "publishedAt": "2026-06-24T10:38:42.179Z",
+      "key": "places-Fora-Кав'ярня-кондитерська \"Гамак\"-2026-06-24"
+    },
+    {
       "type": "news",
       "date": "2026-06-24",
       "publishedAt": "2026-06-24T07:34:46.320Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-06",
       "publishedAt": "2026-05-06T06:26:19.633Z",
       "key": "https://bigkyiv.com.ua/de-u-kyyevi-sogodni-obmezhuvatymut-ruh-yaki-dilyanky-krashhe-obyizhdzhaty-4/"
-    },
-    {
-      "type": "places",
-      "date": "2026-05-05",
-      "publishedAt": "2026-05-05T09:50:40.557Z",
-      "key": "places-White Rabbit Coffee and Friends-Chaykava-2026-05-05"
     }
   ]
 }
