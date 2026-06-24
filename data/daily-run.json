@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-06-24",
+      "publishedAt": "2026-06-24T07:34:46.320Z",
+      "key": "https://bigkyiv.com.ua/u-stolyczi-ne-vystachaye-vodiyiv-gromadskogo-transportu-kyyivpastrans-zaproshuye-na-robotu/"
+    },
+    {
       "type": "places",
       "date": "2026-06-23",
       "publishedAt": "2026-06-23T10:52:00.549Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-05",
       "publishedAt": "2026-05-05T09:50:40.557Z",
       "key": "places-White Rabbit Coffee and Friends-Chaykava-2026-05-05"
-    },
-    {
-      "type": "news",
-      "date": "2026-05-05",
-      "publishedAt": "2026-05-05T06:11:32.125Z",
-      "key": "https://bigkyiv.com.ua/troye-lyudej-postrazhdaly-na-kyyivshhyni-vnaslidok-vorozhoyi-ataky/"
     }
   ]
 }

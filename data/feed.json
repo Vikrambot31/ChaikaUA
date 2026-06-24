@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://bigkyiv.com.ua/u-stolyczi-ne-vystachaye-vodiyiv-gromadskogo-transportu-kyyivpastrans-zaproshuye-na-robotu/",
+    "title": "У столиці не вистачає водіїв громадського транспорту: «Київпастранс» запрошує на роботу",
+    "shortText": "У Києві критична нестача водіїв громадського транспорту. Для мешканців Чайки це означає можливі затримки автобусів на маршрутах до столиці та ускладнення комунікацій. #ЖКЧайка #Ірпінь #КиївськаОбласть #Транспорт",
+    "sourceName": "bigkyiv.com.ua",
+    "sourceUrl": "https://bigkyiv.com.ua/u-stolyczi-ne-vystachaye-vodiyiv-gromadskogo-transportu-kyyivpastrans-zaproshuye-na-robotu/",
+    "publishedAt": "2026-06-24T07:34:46.319Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-#МОЖЕКАВИ?-Fora-2026-06-23",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ #МОЖЕКАВИ? — вулиця Валерія Лобановського, 29 🛒 Fora — вулиця Грушевського, 12 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/troye-lyudej-postrazhdaly-na-kyyivshhyni-vnaslidok-vorozhoyi-ataky/",
-    "title": "Троє людей постраждали на Київщині внаслідок ворожої атаки",
-    "shortText": "Цієї ночі росіяни атакували регіон — постраждали люди у Броварах, пошкоджені житлові будинки. Мешканців Ірпеня закликають залишатися у укриттях під час тривог. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/troye-lyudej-postrazhdaly-na-kyyivshhyni-vnaslidok-vorozhoyi-ataky/",
-    "publishedAt": "2026-05-05T06:11:32.124Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]
