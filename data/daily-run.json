@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-06-25",
+      "publishedAt": "2026-06-25T07:37:08.066Z",
+      "key": "https://bigkyiv.com.ua/na-livomu-berezi-kyyeva-ekstreni-vidklyuchennya-svitla/"
+    },
+    {
       "type": "places",
       "date": "2026-06-24",
       "publishedAt": "2026-06-24T10:38:42.179Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-06",
       "publishedAt": "2026-05-06T10:07:25.593Z",
       "key": "places-Chaykava-NOVUS-2026-05-06"
-    },
-    {
-      "type": "news",
-      "date": "2026-05-06",
-      "publishedAt": "2026-05-06T06:26:19.633Z",
-      "key": "https://bigkyiv.com.ua/de-u-kyyevi-sogodni-obmezhuvatymut-ruh-yaki-dilyanky-krashhe-obyizhdzhaty-4/"
     }
   ]
 }
