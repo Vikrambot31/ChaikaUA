@@ -274,6 +274,9 @@ const RegisterScreenFull: React.FC = () => {
             editable={!loading && !isCompletingExistingAccount}
             maxLength={MAX_EMAIL_LENGTH}
           />
+          {email.length > 0 && !isEmailValid ? (
+            <Text style={styles.fieldHint}>{text.invalidEmail}</Text>
+          ) : null}
 
           <FormSectionLabel label={text.phone} completed={isPhoneValid} labelStyle={styles.label} containerStyle={styles.labelRow} />
           <TactileInput

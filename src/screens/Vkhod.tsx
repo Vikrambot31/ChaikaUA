@@ -376,17 +376,17 @@ const LoginScreen: React.FC = () => {
       await clearLoginLock(normalizedEmail);
       await completeLogin(userCredential.user, 'email');
     } catch (loginError) {
-      const lock = await recordLoginFailure(normalizedEmail);
       const retryAfterSeconds = getRateLimitRetryAfterSeconds(loginError);
       if (retryAfterSeconds) {
         setLoginRateLimitUntil(Date.now() + retryAfterSeconds * 1000);
+        Alert.alert(text.errorLoginTitle, `${text.loginRateLimitServer} ${formatCountdown(retryAfterSeconds)}.`);
+      } else {
+        const lock = await recordLoginFailure(normalizedEmail);
+        const message = lock.lockedUntil > Date.now()
+          ? text.loginLocked
+          : text.errorLogin;
+        Alert.alert(text.errorLoginTitle, message);
       }
-      const message = lock.lockedUntil > Date.now()
-        ? text.loginLocked
-        : retryAfterSeconds
-        ? `${text.loginRateLimitServer} ${formatCountdown(retryAfterSeconds)}.`
-        : text.errorLogin;
-      Alert.alert(text.errorLoginTitle, message);
     } finally {
       dispatch(setLoading(false));
     }

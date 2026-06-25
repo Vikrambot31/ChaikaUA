@@ -121,9 +121,17 @@ export const useFullRegistration = ({
 
       if (referrerPhone) {
         const normalizedReferrer = normalizePhoneText(referrerPhone);
-        const referrerSnap = await get(query(dbRef(database, 'users'), orderByChild('phone'), equalTo(normalizedReferrer)));
-        const referrerSnapAlt = await get(query(dbRef(database, 'users'), orderByChild('phone'), equalTo(referrerPhone.trim())));
-        const referrerVerified = referrerSnap.exists() || referrerSnapAlt.exists();
+        let referrerVerified = false;
+        try {
+          const referrerSnap = await get(query(dbRef(database, 'users'), orderByChild('phone'), equalTo(normalizedReferrer)));
+          const referrerSnapAlt = await get(query(dbRef(database, 'users'), orderByChild('phone'), equalTo(referrerPhone.trim())));
+          referrerVerified = referrerSnap.exists() || referrerSnapAlt.exists();
+        } catch (dbError: unknown) {
+          console.warn('[Registration] Referrer lookup failed:', dbError);
+          dispatch(setError(text.error));
+          Toast.show({ type: 'error', text1: text.error, text2: text.error });
+          return;
+        }
 
         if (!referrerVerified) {
           dispatch(setError(text.referrerNotFound));
@@ -161,6 +169,7 @@ export const useFullRegistration = ({
 
       await dbSet(dbRef(database, `users/${uid}`), {
         name: tempProfile?.name || normalizedName,
+        email: normalizedEmail,
         phone: normalizedPhone,
         building: selectedBuilding?.street || '',
         houseNumber: selectedBuilding?.houseNumber || '',

@@ -21,11 +21,15 @@ const clearNativeGoogleSession = async (): Promise<void> => {
         signOut?: () => Promise<void>;
       };
     };
-    if (GoogleSignin?.signOut && (!GoogleSignin.hasPreviousSignIn || GoogleSignin.hasPreviousSignIn())) {
-      await GoogleSignin.signOut();
+    if (GoogleSignin?.signOut) {
+      const hadSession = !GoogleSignin.hasPreviousSignIn || GoogleSignin.hasPreviousSignIn();
+      if (hadSession) {
+        await GoogleSignin.signOut();
+      }
     }
   } catch (error: unknown) {
     void logClientError('auth.clearNativeGoogleSession', error);
+    throw error;
   }
 };
 
@@ -60,10 +64,15 @@ const flushAuthPersistence = async (): Promise<void> => {
 };
 
 export const clearSocialProviderSessions = async (): Promise<void> => {
-  await Promise.all([
+  const results = await Promise.allSettled([
     clearNativeGoogleSession(),
     clearNativeFacebookSession(),
   ]);
+  for (const r of results) {
+    if (r.status === 'rejected') {
+      void logClientError('auth.clearSocialProviderSessions', r.reason);
+    }
+  }
 };
 
 export const signOutPrimarySession = async (
