@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-06-25",
+      "publishedAt": "2026-06-25T10:32:11.667Z",
+      "key": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-06-25"
+    },
+    {
       "type": "news",
       "date": "2026-06-25",
       "publishedAt": "2026-06-25T07:37:08.066Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-07",
       "publishedAt": "2026-05-07T06:31:26.437Z",
       "key": "https://bigkyiv.com.ua/de-u-kyyevi-sogodni-obmezhuvatymut-ruh-lokacziyi/"
-    },
-    {
-      "type": "places",
-      "date": "2026-05-06",
-      "publishedAt": "2026-05-06T10:07:25.593Z",
-      "key": "places-Chaykava-NOVUS-2026-05-06"
     }
   ]
 }
