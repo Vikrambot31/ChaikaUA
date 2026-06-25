@@ -29,6 +29,7 @@ import { ChildCategory, ChildFeature, ChildOffer, Place, PlaceType } from '../ty
 import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { useAppTheme } from '../hooks/useAppTheme';
+import { useIsAdmin } from '../hooks/useIsAdmin';
 import { subscribeActiveBonusPromotions, subscribeBiznesPlusPlaces, type BonusPromotion } from '../services/bonusService';
 import { safeCallPhone, safeOpenExternalUrl } from '../utils/communicationActions';
 import { selectUserId } from '../redux/selectors';
@@ -456,8 +457,7 @@ export default function VseDlyaDeteyScreen() {
   const training = useTrainingMode('vse_dlya_detey');
   const user = useSelector((state: RootState) => state.auth.user);
   const currentUserId = useSelector(selectUserId);
-  const currentUserEmail = user?.email;
-  const isAdmin = currentUserEmail === 'vikramsave@ukr.net';
+  const isAdmin = useIsAdmin(currentUserId);
   const [activeCategory, setActiveCategory] = useState<CategoryKey>('all');
   const [claimPlaceIds, setClaimPlaceIds] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');

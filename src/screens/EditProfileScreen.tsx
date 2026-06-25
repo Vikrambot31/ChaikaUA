@@ -24,6 +24,8 @@ import { LIGHT_ORBS, SCREEN_THEME } from '../utils/screenTheme';
 import { normalizePersonName, normalizePhoneText, sanitizeStoredText } from '../utils/textUtils';
 import { validateName, validatePhone, normalizeUkrainianPhoneStrict } from '../utils/validators';
 import {
+  deleteProfilePhoto,
+  inferRegistrationStatus,
   loadProfileRecord,
   mapFirebaseUserToAppUser,
   updateProfileRecord,
@@ -306,6 +308,10 @@ const EditProfileScreen: React.FC<{ navigation: { goBack: () => void; navigate: 
 
     if (manageLoading) setAvatarSaving(true);
     try {
+      // Clean up old photos from Storage when switching to a different avatar
+      const oldPaths = photoStoragePaths.filter((p) => p && !nextPhotoStoragePaths.includes(p));
+      await Promise.allSettled(oldPaths.map((p) => deleteProfilePhoto(p)));
+
       // RTDB first — if this fails, Auth photoURL stays unchanged (no desync)
       await updateProfileRecord(uid, {
         photoURL: nextPhotoURL,
@@ -393,14 +399,29 @@ const EditProfileScreen: React.FC<{ navigation: { goBack: () => void; navigate: 
     try {
       if (auth.currentUser) {
         // RTDB first — if this fails, Auth stays unchanged (no desync)
-        await updateProfileRecord(auth.currentUser.uid, {
+        const profilePatch: Record<string, string> = {
           name: normalizedName,
           phone: normalizedPhone,
           building: normalizedCity,
           houseNumber: normalizedHouseNumber,
           profession: normalizedProfession,
           about: normalizedAbout,
-        });
+        };
+
+        // If profile was partial, check whether it's now complete and persist the status
+        if (user?.registrationStatus !== 'complete') {
+          const status = inferRegistrationStatus(auth.currentUser, {
+            name: normalizedName,
+            phone: normalizedPhone,
+            building: normalizedCity,
+            houseNumber: normalizedHouseNumber,
+          });
+          if (status === 'complete') {
+            profilePatch.registrationStatus = 'complete';
+          }
+        }
+
+        await updateProfileRecord(auth.currentUser.uid, profilePatch);
 
         await firebaseUpdateProfile(auth.currentUser, {
           displayName: normalizedName,

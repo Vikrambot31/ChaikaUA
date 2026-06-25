@@ -28,6 +28,7 @@ import { BeautyCategory, BeautyFeature, BeautyOffer, Place } from '../types/app'
 import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { useAppTheme } from '../hooks/useAppTheme';
+import { useIsAdmin } from '../hooks/useIsAdmin';
 import { subscribeActiveBonusPromotions, subscribeBiznesPlusPlaces, type BonusPromotion } from '../services/bonusService';
 import UserCardActionBar from '../components/UserCardActionBar';
 import { toggleFavorite, getFavorites, type FavoriteSource } from '../services/favoritesService';
@@ -370,9 +371,8 @@ export default function SalonyKrasotyScreen() {
   const { colors, isDark } = useAppTheme();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as Lang;
   const user = useSelector((state: RootState) => state.auth.user);
-  const currentUserEmail = user?.email;
   const currentUserId = user?.id;
-  const isAdmin = currentUserEmail === 'vikramsave@ukr.net';
+  const isAdmin = useIsAdmin(currentUserId);
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
   const training = useTrainingMode('salony_krasoty');
   const [activeCategory, setActiveCategory] = useState<CategoryKey>('all');

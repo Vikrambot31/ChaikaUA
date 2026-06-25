@@ -28,6 +28,7 @@ import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
 import type { DetailItemData, BusinessMenuItem, BusinessPromotion } from '../utils/detailViewTypes';
 import { requireAuthForDetails } from '../utils/authGuard';
 import { SCREEN_THEME } from '../utils/screenTheme';
+import { useIsAdmin } from '../hooks/useIsAdmin';
 import { useAppTheme } from '../hooks/useAppTheme';
 import WhoLikedMeInlineSection from '../components/WhoLikedMeInlineSection';
 import CommentSection from '../components/CommentSection';
@@ -218,7 +219,7 @@ export default function ItemDetailScreen({
   const hasBusinessPhoto = Boolean(businessCard?.photoUri || businessCard?.photoStoragePath);
 
   const isAuthenticated = Boolean(currentUser?.id);
-  const isAdmin = currentUser?.email === 'vikramsave@ukr.net';
+  const isAdmin = useIsAdmin(currentUser?.id);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -275,7 +276,7 @@ export default function ItemDetailScreen({
           return;
         }
         const data = snap.val() as { ownerUid?: string; status?: string };
-        if (currentUser.email === 'vikramsave@ukr.net') {
+        if (isAdmin) {
           setClaimStatus((data.status as 'pending' | 'approved' | 'rejected') ?? 'none');
         } else if (data.ownerUid === currentUser.id) {
           setClaimStatus((data.status as 'pending' | 'approved' | 'rejected') ?? 'none');
@@ -287,7 +288,7 @@ export default function ItemDetailScreen({
       }
     })();
     return () => { cancelled = true; };
-  }, [isAuthenticated, isPlaceType, item.sourceId, currentUser?.id]);
+  }, [isAuthenticated, isPlaceType, item.sourceId, currentUser?.id, isAdmin]);
 
   // Load business+ card content for place cards
   useEffect(() => {
@@ -713,7 +714,7 @@ export default function ItemDetailScreen({
           </View>
         </View>
 
-        {/* Admin moderation panel — only for vikramsave@ukr.net */}
+        {/* Admin moderation panel */}
         {isAdmin && isPlaceType && claimStatus !== 'none' ? (
           <View style={styles.adminSection}>
             <View style={styles.adminSectionHeader}>

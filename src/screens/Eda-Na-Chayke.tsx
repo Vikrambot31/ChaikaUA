@@ -33,6 +33,7 @@ import { FoodCategory, FoodOffer, Place } from '../types/app';
 import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { useAppTheme } from '../hooks/useAppTheme';
+import { useIsAdmin } from '../hooks/useIsAdmin';
 import { getMapFocusPlaceParams } from '../utils/mapFocusParams';
 import AppPhotoImage from '../components/AppPhotoImage';
 import { FeatureRatingBanner } from '../components/FeatureRatingBanner';
@@ -317,7 +318,7 @@ export default function EdaNaChaykeScreen() {
   const { colors } = useAppTheme();
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua') as Lang;
   const user = useSelector((state: RootState) => state.auth.user);
-  const isAdmin = user?.email === 'vikramsave@ukr.net';
+  const isAdmin = useIsAdmin(user?.id);
   const text = UI_TEXT[language] ?? UI_TEXT.ua;
   const training = useTrainingMode('eda_na_chayke');
 

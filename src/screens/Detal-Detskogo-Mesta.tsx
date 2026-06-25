@@ -16,6 +16,7 @@ import { ChildCategory, ChildFeature, ChildOffer, Place, PlaceType } from '../ty
 import { RootState } from '../redux/store';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { useAppTheme } from '../hooks/useAppTheme';
+import { useIsAdmin } from '../hooks/useIsAdmin';
 import { safeCallPhone, safeOpenExternalUrl } from '../utils/communicationActions';
 import { getActiveOffers } from '../services/childrenSeed';
 import { database } from '../firebase-core';
@@ -323,7 +324,7 @@ export default function DetalDetskogoMestaScreen() {
   const [isBiznesPlusActive, setIsBiznesPlusActive] = useState(false);
 
   const isAuthenticated = Boolean(currentUser?.id);
-  const isAdmin = currentUser?.email === 'vikramsave@ukr.net';
+  const isAdmin = useIsAdmin(currentUser?.id);
   const isMyApprovedPlace = claimStatus === 'approved';
 
   // Sync subscription from RTDB on screen open
@@ -354,7 +355,7 @@ export default function DetalDetskogoMestaScreen() {
         if (cancelled) return;
         if (!snap.exists()) { setClaimStatus('none'); return; }
         const data = snap.val() as { ownerUid?: string; status?: string };
-        if (currentUser.email === 'vikramsave@ukr.net') {
+        if (isAdmin) {
           setClaimStatus((data.status as 'pending' | 'approved' | 'rejected') ?? 'none');
         } else if (data.ownerUid === currentUser.id) {
           setClaimStatus((data.status as 'pending' | 'approved' | 'rejected') ?? 'none');
@@ -364,7 +365,7 @@ export default function DetalDetskogoMestaScreen() {
       } catch { if (!cancelled) setClaimStatus('none'); }
     })();
     return () => { cancelled = true; };
-  }, [isAuthenticated, place.id, currentUser?.id]);
+  }, [isAuthenticated, place.id, currentUser?.id, isAdmin]);
 
   const offers = useMemo(() => getActiveOffers(place.id), [place.id]);
 
@@ -662,7 +663,7 @@ export default function DetalDetskogoMestaScreen() {
           </View>
         ) : null}
 
-        {/* Admin moderation panel — only for vikramsave@ukr.net */}
+        {/* Admin moderation panel */}
         {isAdmin && claimStatus !== 'none' ? (
           <View style={styles.adminSection}>
             <View style={styles.adminSectionHeader}>
