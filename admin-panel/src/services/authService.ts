@@ -152,7 +152,7 @@ const normalizeRole = (value: unknown): SecurityRole => {
 };
 
 export const isPrimaryServiceEmail = (user: User | null): boolean =>
-  normalizeEmail(user?.email) === primaryServiceEmail;
+  user?.emailVerified === true && normalizeEmail(user?.email) === primaryServiceEmail;
 
 export const isPrimaryOwnerUid = (user: User | null): boolean =>
   Boolean(primaryOwnerUid && user?.uid === primaryOwnerUid);

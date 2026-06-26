@@ -241,7 +241,7 @@
 
     "diagnostics": {
       ".read": "auth != null",
-      ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous'",
+      ".write": "auth != null && (auth.token.admin === true || auth.token.moderator === true)",
       "runtime": {
         ".indexOn": ["at"]
       },
@@ -262,7 +262,7 @@
 
     "security_logs": {
       ".read": "auth != null && (auth.token.admin === true || auth.token.moderator === true)",
-      ".write": "auth != null"
+      ".write": "auth != null && auth.token.admin === true"
     },
 
     "_security": {

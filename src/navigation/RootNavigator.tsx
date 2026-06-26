@@ -248,7 +248,6 @@ const linking: LinkingOptions<RootStackParamList> = {
   prefixes: [
     ExpoLinking.createURL('/'),
     'chaikaua://',
-    'chaika://',
   ],
   config: {
     screens: {

@@ -561,8 +561,6 @@ export const syncAuthorizedDeviceForUser = async (
         authUid: auth.currentUser?.uid ?? null,
         providerId: auth.currentUser?.providerData?.[0]?.providerId ?? null,
         isAnonymous: auth.currentUser?.isAnonymous ?? null,
-        email: auth.currentUser?.email ?? null,
-        emailVerified: auth.currentUser?.emailVerified ?? null,
         failureCount: nextFailureState.count,
       });
     }

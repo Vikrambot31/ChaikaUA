@@ -4,6 +4,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from '../firebase-core';
 import { ensureFirebaseAuth, isAnonymousFirebaseUser } from '../firebase-auth-session';
 import { logClientError } from '../utils/errorLogger';
+import { clearCachedSecurityRole } from './securityRoles';
 
 const AUTH_CLEAR_WAIT_MS = 50;
 const AUTH_CLEAR_MAX_ATTEMPTS = 20;
@@ -78,7 +79,11 @@ export const clearSocialProviderSessions = async (): Promise<void> => {
 export const signOutPrimarySession = async (
   options: { resumeAnonymous?: boolean } = {},
 ): Promise<void> => {
+  const uid = auth.currentUser?.uid;
   await signOut(auth);
+  if (uid) {
+    await clearCachedSecurityRole(uid);
+  }
   await waitForFirebaseSignOut();
   await flushAuthPersistence();
   await clearSocialProviderSessions();
