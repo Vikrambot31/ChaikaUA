@@ -92,7 +92,7 @@
       ".read": true,
       ".indexOn": ["moderationStatus", "userId"],
       "$listingId": {
-        ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && ((auth.token.admin === true || auth.token.moderator === true) || (!data.exists() && newData.child('userId').val() === auth.uid && !(root.child('yellow_list').child(auth.uid).child('active').val() === true && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now)) || (data.exists() && data.child('userId').val() === auth.uid && (!newData.exists() || (newData.child('userId').val() === auth.uid && newData.child('moderationStatus').val() !== 'approved' && newData.child('moderationStatus').val() !== 'rejected'))))"
+        ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && ((auth.token.admin === true || auth.token.moderator === true) || (!data.exists() && newData.child('userId').val() === auth.uid && !(root.child('yellow_list').child(auth.uid).child('active').val() === true && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now)) || (data.exists() && data.child('userId').val() === auth.uid && (!newData.exists() || (newData.child('userId').val() === auth.uid && newData.child('moderationStatus').val() !== 'approved' && newData.child('moderationStatus').val() !== 'rejected' && newData.child('status').val() !== 'approved' && newData.child('status').val() !== 'active' && newData.child('status').val() !== 'rejected'))))"
       }
     },
 
@@ -100,7 +100,7 @@
       ".read": true,
       ".indexOn": ["moderationStatus", "userId"],
       "$listingId": {
-        ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && ((auth.token.admin === true || auth.token.moderator === true) || (!data.exists() && newData.child('userId').val() === auth.uid && !(root.child('yellow_list').child(auth.uid).child('active').val() === true && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now)) || (data.exists() && data.child('userId').val() === auth.uid && (!newData.exists() || (newData.child('userId').val() === auth.uid && newData.child('moderationStatus').val() !== 'approved' && newData.child('moderationStatus').val() !== 'rejected'))))"
+        ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && ((auth.token.admin === true || auth.token.moderator === true) || (!data.exists() && newData.child('userId').val() === auth.uid && !(root.child('yellow_list').child(auth.uid).child('active').val() === true && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now)) || (data.exists() && data.child('userId').val() === auth.uid && (!newData.exists() || (newData.child('userId').val() === auth.uid && newData.child('moderationStatus').val() !== 'approved' && newData.child('moderationStatus').val() !== 'rejected' && newData.child('status').val() !== 'approved' && newData.child('status').val() !== 'active' && newData.child('status').val() !== 'rejected'))))"
       }
     },
 
@@ -108,7 +108,7 @@
       ".read": true,
       ".indexOn": ["moderationStatus", "userId"],
       "$listingId": {
-        ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && ((auth.token.admin === true || auth.token.moderator === true) || (!data.exists() && newData.child('userId').val() === auth.uid && !(root.child('yellow_list').child(auth.uid).child('active').val() === true && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now)) || (data.exists() && data.child('userId').val() === auth.uid && (!newData.exists() || (newData.child('userId').val() === auth.uid && newData.child('moderationStatus').val() !== 'approved' && newData.child('moderationStatus').val() !== 'rejected'))))"
+        ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && ((auth.token.admin === true || auth.token.moderator === true) || (!data.exists() && newData.child('userId').val() === auth.uid && !(root.child('yellow_list').child(auth.uid).child('active').val() === true && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now)) || (data.exists() && data.child('userId').val() === auth.uid && (!newData.exists() || (newData.child('userId').val() === auth.uid && newData.child('moderationStatus').val() !== 'approved' && newData.child('moderationStatus').val() !== 'rejected' && newData.child('status').val() !== 'approved' && newData.child('status').val() !== 'active' && newData.child('status').val() !== 'rejected'))))"
       }
     },
 
@@ -195,7 +195,7 @@
       ".read": true,
       ".indexOn": ["status", "moderationStatus", "userId"],
       "$businessId": {
-        ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && ((auth.token.admin === true || auth.token.moderator === true) || (!data.exists() && newData.child('userId').val() === auth.uid && !(root.child('yellow_list').child(auth.uid).child('active').val() === true && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now)) || (data.exists() && data.child('userId').val() === auth.uid && (!newData.exists() || (newData.child('userId').val() === auth.uid && newData.child('moderationStatus').val() !== 'approved' && newData.child('moderationStatus').val() !== 'rejected' && newData.child('status').val() !== 'approved' && newData.child('status').val() !== 'rejected'))))"
+        ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && ((auth.token.admin === true || auth.token.moderator === true) || (!data.exists() && newData.child('userId').val() === auth.uid && !(root.child('yellow_list').child(auth.uid).child('active').val() === true && root.child('yellow_list').child(auth.uid).child('bannedUntil').val() > now)) || (data.exists() && data.child('userId').val() === auth.uid && (!newData.exists() || (newData.child('userId').val() === auth.uid && newData.child('moderationStatus').val() !== 'approved' && newData.child('moderationStatus').val() !== 'rejected' && newData.child('status').val() !== 'approved' && newData.child('status').val() !== 'active' && newData.child('status').val() !== 'rejected'))))"
       }
     },
 
@@ -386,7 +386,24 @@
 
     "osbb_members": {
       ".read": "auth != null",
-      ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous'"
+      "$buildingId": {
+        "$userId": {
+          ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && (auth.uid === $userId || auth.token.admin === true || auth.token.moderator === true)",
+          ".validate": "newData.hasChildren(['uid', 'buildingId', 'role', 'status']) && newData.child('uid').val() === $userId && newData.child('buildingId').val() === $buildingId && (newData.child('role').val() === 'resident' || newData.child('role').val() === 'manager') && (newData.child('status').val() === 'pending' || newData.child('status').val() === 'approved')"
+        }
+      }
+    },
+
+    "osbb_collection_payments": {
+      ".read": "auth != null",
+      "$buildingId": {
+        "$collectionId": {
+          ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous'",
+          "$paymentId": {
+            ".validate": "newData.hasChildren(['payerName', 'amount', 'paidAt']) && newData.child('payerName').isString() && newData.child('amount').isNumber() && newData.child('amount').val() > 0 && newData.child('paidAt').isString()"
+          }
+        }
+      }
     },
 
     "age_verifications": {
@@ -663,7 +680,7 @@
         ".write": "auth != null && ((!data.exists() && newData.child('userId').val() === auth.uid) || (data.exists() && data.child('userId').val() === auth.uid && newData.child('userId').val() === auth.uid) || auth.token.admin === true)",
         ".validate": "newData.hasChildren(['ticketId', 'userId', 'userName', 'category', 'status', 'createdAt', 'updatedAt'])",
         "status": {
-          ".validate": "newData.val() === 'open' || newData.val() === 'closed'"
+          ".validate": "newData.val() === 'open' || newData.val() === 'closed' || newData.val() === 'paid'"
         },
         "category": {
           ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 30"
@@ -680,7 +697,7 @@
         ".indexOn": ["timestamp"],
         "$messageId": {
           ".write": "auth != null && (root.child('ad_tickets').child($ticketId).child('userId').val() === auth.uid || auth.token.admin === true)",
-          ".validate": "newData.hasChildren(['messageId', 'ticketId', 'senderId', 'senderRole', 'text', 'timestamp']) && newData.child('text').isString() && newData.child('text').val().length <= 500 && newData.child('text').val().length > 0 && (newData.child('senderRole').val() === 'user' || newData.child('senderRole').val() === 'admin')"
+          ".validate": "newData.hasChildren(['messageId', 'ticketId', 'senderId', 'senderRole', 'text', 'timestamp']) && newData.child('text').isString() && newData.child('text').val().length <= 500 && newData.child('text').val().length > 0 && newData.child('senderId').val() === auth.uid && (newData.child('senderRole').val() === 'user' || (newData.child('senderRole').val() === 'admin' && auth.token.admin === true))"
         }
       }
     },
@@ -718,7 +735,7 @@
         ".indexOn": ["timestamp"],
         "$messageId": {
           ".write": "auth != null && (root.child('support_tickets').child($ticketId).child('userId').val() === auth.uid || auth.token.admin === true)",
-          ".validate": "newData.hasChildren(['messageId', 'ticketId', 'senderId', 'senderRole', 'text', 'timestamp']) && newData.child('text').isString() && newData.child('text').val().length <= 500 && newData.child('text').val().length > 0 && (newData.child('senderRole').val() === 'user' || newData.child('senderRole').val() === 'admin')"
+          ".validate": "newData.hasChildren(['messageId', 'ticketId', 'senderId', 'senderRole', 'text', 'timestamp']) && newData.child('text').isString() && newData.child('text').val().length <= 500 && newData.child('text').val().length > 0 && newData.child('senderId').val() === auth.uid && (newData.child('senderRole').val() === 'user' || (newData.child('senderRole').val() === 'admin' && auth.token.admin === true))"
         }
       }
     },

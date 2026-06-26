@@ -61,9 +61,9 @@ const MAX_QUEUE_ITEMS = 250;
 const MAX_DETAILS_KEYS = 40;
 const DEDUP_WINDOW_MS = 10_000;
 const SEND_COOLDOWN_MS = 400;
-const SENSITIVE_KEY_RE = /authorization|password|token|secret|email|phone|message|content|body|text|description/i;
+const SENSITIVE_KEY_RE = /authorization|password|token|secret|email|phone/i;
 const EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
-const PHONE_RE = /\+?\d[\d\s().-]{7,}\d/g;
+const PHONE_RE = /\+?380\d{9}/g;
 
 const sessionId = getSessionId();
 let deviceIdPromise: Promise<string> | null = null;
@@ -85,7 +85,7 @@ const redactString = (value: string): string =>
     .replace(EMAIL_RE, '[redacted-email]')
     .replace(PHONE_RE, '[redacted-phone]');
 
-const sanitizeValue = (value: unknown, key = ''): unknown => {
+const sanitizeValue = (value: unknown, key = '', seen: WeakSet<object> = new WeakSet()): unknown => {
   if (SENSITIVE_KEY_RE.test(key)) {
     return '[redacted]';
   }
@@ -93,12 +93,16 @@ const sanitizeValue = (value: unknown, key = ''): unknown => {
     return redactString(value.length > 800 ? `${value.slice(0, 800)}...` : value);
   }
   if (Array.isArray(value)) {
-    return value.slice(0, 25).map((item) => sanitizeValue(item));
+    if (seen.has(value)) return '[circular]';
+    seen.add(value);
+    return value.slice(0, 25).map((item) => sanitizeValue(item, '', seen));
   }
   if (value && typeof value === 'object') {
+    if (seen.has(value as object)) return '[circular]';
+    seen.add(value as object);
     const out: Record<string, unknown> = {};
     Object.entries(value as Record<string, unknown>).slice(0, MAX_DETAILS_KEYS).forEach(([itemKey, itemValue]) => {
-      out[itemKey] = sanitizeValue(itemValue, itemKey);
+      out[itemKey] = sanitizeValue(itemValue, itemKey, seen);
     });
     return out;
   }

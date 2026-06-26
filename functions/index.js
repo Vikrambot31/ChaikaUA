@@ -27,13 +27,19 @@ const redactText = (value = '') =>
     .replace(EMAIL_RE, '[redacted-email]')
     .replace(PHONE_RE, '[redacted-phone]');
 
-const sanitizePayload = (payload) => {
+const sanitizePayload = (payload, seen = new WeakSet()) => {
   if (typeof payload === 'string') return redactText(payload);
-  if (Array.isArray(payload)) return payload.map((v) => sanitizePayload(v));
+  if (Array.isArray(payload)) {
+    if (seen.has(payload)) return '[circular]';
+    seen.add(payload);
+    return payload.map((v) => sanitizePayload(v, seen));
+  }
   if (payload && typeof payload === 'object') {
+    if (seen.has(payload)) return '[circular]';
+    seen.add(payload);
     const out = {};
     Object.entries(payload).forEach(([k, v]) => {
-      out[k] = sanitizePayload(v);
+      out[k] = sanitizePayload(v, seen);
     });
     return out;
   }

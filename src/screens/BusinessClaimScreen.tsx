@@ -139,7 +139,7 @@ export default function BusinessClaimScreen({
 
     setSubmitting(true);
     try {
-      const claimRef = ref(database, `business_plus_claims/${item.sourceId}/${currentUser.id}`);
+      const claimRef = ref(database, `business_plus_claims/${item.sourceId}`);
       await set(claimRef, {
         placeId: item.sourceId,
         placeName: item.title,
