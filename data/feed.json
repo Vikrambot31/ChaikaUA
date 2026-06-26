@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://bigkyiv.com.ua/ruh-pivnichnym-mostom-galmuvatymut-remontni-roboty/",
+    "title": "Рух Північним мостом гальмуватимуть ремонтні роботи",
+    "shortText": "На Північному мосту з 26 по 29 червня — ремонтні роботи в двох смугах. Для мешканців Чайки це означає можливі затримки при в'їзді до столиці та варто планувати маршрути наперед. #ЖКЧайка #Ірпінь #КиївськаОбласть #Дорожна_ситуація",
+    "sourceName": "bigkyiv.com.ua",
+    "sourceUrl": "https://bigkyiv.com.ua/ruh-pivnichnym-mostom-galmuvatymut-remontni-roboty/",
+    "publishedAt": "2026-06-26T07:44:16.718Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-06-25",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ Кав'ярня-кондитерська \"Гамак\" — вулиця Валерія Лобановського ☕ BALCONE COFFEE — вулиця Валерія Лобановського, 26 к2 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/de-u-kyyevi-sogodni-obmezhuvatymut-ruh-lokacziyi/",
-    "title": "Де у Києві сьогодні обмежуватимуть рух: локації",
-    "shortText": "Ремонти на київських вулицях створюють затори — мешканцям Чайки варто планувати альтернативні маршрути при їздах до міста. Обмеження діють до 9 травня. #ЖКЧайка #Ірпінь #КиївськаОбласть #Дороги",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/de-u-kyyevi-sogodni-obmezhuvatymut-ruh-lokacziyi/",
-    "publishedAt": "2026-05-07T06:31:26.436Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]
