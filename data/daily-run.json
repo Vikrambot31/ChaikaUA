@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-06-26",
+      "publishedAt": "2026-06-26T10:42:09.009Z",
+      "key": "places-BALCONE COFFEE-Coffee ART-2026-06-26"
+    },
+    {
       "type": "news",
       "date": "2026-06-26",
       "publishedAt": "2026-06-26T07:44:16.719Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-08",
       "publishedAt": "2026-05-08T05:52:53.793Z",
       "key": "https://bigkyiv.com.ua/u-kyyevi-sogodni-prognozuyut-grozu/"
-    },
-    {
-      "type": "places",
-      "date": "2026-05-07",
-      "publishedAt": "2026-05-07T10:12:45.589Z",
-      "key": "places-NOVUS-Grano Bakery-2026-05-07"
     }
   ]
 }
