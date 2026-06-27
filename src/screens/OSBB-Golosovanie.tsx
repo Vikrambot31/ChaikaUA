@@ -140,6 +140,7 @@ function totalVotes(options: OsbbVoteOption[]): number {
 }
 
 function winnerId(options: OsbbVoteOption[]): string {
+  if (options.length === 0) return '';
   return options.reduce((best, o) => (o.votes > best.votes ? o : best)).id;
 }
 

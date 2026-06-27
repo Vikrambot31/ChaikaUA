@@ -609,7 +609,7 @@ const ElectricityStatusScreen: React.FC = () => {
                     </View>
                   </View>
                   <Text style={styles.reportTime}>
-                    {item.createdAt.toLocaleTimeString('uk-UA', {
+                    {new Date(item.createdAt).toLocaleTimeString('uk-UA', {
                       hour: '2-digit',
                       minute: '2-digit',
                     })}
@@ -655,7 +655,7 @@ const ElectricityStatusScreen: React.FC = () => {
                     </View>
                   </View>
                   <Text style={styles.reportTime}>
-                    {item.createdAt.toLocaleTimeString('uk-UA', {
+                    {new Date(item.createdAt).toLocaleTimeString('uk-UA', {
                       hour: '2-digit',
                       minute: '2-digit',
                     })}

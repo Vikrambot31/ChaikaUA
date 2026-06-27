@@ -2,7 +2,7 @@ import { useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationProp } from '@react-navigation/native';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { equalTo, get, orderByChild, query, ref as dbRef, set as dbSet } from 'firebase/database';
+import { equalTo, get, orderByChild, query, ref as dbRef, update as dbUpdate } from 'firebase/database';
 import Toast from 'react-native-toast-message';
 import { useDispatch } from 'react-redux';
 import { auth, database } from '../firebase-config';
@@ -167,7 +167,7 @@ export const useFullRegistration = ({
         }
       }
 
-      await dbSet(dbRef(database, `users/${uid}`), {
+      await dbUpdate(dbRef(database, `users/${uid}`), {
         name: tempProfile?.name || normalizedName,
         email: normalizedEmail,
         phone: normalizedPhone,

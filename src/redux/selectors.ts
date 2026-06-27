@@ -39,20 +39,26 @@ export const selectSelectedTypes = (state: RootState) => state.places.selectedTy
 /**
  * Отримати місце за ID
  */
-export const selectPlaceById = (state: RootState, id: string) =>
-  state.places.items.find((place) => place.id === id);
+export const selectPlaceById = createSelector(
+  [(state: RootState) => state.places.items, (_: RootState, id: string) => id],
+  (items, id) => items.find((place) => place.id === id)
+);
 
 /**
  * Отримати кількість місць по типу
  */
-export const selectPlacesByType = (state: RootState, type: string) =>
-  state.places.items.filter((place) => place.type === type);
+export const selectPlacesByType = createSelector(
+  [(state: RootState) => state.places.items, (_: RootState, type: string) => type],
+  (items, type) => items.filter((place) => place.type === type)
+);
 
 /**
  * Перевірити чи є активні фільтри
  */
-export const selectHasActiveFilters = (state: RootState) =>
-  state.places.searchQuery.length > 0 || state.places.selectedTypes.length > 0;
+export const selectHasActiveFilters = createSelector(
+  [(state: RootState) => state.places.searchQuery, (state: RootState) => state.places.selectedTypes],
+  (searchQuery, selectedTypes) => searchQuery.length > 0 || selectedTypes.length > 0
+);
 
 // ============================================================
 // REQUESTS SELECTORS
@@ -68,20 +74,26 @@ export const selectRequestsCount = (state: RootState) => state.requests.approved
 /**
  * Отримати заявку за ID
  */
-export const selectRequestById = (state: RootState, id: string) =>
-  state.requests.items.find((request: Request) => request.id === id);
+export const selectRequestById = createSelector(
+  [(state: RootState) => state.requests.items, (_: RootState, id: string) => id],
+  (items, id) => items.find((request: Request) => request.id === id)
+);
 
 /**
  * Отримати не одобрені заявки
  */
-export const selectPendingRequests = (state: RootState) =>
-  state.requests.items.filter((request: Request) => !request.isApproved);
+export const selectPendingRequests = createSelector(
+  [(state: RootState) => state.requests.items],
+  (items) => items.filter((request: Request) => !request.isApproved)
+);
 
 /**
  * Отримати кількість очікуючих заявок
  */
-export const selectPendingRequestsCount = (state: RootState) =>
-  state.requests.items.filter((request: Request) => !request.isApproved).length;
+export const selectPendingRequestsCount = createSelector(
+  [(state: RootState) => state.requests.items],
+  (items) => items.filter((request: Request) => !request.isApproved).length
+);
 
 /**
  * Отримати останні заявки (N)
@@ -104,40 +116,45 @@ export const selectElectricityError = (state: RootState) => state.electricity?.e
 /**
  * Отримати статус по будинку
  */
-export const selectStatusByBuilding = (state: RootState, buildingId: string) => {
-  const reports = state.electricity?.todayReports ?? [];
-  const lastReport = reports.find((r: (typeof reports)[number]) => r.buildingId === buildingId);
-  return lastReport?.status ?? null;
-};
+export const selectStatusByBuilding = createSelector(
+  [(state: RootState) => state.electricity?.todayReports ?? [], (_: RootState, buildingId: string) => buildingId],
+  (reports, buildingId) => {
+    const lastReport = reports.find((r) => r.buildingId === buildingId);
+    return lastReport?.status ?? null;
+  }
+);
 
 /**
  * Отримати звіти по будинку
  */
-export const selectBuildingReports = (state: RootState, buildingId: string) => {
-  return (state.electricity?.todayReports ?? []).filter((r: (typeof state.electricity.todayReports)[number]) => r.buildingId === buildingId);
-};
+export const selectBuildingReports = createSelector(
+  [(state: RootState) => state.electricity?.todayReports ?? [], (_: RootState, buildingId: string) => buildingId],
+  (reports, buildingId) => reports.filter((r) => r.buildingId === buildingId)
+);
 
 /**
  * Отримати електрику "ВКЛ" будинки
  */
-export const selectBuildingsWithElectricity = (state: RootState) => {
-  const buildings = new Set<string>();
-  (state.electricity?.todayReports ?? [])
-    .filter((r: (typeof state.electricity.todayReports)[number]) => r.status === 'on')
-    .forEach((r: (typeof state.electricity.todayReports)[number]) => buildings.add(r.buildingId));
-  return Array.from(buildings);
-};
+export const selectBuildingsWithElectricity = createSelector(
+  [(state: RootState) => state.electricity?.todayReports ?? []],
+  (reports) => {
+    const buildings = new Set<string>();
+    reports.filter((r) => r.status === 'on').forEach((r) => buildings.add(r.buildingId));
+    return Array.from(buildings);
+  }
+);
 
 /**
  * Отримати електрику "ВИМКЛ" будинки
  */
-export const selectBuildingsWithoutElectricity = (state: RootState) => {
-  const buildings = new Set<string>();
-  (state.electricity?.todayReports ?? [])
-    .filter((r: (typeof state.electricity.todayReports)[number]) => r.status === 'off')
-    .forEach((r: (typeof state.electricity.todayReports)[number]) => buildings.add(r.buildingId));
-  return Array.from(buildings);
-};
+export const selectBuildingsWithoutElectricity = createSelector(
+  [(state: RootState) => state.electricity?.todayReports ?? []],
+  (reports) => {
+    const buildings = new Set<string>();
+    reports.filter((r) => r.status === 'off').forEach((r) => buildings.add(r.buildingId));
+    return Array.from(buildings);
+  }
+);
 
 // ============================================================
 // HELP REQUESTS SELECTORS
@@ -152,42 +169,51 @@ export const selectHelpRequestsError = (state: RootState) => state.helpRequests?
 /**
  * Отримати активні "гарячі" заявки
  */
-export const selectActiveBurningRequests = (state: RootState) => {
-  const today = state.helpRequests?.todayItems ?? [];
-  const nowIso = new Date().toISOString();
-  return today.filter((r: HelpRequest) => r.isBurning && r.expiresAt > nowIso);
-};
+export const selectActiveBurningRequests = createSelector(
+  [(state: RootState) => state.helpRequests?.todayItems ?? []],
+  (today) => {
+    const nowIso = new Date().toISOString();
+    return today.filter((r: HelpRequest) => r.isBurning && r.expiresAt > nowIso);
+  }
+);
 
 /**
  * Отримати завершені заявки
  */
-export const selectCompletedRequests = (state: RootState) => {
-  return (state.helpRequests?.items ?? []).filter((r: HelpRequest) => !r.isBurning);
-};
+export const selectCompletedRequests = createSelector(
+  [(state: RootState) => state.helpRequests?.items ?? []],
+  (items) => items.filter((r: HelpRequest) => !r.isBurning)
+);
 
 /**
  * Отримати кількість активних заявок
  */
-export const selectActiveBurningCount = (state: RootState) => {
-  const today = state.helpRequests?.todayItems ?? [];
-  const nowIso = new Date().toISOString();
-  return today.filter((r: HelpRequest) => r.isBurning && r.expiresAt > nowIso).length;
-};
+export const selectActiveBurningCount = createSelector(
+  [(state: RootState) => state.helpRequests?.todayItems ?? []],
+  (today) => {
+    const nowIso = new Date().toISOString();
+    return today.filter((r: HelpRequest) => r.isBurning && r.expiresAt > nowIso).length;
+  }
+);
 
 /**
  * Отримати заявки за часами
  */
-export const selectHelpRequestsByTime = (state: RootState, hours: number) => {
-  const today = state.helpRequests?.todayItems ?? [];
-  const cutoffTime = new Date(Date.now() - hours * 60 * 60 * 1000);
-  return today.filter((r: HelpRequest) => new Date(r.createdAt) > cutoffTime);
-};
+export const selectHelpRequestsByTime = createSelector(
+  [(state: RootState) => state.helpRequests?.todayItems ?? [], (_: RootState, hours: number) => hours],
+  (today, hours) => {
+    const cutoffTime = new Date(Date.now() - hours * 60 * 60 * 1000);
+    return today.filter((r: HelpRequest) => new Date(r.createdAt) > cutoffTime);
+  }
+);
 
 /**
  * Отримати заявку за ID
  */
-export const selectHelpRequestById = (state: RootState, id: string) =>
-  (state.helpRequests?.items ?? []).find((request: HelpRequest) => request.id === id);
+export const selectHelpRequestById = createSelector(
+  [(state: RootState) => state.helpRequests?.items ?? [], (_: RootState, id: string) => id],
+  (items, id) => items.find((request: HelpRequest) => request.id === id)
+);
 
 // ============================================================
 // GLOBAL STATUS SELECTORS
@@ -216,13 +242,16 @@ export const selectHasErrors = (state: RootState) =>
 /**
  * Отримати всі помилки
  */
-export const selectAllErrors = (state: RootState) => ({
-  auth: state.auth.error,
-  places: state.places.error,
-  requests: state.requests.error,
-  electricity: state.electricity?.error ?? null,
-  helpRequests: state.helpRequests?.error ?? null,
-});
+export const selectAllErrors = createSelector(
+  [
+    (state: RootState) => state.auth.error,
+    (state: RootState) => state.places.error,
+    (state: RootState) => state.requests.error,
+    (state: RootState) => state.electricity?.error ?? null,
+    (state: RootState) => state.helpRequests?.error ?? null,
+  ],
+  (auth, places, requests, electricity, helpRequests) => ({ auth, places, requests, electricity, helpRequests })
+);
 
 /**
  * Отримати перший доступний індекс помилки
@@ -237,21 +266,30 @@ export const selectFirstError = (state: RootState) => {
 };
 
 /**
- * Отримати статус A8=E@>=V70FVW
+ * Отримати статус синхронізації
  */
-export const selectSyncStatus = (state: RootState) => ({
-  authSynced: state.auth.isAuthenticated && !state.auth.loading,
-  placesSynced: state.places.items.length > 0 && !state.places.loading,
-  requestsSynced: state.requests.items.length >= 0 && !state.requests.loading,
-  electricitySynced: (state.electricity?.reports?.length ?? 0) >= 0 && !(state.electricity?.loading ?? false),
-  helpSynced: (state.helpRequests?.items?.length ?? 0) >= 0 && !(state.helpRequests?.loading ?? false),
-  allSynced:
-    !state.auth.loading &&
-    !state.places.loading &&
-    !state.requests.loading &&
-    !(state.electricity?.loading ?? false) &&
-    !(state.helpRequests?.loading ?? false),
-});
+export const selectSyncStatus = createSelector(
+  [
+    (state: RootState) => state.auth.isAuthenticated,
+    (state: RootState) => state.auth.loading,
+    (state: RootState) => state.places.items.length,
+    (state: RootState) => state.places.loading,
+    (state: RootState) => state.requests.items.length,
+    (state: RootState) => state.requests.loading,
+    (state: RootState) => state.electricity?.reports?.length ?? 0,
+    (state: RootState) => state.electricity?.loading ?? false,
+    (state: RootState) => state.helpRequests?.items?.length ?? 0,
+    (state: RootState) => state.helpRequests?.loading ?? false,
+  ],
+  (authOk, authLoading, placesLen, placesLoading, reqLen, reqLoading, elecLen, elecLoading, helpLen, helpLoading) => ({
+    authSynced: authOk && !authLoading,
+    placesSynced: placesLen > 0 && !placesLoading,
+    requestsSynced: reqLen >= 0 && !reqLoading,
+    electricitySynced: elecLen >= 0 && !elecLoading,
+    helpSynced: helpLen >= 0 && !helpLoading,
+    allSynced: !authLoading && !placesLoading && !reqLoading && !elecLoading && !helpLoading,
+  })
+);
 
 export default {
   // Auth
