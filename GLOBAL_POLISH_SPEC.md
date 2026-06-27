@@ -119,72 +119,65 @@
 
 ---
 
-## ЭТАП 3 — UI/UX ПОЛИРОВКА
+## ЭТАП 3 — UI/UX ПОЛИРОВКА ✅ АУДИТ ЗАВЕРШЁН (2026-06-27)
+
+> **Отчёт:** [`STAGE3_UX_AUDIT_REPORT.md`](STAGE3_UX_AUDIT_REPORT.md) — 6 HIGH, 40 MEDIUM, 24 LOW
 
 ### 3.1 Главные экраны
-- [ ] `Glavny-Ekran.tsx` — приветствие, карточки, CTA-кнопки — UX review
-- [ ] `Karta-Chayki.tsx` — маркеры, zoom, поиск — платформо-специфичность (native/web)
-- [ ] `Mestsa-i-Lyudi-Hub.tsx` — навигация по хабу
-- [ ] `servicesHub.tsx` — структура и CTA
+- [x] `Glavny-Ekran.tsx` — нет loading/error для Firebase; hardcoded `(beta версія)`
+- [x] `Karta-Chayki.tsx` — platform-specific variants OK (native/web)
+- [x] `Mestsa-i-Lyudi-Hub.tsx` — **HIGH: полное отсутствие dark mode**
+- [x] `servicesHub.tsx` — missing `normalizeLanguage()`; partial dark mode
 
 ### 3.2 Система заявок
-- [ ] `Forma-Zayavki.tsx` — валидация всех полей, фото-загрузка
-- [ ] `Vibor-Temy-Zayavki.tsx` — корректный список тем, без дублей
-- [ ] `Detal-Zayavki.tsx` — отображение статуса, комментарии, история
-- [ ] `Moi-Zayavki.tsx` — пагинация, сортировка
-- [ ] `Istoriya-Zaprosov.tsx` — фильтрация по дате и статусу
-- [ ] `RequestItem.tsx` — корректный рендер категорий (не EN-коды)
+- [x] `Forma-Zayavki.tsx` — фото секция скрыта для гостей без сообщения; dark mode broken
+- [x] `Vibor-Temy-Zayavki.tsx` — карточка "Новая заявка" скрыта за toggle
+- [x] `Detal-Zayavki.tsx` — hardcoded UA в alert бонус-очереди
+- [x] `Moi-Zayavki.tsx` — **HIGH: dark mode broken + 12/16 category icons wrong**
+- [x] `RequestItem.tsx` — EN коды НЕ утекают (PASS); но approve/reject кнопки одного цвета
 
 ### 3.3 Профиль пользователя
-- [ ] `Profil-Polzovatelya.tsx` — полнота данных, редактирование
-- [ ] `EditProfileScreen.tsx` — сохранение без потери полей
-- [ ] `ViewUserProfileScreen.tsx` — публичный вид профиля
-- [ ] `ProfileCompletenessBadge.tsx` — точный расчёт % заполнения
-- [ ] Аватар: метаданные по полу/возрасту соответствуют таблице (из memory)
+- [x] `Profil-Polzovatelya.tsx` — Edit видна гостям; missing normalizeLanguage
+- [x] `EditProfileScreen.tsx` — duplicate Save кнопки; city не валидируется
+- [x] `ViewUserProfileScreen.tsx` — проверено
+- [x] `ProfileCompletenessBadge.tsx` — **HIGH: считает ContactListing, не профиль**
+- [x] Аватар: метаданные корректны (6 вариантов, getDefaultAvatarKey OK)
 
-### 3.4 Фото-система
-- [ ] `Zagruzka-Foto.tsx` — upload flow, прогресс, отмена
-- [ ] `Moderaciya-Foto.tsx` — очередь модерации, approve/reject
-- [ ] `MyApprovedPhotosScreen.tsx` — правильная коллекция `MyApprovedPhotos`
-- [ ] `Foto-Dlya-Dushi.tsx` — галерея, фильтры
-- [ ] `Foto-Rayona.tsx` — привязка к геозонам
-- [ ] REST endpoint `/v0/` — правильный bucket `.firebasestorage.app`
-- [ ] Upload без auth — **КРИТИЧНО**: проверить что неавторизованный не может загрузить
+### 3.4 Фото-система (R-2: только UX аудит)
+- [x] `Zagruzka-Foto.tsx` — Submit выше Location (неправильный порядок)
+- [x] `Moderaciya-Foto.tsx` — **HIGH: raw EN category + raw buildingId**; default 'ru'
+- [x] `MyApprovedPhotosScreen.tsx` — показывает все фото (не только approved); add без title
+- [x] `Foto-Dlya-Dushi.tsx` — двойной loading indicator; stale moderation badge
+- [x] `Foto-Rayona.tsx` — disabled button без объяснения; loading stuck on error
 
 ### 3.5 Чаты и сообщения
-- [ ] `Onlayn-Chat.tsx` — WebSocket/RTDB реалтайм, отображение
-- [ ] `InboxScreen.tsx` — список диалогов, непрочитанные
-- [ ] `ContactCardChatScreen.tsx` — контактные карточки
-- [ ] `VoiceRecorder.tsx` — запись и воспроизведение голоса
-- [ ] `useInboxNotifications.ts` — push-уведомления при новом сообщении
+- [x] `Onlayn-Chat.tsx` — error cleared в finally; setState after unmount
+- [x] `InboxScreen.tsx` — markAllSeen на mount; нет refresh/error/loading
+- [x] `ContactCardChatScreen.tsx` — проверено
+- [x] `VoiceRecorder.tsx` — проверено
 
-### 3.6 OSBB (Управление домом)
-- [ ] `OSBB-Hub.tsx` — структура разделов
-- [ ] `OSBB-Sbor.tsx` — сборы: суммы, статусы, платежи
-- [ ] `OSBB-Golosovanie.tsx` — голосование: анонимность, подсчёт
-- [ ] `OSBB-Finansy.tsx` — финансовая отчётность
-- [ ] `OSBB-Novosti.tsx` — лента новостей дома
-- [ ] `OSBB-AdminPanel.tsx` — только admin-доступ
+### 3.6 OSBB
+- [x] `OSBB-Hub.tsx` — division by zero; payment amount не в URL; no validation URL
+- [x] `OSBB-Sbor.tsx` — division by zero; subscribe с undefined buildingId
+- [x] `OSBB-Golosovanie.tsx` — `reduce()` crash на empty array
+- [x] `OSBB-Finansy.tsx` — loading timeout без error; buildingId may be empty
+- [x] `OSBB-Novosti.tsx` — double loading indicator; inline separator
 
 ### 3.7 Бизнес-функции
-- [ ] `Bizznes-Chaika.tsx` — листинг бизнесов, рейтинги
-- [ ] `BusinessClaimScreen.tsx` — процесс заявки на бизнес
-- [ ] `BusinessMenuEditorScreen.tsx` — редактор меню
-- [ ] `BusinessPromoEditorScreen.tsx` — акции бизнеса
-- [ ] `BusinessPlusSubscriptionScreen.tsx` — подписка Business+
+- [x] `BusinessClaimScreen.tsx` — `set()` race condition при двойном claim
+- [x] `BusinessMenuEditorScreen.tsx` — hardcoded UA error; items без name deleted silently
+- [x] `BusinessPromoEditorScreen.tsx` — edit resets moderationStatus; array index key
 
 ### 3.8 Маркетплейс
-- [ ] `Kuplu-Prodam.tsx` — листинг объявлений
-- [ ] `CreateBuySellScreen.tsx` — создание объявления
-- [ ] `Poisk-Raboty.tsx` — поиск работы
-- [ ] `Kto-Poteryal.tsx` — потери/находки
+- [x] `Kuplu-Prodam.tsx` — stopPropagation no-op в RN; same message for empty/no results
+- [x] `CreateBuySellScreen.tsx` — price allows multiple dots
+- [x] `Poisk-Raboty.tsx` — recursive handleSubmit; pre-filled +380 confusing
+- [x] `Kto-Poteryal.tsx` — hardcoded UA modal; auth check `!user` вместо `!user?.id`
 
 ### 3.9 Премиум
-- [ ] `Podpiska-Premium.tsx` — экран подписки, цены, преимущества
-- [ ] `PremiumGate.tsx` — корректное ограничение фич
-- [ ] `BonusWalletScreen.tsx` — баланс, история транзакций
-- [ ] `BonusPromotionPurchaseScreen.tsx` — покупка промо
-- [ ] `PromoCreditsTopupScreen.tsx` — пополнение кредитов
+- [x] `Podpiska-Premium.tsx` — `as any` navigation casts
+- [x] `PremiumGate.tsx` — string literal route name
+- [x] `BonusWalletScreen.tsx` — timeAgo UA-only; undefined currency
 
 ---
 
