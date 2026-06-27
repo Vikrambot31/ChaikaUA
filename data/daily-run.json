@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-06-27",
+      "publishedAt": "2026-06-27T09:54:14.262Z",
+      "key": "places-Coffee ART-ANMI SOUL-2026-06-27"
+    },
+    {
       "type": "news",
       "date": "2026-06-27",
       "publishedAt": "2026-06-27T06:48:39.879Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-09",
       "publishedAt": "2026-05-09T06:11:20.006Z",
       "key": "https://bigkyiv.com.ua/pivnichnyj-mist-chastkovo-perekryly-dlya-transportu/"
-    },
-    {
-      "type": "places",
-      "date": "2026-05-08",
-      "publishedAt": "2026-05-08T09:02:52.401Z",
-      "key": "places-Grano Bakery-Кав'ярня ХЛІБ та КАВА-2026-05-08"
     }
   ]
 }

@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Coffee ART-ANMI SOUL-2026-06-27",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Coffee ART — вулиця Валерія Лобановського, 25 ☕ ANMI SOUL — вулиця Валерія Лобановського, 18 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-06-27T09:54:14.261Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/u-darnyczkomu-rajoni-zyavyvsya-doshhovyj-sadok-u-novomu-miniskveri/",
     "title": "У новому скверику Дарницького району з’явився дощовий садок",
     "shortText": "У Дарницькому районі Києва запустили дощовий садок — він накопичує опади й поповнює ґрунтові води. Ірпінь також має потенціал для таких екопроектів біля Чайки. #ЖКЧайка #Ірпінь #КиївськаОбласть #ЕкоБудівництво",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Grano Bakery-Кав'ярня ХЛІБ та КАВА-2026-05-08",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "🛒 Grano Bakery — вулиця Валерія Лобановського, 35 ☕ Кав'ярня ХЛІБ та КАВА — вулиця Валерія Лобановського, 18 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-05-08T09:02:52.400Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
