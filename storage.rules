@@ -18,96 +18,109 @@ service firebase.storage {
       return registered() && (request.auth.token.admin == true || request.auth.token.moderator == true);
     }
 
+    // ── Validation helpers ──────────────────────────────────────────────────
+    function isImageType() {
+      return request.resource.contentType.matches('image/(jpeg|png|webp|heic|heif)');
+    }
+
+    function isUnderSizeLimit() {
+      return request.resource.size <= 10 * 1024 * 1024; // 10 MB
+    }
+
+    function validUpload(userId) {
+      return (isOwner(userId) || isAdmin()) && isImageType() && isUnderSizeLimit();
+    }
+
     // ── Группа E: Storage (Этап 1, шаги 1.3 Дни 9-10) ──────────────────────
     // profile_photos/{uid}/... — читает любой auth, пишет только владелец
     match /profile_photos/{uid}/{allPaths=**} {
       allow get, list: if signedIn();
-      allow write: if isOwner(uid) || isAdmin();
+      allow write: if validUpload(uid);
     }
 
     // community_photos/{uid}/... — путь содержит uid загрузчика (см. photoUploadService)
     // Читает любой auth. Пишет только владелец (загрузчик) или admin через CF.
     match /community_photos/{uid}/{allPaths=**} {
       allow get, list: if signedIn();
-      allow write: if isOwner(uid) || isAdmin();
+      allow write: if validUpload(uid);
     }
 
     // requests/{uid}/... — фото, прикреплённые к заявкам помощи соседям.
     match /requests/{uid}/{allPaths=**} {
       allow get, list: if signedIn();
-      allow write: if isOwner(uid) || isAdmin();
+      allow write: if validUpload(uid);
     }
 
     // uploads/users/{uid}/... — личная очередь загрузок, только владелец
     match /uploads/users/{uid}/{allPaths=**} {
       allow get, list: if signedIn();
-      allow write: if isOwner(uid) || isAdmin();
+      allow write: if validUpload(uid);
     }
 
     // dating_profiles/{uid}/... — личные фото анкет, только владелец
     match /dating_profiles/{uid}/{allPaths=**} {
       allow get, list: if signedIn();
-      allow write: if isOwner(uid) || isAdmin();
+      allow write: if validUpload(uid);
     }
 
     // dating_anketa_listings/{uid}/... — то же для анкет
     match /dating_anketa_listings/{uid}/{allPaths=**} {
       allow get, list: if signedIn();
-      allow write: if isOwner(uid) || isAdmin();
+      allow write: if validUpload(uid);
     }
 
     // job_listings/{uid}/... — фото до резюме та вакансій
     match /job_listings/{uid}/{allPaths=**} {
       allow get, list: if signedIn();
-      allow write: if isOwner(uid) || isAdmin();
+      allow write: if validUpload(uid);
     }
 
     // buy_sell_listings/{uid}/... — фото оголошень купити/продати
     match /buy_sell_listings/{uid}/{allPaths=**} {
       allow get, list: if signedIn();
-      allow write: if isOwner(uid) || isAdmin();
+      allow write: if validUpload(uid);
     }
 
     // lost_found/{uid}/... — фото оголошень "хто загубив"
     match /lost_found/{uid}/{allPaths=**} {
       allow get, list: if signedIn();
-      allow write: if isOwner(uid) || isAdmin();
+      allow write: if validUpload(uid);
     }
 
     // biznes_chaika_listings/{uid}/... — фото оголошень Бізнес Чайка
     match /biznes_chaika_listings/{uid}/{allPaths=**} {
       allow get, list: if signedIn();
-      allow write: if isOwner(uid) || isAdmin();
+      allow write: if validUpload(uid);
     }
 
     // contacts_listings/{uid}/... — фото анкет знайомств
     match /contacts_listings/{uid}/{allPaths=**} {
       allow get, list: if signedIn();
-      allow write: if isOwner(uid) || isAdmin();
+      allow write: if validUpload(uid);
     }
 
     // food_top_listings/{uid}/... — фото оголошень Їжа на Чайці
     match /food_top_listings/{uid}/{allPaths=**} {
       allow get, list: if signedIn();
-      allow write: if isOwner(uid) || isAdmin();
+      allow write: if validUpload(uid);
     }
 
     // beauty_top_listings/{uid}/... — фото оголошень Салони Краси
     match /beauty_top_listings/{uid}/{allPaths=**} {
       allow get, list: if signedIn();
-      allow write: if isOwner(uid) || isAdmin();
+      allow write: if validUpload(uid);
     }
 
     // children_top_listings/{uid}/... — фото оголошень Все для дітей
     match /children_top_listings/{uid}/{allPaths=**} {
       allow get, list: if signedIn();
-      allow write: if isOwner(uid) || isAdmin();
+      allow write: if validUpload(uid);
     }
 
     // thumbnails/{namespace}/{uid}/... — мініатюри для всіх оголошень
     match /thumbnails/{namespace}/{uid}/{allPaths=**} {
       allow get, list: if signedIn();
-      allow write: if isOwner(uid) || isAdmin();
+      allow write: if validUpload(uid);
     }
 
     // Остальные пути — только чтение. Запись в неспецифичные пути запрещена;

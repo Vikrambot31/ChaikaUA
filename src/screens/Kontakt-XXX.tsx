@@ -19,6 +19,7 @@ import PhotoUploadField, { UploadedPhoto } from '../components/PhotoUploadField'
 import UploadedPhotosGrid from '../components/UploadedPhotosGrid';
 import { get, ref } from 'firebase/database';
 import { database } from '../firebase-config';
+import { auth } from '../firebase-core';
 import { useContactRequest } from '../hooks/useContactRequest';
 import ContactReasonModal from '../components/ContactReasonModal';
 import { pickUserAvatarUri } from '../utils/userAvatar';
@@ -789,7 +790,8 @@ const KontaktiChaikyScreen: React.FC = () => {
   }, [blinkAnim]);
 
   const handleViber = (phoneRaw: string) => {
-    if (!user?.id) {
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser?.uid || !user?.id) {
       Alert.alert(
         language === 'en' ? 'Registration required' : language === 'ru' ? 'Нужна регистрация' : 'Потрібна реєстрація',
         language === 'en' ? 'Sign in to contact users.' : language === 'ru' ? 'Для связи необходима регистрация.' : "Для зв'язку потрібна реєстрація.",

@@ -31,14 +31,23 @@ const initialState: ElectricityState = {
   error: null,
 };
 
+const MAX_REPORTS = 200;
+const MAX_TODAY_REPORTS = 100;
+
 const electricitySlice = createSlice({
   name: 'electricity',
   initialState,
   reducers: {
     addReport: (state, action: PayloadAction<ElectricityReport>) => {
       state.reports.push(action.payload);
+      if (state.reports.length > MAX_REPORTS) {
+        state.reports = state.reports.slice(-MAX_REPORTS);
+      }
       // Додати до звітів сьогодні
       state.todayReports.unshift(action.payload);
+      if (state.todayReports.length > MAX_TODAY_REPORTS) {
+        state.todayReports = state.todayReports.slice(0, MAX_TODAY_REPORTS);
+      }
     },
     setReports: (state, action: PayloadAction<ElectricityReport[]>) => {
       state.reports = action.payload;

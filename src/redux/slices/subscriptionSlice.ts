@@ -132,6 +132,9 @@ const subscriptionSlice = createSlice({
       }
     },
   },
+  extraReducers: (builder) => {
+    builder.addCase('auth/logout', () => initialState);
+  },
 });
 
 export const { hydrateSubscription, cancelPlan, resetSubscription, checkExpiry } = subscriptionSlice.actions;

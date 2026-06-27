@@ -106,6 +106,9 @@ const osbbSlice = createSlice({
       return initialState;
     },
   },
+  extraReducers: (builder) => {
+    builder.addCase('auth/logout', () => initialState);
+  },
 });
 
 // ---------------------------------------------------------------------------

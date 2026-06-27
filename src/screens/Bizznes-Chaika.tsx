@@ -36,6 +36,7 @@ import { createPendingModeration, type ModerationStatus } from '../utils/moderat
 import { resolveMediaAccessUrls } from '../services/mediaAccess';
 import { VideoLoadingOverlay } from '../components/VideoLoadingOverlay';
 import { ensureFirebaseAuth, requireWriteSession } from '../firebase-auth-session';
+import { auth } from '../firebase-core';
 import { getBuildingsByStreet, getStreets } from '../data/buildings';
 import { subscribeActiveBonusPromotions, subscribeBiznesPlusPlaces, type BonusPromotion } from '../services/bonusService';
 import ScreenTooltip from '../components/ScreenTooltip';
@@ -1182,7 +1183,8 @@ const BiznesChaikaScreen: React.FC = () => {
   }, [blinkAnim]);
 
   const handleViber = (phoneRaw: string) => {
-    if (!user?.id) {
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser?.uid || !user?.id) {
       Alert.alert(
         language === 'en' ? 'Registration required' : language === 'ru' ? 'Нужна регистрация' : 'Потрібна реєстрація',
         language === 'en' ? 'Sign in to contact users.' : language === 'ru' ? 'Для связи необходима регистрация.' : "Для зв'язку потрібна реєстрація.",

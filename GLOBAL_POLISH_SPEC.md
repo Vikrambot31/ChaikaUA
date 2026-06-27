@@ -71,43 +71,51 @@
 
 ---
 
-## ЭТАП 2 — АУТЕНТИФИКАЦИЯ И БЕЗОПАСНОСТЬ
+## ЭТАП 2 — АУТЕНТИФИКАЦИЯ И БЕЗОПАСНОСТЬ ✅ ЗАВЕРШЁН (2026-06-27)
+
+> **Отчёт:** [`STAGE2_SECURITY_REPORT.md`](STAGE2_SECURITY_REPORT.md)
+> **Фиксы применены:** 7 критических исправлений в коде
 
 ### 2.1 Поток регистрации
-- [ ] `Registraciya-Polnaya.tsx` — полный UX-аудит формы
-- [ ] `ProfileSetupScreen.tsx` — проверка обязательных полей
-- [ ] `StartAvatarPickerScreen.tsx` — работа выбора аватара
-- [ ] Валидация номера телефона (префиксы UA/RU/EU)
-- [ ] Проверка пароля через HIBP (Have I Been Pwned)
-- [ ] Реферальная система — порядок записи и источник
+- [x] `Registraciya-Polnaya.tsx` — аудит завершён (ожидание auth flow агента)
+- [x] `ProfileSetupScreen.tsx` — проверка обязательных полей
+- [x] `StartAvatarPickerScreen.tsx` — работа выбора аватара
+- [x] Валидация номера телефона (префиксы UA/RU/EU)
+- [x] Проверка пароля через HIBP (Have I Been Pwned)
+- [x] Реферальная система — порядок записи и источник
 
 ### 2.2 Поток входа
-- [ ] `Vkhod.tsx` — все кнопки провайдеров (Google, Facebook, Apple, Email)
-- [ ] Восстановление сессии после перезагрузки приложения
-- [ ] Обработка ошибок auth (неверный пароль, сеть, блокировка)
-- [ ] Срок жизни токена — автообновление Firebase Auth
-- [ ] `AuthDiagnosticScreen.tsx` — доступ только для admin
+- [x] `Vkhod.tsx` — все кнопки провайдеров (Google, Facebook, Apple, Email)
+- [x] Восстановление сессии после перезагрузки приложения
+- [x] Обработка ошибок auth (неверный пароль, сеть, блокировка)
+- [x] Срок жизни токена — автообновление Firebase Auth
+- [x] `AuthDiagnosticScreen.tsx` — доступ guarded 'auth'
 
 ### 2.3 Контроль доступа
-- [ ] `AppAccessGuard.tsx` — корректная работа на всех защищённых экранах
-- [ ] `AccessRestrictedScreen.tsx` — понятное сообщение пользователю
-- [ ] `PendingApprovalScreen.tsx` — статус одобрения в реальном времени
-- [ ] `InviteAccessScreen.tsx` — проверка инвайт-кода
-- [ ] Роли: user / moderator / admin — полная проверка разграничения
-- [ ] Виber Auth Bypass — **КРИТИЧНО**: `Kontakt-XXX` и `Bizznes-Chaika` — анонимные Viber-звонки без проверки `user?.id` (из audit)
+- [x] `AppAccessGuard.tsx` — аудит: device auth timeout bypass найден (MEDIUM)
+- [x] `AccessRestrictedScreen.tsx` — проверено
+- [x] `PendingApprovalScreen.tsx` — статус одобрения работает
+- [x] `InviteAccessScreen.tsx` — client-side validation only (MEDIUM risk)
+- [x] Роли: user / moderator / admin — 24 guarded маршрута проверены
+- [x] ~~Viber Auth Bypass~~ — **ИСПРАВЛЕНО**: `auth.currentUser?.uid` проверка добавлена в Kontakt-XXX, Bizznes-Chaika, ProfileRequestsScreen
 
 ### 2.4 Безопасность форм
-- [ ] Все `<TextInput>` с паролями — `secureTextEntry`, autocomplete="off"
-- [ ] SQL/NoSQL injection защита (все Firebase `.set()` с пользовательскими данными)
-- [ ] XSS в web-компонентах — `dangerouslySetInnerHTML` — проверка
-- [ ] Лимиты на загрузку файлов (размер, тип, количество)
-- [ ] Rate limiting на регистрацию (предотвращение спама)
+- [x] Все `<TextInput>` с паролями — `secureTextEntry` подтверждено (PASS)
+- [x] SQL/NoSQL injection — Firebase paths safe, no injection vectors (PASS)
+- [x] XSS — нет `dangerouslySetInnerHTML` в проекте (PASS)
+- [x] ~~Лимиты на загрузку файлов~~ — **ИСПРАВЛЕНО**: `storage.rules` + 10MB + image-only whitelist
+- [x] Rate limiting — 15min lockout после 5 попыток + Cloud Function rate limit (PASS)
 
 ### 2.5 Защита API
-- [ ] `securityRoles.ts` — проверка логики ролей на клиенте + дублирование на сервере
-- [ ] `securityAdminService.ts` — операции только через проверенный UID
-- [ ] `securityAuditLogger.ts` — логирование всех критических действий
-- [ ] `emergencyAccess.ts` — emergency режим без обхода auth
+- [x] `securityRoles.ts` — role cache с TTL, нет invalidation hook (LOW-MEDIUM risk)
+- [x] `securityAdminService.ts` — операции через проверенный UID
+- [x] `securityAuditLogger.ts` — 8 типов событий, throttle 30s (расширить)
+- [x] `emergencyAccess.ts` — client-side time check (MEDIUM risk, clock manipulation)
+
+### 2.6 Redux — критические фиксы из Этапа 1
+- [x] ~~osbbSlice~~ — **ИСПРАВЛЕНО**: `extraReducers → auth/logout → initialState`
+- [x] ~~electricitySlice~~ — **ИСПРАВЛЕНО**: MAX_REPORTS=200, MAX_TODAY_REPORTS=100
+- [x] ~~subscriptionSlice~~ — **ИСПРАВЛЕНО**: `extraReducers → auth/logout → initialState`
 
 ---
 

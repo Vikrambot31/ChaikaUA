@@ -17,6 +17,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { get, onValue, ref } from 'firebase/database';
 import { ensureFirebaseAuth } from '../firebase-auth-session';
+import { auth } from '../firebase-core';
 import { ContactReason, ProfileViewRequest, ViewRequestContext, ViewRequestStatus, profilePermissionService } from '../services/profilePermissionService';
 import {
   PROFILE_REQUEST_CONTEXT_KEYS,
@@ -677,6 +678,7 @@ export default function ProfileRequestsScreen() {
   };
 
   const handleViber = async (phoneRaw?: string) => {
+    if (!auth.currentUser?.uid) return;
     await safeOpenViber(phoneRaw, language);
   };
 
