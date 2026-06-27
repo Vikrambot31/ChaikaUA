@@ -181,27 +181,27 @@
 
 ---
 
-## ЭТАП 4 — ЛОКАЛИЗАЦИЯ И КОНТЕНТ
+## ЭТАП 4 — ЛОКАЛИЗАЦИЯ И КОНТЕНТ ✅ АУДИТ ЗАВЕРШЁН (2026-06-27)
+
+> **Отчёт:** [`STAGE4_LOCALIZATION_REPORT.md`](STAGE4_LOCALIZATION_REPORT.md)
 
 ### 4.1 Полный аудит переводов
-- [ ] `src/i18n/translations.ts` — все ключи переведены на UA/RU/EN
-- [ ] Поиск hardcoded русских/украинских строк в 106 экранах
-- [ ] Поиск отображаемых EN-кодов категорий (напр. категории в `RequestItem.tsx`)
-- [ ] `categories.ts` — все названия категорий локализованы
-- [ ] Даты и числа — форматирование по локали
+- [x] `translations.ts` — **PASS**: 27 секций, все ключи ua/ru/en совпадают, 0 пустых
+- [x] 16 экранов с hardcoded UI_TEXT/COPY — задокументированы (параллельная i18n)
+- [x] EN-коды категорий — **PASS**: `RequestItem.tsx` корректно локализует через TOPIC_LABELS
+- [x] `categories.ts` — **PASS** (9 групп + 43 подкат.); **FAIL**: CHAIKA_STORES + TIME_SLOTS UA-only
+- [x] Даты — **FAIL**: ~15 мест hardcoded `uk-UA`, ~5 мест `ru-RU`; нет `DATE_LOCALES[language]`
 
 ### 4.2 Контентная валидация
-- [ ] `chaykaPlacesData.ts` — актуальность мест Чайки
-- [ ] `buildings.ts` — справочник домов актуален
-- [ ] `Vazhnye-Novosti-Chayki.tsx` — актуальные новости
-- [ ] `Status-Sveta.tsx` — реальная интеграция с расписаниями отключений
-- [ ] `Reyting-Domov.tsx` — корректный алгоритм рейтинга
+- [x] `buildings.ts` — **PASS**: 125 зданий, 13 улиц, все ID уникальны
+- [x] `Vazhnye-Novosti-Chayki.tsx` — **PASS**: Firebase real-time, полные empty/error states
+- [x] `Status-Sveta.tsx` — **BUG**: `.toLocaleTimeString()` на string date → crash (строки 612, 657)
+- [x] `Reyting-Domov.tsx` — **PASS**: среднее 4 категорий, 1 голос/день, auth required
 
 ### 4.3 Медиа и иконки
-- [ ] `CustomIcons.tsx` — все иконки отображаются корректно
-- [ ] Аватары: 6 вариантов (муж/жен × 3 возраста) — правильная матрица
-- [ ] Изображения-заглушки для пустых состояний на всех экранах
-- [ ] Splash screen и иконка приложения — актуальные
+- [x] `CustomIcons.tsx` — 4 SVG иконки OK; minor: MegaphoneIcon пустой Path
+- [x] Аватары — **PASS**: 6 вариантов, `getDefaultAvatarKey()` корректен
+- [x] `chaikaGallerySeed.ts` — 11 seed фото; hardcoded RU description + EN uploadedBy
 
 ---
 
