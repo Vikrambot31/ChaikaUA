@@ -66,4 +66,42 @@
 
 ---
 
-*Аудит и фиксы: 2026-06-27*
+---
+
+## AUTH FLOW АУДИТ — ДОПОЛНИТЕЛЬНЫЕ НАХОДКИ
+
+### HIGH severity
+
+| # | Файл:строка | Проблема |
+|---|---|---|
+| 1 | `useFullRegistration.ts:170-187` | `dbSet()` перезаписывает весь user node — при completing existing account уничтожает данные social-login |
+| 2 | `ProfileSetupScreen.tsx:259` | Фото при настройке профиля получает `moderationStatus: 'approved'` — обход модерации |
+
+### MEDIUM severity
+
+| # | Файл:строка | Проблема |
+|---|---|---|
+| 3 | `Registraciya-Polnaya.tsx:152` | Referrer phone validation: `normalizePhoneText` вместо `normalizeUkrainianPhoneStrict` |
+| 4 | `useFullRegistration.ts:186` | referrerPhone сохраняется raw (не нормализован) — будущие lookup сломаны |
+| 5 | `StartAvatarPickerScreen.tsx:77-103` | Нет catch в `confirm()` — success modal при ошибке сети |
+| 6 | `firebase-auth-session.ts:194` | `isModeratorByEmail` — проверка только email, нет RTDB role lookup |
+
+### LOW severity
+
+| # | Файл:строка | Проблема |
+|---|---|---|
+| 7 | `ProfileSetupScreen.tsx:427` | Continue button tappable при невалидной форме (только визуальный disable) |
+| 8 | `Registraciya-Polnaya.tsx:317` | Password hint не упоминает требования digit+special char |
+| 9 | `firebase-auth-session.ts:29` | Stale bootstrap promise после logout — нет session cleanup |
+| 10 | `Vkhod.tsx:289` | `redirectTo as never` — unsafe cast, crash при несуществующем экране |
+
+### Регистрация — подтверждено работающим
+- HIBP check: блокирует скомпрометированные пароли (graceful degradation если HIBP offline)
+- Phone: только `+380` формат (UA only, by design)
+- Referral: двойной lookup (normalized + raw), блокирует если не найден
+- Rate limiting: 5 попыток → 15min lock (client) + Cloud Function (server)
+- Auth providers: Google, Facebook, Apple, Email — все с error mapping
+
+---
+
+*Аудит и фиксы: 2026-06-27 | Дополнено: auth flow audit*
