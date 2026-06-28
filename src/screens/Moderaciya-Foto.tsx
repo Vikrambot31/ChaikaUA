@@ -26,6 +26,8 @@ import { lostFoundService, LostFoundItem } from '../services/lostFoundService';
 import { moderateOsbbNews, OsbbNewsItem } from '../services/osbbNews';
 import { SCREEN_THEME } from '../utils/screenTheme';
 import { logClientError } from '../utils/errorLogger';
+import { getRequestTopicLabel } from '../data/categories';
+import { getBuildingById, getFullAddress } from '../data/buildings';
 import { useAppTheme } from '../hooks/useAppTheme';
 
 type Tab = 'requests' | 'photos' | 'buysell' | 'contacts' | 'jobs' | 'lostfound' | 'osbbnews';
@@ -139,7 +141,7 @@ const isPublicGalleryPhoto = (photo: CommunityPhoto): boolean => {
 
 const PhotoModerationScreen: React.FC = () => {
   const { colors } = useAppTheme();
-  const language = useSelector((state: RootState) => (state.language?.current ?? 'ru') as Lang);
+  const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
   const text = T[language];
 
   const [activeTab, setActiveTab] = useState<Tab>('requests');
@@ -494,7 +496,7 @@ const PhotoModerationScreen: React.FC = () => {
         <View style={styles.card}>
           <Text style={styles.cardTitle} numberOfLines={3}>{item.text || '—'}</Text>
           <Text style={styles.cardMeta}>{text.author}: {item.name || '—'}</Text>
-          {item.category ? <Text style={styles.cardMeta}>{text.category}: {item.category}</Text> : null}
+          {item.category ? <Text style={styles.cardMeta}>{text.category}: {getRequestTopicLabel({ category: item.category }, language)}</Text> : null}
           {item.phone ? <Text style={styles.cardMeta}>{text.phone}: {item.phone}</Text> : null}
           <Text style={styles.cardMeta}>{text.status}: {statusLabel(item.status)}</Text>
           <View style={styles.actions}>
@@ -576,7 +578,7 @@ const PhotoModerationScreen: React.FC = () => {
       renderItem={({ item }) => (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>{item.itemName || '—'}</Text>
-          <Text style={styles.cardMeta}>{text.category}: {item.category}</Text>
+          <Text style={styles.cardMeta}>{text.category}: {getRequestTopicLabel({ category: item.category }, language)}</Text>
           {item.price ? <Text style={styles.cardMeta}>{text.price}: {item.price}</Text> : null}
           {item.phone ? <Text style={styles.cardMeta}>{text.phone}: {item.phone}</Text> : null}
           <Text style={styles.cardMeta}>{text.status}: {statusLabel(item.moderationStatus)}</Text>
@@ -604,7 +606,7 @@ const PhotoModerationScreen: React.FC = () => {
       renderItem={({ item }) => (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>{item.itemName || '—'}</Text>
-          <Text style={styles.cardMeta}>{text.category}: {item.category}</Text>
+          <Text style={styles.cardMeta}>{text.category}: {getRequestTopicLabel({ category: item.category }, language)}</Text>
           {item.price ? <Text style={styles.cardMeta}>{text.age}: {item.price}</Text> : null}
           {item.phone ? <Text style={styles.cardMeta}>{text.phone}: {item.phone}</Text> : null}
           <Text style={styles.cardMeta}>{text.status}: {statusLabel(item.moderationStatus)}</Text>
@@ -660,7 +662,7 @@ const PhotoModerationScreen: React.FC = () => {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>{item.name || '—'}</Text>
           <Text style={styles.cardMeta}>{text.type}: {item.type}</Text>
-          {item.category ? <Text style={styles.cardMeta}>{text.category}: {item.category}</Text> : null}
+          {item.category ? <Text style={styles.cardMeta}>{text.category}: {getRequestTopicLabel({ category: item.category }, language)}</Text> : null}
           {item.phone ? <Text style={styles.cardMeta}>{text.phone}: {item.phone}</Text> : null}
           <Text style={styles.cardMeta}>{text.status}: {statusLabel(item.moderationStatus)}</Text>
           <View style={styles.actions}>
@@ -687,7 +689,7 @@ const PhotoModerationScreen: React.FC = () => {
       renderItem={({ item }) => (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>{item.title || '—'}</Text>
-          <Text style={styles.cardMeta}>{text.category}: {item.buildingId}</Text>
+          <Text style={styles.cardMeta}>{text.category}: {(() => { const b = getBuildingById(item.buildingId); return b ? getFullAddress(b) : item.buildingId; })()}</Text>
           <Text style={styles.cardMeta}>{text.status}: {statusLabel(item.moderationStatus)}</Text>
           <View style={styles.actions}>
             <ModerationBtns

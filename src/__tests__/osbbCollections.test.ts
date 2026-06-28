@@ -1,3 +1,25 @@
+jest.mock('../firebase-core', () => ({
+  database: {},
+  auth: {},
+}));
+
+jest.mock('../firebase-auth-session', () => ({
+  getCurrentUser: jest.fn(() => ({ uid: 'test-user' })),
+}));
+
+jest.mock('firebase/database', () => ({
+  ref: jest.fn(),
+  get: jest.fn(),
+  set: jest.fn(),
+  push: jest.fn(),
+  onValue: jest.fn(),
+  update: jest.fn(),
+  remove: jest.fn(),
+  query: jest.fn(),
+  orderByChild: jest.fn(),
+  equalTo: jest.fn(),
+}));
+
 import { calculateOsbbCollectionTotals } from '../services/osbbCollections';
 
 describe('OSBB finance calculations', () => {

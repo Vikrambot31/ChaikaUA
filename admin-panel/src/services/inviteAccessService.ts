@@ -320,17 +320,25 @@ export const moderateInviteRequest = async (
   await callable({ requestId, status, reason: reason.trim() || undefined });
 };
 
+const MAX_TEMPORARY_ACCESS_HOURS = 720; // 30 days
+
 export const grantTemporaryAccess = async (
   uid: string,
   durationHours: number,
   reason: string,
   requestId?: string,
 ): Promise<void> => {
+  if (!Number.isFinite(durationHours) || durationHours < 1 || durationHours > MAX_TEMPORARY_ACCESS_HOURS) {
+    throw new Error(`Тривалість повинна бути від 1 до ${MAX_TEMPORARY_ACCESS_HOURS} годин.`);
+  }
+  const trimmedReason = reason.trim();
+  if (!trimmedReason) throw new Error('Причина обов\u0027язкова.');
+
   if (LOCAL_MODE) {
     await fetch(`${LOCAL_API}/temporary_access`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uid, durationHours, reason: reason.trim(), requestId, grantedAt: Date.now() }),
+      body: JSON.stringify({ uid, durationHours, reason: trimmedReason, requestId, grantedAt: Date.now() }),
     });
     return;
   }
@@ -338,5 +346,5 @@ export const grantTemporaryAccess = async (
     { uid: string; durationHours: number; reason: string; requestId?: string },
     CallableResult
   >(functions!, 'grantTemporaryAccess');
-  await callable({ uid, durationHours, reason: reason.trim(), requestId });
+  await callable({ uid, durationHours, reason: trimmedReason, requestId });
 };

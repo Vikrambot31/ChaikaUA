@@ -1,7 +1,17 @@
 ﻿import React, { useMemo, useRef, useState } from 'react';
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSelector } from 'react-redux';
 import { SCREEN_W as width } from '../utils/webDimensions';
+import type { RootState } from '../redux/store';
+
+type Lang = 'ua' | 'ru' | 'en';
+
+const TEXT = {
+  ua: { next: 'Далі', continue: 'Продовжити', hint: 'Гортайте вліво, щоб переглянути всі слайди' },
+  ru: { next: 'Далее', continue: 'Продолжить', hint: 'Листайте влево, чтобы просмотреть все слайды' },
+  en: { next: 'Next', continue: 'Continue', hint: 'Swipe left to see all slides' },
+} as const;
 
 type InviteAccessIntroSlidesProps = {
   onDone: () => void;
@@ -14,11 +24,13 @@ const SLIDES = [
 ];
 
 export default function InviteAccessIntroSlides({ onDone }: InviteAccessIntroSlidesProps) {
+  const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
+  const t = TEXT[language];
   const [index, setIndex] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
   const isLast = index === SLIDES.length - 1;
 
-  const buttonLabel = useMemo(() => (isLast ? 'Продовжити' : 'Далі'), [isLast]);
+  const buttonLabel = useMemo(() => (isLast ? t.continue : t.next), [isLast, t]);
 
   const handleNext = () => {
     if (isLast) {
@@ -56,7 +68,7 @@ export default function InviteAccessIntroSlides({ onDone }: InviteAccessIntroSli
               <View key={dotIndex} style={[styles.dot, dotIndex === index && styles.dotActive]} />
             ))}
           </View>
-          <Text style={styles.hint}>Гортайте вліво, щоб переглянути всі слайди</Text>
+          <Text style={styles.hint}>{t.hint}</Text>
           <TouchableOpacity style={styles.button} onPress={handleNext} activeOpacity={0.9}>
             <Text style={styles.buttonText}>{buttonLabel}</Text>
           </TouchableOpacity>

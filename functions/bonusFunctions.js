@@ -267,8 +267,8 @@ const awardTrustBonus = async (db, uid, category, points, idempotencyKey, txMeta
   await bonusRef.transaction((current) => {
     const d = current && typeof current === 'object' ? { ...current } : {};
 
-    // Weekly limit check
-    const limitCheck = checkWeeklyLimit(d, category, points, now, isNewcomer);
+    // Weekly limit check (use multiplied points to prevent premium users exceeding limits)
+    const limitCheck = checkWeeklyLimit(d, category, multipliedPoints, now, isNewcomer);
     if (!limitCheck.allowed) {
       result = { awarded: false, reason: limitCheck.reason, newTotal: Number(d.total || 0) };
       return current; // Abort transaction
@@ -502,6 +502,7 @@ const createBonusFunctions = ({
 
   const assertAdminOrPrimaryOwner = async (context) => {
     if (isPrimaryServiceOwnerContext(context)) return;
+    if (!context.auth?.uid) throw new functions.https.HttpsError('unauthenticated', 'auth_required');
     const role = await getRoleForUid(context.auth.uid);
     if (role !== 'admin') throw new functions.https.HttpsError('permission-denied', 'admin_only');
   };

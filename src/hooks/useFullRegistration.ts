@@ -159,7 +159,7 @@ export const useFullRegistration = ({
 
       if (!authUser.photoURL && tempProfile?.customAvatarUri) {
         try {
-          const uploaded = await uploadProfilePhoto(tempProfile.customAvatarUri, { moderationStatus: 'approved' });
+          const uploaded = await uploadProfilePhoto(tempProfile.customAvatarUri, { moderationStatus: 'pending' });
           avatarUri = uploaded.url;
           avatarKey = '';
         } catch {

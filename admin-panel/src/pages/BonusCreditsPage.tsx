@@ -114,14 +114,17 @@ function UsersTab() {
   };
 
   const handleGrantCredits = async (uid: string) => {
-    const amountStr = window.prompt('Сума кредитів для поповнення:');
+    const amountStr = window.prompt('Сума кредитів для поповнення (макс 10 000):');
     if (!amountStr) return;
     const amount = Number(amountStr);
-    if (isNaN(amount) || amount <= 0) { alert('Невірна сума'); return; }
-    const reason = window.prompt('Причина:') || '';
+    if (!Number.isFinite(amount) || amount <= 0) { alert('Невірна сума: має бути додатне число'); return; }
+    if (amount > 10000) { alert('Максимальна сума: 10 000'); return; }
+    const reason = window.prompt('Причина:');
+    if (!reason?.trim()) { alert('Причина обов\u0027язкова'); return; }
+    if (!window.confirm(`Поповнити ${amount} кредитів для ${uid}?`)) return;
     setActionLoading(true);
     try {
-      await grantPromoCredits(uid, amount, reason);
+      await grantPromoCredits(uid, amount, reason.trim());
       alert('Кредити поповнено');
     } catch (e) {
       alert('Помилка: ' + (e instanceof Error ? e.message : String(e)));
@@ -131,14 +134,17 @@ function UsersTab() {
   };
 
   const handleAdjustBonuses = async (uid: string) => {
-    const amountStr = window.prompt('Коригування бонусів (може бути від\'ємним):');
+    const amountStr = window.prompt('Коригування бонусів (може бути від\'ємним, макс ±50 000):');
     if (!amountStr) return;
     const amount = Number(amountStr);
-    if (isNaN(amount)) { alert('Невірна сума'); return; }
-    const reason = window.prompt('Причина:') || '';
+    if (!Number.isFinite(amount) || amount === 0) { alert('Невірна сума: має бути числом, не нулем'); return; }
+    if (Math.abs(amount) > 50000) { alert('Максимальна сума: ±50 000'); return; }
+    const reason = window.prompt('Причина:');
+    if (!reason?.trim()) { alert('Причина обов\u0027язкова'); return; }
+    if (!window.confirm(`Коригувати бонуси на ${amount} для ${uid}?`)) return;
     setActionLoading(true);
     try {
-      await adjustTrustBonuses(uid, amount, reason);
+      await adjustTrustBonuses(uid, amount, reason.trim());
       alert('Бонуси скориговано');
     } catch (e) {
       alert('Помилка: ' + (e instanceof Error ? e.message : String(e)));
@@ -150,9 +156,11 @@ function UsersTab() {
   const handleBlock = async (uid: string) => {
     const reason = window.prompt('Причина блокування:');
     if (reason === null) return;
+    if (!reason.trim()) { alert('Причина обов\u0027язкова'); return; }
+    if (!window.confirm(`Заблокувати користувача ${uid}?`)) return;
     setActionLoading(true);
     try {
-      await blockUser(uid, true, reason);
+      await blockUser(uid, true, reason.trim());
       alert('Користувача заблоковано');
     } catch (e) {
       alert('Помилка: ' + (e instanceof Error ? e.message : String(e)));

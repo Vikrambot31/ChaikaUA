@@ -38,7 +38,7 @@ export const addWeightedRating = (current: RatingAggregate, value: number): Rati
 };
 
 export const replaceWeightedRating = (current: RatingAggregate, nextValue: number, previousValue?: number): RatingAggregate => {
-  if (!previousValue || previousValue < 1 || previousValue > 5) {
+  if (previousValue == null || previousValue < 1 || previousValue > 5) {
     return addWeightedRating(current, nextValue);
   }
 

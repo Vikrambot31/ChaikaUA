@@ -189,8 +189,7 @@ export default function NotificationSettingsScreen() {
   const requestPermission = useCallback(async () => {
     try {
       const token = await fcmAPI.registerToken();
-      const { status } = await Notifications.requestPermissionsAsync();
-      const granted = status === 'granted';
+      const granted = !!token;
 
       setPermissionGranted(granted);
 

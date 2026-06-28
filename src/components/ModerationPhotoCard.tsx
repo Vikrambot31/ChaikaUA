@@ -319,16 +319,16 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   modBtnApprove: {
-    backgroundColor: '#7d0e59',
+    backgroundColor: '#2e7d32',
   },
   modBtnDetails: {
-    backgroundColor: '#7d0e59',
+    backgroundColor: '#5c6bc0',
   },
   modBtnReject: {
-    backgroundColor: '#7d0e59',
+    backgroundColor: '#e65100',
   },
   modBtnDelete: {
-    backgroundColor: '#7d0e59',
+    backgroundColor: '#c62828',
   },
   modBtnText: {
     fontSize: 12,

@@ -112,13 +112,13 @@ export default function FirstLaunchOnboarding({ onDone }: FirstLaunchOnboardingP
             setIndex(nextIndex);
           }}
         >
-          {SLIDES.map((slide) => (
+          {SLIDES.map((slide, slideIndex) => (
             <View key={slide.key} style={styles.slide}>
               <View style={styles.imageCard}>
                 <Image source={slide.image} style={styles.image} resizeMode="contain" />
               </View>
               <View style={styles.captionChip}>
-                <Text style={styles.captionText}>{captions[language][SLIDES.findIndex((item) => item.key === slide.key)]}</Text>
+                <Text style={styles.captionText}>{captions[language][slideIndex]}</Text>
               </View>
             </View>
           ))}

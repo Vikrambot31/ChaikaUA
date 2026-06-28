@@ -82,17 +82,24 @@ const formatDate = (timestamp: number, language: AppLanguage) => {
   return new Date(timestamp).toLocaleDateString(DATE_LOCALES[language]);
 };
 
-const timeAgo = (timestamp: number): string => {
+const TIME_AGO_TEXT = {
+  ua: { justNow: 'тільки що', min: 'хв тому', hour: 'год тому', day: 'дн тому' },
+  ru: { justNow: 'только что', min: 'мин назад', hour: 'ч назад', day: 'дн назад' },
+  en: { justNow: 'just now', min: 'min ago', hour: 'h ago', day: 'd ago' },
+} as const;
+
+const timeAgo = (timestamp: number, language: AppLanguage = 'ua'): string => {
   if (!timestamp) return '';
+  const ta = TIME_AGO_TEXT[language];
   const diff = Date.now() - timestamp;
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'тільки що';
-  if (mins < 60) return `${mins} хв тому`;
+  if (mins < 1) return ta.justNow;
+  if (mins < 60) return `${mins} ${ta.min}`;
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours} год тому`;
+  if (hours < 24) return `${hours} ${ta.hour}`;
   const days = Math.floor(hours / 24);
-  if (days < 7) return `${days} дн тому`;
-  return formatDate(timestamp, 'ua');
+  if (days < 7) return `${days} ${ta.day}`;
+  return formatDate(timestamp, language);
 };
 
 const CATEGORY_SOURCE_KEYS = ['request_closed', 'request_respond', 'confirm_helper', 'gratitude'] as const;
@@ -326,7 +333,7 @@ const BonusWalletScreen: React.FC = () => {
                     <View style={styles.listCopy}>
                       <Text style={styles.listTitle}>{getPromotionTitle(item)}</Text>
                       <Text style={styles.listMeta}>
-                        {item.pointsSpent} {item.currency} · {t.bonus.until} {formatDate(item.expiresAt, language)} · {getStatusLabel(item.moderationStatus, t.bonus)}
+                        {item.pointsSpent} {item.currency || 'pts'} · {t.bonus.until} {formatDate(item.expiresAt, language)} · {getStatusLabel(item.moderationStatus, t.bonus)}
                       </Text>
                     </View>
                   </View>
@@ -403,7 +410,7 @@ const BonusWalletScreen: React.FC = () => {
                           <Text style={styles.historySource} numberOfLines={1}>
                             {getTransactionSource(item, t.bonus, language)}
                           </Text>
-                          <Text style={styles.historyTime}>{timeAgo(item.createdAt)}</Text>
+                          <Text style={styles.historyTime}>{timeAgo(item.createdAt, language)}</Text>
                         </View>
                       </View>
                     </View>

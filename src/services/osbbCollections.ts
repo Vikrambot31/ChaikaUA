@@ -1,5 +1,5 @@
 import { ref, push, onValue, query, orderByChild, limitToLast, runTransaction } from 'firebase/database';
-import { database } from '../firebase-core';
+import { database, auth } from '../firebase-core';
 import { ModerationStatus, createPendingModeration } from '../utils/moderation';
 import { sanitizeStoredText } from '../utils/textUtils';
 
@@ -189,6 +189,7 @@ export const recordCollectionPayment = async (
     payerName: sanitizeStoredText(payerName),
     amount,
     paidAt: new Date().toISOString(),
+    uid: auth.currentUser?.uid ?? '',
   });
 };
 

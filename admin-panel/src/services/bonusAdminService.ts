@@ -182,13 +182,33 @@ export const subscribeToPromotions = (
 
 // ── Admin actions (Cloud Functions) ──
 
+const MAX_SINGLE_GRANT = 10000;
+const MAX_SINGLE_ADJUST = 50000;
+const MAX_REASON_LENGTH = 500;
+
+const validateBonusAmount = (amount: number, max: number): void => {
+  if (!Number.isFinite(amount) || amount === 0) {
+    throw new Error('Сума повинна бути числом і не дорівнювати нулю.');
+  }
+  if (Math.abs(amount) > max) {
+    throw new Error(`Сума не може перевищувати ${max}.`);
+  }
+};
+
+const sanitizeReason = (reason: string): string => {
+  const trimmed = reason.trim();
+  if (!trimmed) throw new Error('Причина обов\u0027язкова.');
+  return trimmed.slice(0, MAX_REASON_LENGTH);
+};
+
 export const grantPromoCredits = async (
   targetUid: string,
   amount: number,
   reason: string,
 ): Promise<void> => {
+  validateBonusAmount(amount, MAX_SINGLE_GRANT);
   const fn = httpsCallable(functions, 'adminGrantPromoCredits');
-  await fn({ targetUid, amount, reason });
+  await fn({ targetUid, amount, reason: sanitizeReason(reason) });
 };
 
 export const adjustPromoCredits = async (
@@ -196,8 +216,9 @@ export const adjustPromoCredits = async (
   amount: number,
   reason: string,
 ): Promise<void> => {
+  validateBonusAmount(amount, MAX_SINGLE_ADJUST);
   const fn = httpsCallable(functions, 'adminAdjustPromoCredits');
-  await fn({ targetUid, amount, reason });
+  await fn({ targetUid, amount, reason: sanitizeReason(reason) });
 };
 
 export const adjustTrustBonuses = async (
@@ -205,8 +226,9 @@ export const adjustTrustBonuses = async (
   amount: number,
   reason: string,
 ): Promise<void> => {
+  validateBonusAmount(amount, MAX_SINGLE_ADJUST);
   const fn = httpsCallable(functions, 'adminAdjustTrustBonuses');
-  await fn({ targetUid, amount, reason });
+  await fn({ targetUid, amount, reason: sanitizeReason(reason) });
 };
 
 export const blockUser = async (

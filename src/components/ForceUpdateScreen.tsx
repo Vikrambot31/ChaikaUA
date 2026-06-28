@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Image, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, Linking, Platform, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { SCREEN_THEME } from '../utils/screenTheme';
@@ -85,6 +85,17 @@ const ForceUpdateScreen: React.FC<ForceUpdateScreenProps> = ({ result, onRetry }
     requiredVersion === result.currentVersion ? getNextPatchVersion(result.currentVersion) : requiredVersion;
 
   const updateApp = async () => {
+    if (Platform.OS === 'ios') {
+      const iosUrl = config?.iosUrl?.trim();
+      if (iosUrl) { void Linking.openURL(iosUrl); }
+      return;
+    }
+    if (Platform.OS === 'web') {
+      const webUrl = config?.webUrl?.trim() || config?.landingUrl?.trim();
+      if (webUrl) { void Linking.openURL(webUrl); }
+      return;
+    }
+
     const androidUrl = config?.androidUrl?.trim();
     if (!androidUrl) {
       setStatus('error');

@@ -58,7 +58,7 @@ export const reportBlockService = {
       [`reports/${reportRef.key}`]: {
         reporterId: user.uid,
         reportedUserId: blockedUserId,
-        reportedListingId: blockedUserId,
+        reportedListingId: null,
         reason: 'other',
         description: reason,
         source: 'profile_block',

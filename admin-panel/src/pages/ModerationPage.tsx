@@ -782,7 +782,7 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
                           {item.userName || '-'}
                         </strong>
                         {isUserInYellowList(item.userId) ? (
-                          <span className="ylBadge" title={`В жёлтом списке до ${new Date(yellowList.get(item.userId)!.bannedUntil).toLocaleDateString()}`}>&#128683; ЗАБАНЕН</span>
+                          <span className="ylBadge" title={`В жёлтом списке до ${new Date(yellowList.get(item.userId)?.bannedUntil ?? 0).toLocaleDateString()}`}>&#128683; ЗАБАНЕН</span>
                         ) : getUserViolationLevel(item.userId) === 2 ? (
                           <>
                             <span className="ylSuspectBadge">ПОДОЗРЕНИЕ</span>
@@ -865,7 +865,7 @@ export const ModerationPage = ({ user, initialStatusFilter = 'pending', archiveM
                     {item.userId && !TEST_BOT_UIDS.has(item.userId) ? (
                       isUserInYellowList(item.userId) ? (
                         <>
-                          <button type="button" className="ylBtnBanned" disabled title={`В жёлтом списке до ${new Date(yellowList.get(item.userId)!.bannedUntil).toLocaleDateString()}`}>
+                          <button type="button" className="ylBtnBanned" disabled title={`В жёлтом списке до ${new Date(yellowList.get(item.userId)?.bannedUntil ?? 0).toLocaleDateString()}`}>
                             &#128683; ЗАБАНЕН
                           </button>
                           <button

@@ -256,7 +256,7 @@ export default function ProfileSetupScreen() {
           Alert.alert(text.missingTitle, text.loginRequiredForPhoto);
           return;
         }
-        const uploaded = await uploadProfilePhoto(customAvatarUri, { moderationStatus: 'approved' });
+        const uploaded = await uploadProfilePhoto(customAvatarUri, { moderationStatus: 'pending' });
         nextPhotoURL = uploaded.url;
         nextPhotoURLs = [uploaded.url];
         nextStartAvatarKey = '';

@@ -1,5 +1,5 @@
 # ГЛОБАЛЬНАЯ ПОЛИРОВКА — ТОЧКА ПРОДОЛЖЕНИЯ
-## Последнее обновление: 2026-06-27
+## Последнее обновление: 2026-06-28 (Stages 10-11 завершены)
 
 ---
 
@@ -19,12 +19,12 @@
 | 3. UI/UX полировка (аудит) | ✅ АУДИТ ГОТОВ | `0a2349a` | STAGE3_UX_AUDIT_REPORT.md |
 | 4. Локализация и контент | ✅ АУДИТ ГОТОВ | `23076f5` | STAGE4_LOCALIZATION_REPORT.md |
 | 5. Производительность + P0 фиксы | ✅ ЗАВЕРШЁН | — | STAGE5_PERFORMANCE_REPORT.md |
-| **6. Серверная часть Firebase** | ⬅️ **СЛЕДУЮЩИЙ** | — | — |
-| 7. Модерация и контент | ⏳ | — | — |
-| 8. Уведомления и онбординг | ⏳ | — | — |
-| 9. Специфические фичи | ⏳ | — | — |
-| 10. Admin Panel | ⏳ | — | — |
-| 11. Тестирование | ⏳ | — | — |
+| 6. Firebase Rules + Moderation bypass | ✅ ЗАВЕРШЁН + 7 code fixes | — | STAGE6_FIREBASE_RULES_REPORT.md |
+| 7. Модерация и контент | ✅ ЗАВЕРШЁН + 6 code fixes | — | STAGE7_MODERATION_REPORT.md |
+| 8. Уведомления и онбординг | ✅ ЗАВЕРШЁН + 5 code fixes | — | STAGE8_NOTIFICATIONS_ONBOARDING_REPORT.md |
+| 9. Специфические фичи | ✅ ЗАВЕРШЁН + 6 code fixes | — | STAGE9_FEATURES_REPORT.md |
+| 10. Admin Panel | ✅ ЗАВЕРШЁН + 8 code fixes | — | STAGE10_ADMIN_PANEL_REPORT.md |
+| 11. Тестирование (Unit) | ✅ ЗАВЕРШЁН + 7 fixes + 4 new | — | STAGE11_TESTING_REPORT.md |
 | 12. Сборка и релиз | ⏳ | — | — |
 | 13. Документация | ⏳ | — | — |
 
@@ -55,16 +55,16 @@ last commit: 23076f5
 | # | Проблема | Файл | Статус |
 |---|---|---|---|
 | 1 | ~~`dbSet()` уничтожает existing user data~~ | useFullRegistration.ts | ✅ FIXED (Stage 5) |
-| 2 | Profile photo auto-approved (bypasses moderation) | ProfileSetupScreen.tsx:259 | ⏳ Stage 7 |
+| 2 | ~~Profile photo auto-approved (bypasses moderation)~~ | ProfileSetupScreen.tsx:259 | ✅ FIXED (Stage 6) |
 | 3 | ~~`reduce()` crash на empty array~~ | OSBB-Golosovanie.tsx:143 | ✅ FIXED (Stage 5) |
 | 4 | ~~`.toLocaleTimeString()` на string → crash~~ | Status-Sveta.tsx:612,657 | ✅ FIXED (Stage 5) |
-| 5 | osbb_collection_payments — любой юзер может писать | firebase.rules.json | ⏳ Stage 6 |
+| 5 | ~~osbb_collection_payments — любой юзер может писать~~ | firebase.rules.json | ✅ FIXED (Stage 6) |
 
 ### P1 — Высокий приоритет:
 | # | Проблема | Файл |
 |---|---|---|
-| 6 | Raw EN category в модерации | Moderaciya-Foto.tsx:497 |
-| 7 | Raw buildingId в модерации | Moderaciya-Foto.tsx:690 |
+| 6 | ~~Raw EN category в модерации~~ | Moderaciya-Foto.tsx:497 | ✅ FIXED (Stage 7) |
+| 7 | ~~Raw buildingId в модерации~~ | Moderaciya-Foto.tsx:690 | ✅ FIXED (Stage 7) |
 | 8 | Dark mode отсутствует | Mestsa-i-Lyudi-Hub.tsx |
 | 9 | ProfileCompletenessBadge считает ContactListing, не профиль | ProfileCompletenessBadge.tsx |
 | 10 | 44/45 Redux selectors без мемоизации | selectors.ts |

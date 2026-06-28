@@ -397,11 +397,21 @@ type EditPayload = {
   aiSuggestionId?: string;
 };
 
+const EDITABLE_FIELDS = new Set([
+  'title', 'subtitle', 'description', 'text', 'name', 'address',
+  'phone', 'category', 'price', 'location', 'details', 'comment',
+  'reason', 'moderationReason', 'tags',
+]);
+
 export const editModerationItem = async (
   item: ModerationItem,
   edits: Record<string, string>,
   options?: { aiSuggestionId?: string },
 ): Promise<EditResult> => {
+  const disallowedFields = Object.keys(edits).filter((f) => !EDITABLE_FIELDS.has(f));
+  if (disallowedFields.length > 0) {
+    throw new Error(`Заборонені поля для редагування: ${disallowedFields.join(', ')}`);
+  }
   if (LOCAL_MODE) {
     await localPatch(`/moderation_items/${item.id}`, {
       ...edits,

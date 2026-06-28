@@ -13,6 +13,20 @@ jest.mock('firebase/database', () => ({
   runTransaction: (...args: unknown[]) => runTransactionMock(...args),
 }));
 
+jest.mock('../firebase-core', () => ({
+  database: {},
+  auth: {},
+}));
+
+jest.mock('../firebase-auth-session', () => ({
+  getCurrentUser: jest.fn(() => ({ uid: 'test-user' })),
+  hasPrimaryServiceAccess: jest.fn(() => false),
+}));
+
+jest.mock('../services/deviceAuth', () => ({
+  getOrCreateDeviceId: jest.fn(() => Promise.resolve('test-device')),
+}));
+
 import { updateOsbbNews } from '../services/osbbNews';
 
 describe('osbbNews update flow', () => {

@@ -255,7 +255,7 @@
       ".write": "auth != null && auth.token.admin === true",
       "app_control": {
         "current": {
-          ".read": true
+          ".read": "auth != null"
         }
       }
     },
@@ -333,7 +333,10 @@
     "profile_photos": {
       ".read": "auth != null",
       "$uid": {
-        ".write": "auth != null && auth.uid === $uid"
+        ".write": "auth != null && auth.uid === $uid",
+        "$photoId": {
+          ".validate": "!newData.child('moderationStatus').exists() || (newData.child('moderationStatus').val() !== 'approved' && newData.child('moderationStatus').val() !== 'rejected') || auth.token.admin === true || auth.token.moderator === true"
+        }
       }
     },
 
@@ -398,9 +401,9 @@
       ".read": "auth != null",
       "$buildingId": {
         "$collectionId": {
-          ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous'",
+          ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && (auth.token.admin === true || auth.token.moderator === true || root.child('osbb_members').child($buildingId).child(auth.uid).child('status').val() === 'approved')",
           "$paymentId": {
-            ".validate": "newData.hasChildren(['payerName', 'amount', 'paidAt']) && newData.child('payerName').isString() && newData.child('amount').isNumber() && newData.child('amount').val() > 0 && newData.child('paidAt').isString()"
+            ".validate": "newData.hasChildren(['payerName', 'amount', 'paidAt', 'uid']) && newData.child('payerName').isString() && newData.child('amount').isNumber() && newData.child('amount').val() > 0 && newData.child('paidAt').isString() && newData.child('uid').val() === auth.uid"
           }
         }
       }
@@ -619,7 +622,7 @@
       "close_request": {
         "$requestId": {
           ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && !data.exists()",
-          ".validate": "newData.hasChildren(['uid', 'requestId', 'timestamp']) && newData.child('requestId').val() === $requestId"
+          ".validate": "newData.hasChildren(['uid', 'requestId', 'timestamp']) && newData.child('requestId').val() === $requestId && newData.child('uid').val() === auth.uid && root.child('requests').child($requestId).child('userId').val() === auth.uid"
         }
       }
     },

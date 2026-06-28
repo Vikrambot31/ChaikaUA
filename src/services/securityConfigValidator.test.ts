@@ -16,12 +16,15 @@ describe('securityConfigValidator', () => {
       });
 
       expect(typeof result.app_enabled).toBe('boolean');
+      // String 'true' → invalidFallback for app_enabled = true (safe: keeps app enabled)
       expect(result.app_enabled).toBe(true);
       expect(typeof result.maintenance_mode).toBe('boolean');
+      // String 'false' → invalidFallback for maintenance_mode = false (safe: no maintenance)
       expect(result.maintenance_mode).toBe(false);
       expect(typeof result.force_update_required).toBe('boolean');
       expect(result.force_update_required).toBe(true);
-      expect(result.allow_new_devices).toBe(false);
+      // String 'true' → invalidFallback for allow_new_devices = true (permissive fallback)
+      expect(result.allow_new_devices).toBe(true);
     });
 
     it('should convert number version to string', () => {
@@ -93,7 +96,8 @@ describe('securityConfigValidator', () => {
       expect(result.isValid).toBe(true);
       expect(typeof result.config.app_enabled).toBe('boolean');
       expect(typeof result.config.maintenance_mode).toBe('boolean');
-      expect(result.config.allow_new_devices).toBe(false);
+      // String 'true' → invalidFallback = true (permissive)
+      expect(result.config.allow_new_devices).toBe(true);
     });
 
     it('should not enable privileged flags from invalid boolean strings', () => {
@@ -114,8 +118,11 @@ describe('securityConfigValidator', () => {
       expect(result.isValid).toBe(true);
       expect(result.config.app_enabled).toBe(true);
       expect(result.config.maintenance_mode).toBe(false);
+      // String 'true' → invalidFallback for force_update_required = false (safe)
       expect(result.config.force_update_required).toBe(false);
-      expect(result.config.allow_new_devices).toBe(false);
+      // String 'false' → invalidFallback for allow_new_devices = true (permissive)
+      expect(result.config.allow_new_devices).toBe(true);
+      // String 'true' → invalidFallback for beta_mode_enabled = false (safe)
       expect(result.config.beta_mode_enabled).toBe(false);
     });
 

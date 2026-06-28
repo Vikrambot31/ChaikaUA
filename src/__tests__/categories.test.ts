@@ -1,9 +1,7 @@
 import {
   SPECIAL,
   buildRequestText,
-  getStoreLabel,
   getSubcategoryLabel,
-  getTimeLabel,
 } from '../data/categories';
 
 describe('categories/buildRequestText', () => {
@@ -15,9 +13,8 @@ describe('categories/buildRequestText', () => {
       timeSlot: 'now',
     });
 
-    expect(result).toContain(getStoreLabel('atb'));
-    expect(result).toContain(getTimeLabel('now'));
-    expect(result).toMatch(/\s.\s/);
+    // buildRequestText now returns subcategory label only (store/time ignored)
+    expect(result).toBe(getSubcategoryLabel('foodsharing', SPECIAL.FOODSHARING));
   });
 
   it('formats ride sharing request text (TC-2)', () => {
@@ -29,9 +26,8 @@ describe('categories/buildRequestText', () => {
       timeSlot: 'tomorrow_morning',
     });
 
-    expect(result).toContain(destination);
-    expect(result).toContain(getTimeLabel('tomorrow_morning'));
-    expect(result).toMatch(/\s.\s/);
+    // buildRequestText now returns subcategory label only
+    expect(result).toBe(getSubcategoryLabel('transport', SPECIAL.RIDE_SHARE));
   });
 
   it('returns plain subcategory label for regular category (TC-3)', () => {

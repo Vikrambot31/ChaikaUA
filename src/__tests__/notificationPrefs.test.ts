@@ -8,6 +8,7 @@ describe('notification preferences helpers', () => {
       osbb: true,
       electricity: true,
       general: true,
+      comments: true,
     });
   });
 

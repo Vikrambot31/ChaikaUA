@@ -43,7 +43,15 @@ export const assignRole = async (
 ): Promise<ApiVoidResult> => {
   try {
     const currentUser = getCurrentUser();
-    const actorUid = currentUser?.uid ?? 'pin_operator';
+    if (!currentUser?.uid) {
+      return { success: false, error: 'auth_required' };
+    }
+    const actorUid = currentUser.uid;
+
+    const actorRole = await getUserRole(actorUid);
+    if (actorRole !== 'admin') {
+      return { success: false, error: 'admin_required' };
+    }
 
     const record: Omit<ModeratorRecord, 'uid'> = {
       role,
@@ -72,7 +80,15 @@ export const assignRole = async (
 export const revokeRole = async (targetUid: string): Promise<ApiVoidResult> => {
   try {
     const currentUser = getCurrentUser();
-    const actorUid = currentUser?.uid ?? 'pin_operator';
+    if (!currentUser?.uid) {
+      return { success: false, error: 'auth_required' };
+    }
+    const actorUid = currentUser.uid;
+
+    const actorRole = await getUserRole(actorUid);
+    if (actorRole !== 'admin') {
+      return { success: false, error: 'admin_required' };
+    }
 
     await remove(ref(database, `user_roles/${targetUid}/role`));
     void push(ref(database, 'security_logs'), {

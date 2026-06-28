@@ -15,6 +15,12 @@ jest.mock('firebase/database', () => ({
 
 jest.mock('../firebase-core', () => ({
   database: {},
+  functions: {},
+}));
+
+jest.mock('firebase/functions', () => ({
+  getFunctions: jest.fn(() => ({})),
+  httpsCallable: jest.fn(() => jest.fn().mockRejectedValue(new Error('not-deployed'))),
 }));
 
 jest.mock('../firebase-auth-session', () => ({
@@ -119,7 +125,10 @@ describe('service moderation user controls', () => {
     ]);
   });
 
-  it('marks deleted users, blocks them, and removes app profile data', async () => {
+  it('marks deleted users and removes app profile data', async () => {
+    // Mock httpsCallable to simulate cloud function not deployed (fallback path)
+    getMock.mockRejectedValueOnce(new Error('not-found'));
+
     await deleteCommunityUser({
       id: 'user-3',
       name: 'Deleted User',
@@ -135,14 +144,7 @@ describe('service moderation user controls', () => {
         deletedBy: 'owner-1',
       }),
     );
-    expect(setMock).toHaveBeenCalledWith(
-      { path: 'service_moderation/blocked_users/user-3' },
-      expect.objectContaining({
-        uid: 'user-3',
-        reason: 'Deleted in service moderation',
-        blockedBy: 'owner-1',
-      }),
-    );
+    // deleteCommunityUser no longer writes to blocked_users
     expect(removeMock).toHaveBeenCalledWith({ path: 'users/user-3' });
     expect(removeMock).toHaveBeenCalledWith({ path: 'user_roles/user-3' });
   });

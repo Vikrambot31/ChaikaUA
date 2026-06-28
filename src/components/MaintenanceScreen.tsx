@@ -42,7 +42,7 @@ type MaintenanceScreenProps = {
 
 const MaintenanceScreen: React.FC<MaintenanceScreenProps> = ({ message, onRetry }) => {
   const language = useSelector(
-    (state: RootState) => (state.language?.current ?? 'ru') as Lang,
+    (state: RootState) => (state.language?.current ?? 'ua') as Lang,
   );
   const text = COPY[language];
 

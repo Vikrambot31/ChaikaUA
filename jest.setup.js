@@ -31,6 +31,19 @@ jest.mock('./src/firebase-config', () => ({
   database: {},
 }));
 
+// Mock firebase-core (imports expo-constants which uses ESM)
+jest.mock('./src/firebase-core', () => ({
+  database: {},
+  auth: {},
+  storage: {},
+  functions: {},
+}));
+
+// Mock expo-constants (ESM module)
+jest.mock('expo-constants', () => ({
+  expoConfig: { extra: {} },
+}));
+
 // Suppress console warnings in tests
 global.console = {
   ...console,
