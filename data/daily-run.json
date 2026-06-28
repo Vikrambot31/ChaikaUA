@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-06-28",
+      "publishedAt": "2026-06-28T10:18:37.242Z",
+      "key": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-06-28"
+    },
+    {
       "type": "news",
       "date": "2026-06-28",
       "publishedAt": "2026-06-28T07:45:50.155Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-10",
       "publishedAt": "2026-05-10T06:30:05.335Z",
       "key": "https://www.pravda.com.ua/news/2026/05/10/8034016/"
-    },
-    {
-      "type": "places",
-      "date": "2026-05-09",
-      "publishedAt": "2026-05-09T09:06:20.358Z",
-      "key": "places-Кав'ярня ХЛІБ та КАВА-Мозаїка Espresso bar-2026-05-09"
     }
   ]
 }
