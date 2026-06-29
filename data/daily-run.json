@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-06-29",
+      "publishedAt": "2026-06-29T12:21:35.701Z",
+      "key": "places-White Rabbit Coffee and Friends-Chaykava-2026-06-29"
+    },
+    {
       "type": "news",
       "date": "2026-06-29",
       "publishedAt": "2026-06-29T08:52:55.377Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-11",
       "publishedAt": "2026-05-11T07:36:30.410Z",
       "key": "https://bigkyiv.com.ua/remontni-roboty-vplynut-na-ruh-nyzky-rejsiv-miskoyi-kilczevoyi-elektrychky/"
-    },
-    {
-      "type": "places",
-      "date": "2026-05-10",
-      "publishedAt": "2026-05-10T09:20:02.235Z",
-      "key": "places-Мозаїка Espresso bar-#МОЖЕКАВИ?-2026-05-10"
     }
   ]
 }
