@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://bigkyiv.com.ua/kyyanam-radyat-pidzaryadyty-poverbanky-cherez-speku-mozhlyvi-pereboyi-zi-svitlom/",
+    "title": "Киянам радять підзарядити повербанки: через спеку можливі перебої зі світлом",
+    "shortText": "В Україні через аномальну спеку можливі перебої зі світлом. Для мешканців Чайки це означає: заряджайте повербанки, заготовляйте воду та припасайте ліхтарики на випадок екстрених відключень. #ЖКЧайка #Ірпінь #КиївськаОбласть #Енергобезпека",
+    "sourceName": "bigkyiv.com.ua",
+    "sourceUrl": "https://bigkyiv.com.ua/kyyanam-radyat-pidzaryadyty-poverbanky-cherez-speku-mozhlyvi-pereboyi-zi-svitlom/",
+    "publishedAt": "2026-06-29T08:52:55.376Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-06-28",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ ANMI SOUL — вулиця Валерія Лобановського, 18 ☕ White Rabbit Coffee and Friends — вулиця Валерія Лобановського, 26 к2 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://www.pravda.com.ua/news/2026/05/10/8034016/",
-    "title": "Пожежа в Зоні відчуження: інспекція ядерного регулювання оцінила рівень радіації",
-    "shortText": "У Зоні відчуження ЧАЕС інспекція виявила підвищення радіації через масштабну пожежу. Для мешканців Ірпені це означає необхідність моніторити якість повітря та дотримуватися рекомендацій дозиметристів. #ЖКЧайка #Ірпінь #КиївськаОбласть #Радіація",
-    "sourceName": "www.pravda.com.ua",
-    "sourceUrl": "https://www.pravda.com.ua/news/2026/05/10/8034016/",
-    "publishedAt": "2026-05-10T06:30:05.335Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]
