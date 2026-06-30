@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-06-30",
+      "publishedAt": "2026-06-30T07:46:44.209Z",
+      "key": "https://bigkyiv.com.ua/yihala-na-vruchennya-dyplomu-v-harkovi-zagynula-vid-rosijskogo-obstrilu-vypusknyczya-medychnogo-vyshu/"
+    },
+    {
       "type": "places",
       "date": "2026-06-29",
       "publishedAt": "2026-06-29T12:21:35.701Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-11",
       "publishedAt": "2026-05-11T10:51:39.805Z",
       "key": "places-#МОЖЕКАВИ?-Fora-2026-05-11"
-    },
-    {
-      "type": "news",
-      "date": "2026-05-11",
-      "publishedAt": "2026-05-11T07:36:30.410Z",
-      "key": "https://bigkyiv.com.ua/remontni-roboty-vplynut-na-ruh-nyzky-rejsiv-miskoyi-kilczevoyi-elektrychky/"
     }
   ]
 }
