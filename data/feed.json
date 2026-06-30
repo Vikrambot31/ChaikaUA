@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Chaykava-NOVUS-2026-06-30",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Chaykava — вулиця Українського Відродження 🛒 NOVUS — вулиця Авіаконструктора Антонова #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-06-30T10:46:53.043Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/yihala-na-vruchennya-dyplomu-v-harkovi-zagynula-vid-rosijskogo-obstrilu-vypusknyczya-medychnogo-vyshu/",
     "title": "Їхала на вручення диплому: в Харкові загинула від російського обстрілу випускниця медичного вишу",
     "shortText": "У Харкові від російського обстрілу загинула 23-річна випускниця медичного вишу, яка приїхала на вручення диплома. Це нагадує, як далеко досягає війна — навіть святкові моменти стають траурними в Україні. #ЖКЧайка #Ірпінь #КиївськаОбласть #Пам'ять",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-#МОЖЕКАВИ?-Fora-2026-05-11",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ #МОЖЕКАВИ? — вулиця Валерія Лобановського, 29 🛒 Fora — вулиця Грушевського, 12 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-05-11T10:51:39.804Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
