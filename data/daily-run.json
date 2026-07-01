@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-07-01",
+      "publishedAt": "2026-07-01T10:59:58.441Z",
+      "key": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-07-01"
+    },
+    {
       "type": "news",
       "date": "2026-07-01",
       "publishedAt": "2026-07-01T08:05:53.705Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-13",
       "publishedAt": "2026-05-13T06:43:52.978Z",
       "key": "https://bigkyiv.com.ua/de-u-kyyevi-bezkoshtovno-pospilkuvatysya-z-psyhologom-ta-pozajmatysya-jogoyu-2/"
-    },
-    {
-      "type": "places",
-      "date": "2026-05-12",
-      "publishedAt": "2026-05-12T10:22:18.520Z",
-      "key": "places-Fora-Кав'ярня-кондитерська \"Гамак\"-2026-05-12"
     }
   ]
 }
