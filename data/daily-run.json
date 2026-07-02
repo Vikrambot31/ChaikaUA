@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-07-02",
+      "publishedAt": "2026-07-02T07:25:04.957Z",
+      "key": "https://bigkyiv.com.ua/pyat-rajoniv-kyyivshhyny-postrazhdaly-vnaslidok-vorozhoyi-ataky-ye-poraneni/"
+    },
+    {
       "type": "places",
       "date": "2026-07-01",
       "publishedAt": "2026-07-01T10:59:58.441Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-13",
       "publishedAt": "2026-05-13T10:11:47.425Z",
       "key": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-05-13"
-    },
-    {
-      "type": "news",
-      "date": "2026-05-13",
-      "publishedAt": "2026-05-13T06:43:52.978Z",
-      "key": "https://bigkyiv.com.ua/de-u-kyyevi-bezkoshtovno-pospilkuvatysya-z-psyhologom-ta-pozajmatysya-jogoyu-2/"
     }
   ]
 }
