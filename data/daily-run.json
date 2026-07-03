@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-07-03",
+      "publishedAt": "2026-07-03T06:56:46.293Z",
+      "key": "https://bigkyiv.com.ua/kyyivshhyna-otrymaye-do-500-novyh-robochyh-miscz-u-mashynobuduvanni/"
+    },
+    {
       "type": "places",
       "date": "2026-07-02",
       "publishedAt": "2026-07-02T10:26:26.757Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-14",
       "publishedAt": "2026-05-14T10:04:23.934Z",
       "key": "places-BALCONE COFFEE-Coffee ART-2026-05-14"
-    },
-    {
-      "type": "news",
-      "date": "2026-05-14",
-      "publishedAt": "2026-05-14T06:42:44.307Z",
-      "key": "https://www.pravda.com.ua/news/2026/05/14/8034618/"
     }
   ]
 }
