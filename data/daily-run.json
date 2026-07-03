@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-07-03",
+      "publishedAt": "2026-07-03T10:24:08.653Z",
+      "key": "places-Coffee ART-ANMI SOUL-2026-07-03"
+    },
+    {
       "type": "news",
       "date": "2026-07-03",
       "publishedAt": "2026-07-03T06:56:46.293Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-15",
       "publishedAt": "2026-05-15T06:51:48.508Z",
       "key": "https://bigkyiv.com.ua/vorog-vdaryv-po-prymiskomu-poyizdu-na-zaporizhzhi-ye-postrazhdali/"
-    },
-    {
-      "type": "places",
-      "date": "2026-05-14",
-      "publishedAt": "2026-05-14T10:04:23.934Z",
-      "key": "places-BALCONE COFFEE-Coffee ART-2026-05-14"
     }
   ]
 }

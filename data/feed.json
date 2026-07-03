@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Coffee ART-ANMI SOUL-2026-07-03",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Coffee ART — вулиця Валерія Лобановського, 25 ☕ ANMI SOUL — вулиця Валерія Лобановського, 18 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-07-03T10:24:08.652Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/kyyivshhyna-otrymaye-do-500-novyh-robochyh-miscz-u-mashynobuduvanni/",
     "title": "Київщина отримає до 500 нових робочих місць у машинобудуванні",
     "shortText": "Індустріальний парк у Броварах створить до 500 нових робочих місць у машинобудуванні. Для мешканців Чайки — це зростання економіки регіону й підвищення попиту на послуги. #ЖКЧайка #Ірпінь #КиївськаОбласть #Розвиток",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-BALCONE COFFEE-Coffee ART-2026-05-14",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ BALCONE COFFEE — вулиця Валерія Лобановського, 26 к2 ☕ Coffee ART — вулиця Валерія Лобановського, 25 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-05-14T10:04:23.933Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
