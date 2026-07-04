@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-07-04",
+      "publishedAt": "2026-07-04T06:42:38.495Z",
+      "key": "https://bigkyiv.com.ua/na-kyyivshhyni-sogodni-bude-minlyva-hmarnist-i-do-26-tepla/"
+    },
+    {
       "type": "places",
       "date": "2026-07-03",
       "publishedAt": "2026-07-03T10:24:08.653Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-15",
       "publishedAt": "2026-05-15T10:11:14.470Z",
       "key": "places-Coffee ART-ANMI SOUL-2026-05-15"
-    },
-    {
-      "type": "news",
-      "date": "2026-05-15",
-      "publishedAt": "2026-05-15T06:51:48.508Z",
-      "key": "https://bigkyiv.com.ua/vorog-vdaryv-po-prymiskomu-poyizdu-na-zaporizhzhi-ye-postrazhdali/"
     }
   ]
 }
