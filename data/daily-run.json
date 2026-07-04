@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-07-04",
+      "publishedAt": "2026-07-04T09:57:54.416Z",
+      "key": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-07-04"
+    },
+    {
       "type": "news",
       "date": "2026-07-04",
       "publishedAt": "2026-07-04T06:42:38.495Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-16",
       "publishedAt": "2026-05-16T06:17:53.716Z",
       "key": "https://bigkyiv.com.ua/doslidzhennya-pokazalo-shho-yabluko-na-den-dopomagaye-unyknuty-dytyachyh-isteryk/"
-    },
-    {
-      "type": "places",
-      "date": "2026-05-15",
-      "publishedAt": "2026-05-15T10:11:14.470Z",
-      "key": "places-Coffee ART-ANMI SOUL-2026-05-15"
     }
   ]
 }
