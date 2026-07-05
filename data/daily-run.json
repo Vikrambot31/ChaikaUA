@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-07-05",
+      "publishedAt": "2026-07-05T10:01:16.039Z",
+      "key": "places-White Rabbit Coffee and Friends-Chaykava-2026-07-05"
+    },
+    {
       "type": "news",
       "date": "2026-07-05",
       "publishedAt": "2026-07-05T07:19:08.298Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-17",
       "publishedAt": "2026-05-17T06:41:14.928Z",
       "key": "https://bigkyiv.com.ua/molod-zaproshuyut-na-bezplatnyj-vyshkil-chyn-geroyiv-vid-sso-zsu/"
-    },
-    {
-      "type": "places",
-      "date": "2026-05-16",
-      "publishedAt": "2026-05-16T09:18:52.863Z",
-      "key": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-05-16"
     }
   ]
 }
