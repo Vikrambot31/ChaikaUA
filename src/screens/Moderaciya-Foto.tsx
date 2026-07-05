@@ -135,7 +135,7 @@ const T = {
 
 const isPublicGalleryPhoto = (photo: CommunityPhoto): boolean => {
   const title = typeof photo.title === 'string' ? photo.title.trim() : '';
-  const isLegacyPersonalDefault = title === 'Photo' || title === 'Р¤РѕС‚Рѕ';
+  const isLegacyPersonalDefault = title === 'Photo' || title === '\u0424\u043e\u0442\u043e';
   return photo.target === 'gallery_public' && !isLegacyPersonalDefault;
 };
 

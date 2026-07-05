@@ -54,6 +54,11 @@ export function useContactRequest() {
 
   const openModal = useCallback(
     async (target: ContactTarget) => {
+      if (!user?.id) {
+        Toast.show({ type: 'error', text1: TOAST_TEXT.no_auth[language] });
+        return;
+      }
+
       if (!target.userId) {
         Toast.show({ type: 'error', text1: TOAST_TEXT.no_user[language] });
         return;
@@ -61,7 +66,11 @@ export function useContactRequest() {
 
       try {
         const firebaseUser = await ensureFirebaseAuth();
-        const requesterId = user?.id ?? firebaseUser.uid;
+        if (!firebaseUser || firebaseUser.isAnonymous) {
+          Toast.show({ type: 'error', text1: TOAST_TEXT.no_auth[language] });
+          return;
+        }
+        const requesterId = user.id;
         if (!requesterId || target.userId === requesterId) return;
         setCurrentTarget(target);
         setModalVisible(true);
@@ -80,10 +89,19 @@ export function useContactRequest() {
   const sendRequest = useCallback(
     async (reason: ContactReason) => {
       if (!currentTarget) return;
+      if (!user?.id) {
+        Toast.show({ type: 'error', text1: TOAST_TEXT.no_auth[language] });
+        return;
+      }
+
       setPending(true);
       try {
         const firebaseUser = await ensureFirebaseAuth();
-        const requesterId = user?.id ?? firebaseUser.uid;
+        if (!firebaseUser || firebaseUser.isAnonymous) {
+          Toast.show({ type: 'error', text1: TOAST_TEXT.no_auth[language] });
+          return;
+        }
+        const requesterId = user.id;
         if (!requesterId || currentTarget.userId === requesterId) return;
 
         let requesterPhone = '';

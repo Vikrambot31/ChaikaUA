@@ -2352,7 +2352,7 @@ exports.onRoleChanged = functionsV1.database
 exports.sendChaykaTelegramTest = functionsV1.https.onRequest(async (req, res) => {
   try {
     const configuredSecret = process.env.TELEGRAM_TEST_SECRET || '';
-    const providedSecret = req.get('x-telegram-test-secret') || req.query.secret || '';
+    const providedSecret = req.get('x-telegram-test-secret') || '';
     if (!configuredSecret || providedSecret !== configuredSecret) {
       res.status(403).json({ ok: false, error: 'Forbidden' });
       return;
@@ -3676,10 +3676,29 @@ exports.aiAutoModerateScheduled = functionsV1.pubsub
           // Scan parent keys, then find pending children inside each
           const items = [];
           if (section.nested) {
-            const parentSnap = await db.ref(section.path).limitToFirst(20).once('value');
+            // Cursor-based rotation: resume from where we left off last cycle
+            const cursorPath = `ai_config/auto_mod_cursors/${section.path.replace(/\//g, '_')}`;
+            const cursorSnap = await db.ref(cursorPath).once('value');
+            const lastCursor = cursorSnap.val() || null;
+
+            // Read a batch of parent keys starting after the last processed cursor
+            let parentQuery = db.ref(section.path).orderByKey().limitToFirst(20);
+            if (lastCursor) parentQuery = db.ref(section.path).orderByKey().startAfter(lastCursor).limitToFirst(20);
+
+            let parentSnap = await parentQuery.once('value');
+
+            // If cursor reached the end, wrap around to the beginning
+            if (!parentSnap.exists() && lastCursor) {
+              await db.ref(cursorPath).remove();
+              parentSnap = await db.ref(section.path).orderByKey().limitToFirst(20).once('value');
+            }
+
             if (!parentSnap.exists()) continue;
+
+            let lastParentKey = null;
             parentSnap.forEach((parentChild) => {
               const parentId = parentChild.key;
+              lastParentKey = parentId;
               const children = parentChild.val();
               if (!children || typeof children !== 'object') return;
               Object.entries(children).forEach(([childId, childVal]) => {
@@ -3688,6 +3707,10 @@ exports.aiAutoModerateScheduled = functionsV1.pubsub
                 }
               });
             });
+
+            // Save cursor for next cycle
+            if (lastParentKey) await db.ref(cursorPath).set(lastParentKey);
+
             // Limit to 10 comments per cycle to avoid overloading
             items.splice(10);
           } else {

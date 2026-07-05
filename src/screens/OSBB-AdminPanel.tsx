@@ -15,7 +15,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../redux/store';
-import { selectOsbbBuilding } from '../redux/slices/osbbSlice';
+import { selectIsOsbbManager, selectOsbbBuilding } from '../redux/slices/osbbSlice';
 import { subscribeOsbbNews } from '../services/osbbNews';
 import { subscribeOsbbCollections } from '../services/osbbCollections';
 import { osbbVotingService } from '../services/osbbVotingService';
@@ -27,6 +27,7 @@ import {
   subscribeModeratorList,
 } from '../services/moderatorService';
 import { SCREEN_THEME } from '../utils/screenTheme';
+import { useOsbbMembership } from '../hooks/useOsbbMembership';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -75,6 +76,9 @@ const UI_TEXT = {
     confirm: 'Так, зняти',
     errorAssign: 'Вкажіть UID.',
     assignedAt: 'Призначено',
+    accessDeniedTitle: 'Access restricted',
+    accessDeniedBody: 'This panel is available only to an approved HOA manager or system administrator.',
+    loadingAccess: 'Checking access...',
   },
   ru: {
     screenTitle: 'Панель управляющего',
@@ -111,6 +115,9 @@ const UI_TEXT = {
     confirm: 'Да, снять',
     errorAssign: 'Укажите UID.',
     assignedAt: 'Назначен',
+    accessDeniedTitle: 'Access restricted',
+    accessDeniedBody: 'This panel is available only to an approved HOA manager or system administrator.',
+    loadingAccess: 'Checking access...',
   },
   en: {
     screenTitle: 'Manager Panel',
@@ -147,6 +154,9 @@ const UI_TEXT = {
     confirm: 'Yes, revoke',
     errorAssign: 'Enter a UID.',
     assignedAt: 'Assigned',
+    accessDeniedTitle: 'Access restricted',
+    accessDeniedBody: 'This panel is available only to an approved HOA manager or system administrator.',
+    loadingAccess: 'Checking access...',
   },
 } as const;
 
@@ -172,7 +182,9 @@ const OsbbAdminScreen: React.FC = () => {
   ) as Lang;
   const t = UI_TEXT[language];
   const osbbBuilding = useSelector(selectOsbbBuilding);
+  const canManageOsbb = useSelector(selectIsOsbbManager);
   const userId = useSelector((state: RootState) => state.auth.user?.id);
+  useOsbbMembership();
   const [newsCount, setNewsCount] = useState(0);
   const [activeVotes, setActiveVotes] = useState(0);
   const [collectionsCount, setCollectionsCount] = useState(0);
@@ -180,35 +192,62 @@ const OsbbAdminScreen: React.FC = () => {
   // Moderator list state
   const [moderators, setModerators] = useState<ModeratorRecord[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [roleChecked, setRoleChecked] = useState(false);
   const [assignUid, setAssignUid] = useState('');
   const [assignEmail, setAssignEmail] = useState('');
   const [isAssigning, setIsAssigning] = useState(false);
 
+  const canOpenPanel = isAdmin || canManageOsbb;
+
   useEffect(() => {
+    if (!canOpenPanel) {
+      setNewsCount(0);
+      return () => {};
+    }
     return subscribeOsbbNews(osbbBuilding.buildingId, (items) => {
       setNewsCount(items.length);
     });
-  }, [osbbBuilding.buildingId]);
+  }, [canOpenPanel, osbbBuilding.buildingId]);
 
   useEffect(() => {
+    if (!canOpenPanel) {
+      setCollectionsCount(0);
+      return () => {};
+    }
     return subscribeOsbbCollections(osbbBuilding.buildingId, (items) => {
       setCollectionsCount(items.length);
     });
-  }, [osbbBuilding.buildingId]);
+  }, [canOpenPanel, osbbBuilding.buildingId]);
 
   useEffect(() => {
+    if (!canOpenPanel) {
+      setActiveVotes(0);
+      return () => {};
+    }
     return osbbVotingService.subscribe(osbbBuilding.buildingId, userId, (items) => {
       setActiveVotes(items.filter((item) => item.status === 'active').length);
     });
-  }, [osbbBuilding.buildingId, userId]);
+  }, [canOpenPanel, osbbBuilding.buildingId, userId]);
 
   useEffect(() => {
+    if (!isAdmin) {
+      setModerators([]);
+      return () => {};
+    }
     return subscribeModeratorList(setModerators);
-  }, []);
+  }, [isAdmin]);
 
   useEffect(() => {
-    if (!userId) return;
-    void getUserRole(userId).then((role) => setIsAdmin(role === 'admin')).catch(() => {});
+    setRoleChecked(false);
+    if (!userId) {
+      setIsAdmin(false);
+      setRoleChecked(true);
+      return;
+    }
+    void getUserRole(userId)
+      .then((role) => setIsAdmin(role === 'admin'))
+      .catch(() => setIsAdmin(false))
+      .finally(() => setRoleChecked(true));
   }, [userId]);
 
   const stats = useMemo(() => ({
@@ -273,13 +312,36 @@ const OsbbAdminScreen: React.FC = () => {
       color: SCREEN_THEME.woodGreen,
       onPress: (nav) => nav.navigate('OsbbFinansyScreen'),
     },
-    {
-      icon: 'shield-lock-outline',
-      labelKey: 'actionSecurity',
+    ...(isAdmin ? [{
+      icon: 'shield-lock-outline' as const,
+      labelKey: 'actionSecurity' as const,
       color: SCREEN_THEME.terracottaDark,
-      onPress: (nav) => nav.navigate('SecurityControlScreen'),
-    },
+      onPress: (nav: AppNav) => nav.navigate('SecurityControlScreen'),
+    }] : []),
   ];
+
+  if (!roleChecked) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.accessState}>
+          <ActivityIndicator size="large" color={SCREEN_THEME.enamelBlue} />
+          <Text style={styles.accessStateText}>{t.loadingAccess}</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!canOpenPanel) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.accessState}>
+          <MaterialCommunityIcons name="lock-alert-outline" size={48} color={SCREEN_THEME.terracotta} />
+          <Text style={styles.accessStateTitle}>{t.accessDeniedTitle}</Text>
+          <Text style={styles.accessStateText}>{t.accessDeniedBody}</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -507,6 +569,26 @@ const CARD_BASE = {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: SCREEN_THEME.appBg },
+  accessState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 28,
+    gap: 12,
+  },
+  accessStateTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: SCREEN_THEME.textPrimary,
+    textAlign: 'center',
+  },
+  accessStateText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: SCREEN_THEME.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
 
   // Header
   header: {

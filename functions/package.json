@@ -9,7 +9,7 @@
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
-    "lint": "node --check index.js && node --check scripts/seed-chayka-news.js"
+    "lint": "node --check index.js && node --check bonusFunctions.js && node --check promotionFunctions.js && node --check inviteAccess.js && node --check scripts/seed-chayka-news.js"
   },
   "engines": {
     "node": "22"

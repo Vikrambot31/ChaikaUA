@@ -420,7 +420,7 @@ function ScreenFileInfoOverlay() {
   const language = useSelector((state: RootState) => state.language?.current ?? 'ua');
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const infoText = language === 'en' ? 'Info' : language === 'ru' ? 'Инфо' : 'Інфо';
+  const infoText = language === 'en' ? 'Info' : language === 'ru' ? '\u0418\u043d\u0444\u043e' : '\u0406\u043d\u0444\u043e';
 
   useEffect(() => () => {
     if (hideTimer.current) {
@@ -769,6 +769,14 @@ function AuthNavigation() {
   const guardedLinking = useMemo<LinkingOptions<RootStackParamList>>(() => {
     const authOnlyRoutes = new Set<keyof RootStackParamList>([
       'OsbbAdminScreen',
+      'ContactCardChatScreen',
+      'CrashDiagnosticsScreen',
+      'OsbbFinansyScreen',
+      'PhotoUploadScreen',
+      'MyPhotosScreen',
+      'MyApprovedPhotosScreen',
+      'FavoritesScreen',
+      'InboxScreen',
     ]);
     const completeRoutes = new Set<keyof RootStackParamList>([
       'RequestFormScreen',
@@ -876,7 +884,7 @@ function AuthNavigation() {
         <Stack.Screen name="ServiceModerationIssuesScreen" component={withGuard(ServiceModerationIssuesScreen, 'moderator')} />
         <Stack.Screen name="ServerStatusScreen" component={withGuard(ServerStatusScreen, 'admin')} />
         <Stack.Screen name="AuthDiagnosticScreen" component={withGuard(AuthDiagnosticScreen, 'auth')} />
-        <Stack.Screen name="CrashDiagnosticsScreen" component={CrashDiagnosticsScreen} />
+        <Stack.Screen name="CrashDiagnosticsScreen" component={withGuard(CrashDiagnosticsScreen, 'admin')} />
         <Stack.Screen name="SecurityControlScreen" component={withGuard(SecurityControlScreen, 'admin')} />
         <Stack.Screen name="SectionScreen" component={SectionScreen} />
         <Stack.Screen name="TopCafeScreen" component={TopCafeScreen} />
@@ -889,7 +897,7 @@ function AuthNavigation() {
         <Stack.Screen name="BuildingRatingDetailScreen" component={BuildingRatingDetailScreen} />
         <Stack.Screen name="QRCodeScreen" component={QRCodeScreen} />
         <Stack.Screen name="EditProfileScreen" component={withGuard(EditProfileScreen, 'auth')} />
-        <Stack.Screen name="ViewUserProfile" component={ViewUserProfileScreen} />
+        <Stack.Screen name="ViewUserProfile" component={withGuard(ViewUserProfileScreen, 'auth')} />
         <Stack.Screen name="PlacesAndPeopleHub" component={PlacesAndPeopleHub} />
         <Stack.Screen name="VseDlyaDeteyScreen" component={VseDlyaDeteyScreen} />
         <Stack.Screen name="DetalDetskogoMestaScreen" component={DetalDetskogoMestaScreen} />
@@ -901,7 +909,7 @@ function AuthNavigation() {
         <Stack.Screen name="OsbbHubScreen" component={OsbbHubScreen} />
         <Stack.Screen name="OsbbSborScreen" component={OsbbSborScreen} />
         <Stack.Screen name="OsbbGolosuvannyaScreen" component={OsbbGolosuvannyaScreen} />
-        <Stack.Screen name="OsbbFinansyScreen" component={OsbbFinansyScreen} />
+        <Stack.Screen name="OsbbFinansyScreen" component={withGuard(OsbbFinansyScreen, 'auth')} />
         <Stack.Screen name="OsbbNovostyScreen" component={OsbbNovostyScreen} />
         <Stack.Screen name="OsbbSetupScreen" component={withGuard(OsbbSetupScreen, 'auth')} />
         <Stack.Screen name="OsbbAddNewsScreen" component={withGuard(OsbbAddNewsScreen, 'auth')} />
@@ -909,7 +917,7 @@ function AuthNavigation() {
         <Stack.Screen name="ServicesHubScreen" component={ServicesHubScreen} />
         <Stack.Screen name="SoulPhotosScreen" component={SoulPhotosScreen} />
         <Stack.Screen name="FotoRayonaScreen" component={FotoRayonaScreenWithBoundary} />
-        <Stack.Screen name="PhotoUploadScreen" component={PhotoUploadScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="PhotoUploadScreen" component={withGuard(PhotoUploadScreen, 'auth')} options={{ headerShown: false }} />
         <Stack.Screen name="StartAvatarPickerScreen" component={StartAvatarPickerScreen} options={{ headerShown: false }} />
         <Stack.Screen name="ProfileSetupScreen" component={ProfileSetupScreen} options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen name="LostAndFoundScreen" component={LostAndFoundScreen} />
@@ -919,10 +927,10 @@ function AuthNavigation() {
         <Stack.Screen name="SportDetailScreen" component={SportDetailScreen} />
         <Stack.Screen name="EdaNaChaykeScreen" component={EdaNaChaykeScreen} />
         <Stack.Screen name="SpisokPokupokScreen" component={SpisokPokupokScreen} />
-        <Stack.Screen name="ProfileRequestsScreen" component={ProfileRequestsScreen} />
-        <Stack.Screen name="ContactCardChatScreen" component={ContactCardChatScreen} />
-        <Stack.Screen name="MyPhotosScreen" component={MyPhotosScreen} options={{ headerShown: false }} />
-        <Stack.Screen name="MyApprovedPhotosScreen" component={MyApprovedPhotosScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="ProfileRequestsScreen" component={withGuard(ProfileRequestsScreen, 'auth')} />
+        <Stack.Screen name="ContactCardChatScreen" component={withGuard(ContactCardChatScreen, 'auth')} />
+        <Stack.Screen name="MyPhotosScreen" component={withGuard(MyPhotosScreen, 'auth')} options={{ headerShown: false }} />
+        <Stack.Screen name="MyApprovedPhotosScreen" component={withGuard(MyApprovedPhotosScreen, 'auth')} options={{ headerShown: false }} />
         <Stack.Screen name="AppVersionInfoScreen" component={AppVersionInfoScreen} />
         <Stack.Screen name="AppMonitorScreen" component={withGuard(AppMonitorScreen, 'auth')} />
         <Stack.Screen name="SupportScreen" component={SupportScreen} />
@@ -930,9 +938,9 @@ function AuthNavigation() {
         <Stack.Screen name="PromoCreditsTopupScreen" component={withGuard(PromoCreditsTopupScreen, 'auth')} />
         <Stack.Screen name="PromoCreditsAdminScreen" component={withGuard(PromoCreditsAdminScreen, 'admin')} />
         <Stack.Screen name="BonusPromotionPurchaseScreen" component={withGuard(BonusPromotionPurchaseScreen, 'auth')} />
-        <Stack.Screen name="FavoritesScreen" component={FavoritesScreen} />
+        <Stack.Screen name="FavoritesScreen" component={withGuard(FavoritesScreen, 'auth')} />
         <Stack.Screen name="EditContactListingScreen" component={withGuard(EditContactListingScreen, 'auth')} />
-        <Stack.Screen name="InboxScreen" component={InboxScreen} />
+        <Stack.Screen name="InboxScreen" component={withGuard(InboxScreen, 'auth')} />
         <Stack.Screen name="BusinessClaimScreen" component={withGuard(BusinessClaimScreen, 'auth')} />
         <Stack.Screen name="BusinessPlusSubscriptionScreen" component={withGuard(BusinessPlusSubscriptionScreen, 'auth')} />
         <Stack.Screen name="BusinessMenuEditorScreen" component={withGuard(BusinessMenuEditorScreen, 'auth')} />
@@ -990,3 +998,4 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
+

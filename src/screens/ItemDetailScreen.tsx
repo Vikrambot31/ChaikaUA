@@ -145,12 +145,26 @@ const getContactContext = (sourceType: string): ViewRequestContext => (
   REQUEST_CONTEXTS.has(sourceType) ? sourceType as ViewRequestContext : 'lyudi'
 );
 
-export default function ItemDetailScreen({
+const isNonEmptyString = (value: unknown): value is string =>
+  typeof value === 'string' && value.trim().length > 0;
+
+const isDetailItemData = (value: unknown): value is DetailItemData => {
+  if (!value || typeof value !== 'object') return false;
+  const item = value as Partial<DetailItemData>;
+  return isNonEmptyString(item.id)
+    && isNonEmptyString(item.title)
+    && isNonEmptyString(item.sourceType)
+    && isNonEmptyString(item.sourceId);
+};
+
+function ItemDetailScreenContent({
   navigation,
-  route,
+  item,
+  feedScreen,
 }: {
   navigation: NavigationProp<RootStackParamList, 'ItemDetailScreen'>;
-  route: RouteProp<ItemDetailParams, 'ItemDetailScreen'>;
+  item: DetailItemData;
+  feedScreen?: string;
 }) {
   const dispatch = useDispatch();
   const { width: windowWidth } = useWindowDimensions();
@@ -159,8 +173,6 @@ export default function ItemDetailScreen({
   const currentUser = useSelector((state: RootState) => state.auth.user);
   const isBusinessPlus = useSelector(selectIsBusinessPlus);
   const { modalVisible, pending, currentTarget, openModal, closeModal, sendRequest } = useContactRequest();
-  const item = route.params.item;
-  const feedScreen = route.params.feedScreen;
   const text = UI_TEXT[language];
   const [contactApproved, setContactApproved] = useState(false);
   const [showBusinessSection, setShowBusinessSection] = useState(false);
@@ -931,6 +943,57 @@ export default function ItemDetailScreen({
       />
     </SafeAreaView>
   );
+}
+
+export default function ItemDetailScreen({
+  navigation,
+  route,
+}: {
+  navigation: NavigationProp<RootStackParamList, 'ItemDetailScreen'>;
+  route: RouteProp<ItemDetailParams, 'ItemDetailScreen'>;
+}) {
+  const language = useSelector((state: RootState) => (state.language?.current ?? 'ua') as Lang);
+  const { colors } = useAppTheme();
+  const text = UI_TEXT[language];
+  const item = isDetailItemData(route.params?.item) ? route.params.item : null;
+  const feedScreen = route.params?.feedScreen;
+
+  if (!item) {
+    const title = language === 'en'
+      ? 'Details unavailable'
+      : language === 'ru'
+        ? '\u0414\u0435\u0442\u0430\u043b\u0438 \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u043d\u044b'
+        : '\u0414\u0435\u0442\u0430\u043b\u0456 \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u043d\u0456';
+    const body = language === 'en'
+      ? 'Open this card from the feed again.'
+      : language === 'ru'
+        ? '\u041e\u0442\u043a\u0440\u043e\u0439\u0442\u0435 \u044d\u0442\u0443 \u043a\u0430\u0440\u0442\u043e\u0447\u043a\u0443 \u0438\u0437 \u043b\u0435\u043d\u0442\u044b \u0435\u0449\u0451 \u0440\u0430\u0437.'
+        : '\u0412\u0456\u0434\u043a\u0440\u0438\u0439\u0442\u0435 \u0446\u044e \u043a\u0430\u0440\u0442\u043a\u0443 \u0437\u0456 \u0441\u0442\u0440\u0456\u0447\u043a\u0438 \u0449\u0435 \u0440\u0430\u0437.';
+
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.appBg }]}> 
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.8}>
+            <MaterialCommunityIcons name="chevron-left" size={22} color="#403933" />
+            <Text style={styles.backText}>{text.back}</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>{text.headerTitle}</Text>
+          <View style={styles.headerSpacer} />
+        </View>
+        <View style={styles.authGate}>
+          <MaterialCommunityIcons name="alert-circle-outline" size={42} color={SCREEN_THEME.terracotta} />
+          <Text style={styles.authGateTitle}>{title}</Text>
+          <Text style={styles.authGateText}>{body}</Text>
+          <TouchableOpacity style={styles.authGateButton} onPress={() => navigation.goBack()} activeOpacity={0.86}>
+            <Text style={styles.authGateButtonText}>{text.back}</Text>
+          </TouchableOpacity>
+        </View>
+        <MiniTabBar />
+      </SafeAreaView>
+    );
+  }
+
+  return <ItemDetailScreenContent navigation={navigation} item={item} feedScreen={feedScreen} />;
 }
 
 const styles = StyleSheet.create({

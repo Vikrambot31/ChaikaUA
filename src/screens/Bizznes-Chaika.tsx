@@ -1213,7 +1213,8 @@ const BiznesChaikaScreen: React.FC = () => {
       if (searchCondition && item.condition !== searchCondition) return false;
       if (queryItemName && !item.itemName.toLowerCase().includes(queryItemName)) return false;
       if (queryContact) {
-        const contactHaystack = `${item.phone} ${item.contactName || ''}`.toLowerCase();
+        const contactPhone = item.showPhone !== false || item.userId === user?.id ? item.phone : '';
+        const contactHaystack = `${contactPhone} ${item.contactName || ''}`.toLowerCase();
         if (!contactHaystack.includes(queryContact)) return false;
       }
       if (queryDescription && !item.description.toLowerCase().includes(queryDescription)) return false;
@@ -1231,6 +1232,7 @@ const BiznesChaikaScreen: React.FC = () => {
     searchPriceFrom,
     searchPriceTo,
     selectedFilterCategory,
+    user?.id,
   ]);
 
   const topListings = useMemo(() => {

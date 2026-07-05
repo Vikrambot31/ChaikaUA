@@ -24,7 +24,7 @@ import { selectUser } from '../redux/slices/authSlice';
 import { selectIsPremium } from '../redux/slices/subscriptionSlice';
 import type { RootState } from '../redux/store';
 import type { Comment } from '../types/app';
-import type { ContactReason } from '../services/profilePermissionService';
+import type { ContactReason, ProfileViewRequest } from '../services/profilePermissionService';
 import { firebaseChatAPI } from '../firebase-config';
 import { getProfileRequestContextLabel, getProfileRequestStatusLabel } from '../utils/profileRequestMeta';
 import { safeCallPhone, safeOpenViber } from '../utils/communicationActions';
@@ -38,6 +38,7 @@ import {
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ContactCardChatScreen'>;
 type Lang = 'ua' | 'ru' | 'en';
+type ContactCardChatRequest = ProfileViewRequest & { targetUserId: string };
 
 const ACCENT = '#7A1E5C';
 
@@ -60,6 +61,19 @@ const META_LABELS: Record<Lang, { screen: string; reason: string }> = {
 };
 
 const sanitizeFirebaseKey = (key: string) => key.replace(/[.#$[\]:]/g, '_');
+
+const isNonEmptyString = (value: unknown): value is string =>
+  typeof value === 'string' && value.trim().length > 0;
+
+const isContactCardChatRequest = (value: unknown): value is ContactCardChatRequest => {
+  if (!value || typeof value !== 'object') return false;
+  const request = value as Partial<ContactCardChatRequest>;
+  return isNonEmptyString(request.requesterId)
+    && isNonEmptyString(request.targetUserId)
+    && isNonEmptyString(request.requestedAt)
+    && isNonEmptyString(request.context)
+    && isNonEmptyString(request.status);
+};
 
 const formatTimeShort = (iso: string) => {
   const d = new Date(iso);
@@ -84,6 +98,11 @@ const TEXT: Record<Lang, {
   longError: string;
   sourceUnavailable: string;
   sourceError: string;
+  invalidRouteTitle: string;
+  invalidRouteBody: string;
+  accessDeniedTitle: string;
+  accessDeniedBody: string;
+  backButton: string;
 }> = {
   ua: {
     title: '\u0427\u0430\u0442 \u043f\u043e \u043a\u0430\u0440\u0442\u0446\u0456',
@@ -99,6 +118,11 @@ const TEXT: Record<Lang, {
     longError: '\u041c\u0430\u043a\u0441\u0438\u043c\u0443\u043c 500 \u0441\u0438\u043c\u0432\u043e\u043b\u0456\u0432.',
     sourceUnavailable: '\u0426\u044f \u0437\u0430\u044f\u0432\u043a\u0430 \u0431\u0456\u043b\u044c\u0448\u0435 \u043d\u0435 \u0434\u043e\u0441\u0442\u0443\u043f\u043d\u0430 \u0443 \u043f\u0443\u0431\u043b\u0456\u0447\u043d\u0456\u0439 \u0441\u0442\u0440\u0456\u0447\u0446\u0456.',
     sourceError: '\u041d\u0435 \u0432\u0434\u0430\u043b\u043e\u0441\u044f \u0432\u0456\u0434\u043a\u0440\u0438\u0442\u0438 \u0437\u0430\u044f\u0432\u043a\u0443.',
+    invalidRouteTitle: '\u0427\u0430\u0442 \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u043d\u0438\u0439',
+    invalidRouteBody: '\u0412\u0456\u0434\u043a\u0440\u0438\u0439\u0442\u0435 \u0447\u0430\u0442 \u0437 \u043a\u0430\u0440\u0442\u043a\u0438 \u0437\u0430\u044f\u0432\u043a\u0438 \u0430\u0431\u043e \u0437 \u0432\u0445\u0456\u0434\u043d\u0438\u0445 \u0437\u0430\u043f\u0438\u0442\u0456\u0432.',
+    accessDeniedTitle: '\u041d\u0435\u043c\u0430\u0454 \u0434\u043e\u0441\u0442\u0443\u043f\u0443',
+    accessDeniedBody: '\u0426\u0435\u0439 \u0447\u0430\u0442 \u0434\u043e\u0441\u0442\u0443\u043f\u043d\u0438\u0439 \u043b\u0438\u0448\u0435 \u0443\u0447\u0430\u0441\u043d\u0438\u043a\u0430\u043c \u0437\u0430\u043f\u0438\u0442\u0443.',
+    backButton: '\u041d\u0430\u0437\u0430\u0434',
   },
   ru: {
     title: '\u0427\u0430\u0442 \u043f\u043e \u043a\u0430\u0440\u0442\u043e\u0447\u043a\u0435',
@@ -114,6 +138,11 @@ const TEXT: Record<Lang, {
     longError: '\u041c\u0430\u043a\u0441\u0438\u043c\u0443\u043c 500 \u0441\u0438\u043c\u0432\u043e\u043b\u043e\u0432.',
     sourceUnavailable: '\u042d\u0442\u0430 \u0437\u0430\u044f\u0432\u043a\u0430 \u0431\u043e\u043b\u044c\u0448\u0435 \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u043d\u0430 \u0432 \u043f\u0443\u0431\u043b\u0438\u0447\u043d\u043e\u0439 \u043b\u0435\u043d\u0442\u0435.',
     sourceError: '\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043e\u0442\u043a\u0440\u044b\u0442\u044c \u0437\u0430\u044f\u0432\u043a\u0443.',
+    invalidRouteTitle: '\u0427\u0430\u0442 \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u0435\u043d',
+    invalidRouteBody: '\u041e\u0442\u043a\u0440\u043e\u0439\u0442\u0435 \u0447\u0430\u0442 \u0438\u0437 \u043a\u0430\u0440\u0442\u043e\u0447\u043a\u0438 \u0437\u0430\u044f\u0432\u043a\u0438 \u0438\u043b\u0438 \u0438\u0437 \u0432\u0445\u043e\u0434\u044f\u0449\u0438\u0445 \u0437\u0430\u043f\u0440\u043e\u0441\u043e\u0432.',
+    accessDeniedTitle: '\u041d\u0435\u0442 \u0434\u043e\u0441\u0442\u0443\u043f\u0430',
+    accessDeniedBody: '\u042d\u0442\u043e\u0442 \u0447\u0430\u0442 \u0434\u043e\u0441\u0442\u0443\u043f\u0435\u043d \u0442\u043e\u043b\u044c\u043a\u043e \u0443\u0447\u0430\u0441\u0442\u043d\u0438\u043a\u0430\u043c \u0437\u0430\u043f\u0440\u043e\u0441\u0430.',
+    backButton: '\u041d\u0430\u0437\u0430\u0434',
   },
   en: {
     title: 'Card chat',
@@ -129,6 +158,11 @@ const TEXT: Record<Lang, {
     longError: 'Maximum 500 characters.',
     sourceUnavailable: 'This request is no longer available in the public feed.',
     sourceError: 'Failed to open the request.',
+    invalidRouteTitle: 'Chat unavailable',
+    invalidRouteBody: 'Open the chat from a request card or from profile requests.',
+    accessDeniedTitle: 'No access',
+    accessDeniedBody: 'This chat is available only to the request participants.',
+    backButton: 'Back',
   },
 };
 
@@ -151,35 +185,37 @@ export default function ContactCardChatScreen({ navigation, route }: Props) {
   const [openingSource, setOpeningSource] = useState(false);
   const listRef = useRef<FlatList<Comment>>(null);
 
-  const { request } = route.params;
-  const targetUserId = request.targetUserId;
-  const requesterId = request.requesterId;
+  const request = isContactCardChatRequest(route.params?.request) ? route.params.request : null;
+  const currentUserId = currentUser?.id ?? '';
+  const targetUserId = request?.targetUserId ?? '';
+  const requesterId = request?.requesterId ?? '';
+  const canAccessChat = Boolean(request && currentUserId && (currentUserId === requesterId || currentUserId === targetUserId));
   const chatId = useMemo(
-    () => buildContactCardChatId(targetUserId, requesterId, request.sourceId),
-    [request.sourceId, requesterId, targetUserId],
+    () => (request ? buildContactCardChatId(targetUserId, requesterId, request.sourceId) : ''),
+    [request, requesterId, targetUserId],
   );
   const limit = getContactCardMessageLimit(isPremium);
   const isLimitReached = messageCount >= limit;
-  const otherName = currentUser?.id === requesterId ? request.targetName : request.requesterName;
-  const topic = request.sourceTitle || request.context;
-  const canOpenSourceRequest = Boolean(request.sourceId && (request.sourceType === 'help' || request.context === 'help'));
+  const otherName = currentUserId === requesterId ? request?.targetName : request?.requesterName;
+  const topic = request?.sourceTitle || request?.context || '';
+  const canOpenSourceRequest = Boolean(request?.sourceId && (request.sourceType === 'help' || request.context === 'help'));
 
   // Card data — same as feed card
-  const isIncoming = currentUser?.id === targetUserId;
-  const cardPhoto = isIncoming ? request.requesterPhotoURL : (request.targetPhotoURL || '');
-  const cardName = isIncoming ? request.requesterName : (request.targetName?.trim() || 'Unknown');
-  const cardUserId = isIncoming ? request.requesterId : (request.targetUserId ?? '');
-  const reasonLabel = getReasonLabel(request.reason as ContactReason | undefined, language);
-  const contextLabel = getProfileRequestContextLabel(request.context, language);
-  const sourceTitleText = request.sourceTitle?.trim();
+  const isIncoming = currentUserId === targetUserId;
+  const cardPhoto = request ? (isIncoming ? request.requesterPhotoURL : (request.targetPhotoURL || '')) : '';
+  const cardName = request ? (isIncoming ? request.requesterName : (request.targetName?.trim() || 'Unknown')) : 'Unknown';
+  const cardUserId = request ? (isIncoming ? request.requesterId : request.targetUserId) : '';
+  const reasonLabel = getReasonLabel(request?.reason as ContactReason | undefined, language);
+  const contextLabel = request ? getProfileRequestContextLabel(request.context, language) : null;
+  const sourceTitleText = request?.sourceTitle?.trim();
   const descText = sourceTitleText || reasonLabel || contextLabel || null;
   const sourceMetaText = contextLabel ? `${META_LABELS[language].screen}: ${contextLabel}` : null;
   const reasonMetaText = reasonLabel && reasonLabel !== descText ? `${META_LABELS[language].reason}: ${reasonLabel}` : null;
-  const statusLabel = getProfileRequestStatusLabel(request.status, language);
-  const statusIcon = request.status === 'approved' ? 'check-circle' : request.status === 'denied' ? 'close-circle-outline' : 'clock-outline';
-  const statusIconColor = request.status === 'approved' ? '#2D7A46' : request.status === 'denied' ? '#A73737' : '#8A6D2A';
-  const cardPhone = isIncoming ? request.requesterPhone : request.sharedContact;
-  const hasContact = request.status === 'approved' && !!cardPhone;
+  const statusLabel = request ? getProfileRequestStatusLabel(request.status, language) : '';
+  const statusIcon = request?.status === 'approved' ? 'check-circle' : request?.status === 'denied' ? 'close-circle-outline' : 'clock-outline';
+  const statusIconColor = request?.status === 'approved' ? '#2D7A46' : request?.status === 'denied' ? '#A73737' : '#8A6D2A';
+  const cardPhone = request ? (isIncoming ? request.requesterPhone : request.sharedContact) : undefined;
+  const hasContact = request?.status === 'approved' && !!cardPhone;
   const callLabel = language === 'en' ? 'Call' : language === 'ru' ? 'Позвонить' : 'Подзвонити';
 
   const handleCallContact = useCallback(() => {
@@ -196,16 +232,26 @@ export default function ContactCardChatScreen({ navigation, route }: Props) {
   }, [cardPhone, language, callLabel]);
 
   useEffect(() => {
+    if (!canAccessChat || !currentUserId || !chatId) {
+      setMessages([]);
+      setMessageCount(0);
+      setLoading(false);
+      return () => {};
+    }
     setLoading(true);
-    return subscribeContactCardMessages(chatId, currentUser?.id || '', (nextMessages, totalCount) => {
+    return subscribeContactCardMessages(chatId, currentUserId, (nextMessages, totalCount) => {
       setMessages(nextMessages);
       setMessageCount(totalCount);
       setLoading(false);
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
     });
-  }, [chatId, currentUser?.id]);
+  }, [canAccessChat, chatId, currentUserId]);
 
   const handleSend = useCallback(async () => {
+    if (!canAccessChat || !currentUserId || !chatId) {
+      Alert.alert(t.accessDeniedTitle, t.accessDeniedBody);
+      return;
+    }
     if (sending) return;
     const trimmed = draft.trim();
     if (!trimmed) return;
@@ -234,10 +280,10 @@ export default function ContactCardChatScreen({ navigation, route }: Props) {
     } finally {
       setSending(false);
     }
-  }, [chatId, currentUser?.name, currentUser?.startAvatarKey, draft, isLimitReached, isPremium, language, sending, t.limitError, t.longError, t.sendError]);
+  }, [canAccessChat, chatId, currentUser?.name, currentUser?.startAvatarKey, currentUserId, draft, isLimitReached, isPremium, language, sending, t.accessDeniedBody, t.accessDeniedTitle, t.limitError, t.longError, t.sendError]);
 
   const handleOpenSourceRequest = useCallback(async () => {
-    if (!canOpenSourceRequest || !request.sourceId || openingSource) return;
+    if (!canOpenSourceRequest || !request?.sourceId || openingSource) return;
     setOpeningSource(true);
     try {
       const result = await firebaseChatAPI.getRequestById(request.sourceId);
@@ -257,7 +303,36 @@ export default function ContactCardChatScreen({ navigation, route }: Props) {
     } finally {
       setOpeningSource(false);
     }
-  }, [canOpenSourceRequest, navigation, openingSource, request.sourceId, t.sourceError, t.sourceUnavailable]);
+  }, [canOpenSourceRequest, navigation, openingSource, request, t.sourceError, t.sourceUnavailable]);
+
+  if (!request || !canAccessChat) {
+    const title = !request ? t.invalidRouteTitle : t.accessDeniedTitle;
+    const body = !request ? t.invalidRouteBody : t.accessDeniedBody;
+
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back} activeOpacity={0.8}>
+            <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
+          </TouchableOpacity>
+          <View style={styles.headerTextBox}>
+            <Text style={styles.headerTitle} numberOfLines={1}>{t.title}</Text>
+          </View>
+        </View>
+        <View style={styles.center}>
+          <View style={styles.fallbackBox}>
+            <MaterialCommunityIcons name="lock-alert-outline" size={38} color={ACCENT} />
+            <Text style={styles.fallbackTitle}>{title}</Text>
+            <Text style={styles.fallbackText}>{body}</Text>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.fallbackButton} activeOpacity={0.85}>
+              <Text style={styles.fallbackButtonText}>{t.backButton}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+        <MiniTabBar />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -613,6 +688,19 @@ const styles = StyleSheet.create({
     color: '#8A6D2A',
   },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  fallbackBox: {
+    margin: 24,
+    padding: 18,
+    borderRadius: 14,
+    backgroundColor: '#FFFDF9',
+    borderWidth: 1,
+    borderColor: '#E8D8C6',
+    alignItems: 'center',
+  },
+  fallbackTitle: { marginTop: 10, color: '#2F2929', fontSize: 17, fontWeight: '900', textAlign: 'center' },
+  fallbackText: { marginTop: 8, color: '#6F5D54', fontSize: 14, fontWeight: '700', textAlign: 'center', lineHeight: 20 },
+  fallbackButton: { marginTop: 14, borderRadius: 12, backgroundColor: ACCENT, paddingHorizontal: 18, paddingVertical: 10 },
+  fallbackButtonText: { color: '#fff', fontSize: 14, fontWeight: '900' },
   messagesList: { paddingHorizontal: 12, paddingBottom: 14 },
   messagesListEmpty: { flexGrow: 1, alignItems: 'center', justifyContent: 'center' },
   emptyText: { color: '#8A756A', fontSize: 14, fontWeight: '800' },

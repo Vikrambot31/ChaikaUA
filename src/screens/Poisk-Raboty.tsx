@@ -625,7 +625,11 @@ const JobSearchScreen: React.FC = () => {
         if (fi !== -1 && ii !== -1 ? fi !== ii : item.workType !== selectedFilter) return false;
       }
       if (queryName && !item.name.toLowerCase().includes(queryName)) return false;
-      if (queryContact && !item.phone.toLowerCase().includes(queryContact)) return false;
+      if (queryContact) {
+        const contactPhone = !item.userId || item.userId === user?.id ? item.phone : '';
+        const contactHaystack = [item.name, contactPhone].filter(Boolean).join(' ').toLowerCase();
+        if (!contactHaystack.includes(queryContact)) return false;
+      }
       if (searchAge && item.age !== searchAge) return false;
       if (searchWorkType) {
         const fi = normalizeWorkType(searchWorkType);
@@ -635,7 +639,7 @@ const JobSearchScreen: React.FC = () => {
       if (queryAbout && !item.about.toLowerCase().includes(queryAbout)) return false;
       return true;
     });
-  }, [listings, searchAge, searchAbout, searchContact, searchName, searchWorkType, selectedFilter]);
+  }, [listings, searchAge, searchAbout, searchContact, searchName, searchWorkType, selectedFilter, user?.id]);
 
   useEffect(() => {
     setShowAllListings(false);
@@ -667,7 +671,7 @@ const JobSearchScreen: React.FC = () => {
     description: item.about,
     photoUri: item.photoUri,
     photoStoragePath: item.photoStoragePath,
-    phone: item.phone,
+    phone: !item.userId || item.userId === user?.id ? item.phone : undefined,
     category: item.workType,
     price: getListingKind(item) === 'resume' && item.age ? `${item.age} ${text.years}` : undefined,
     status: getModerationLabel(item.moderationStatus, moderationLabels),

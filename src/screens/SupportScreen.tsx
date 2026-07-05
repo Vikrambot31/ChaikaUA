@@ -30,7 +30,7 @@ import {
   hasUnreadAdminReply,
 } from '../services/supportService';
 import type { SupportTicket, SupportMessage, SupportCategory } from '../types/support';
-import { ensureFirebaseAuth } from '../firebase-auth-session';
+import { ensureFirebaseAuth, isAnonymousFirebaseUser } from '../firebase-auth-session';
 import { useTrainingMode } from '../hooks/useTrainingMode';
 import TrainingHint from '../components/TrainingHint';
 import HintBadge, { HINT_BADGE_LABELS } from '../components/HintBadge';
@@ -159,11 +159,19 @@ const SupportScreen: React.FC = () => {
 
   useEffect(() => {
     let active = true;
+    if (!user?.id) {
+      setSupportUserId(null);
+      setTicket(null);
+      setMessages([]);
+      setLoading(false);
+      return () => { active = false; };
+    }
+
     setLoading(true);
     void ensureFirebaseAuth()
       .then((firebaseUser) => {
         if (active) {
-          setSupportUserId(firebaseUser?.uid ?? null);
+          setSupportUserId(firebaseUser && !isAnonymousFirebaseUser(firebaseUser) ? firebaseUser.uid : null);
         }
       })
       .catch(() => {
@@ -173,7 +181,7 @@ const SupportScreen: React.FC = () => {
         }
       });
     return () => { active = false; };
-  }, []);
+  }, [user?.id]);
 
   // Subscribe to user's ticket
   useEffect(() => {

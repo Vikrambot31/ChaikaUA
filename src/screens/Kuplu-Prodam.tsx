@@ -357,7 +357,10 @@ const BuySellScreen: React.FC = () => {
       if (searchListingType && itemListingType !== searchListingType) return false;
       if (searchCondition && item.condition !== searchCondition) return false;
       if (queryItemName && !item.itemName.toLowerCase().includes(queryItemName)) return false;
-      if (queryContact && !item.phone.toLowerCase().includes(queryContact)) return false;
+      if (queryContact) {
+        const contactPhone = item.showPhone !== false || item.userId === user?.id ? item.phone : '';
+        if (!contactPhone.toLowerCase().includes(queryContact)) return false;
+      }
       if (queryDescription && !item.description.toLowerCase().includes(queryDescription)) return false;
       if (priceFrom !== null && Number.isFinite(priceFrom) && (!Number.isFinite(numericPrice) || numericPrice < priceFrom)) return false;
       if (priceTo !== null && Number.isFinite(priceTo) && (!Number.isFinite(numericPrice) || numericPrice > priceTo)) return false;
@@ -375,6 +378,7 @@ const BuySellScreen: React.FC = () => {
     searchPriceTo,
     selectedFilterCategory,
     selectedFilterListingType,
+    user?.id,
   ]);
 
   const hasAdvancedSearch = useMemo(
@@ -424,7 +428,7 @@ const BuySellScreen: React.FC = () => {
       id: item.id,
       title: item.itemName,
       description: item.description,
-      phone: item.phone,
+      phone: item.showPhone !== false ? item.phone : undefined,
       photoUri: item.photoUri,
       photoStoragePath: item.photoStoragePath,
       price: item.price !== null && item.price !== undefined ? `${item.price} грн` : undefined,
@@ -686,8 +690,8 @@ const BuySellScreen: React.FC = () => {
               currentUserId={user?.id}
               language={language}
               onProfile={item.userId ? () => { if (navLock.current) return; navLock.current = true; navigation.navigate('ViewUserProfile', { userId: item.userId as string }); setTimeout(() => { navLock.current = false; }, 800); } : undefined}
-              onContact={item.userId && item.userId !== user?.id ? () => openContactModal({ userId: item.userId as string, name: item.itemName ?? 'Unknown', photoURL: authorAvatarUri || undefined, sourceType: 'buysell', sourceId: item.id, sourceTitle: item.itemName }) : item.phone ? () => void safeCallPhone(item.phone, language) : undefined}
-              contactDisabled={!item.phone && (!item.userId || item.userId === user?.id)}
+              onContact={item.userId && item.userId !== user?.id ? () => openContactModal({ userId: item.userId as string, name: item.itemName ?? 'Unknown', photoURL: authorAvatarUri || undefined, sourceType: 'buysell', sourceId: item.id, sourceTitle: item.itemName }) : (item.phone && item.showPhone !== false) ? () => void safeCallPhone(item.phone, language) : undefined}
+              contactDisabled={!(item.phone && item.showPhone !== false) && (!item.userId || item.userId === user?.id)}
               likePath="feed_likes/buysell"
               likeId={item.id}
               shareMessage={`${item.itemName}${item.price ? ` · ${item.price} грн` : ''}${item.description ? `\n${item.description}` : ''}`}

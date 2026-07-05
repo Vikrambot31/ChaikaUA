@@ -88,6 +88,8 @@ const UI_TEXT = {
     // Paid entries list
     noPayers: 'Платежів ще немає',
     by: 'від',
+    accessDeniedTitle: 'Access restricted',
+    accessDeniedBody: 'Building finances are available only to approved residents or the HOA manager.',
   },
   ru: {
     screenTitle: 'Финансы',
@@ -122,6 +124,8 @@ const UI_TEXT = {
     target: 'Цель',
     noPayers: 'Платежей ещё нет',
     by: 'от',
+    accessDeniedTitle: 'Access restricted',
+    accessDeniedBody: 'Building finances are available only to approved residents or the HOA manager.',
   },
   en: {
     screenTitle: 'Finance',
@@ -156,6 +160,8 @@ const UI_TEXT = {
     target: 'Target',
     noPayers: 'No payments yet',
     by: 'by',
+    accessDeniedTitle: 'Access restricted',
+    accessDeniedBody: 'Building finances are available only to approved residents or the HOA manager.',
   },
 } as const;
 
@@ -365,7 +371,9 @@ const OsbbFinansyScreen: React.FC = () => {
     (state: RootState) => state.language?.current ?? 'ua'
   ) as Lang;
   const buildingId = useSelector((state: RootState) => state.osbb.buildingId);
+  const membershipStatus = useSelector((state: RootState) => state.osbb.membershipStatus);
   useOsbbMembership();
+  const canViewFinance = membershipStatus === 'approved';
   const canManageCollections = useSelector(
     (state: RootState) =>
       state.osbb.membershipRole === 'manager' &&
@@ -391,17 +399,25 @@ const OsbbFinansyScreen: React.FC = () => {
   const [collectionPayments, setCollectionPayments] = useState<CollectionPayment[]>([]);
 
   useEffect(() => {
-    if (!expandedId || !buildingId) {
+    if (!expandedId || !buildingId || !canViewFinance) {
       setCollectionPayments([]);
       return;
     }
     return subscribeOsbbCollectionPayments(buildingId, expandedId, setCollectionPayments);
-  }, [buildingId, expandedId]);
+  }, [buildingId, canViewFinance, expandedId]);
 
   // ---------------------------------------------------------------------------
   // Subscription
   // ---------------------------------------------------------------------------
   const loadData = () => {
+    if (!buildingId || !canViewFinance) {
+      setCollections([]);
+      setCollectionPayments([]);
+      setIsLoading(false);
+      setHasError(false);
+      return () => {};
+    }
+
     setIsLoading(true);
     setHasError(false);
 
@@ -428,7 +444,7 @@ const OsbbFinansyScreen: React.FC = () => {
   useEffect(() => {
     return loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [buildingId]);
+  }, [buildingId, canViewFinance]);
 
   // ---------------------------------------------------------------------------
   // Derived values
@@ -476,6 +492,14 @@ const OsbbFinansyScreen: React.FC = () => {
     </View>
   );
 
+  const renderAccessDenied = () => (
+    <View style={styles.emptyCard}>
+      <MaterialCommunityIcons name="lock-alert-outline" size={48} color={SCREEN_THEME.terracotta} />
+      <Text style={styles.emptyTitle}>{t.accessDeniedTitle}</Text>
+      <Text style={styles.emptySubtitle}>{t.accessDeniedBody}</Text>
+    </View>
+  );
+
   // ---------------------------------------------------------------------------
   // Main render
   // ---------------------------------------------------------------------------
@@ -508,17 +532,19 @@ const OsbbFinansyScreen: React.FC = () => {
           <View style={styles.backBtn} />
         </View>
 
+        {!canViewFinance && renderAccessDenied()}
+
         {/* Loading */}
-        {isLoading && renderLoading()}
+        {canViewFinance && isLoading && renderLoading()}
 
         {/* Error */}
-        {!isLoading && hasError && renderError()}
+        {canViewFinance && !isLoading && hasError && renderError()}
 
         {/* Empty */}
-        {!isLoading && !hasError && collections.length === 0 && renderEmpty()}
+        {canViewFinance && !isLoading && !hasError && collections.length === 0 && renderEmpty()}
 
         {/* Content */}
-        {!isLoading && !hasError && collections.length > 0 && (
+        {canViewFinance && !isLoading && !hasError && collections.length > 0 && (
           <>
             {/* Summary cards: total collected / total target / remaining */}
             <View style={styles.summaryGrid}>

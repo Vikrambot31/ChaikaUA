@@ -857,7 +857,10 @@ const KontaktiChaikyScreen: React.FC = () => {
       if (searchCategory && item.category !== searchCategory) return false;
       if (searchCondition && item.condition !== searchCondition) return false;
       if (queryItemName && !item.itemName.toLowerCase().includes(queryItemName)) return false;
-      if (queryContact && !item.phone.toLowerCase().includes(queryContact)) return false;
+      if (queryContact) {
+        const contactPhone = item.showPhone !== false || item.userId === user?.id ? item.phone : '';
+        if (!contactPhone.toLowerCase().includes(queryContact)) return false;
+      }
       if (queryDescription && !item.description.toLowerCase().includes(queryDescription)) return false;
       if (priceFrom !== null && Number.isFinite(priceFrom) && (!Number.isFinite(numericPrice) || numericPrice < priceFrom)) return false;
       if (priceTo !== null && Number.isFinite(priceTo) && (!Number.isFinite(numericPrice) || numericPrice > priceTo)) return false;
@@ -874,6 +877,7 @@ const KontaktiChaikyScreen: React.FC = () => {
     searchPriceFrom,
     searchPriceTo,
     selectedFilterCategory,
+    user?.id,
   ]);
 
   const topListings = useMemo(() => {

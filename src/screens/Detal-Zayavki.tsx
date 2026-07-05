@@ -424,13 +424,19 @@ const RequestDetailScreen = ({
   }, [request.id]);
 
   useEffect(() => {
+    if (!currentUser?.id || !request.id || request.userId !== currentUser.id) {
+      setHelpResponses([]);
+      setHelpConfirmations([]);
+      return () => {};
+    }
+
     const unsubResponses = subscribeHelpResponses(request.id, setHelpResponses);
     const unsubConfirmations = subscribeHelpConfirmations(request.id, setHelpConfirmations);
     return () => {
       unsubResponses();
       unsubConfirmations();
     };
-  }, [request.id]);
+  }, [currentUser?.id, request.id, request.userId]);
 
   useEffect(() => {
     if (helperIds.length === 0) {
@@ -458,7 +464,7 @@ const RequestDetailScreen = ({
     };
   }, [helperIds]);
 
-  const canRequestContact = Boolean(request.userId && request.userId !== currentUser?.id);
+  const canRequestContact = Boolean(currentUser?.id && request.userId && request.userId !== currentUser.id);
   const canOpenProfile = Boolean(request.userId && request.userId !== currentUser?.id);
 
   const isOwnRequest = useMemo(() => {
