@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-07-06",
+      "publishedAt": "2026-07-06T11:53:04.639Z",
+      "key": "places-Chaykava-NOVUS-2026-07-06"
+    },
+    {
       "type": "news",
       "date": "2026-07-06",
       "publishedAt": "2026-07-06T08:14:19.937Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-18",
       "publishedAt": "2026-05-18T07:57:23.431Z",
       "key": "https://bigkyiv.com.ua/poperedu-tyzhden-zlyv-ta-proholody-po-vsij-ukrayini/"
-    },
-    {
-      "type": "places",
-      "date": "2026-05-17",
-      "publishedAt": "2026-05-17T09:26:24.136Z",
-      "key": "places-White Rabbit Coffee and Friends-Chaykava-2026-05-17"
     }
   ]
 }
