@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-07-06",
+      "publishedAt": "2026-07-06T08:14:19.937Z",
+      "key": "https://bigkyiv.com.ua/mozhut-zavdaty-udar-i-u-vivtorok-yurij-ignat-poperedyv-pro-nebezpeku-dlya-stolyczi/"
+    },
+    {
       "type": "places",
       "date": "2026-07-05",
       "publishedAt": "2026-07-05T10:01:16.039Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-17",
       "publishedAt": "2026-05-17T09:26:24.136Z",
       "key": "places-White Rabbit Coffee and Friends-Chaykava-2026-05-17"
-    },
-    {
-      "type": "news",
-      "date": "2026-05-17",
-      "publishedAt": "2026-05-17T06:41:14.928Z",
-      "key": "https://bigkyiv.com.ua/molod-zaproshuyut-na-bezplatnyj-vyshkil-chyn-geroyiv-vid-sso-zsu/"
     }
   ]
 }
