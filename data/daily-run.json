@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-07-07",
+      "publishedAt": "2026-07-07T07:32:32.680Z",
+      "key": "https://bigkyiv.com.ua/kilkist-zagyblyh-u-kyyevi-pislya-rosijskogo-udaru-zrosla-do-19-u-stolyczi-ogolosyly-den-zhaloby/"
+    },
+    {
       "type": "places",
       "date": "2026-07-06",
       "publishedAt": "2026-07-06T11:53:04.639Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-18",
       "publishedAt": "2026-05-18T11:35:33.982Z",
       "key": "places-Chaykava-NOVUS-2026-05-18"
-    },
-    {
-      "type": "news",
-      "date": "2026-05-18",
-      "publishedAt": "2026-05-18T07:57:23.431Z",
-      "key": "https://bigkyiv.com.ua/poperedu-tyzhden-zlyv-ta-proholody-po-vsij-ukrayini/"
     }
   ]
 }
