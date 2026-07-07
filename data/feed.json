@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-NOVUS-Grano Bakery-2026-07-07",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "🛒 NOVUS — вулиця Авіаконструктора Антонова 🛒 Grano Bakery — вулиця Валерія Лобановського, 35 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-07-07T10:42:56.116Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/kilkist-zagyblyh-u-kyyevi-pislya-rosijskogo-udaru-zrosla-do-19-u-stolyczi-ogolosyly-den-zhaloby/",
     "title": "Кількість загиблих у Києві після російського удару зросла до 19: у столиці оголосили День жалоби",
     "shortText": "У Києві після російського удару загинуло 19 осіб. Для мешканців Чайки це нагадування про важливість готовності до укриття та взаємної допомоги в умовах війни. #ЖКЧайка #Ірпінь #КиївськаОбласть #Пам'ять",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Chaykava-NOVUS-2026-05-18",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ Chaykava — вулиця Українського Відродження 🛒 NOVUS — вулиця Авіаконструктора Антонова #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-05-18T11:35:33.981Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
