@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Grano Bakery-Кав'ярня ХЛІБ та КАВА-2026-07-08",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "🛒 Grano Bakery — вулиця Валерія Лобановського, 35 ☕ Кав'ярня ХЛІБ та КАВА — вулиця Валерія Лобановського, 18 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-07-08T10:04:13.692Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/na-kyyivshhyni-sogodni-ochikuyutsya-korotkochasni-doshhi-grozy-ta-poryvchastyj-viter-2/",
     "title": "На Київщині сьогодні очікуються короткочасні дощі, грози та поривчастий вітер",
     "shortText": "Сьогодні на Київщині короткочасні дощі, грози та поривчастий вітер до 20 м/с. Мешканцям Чайки варто закріпити зовнішні предмети та бути обережними на дорогах. #ЖКЧайка #Ірпінь #КиївськаОбласть #Погода",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-NOVUS-Grano Bakery-2026-05-19",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "🛒 NOVUS — вулиця Авіаконструктора Антонова 🛒 Grano Bakery — вулиця Валерія Лобановського, 35 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-05-19T10:52:20.646Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
