@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://bigkyiv.com.ua/na-kyyivshhyni-sogodni-ochikuyutsya-korotkochasni-doshhi-grozy-ta-poryvchastyj-viter-2/",
+    "title": "На Київщині сьогодні очікуються короткочасні дощі, грози та поривчастий вітер",
+    "shortText": "Сьогодні на Київщині короткочасні дощі, грози та поривчастий вітер до 20 м/с. Мешканцям Чайки варто закріпити зовнішні предмети та бути обережними на дорогах. #ЖКЧайка #Ірпінь #КиївськаОбласть #Погода",
+    "sourceName": "bigkyiv.com.ua",
+    "sourceUrl": "https://bigkyiv.com.ua/na-kyyivshhyni-sogodni-ochikuyutsya-korotkochasni-doshhi-grozy-ta-poryvchastyj-viter-2/",
+    "publishedAt": "2026-07-08T06:23:07.335Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-NOVUS-Grano Bakery-2026-07-07",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "🛒 NOVUS — вулиця Авіаконструктора Антонова 🛒 Grano Bakery — вулиця Валерія Лобановського, 35 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/petycziya-shhodo-vidmovy-zaluchaty-inozemcziv-do-roboty-v-ukrayini-nabrala-neobhidni-golosy/",
-    "title": "Петиція щодо відмови залучати іноземців до роботи в Україні набрала необхідні голоси",
-    "shortText": "Петиція щодо відмови залучати іноземців до роботи в Україні набрала необхідні голоси — може стосуватися мешканців Ірпеня та Чайки. #ЖКЧайка #Ірпінь #КиївськаОбласть #Новини",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/petycziya-shhodo-vidmovy-zaluchaty-inozemcziv-do-roboty-v-ukrayini-nabrala-neobhidni-golosy/",
-    "publishedAt": "2026-05-19T07:41:14.032Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]
