@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-07-09",
+      "publishedAt": "2026-07-09T07:37:09.761Z",
+      "key": "https://www.pravda.com.ua/news/2026/07/09/8043191/"
+    },
+    {
       "type": "places",
       "date": "2026-07-08",
       "publishedAt": "2026-07-08T10:04:13.693Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-20",
       "publishedAt": "2026-05-20T10:40:21.563Z",
       "key": "places-Grano Bakery-Кав'ярня ХЛІБ та КАВА-2026-05-20"
-    },
-    {
-      "type": "news",
-      "date": "2026-05-20",
-      "publishedAt": "2026-05-20T07:38:39.165Z",
-      "key": "https://bigkyiv.com.ua/vorog-znovu-atakuvav-zhytlovyj-sektor-odesy-udarnymy-bezpilotnykamy/"
     }
   ]
 }
