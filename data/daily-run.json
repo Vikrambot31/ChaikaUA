@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-07-09",
+      "publishedAt": "2026-07-09T10:43:27.088Z",
+      "key": "places-Кав'ярня ХЛІБ та КАВА-Мозаїка Espresso bar-2026-07-09"
+    },
+    {
       "type": "news",
       "date": "2026-07-09",
       "publishedAt": "2026-07-09T07:37:09.761Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-21",
       "publishedAt": "2026-05-21T07:43:59.977Z",
       "key": "https://bigkyiv.com.ua/rosiyany-atakuvaly-chernigivshhynu-ta-dnipropetrovshhynu-ye-zagybli-ta-postrazhdali/"
-    },
-    {
-      "type": "places",
-      "date": "2026-05-20",
-      "publishedAt": "2026-05-20T10:40:21.563Z",
-      "key": "places-Grano Bakery-Кав'ярня ХЛІБ та КАВА-2026-05-20"
     }
   ]
 }
