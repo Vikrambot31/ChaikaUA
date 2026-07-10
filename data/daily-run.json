@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-07-10",
+      "publishedAt": "2026-07-10T10:42:14.210Z",
+      "key": "places-Мозаїка Espresso bar-#МОЖЕКАВИ?-2026-07-10"
+    },
+    {
       "type": "news",
       "date": "2026-07-10",
       "publishedAt": "2026-07-10T07:29:42.705Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-22",
       "publishedAt": "2026-05-22T07:38:48.411Z",
       "key": "https://bigkyiv.com.ua/ruh-gostomelskym-shose-obmezhyly-do-kinczya-misyaczya/"
-    },
-    {
-      "type": "places",
-      "date": "2026-05-21",
-      "publishedAt": "2026-05-21T10:56:55.001Z",
-      "key": "places-Кав'ярня ХЛІБ та КАВА-Мозаїка Espresso bar-2026-05-21"
     }
   ]
 }
