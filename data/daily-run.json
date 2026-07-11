@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-07-11",
+      "publishedAt": "2026-07-11T06:08:04.202Z",
+      "key": "https://bigkyiv.com.ua/ukrayinski-muzeyi-zmusheni-povertaty-evakujovani-tvory-i-chasu-majzhe-ne-lyshylosya/"
+    },
+    {
       "type": "places",
       "date": "2026-07-10",
       "publishedAt": "2026-07-10T10:42:14.210Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-22",
       "publishedAt": "2026-05-22T10:40:44.266Z",
       "key": "places-Мозаїка Espresso bar-#МОЖЕКАВИ?-2026-05-22"
-    },
-    {
-      "type": "news",
-      "date": "2026-05-22",
-      "publishedAt": "2026-05-22T07:38:48.411Z",
-      "key": "https://bigkyiv.com.ua/ruh-gostomelskym-shose-obmezhyly-do-kinczya-misyaczya/"
     }
   ]
 }
