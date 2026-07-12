@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Fora-Кав'ярня-кондитерська \"Гамак\"-2026-07-12",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "🛒 Fora — вулиця Грушевського, 12 ☕ Кав'ярня-кондитерська \"Гамак\" — вулиця Валерія Лобановського #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-07-12T09:40:57.624Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/vzhe-vidomo-hto-dopustyv-rozmishhennya-skladiv-zi-zbroyeyu-u-vyshnevomu-zelenskyj/",
     "title": "Вже відомо, хто допустив розміщення складів зі зброєю у Вишневому — Зеленський",
     "shortText": "Вибух на складах у Вишневому розслідують як можливе порушення законів про розміщення зброї. Для жителів Чайки це означає підвищену увагу до безпеки в сусідніх районах. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-#МОЖЕКАВИ?-Fora-2026-05-23",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ #МОЖЕКАВИ? — вулиця Валерія Лобановського, 29 🛒 Fora — вулиця Грушевського, 12 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-05-23T09:30:33.324Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]

@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-07-12",
+      "publishedAt": "2026-07-12T09:40:57.625Z",
+      "key": "places-Fora-Кав'ярня-кондитерська \"Гамак\"-2026-07-12"
+    },
+    {
       "type": "news",
       "date": "2026-07-12",
       "publishedAt": "2026-07-12T06:27:58.779Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-24",
       "publishedAt": "2026-05-24T06:55:29.279Z",
       "key": "https://bigkyiv.com.ua/u-kyyevi-cherez-nichnu-ataku-podekudy-perekryto-ruh-transportu-ne-kursuyut-tramvayi/"
-    },
-    {
-      "type": "places",
-      "date": "2026-05-23",
-      "publishedAt": "2026-05-23T09:30:33.325Z",
-      "key": "places-#МОЖЕКАВИ?-Fora-2026-05-23"
     }
   ]
 }
