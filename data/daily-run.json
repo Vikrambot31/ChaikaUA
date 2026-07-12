@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-07-12",
+      "publishedAt": "2026-07-12T06:27:58.779Z",
+      "key": "https://bigkyiv.com.ua/vzhe-vidomo-hto-dopustyv-rozmishhennya-skladiv-zi-zbroyeyu-u-vyshnevomu-zelenskyj/"
+    },
+    {
       "type": "places",
       "date": "2026-07-11",
       "publishedAt": "2026-07-11T09:14:14.184Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-23",
       "publishedAt": "2026-05-23T09:30:33.325Z",
       "key": "places-#МОЖЕКАВИ?-Fora-2026-05-23"
-    },
-    {
-      "type": "news",
-      "date": "2026-05-23",
-      "publishedAt": "2026-05-23T06:30:39.594Z",
-      "key": "https://www.pravda.com.ua/news/2026/05/23/8036055/"
     }
   ]
 }
