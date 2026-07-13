@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-07-13",
+      "publishedAt": "2026-07-13T10:47:20.456Z",
+      "key": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-07-13"
+    },
+    {
       "type": "news",
       "date": "2026-07-13",
       "publishedAt": "2026-07-13T06:47:53.845Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-25",
       "publishedAt": "2026-05-25T08:14:35.801Z",
       "key": "https://bigkyiv.com.ua/u-kyyevi-vidnovyly-ruh-nyzky-trolejbusiv-pislya-vchorashnoyi-ataky/"
-    },
-    {
-      "type": "places",
-      "date": "2026-05-24",
-      "publishedAt": "2026-05-24T09:46:29.147Z",
-      "key": "places-Fora-Кав'ярня-кондитерська \"Гамак\"-2026-05-24"
     }
   ]
 }

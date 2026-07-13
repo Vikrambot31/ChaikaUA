@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-07-13",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Кав'ярня-кондитерська \"Гамак\" — вулиця Валерія Лобановського ☕ BALCONE COFFEE — вулиця Валерія Лобановського, 26 к2 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-07-13T10:47:20.455Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/u-vyshnevomu-pislya-obstriliv-povernuly-gaz-do-214-osel-u-bagatopoverhivkah-ta-pryvatnyh-sadybah/",
     "title": "У Вишневому після обстрілів повернули газ до 214 осель у багатоповерхівках та приватних садибах",
     "shortText": "У Вишневому відновили газ до 214 осель після обстрілів. Для мешканців Ірпенського р-ну це сигнал про спроможність комунальних служб швидко реагувати на надзвичайні ситуації. #ЖКЧайка #Ірпінь #КиївськаОбласть #газопостачання",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Fora-Кав'ярня-кондитерська \"Гамак\"-2026-05-24",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "🛒 Fora — вулиця Грушевського, 12 ☕ Кав'ярня-кондитерська \"Гамак\" — вулиця Валерія Лобановського #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-05-24T09:46:29.146Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
