@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-07-13",
+      "publishedAt": "2026-07-13T06:47:53.845Z",
+      "key": "https://bigkyiv.com.ua/u-vyshnevomu-pislya-obstriliv-povernuly-gaz-do-214-osel-u-bagatopoverhivkah-ta-pryvatnyh-sadybah/"
+    },
+    {
       "type": "places",
       "date": "2026-07-12",
       "publishedAt": "2026-07-12T09:40:57.625Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-24",
       "publishedAt": "2026-05-24T09:46:29.147Z",
       "key": "places-Fora-Кав'ярня-кондитерська \"Гамак\"-2026-05-24"
-    },
-    {
-      "type": "news",
-      "date": "2026-05-24",
-      "publishedAt": "2026-05-24T06:55:29.279Z",
-      "key": "https://bigkyiv.com.ua/u-kyyevi-cherez-nichnu-ataku-podekudy-perekryto-ruh-transportu-ne-kursuyut-tramvayi/"
     }
   ]
 }
