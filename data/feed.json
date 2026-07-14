@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://www.pravda.com.ua/news/2026/07/14/8043981/",
+    "title": "Після нічної атаки у Києві горіли складські приміщення: постраждалих немає",
+    "shortText": "У Голосіївському й Дарницькому районах Києва після атаки горіли складські приміщення. Мешканці Чайки можуть очікувати можливих перебоїв електропостачання та посилення безпеки. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
+    "sourceName": "www.pravda.com.ua",
+    "sourceUrl": "https://www.pravda.com.ua/news/2026/07/14/8043981/",
+    "publishedAt": "2026-07-14T06:05:36.453Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-07-13",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ Кав'ярня-кондитерська \"Гамак\" — вулиця Валерія Лобановського ☕ BALCONE COFFEE — вулиця Валерія Лобановського, 26 к2 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/u-kyyevi-vidnovyly-ruh-nyzky-trolejbusiv-pislya-vchorashnoyi-ataky/",
-    "title": "У Києві відновили рух низки тролейбусів після вчорашньої атаки",
-    "shortText": "У Києві відновили рух кількох тролейбусних маршрутів, але вони курсують з затримками. Для ірпінців, які їздять до столиці, це означає довше чекати на громадський транспорт і планувати час з запасом. #ЖКЧайка #Ірпінь #КиївськаОбласть #Транспорт",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/u-kyyevi-vidnovyly-ruh-nyzky-trolejbusiv-pislya-vchorashnoyi-ataky/",
-    "publishedAt": "2026-05-25T08:14:35.800Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]
