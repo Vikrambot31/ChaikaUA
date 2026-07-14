@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-07-14",
+      "publishedAt": "2026-07-14T09:43:45.791Z",
+      "key": "places-BALCONE COFFEE-Coffee ART-2026-07-14"
+    },
+    {
       "type": "news",
       "date": "2026-07-14",
       "publishedAt": "2026-07-14T06:05:36.455Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-26",
       "publishedAt": "2026-05-26T07:40:23.853Z",
       "key": "https://bigkyiv.com.ua/u-kyyevi-do-pyatnyczi-obmezhuvatymut-ruh-pivdennym-mostom/"
-    },
-    {
-      "type": "places",
-      "date": "2026-05-25",
-      "publishedAt": "2026-05-25T11:40:51.211Z",
-      "key": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-05-25"
     }
   ]
 }
