@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Coffee ART-ANMI SOUL-2026-07-15",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Coffee ART — вулиця Валерія Лобановського, 25 ☕ ANMI SOUL — вулиця Валерія Лобановського, 18 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-07-15T09:47:11.025Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/ogolosheno-tender-na-proyektuvannya-kapremontu-metroproyizdu-pivdennogo-mostovogo-perehodu/",
     "title": "Оголошено тендер на проєктування капремонту метропроїзду Південного мостового переходу",
     "shortText": "Київський метрополітен оголосив тендер на проєктування капремонту Південного мостового переходу. Це забезпечить надійність транспортного зв'язку Ірпеня з центром міста на довгі роки. #ЖКЧайка #Ірпінь #КиївськаОбласть #Метро",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/zatrymanyj-kliryk-upcz-mp-yakyj-navodyv-iskandery-po-odesi/",
-    "title": "Затриманий клірик УПЦ (МП), який наводив «Іскандери» по Одесі",
-    "shortText": "Затриманий клірик УПЦ (МП), який наводив «Іскандери» по Одесі — може стосуватися мешканців Ірпеня та Чайки. #ЖКЧайка #Ірпінь #КиївськаОбласть #Новини",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/zatrymanyj-kliryk-upcz-mp-yakyj-navodyv-iskandery-po-odesi/",
-    "publishedAt": "2026-05-27T07:58:09.138Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]
