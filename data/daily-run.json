@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-07-15",
+      "publishedAt": "2026-07-15T06:09:23.511Z",
+      "key": "https://bigkyiv.com.ua/ogolosheno-tender-na-proyektuvannya-kapremontu-metroproyizdu-pivdennogo-mostovogo-perehodu/"
+    },
+    {
       "type": "places",
       "date": "2026-07-14",
       "publishedAt": "2026-07-14T09:43:45.791Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-27",
       "publishedAt": "2026-05-27T07:58:09.139Z",
       "key": "https://bigkyiv.com.ua/zatrymanyj-kliryk-upcz-mp-yakyj-navodyv-iskandery-po-odesi/"
-    },
-    {
-      "type": "news",
-      "date": "2026-05-26",
-      "publishedAt": "2026-05-26T07:40:23.853Z",
-      "key": "https://bigkyiv.com.ua/u-kyyevi-do-pyatnyczi-obmezhuvatymut-ruh-pivdennym-mostom/"
     }
   ]
 }
