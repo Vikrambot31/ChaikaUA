@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-07-16",
+      "publishedAt": "2026-07-16T06:11:47.659Z",
+      "key": "https://bigkyiv.com.ua/pidlitok-iz-druzhkivky-sam-poprosyv-ombudsmena-dopomogty-z-evakuacziyeyu-cherez-vidmovu-batkiv-vyyizhdzhaty/"
+    },
+    {
       "type": "places",
       "date": "2026-07-15",
       "publishedAt": "2026-07-15T09:47:11.026Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-28",
       "publishedAt": "2026-05-28T07:51:39.351Z",
       "key": "https://bigkyiv.com.ua/vidoma-tiktok-blogerka-vikunciy-razom-z-pomichnyczeyu-zagynuly-u-dtp/"
-    },
-    {
-      "type": "places",
-      "date": "2026-05-27",
-      "publishedAt": "2026-05-27T11:27:31.870Z",
-      "key": "places-Coffee ART-ANMI SOUL-2026-05-27"
     }
   ]
 }
