@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-07-16",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ ANMI SOUL — вулиця Валерія Лобановського, 18 ☕ White Rabbit Coffee and Friends — вулиця Валерія Лобановського, 26 к2 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-07-16T09:53:53.105Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/pidlitok-iz-druzhkivky-sam-poprosyv-ombudsmena-dopomogty-z-evakuacziyeyu-cherez-vidmovu-batkiv-vyyizhdzhaty/",
     "title": "Підліток із Дружківки сам попросив омбудсмена допомогти з евакуацією через відмову батьків виїжджати",
     "shortText": "Підлітка з Дружківки евакуювали до Черкас після звернення до омбудсмена, коли батьки відмовлялись виїжджати. Для мешканців Чайки це нагадує: дитина має право на безпеку, незалежно від рішень дорослих. #ЖКЧайка #Ірпінь #КиївськаОбласть #Евакуація",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/vidoma-tiktok-blogerka-vikunciy-razom-z-pomichnyczeyu-zagynuly-u-dtp/",
-    "title": "Відома TikTok-блогерка Vikunciy разом з помічницею загинули у ДТП",
-    "shortText": "На трасі Київ-Одеса сталася смертельна ДТП з TikTok-блогеркою Vikunciy. Це нагадує водіям про критичну важливість безпеки й концентрації на дорозі, особливо на магістралях поблизу Ірпеня. #ЖКЧайка #Ірпінь #КиївськаОбласть #безпеканадорозі",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/vidoma-tiktok-blogerka-vikunciy-razom-z-pomichnyczeyu-zagynuly-u-dtp/",
-    "publishedAt": "2026-05-28T07:51:39.350Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]
