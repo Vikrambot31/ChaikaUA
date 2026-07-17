@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-07-17",
+      "publishedAt": "2026-07-17T09:43:51.306Z",
+      "key": "places-White Rabbit Coffee and Friends-Chaykava-2026-07-17"
+    },
+    {
       "type": "news",
       "date": "2026-07-17",
       "publishedAt": "2026-07-17T06:10:42.294Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-29",
       "publishedAt": "2026-05-29T11:17:43.257Z",
       "key": "places-White Rabbit Coffee and Friends-Chaykava-2026-05-29"
-    },
-    {
-      "type": "news",
-      "date": "2026-05-29",
-      "publishedAt": "2026-05-29T07:50:21.564Z",
-      "key": "https://bigkyiv.com.ua/dorogu-na-vulyczi-synoozernij-zarahuvaly-do-komunalnoyi-vlasnosti-ta-nareshti-vidremontuyut/"
     }
   ]
 }
