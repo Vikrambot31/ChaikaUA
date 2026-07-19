@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-NOVUS-Grano Bakery-2026-07-19",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "🛒 NOVUS — вулиця Авіаконструктора Антонова 🛒 Grano Bakery — вулиця Валерія Лобановського, 35 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-07-19T09:42:05.104Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://www.pravda.com.ua/news/2026/07/19/8044765/",
     "title": "Через загрозу балістики в Києві з початку доби вдруге була повітряна тривога",
     "shortText": "У Києві вдруге за добу оголосили повітряну тривогу через загрозу балістики. Мешканцям Чайки важливо слідкувати за сигналами тривог і дотримуватися правил безпеки. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/kyyeve-mij-otrymav-nove-zvuchannya-u-vykonanni-ansamblyu-solistiv-kulturnyh-syl/",
-    "title": "«Києве мій» отримав нове звучання у виконанні ансамблю солістів Культурних сил",
-    "shortText": "Ансамбль солістів Культурних сил переосмислив гімн Києва в нових аранжуваннях. Мешканці Чайки чують у цьому символ єдності й опору в часи випробувань для столиці й всієї области. #ЖКЧайка #Ірпінь #КиївськаОбласть #Культура",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/kyyeve-mij-otrymav-nove-zvuchannya-u-vykonanni-ansamblyu-solistiv-kulturnyh-syl/",
-    "publishedAt": "2026-05-31T07:40:44.682Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]
