@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://www.pravda.com.ua/news/2026/07/19/8044765/",
+    "title": "Через загрозу балістики в Києві з початку доби вдруге була повітряна тривога",
+    "shortText": "У Києві вдруге за добу оголосили повітряну тривогу через загрозу балістики. Мешканцям Чайки важливо слідкувати за сигналами тривог і дотримуватися правил безпеки. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
+    "sourceName": "www.pravda.com.ua",
+    "sourceUrl": "https://www.pravda.com.ua/news/2026/07/19/8044765/",
+    "publishedAt": "2026-07-19T06:25:02.923Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-Chaykava-NOVUS-2026-07-18",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ Chaykava — вулиця Українського Відродження 🛒 NOVUS — вулиця Авіаконструктора Антонова #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Chaykava-NOVUS-2026-05-30",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ Chaykava — вулиця Українського Відродження 🛒 NOVUS — вулиця Авіаконструктора Антонова #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-05-30T09:48:43.413Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]

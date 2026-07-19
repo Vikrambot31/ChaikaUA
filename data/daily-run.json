@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-07-19",
+      "publishedAt": "2026-07-19T06:25:02.924Z",
+      "key": "https://www.pravda.com.ua/news/2026/07/19/8044765/"
+    },
+    {
       "type": "places",
       "date": "2026-07-18",
       "publishedAt": "2026-07-18T09:13:36.181Z",
@@ -593,12 +599,6 @@
       "date": "2026-05-31",
       "publishedAt": "2026-05-31T07:40:44.683Z",
       "key": "https://bigkyiv.com.ua/kyyeve-mij-otrymav-nove-zvuchannya-u-vykonanni-ansamblyu-solistiv-kulturnyh-syl/"
-    },
-    {
-      "type": "places",
-      "date": "2026-05-30",
-      "publishedAt": "2026-05-30T09:48:43.414Z",
-      "key": "places-Chaykava-NOVUS-2026-05-30"
     }
   ]
 }
