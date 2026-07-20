@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Grano Bakery-Кав'ярня ХЛІБ та КАВА-2026-07-20",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "🛒 Grano Bakery — вулиця Валерія Лобановського, 35 ☕ Кав'ярня ХЛІБ та КАВА — вулиця Валерія Лобановського, 18 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-07-20T10:37:53.738Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/bilya-metro-lukyanivska-oblashtovuyut-tymchasovyj-nazemnyj-perehid/",
     "title": "Біля метро «Лук’янівська» облаштовують тимчасовий наземний перехід",
     "shortText": "Біля метро «Лук'янівська» облаштовують тимчасовий наземний перехід після ворожого обстрілу. Для мешканців Чайки — ще одна ознака того, що відновлення інфраструктури в регіоні йде активно. #ЖКЧайка #Ірпінь #КиївськаОбласть #Інфраструктура",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/pochatok-chervnya-v-ukrayini-bude-doshhovym-i-spekotnym-vodnochas/",
-    "title": "Початок червня в Україні буде дощовим і спекотним водночас",
-    "shortText": "На початку червня в регіоні очікуються дощі та спека — спекотна погода з опадами буде непередбачуваною. Мешканцям Чайки варто стежити за прогнозом і готуватися до різких змін погоди. #ЖКЧайка #Ірпінь #КиївськаОбласть #Погода",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/pochatok-chervnya-v-ukrayini-bude-doshhovym-i-spekotnym-vodnochas/",
-    "publishedAt": "2026-06-01T09:19:38.191Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]

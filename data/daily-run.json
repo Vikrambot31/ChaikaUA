@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-07-20",
+      "publishedAt": "2026-07-20T10:37:53.739Z",
+      "key": "places-Grano Bakery-Кав'ярня ХЛІБ та КАВА-2026-07-20"
+    },
+    {
       "type": "news",
       "date": "2026-07-20",
       "publishedAt": "2026-07-20T06:40:30.527Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-01",
       "publishedAt": "2026-06-01T13:25:37.990Z",
       "key": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-06-01"
-    },
-    {
-      "type": "news",
-      "date": "2026-06-01",
-      "publishedAt": "2026-06-01T09:19:38.192Z",
-      "key": "https://bigkyiv.com.ua/pochatok-chervnya-v-ukrayini-bude-doshhovym-i-spekotnym-vodnochas/"
     }
   ]
 }
