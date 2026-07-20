@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://bigkyiv.com.ua/bilya-metro-lukyanivska-oblashtovuyut-tymchasovyj-nazemnyj-perehid/",
+    "title": "Біля метро «Лук’янівська» облаштовують тимчасовий наземний перехід",
+    "shortText": "Біля метро «Лук'янівська» облаштовують тимчасовий наземний перехід після ворожого обстрілу. Для мешканців Чайки — ще одна ознака того, що відновлення інфраструктури в регіоні йде активно. #ЖКЧайка #Ірпінь #КиївськаОбласть #Інфраструктура",
+    "sourceName": "bigkyiv.com.ua",
+    "sourceUrl": "https://bigkyiv.com.ua/bilya-metro-lukyanivska-oblashtovuyut-tymchasovyj-nazemnyj-perehid/",
+    "publishedAt": "2026-07-20T06:40:30.526Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-NOVUS-Grano Bakery-2026-07-19",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "🛒 NOVUS — вулиця Авіаконструктора Антонова 🛒 Grano Bakery — вулиця Валерія Лобановського, 35 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-NOVUS-Grano Bakery-2026-05-31",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "🛒 NOVUS — вулиця Авіаконструктора Антонова 🛒 Grano Bakery — вулиця Валерія Лобановського, 35 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-05-31T10:05:39.101Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
