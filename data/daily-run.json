@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-07-21",
+      "publishedAt": "2026-07-21T06:23:15.289Z",
+      "key": "https://bigkyiv.com.ua/bilya-lavina-mall-chastkovo-obmezhuvatymut-ruh/"
+    },
+    {
       "type": "places",
       "date": "2026-07-20",
       "publishedAt": "2026-07-20T10:37:53.739Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-02",
       "publishedAt": "2026-06-02T08:22:58.345Z",
       "key": "https://bigkyiv.com.ua/rosiya-zapustyla-po-ukrayini-73-rakety-ta-656-bpla-zagynuly-13-lyudej-ponad-100-postrazhdaly/"
-    },
-    {
-      "type": "places",
-      "date": "2026-06-01",
-      "publishedAt": "2026-06-01T13:25:37.990Z",
-      "key": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-06-01"
     }
   ]
 }

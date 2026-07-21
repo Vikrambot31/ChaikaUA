@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://bigkyiv.com.ua/bilya-lavina-mall-chastkovo-obmezhuvatymut-ruh/",
+    "title": "Біля «Lavina Mall» частково обмежуватимуть рух",
+    "shortText": "21 липня на просп. Палладіна біля «Lavina Mall» перекриють праву смугу для ремонту асфальту до 19:00. Для Чайки це означає можливі затримки при поїздках до столиці цим маршрутом. #ЖКЧайка #Ірпінь #КиївськаОбласть #Дорожні роботи",
+    "sourceName": "bigkyiv.com.ua",
+    "sourceUrl": "https://bigkyiv.com.ua/bilya-lavina-mall-chastkovo-obmezhuvatymut-ruh/",
+    "publishedAt": "2026-07-21T06:23:15.288Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-Grano Bakery-Кав'ярня ХЛІБ та КАВА-2026-07-20",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "🛒 Grano Bakery — вулиця Валерія Лобановського, 35 ☕ Кав'ярня ХЛІБ та КАВА — вулиця Валерія Лобановського, 18 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-06-01",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ Кав'ярня-кондитерська \"Гамак\" — вулиця Валерія Лобановського ☕ BALCONE COFFEE — вулиця Валерія Лобановського, 26 к2 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-06-01T13:25:37.989Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
