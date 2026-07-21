@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Кав'ярня ХЛІБ та КАВА-Мозаїка Espresso bar-2026-07-21",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Кав'ярня ХЛІБ та КАВА — вулиця Валерія Лобановського, 18 ☕ Мозаїка Espresso bar — вулиця Валерія Лобановського #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-07-21T10:12:02.666Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/bilya-lavina-mall-chastkovo-obmezhuvatymut-ruh/",
     "title": "Біля «Lavina Mall» частково обмежуватимуть рух",
     "shortText": "21 липня на просп. Палладіна біля «Lavina Mall» перекриють праву смугу для ремонту асфальту до 19:00. Для Чайки це означає можливі затримки при поїздках до столиці цим маршрутом. #ЖКЧайка #Ірпінь #КиївськаОбласть #Дорожні роботи",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/rosiya-zapustyla-po-ukrayini-73-rakety-ta-656-bpla-zagynuly-13-lyudej-ponad-100-postrazhdaly/",
-    "title": "Росія запустила по Україні 73 ракети та 656 БпЛА: загинули 13 людей, понад 100 – постраждали",
-    "shortText": "У ніч на 2 червня Росія випустила 73 ракети та 656 дронів по Україні. Для мешканців Чайки це означає можливі відключення електроенергії та необхідність бути готовими до укриття. #ЖКЧайка #Ірпінь #КиївськаОбласть #БезпекаЧайки",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/rosiya-zapustyla-po-ukrayini-73-rakety-ta-656-bpla-zagynuly-13-lyudej-ponad-100-postrazhdaly/",
-    "publishedAt": "2026-06-02T08:22:58.344Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]

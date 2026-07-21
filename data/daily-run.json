@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-07-21",
+      "publishedAt": "2026-07-21T10:12:02.667Z",
+      "key": "places-Кав'ярня ХЛІБ та КАВА-Мозаїка Espresso bar-2026-07-21"
+    },
+    {
       "type": "news",
       "date": "2026-07-21",
       "publishedAt": "2026-07-21T06:23:15.289Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-02",
       "publishedAt": "2026-06-02T11:55:59.156Z",
       "key": "places-BALCONE COFFEE-Coffee ART-2026-06-02"
-    },
-    {
-      "type": "news",
-      "date": "2026-06-02",
-      "publishedAt": "2026-06-02T08:22:58.345Z",
-      "key": "https://bigkyiv.com.ua/rosiya-zapustyla-po-ukrayini-73-rakety-ta-656-bpla-zagynuly-13-lyudej-ponad-100-postrazhdaly/"
     }
   ]
 }
