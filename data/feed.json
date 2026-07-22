@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://bigkyiv.com.ua/shlyahoprovodom-na-harkivskomu-shose-obmezhat-ruh/",
+    "title": "Шляхопроводом на Харківському шосе обмежать рух",
+    "shortText": "На Харківському шосе в Дарницькому районі 22 липня обмежать рух через ремонт асфальту. Мешканцям Чайки варто спланувати маршрути — затори можуть вплинути на дорогу до центру Ірпеня через столицю. #ЖКЧайка #Ірпінь #КиївськаОбласть #Дорожиремонт",
+    "sourceName": "bigkyiv.com.ua",
+    "sourceUrl": "https://bigkyiv.com.ua/shlyahoprovodom-na-harkivskomu-shose-obmezhat-ruh/",
+    "publishedAt": "2026-07-22T06:23:06.369Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-Кав'ярня ХЛІБ та КАВА-Мозаїка Espresso bar-2026-07-21",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ Кав'ярня ХЛІБ та КАВА — вулиця Валерія Лобановського, 18 ☕ Мозаїка Espresso bar — вулиця Валерія Лобановського #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-BALCONE COFFEE-Coffee ART-2026-06-02",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ BALCONE COFFEE — вулиця Валерія Лобановського, 26 к2 ☕ Coffee ART — вулиця Валерія Лобановського, 25 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-06-02T11:55:59.155Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]

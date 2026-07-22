@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-07-22",
+      "publishedAt": "2026-07-22T06:23:06.370Z",
+      "key": "https://bigkyiv.com.ua/shlyahoprovodom-na-harkivskomu-shose-obmezhat-ruh/"
+    },
+    {
       "type": "places",
       "date": "2026-07-21",
       "publishedAt": "2026-07-21T10:12:02.667Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-03",
       "publishedAt": "2026-06-03T08:49:56.678Z",
       "key": "https://bigkyiv.com.ua/sud-sogodni-maye-vyrishyty-dolyu-oglyadovogo-kolesa-na-podoli/"
-    },
-    {
-      "type": "places",
-      "date": "2026-06-02",
-      "publishedAt": "2026-06-02T11:55:59.156Z",
-      "key": "places-BALCONE COFFEE-Coffee ART-2026-06-02"
     }
   ]
 }
