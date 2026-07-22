@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Мозаїка Espresso bar-#МОЖЕКАВИ?-2026-07-22",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Мозаїка Espresso bar — вулиця Валерія Лобановського ☕ #МОЖЕКАВИ? — вулиця Валерія Лобановського, 29 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-07-22T10:11:39.887Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/shlyahoprovodom-na-harkivskomu-shose-obmezhat-ruh/",
     "title": "Шляхопроводом на Харківському шосе обмежать рух",
     "shortText": "На Харківському шосе в Дарницькому районі 22 липня обмежать рух через ремонт асфальту. Мешканцям Чайки варто спланувати маршрути — затори можуть вплинути на дорогу до центру Ірпеня через столицю. #ЖКЧайка #Ірпінь #КиївськаОбласть #Дорожиремонт",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/sud-sogodni-maye-vyrishyty-dolyu-oglyadovogo-kolesa-na-podoli/",
-    "title": "Суд сьогодні має вирішити долю оглядового колеса на Подолі",
-    "shortText": "Суд вирішує долю оглядового колеса на Подолі — розбір конструкції триватиме залежно від вердикту. Для мешканців Чайки це важливо: вирішення конфліктів щодо громадських об'єктів впливає на якість середовища в усій столиці й області. #ЖКЧайка #Ірпінь #КиївськаОбласть #Київ",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/sud-sogodni-maye-vyrishyty-dolyu-oglyadovogo-kolesa-na-podoli/",
-    "publishedAt": "2026-06-03T08:49:56.677Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]

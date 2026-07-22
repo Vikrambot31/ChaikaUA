@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-07-22",
+      "publishedAt": "2026-07-22T10:11:39.888Z",
+      "key": "places-Мозаїка Espresso bar-#МОЖЕКАВИ?-2026-07-22"
+    },
+    {
       "type": "news",
       "date": "2026-07-22",
       "publishedAt": "2026-07-22T06:23:06.370Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-03",
       "publishedAt": "2026-06-03T12:28:18.956Z",
       "key": "places-Coffee ART-ANMI SOUL-2026-06-03"
-    },
-    {
-      "type": "news",
-      "date": "2026-06-03",
-      "publishedAt": "2026-06-03T08:49:56.678Z",
-      "key": "https://bigkyiv.com.ua/sud-sogodni-maye-vyrishyty-dolyu-oglyadovogo-kolesa-na-podoli/"
     }
   ]
 }
