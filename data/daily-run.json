@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-07-23",
+      "publishedAt": "2026-07-23T06:25:23.536Z",
+      "key": "https://bigkyiv.com.ua/bilya-stancziyi-metro-ipodrom-demontuvaly-mafy/"
+    },
+    {
       "type": "places",
       "date": "2026-07-22",
       "publishedAt": "2026-07-22T10:11:39.888Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-04",
       "publishedAt": "2026-06-04T08:14:26.892Z",
       "key": "https://bigkyiv.com.ua/vorozha-ataka-sprychynyla-masshtabnu-pozhezhu-na-boryspilshhyni/"
-    },
-    {
-      "type": "places",
-      "date": "2026-06-03",
-      "publishedAt": "2026-06-03T12:28:18.956Z",
-      "key": "places-Coffee ART-ANMI SOUL-2026-06-03"
     }
   ]
 }

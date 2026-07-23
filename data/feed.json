@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://bigkyiv.com.ua/bilya-stancziyi-metro-ipodrom-demontuvaly-mafy/",
+    "title": "Біля станції метро «Іподром» демонтували МАФи",
+    "shortText": "У Києві демонтують МАФи без дозвільної документації. Для Ірпеня це сигнал: місто посилює контроль за незаконними торговельними об'єктами в регіоні. #ЖКЧайка #Ірпінь #КиївськаОбласть #Благоустрій",
+    "sourceName": "bigkyiv.com.ua",
+    "sourceUrl": "https://bigkyiv.com.ua/bilya-stancziyi-metro-ipodrom-demontuvaly-mafy/",
+    "publishedAt": "2026-07-23T06:25:23.535Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-Мозаїка Espresso bar-#МОЖЕКАВИ?-2026-07-22",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ Мозаїка Espresso bar — вулиця Валерія Лобановського ☕ #МОЖЕКАВИ? — вулиця Валерія Лобановського, 29 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Coffee ART-ANMI SOUL-2026-06-03",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ Coffee ART — вулиця Валерія Лобановського, 25 ☕ ANMI SOUL — вулиця Валерія Лобановського, 18 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-06-03T12:28:18.955Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
