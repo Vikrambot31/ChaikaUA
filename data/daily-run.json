@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-07-23",
+      "publishedAt": "2026-07-23T10:09:14.822Z",
+      "key": "places-#МОЖЕКАВИ?-Fora-2026-07-23"
+    },
+    {
       "type": "news",
       "date": "2026-07-23",
       "publishedAt": "2026-07-23T06:25:23.536Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-04",
       "publishedAt": "2026-06-04T10:53:02.420Z",
       "key": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-06-04"
-    },
-    {
-      "type": "news",
-      "date": "2026-06-04",
-      "publishedAt": "2026-06-04T08:14:26.892Z",
-      "key": "https://bigkyiv.com.ua/vorozha-ataka-sprychynyla-masshtabnu-pozhezhu-na-boryspilshhyni/"
     }
   ]
 }

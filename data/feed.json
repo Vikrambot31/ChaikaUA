@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-#МОЖЕКАВИ?-Fora-2026-07-23",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ #МОЖЕКАВИ? — вулиця Валерія Лобановського, 29 🛒 Fora — вулиця Грушевського, 12 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-07-23T10:09:14.822Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/bilya-stancziyi-metro-ipodrom-demontuvaly-mafy/",
     "title": "Біля станції метро «Іподром» демонтували МАФи",
     "shortText": "У Києві демонтують МАФи без дозвільної документації. Для Ірпеня це сигнал: місто посилює контроль за незаконними торговельними об'єктами в регіоні. #ЖКЧайка #Ірпінь #КиївськаОбласть #Благоустрій",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/vorozha-ataka-sprychynyla-masshtabnu-pozhezhu-na-boryspilshhyni/",
-    "title": "Ворожа атака спричинила масштабну пожежу на Бориспільщині",
-    "shortText": "Росіяни атакували промислові об'єкти на Бориспільщині — виникла масштабна пожежа. Для Ірпені це означає посилену готовність до можливих атак і важливість дотримання правил безпеки. #ЖКЧайка #Ірпінь #КиївськаОбласть #безпека",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/vorozha-ataka-sprychynyla-masshtabnu-pozhezhu-na-boryspilshhyni/",
-    "publishedAt": "2026-06-04T08:14:26.891Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]
