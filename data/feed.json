@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Fora-Кав'ярня-кондитерська \"Гамак\"-2026-07-24",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "🛒 Fora — вулиця Грушевського, 12 ☕ Кав'ярня-кондитерська \"Гамак\" — вулиця Валерія Лобановського #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-07-24T10:04:42.484Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/u-podilskomu-rajoni-do-kinczya-lita-obmezhat-ruh/",
     "title": "У Подільському районі до кінця літа обмежать рух",
     "shortText": "У Подільському районі Києва до 30 серпня обмежують рух на вулиці Введенській через ремонт асфальту. Мешканцям Чайки варто планувати маршрути в столицю через альтернативні в'їзди. #ЖКЧайка #Ірпінь #КиївськаОбласть #Транспорт",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/ekonomichni-perevagy-vstanovlennya-kogeneraczijnoyi-ustanovky-chomu-vlasna-generacziya-vygidnisha-za-merezhu/",
-    "title": "Економічні переваги встановлення когенераційної установки: чому власна генерація вигідніша за мережу",
-    "shortText": "У Бучанському районі когенераційні установки дозволяють підприємствам скоротити витрати на енергію на 30–40%. Для мешканців Чайки це означає потенціал розвитку локальної інфраструктури та більше робочих місць. #ЖКЧайка #Ірпінь #КиївськаОбласть #Енергоефективність",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/ekonomichni-perevagy-vstanovlennya-kogeneraczijnoyi-ustanovky-chomu-vlasna-generacziya-vygidnisha-za-merezhu/",
-    "publishedAt": "2026-06-05T08:01:52.980Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]

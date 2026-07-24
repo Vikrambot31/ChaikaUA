@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-07-24",
+      "publishedAt": "2026-07-24T10:04:42.485Z",
+      "key": "places-Fora-Кав'ярня-кондитерська \"Гамак\"-2026-07-24"
+    },
+    {
       "type": "news",
       "date": "2026-07-24",
       "publishedAt": "2026-07-24T06:20:40.847Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-05",
       "publishedAt": "2026-06-05T11:17:01.254Z",
       "key": "places-White Rabbit Coffee and Friends-Chaykava-2026-06-05"
-    },
-    {
-      "type": "news",
-      "date": "2026-06-05",
-      "publishedAt": "2026-06-05T08:01:52.981Z",
-      "key": "https://bigkyiv.com.ua/ekonomichni-perevagy-vstanovlennya-kogeneraczijnoyi-ustanovky-chomu-vlasna-generacziya-vygidnisha-za-merezhu/"
     }
   ]
 }
