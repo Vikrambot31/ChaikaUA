@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-07-24",
+      "publishedAt": "2026-07-24T06:20:40.847Z",
+      "key": "https://bigkyiv.com.ua/u-podilskomu-rajoni-do-kinczya-lita-obmezhat-ruh/"
+    },
+    {
       "type": "places",
       "date": "2026-07-23",
       "publishedAt": "2026-07-23T10:09:14.822Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-05",
       "publishedAt": "2026-06-05T08:01:52.981Z",
       "key": "https://bigkyiv.com.ua/ekonomichni-perevagy-vstanovlennya-kogeneraczijnoyi-ustanovky-chomu-vlasna-generacziya-vygidnisha-za-merezhu/"
-    },
-    {
-      "type": "places",
-      "date": "2026-06-04",
-      "publishedAt": "2026-06-04T10:53:02.420Z",
-      "key": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-06-04"
     }
   ]
 }
