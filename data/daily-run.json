@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-07-25",
+      "publishedAt": "2026-07-25T09:24:54.650Z",
+      "key": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-07-25"
+    },
+    {
       "type": "news",
       "date": "2026-07-25",
       "publishedAt": "2026-07-25T06:11:07.900Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-06",
       "publishedAt": "2026-06-06T09:51:25.286Z",
       "key": "places-Chaykava-NOVUS-2026-06-06"
-    },
-    {
-      "type": "news",
-      "date": "2026-06-06",
-      "publishedAt": "2026-06-06T06:48:41.787Z",
-      "key": "https://bigkyiv.com.ua/u-dtp-u-solomyanskomu-rajoni-kyyeva-zagynuly-dvoye-policzejskyh/"
     }
   ]
 }

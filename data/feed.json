@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-07-25",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Кав'ярня-кондитерська \"Гамак\" — вулиця Валерія Лобановського ☕ BALCONE COFFEE — вулиця Валерія Лобановського, 26 к2 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-07-25T09:24:54.649Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/metro-na-vynogradar-staye-blyzhchym-yak-prosuvayetsya-budivnycztvo/",
     "title": "Метро на Виноградар стає ближчим: як просувається будівництво",
     "shortText": "Будівництво метро на Виноградар активізується в Києві. Для мешканців Чайки це означає покращення транспортної доступності та зв'язку з центром міста у найближчі роки. #ЖКЧайка #Ірпінь #КиївськаОбласть #Транспорт",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/u-dtp-u-solomyanskomu-rajoni-kyyeva-zagynuly-dvoye-policzejskyh/",
-    "title": "У ДТП у Солом’янському районі Києва загинули двоє поліцейських",
-    "shortText": "У Києві водій Mercedes на великій швидкості виїхав на пішоходів — загинули двоє поліцейських, жінка й дитина. Для мешканців Ірпені це нагадування про небезпеку на дорогах району. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/u-dtp-u-solomyanskomu-rajoni-kyyeva-zagynuly-dvoye-policzejskyh/",
-    "publishedAt": "2026-06-06T06:48:41.786Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]
