@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://bigkyiv.com.ua/metro-na-vynogradar-staye-blyzhchym-yak-prosuvayetsya-budivnycztvo/",
+    "title": "Метро на Виноградар стає ближчим: як просувається будівництво",
+    "shortText": "Будівництво метро на Виноградар активізується в Києві. Для мешканців Чайки це означає покращення транспортної доступності та зв'язку з центром міста у найближчі роки. #ЖКЧайка #Ірпінь #КиївськаОбласть #Транспорт",
+    "sourceName": "bigkyiv.com.ua",
+    "sourceUrl": "https://bigkyiv.com.ua/metro-na-vynogradar-staye-blyzhchym-yak-prosuvayetsya-budivnycztvo/",
+    "publishedAt": "2026-07-25T06:11:07.899Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-Fora-Кав'ярня-кондитерська \"Гамак\"-2026-07-24",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "🛒 Fora — вулиця Грушевського, 12 ☕ Кав'ярня-кондитерська \"Гамак\" — вулиця Валерія Лобановського #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-White Rabbit Coffee and Friends-Chaykava-2026-06-05",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ White Rabbit Coffee and Friends — вулиця Валерія Лобановського, 26 к2 ☕ Chaykava — вулиця Українського Відродження #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-06-05T11:17:01.253Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]

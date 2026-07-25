@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-07-25",
+      "publishedAt": "2026-07-25T06:11:07.900Z",
+      "key": "https://bigkyiv.com.ua/metro-na-vynogradar-staye-blyzhchym-yak-prosuvayetsya-budivnycztvo/"
+    },
+    {
       "type": "places",
       "date": "2026-07-24",
       "publishedAt": "2026-07-24T10:04:42.485Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-06",
       "publishedAt": "2026-06-06T06:48:41.787Z",
       "key": "https://bigkyiv.com.ua/u-dtp-u-solomyanskomu-rajoni-kyyeva-zagynuly-dvoye-policzejskyh/"
-    },
-    {
-      "type": "places",
-      "date": "2026-06-05",
-      "publishedAt": "2026-06-05T11:17:01.254Z",
-      "key": "places-White Rabbit Coffee and Friends-Chaykava-2026-06-05"
     }
   ]
 }
