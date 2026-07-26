@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-07-26",
+      "publishedAt": "2026-07-26T06:30:44.335Z",
+      "key": "https://www.pravda.com.ua/news/2026/07/26/8045920/"
+    },
+    {
       "type": "places",
       "date": "2026-07-25",
       "publishedAt": "2026-07-25T09:24:54.650Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-07",
       "publishedAt": "2026-06-07T07:50:17.782Z",
       "key": "https://bigkyiv.com.ua/u-kryvavij-dtp-na-kardachah-zagynuv-12-richnyj-grygorij-glushych/"
-    },
-    {
-      "type": "places",
-      "date": "2026-06-06",
-      "publishedAt": "2026-06-06T09:51:25.286Z",
-      "key": "places-Chaykava-NOVUS-2026-06-06"
     }
   ]
 }
