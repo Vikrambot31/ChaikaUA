@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Coffee ART-ANMI SOUL-2026-07-27",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Coffee ART — вулиця Валерія Лобановського, 25 ☕ ANMI SOUL — вулиця Валерія Лобановського, 18 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-07-27T10:59:47.686Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/na-nyvkah-do-29-lypnya-chastkovo-obmezhyly-ruh/",
     "title": "На Нивках до 29 липня частково обмежили рух",
     "shortText": "На Нивках у Шевченківському районі до 29 липня обмежують рух через ремонт асфальту. Мешканцям Чайки варто враховувати можливі затримки при їзді до центру. #ЖКЧайка #Ірпінь #КиївськаОбласть #дорожниРоботи",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/speku-bude-zminyuvaty-doshh-pogoda-v-ukrayini-u-drugyj-tyzhden-chervnya-poraduye-komfortom/",
-    "title": "Спеку буде змінювати дощ: погода в Україні у другий тиждень червня порадує комфортом",
-    "shortText": "На другому тижні червня Україну чекає комфортна погода: спеку змінюватимуть грозові дощі. Для Ірпеня це означає перерву від спеки й достатньо вологи для зеленених насаджень. #ЖКЧайка #Ірпінь #КиївськаОбласть #погода",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/speku-bude-zminyuvaty-doshh-pogoda-v-ukrayini-u-drugyj-tyzhden-chervnya-poraduye-komfortom/",
-    "publishedAt": "2026-06-08T08:48:10.192Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]
