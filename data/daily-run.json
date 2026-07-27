@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-07-27",
+      "publishedAt": "2026-07-27T06:56:55.695Z",
+      "key": "https://bigkyiv.com.ua/na-nyvkah-do-29-lypnya-chastkovo-obmezhyly-ruh/"
+    },
+    {
       "type": "places",
       "date": "2026-07-26",
       "publishedAt": "2026-07-26T09:49:03.455Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-08",
       "publishedAt": "2026-06-08T08:48:10.193Z",
       "key": "https://bigkyiv.com.ua/speku-bude-zminyuvaty-doshh-pogoda-v-ukrayini-u-drugyj-tyzhden-chervnya-poraduye-komfortom/"
-    },
-    {
-      "type": "places",
-      "date": "2026-06-07",
-      "publishedAt": "2026-06-07T10:19:29.948Z",
-      "key": "places-NOVUS-Grano Bakery-2026-06-07"
     }
   ]
 }
