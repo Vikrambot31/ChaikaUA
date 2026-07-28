@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-07-28",
+      "publishedAt": "2026-07-28T10:20:18.698Z",
+      "key": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-07-28"
+    },
+    {
       "type": "news",
       "date": "2026-07-28",
       "publishedAt": "2026-07-28T06:20:36.896Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-09",
       "publishedAt": "2026-06-09T10:50:19.821Z",
       "key": "places-Кав'ярня ХЛІБ та КАВА-Мозаїка Espresso bar-2026-06-09"
-    },
-    {
-      "type": "news",
-      "date": "2026-06-09",
-      "publishedAt": "2026-06-09T07:41:34.063Z",
-      "key": "https://bigkyiv.com.ua/na-sumshhyni-cherez-vorozhi-ataky-dvoye-lyudej-zagynuly-shhe-13-postrazhdaly/"
     }
   ]
 }
