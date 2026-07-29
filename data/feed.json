@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-White Rabbit Coffee and Friends-Chaykava-2026-07-29",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ White Rabbit Coffee and Friends — вулиця Валерія Лобановського, 26 к2 ☕ Chaykava — вулиця Українського Відродження #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-07-29T10:26:36.635Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/na-perehrestyah-bulvaru-tarasa-shevchenka-tymchasovo-ne-praczyuvatymut-svitlofory/",
     "title": "На перехрестях бульвару Тараса Шевченка тимчасово не працюватимуть світлофори",
     "shortText": "На перехрестях бульвару Тараса Шевченка в середу модернізуватимуть світлофори з 9:15 до 14:00. Мешканцям Ірпеня варто враховувати можливі затримки під час поїздок до столиці. #ЖКЧайка #Ірпінь #КиївськаОбласть #дорожнійрух",
@@ -1084,17 +1095,6 @@
     "sourceName": "bigkyiv.com.ua",
     "sourceUrl": "https://bigkyiv.com.ua/na-podoli-zatopylo-knygarnyu-smoloskyp-kyyan-prosyat-pro-dopomogu/",
     "publishedAt": "2026-06-10T08:02:24.593Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/na-bulvari-shevchenka-i-bilya-arsenalnoyi-uskladeno-ruh-cherez-provallya-na-dorozi/",
-    "title": "На бульварі Шевченка і біля «Арсенальної» ускладено рух через провалля на дорозі",
-    "shortText": "У Києві з'явилися великі провалля на дорогах. Для ірпінян, які їздять до столиці, це означає пробки та довші маршрути — краще планувати поїздки заздалегідь. #ЖКЧайка #Ірпінь #КиївськаОбласть #дорожнійстан",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/na-bulvari-shevchenka-i-bilya-arsenalnoyi-uskladeno-ruh-cherez-provallya-na-dorozi/",
-    "publishedAt": "2026-06-09T11:44:10.255Z",
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
