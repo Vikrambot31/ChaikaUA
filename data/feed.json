@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://bigkyiv.com.ua/na-perehrestyah-bulvaru-tarasa-shevchenka-tymchasovo-ne-praczyuvatymut-svitlofory/",
+    "title": "На перехрестях бульвару Тараса Шевченка тимчасово не працюватимуть світлофори",
+    "shortText": "На перехрестях бульвару Тараса Шевченка в середу модернізуватимуть світлофори з 9:15 до 14:00. Мешканцям Ірпеня варто враховувати можливі затримки під час поїздок до столиці. #ЖКЧайка #Ірпінь #КиївськаОбласть #дорожнійрух",
+    "sourceName": "bigkyiv.com.ua",
+    "sourceUrl": "https://bigkyiv.com.ua/na-perehrestyah-bulvaru-tarasa-shevchenka-tymchasovo-ne-praczyuvatymut-svitlofory/",
+    "publishedAt": "2026-07-29T06:25:38.281Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-07-28",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ ANMI SOUL — вулиця Валерія Лобановського, 18 ☕ White Rabbit Coffee and Friends — вулиця Валерія Лобановського, 26 к2 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Кав'ярня ХЛІБ та КАВА-Мозаїка Espresso bar-2026-06-09",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ Кав'ярня ХЛІБ та КАВА — вулиця Валерія Лобановського, 18 ☕ Мозаїка Espresso bar — вулиця Валерія Лобановського #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-06-09T10:50:19.820Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]

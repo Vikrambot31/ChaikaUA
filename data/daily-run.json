@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-07-29",
+      "publishedAt": "2026-07-29T06:25:38.282Z",
+      "key": "https://bigkyiv.com.ua/na-perehrestyah-bulvaru-tarasa-shevchenka-tymchasovo-ne-praczyuvatymut-svitlofory/"
+    },
+    {
       "type": "places",
       "date": "2026-07-28",
       "publishedAt": "2026-07-28T10:20:18.698Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-09",
       "publishedAt": "2026-06-09T11:44:10.256Z",
       "key": "https://bigkyiv.com.ua/na-bulvari-shevchenka-i-bilya-arsenalnoyi-uskladeno-ruh-cherez-provallya-na-dorozi/"
-    },
-    {
-      "type": "places",
-      "date": "2026-06-09",
-      "publishedAt": "2026-06-09T10:50:19.821Z",
-      "key": "places-Кав'ярня ХЛІБ та КАВА-Мозаїка Espresso bar-2026-06-09"
     }
   ]
 }
