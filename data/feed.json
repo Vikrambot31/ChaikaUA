@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Chaykava-NOVUS-2026-07-30",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Chaykava — вулиця Українського Відродження 🛒 NOVUS — вулиця Авіаконструктора Антонова #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-07-30T10:09:05.287Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://www.pravda.com.ua/news/2026/07/30/8046489/",
     "title": "У Люблінському воєводстві Польщі чули вибухи, а на полі з’явився кратер",
     "shortText": "Російські ракети долітають до Люблінського воєводства Польщі — це означає, що конфлікт наближається до меж НАТО, впливаючи на безпеку всього регіону, включаючи Ірпінь. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Мозаїка Espresso bar-#МОЖЕКАВИ?-2026-06-10",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ Мозаїка Espresso bar — вулиця Валерія Лобановського ☕ #МОЖЕКАВИ? — вулиця Валерія Лобановського, 29 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-06-10T11:29:16.835Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
