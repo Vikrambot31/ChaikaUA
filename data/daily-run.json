@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-07-30",
+      "publishedAt": "2026-07-30T06:21:35.128Z",
+      "key": "https://www.pravda.com.ua/news/2026/07/30/8046489/"
+    },
+    {
       "type": "places",
       "date": "2026-07-29",
       "publishedAt": "2026-07-29T10:26:36.636Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-10",
       "publishedAt": "2026-06-10T11:29:16.836Z",
       "key": "places-Мозаїка Espresso bar-#МОЖЕКАВИ?-2026-06-10"
-    },
-    {
-      "type": "news",
-      "date": "2026-06-10",
-      "publishedAt": "2026-06-10T08:02:24.594Z",
-      "key": "https://bigkyiv.com.ua/na-podoli-zatopylo-knygarnyu-smoloskyp-kyyan-prosyat-pro-dopomogu/"
     }
   ]
 }
