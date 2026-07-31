@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-07-31",
+      "publishedAt": "2026-07-31T06:38:30.303Z",
+      "key": "https://bigkyiv.com.ua/u-kyyevi-chastkovo-obmezhat-ruh-mostom-metro/"
+    },
+    {
       "type": "places",
       "date": "2026-07-30",
       "publishedAt": "2026-07-30T10:09:05.287Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-11",
       "publishedAt": "2026-06-11T12:01:32.670Z",
       "key": "places-#МОЖЕКАВИ?-Fora-2026-06-11"
-    },
-    {
-      "type": "news",
-      "date": "2026-06-11",
-      "publishedAt": "2026-06-11T08:38:32.210Z",
-      "key": "https://bigkyiv.com.ua/rosiyany-vdaryly-po-zaliznychnomu-depo-v-konotopi-zagynula-praczivnyczya-chetvero-poranenyh/"
     }
   ]
 }
