@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-NOVUS-Grano Bakery-2026-07-31",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "🛒 NOVUS — вулиця Авіаконструктора Антонова 🛒 Grano Bakery — вулиця Валерія Лобановського, 35 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-07-31T10:26:09.159Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/u-kyyevi-chastkovo-obmezhat-ruh-mostom-metro/",
     "title": "У Києві частково обмежать рух мостом Метро",
     "shortText": "З 31 липня до 3 серпня обмежують рух мостом Метро в Києві. Для ірпінців — затримки при в'їзді до столиці та збільшення часу в дорозі. #ЖКЧайка #Ірпінь #КиFreguesiasObласть #ДорожнийРух",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-#МОЖЕКАВИ?-Fora-2026-06-11",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ #МОЖЕКАВИ? — вулиця Валерія Лобановського, 29 🛒 Fora — вулиця Грушевського, 12 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-06-11T12:01:32.669Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
