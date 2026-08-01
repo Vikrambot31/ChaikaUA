@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-08-01",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Кав'ярня-кондитерська \"Гамак\" — вулиця Валерія Лобановського ☕ BALCONE COFFEE — вулиця Валерія Лобановського, 26 к2 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-08-01T09:47:31.423Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/kilkist-zagyblyh-u-kyyevi-vnaslidok-rosijskoyi-ataky-zrosla-do-devyaty/",
     "title": "Кількість загиблих у Києві внаслідок російської атаки зросла до дев’яти",
     "shortText": "У Києві під час атаки загинуло дев'ять людей, 28 поранено. Для мешканців Чайки це нагадування про важливість укриттів і готовності до тривог. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Fora-Кав'ярня-кондитерська \"Гамак\"-2026-06-12",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "🛒 Fora — вулиця Грушевського, 12 ☕ Кав'ярня-кондитерська \"Гамак\" — вулиця Валерія Лобановського #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-06-12T11:33:02.471Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
