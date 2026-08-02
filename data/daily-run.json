@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-08-02",
+      "publishedAt": "2026-08-02T06:28:02.161Z",
+      "key": "https://bigkyiv.com.ua/plisnyava-i-antysanitariya-ta-nebezpechne-ukryttya-u-tabori-artek-zakarpattya-vyyavyly-krychushhi-porushennya/"
+    },
+    {
       "type": "places",
       "date": "2026-08-01",
       "publishedAt": "2026-08-01T09:47:31.424Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-13",
       "publishedAt": "2026-06-13T10:19:41.327Z",
       "key": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-06-13"
-    },
-    {
-      "type": "news",
-      "date": "2026-06-13",
-      "publishedAt": "2026-06-13T07:41:08.947Z",
-      "key": "https://bigkyiv.com.ua/sogodni-na-kyyivshhyni-bude-minlyva-hmarnist-bez-opadiv/"
     }
   ]
 }
