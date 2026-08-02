@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-08-02",
+      "publishedAt": "2026-08-02T09:46:47.550Z",
+      "key": "places-BALCONE COFFEE-Coffee ART-2026-08-02"
+    },
+    {
       "type": "news",
       "date": "2026-08-02",
       "publishedAt": "2026-08-02T06:28:02.161Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-14",
       "publishedAt": "2026-06-14T08:11:03.758Z",
       "key": "https://bigkyiv.com.ua/stolyczya-rosiyi-faktychno-pishla-po-kursu-krejsera-moskvy-video/"
-    },
-    {
-      "type": "places",
-      "date": "2026-06-13",
-      "publishedAt": "2026-06-13T10:19:41.327Z",
-      "key": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-06-13"
     }
   ]
 }

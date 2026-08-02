@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-BALCONE COFFEE-Coffee ART-2026-08-02",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ BALCONE COFFEE — вулиця Валерія Лобановського, 26 к2 ☕ Coffee ART — вулиця Валерія Лобановського, 25 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-08-02T09:46:47.550Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/plisnyava-i-antysanitariya-ta-nebezpechne-ukryttya-u-tabori-artek-zakarpattya-vyyavyly-krychushhi-porushennya/",
     "title": "Пліснява і антисанітарія та небезпечне укриття: у таборі «Артек Закарпаття» виявили кричущі порушення",
     "shortText": "У таборі «Артек Закарпаття» виявили плісень, антисанітарію та небезпечне укриття. Для мешканців Чайки це нагадування перевіряти умови в дитячих закладах, де відпочивають ваші діти. #ЖКЧайка #Ірпінь #КиївськаОбласть #БезпекаДітей",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-06-13",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ Кав'ярня-кондитерська \"Гамак\" — вулиця Валерія Лобановського ☕ BALCONE COFFEE — вулиця Валерія Лобановського, 26 к2 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-06-13T10:19:41.326Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
