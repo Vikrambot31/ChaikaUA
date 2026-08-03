@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-08-03",
+      "publishedAt": "2026-08-03T06:54:03.693Z",
+      "key": "https://bigkyiv.com.ua/u-grecziyi-pid-chas-gasinnya-lisovoyi-pozhezhi-zitknulysya-dva-vertoloty/"
+    },
+    {
       "type": "places",
       "date": "2026-08-02",
       "publishedAt": "2026-08-02T09:46:47.550Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-14",
       "publishedAt": "2026-06-14T10:42:50.559Z",
       "key": "places-BALCONE COFFEE-Coffee ART-2026-06-14"
-    },
-    {
-      "type": "news",
-      "date": "2026-06-14",
-      "publishedAt": "2026-06-14T08:11:03.758Z",
-      "key": "https://bigkyiv.com.ua/stolyczya-rosiyi-faktychno-pishla-po-kursu-krejsera-moskvy-video/"
     }
   ]
 }
