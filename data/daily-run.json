@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-08-03",
+      "publishedAt": "2026-08-03T11:10:33.260Z",
+      "key": "places-Coffee ART-ANMI SOUL-2026-08-03"
+    },
+    {
       "type": "news",
       "date": "2026-08-03",
       "publishedAt": "2026-08-03T06:54:03.693Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-15",
       "publishedAt": "2026-06-15T09:55:47.615Z",
       "key": "https://bigkyiv.com.ua/sbu-pokazala-ulamky-gerani-yakoyu-rf-atakuvala-kyyevo-pechersku-lavru/"
-    },
-    {
-      "type": "places",
-      "date": "2026-06-14",
-      "publishedAt": "2026-06-14T10:42:50.559Z",
-      "key": "places-BALCONE COFFEE-Coffee ART-2026-06-14"
     }
   ]
 }
