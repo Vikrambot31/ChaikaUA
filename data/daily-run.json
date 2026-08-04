@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-08-04",
+      "publishedAt": "2026-08-04T06:21:38.468Z",
+      "key": "https://bigkyiv.com.ua/kyyan-poperedzhayut-pro-sylnu-speku/"
+    },
+    {
       "type": "places",
       "date": "2026-08-03",
       "publishedAt": "2026-08-03T11:10:33.260Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-15",
       "publishedAt": "2026-06-15T13:44:13.199Z",
       "key": "places-Coffee ART-ANMI SOUL-2026-06-15"
-    },
-    {
-      "type": "news",
-      "date": "2026-06-15",
-      "publishedAt": "2026-06-15T09:55:47.615Z",
-      "key": "https://bigkyiv.com.ua/sbu-pokazala-ulamky-gerani-yakoyu-rf-atakuvala-kyyevo-pechersku-lavru/"
     }
   ]
 }

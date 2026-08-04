@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://bigkyiv.com.ua/kyyan-poperedzhayut-pro-sylnu-speku/",
+    "title": "Киян попереджають про сильну спеку",
+    "shortText": "На Київщині тримається спека до 37°С. Мешканцям Чайки знадобиться максимум води, тіні й обережності на сонці. #ЖКЧайка #Ірпінь #КиївськаОбласть #Спека",
+    "sourceName": "bigkyiv.com.ua",
+    "sourceUrl": "https://bigkyiv.com.ua/kyyan-poperedzhayut-pro-sylnu-speku/",
+    "publishedAt": "2026-08-04T06:21:38.467Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-Coffee ART-ANMI SOUL-2026-08-03",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ Coffee ART — вулиця Валерія Лобановського, 25 ☕ ANMI SOUL — вулиця Валерія Лобановського, 18 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/sbu-pokazala-ulamky-gerani-yakoyu-rf-atakuvala-kyyevo-pechersku-lavru/",
-    "title": "СБУ показала уламки «Герані», якою РФ атакувала Києво-Печерську лавру",
-    "shortText": "Російські дрони «Герань-2» регулярно атакують Київ та область. Мешканці Чайки повинні залишатися пильними та дотримуватися правил безпеки під час повітряних тривог. #ЖКЧайка #Ірпінь #КиївськаОбласть #БезпекаУкраїни",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/sbu-pokazala-ulamky-gerani-yakoyu-rf-atakuvala-kyyevo-pechersku-lavru/",
-    "publishedAt": "2026-06-15T09:55:47.614Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]
