@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-08-04",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ ANMI SOUL — вулиця Валерія Лобановського, 18 ☕ White Rabbit Coffee and Friends — вулиця Валерія Лобановського, 26 к2 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-08-04T10:25:12.978Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/kyyan-poperedzhayut-pro-sylnu-speku/",
     "title": "Киян попереджають про сильну спеку",
     "shortText": "На Київщині тримається спека до 37°С. Мешканцям Чайки знадобиться максимум води, тіні й обережності на сонці. #ЖКЧайка #Ірпінь #КиївськаОбласть #Спека",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Coffee ART-ANMI SOUL-2026-06-15",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ Coffee ART — вулиця Валерія Лобановського, 25 ☕ ANMI SOUL — вулиця Валерія Лобановського, 18 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-06-15T13:44:13.198Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
