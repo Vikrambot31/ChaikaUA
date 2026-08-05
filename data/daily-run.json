@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-08-05",
+      "publishedAt": "2026-08-05T10:21:56.312Z",
+      "key": "places-White Rabbit Coffee and Friends-Chaykava-2026-08-05"
+    },
+    {
       "type": "news",
       "date": "2026-08-05",
       "publishedAt": "2026-08-05T06:21:39.322Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-17",
       "publishedAt": "2026-06-17T08:55:38.128Z",
       "key": "https://www.pravda.com.ua/news/2026/06/17/8039731/"
-    },
-    {
-      "type": "places",
-      "date": "2026-06-16",
-      "publishedAt": "2026-06-16T12:43:54.918Z",
-      "key": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-06-16"
     }
   ]
 }
