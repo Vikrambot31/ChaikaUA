@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://bigkyiv.com.ua/na-zaliznychnij-platformi-bilya-atakovanyh-logistychnyh-czentriv-zagynuly-lyudy-poyizdy-zminyly-ruh/",
+    "title": "На залізничній платформі біля атакованих логістичних центрів загинули люди: поїзди змінили рух",
+    "shortText": "Атака на логістичні центри біля Броварів пошкодила залізничну інфраструктуру. Для мешканців Чайки це означає можливі затримки доставок і змінений транспортний рух у регіоні. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
+    "sourceName": "bigkyiv.com.ua",
+    "sourceUrl": "https://bigkyiv.com.ua/na-zaliznychnij-platformi-bilya-atakovanyh-logistychnyh-czentriv-zagynuly-lyudy-poyizdy-zminyly-ruh/",
+    "publishedAt": "2026-08-05T06:21:39.321Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-08-04",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ ANMI SOUL — вулиця Валерія Лобановського, 18 ☕ White Rabbit Coffee and Friends — вулиця Валерія Лобановського, 26 к2 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/pid-chas-rosijskoyi-ataky-na-stolyczyu-postrazhdala-budivlya-avarijnoyi-sluzhby-kyyivteploenergo/",
-    "title": "Під час російської атаки на столицю постраждала будівля аварійної служби «Київтеплоенерго»",
-    "shortText": "Під час атаки пошкоджено будівлю аварійної служби «Київтеплоенерго». Для ірпінян це означає можливі затримки з опаленням та гарячою водою взимку. #ЖКЧайка #Ірпінь #КиївськаОбласть #Теплопостачання",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/pid-chas-rosijskoyi-ataky-na-stolyczyu-postrazhdala-budivlya-avarijnoyi-sluzhby-kyyivteploenergo/",
-    "publishedAt": "2026-06-16T09:21:03.971Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]

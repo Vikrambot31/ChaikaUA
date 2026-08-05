@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-08-05",
+      "publishedAt": "2026-08-05T06:21:39.322Z",
+      "key": "https://bigkyiv.com.ua/na-zaliznychnij-platformi-bilya-atakovanyh-logistychnyh-czentriv-zagynuly-lyudy-poyizdy-zminyly-ruh/"
+    },
+    {
       "type": "places",
       "date": "2026-08-04",
       "publishedAt": "2026-08-04T10:25:12.980Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-16",
       "publishedAt": "2026-06-16T12:43:54.918Z",
       "key": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-06-16"
-    },
-    {
-      "type": "news",
-      "date": "2026-06-16",
-      "publishedAt": "2026-06-16T09:21:03.972Z",
-      "key": "https://bigkyiv.com.ua/pid-chas-rosijskoyi-ataky-na-stolyczyu-postrazhdala-budivlya-avarijnoyi-sluzhby-kyyivteploenergo/"
     }
   ]
 }
