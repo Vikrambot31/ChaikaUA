@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Chaykava-NOVUS-2026-08-06",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Chaykava — вулиця Українського Відродження 🛒 NOVUS — вулиця Авіаконструктора Антонова #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-08-06T10:23:42.241Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/u-perehodi-na-majdani-nezalezhnosti-tryvaye-remont/",
     "title": "У переході на Майдані Незалежності триває ремонт",
     "shortText": "У Київі на Майдані Незалежності ремонтують підземний перехід. Для ірпінян, які часто бувають у центрі столиці, це означає можливі затримки при проходженні цієї локації. #ЖКЧайка #Ірпінь #КиївськаОбласть #Транспорт",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-White Rabbit Coffee and Friends-Chaykava-2026-06-17",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ White Rabbit Coffee and Friends — вулиця Валерія Лобановського, 26 к2 ☕ Chaykava — вулиця Українського Відродження #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-06-17T12:08:24.445Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
