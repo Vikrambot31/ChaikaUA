@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://bigkyiv.com.ua/u-perehodi-na-majdani-nezalezhnosti-tryvaye-remont/",
+    "title": "У переході на Майдані Незалежності триває ремонт",
+    "shortText": "У Київі на Майдані Незалежності ремонтують підземний перехід. Для ірпінян, які часто бувають у центрі столиці, це означає можливі затримки при проходженні цієї локації. #ЖКЧайка #Ірпінь #КиївськаОбласть #Транспорт",
+    "sourceName": "bigkyiv.com.ua",
+    "sourceUrl": "https://bigkyiv.com.ua/u-perehodi-na-majdani-nezalezhnosti-tryvaye-remont/",
+    "publishedAt": "2026-08-06T06:24:17.382Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-White Rabbit Coffee and Friends-Chaykava-2026-08-05",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ White Rabbit Coffee and Friends — вулиця Валерія Лобановського, 26 к2 ☕ Chaykava — вулиця Українського Відродження #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://www.pravda.com.ua/news/2026/06/17/8039731/",
-    "title": "Більшість українців хочуть перезавантаження влади після війни, заміни Зеленського очікують 67% – опитування",
-    "shortText": "67% українців хочуть змін на посту президента після закінчення війни. Для Ірпеня це означає, що громада активно обговорює майбутнє країни та очікує оновлення керівництва. #ЖКЧайка #Ірпінь #КиївськаОбласть #Політика",
-    "sourceName": "www.pravda.com.ua",
-    "sourceUrl": "https://www.pravda.com.ua/news/2026/06/17/8039731/",
-    "publishedAt": "2026-06-17T08:55:38.126Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]
