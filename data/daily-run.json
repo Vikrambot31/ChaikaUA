@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-08-07",
+      "publishedAt": "2026-08-07T08:43:53.872Z",
+      "key": "places-NOVUS-Grano Bakery-2026-08-07"
+    },
+    {
       "type": "news",
       "date": "2026-08-07",
       "publishedAt": "2026-08-07T05:30:01.201Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-19",
       "publishedAt": "2026-06-19T09:02:04.931Z",
       "key": "https://bigkyiv.com.ua/pid-kyyevom-lunatymut-vybuhy-mistyan-zaklykayut-zberigaty-spokij/"
-    },
-    {
-      "type": "places",
-      "date": "2026-06-18",
-      "publishedAt": "2026-06-18T11:43:01.513Z",
-      "key": "places-Chaykava-NOVUS-2026-06-18"
     }
   ]
 }
