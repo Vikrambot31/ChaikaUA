@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://www.pravda.com.ua/news/2026/08/08/8047842/",
+    "title": "У Києві через російську атаку постраждали четверо осіб",
+    "shortText": "Цієї ночі російська атака вразила столицю, постраждали четверо людей. Для мешканців Чайки це нагадує про важливість готовності та взаємної підтримки в громаді під час загроз. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
+    "sourceName": "www.pravda.com.ua",
+    "sourceUrl": "https://www.pravda.com.ua/news/2026/08/08/8047842/",
+    "publishedAt": "2026-08-08T04:49:38.227Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-NOVUS-Grano Bakery-2026-08-07",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "🛒 NOVUS — вулиця Авіаконструктора Антонова 🛒 Grano Bakery — вулиця Валерія Лобановського, 35 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/pid-kyyevom-lunatymut-vybuhy-mistyan-zaklykayut-zberigaty-spokij/",
-    "title": "Під Києвом лунатимуть вибухи: містян закликають зберігати спокій",
-    "shortText": "Під Києвом проводитимуть контрольовані вибухи, переважно в Броварському районі. Для мешканців Чайки — дотримуватися спокою, при повітряній тривозі йти в укриття. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/pid-kyyevom-lunatymut-vybuhy-mistyan-zaklykayut-zberigaty-spokij/",
-    "publishedAt": "2026-06-19T09:02:04.930Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]
