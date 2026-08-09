@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-08-09",
+      "publishedAt": "2026-08-09T08:27:41.911Z",
+      "key": "places-Кав'ярня ХЛІБ та КАВА-Мозаїка Espresso bar-2026-08-09"
+    },
+    {
       "type": "news",
       "date": "2026-08-09",
       "publishedAt": "2026-08-09T04:57:48.598Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-21",
       "publishedAt": "2026-06-21T08:23:18.009Z",
       "key": "https://bigkyiv.com.ua/na-poshkodzhenomu-rosijskym-obstrilom-uspenskomu-sobori-vzhe-zakryly-blyzko-70-dahu/"
-    },
-    {
-      "type": "places",
-      "date": "2026-06-20",
-      "publishedAt": "2026-06-20T10:24:15.977Z",
-      "key": "places-Grano Bakery-Кав'ярня ХЛІБ та КАВА-2026-06-20"
     }
   ]
 }

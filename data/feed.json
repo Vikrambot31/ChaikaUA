@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Кав'ярня ХЛІБ та КАВА-Мозаїка Espresso bar-2026-08-09",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Кав'ярня ХЛІБ та КАВА — вулиця Валерія Лобановського, 18 ☕ Мозаїка Espresso bar — вулиця Валерія Лобановського #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-08-09T08:27:41.910Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/u-kyyevi-poproshhalysya-iz-zasnovnykom-poshukovogo-zagonu-placzdarm-oleksiyem-yukovym/",
     "title": "У Києві попрощалися із засновником пошукового загону «Плацдарм» Олексієм Юковим",
     "shortText": "Засновник пошукового загону «Плацдарм» Олексій Юков загинув 5 серпня на Донеччині. Його 27-літня робота повертала полеглих захисників додому для гідного поховання. Мешканці Ірпені вшановують пам'ять героя, який поклав життя служінню Україні. #ЖКЧайка #Ірпінь #КиївськаОбласть #Пам'ятьПолеглих",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Grano Bakery-Кав'ярня ХЛІБ та КАВА-2026-06-20",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "🛒 Grano Bakery — вулиця Валерія Лобановського, 35 ☕ Кав'ярня ХЛІБ та КАВА — вулиця Валерія Лобановського, 18 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-06-20T10:24:15.976Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
