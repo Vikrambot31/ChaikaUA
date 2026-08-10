@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-08-10",
+      "publishedAt": "2026-08-10T09:04:25.688Z",
+      "key": "places-Мозаїка Espresso bar-#МОЖЕКАВИ?-2026-08-10"
+    },
+    {
       "type": "news",
       "date": "2026-08-10",
       "publishedAt": "2026-08-10T05:19:51.708Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-22",
       "publishedAt": "2026-06-22T09:42:31.803Z",
       "key": "https://bigkyiv.com.ua/u-buchanskij-gromadi-z-1-lypnya-diyatymut-novi-taryfy-na-vyvezennya-smittya/"
-    },
-    {
-      "type": "places",
-      "date": "2026-06-21",
-      "publishedAt": "2026-06-21T10:57:53.563Z",
-      "key": "places-Кав'ярня ХЛІБ та КАВА-Мозаїка Espresso bar-2026-06-21"
     }
   ]
 }

@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Мозаїка Espresso bar-#МОЖЕКАВИ?-2026-08-10",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Мозаїка Espresso bar — вулиця Валерія Лобановського ☕ #МОЖЕКАВИ? — вулиця Валерія Лобановського, 29 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-08-10T09:04:25.687Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/zatoriv-ne-unyknuty-u-dvoh-rajonah-kyyeva-z-10-serpnya-obmezhat-ruh/",
     "title": "Заторів не уникнути: у двох районах Києва з 10 серпня обмежують рух",
     "shortText": "З 10 серпня у Києві обмежують рух на проспекті Романа Шухевича до 1 вересня. Для ірпінців це означає потенційні затримки при їзді до столиці в робочий час. #ЖКЧайка #Ірпінь #КиївськаОбласть #Транспорт",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Кав'ярня ХЛІБ та КАВА-Мозаїка Espresso bar-2026-06-21",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ Кав'ярня ХЛІБ та КАВА — вулиця Валерія Лобановського, 18 ☕ Мозаїка Espresso bar — вулиця Валерія Лобановського #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-06-21T10:57:53.562Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
