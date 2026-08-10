@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-08-10",
+      "publishedAt": "2026-08-10T05:19:51.708Z",
+      "key": "https://bigkyiv.com.ua/zatoriv-ne-unyknuty-u-dvoh-rajonah-kyyeva-z-10-serpnya-obmezhat-ruh/"
+    },
+    {
       "type": "places",
       "date": "2026-08-09",
       "publishedAt": "2026-08-09T08:27:41.911Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-21",
       "publishedAt": "2026-06-21T10:57:53.563Z",
       "key": "places-Кав'ярня ХЛІБ та КАВА-Мозаїка Espresso bar-2026-06-21"
-    },
-    {
-      "type": "news",
-      "date": "2026-06-21",
-      "publishedAt": "2026-06-21T08:23:18.009Z",
-      "key": "https://bigkyiv.com.ua/na-poshkodzhenomu-rosijskym-obstrilom-uspenskomu-sobori-vzhe-zakryly-blyzko-70-dahu/"
     }
   ]
 }
