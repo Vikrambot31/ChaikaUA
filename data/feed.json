@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Fora-Кав'ярня-кондитерська \"Гамак\"-2026-08-12",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "🛒 Fora — вулиця Грушевського, 12 ☕ Кав'ярня-кондитерська \"Гамак\" — вулиця Валерія Лобановського #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-08-12T08:58:21.217Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/robotu-tramvayiv-number-14-15-pryzupynyayut-na-try-dni/",
     "title": "Роботу трамваїв № 14, 15 призупиняють на три дні",
     "shortText": "У Києві 12–14 серпня зупинять трамваї № 14 і 15 на ремонт колій. Для мешканців Чайки це означає затримки під час поїздок у центр міста — замість трамвая служитиме тимчасовий автобус. #ЖКЧайка #Ірпінь #КиївськаОбласть #громадськийтранспорт",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-#МОЖЕКАВИ?-Fora-2026-06-23",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ #МОЖЕКАВИ? — вулиця Валерія Лобановського, 29 🛒 Fora — вулиця Грушевського, 12 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-06-23T10:52:00.548Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]

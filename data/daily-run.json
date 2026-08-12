@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-08-12",
+      "publishedAt": "2026-08-12T08:58:21.218Z",
+      "key": "places-Fora-Кав'ярня-кондитерська \"Гамак\"-2026-08-12"
+    },
+    {
       "type": "news",
       "date": "2026-08-12",
       "publishedAt": "2026-08-12T05:26:12.715Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-24",
       "publishedAt": "2026-06-24T07:34:46.320Z",
       "key": "https://bigkyiv.com.ua/u-stolyczi-ne-vystachaye-vodiyiv-gromadskogo-transportu-kyyivpastrans-zaproshuye-na-robotu/"
-    },
-    {
-      "type": "places",
-      "date": "2026-06-23",
-      "publishedAt": "2026-06-23T10:52:00.549Z",
-      "key": "places-#МОЖЕКАВИ?-Fora-2026-06-23"
     }
   ]
 }
