@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-08-12",
+      "publishedAt": "2026-08-12T05:26:12.715Z",
+      "key": "https://bigkyiv.com.ua/robotu-tramvayiv-number-14-15-pryzupynyayut-na-try-dni/"
+    },
+    {
       "type": "places",
       "date": "2026-08-11",
       "publishedAt": "2026-08-11T08:41:19.473Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-23",
       "publishedAt": "2026-06-23T10:52:00.549Z",
       "key": "places-#МОЖЕКАВИ?-Fora-2026-06-23"
-    },
-    {
-      "type": "news",
-      "date": "2026-06-23",
-      "publishedAt": "2026-06-23T07:42:27.873Z",
-      "key": "https://bigkyiv.com.ua/na-podoli-chastkovo-obmezhyly-ruh/"
     }
   ]
 }
