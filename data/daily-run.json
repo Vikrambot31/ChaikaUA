@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-08-13",
+      "publishedAt": "2026-08-13T05:29:03.622Z",
+      "key": "https://bigkyiv.com.ua/pyat-kyyivskyh-shkil-ne-vstygayut-vidnovyty-pislya-atak-yak-navchatymutsya-dity/"
+    },
+    {
       "type": "places",
       "date": "2026-08-12",
       "publishedAt": "2026-08-12T08:58:21.218Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-24",
       "publishedAt": "2026-06-24T10:38:42.179Z",
       "key": "places-Fora-Кав'ярня-кондитерська \"Гамак\"-2026-06-24"
-    },
-    {
-      "type": "news",
-      "date": "2026-06-24",
-      "publishedAt": "2026-06-24T07:34:46.320Z",
-      "key": "https://bigkyiv.com.ua/u-stolyczi-ne-vystachaye-vodiyiv-gromadskogo-transportu-kyyivpastrans-zaproshuye-na-robotu/"
     }
   ]
 }
