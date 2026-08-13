@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-08-13",
+      "publishedAt": "2026-08-13T09:00:02.935Z",
+      "key": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-08-13"
+    },
+    {
       "type": "news",
       "date": "2026-08-13",
       "publishedAt": "2026-08-13T05:29:03.622Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-25",
       "publishedAt": "2026-06-25T07:37:08.066Z",
       "key": "https://bigkyiv.com.ua/na-livomu-berezi-kyyeva-ekstreni-vidklyuchennya-svitla/"
-    },
-    {
-      "type": "places",
-      "date": "2026-06-24",
-      "publishedAt": "2026-06-24T10:38:42.179Z",
-      "key": "places-Fora-Кав'ярня-кондитерська \"Гамак\"-2026-06-24"
     }
   ]
 }
