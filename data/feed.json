@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-BALCONE COFFEE-Coffee ART-2026-08-14",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ BALCONE COFFEE — вулиця Валерія Лобановського, 26 к2 ☕ Coffee ART — вулиця Валерія Лобановського, 25 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-08-14T08:55:19.918Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://www.pravda.com.ua/news/2026/08/14/8048615/",
     "title": "Польща може передати Україні літаки МіГ-29 вже найближчими тижнями в обмін на дрони – ЗМІ",
     "shortText": "Польща може передати Україні МіГ-29 вже найближчими тижнями. Це зміцнює оборону нашої країни і прибличує мир ближче до Ірпеня та região. #ЖКЧайка #Ірпінь #КиївськаОбласть #Оборона",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-06-25",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ Кав'ярня-кондитерська \"Гамак\" — вулиця Валерія Лобановського ☕ BALCONE COFFEE — вулиця Валерія Лобановського, 26 к2 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-06-25T10:32:11.666Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
