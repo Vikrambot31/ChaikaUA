@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-08-14",
+      "publishedAt": "2026-08-14T05:26:43.185Z",
+      "key": "https://www.pravda.com.ua/news/2026/08/14/8048615/"
+    },
+    {
       "type": "places",
       "date": "2026-08-13",
       "publishedAt": "2026-08-13T09:00:02.935Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-25",
       "publishedAt": "2026-06-25T10:32:11.667Z",
       "key": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-06-25"
-    },
-    {
-      "type": "news",
-      "date": "2026-06-25",
-      "publishedAt": "2026-06-25T07:37:08.066Z",
-      "key": "https://bigkyiv.com.ua/na-livomu-berezi-kyyeva-ekstreni-vidklyuchennya-svitla/"
     }
   ]
 }
