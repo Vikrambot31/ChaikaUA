@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://bigkyiv.com.ua/iz-15-serpnya-chastkovo-obmezhyly-ruh-transportu-yevropejskoyu-ploshheyu/",
+    "title": "Із 15 серпня частково обмежили рух транспорту  Європейською площею",
+    "shortText": "На Європейській площі з 15 серпня частково обмежили рух через ремонт проїжджої частини. Ірпінцям варто обходити цю ділянку при плануванні маршрутів до столиці. #ЖКЧайка #Ірпінь #КиївськаОбласть #ДорожиКиєва",
+    "sourceName": "bigkyiv.com.ua",
+    "sourceUrl": "https://bigkyiv.com.ua/iz-15-serpnya-chastkovo-obmezhyly-ruh-transportu-yevropejskoyu-ploshheyu/",
+    "publishedAt": "2026-08-15T04:22:32.314Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-BALCONE COFFEE-Coffee ART-2026-08-14",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ BALCONE COFFEE — вулиця Валерія Лобановського, 26 к2 ☕ Coffee ART — вулиця Валерія Лобановського, 25 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/ruh-pivnichnym-mostom-galmuvatymut-remontni-roboty/",
-    "title": "Рух Північним мостом гальмуватимуть ремонтні роботи",
-    "shortText": "На Північному мосту з 26 по 29 червня — ремонтні роботи в двох смугах. Для мешканців Чайки це означає можливі затримки при в'їзді до столиці та варто планувати маршрути наперед. #ЖКЧайка #Ірпінь #КиївськаОбласть #Дорожна_ситуація",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/ruh-pivnichnym-mostom-galmuvatymut-remontni-roboty/",
-    "publishedAt": "2026-06-26T07:44:16.718Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]
