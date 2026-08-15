@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-08-15",
+      "publishedAt": "2026-08-15T08:14:40.490Z",
+      "key": "places-Coffee ART-ANMI SOUL-2026-08-15"
+    },
+    {
       "type": "news",
       "date": "2026-08-15",
       "publishedAt": "2026-08-15T04:22:32.315Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-27",
       "publishedAt": "2026-06-27T06:48:39.879Z",
       "key": "https://bigkyiv.com.ua/u-darnyczkomu-rajoni-zyavyvsya-doshhovyj-sadok-u-novomu-miniskveri/"
-    },
-    {
-      "type": "places",
-      "date": "2026-06-26",
-      "publishedAt": "2026-06-26T10:42:09.009Z",
-      "key": "places-BALCONE COFFEE-Coffee ART-2026-06-26"
     }
   ]
 }
