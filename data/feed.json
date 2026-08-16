@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://www.pravda.com.ua/news/2026/08/16/8048849/",
+    "title": "РФ атакувала балістикою низку регіонів України: під ударом Київ, Дніпропетровщина та Полтавщина",
+    "shortText": "Ночі на 16 серпня Росія атакувала балістикою Київ та сусідні регіони. Для мешканців Чайки це означає посилену активність ППО та можливі перебої з комунікаціями. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
+    "sourceName": "www.pravda.com.ua",
+    "sourceUrl": "https://www.pravda.com.ua/news/2026/08/16/8048849/",
+    "publishedAt": "2026-08-16T04:28:51.030Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-Coffee ART-ANMI SOUL-2026-08-15",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ Coffee ART — вулиця Валерія Лобановського, 25 ☕ ANMI SOUL — вулиця Валерія Лобановського, 18 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/u-darnyczkomu-rajoni-zyavyvsya-doshhovyj-sadok-u-novomu-miniskveri/",
-    "title": "У новому скверику Дарницького району з’явився дощовий садок",
-    "shortText": "У Дарницькому районі Києва запустили дощовий садок — він накопичує опади й поповнює ґрунтові води. Ірпінь також має потенціал для таких екопроектів біля Чайки. #ЖКЧайка #Ірпінь #КиївськаОбласть #ЕкоБудівництво",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/u-darnyczkomu-rajoni-zyavyvsya-doshhovyj-sadok-u-novomu-miniskveri/",
-    "publishedAt": "2026-06-27T06:48:39.878Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]

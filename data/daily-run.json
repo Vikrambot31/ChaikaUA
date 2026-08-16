@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-08-16",
+      "publishedAt": "2026-08-16T04:28:51.031Z",
+      "key": "https://www.pravda.com.ua/news/2026/08/16/8048849/"
+    },
+    {
       "type": "places",
       "date": "2026-08-15",
       "publishedAt": "2026-08-15T08:14:40.490Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-27",
       "publishedAt": "2026-06-27T09:54:14.262Z",
       "key": "places-Coffee ART-ANMI SOUL-2026-06-27"
-    },
-    {
-      "type": "news",
-      "date": "2026-06-27",
-      "publishedAt": "2026-06-27T06:48:39.879Z",
-      "key": "https://bigkyiv.com.ua/u-darnyczkomu-rajoni-zyavyvsya-doshhovyj-sadok-u-novomu-miniskveri/"
     }
   ]
 }
