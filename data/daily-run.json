@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-08-16",
+      "publishedAt": "2026-08-16T08:14:34.897Z",
+      "key": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-08-16"
+    },
+    {
       "type": "news",
       "date": "2026-08-16",
       "publishedAt": "2026-08-16T04:28:51.031Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-28",
       "publishedAt": "2026-06-28T07:45:50.155Z",
       "key": "https://bigkyiv.com.ua/u-shkolah-i-sadochkah-do-kinczya-roku-planuyut-dobuduvaty-9-ukryttiv-podvijnogo-pryznachennya/"
-    },
-    {
-      "type": "places",
-      "date": "2026-06-27",
-      "publishedAt": "2026-06-27T09:54:14.262Z",
-      "key": "places-Coffee ART-ANMI SOUL-2026-06-27"
     }
   ]
 }
