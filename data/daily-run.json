@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-08-17",
+      "publishedAt": "2026-08-17T08:28:29.761Z",
+      "key": "places-White Rabbit Coffee and Friends-Chaykava-2026-08-17"
+    },
+    {
       "type": "news",
       "date": "2026-08-17",
       "publishedAt": "2026-08-17T04:34:15.539Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-29",
       "publishedAt": "2026-06-29T08:52:55.377Z",
       "key": "https://bigkyiv.com.ua/kyyanam-radyat-pidzaryadyty-poverbanky-cherez-speku-mozhlyvi-pereboyi-zi-svitlom/"
-    },
-    {
-      "type": "places",
-      "date": "2026-06-28",
-      "publishedAt": "2026-06-28T10:18:37.242Z",
-      "key": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-06-28"
     }
   ]
 }
