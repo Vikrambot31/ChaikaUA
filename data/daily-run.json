@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-08-17",
+      "publishedAt": "2026-08-17T04:34:15.539Z",
+      "key": "https://bigkyiv.com.ua/vulyczeyu-zolotoustivskoyu-do-kinczya-lita-obmezhat-ruh/"
+    },
+    {
       "type": "places",
       "date": "2026-08-16",
       "publishedAt": "2026-08-16T08:14:34.897Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-28",
       "publishedAt": "2026-06-28T10:18:37.242Z",
       "key": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-06-28"
-    },
-    {
-      "type": "news",
-      "date": "2026-06-28",
-      "publishedAt": "2026-06-28T07:45:50.155Z",
-      "key": "https://bigkyiv.com.ua/u-shkolah-i-sadochkah-do-kinczya-roku-planuyut-dobuduvaty-9-ukryttiv-podvijnogo-pryznachennya/"
     }
   ]
 }
