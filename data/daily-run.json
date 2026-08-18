@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-08-18",
+      "publishedAt": "2026-08-18T04:28:31.610Z",
+      "key": "https://www.pravda.com.ua/news/2026/08/18/8049088/"
+    },
+    {
       "type": "places",
       "date": "2026-08-17",
       "publishedAt": "2026-08-17T08:28:29.761Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-29",
       "publishedAt": "2026-06-29T12:21:35.701Z",
       "key": "places-White Rabbit Coffee and Friends-Chaykava-2026-06-29"
-    },
-    {
-      "type": "news",
-      "date": "2026-06-29",
-      "publishedAt": "2026-06-29T08:52:55.377Z",
-      "key": "https://bigkyiv.com.ua/kyyanam-radyat-pidzaryadyty-poverbanky-cherez-speku-mozhlyvi-pereboyi-zi-svitlom/"
     }
   ]
 }
