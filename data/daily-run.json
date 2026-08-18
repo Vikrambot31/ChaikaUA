@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-08-18",
+      "publishedAt": "2026-08-18T08:20:51.807Z",
+      "key": "places-Chaykava-NOVUS-2026-08-18"
+    },
+    {
       "type": "news",
       "date": "2026-08-18",
       "publishedAt": "2026-08-18T04:28:31.610Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-30",
       "publishedAt": "2026-06-30T07:46:44.209Z",
       "key": "https://bigkyiv.com.ua/yihala-na-vruchennya-dyplomu-v-harkovi-zagynula-vid-rosijskogo-obstrilu-vypusknyczya-medychnogo-vyshu/"
-    },
-    {
-      "type": "places",
-      "date": "2026-06-29",
-      "publishedAt": "2026-06-29T12:21:35.701Z",
-      "key": "places-White Rabbit Coffee and Friends-Chaykava-2026-06-29"
     }
   ]
 }
