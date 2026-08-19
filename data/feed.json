@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-NOVUS-Grano Bakery-2026-08-19",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "🛒 NOVUS — вулиця Авіаконструктора Антонова 🛒 Grano Bakery — вулиця Валерія Лобановського, 35 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-08-19T08:21:57.366Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/brytaniya-prodovzhyt-nadavaty-ukrayini-zbroyu-popry-pogrozy-rf/",
     "title": "Британія продовжить надавати Україні зброю попри погрози РФ",
     "shortText": "Британія продовжує постачати зброю Україні, незважаючи на російські загрози. Для мешканців Чайки це означає стабільність оборони та впевненість у завтрашньому дні. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Chaykava-NOVUS-2026-06-30",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ Chaykava — вулиця Українського Відродження 🛒 NOVUS — вулиця Авіаконструктора Антонова #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-06-30T10:46:53.043Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]

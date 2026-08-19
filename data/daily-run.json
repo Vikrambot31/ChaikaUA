@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-08-19",
+      "publishedAt": "2026-08-19T08:21:57.367Z",
+      "key": "places-NOVUS-Grano Bakery-2026-08-19"
+    },
+    {
       "type": "news",
       "date": "2026-08-19",
       "publishedAt": "2026-08-19T04:30:28.851Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-01",
       "publishedAt": "2026-07-01T08:05:53.705Z",
       "key": "https://bigkyiv.com.ua/u-sivkovycha-ostatochno-zabraly-budivlyu-opikovogo-czentru-na-troyeshhyni/"
-    },
-    {
-      "type": "places",
-      "date": "2026-06-30",
-      "publishedAt": "2026-06-30T10:46:53.044Z",
-      "key": "places-Chaykava-NOVUS-2026-06-30"
     }
   ]
 }
