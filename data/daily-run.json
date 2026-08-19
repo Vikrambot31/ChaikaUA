@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-08-19",
+      "publishedAt": "2026-08-19T04:30:28.851Z",
+      "key": "https://bigkyiv.com.ua/brytaniya-prodovzhyt-nadavaty-ukrayini-zbroyu-popry-pogrozy-rf/"
+    },
+    {
       "type": "places",
       "date": "2026-08-18",
       "publishedAt": "2026-08-18T08:20:51.807Z",
@@ -593,12 +599,6 @@
       "date": "2026-06-30",
       "publishedAt": "2026-06-30T10:46:53.044Z",
       "key": "places-Chaykava-NOVUS-2026-06-30"
-    },
-    {
-      "type": "news",
-      "date": "2026-06-30",
-      "publishedAt": "2026-06-30T07:46:44.209Z",
-      "key": "https://bigkyiv.com.ua/yihala-na-vruchennya-dyplomu-v-harkovi-zagynula-vid-rosijskogo-obstrilu-vypusknyczya-medychnogo-vyshu/"
     }
   ]
 }
