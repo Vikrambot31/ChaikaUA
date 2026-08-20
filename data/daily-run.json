@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-08-20",
+      "publishedAt": "2026-08-20T08:22:43.162Z",
+      "key": "places-Grano Bakery-Кав'ярня ХЛІБ та КАВА-2026-08-20"
+    },
+    {
       "type": "news",
       "date": "2026-08-20",
       "publishedAt": "2026-08-20T04:29:52.522Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-02",
       "publishedAt": "2026-07-02T07:25:04.957Z",
       "key": "https://bigkyiv.com.ua/pyat-rajoniv-kyyivshhyny-postrazhdaly-vnaslidok-vorozhoyi-ataky-ye-poraneni/"
-    },
-    {
-      "type": "places",
-      "date": "2026-07-01",
-      "publishedAt": "2026-07-01T10:59:58.441Z",
-      "key": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-07-01"
     }
   ]
 }
