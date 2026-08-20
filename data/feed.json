@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://www.pravda.com.ua/news/2026/08/20/8049465/",
+    "title": "\"Укрзалізниця\" змінила маршрути деяких поїздів через російський удар по Києву та області",
+    "shortText": "Укрзалізниця змінила маршрути поїздів через пошкодження від російського удару по Київ і область. Це впливає на зв'язок мешканців Чайки з містом та сусідніми регіонами. #ЖКЧайка #Ірпінь #КиївськаОбласть #Транспорт",
+    "sourceName": "www.pravda.com.ua",
+    "sourceUrl": "https://www.pravda.com.ua/news/2026/08/20/8049465/",
+    "publishedAt": "2026-08-20T04:29:52.521Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-NOVUS-Grano Bakery-2026-08-19",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "🛒 NOVUS — вулиця Авіаконструктора Антонова 🛒 Grano Bakery — вулиця Валерія Лобановського, 35 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/u-sivkovycha-ostatochno-zabraly-budivlyu-opikovogo-czentru-na-troyeshhyni/",
-    "title": "У Сівковича остаточно забрали будівлю Опікового центру на Троєщині",
-    "shortText": "Господарський суд повернув державі контроль над недобудованою лікарнею на Троєщині. Для Ірпеня це означає прецедент повернення громадської власності та можливість розвитку медичної інфраструктури регіону. #ЖКЧайка #Ірпінь #КиївськаОбласть #Медицина",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/u-sivkovycha-ostatochno-zabraly-budivlyu-opikovogo-czentru-na-troyeshhyni/",
-    "publishedAt": "2026-07-01T08:05:53.703Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]

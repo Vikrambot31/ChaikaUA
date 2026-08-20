@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-08-20",
+      "publishedAt": "2026-08-20T04:29:52.522Z",
+      "key": "https://www.pravda.com.ua/news/2026/08/20/8049465/"
+    },
+    {
       "type": "places",
       "date": "2026-08-19",
       "publishedAt": "2026-08-19T08:21:57.367Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-01",
       "publishedAt": "2026-07-01T10:59:58.441Z",
       "key": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-07-01"
-    },
-    {
-      "type": "news",
-      "date": "2026-07-01",
-      "publishedAt": "2026-07-01T08:05:53.705Z",
-      "key": "https://bigkyiv.com.ua/u-sivkovycha-ostatochno-zabraly-budivlyu-opikovogo-czentru-na-troyeshhyni/"
     }
   ]
 }
