@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://bigkyiv.com.ua/u-kyyevi-vzhe-544-svitlofory-mozhut-praczyuvaty-pid-chas-vidklyuchen-svitla/",
+    "title": "У Києві вже 544 світлофори можуть працювати під час відключень світла",
+    "shortText": "У Києві встановлюють резервне живлення для світлофорів на ключових перехрестях. Для мешканців Чайки це означає безпечніші проїзди та переходи під час можливих аварій на електромережі. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
+    "sourceName": "bigkyiv.com.ua",
+    "sourceUrl": "https://bigkyiv.com.ua/u-kyyevi-vzhe-544-svitlofory-mozhut-praczyuvaty-pid-chas-vidklyuchen-svitla/",
+    "publishedAt": "2026-08-21T04:31:09.922Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-Grano Bakery-Кав'ярня ХЛІБ та КАВА-2026-08-20",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "🛒 Grano Bakery — вулиця Валерія Лобановського, 35 ☕ Кав'ярня ХЛІБ та КАВА — вулиця Валерія Лобановського, 18 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/pyat-rajoniv-kyyivshhyny-postrazhdaly-vnaslidok-vorozhoyi-ataky-ye-poraneni/",
-    "title": "П’ять районів Київщини постраждали внаслідок ворожої атаки: є поранені",
-    "shortText": "Ночі ворог атакував п'ять районів Київщини, включно з Бучанщиною. Для мешканців Чайки — перевірити укриття й мати під рукою номери екстреної служби. #ЖКЧайка #Ірпінь #КиївськаОбласть #безпека",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/pyat-rajoniv-kyyivshhyny-postrazhdaly-vnaslidok-vorozhoyi-ataky-ye-poraneni/",
-    "publishedAt": "2026-07-02T07:25:04.956Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]
