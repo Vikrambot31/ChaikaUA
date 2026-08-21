@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-08-21",
+      "publishedAt": "2026-08-21T08:24:09.663Z",
+      "key": "places-Кав'ярня ХЛІБ та КАВА-Мозаїка Espresso bar-2026-08-21"
+    },
+    {
       "type": "news",
       "date": "2026-08-21",
       "publishedAt": "2026-08-21T04:31:09.923Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-03",
       "publishedAt": "2026-07-03T06:56:46.293Z",
       "key": "https://bigkyiv.com.ua/kyyivshhyna-otrymaye-do-500-novyh-robochyh-miscz-u-mashynobuduvanni/"
-    },
-    {
-      "type": "places",
-      "date": "2026-07-02",
-      "publishedAt": "2026-07-02T10:26:26.757Z",
-      "key": "places-BALCONE COFFEE-Coffee ART-2026-07-02"
     }
   ]
 }
