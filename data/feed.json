@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Мозаїка Espresso bar-#МОЖЕКАВИ?-2026-08-22",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Мозаїка Espresso bar — вулиця Валерія Лобановського ☕ #МОЖЕКАВИ? — вулиця Валерія Лобановського, 29 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-08-22T08:14:55.236Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/lvivski-likari-vryatuvaly-4-misyachnu-divchynku-u-yakoyi-tromby-perekryly-90-legenevoyi-arteriyi/",
     "title": "Львівські лікарі врятували 4-місячну дівчинку, у якої тромби перекрили 90% легеневої артерії",
     "shortText": "Львівські лікарі врятували 4-місячну дівчинку з тромбами у легеневій артерії без операції. Для ірпінян це нагадування про значення якісної медичної допомоги поблизу дому. #ЖКЧайка #Ірпінь #КиївськаОбласть #Медицина",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Coffee ART-ANMI SOUL-2026-07-03",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ Coffee ART — вулиця Валерія Лобановського, 25 ☕ ANMI SOUL — вулиця Валерія Лобановського, 18 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-07-03T10:24:08.652Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
