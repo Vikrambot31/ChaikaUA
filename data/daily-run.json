@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-08-23",
+      "publishedAt": "2026-08-23T04:29:53.109Z",
+      "key": "https://bigkyiv.com.ua/rosijska-banderol-upala-u-bilorusi-zagalom-u-povitryanyj-prostir-zajshly-shhonajmenshe-12-bezpilotnykiv/"
+    },
+    {
       "type": "places",
       "date": "2026-08-22",
       "publishedAt": "2026-08-22T08:14:55.237Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-04",
       "publishedAt": "2026-07-04T09:57:54.416Z",
       "key": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-07-04"
-    },
-    {
-      "type": "news",
-      "date": "2026-07-04",
-      "publishedAt": "2026-07-04T06:42:38.495Z",
-      "key": "https://bigkyiv.com.ua/na-kyyivshhyni-sogodni-bude-minlyva-hmarnist-i-do-26-tepla/"
     }
   ]
 }
