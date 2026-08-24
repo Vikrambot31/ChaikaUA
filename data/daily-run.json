@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-08-24",
+      "publishedAt": "2026-08-24T08:33:57.845Z",
+      "key": "places-Fora-Кав'ярня-кондитерська \"Гамак\"-2026-08-24"
+    },
+    {
       "type": "news",
       "date": "2026-08-24",
       "publishedAt": "2026-08-24T04:37:57.142Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-06",
       "publishedAt": "2026-07-06T08:14:19.937Z",
       "key": "https://bigkyiv.com.ua/mozhut-zavdaty-udar-i-u-vivtorok-yurij-ignat-poperedyv-pro-nebezpeku-dlya-stolyczi/"
-    },
-    {
-      "type": "places",
-      "date": "2026-07-05",
-      "publishedAt": "2026-07-05T10:01:16.039Z",
-      "key": "places-White Rabbit Coffee and Friends-Chaykava-2026-07-05"
     }
   ]
 }
