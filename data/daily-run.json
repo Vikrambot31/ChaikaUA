@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-08-24",
+      "publishedAt": "2026-08-24T04:37:57.142Z",
+      "key": "https://bigkyiv.com.ua/u-darnyczkomu-rajoni-zamist-vyrvy-pislya-obstrilu-zyavylasya-nova-klumba/"
+    },
+    {
       "type": "places",
       "date": "2026-08-23",
       "publishedAt": "2026-08-23T08:15:43.980Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-05",
       "publishedAt": "2026-07-05T10:01:16.039Z",
       "key": "places-White Rabbit Coffee and Friends-Chaykava-2026-07-05"
-    },
-    {
-      "type": "news",
-      "date": "2026-07-05",
-      "publishedAt": "2026-07-05T07:19:08.298Z",
-      "key": "https://bigkyiv.com.ua/u-lavri-provedut-toloku-pislya-rosijskoyi-ataky-kyyan-zaproshuyut-doluchytysya/"
     }
   ]
 }
