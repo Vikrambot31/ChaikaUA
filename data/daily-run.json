@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-08-25",
+      "publishedAt": "2026-08-25T04:32:17.111Z",
+      "key": "https://bigkyiv.com.ua/u-kryvomu-rozi-chetvertu-dobu-tryvaye-poshukova-operacziya-pislya-udaru-rosiyi-po-trcz/"
+    },
+    {
       "type": "places",
       "date": "2026-08-24",
       "publishedAt": "2026-08-24T08:33:57.845Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-06",
       "publishedAt": "2026-07-06T11:53:04.639Z",
       "key": "places-Chaykava-NOVUS-2026-07-06"
-    },
-    {
-      "type": "news",
-      "date": "2026-07-06",
-      "publishedAt": "2026-07-06T08:14:19.937Z",
-      "key": "https://bigkyiv.com.ua/mozhut-zavdaty-udar-i-u-vivtorok-yurij-ignat-poperedyv-pro-nebezpeku-dlya-stolyczi/"
     }
   ]
 }
