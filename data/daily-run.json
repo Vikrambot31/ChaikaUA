@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-08-25",
+      "publishedAt": "2026-08-25T08:27:46.316Z",
+      "key": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-08-25"
+    },
+    {
       "type": "news",
       "date": "2026-08-25",
       "publishedAt": "2026-08-25T04:32:17.111Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-07",
       "publishedAt": "2026-07-07T07:32:32.680Z",
       "key": "https://bigkyiv.com.ua/kilkist-zagyblyh-u-kyyevi-pislya-rosijskogo-udaru-zrosla-do-19-u-stolyczi-ogolosyly-den-zhaloby/"
-    },
-    {
-      "type": "places",
-      "date": "2026-07-06",
-      "publishedAt": "2026-07-06T11:53:04.639Z",
-      "key": "places-Chaykava-NOVUS-2026-07-06"
     }
   ]
 }
