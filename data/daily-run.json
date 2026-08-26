@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-08-26",
+      "publishedAt": "2026-08-26T08:28:02.435Z",
+      "key": "places-BALCONE COFFEE-Coffee ART-2026-08-26"
+    },
+    {
       "type": "news",
       "date": "2026-08-26",
       "publishedAt": "2026-08-26T04:33:02.209Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-08",
       "publishedAt": "2026-07-08T06:23:07.336Z",
       "key": "https://bigkyiv.com.ua/na-kyyivshhyni-sogodni-ochikuyutsya-korotkochasni-doshhi-grozy-ta-poryvchastyj-viter-2/"
-    },
-    {
-      "type": "places",
-      "date": "2026-07-07",
-      "publishedAt": "2026-07-07T10:42:56.117Z",
-      "key": "places-NOVUS-Grano Bakery-2026-07-07"
     }
   ]
 }
