@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-08-27",
+      "publishedAt": "2026-08-27T14:54:40.383Z",
+      "key": "https://bigkyiv.com.ua/na-kyyivshhyni-znyshheno-sklad-roshen-mozhlyvi-pereboyi-z-postachannyam-okremyh-tovariv/"
+    },
+    {
       "type": "places",
       "date": "2026-08-26",
       "publishedAt": "2026-08-26T08:28:02.435Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-08",
       "publishedAt": "2026-07-08T10:04:13.693Z",
       "key": "places-Grano Bakery-Кав'ярня ХЛІБ та КАВА-2026-07-08"
-    },
-    {
-      "type": "news",
-      "date": "2026-07-08",
-      "publishedAt": "2026-07-08T06:23:07.336Z",
-      "key": "https://bigkyiv.com.ua/na-kyyivshhyni-sogodni-ochikuyutsya-korotkochasni-doshhi-grozy-ta-poryvchastyj-viter-2/"
     }
   ]
 }
