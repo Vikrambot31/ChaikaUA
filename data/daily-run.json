@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-08-27",
+      "publishedAt": "2026-08-27T18:27:48.798Z",
+      "key": "places-Coffee ART-ANMI SOUL-2026-08-27"
+    },
+    {
       "type": "news",
       "date": "2026-08-27",
       "publishedAt": "2026-08-27T14:54:40.383Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-09",
       "publishedAt": "2026-07-09T07:37:09.761Z",
       "key": "https://www.pravda.com.ua/news/2026/07/09/8043191/"
-    },
-    {
-      "type": "places",
-      "date": "2026-07-08",
-      "publishedAt": "2026-07-08T10:04:13.693Z",
-      "key": "places-Grano Bakery-Кав'ярня ХЛІБ та КАВА-2026-07-08"
     }
   ]
 }

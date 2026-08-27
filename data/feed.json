@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Coffee ART-ANMI SOUL-2026-08-27",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Coffee ART — вулиця Валерія Лобановського, 25 ☕ ANMI SOUL — вулиця Валерія Лобановського, 18 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-08-27T18:27:48.797Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/na-kyyivshhyni-znyshheno-sklad-roshen-mozhlyvi-pereboyi-z-postachannyam-okremyh-tovariv/",
     "title": "На Київщині знищено склад Roshen: можливі перебої з постачанням окремих товарів",
     "shortText": "На Київщині розбомбили склад Roshen — можливі перебої з солодощами в місцевих магазинах. Для мешканців Чайки це означає дефіцит улюблених кондитерських товарів на полицях. #ЖКЧайка #Ірпінь #КиївськаОбласть #логістика",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Grano Bakery-Кав'ярня ХЛІБ та КАВА-2026-07-08",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "🛒 Grano Bakery — вулиця Валерія Лобановського, 35 ☕ Кав'ярня ХЛІБ та КАВА — вулиця Валерія Лобановського, 18 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-07-08T10:04:13.692Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
