@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-08-28",
+      "publishedAt": "2026-08-28T19:42:26.675Z",
+      "key": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-08-28"
+    },
+    {
       "type": "news",
       "date": "2026-08-28",
       "publishedAt": "2026-08-28T15:50:03.931Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-10",
       "publishedAt": "2026-07-10T07:29:42.705Z",
       "key": "https://bigkyiv.com.ua/sbu-zatrymala-agenta-fsb-yakyj-gotuvav-novyj-udar-rf-po-hmelnychchyni/"
-    },
-    {
-      "type": "places",
-      "date": "2026-07-09",
-      "publishedAt": "2026-07-09T10:43:27.088Z",
-      "key": "places-Кав'ярня ХЛІБ та КАВА-Мозаїка Espresso bar-2026-07-09"
     }
   ]
 }
