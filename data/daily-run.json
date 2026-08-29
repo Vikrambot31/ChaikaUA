@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-08-29",
+      "publishedAt": "2026-08-29T10:38:40.933Z",
+      "key": "https://bigkyiv.com.ua/u-seli-myla-pislya-udaru-rf-i-detonacziyi-zagynuly-27-lyudej/"
+    },
+    {
       "type": "places",
       "date": "2026-08-28",
       "publishedAt": "2026-08-28T19:42:26.675Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-10",
       "publishedAt": "2026-07-10T10:42:14.210Z",
       "key": "places-Мозаїка Espresso bar-#МОЖЕКАВИ?-2026-07-10"
-    },
-    {
-      "type": "news",
-      "date": "2026-07-10",
-      "publishedAt": "2026-07-10T07:29:42.705Z",
-      "key": "https://bigkyiv.com.ua/sbu-zatrymala-agenta-fsb-yakyj-gotuvav-novyj-udar-rf-po-hmelnychchyni/"
     }
   ]
 }

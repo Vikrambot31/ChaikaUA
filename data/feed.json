@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://bigkyiv.com.ua/u-seli-myla-pislya-udaru-rf-i-detonacziyi-zagynuly-27-lyudej/",
+    "title": "У селі Мила після удару РФ і детонації загинули 27 людей",
+    "shortText": "У селі Мила Бучанського р-ну після дронового удару загинули 27 людей. Для жителів Ірпеня це нагадує про важливість цивільного захисту й готовності до надзвичайних ситуацій. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
+    "sourceName": "bigkyiv.com.ua",
+    "sourceUrl": "https://bigkyiv.com.ua/u-seli-myla-pislya-udaru-rf-i-detonacziyi-zagynuly-27-lyudej/",
+    "publishedAt": "2026-08-29T10:38:40.932Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-08-28",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ ANMI SOUL — вулиця Валерія Лобановського, 18 ☕ White Rabbit Coffee and Friends — вулиця Валерія Лобановського, 26 к2 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/sbu-zatrymala-agenta-fsb-yakyj-gotuvav-novyj-udar-rf-po-hmelnychchyni/",
-    "title": "СБУ затримала агента ФСБ, який готував новий удар РФ по Хмельниччині",
-    "shortText": "СБУ затримала агента ФСБ, який збирав координати для атак на Хмельниччину. Для мешканців Чайки це означає, що контррозвідка активно протидіє загрозам на всій території України. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/sbu-zatrymala-agenta-fsb-yakyj-gotuvav-novyj-udar-rf-po-hmelnychchyni/",
-    "publishedAt": "2026-07-10T07:29:42.705Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]
