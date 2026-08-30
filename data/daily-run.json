@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-08-30",
+      "publishedAt": "2026-08-30T13:22:49.144Z",
+      "key": "places-Chaykava-NOVUS-2026-08-30"
+    },
+    {
       "type": "news",
       "date": "2026-08-30",
       "publishedAt": "2026-08-30T09:38:59.594Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-12",
       "publishedAt": "2026-07-12T06:27:58.779Z",
       "key": "https://bigkyiv.com.ua/vzhe-vidomo-hto-dopustyv-rozmishhennya-skladiv-zi-zbroyeyu-u-vyshnevomu-zelenskyj/"
-    },
-    {
-      "type": "places",
-      "date": "2026-07-11",
-      "publishedAt": "2026-07-11T09:14:14.184Z",
-      "key": "places-#МОЖЕКАВИ?-Fora-2026-07-11"
     }
   ]
 }

@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Chaykava-NOVUS-2026-08-30",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Chaykava — вулиця Українського Відродження 🛒 NOVUS — вулиця Авіаконструктора Антонова #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-08-30T13:22:49.143Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/pislya-tragediyi-v-buchanskomu-rajoni-minoborony-zaklykalo-provesty-audyt-skladiv-zbroyi/",
     "title": "Після трагедії в Бучанському районі Міноборони закликало провести аудит складів зброї",
     "shortText": "У селі Мила Бучанського району після детонації боєприпасів загинуло 37 людей. Для мешканців Чайки це нагадує про потребу посилення безпеки навколо військових об'єктів поблизу. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-#МОЖЕКАВИ?-Fora-2026-07-11",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ #МОЖЕКАВИ? — вулиця Валерія Лобановського, 29 🛒 Fora — вулиця Грушевського, 12 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-07-11T09:14:14.183Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
