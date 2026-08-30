@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-08-30",
+      "publishedAt": "2026-08-30T09:38:59.594Z",
+      "key": "https://bigkyiv.com.ua/pislya-tragediyi-v-buchanskomu-rajoni-minoborony-zaklykalo-provesty-audyt-skladiv-zbroyi/"
+    },
+    {
       "type": "places",
       "date": "2026-08-29",
       "publishedAt": "2026-08-29T13:26:33.398Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-11",
       "publishedAt": "2026-07-11T09:14:14.184Z",
       "key": "places-#МОЖЕКАВИ?-Fora-2026-07-11"
-    },
-    {
-      "type": "news",
-      "date": "2026-07-11",
-      "publishedAt": "2026-07-11T06:08:04.202Z",
-      "key": "https://bigkyiv.com.ua/ukrayinski-muzeyi-zmusheni-povertaty-evakujovani-tvory-i-chasu-majzhe-ne-lyshylosya/"
     }
   ]
 }
