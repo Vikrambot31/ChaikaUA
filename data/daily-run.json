@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-08-31",
+      "publishedAt": "2026-08-31T15:35:29.308Z",
+      "key": "places-NOVUS-Grano Bakery-2026-08-31"
+    },
+    {
       "type": "news",
       "date": "2026-08-31",
       "publishedAt": "2026-08-31T10:21:00.415Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-13",
       "publishedAt": "2026-07-13T06:47:53.845Z",
       "key": "https://bigkyiv.com.ua/u-vyshnevomu-pislya-obstriliv-povernuly-gaz-do-214-osel-u-bagatopoverhivkah-ta-pryvatnyh-sadybah/"
-    },
-    {
-      "type": "places",
-      "date": "2026-07-12",
-      "publishedAt": "2026-07-12T09:40:57.625Z",
-      "key": "places-Fora-Кав'ярня-кондитерська \"Гамак\"-2026-07-12"
     }
   ]
 }

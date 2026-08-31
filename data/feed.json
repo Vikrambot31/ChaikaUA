@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-NOVUS-Grano Bakery-2026-08-31",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "🛒 NOVUS — вулиця Авіаконструктора Антонова 🛒 Grano Bakery — вулиця Валерія Лобановського, 35 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-08-31T15:35:29.307Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/pidpysy-zbyrayut-zhvavo-v-ukrayini-stvoryly-petycziyu-pro-perehid-na-4-dennyj-robochyj-tyzhden/",
     "title": "Підписи збирають жваво: в Україні створили петицію про перехід на 4-денний робочий тиждень",
     "shortText": "В Україні активно збирають підписи за 4-денний робочий тиждень. Для мешканців Чайки це означає можливість більше часу проводити з сім'єю і відпочивати, не жертвуючи доходом. #ЖКЧайка #Ірпінь #КиївськаОбласть #ЛіквідністьПрацівників",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Fora-Кав'ярня-кондитерська \"Гамак\"-2026-07-12",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "🛒 Fora — вулиця Грушевського, 12 ☕ Кав'ярня-кондитерська \"Гамак\" — вулиця Валерія Лобановського #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-07-12T09:40:57.624Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
