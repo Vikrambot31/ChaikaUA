@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-08-31",
+      "publishedAt": "2026-08-31T10:21:00.415Z",
+      "key": "https://bigkyiv.com.ua/pidpysy-zbyrayut-zhvavo-v-ukrayini-stvoryly-petycziyu-pro-perehid-na-4-dennyj-robochyj-tyzhden/"
+    },
+    {
       "type": "places",
       "date": "2026-08-30",
       "publishedAt": "2026-08-30T13:22:49.144Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-12",
       "publishedAt": "2026-07-12T09:40:57.625Z",
       "key": "places-Fora-Кав'ярня-кондитерська \"Гамак\"-2026-07-12"
-    },
-    {
-      "type": "news",
-      "date": "2026-07-12",
-      "publishedAt": "2026-07-12T06:27:58.779Z",
-      "key": "https://bigkyiv.com.ua/vzhe-vidomo-hto-dopustyv-rozmishhennya-skladiv-zi-zbroyeyu-u-vyshnevomu-zelenskyj/"
     }
   ]
 }
