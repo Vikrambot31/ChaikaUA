@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-09-01",
+      "publishedAt": "2026-09-01T09:04:25.640Z",
+      "key": "https://bigkyiv.com.ua/rankova-ataka-na-kyyiv-ye-vluchannya-u-bagatopoverhivku-na-syrczi/"
+    },
+    {
       "type": "places",
       "date": "2026-08-31",
       "publishedAt": "2026-08-31T15:35:29.308Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-13",
       "publishedAt": "2026-07-13T10:47:20.456Z",
       "key": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-07-13"
-    },
-    {
-      "type": "news",
-      "date": "2026-07-13",
-      "publishedAt": "2026-07-13T06:47:53.845Z",
-      "key": "https://bigkyiv.com.ua/u-vyshnevomu-pislya-obstriliv-povernuly-gaz-do-214-osel-u-bagatopoverhivkah-ta-pryvatnyh-sadybah/"
     }
   ]
 }
