@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-09-02",
+      "publishedAt": "2026-09-02T08:17:57.154Z",
+      "key": "https://bigkyiv.com.ua/bezpilotnyk-vluchyv-u-shestypoverhivku-u-shevchenkivskomu-rajoni/"
+    },
+    {
       "type": "places",
       "date": "2026-09-01",
       "publishedAt": "2026-09-01T12:50:35.547Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-14",
       "publishedAt": "2026-07-14T09:43:45.791Z",
       "key": "places-BALCONE COFFEE-Coffee ART-2026-07-14"
-    },
-    {
-      "type": "news",
-      "date": "2026-07-14",
-      "publishedAt": "2026-07-14T06:05:36.455Z",
-      "key": "https://www.pravda.com.ua/news/2026/07/14/8043981/"
     }
   ]
 }
