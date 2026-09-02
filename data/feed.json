@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-BALCONE COFFEE-Coffee ART-2026-09-02",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ BALCONE COFFEE — вулиця Валерія Лобановського, 26 к2 ☕ Coffee ART — вулиця Валерія Лобановського, 25 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-09-02T12:20:33.256Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/bezpilotnyk-vluchyv-u-shestypoverhivku-u-shevchenkivskomu-rajoni/",
     "title": "Безпілотник влучив у шестиповерхівку у Шевченківському районі",
     "shortText": "У Шевченківському районі Києва дрон влучив у житловий будинок, спалахнула пожежа. Мешканцям Чайки нагадування: під час тривог — у укриття без зволікання. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-BALCONE COFFEE-Coffee ART-2026-07-14",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ BALCONE COFFEE — вулиця Валерія Лобановського, 26 к2 ☕ Coffee ART — вулиця Валерія Лобановського, 25 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-07-14T09:43:45.790Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
