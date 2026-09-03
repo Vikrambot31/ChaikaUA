@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-09-03",
+      "publishedAt": "2026-09-03T12:18:31.303Z",
+      "key": "places-Coffee ART-ANMI SOUL-2026-09-03"
+    },
+    {
       "type": "news",
       "date": "2026-09-03",
       "publishedAt": "2026-09-03T08:27:28.208Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-16",
       "publishedAt": "2026-07-16T06:11:47.659Z",
       "key": "https://bigkyiv.com.ua/pidlitok-iz-druzhkivky-sam-poprosyv-ombudsmena-dopomogty-z-evakuacziyeyu-cherez-vidmovu-batkiv-vyyizhdzhaty/"
-    },
-    {
-      "type": "places",
-      "date": "2026-07-15",
-      "publishedAt": "2026-07-15T09:47:11.026Z",
-      "key": "places-Coffee ART-ANMI SOUL-2026-07-15"
     }
   ]
 }
