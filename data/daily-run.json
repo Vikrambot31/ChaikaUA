@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-09-04",
+      "publishedAt": "2026-09-04T12:19:07.993Z",
+      "key": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-09-04"
+    },
+    {
       "type": "news",
       "date": "2026-09-04",
       "publishedAt": "2026-09-04T08:28:17.049Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-17",
       "publishedAt": "2026-07-17T06:10:42.294Z",
       "key": "https://bigkyiv.com.ua/google-play-pislya-app-store-vydalyv-mesendzher-max-i-vk/"
-    },
-    {
-      "type": "places",
-      "date": "2026-07-16",
-      "publishedAt": "2026-07-16T09:53:53.106Z",
-      "key": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-07-16"
     }
   ]
 }
