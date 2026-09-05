@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-09-05",
+      "publishedAt": "2026-09-05T07:58:37.523Z",
+      "key": "https://www.pravda.com.ua/news/2026/09/05/8051982/"
+    },
+    {
       "type": "places",
       "date": "2026-09-04",
       "publishedAt": "2026-09-04T12:19:07.993Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-17",
       "publishedAt": "2026-07-17T09:43:51.306Z",
       "key": "places-White Rabbit Coffee and Friends-Chaykava-2026-07-17"
-    },
-    {
-      "type": "news",
-      "date": "2026-07-17",
-      "publishedAt": "2026-07-17T06:10:42.294Z",
-      "key": "https://bigkyiv.com.ua/google-play-pislya-app-store-vydalyv-mesendzher-max-i-vk/"
     }
   ]
 }

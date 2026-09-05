@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://www.pravda.com.ua/news/2026/09/05/8051982/",
+    "title": "Росіяни атакували багатоповерхівку в Борисполі: виникла пожежа, двоє потерпілих",
+    "shortText": "Росіяни атакували багатоповерхівку в Борисполі — загорілися квартира й дах. Бориспіль розташований неподалік, тому атаки на región збільшують ризики для мешканців Ірпеня. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
+    "sourceName": "www.pravda.com.ua",
+    "sourceUrl": "https://www.pravda.com.ua/news/2026/09/05/8051982/",
+    "publishedAt": "2026-09-05T07:58:37.522Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-09-04",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ ANMI SOUL — вулиця Валерія Лобановського, 18 ☕ White Rabbit Coffee and Friends — вулиця Валерія Лобановського, 26 к2 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/google-play-pislya-app-store-vydalyv-mesendzher-max-i-vk/",
-    "title": "Google Play після App Store видалив месенджер Max і VK",
-    "shortText": "Google Play видалив російські месенджер Max і VK. Для мешканців Ірпені це означає спрощення доступу до західних альтернатив комунікації без російських сервісів. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/google-play-pislya-app-store-vydalyv-mesendzher-max-i-vk/",
-    "publishedAt": "2026-07-17T06:10:42.293Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]
