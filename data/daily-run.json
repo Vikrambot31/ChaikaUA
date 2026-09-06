@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-09-06",
+      "publishedAt": "2026-09-06T11:47:30.336Z",
+      "key": "places-Chaykava-NOVUS-2026-09-06"
+    },
+    {
       "type": "news",
       "date": "2026-09-06",
       "publishedAt": "2026-09-06T08:16:19.917Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-19",
       "publishedAt": "2026-07-19T06:25:02.924Z",
       "key": "https://www.pravda.com.ua/news/2026/07/19/8044765/"
-    },
-    {
-      "type": "places",
-      "date": "2026-07-18",
-      "publishedAt": "2026-07-18T09:13:36.181Z",
-      "key": "places-Chaykava-NOVUS-2026-07-18"
     }
   ]
 }

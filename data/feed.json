@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Chaykava-NOVUS-2026-09-06",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Chaykava — вулиця Українського Відродження 🛒 NOVUS — вулиця Авіаконструктора Антонова #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-09-06T11:47:30.335Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/rosiyany-vbyly-dytynu-u-harkovi-na-hmelnychchyni-7-postrazhdalyh-na-kyyivshhyni-masshtabna-pozhezha/",
     "title": "Росіяни вбили дитину у Харкові, на Хмельниччині – 7 постраждалих, на Київщині – масштабна пожежа",
     "shortText": "На Харківщині російська атака знищила житловий дім, загинули троє людей, серед них дитина. Для мешканців Чайки це нагадування про важливість цивільного захисту та готовності до надзвичайних ситуацій. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Chaykava-NOVUS-2026-07-18",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ Chaykava — вулиця Українського Відродження 🛒 NOVUS — вулиця Авіаконструктора Антонова #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-07-18T09:13:36.180Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
