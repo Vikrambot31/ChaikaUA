@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-NOVUS-Grano Bakery-2026-09-07",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "🛒 NOVUS — вулиця Авіаконструктора Антонова 🛒 Grano Bakery — вулиця Валерія Лобановського, 35 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-09-07T13:44:51.680Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/u-kyyevi-gotuyut-zapasy-produktiv-i-vody-na-vypadok-nadzvychajnyh-sytuaczij/",
     "title": "У Києві готують запаси продуктів і води на випадок надзвичайних ситуацій",
     "shortText": "У Києві створюють запаси продуктів і води на випадок надзвичайних ситуацій. Для мешканців Чайки це означає необхідність мати домашні запаси на 2–3 тижні. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-NOVUS-Grano Bakery-2026-07-19",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "🛒 NOVUS — вулиця Авіаконструктора Антонова 🛒 Grano Bakery — вулиця Валерія Лобановського, 35 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-07-19T09:42:05.104Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
