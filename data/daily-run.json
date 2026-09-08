@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-09-08",
+      "publishedAt": "2026-09-08T08:29:14.821Z",
+      "key": "https://bigkyiv.com.ua/u-kyyevi-vnaslidok-ataky-poshkodzheno-piv-sotni-obyektiv-na-7-lokacziyah-rozbyrayut-zavaly/"
+    },
+    {
       "type": "places",
       "date": "2026-09-07",
       "publishedAt": "2026-09-07T13:44:51.681Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-20",
       "publishedAt": "2026-07-20T10:37:53.739Z",
       "key": "places-Grano Bakery-Кав'ярня ХЛІБ та КАВА-2026-07-20"
-    },
-    {
-      "type": "news",
-      "date": "2026-07-20",
-      "publishedAt": "2026-07-20T06:40:30.527Z",
-      "key": "https://bigkyiv.com.ua/bilya-metro-lukyanivska-oblashtovuyut-tymchasovyj-nazemnyj-perehid/"
     }
   ]
 }
