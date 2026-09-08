@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Grano Bakery-Кав'ярня ХЛІБ та КАВА-2026-09-08",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "🛒 Grano Bakery — вулиця Валерія Лобановського, 35 ☕ Кав'ярня ХЛІБ та КАВА — вулиця Валерія Лобановського, 18 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-09-08T12:20:37.385Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/u-kyyevi-vnaslidok-ataky-poshkodzheno-piv-sotni-obyektiv-na-7-lokacziyah-rozbyrayut-zavaly/",
     "title": "У Києві внаслідок атаки пошкоджено пів сотні об’єктів, на 7 локаціях розбирають завали",
     "shortText": "У Києві після масованої атаки пошкоджено понад 50 об'єктів, на семи локаціях розбирають завали. Для мешканців Чайки це означає можливі перебої з комунальними послугами й транспортом у регіоні. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Grano Bakery-Кав'ярня ХЛІБ та КАВА-2026-07-20",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "🛒 Grano Bakery — вулиця Валерія Лобановського, 35 ☕ Кав'ярня ХЛІБ та КАВА — вулиця Валерія Лобановського, 18 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-07-20T10:37:53.738Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]

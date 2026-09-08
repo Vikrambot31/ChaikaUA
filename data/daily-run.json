@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-09-08",
+      "publishedAt": "2026-09-08T12:20:37.386Z",
+      "key": "places-Grano Bakery-Кав'ярня ХЛІБ та КАВА-2026-09-08"
+    },
+    {
       "type": "news",
       "date": "2026-09-08",
       "publishedAt": "2026-09-08T08:29:14.821Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-21",
       "publishedAt": "2026-07-21T06:23:15.289Z",
       "key": "https://bigkyiv.com.ua/bilya-lavina-mall-chastkovo-obmezhuvatymut-ruh/"
-    },
-    {
-      "type": "places",
-      "date": "2026-07-20",
-      "publishedAt": "2026-07-20T10:37:53.739Z",
-      "key": "places-Grano Bakery-Кав'ярня ХЛІБ та КАВА-2026-07-20"
     }
   ]
 }
