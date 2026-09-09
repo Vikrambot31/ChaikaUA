@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-09-09",
+      "publishedAt": "2026-09-09T08:31:51.296Z",
+      "key": "https://bigkyiv.com.ua/na-vidnovlennya-ohmatdytu-pislya-vorozhogo-vluchannya-znadobylosya-dva-roky-ta-272-mln-grn/"
+    },
+    {
       "type": "places",
       "date": "2026-09-08",
       "publishedAt": "2026-09-08T12:20:37.386Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-21",
       "publishedAt": "2026-07-21T10:12:02.667Z",
       "key": "places-Кав'ярня ХЛІБ та КАВА-Мозаїка Espresso bar-2026-07-21"
-    },
-    {
-      "type": "news",
-      "date": "2026-07-21",
-      "publishedAt": "2026-07-21T06:23:15.289Z",
-      "key": "https://bigkyiv.com.ua/bilya-lavina-mall-chastkovo-obmezhuvatymut-ruh/"
     }
   ]
 }
