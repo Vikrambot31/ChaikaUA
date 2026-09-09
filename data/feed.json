@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Кав'ярня ХЛІБ та КАВА-Мозаїка Espresso bar-2026-09-09",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Кав'ярня ХЛІБ та КАВА — вулиця Валерія Лобановського, 18 ☕ Мозаїка Espresso bar — вулиця Валерія Лобановського #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-09-09T12:31:52.717Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/na-vidnovlennya-ohmatdytu-pislya-vorozhogo-vluchannya-znadobylosya-dva-roky-ta-272-mln-grn/",
     "title": "На відновлення «Охматдиту» після ворожого влучання знадобилося два роки та 272 млн грн",
     "shortText": "На відновлення «Охматдиту» у Києві витратили 272 млн грн та два роки після ракетного удару. Для родин з Чайки це означає повернення якісної дитячої медичної допомоги поблизу. #ЖКЧайка #Ірпінь #КиївськаОбласть #Охматдит",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Кав'ярня ХЛІБ та КАВА-Мозаїка Espresso bar-2026-07-21",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ Кав'ярня ХЛІБ та КАВА — вулиця Валерія Лобановського, 18 ☕ Мозаїка Espresso bar — вулиця Валерія Лобановського #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-07-21T10:12:02.666Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
