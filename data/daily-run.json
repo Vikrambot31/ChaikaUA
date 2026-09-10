@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-09-10",
+      "publishedAt": "2026-09-10T12:25:43.280Z",
+      "key": "places-Мозаїка Espresso bar-#МОЖЕКАВИ?-2026-09-10"
+    },
+    {
       "type": "news",
       "date": "2026-09-10",
       "publishedAt": "2026-09-10T08:33:58.812Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-23",
       "publishedAt": "2026-07-23T06:25:23.536Z",
       "key": "https://bigkyiv.com.ua/bilya-stancziyi-metro-ipodrom-demontuvaly-mafy/"
-    },
-    {
-      "type": "places",
-      "date": "2026-07-22",
-      "publishedAt": "2026-07-22T10:11:39.888Z",
-      "key": "places-Мозаїка Espresso bar-#МОЖЕКАВИ?-2026-07-22"
     }
   ]
 }

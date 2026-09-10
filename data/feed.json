@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Мозаїка Espresso bar-#МОЖЕКАВИ?-2026-09-10",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Мозаїка Espresso bar — вулиця Валерія Лобановського ☕ #МОЖЕКАВИ? — вулиця Валерія Лобановського, 29 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-09-10T12:25:43.279Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/povidomleno-pro-pidozru-posadovczyu-yakyj-vidpovidav-za-sklad-boyeprypasiv-u-selyshhi-myla/",
     "title": "Повідомлено про підозру посадовцю, який відповідав за склад боєприпасів у селищі Мила",
     "shortText": "У селищі Мила під Києвом виявили порушення при зберіганні боєприпасів — посадовцю повідомили про підозру. Для мешканців Чайки це означає посилення контролю над безпекою в сусідніх районах. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Мозаїка Espresso bar-#МОЖЕКАВИ?-2026-07-22",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ Мозаїка Espresso bar — вулиця Валерія Лобановського ☕ #МОЖЕКАВИ? — вулиця Валерія Лобановського, 29 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-07-22T10:11:39.887Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
