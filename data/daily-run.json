@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-09-10",
+      "publishedAt": "2026-09-10T08:33:58.812Z",
+      "key": "https://bigkyiv.com.ua/povidomleno-pro-pidozru-posadovczyu-yakyj-vidpovidav-za-sklad-boyeprypasiv-u-selyshhi-myla/"
+    },
+    {
       "type": "places",
       "date": "2026-09-09",
       "publishedAt": "2026-09-09T12:31:52.718Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-22",
       "publishedAt": "2026-07-22T10:11:39.888Z",
       "key": "places-Мозаїка Espresso bar-#МОЖЕКАВИ?-2026-07-22"
-    },
-    {
-      "type": "news",
-      "date": "2026-07-22",
-      "publishedAt": "2026-07-22T06:23:06.370Z",
-      "key": "https://bigkyiv.com.ua/shlyahoprovodom-na-harkivskomu-shose-obmezhat-ruh/"
     }
   ]
 }
