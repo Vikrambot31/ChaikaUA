@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-09-11",
+      "publishedAt": "2026-09-11T08:28:31.802Z",
+      "key": "https://bigkyiv.com.ua/u-vyshgorodskomu-rajoni-vnaslidok-obstrilu-zagynula-zhinka/"
+    },
+    {
       "type": "places",
       "date": "2026-09-10",
       "publishedAt": "2026-09-10T12:25:43.280Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-23",
       "publishedAt": "2026-07-23T10:09:14.822Z",
       "key": "places-#МОЖЕКАВИ?-Fora-2026-07-23"
-    },
-    {
-      "type": "news",
-      "date": "2026-07-23",
-      "publishedAt": "2026-07-23T06:25:23.536Z",
-      "key": "https://bigkyiv.com.ua/bilya-stancziyi-metro-ipodrom-demontuvaly-mafy/"
     }
   ]
 }
