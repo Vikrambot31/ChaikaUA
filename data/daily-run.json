@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-09-12",
+      "publishedAt": "2026-09-12T11:45:56.523Z",
+      "key": "places-Fora-Кав'ярня-кондитерська \"Гамак\"-2026-09-12"
+    },
+    {
       "type": "news",
       "date": "2026-09-12",
       "publishedAt": "2026-09-12T08:16:43.658Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-25",
       "publishedAt": "2026-07-25T06:11:07.900Z",
       "key": "https://bigkyiv.com.ua/metro-na-vynogradar-staye-blyzhchym-yak-prosuvayetsya-budivnycztvo/"
-    },
-    {
-      "type": "places",
-      "date": "2026-07-24",
-      "publishedAt": "2026-07-24T10:04:42.485Z",
-      "key": "places-Fora-Кав'ярня-кондитерська \"Гамак\"-2026-07-24"
     }
   ]
 }
