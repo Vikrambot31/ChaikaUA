@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-09-12",
+      "publishedAt": "2026-09-12T08:16:43.658Z",
+      "key": "https://bigkyiv.com.ua/yak-praczyuvatymut-soczialni-zaklady-kyyeva-pid-chas-zhovtogo-ta-chervonogo-rivniv-zagrozy/"
+    },
+    {
       "type": "places",
       "date": "2026-09-11",
       "publishedAt": "2026-09-11T12:24:10.109Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-24",
       "publishedAt": "2026-07-24T10:04:42.485Z",
       "key": "places-Fora-Кав'ярня-кондитерська \"Гамак\"-2026-07-24"
-    },
-    {
-      "type": "news",
-      "date": "2026-07-24",
-      "publishedAt": "2026-07-24T06:20:40.847Z",
-      "key": "https://bigkyiv.com.ua/u-podilskomu-rajoni-do-kinczya-lita-obmezhat-ruh/"
     }
   ]
 }
