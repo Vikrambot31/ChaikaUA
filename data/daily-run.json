@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-09-13",
+      "publishedAt": "2026-09-13T08:41:17.722Z",
+      "key": "https://bigkyiv.com.ua/vorog-dvichi-za-dvi-doby-atakuvav-odyn-iz-najbilshyh-farmskladiv-ukrayiny-ta-byv-po-terminalu-novoyi-poshty/"
+    },
+    {
       "type": "places",
       "date": "2026-09-12",
       "publishedAt": "2026-09-12T11:45:56.523Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-25",
       "publishedAt": "2026-07-25T09:24:54.650Z",
       "key": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-07-25"
-    },
-    {
-      "type": "news",
-      "date": "2026-07-25",
-      "publishedAt": "2026-07-25T06:11:07.900Z",
-      "key": "https://bigkyiv.com.ua/metro-na-vynogradar-staye-blyzhchym-yak-prosuvayetsya-budivnycztvo/"
     }
   ]
 }
