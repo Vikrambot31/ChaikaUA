@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-09-13",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Кав'ярня-кондитерська \"Гамак\" — вулиця Валерія Лобановського ☕ BALCONE COFFEE — вулиця Валерія Лобановського, 26 к2 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-09-13T12:53:47.689Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/vorog-dvichi-za-dvi-doby-atakuvav-odyn-iz-najbilshyh-farmskladiv-ukrayiny-ta-byv-po-terminalu-novoyi-poshty/",
     "title": "Ворог двічі за дві доби атакував один із найбільших фармскладів України та бив по терміналу “Нової пошти”",
     "shortText": "Ворог атакував аптечні та логістичні центри в районі Ірпеня. Це може вплинути на доставку ліків і посилок до мешканців Чайки. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-07-25",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ Кав'ярня-кондитерська \"Гамак\" — вулиця Валерія Лобановського ☕ BALCONE COFFEE — вулиця Валерія Лобановського, 26 к2 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-07-25T09:24:54.649Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
