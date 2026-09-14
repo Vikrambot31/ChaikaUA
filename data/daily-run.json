@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-09-14",
+      "publishedAt": "2026-09-14T09:27:31.469Z",
+      "key": "https://bigkyiv.com.ua/rosiya-gotuye-novu-hvylyu-udariv-po-ukrayini-ignat/"
+    },
+    {
       "type": "places",
       "date": "2026-09-13",
       "publishedAt": "2026-09-13T12:53:47.690Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-26",
       "publishedAt": "2026-07-26T09:49:03.455Z",
       "key": "places-BALCONE COFFEE-Coffee ART-2026-07-26"
-    },
-    {
-      "type": "news",
-      "date": "2026-07-26",
-      "publishedAt": "2026-07-26T06:30:44.335Z",
-      "key": "https://www.pravda.com.ua/news/2026/07/26/8045920/"
     }
   ]
 }
