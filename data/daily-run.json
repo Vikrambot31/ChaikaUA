@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-09-14",
+      "publishedAt": "2026-09-14T14:30:51.183Z",
+      "key": "places-BALCONE COFFEE-Coffee ART-2026-09-14"
+    },
+    {
       "type": "news",
       "date": "2026-09-14",
       "publishedAt": "2026-09-14T09:27:31.469Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-27",
       "publishedAt": "2026-07-27T06:56:55.695Z",
       "key": "https://bigkyiv.com.ua/na-nyvkah-do-29-lypnya-chastkovo-obmezhyly-ruh/"
-    },
-    {
-      "type": "places",
-      "date": "2026-07-26",
-      "publishedAt": "2026-07-26T09:49:03.455Z",
-      "key": "places-BALCONE COFFEE-Coffee ART-2026-07-26"
     }
   ]
 }
