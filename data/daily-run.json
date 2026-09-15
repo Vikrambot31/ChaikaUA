@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-09-15",
+      "publishedAt": "2026-09-15T09:06:56.179Z",
+      "key": "https://bigkyiv.com.ua/perenesty-nomer-do-lifecell-mozhna-cherez-diyu-ne-vyhodyachy-z-domu/"
+    },
+    {
       "type": "places",
       "date": "2026-09-14",
       "publishedAt": "2026-09-14T14:30:51.183Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-27",
       "publishedAt": "2026-07-27T10:59:47.687Z",
       "key": "places-Coffee ART-ANMI SOUL-2026-07-27"
-    },
-    {
-      "type": "news",
-      "date": "2026-07-27",
-      "publishedAt": "2026-07-27T06:56:55.695Z",
-      "key": "https://bigkyiv.com.ua/na-nyvkah-do-29-lypnya-chastkovo-obmezhyly-ruh/"
     }
   ]
 }
