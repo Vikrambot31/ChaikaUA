@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-09-15",
+      "publishedAt": "2026-09-15T12:56:37.916Z",
+      "key": "places-Coffee ART-ANMI SOUL-2026-09-15"
+    },
+    {
       "type": "news",
       "date": "2026-09-15",
       "publishedAt": "2026-09-15T09:06:56.179Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-28",
       "publishedAt": "2026-07-28T06:20:36.896Z",
       "key": "https://bigkyiv.com.ua/ne-lyshe-kvadratni-metry-shho-pereviryty-u-kvartyri-pid-chas-vyboru-kondyczionera/"
-    },
-    {
-      "type": "places",
-      "date": "2026-07-27",
-      "publishedAt": "2026-07-27T10:59:47.687Z",
-      "key": "places-Coffee ART-ANMI SOUL-2026-07-27"
     }
   ]
 }

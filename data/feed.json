@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Coffee ART-ANMI SOUL-2026-09-15",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Coffee ART — вулиця Валерія Лобановського, 25 ☕ ANMI SOUL — вулиця Валерія Лобановського, 18 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-09-15T12:56:37.915Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/perenesty-nomer-do-lifecell-mozhna-cherez-diyu-ne-vyhodyachy-z-domu/",
     "title": "Перенести номер до lifecell можна через Дію, не виходячи з дому",
     "shortText": "Lifecell став першим оператором, до якого можна перенести номер через застосунок Дія без відвідування офісу. Для мешканців Чайки — ще один спосіб перейти на вигідний тариф за кілька хвилин онлайн. #ЖКЧайка #Ірпінь #КиївськаОбласть #мобільність",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Coffee ART-ANMI SOUL-2026-07-27",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ Coffee ART — вулиця Валерія Лобановського, 25 ☕ ANMI SOUL — вулиця Валерія Лобановського, 18 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-07-27T10:59:47.686Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
