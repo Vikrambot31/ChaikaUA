@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-09-16",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ ANMI SOUL — вулиця Валерія Лобановського, 18 ☕ White Rabbit Coffee and Friends — вулиця Валерія Лобановського, 26 к2 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-09-16T12:54:11.987Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/v-obuhivskomu-rajoni-vnaslidok-ataky-poshkodzheno-budynok-ta-transport-ye-postrazhdalyj/",
     "title": "В Обухівському районі внаслідок атаки пошкоджено будинок та транспорт, є постраждалий",
     "shortText": "Обухівський район Київщини атакували вранці — пошкоджено будинки та машини, є постраждалий. Для Чайки це нагадує про необхідність готувати укриття й припаси. #ЖКЧайка #Ірпінь #КиївськаОбласть #безпека",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-07-28",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ ANMI SOUL — вулиця Валерія Лобановського, 18 ☕ White Rabbit Coffee and Friends — вулиця Валерія Лобановського, 26 к2 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-07-28T10:20:18.697Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
