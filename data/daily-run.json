@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-09-17",
+      "publishedAt": "2026-09-17T09:05:19.323Z",
+      "key": "https://bigkyiv.com.ua/rosiya-atakuvala-zaliznyczyu-za-nich-111-raziv-zupynyaly-poyizdy-ye-vluchannya-u-vokzal-berestyna/"
+    },
+    {
       "type": "places",
       "date": "2026-09-16",
       "publishedAt": "2026-09-16T12:54:11.988Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-29",
       "publishedAt": "2026-07-29T10:26:36.636Z",
       "key": "places-White Rabbit Coffee and Friends-Chaykava-2026-07-29"
-    },
-    {
-      "type": "news",
-      "date": "2026-07-29",
-      "publishedAt": "2026-07-29T06:25:38.282Z",
-      "key": "https://bigkyiv.com.ua/na-perehrestyah-bulvaru-tarasa-shevchenka-tymchasovo-ne-praczyuvatymut-svitlofory/"
     }
   ]
 }
