@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-09-18",
+      "publishedAt": "2026-09-18T08:39:28.152Z",
+      "key": "https://bigkyiv.com.ua/tryvoga-ne-skasovuye-onlajn-urok-yak-praczyuyut-kyyivski-shkoly-v-umovah-tryvalyh-atak/"
+    },
+    {
       "type": "places",
       "date": "2026-09-17",
       "publishedAt": "2026-09-17T12:50:37.290Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-30",
       "publishedAt": "2026-07-30T10:09:05.287Z",
       "key": "places-Chaykava-NOVUS-2026-07-30"
-    },
-    {
-      "type": "news",
-      "date": "2026-07-30",
-      "publishedAt": "2026-07-30T06:21:35.128Z",
-      "key": "https://www.pravda.com.ua/news/2026/07/30/8046489/"
     }
   ]
 }
