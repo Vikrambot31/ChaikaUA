@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Chaykava-NOVUS-2026-09-18",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Chaykava — вулиця Українського Відродження 🛒 NOVUS — вулиця Авіаконструктора Антонова #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-09-18T12:25:24.686Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/tryvoga-ne-skasovuye-onlajn-urok-yak-praczyuyut-kyyivski-shkoly-v-umovah-tryvalyh-atak/",
     "title": "Тривога не скасовує онлайн-урок: як працюють київські школи в умовах тривалих атак",
     "shortText": "Київські школи продовжують уроки під час тривоги — учні просто переходять в безпечніше місце. У Чайці це означає, що діти продовжують навчання навіть під час атак, не втрачаючи темп. #ЖКЧайка #Ірпінь #КиївськаОбласть #Освіта",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Chaykava-NOVUS-2026-07-30",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ Chaykava — вулиця Українського Відродження 🛒 NOVUS — вулиця Авіаконструктора Антонова #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-07-30T10:09:05.287Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]

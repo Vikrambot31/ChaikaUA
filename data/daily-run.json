@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-09-18",
+      "publishedAt": "2026-09-18T12:25:24.686Z",
+      "key": "places-Chaykava-NOVUS-2026-09-18"
+    },
+    {
       "type": "news",
       "date": "2026-09-18",
       "publishedAt": "2026-09-18T08:39:28.152Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-31",
       "publishedAt": "2026-07-31T06:38:30.303Z",
       "key": "https://bigkyiv.com.ua/u-kyyevi-chastkovo-obmezhat-ruh-mostom-metro/"
-    },
-    {
-      "type": "places",
-      "date": "2026-07-30",
-      "publishedAt": "2026-07-30T10:09:05.287Z",
-      "key": "places-Chaykava-NOVUS-2026-07-30"
     }
   ]
 }
