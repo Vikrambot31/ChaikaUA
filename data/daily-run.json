@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-09-19",
+      "publishedAt": "2026-09-19T12:06:42.643Z",
+      "key": "places-NOVUS-Grano Bakery-2026-09-19"
+    },
+    {
       "type": "news",
       "date": "2026-09-19",
       "publishedAt": "2026-09-19T08:26:41.893Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-01",
       "publishedAt": "2026-08-01T06:23:06.521Z",
       "key": "https://bigkyiv.com.ua/kilkist-zagyblyh-u-kyyevi-vnaslidok-rosijskoyi-ataky-zrosla-do-devyaty/"
-    },
-    {
-      "type": "places",
-      "date": "2026-07-31",
-      "publishedAt": "2026-07-31T10:26:09.160Z",
-      "key": "places-NOVUS-Grano Bakery-2026-07-31"
     }
   ]
 }

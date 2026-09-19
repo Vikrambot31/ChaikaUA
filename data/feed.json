@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-NOVUS-Grano Bakery-2026-09-19",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "🛒 NOVUS — вулиця Авіаконструктора Антонова 🛒 Grano Bakery — вулиця Валерія Лобановського, 35 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-09-19T12:06:42.642Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://www.pravda.com.ua/news/2026/09/19/8054172/",
     "title": "У Києві вдруге за ніч оголошували тривогу через дронову небезпеку",
     "shortText": "Ночі в Київській області знову проходять під звуки сирен — за ніч двічі оголошували тривогу через дронову небезпеку. Мешканцям Чайки важливо тримати під рукою засоби захисту й знати локацію укриттів. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-NOVUS-Grano Bakery-2026-07-31",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "🛒 NOVUS — вулиця Авіаконструктора Антонова 🛒 Grano Bakery — вулиця Валерія Лобановського, 35 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-07-31T10:26:09.159Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
