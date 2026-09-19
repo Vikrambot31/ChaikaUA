@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-09-19",
+      "publishedAt": "2026-09-19T08:26:41.893Z",
+      "key": "https://www.pravda.com.ua/news/2026/09/19/8054172/"
+    },
+    {
       "type": "places",
       "date": "2026-09-18",
       "publishedAt": "2026-09-18T12:25:24.686Z",
@@ -593,12 +599,6 @@
       "date": "2026-07-31",
       "publishedAt": "2026-07-31T10:26:09.160Z",
       "key": "places-NOVUS-Grano Bakery-2026-07-31"
-    },
-    {
-      "type": "news",
-      "date": "2026-07-31",
-      "publishedAt": "2026-07-31T06:38:30.303Z",
-      "key": "https://bigkyiv.com.ua/u-kyyevi-chastkovo-obmezhat-ruh-mostom-metro/"
     }
   ]
 }
