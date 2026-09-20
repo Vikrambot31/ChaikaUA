@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-09-20",
+      "publishedAt": "2026-09-20T08:58:09.261Z",
+      "key": "https://bigkyiv.com.ua/rosiyany-bily-po-zaliznyczi-na-vinnychchyni-po-ryatuvalnykah-u-zaporizhzhi-u-kramatorsku-gorily-kvartyry/"
+    },
+    {
       "type": "places",
       "date": "2026-09-19",
       "publishedAt": "2026-09-19T12:06:42.643Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-01",
       "publishedAt": "2026-08-01T09:47:31.424Z",
       "key": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-08-01"
-    },
-    {
-      "type": "news",
-      "date": "2026-08-01",
-      "publishedAt": "2026-08-01T06:23:06.521Z",
-      "key": "https://bigkyiv.com.ua/kilkist-zagyblyh-u-kyyevi-vnaslidok-rosijskoyi-ataky-zrosla-do-devyaty/"
     }
   ]
 }
