@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Кав'ярня ХЛІБ та КАВА-Мозаїка Espresso bar-2026-09-21",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Кав'ярня ХЛІБ та КАВА — вулиця Валерія Лобановського, 18 ☕ Мозаїка Espresso bar — вулиця Валерія Лобановського #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-09-21T14:38:22.351Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/prev%ca%bcyu-7-go-turu-upl-duel-chempiona-ta-viczechempiona-a-takozh-bytva-moryakiv-proty-pyvovariv/",
     "title": "Превʼю 7-го туру УПЛ: дуель чемпіона та віцечемпіона, а також битва «моряків» проти «пивоварів»",
     "shortText": "Попри повітряні тривоги УПЛ продовжує 7-й тур: чемпіон зіграє з віцечемпіоном. Для мешканців Чайки це нагадування про те, як спорт об'єднує навіть у складні часи. #ЖКЧайка #Ірпінь #КиївськаОбласть #УПЛ",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-BALCONE COFFEE-Coffee ART-2026-08-02",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ BALCONE COFFEE — вулиця Валерія Лобановського, 26 к2 ☕ Coffee ART — вулиця Валерія Лобановського, 25 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-08-02T09:46:47.550Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]

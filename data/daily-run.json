@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-09-21",
+      "publishedAt": "2026-09-21T14:38:22.352Z",
+      "key": "places-Кав'ярня ХЛІБ та КАВА-Мозаїка Espresso bar-2026-09-21"
+    },
+    {
       "type": "news",
       "date": "2026-09-21",
       "publishedAt": "2026-09-21T09:30:28.519Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-03",
       "publishedAt": "2026-08-03T06:54:03.693Z",
       "key": "https://bigkyiv.com.ua/u-grecziyi-pid-chas-gasinnya-lisovoyi-pozhezhi-zitknulysya-dva-vertoloty/"
-    },
-    {
-      "type": "places",
-      "date": "2026-08-02",
-      "publishedAt": "2026-08-02T09:46:47.550Z",
-      "key": "places-BALCONE COFFEE-Coffee ART-2026-08-02"
     }
   ]
 }
