@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-09-21",
+      "publishedAt": "2026-09-21T09:30:28.519Z",
+      "key": "https://bigkyiv.com.ua/prev%ca%bcyu-7-go-turu-upl-duel-chempiona-ta-viczechempiona-a-takozh-bytva-moryakiv-proty-pyvovariv/"
+    },
+    {
       "type": "places",
       "date": "2026-09-20",
       "publishedAt": "2026-09-20T12:42:27.812Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-02",
       "publishedAt": "2026-08-02T09:46:47.550Z",
       "key": "places-BALCONE COFFEE-Coffee ART-2026-08-02"
-    },
-    {
-      "type": "news",
-      "date": "2026-08-02",
-      "publishedAt": "2026-08-02T06:28:02.161Z",
-      "key": "https://bigkyiv.com.ua/plisnyava-i-antysanitariya-ta-nebezpechne-ukryttya-u-tabori-artek-zakarpattya-vyyavyly-krychushhi-porushennya/"
     }
   ]
 }
