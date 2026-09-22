@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://www.pravda.com.ua/news/2026/09/22/8054565/",
+    "title": "МВС: Пожежі загасили, у Дніпрі перевіряють, чи є під завалами люди, залізниця ще під атакою РФ",
+    "shortText": "Ночью россияне атаковали инфраструктуру по всей Украине, загасили все пожары. В Днепре проверяют завалы на наличие людей. Для мешканцев Чайки это напоминание о важности готовности убежищ и запасов. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
+    "sourceName": "www.pravda.com.ua",
+    "sourceUrl": "https://www.pravda.com.ua/news/2026/09/22/8054565/",
+    "publishedAt": "2026-09-22T08:57:02.904Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-Кав'ярня ХЛІБ та КАВА-Мозаїка Espresso bar-2026-09-21",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ Кав'ярня ХЛІБ та КАВА — вулиця Валерія Лобановського, 18 ☕ Мозаїка Espresso bar — вулиця Валерія Лобановського #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/u-grecziyi-pid-chas-gasinnya-lisovoyi-pozhezhi-zitknulysya-dva-vertoloty/",
-    "title": "У Греції під час гасіння лісової пожежі зіткнулися два вертольоти",
-    "shortText": "У Греції під час гасіння лісової пожежі зіткнулися два вертольоти. Для мешканців Чайки це нагадує про важливість якісної системи безпеки та координації екстрених служб під час криз. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/u-grecziyi-pid-chas-gasinnya-lisovoyi-pozhezhi-zitknulysya-dva-vertoloty/",
-    "publishedAt": "2026-08-03T06:54:03.692Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]
