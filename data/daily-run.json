@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-09-22",
+      "publishedAt": "2026-09-22T12:53:30.771Z",
+      "key": "places-Мозаїка Espresso bar-#МОЖЕКАВИ?-2026-09-22"
+    },
+    {
       "type": "news",
       "date": "2026-09-22",
       "publishedAt": "2026-09-22T08:57:02.905Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-04",
       "publishedAt": "2026-08-04T06:21:38.468Z",
       "key": "https://bigkyiv.com.ua/kyyan-poperedzhayut-pro-sylnu-speku/"
-    },
-    {
-      "type": "places",
-      "date": "2026-08-03",
-      "publishedAt": "2026-08-03T11:10:33.260Z",
-      "key": "places-Coffee ART-ANMI SOUL-2026-08-03"
     }
   ]
 }

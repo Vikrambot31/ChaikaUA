@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Мозаїка Espresso bar-#МОЖЕКАВИ?-2026-09-22",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Мозаїка Espresso bar — вулиця Валерія Лобановського ☕ #МОЖЕКАВИ? — вулиця Валерія Лобановського, 29 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-09-22T12:53:30.770Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://www.pravda.com.ua/news/2026/09/22/8054565/",
     "title": "МВС: Пожежі загасили, у Дніпрі перевіряють, чи є під завалами люди, залізниця ще під атакою РФ",
     "shortText": "Ночью россияне атаковали инфраструктуру по всей Украине, загасили все пожары. В Днепре проверяют завалы на наличие людей. Для мешканцев Чайки это напоминание о важности готовности убежищ и запасов. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Coffee ART-ANMI SOUL-2026-08-03",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ Coffee ART — вулиця Валерія Лобановського, 25 ☕ ANMI SOUL — вулиця Валерія Лобановського, 18 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-08-03T11:10:33.260Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
