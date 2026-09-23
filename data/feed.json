@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://bigkyiv.com.ua/vorog-bye-po-zaliznychnij-infrastrukturi-kyyeva-poranenyj-praczivnyk-uz/",
+    "title": "Ворог б’є по залізничній інфраструктурі Києва: поранений працівник «УЗ»",
+    "shortText": "Ворог атакує залізничну інфраструктуру Києва — поранений працівник «УЗ». Мешканцям Чайки варто уникати залізничних об'єктів та бути обережними під час пересування. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
+    "sourceName": "bigkyiv.com.ua",
+    "sourceUrl": "https://bigkyiv.com.ua/vorog-bye-po-zaliznychnij-infrastrukturi-kyyeva-poranenyj-praczivnyk-uz/",
+    "publishedAt": "2026-09-23T08:59:17.677Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-Мозаїка Espresso bar-#МОЖЕКАВИ?-2026-09-22",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ Мозаїка Espresso bar — вулиця Валерія Лобановського ☕ #МОЖЕКАВИ? — вулиця Валерія Лобановського, 29 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/kyyan-poperedzhayut-pro-sylnu-speku/",
-    "title": "Киян попереджають про сильну спеку",
-    "shortText": "На Київщині тримається спека до 37°С. Мешканцям Чайки знадобиться максимум води, тіні й обережності на сонці. #ЖКЧайка #Ірпінь #КиївськаОбласть #Спека",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/kyyan-poperedzhayut-pro-sylnu-speku/",
-    "publishedAt": "2026-08-04T06:21:38.467Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]
