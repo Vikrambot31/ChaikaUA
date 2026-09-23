@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-09-23",
+      "publishedAt": "2026-09-23T13:05:12.393Z",
+      "key": "places-#МОЖЕКАВИ?-Fora-2026-09-23"
+    },
+    {
       "type": "news",
       "date": "2026-09-23",
       "publishedAt": "2026-09-23T08:59:17.678Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-05",
       "publishedAt": "2026-08-05T06:21:39.322Z",
       "key": "https://bigkyiv.com.ua/na-zaliznychnij-platformi-bilya-atakovanyh-logistychnyh-czentriv-zagynuly-lyudy-poyizdy-zminyly-ruh/"
-    },
-    {
-      "type": "places",
-      "date": "2026-08-04",
-      "publishedAt": "2026-08-04T10:25:12.980Z",
-      "key": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-08-04"
     }
   ]
 }
