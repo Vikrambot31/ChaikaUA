@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Fora-Кав'ярня-кондитерська \"Гамак\"-2026-09-24",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "🛒 Fora — вулиця Грушевського, 12 ☕ Кав'ярня-кондитерська \"Гамак\" — вулиця Валерія Лобановського #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-09-24T12:57:52.871Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/cherez-nichnu-ataku-zatrymuyutsya-piv-sotni-poyizdiv-deyaki-rejsy-zapiznyuyutsya-bilsh-nizh-na-7-godyn/",
     "title": "Через нічну атаку затримуються пів сотні поїздів: деякі рейси запізнюються більш ніж на 7 годин",
     "shortText": "Після масованої атаки 24 вересня половина поїздів в Україні запізнюються до 7 годин. Для мешканців Чайки це означає утруднення планування поїздок до Києва та інших міст. #ЖКЧайка #Ірпінь #КиївськаОбласть #транспорт",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-White Rabbit Coffee and Friends-Chaykava-2026-08-05",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ White Rabbit Coffee and Friends — вулиця Валерія Лобановського, 26 к2 ☕ Chaykava — вулиця Українського Відродження #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-08-05T10:21:56.311Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
