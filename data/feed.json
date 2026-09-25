@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://www.pravda.com.ua/news/2026/09/25/8054977/",
+    "title": "Нічні удари по Київщині: горіло підприємство, пошкоджено склади, будинки і авто",
+    "shortText": "Вночі російські ataky пошкодили будинки та авто на Київщині. Для мешканців Чайки це нагадує про важливість укриттів і готовності до небезпеки. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
+    "sourceName": "www.pravda.com.ua",
+    "sourceUrl": "https://www.pravda.com.ua/news/2026/09/25/8054977/",
+    "publishedAt": "2026-09-25T09:16:03.966Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-Fora-Кав'ярня-кондитерська \"Гамак\"-2026-09-24",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "🛒 Fora — вулиця Грушевського, 12 ☕ Кав'ярня-кондитерська \"Гамак\" — вулиця Валерія Лобановського #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/u-perehodi-na-majdani-nezalezhnosti-tryvaye-remont/",
-    "title": "У переході на Майдані Незалежності триває ремонт",
-    "shortText": "У Київі на Майдані Незалежності ремонтують підземний перехід. Для ірпінян, які часто бувають у центрі столиці, це означає можливі затримки при проходженні цієї локації. #ЖКЧайка #Ірпінь #КиївськаОбласть #Транспорт",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/u-perehodi-na-majdani-nezalezhnosti-tryvaye-remont/",
-    "publishedAt": "2026-08-06T06:24:17.382Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]

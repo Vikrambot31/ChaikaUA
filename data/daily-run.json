@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-09-25",
+      "publishedAt": "2026-09-25T09:16:03.967Z",
+      "key": "https://www.pravda.com.ua/news/2026/09/25/8054977/"
+    },
+    {
       "type": "places",
       "date": "2026-09-24",
       "publishedAt": "2026-09-24T12:57:52.872Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-06",
       "publishedAt": "2026-08-06T10:23:42.242Z",
       "key": "places-Chaykava-NOVUS-2026-08-06"
-    },
-    {
-      "type": "news",
-      "date": "2026-08-06",
-      "publishedAt": "2026-08-06T06:24:17.384Z",
-      "key": "https://bigkyiv.com.ua/u-perehodi-na-majdani-nezalezhnosti-tryvaye-remont/"
     }
   ]
 }
