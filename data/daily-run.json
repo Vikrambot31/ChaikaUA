@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-09-25",
+      "publishedAt": "2026-09-25T13:04:11.222Z",
+      "key": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-09-25"
+    },
+    {
       "type": "news",
       "date": "2026-09-25",
       "publishedAt": "2026-09-25T09:16:03.967Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-07",
       "publishedAt": "2026-08-07T05:30:01.201Z",
       "key": "https://bigkyiv.com.ua/pozyvnyj-cherez-kohannya-do-malviny-istoriya-3d-dyzajnera-yakyj-stvoryuye-detali-dlya-droniv-zsu/"
-    },
-    {
-      "type": "places",
-      "date": "2026-08-06",
-      "publishedAt": "2026-08-06T10:23:42.242Z",
-      "key": "places-Chaykava-NOVUS-2026-08-06"
     }
   ]
 }

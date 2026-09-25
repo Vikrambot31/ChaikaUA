@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-09-25",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Кав'ярня-кондитерська \"Гамак\" — вулиця Валерія Лобановського ☕ BALCONE COFFEE — вулиця Валерія Лобановського, 26 к2 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-09-25T13:04:11.221Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://www.pravda.com.ua/news/2026/09/25/8054977/",
     "title": "Нічні удари по Київщині: горіло підприємство, пошкоджено склади, будинки і авто",
     "shortText": "Вночі російські ataky пошкодили будинки та авто на Київщині. Для мешканців Чайки це нагадує про важливість укриттів і готовності до небезпеки. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Chaykava-NOVUS-2026-08-06",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ Chaykava — вулиця Українського Відродження 🛒 NOVUS — вулиця Авіаконструктора Антонова #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-08-06T10:23:42.241Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
