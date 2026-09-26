@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-09-26",
+      "publishedAt": "2026-09-26T12:31:54.971Z",
+      "key": "places-BALCONE COFFEE-Coffee ART-2026-09-26"
+    },
+    {
       "type": "news",
       "date": "2026-09-26",
       "publishedAt": "2026-09-26T08:58:49.081Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-08",
       "publishedAt": "2026-08-08T04:49:38.228Z",
       "key": "https://www.pravda.com.ua/news/2026/08/08/8047842/"
-    },
-    {
-      "type": "places",
-      "date": "2026-08-07",
-      "publishedAt": "2026-08-07T08:43:53.872Z",
-      "key": "places-NOVUS-Grano Bakery-2026-08-07"
     }
   ]
 }
