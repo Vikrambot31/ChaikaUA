@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-09-26",
+      "publishedAt": "2026-09-26T08:58:49.081Z",
+      "key": "https://www.pravda.com.ua/news/2026/09/26/8055119/"
+    },
+    {
       "type": "places",
       "date": "2026-09-25",
       "publishedAt": "2026-09-25T13:04:11.222Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-07",
       "publishedAt": "2026-08-07T08:43:53.872Z",
       "key": "places-NOVUS-Grano Bakery-2026-08-07"
-    },
-    {
-      "type": "news",
-      "date": "2026-08-07",
-      "publishedAt": "2026-08-07T05:30:01.201Z",
-      "key": "https://bigkyiv.com.ua/pozyvnyj-cherez-kohannya-do-malviny-istoriya-3d-dyzajnera-yakyj-stvoryuye-detali-dlya-droniv-zsu/"
     }
   ]
 }
