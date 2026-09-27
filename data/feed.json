@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Coffee ART-ANMI SOUL-2026-09-27",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Coffee ART — вулиця Валерія Лобановського, 25 ☕ ANMI SOUL — вулиця Валерія Лобановського, 18 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-09-27T13:22:17.220Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/ataka-na-kyyivshhynu-poshkodzheno-16-obyektiv-v-obuhovi-ta-brovarah-pogirshylasya-yakist-povitrya/",
     "title": "Атака на Київщину:  пошкоджено 16 об’єктів, в Обухові та Броварах погіршилася якість повітря",
     "shortText": "Російські дрони атакували Київщину: пошкоджено 16 об'єктів у трьох районах, погіршилася якість повітря в Обухові та Броварах. Мешканцям Чайки варто стежити за повітряними тривогами та якістю повітря. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Grano Bakery-Кав'ярня ХЛІБ та КАВА-2026-08-08",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "🛒 Grano Bakery — вулиця Валерія Лобановського, 35 ☕ Кав'ярня ХЛІБ та КАВА — вулиця Валерія Лобановського, 18 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-08-08T08:25:28.059Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
