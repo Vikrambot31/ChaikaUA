@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-09-28",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ ANMI SOUL — вулиця Валерія Лобановського, 18 ☕ White Rabbit Coffee and Friends — вулиця Валерія Лобановського, 26 к2 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-09-28T16:09:30.208Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://www.pravda.com.ua/news/2026/09/28/8055370/",
     "title": "Корецький каже, що частині мешканців Києва треба вже подбати про альтернативне житло на зиму",
     "shortText": "Прем'єр Корецький рекомендує киянам мати альтернативне житло на зиму через можливі перебої зі світлом. Мешканцям Чайки варто перевірити резервні опалювальні системи та запаси палива заздалегідь. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Кав'ярня ХЛІБ та КАВА-Мозаїка Espresso bar-2026-08-09",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ Кав'ярня ХЛІБ та КАВА — вулиця Валерія Лобановського, 18 ☕ Мозаїка Espresso bar — вулиця Валерія Лобановського #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-08-09T08:27:41.910Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]

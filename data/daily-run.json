@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-09-28",
+      "publishedAt": "2026-09-28T16:09:30.208Z",
+      "key": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-09-28"
+    },
+    {
       "type": "news",
       "date": "2026-09-28",
       "publishedAt": "2026-09-28T10:23:20.020Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-10",
       "publishedAt": "2026-08-10T05:19:51.708Z",
       "key": "https://bigkyiv.com.ua/zatoriv-ne-unyknuty-u-dvoh-rajonah-kyyeva-z-10-serpnya-obmezhat-ruh/"
-    },
-    {
-      "type": "places",
-      "date": "2026-08-09",
-      "publishedAt": "2026-08-09T08:27:41.911Z",
-      "key": "places-Кав'ярня ХЛІБ та КАВА-Мозаїка Espresso bar-2026-08-09"
     }
   ]
 }
