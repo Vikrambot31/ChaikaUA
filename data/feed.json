@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://www.pravda.com.ua/news/2026/09/28/8055370/",
+    "title": "Корецький каже, що частині мешканців Києва треба вже подбати про альтернативне житло на зиму",
+    "shortText": "Прем'єр Корецький рекомендує киянам мати альтернативне житло на зиму через можливі перебої зі світлом. Мешканцям Чайки варто перевірити резервні опалювальні системи та запаси палива заздалегідь. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
+    "sourceName": "www.pravda.com.ua",
+    "sourceUrl": "https://www.pravda.com.ua/news/2026/09/28/8055370/",
+    "publishedAt": "2026-09-28T10:23:20.019Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-Coffee ART-ANMI SOUL-2026-09-27",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ Coffee ART — вулиця Валерія Лобановського, 25 ☕ ANMI SOUL — вулиця Валерія Лобановського, 18 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/u-kyyevi-poproshhalysya-iz-zasnovnykom-poshukovogo-zagonu-placzdarm-oleksiyem-yukovym/",
-    "title": "У Києві попрощалися із засновником пошукового загону «Плацдарм» Олексієм Юковим",
-    "shortText": "Засновник пошукового загону «Плацдарм» Олексій Юков загинув 5 серпня на Донеччині. Його 27-літня робота повертала полеглих захисників додому для гідного поховання. Мешканці Ірпені вшановують пам'ять героя, який поклав життя служінню Україні. #ЖКЧайка #Ірпінь #КиївськаОбласть #Пам'ятьПолеглих",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/u-kyyevi-poproshhalysya-iz-zasnovnykom-poshukovogo-zagonu-placzdarm-oleksiyem-yukovym/",
-    "publishedAt": "2026-08-09T04:57:48.597Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]
