@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://bigkyiv.com.ua/masova-avariya-stalasya-u-desnyanskomu-rajoni-ye-postrazhdali/",
+    "title": "Масова аварія сталася у Деснянському районі: є постраждалі",
+    "shortText": "Зранку на вулиці Пухівській у Деснянському районі сталася масова аварія. Для мешканців Чайки це нагадування про небезпеку на дорогах під час спішки та важливість дотримання швидкості. #ЖКЧайка #Ірпінь #КиївськаОбласть #безпека",
+    "sourceName": "bigkyiv.com.ua",
+    "sourceUrl": "https://bigkyiv.com.ua/masova-avariya-stalasya-u-desnyanskomu-rajoni-ye-postrazhdali/",
+    "publishedAt": "2026-09-30T10:11:48.277Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-White Rabbit Coffee and Friends-Chaykava-2026-09-29",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ White Rabbit Coffee and Friends — вулиця Валерія Лобановського, 26 к2 ☕ Chaykava — вулиця Українського Відродження #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://www.pravda.com.ua/news/2026/08/11/8048171/",
-    "title": "Росіяни масовано атакували Запоріжжя ракетами та КАБами: 6 людей загинули, 19 поранені",
-    "shortText": "Росія атакувала Запоріжжя ракетами й авіабомбами: 6 загиблих, 19 поранених. Для мешканців Чайки це нагадування про важливість укриттів і готовності до повітряної тривоги. #ЖКЧайка #Ірпінь #КиївськаОбласть #ПовітрянаТривога",
-    "sourceName": "www.pravda.com.ua",
-    "sourceUrl": "https://www.pravda.com.ua/news/2026/08/11/8048171/",
-    "publishedAt": "2026-08-11T05:00:44.133Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]

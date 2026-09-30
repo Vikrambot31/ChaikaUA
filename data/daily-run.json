@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-09-30",
+      "publishedAt": "2026-09-30T10:11:48.278Z",
+      "key": "https://bigkyiv.com.ua/masova-avariya-stalasya-u-desnyanskomu-rajoni-ye-postrazhdali/"
+    },
+    {
       "type": "places",
       "date": "2026-09-29",
       "publishedAt": "2026-09-29T14:25:00.109Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-11",
       "publishedAt": "2026-08-11T08:41:19.473Z",
       "key": "places-#МОЖЕКАВИ?-Fora-2026-08-11"
-    },
-    {
-      "type": "news",
-      "date": "2026-08-11",
-      "publishedAt": "2026-08-11T05:00:44.134Z",
-      "key": "https://www.pravda.com.ua/news/2026/08/11/8048171/"
     }
   ]
 }
