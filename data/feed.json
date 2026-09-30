@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Chaykava-NOVUS-2026-09-30",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Chaykava — вулиця Українського Відродження 🛒 NOVUS — вулиця Авіаконструктора Антонова #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-09-30T14:21:11.900Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/masova-avariya-stalasya-u-desnyanskomu-rajoni-ye-postrazhdali/",
     "title": "Масова аварія сталася у Деснянському районі: є постраждалі",
     "shortText": "Зранку на вулиці Пухівській у Деснянському районі сталася масова аварія. Для мешканців Чайки це нагадування про небезпеку на дорогах під час спішки та важливість дотримання швидкості. #ЖКЧайка #Ірпінь #КиївськаОбласть #безпека",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-#МОЖЕКАВИ?-Fora-2026-08-11",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ #МОЖЕКАВИ? — вулиця Валерія Лобановського, 29 🛒 Fora — вулиця Грушевського, 12 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-08-11T08:41:19.472Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]

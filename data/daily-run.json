@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-09-30",
+      "publishedAt": "2026-09-30T14:21:11.901Z",
+      "key": "places-Chaykava-NOVUS-2026-09-30"
+    },
+    {
       "type": "news",
       "date": "2026-09-30",
       "publishedAt": "2026-09-30T10:11:48.278Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-12",
       "publishedAt": "2026-08-12T05:26:12.715Z",
       "key": "https://bigkyiv.com.ua/robotu-tramvayiv-number-14-15-pryzupynyayut-na-try-dni/"
-    },
-    {
-      "type": "places",
-      "date": "2026-08-11",
-      "publishedAt": "2026-08-11T08:41:19.473Z",
-      "key": "places-#МОЖЕКАВИ?-Fora-2026-08-11"
     }
   ]
 }
