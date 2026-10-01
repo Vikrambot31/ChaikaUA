@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-10-01",
+      "publishedAt": "2026-10-01T14:53:09.758Z",
+      "key": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-10-01"
+    },
+    {
       "type": "news",
       "date": "2026-10-01",
       "publishedAt": "2026-10-01T10:38:29.925Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-13",
       "publishedAt": "2026-08-13T05:29:03.622Z",
       "key": "https://bigkyiv.com.ua/pyat-kyyivskyh-shkil-ne-vstygayut-vidnovyty-pislya-atak-yak-navchatymutsya-dity/"
-    },
-    {
-      "type": "places",
-      "date": "2026-08-12",
-      "publishedAt": "2026-08-12T08:58:21.218Z",
-      "key": "places-Fora-Кав'ярня-кондитерська \"Гамак\"-2026-08-12"
     }
   ]
 }
