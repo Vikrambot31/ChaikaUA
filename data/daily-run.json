@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-10-01",
+      "publishedAt": "2026-10-01T10:38:29.925Z",
+      "key": "https://bigkyiv.com.ua/dlya-sumshhyny-ta-harkivshhyny-zapustyly-spoluchennya-poyizd-avtobus/"
+    },
+    {
       "type": "places",
       "date": "2026-09-30",
       "publishedAt": "2026-09-30T14:21:11.901Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-12",
       "publishedAt": "2026-08-12T08:58:21.218Z",
       "key": "places-Fora-Кав'ярня-кондитерська \"Гамак\"-2026-08-12"
-    },
-    {
-      "type": "news",
-      "date": "2026-08-12",
-      "publishedAt": "2026-08-12T05:26:12.715Z",
-      "key": "https://bigkyiv.com.ua/robotu-tramvayiv-number-14-15-pryzupynyayut-na-try-dni/"
     }
   ]
 }

@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://bigkyiv.com.ua/dlya-sumshhyny-ta-harkivshhyny-zapustyly-spoluchennya-poyizd-avtobus/",
+    "title": "Для Сумщини та Харківщини запустили сполучення «поїзд + автобус»",
+    "shortText": "Сумщина та Харківщина запускають комбіноване сполучення «поїзд + автобус» — резервна схема, якщо рух поїздів обмежать через небезпеку. Для мешканців Чайки це означає більшу стійкість залізничного сполучення в регіоні. #ЖКЧайка #Ірпінь #КиївськаОбласть #Транспорт",
+    "sourceName": "bigkyiv.com.ua",
+    "sourceUrl": "https://bigkyiv.com.ua/dlya-sumshhyny-ta-harkivshhyny-zapustyly-spoluchennya-poyizd-avtobus/",
+    "publishedAt": "2026-10-01T10:38:29.924Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-Chaykava-NOVUS-2026-09-30",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ Chaykava — вулиця Українського Відродження 🛒 NOVUS — вулиця Авіаконструктора Антонова #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/robotu-tramvayiv-number-14-15-pryzupynyayut-na-try-dni/",
-    "title": "Роботу трамваїв № 14, 15 призупиняють на три дні",
-    "shortText": "У Києві 12–14 серпня зупинять трамваї № 14 і 15 на ремонт колій. Для мешканців Чайки це означає затримки під час поїздок у центр міста — замість трамвая служитиме тимчасовий автобус. #ЖКЧайка #Ірпінь #КиївськаОбласть #громадськийтранспорт",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/robotu-tramvayiv-number-14-15-pryzupynyayut-na-try-dni/",
-    "publishedAt": "2026-08-12T05:26:12.714Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]
