@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-10-02",
+      "publishedAt": "2026-10-02T14:15:05.494Z",
+      "key": "places-BALCONE COFFEE-Coffee ART-2026-10-02"
+    },
+    {
       "type": "news",
       "date": "2026-10-02",
       "publishedAt": "2026-10-02T10:13:41.960Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-14",
       "publishedAt": "2026-08-14T05:26:43.185Z",
       "key": "https://www.pravda.com.ua/news/2026/08/14/8048615/"
-    },
-    {
-      "type": "places",
-      "date": "2026-08-13",
-      "publishedAt": "2026-08-13T09:00:02.935Z",
-      "key": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-08-13"
     }
   ]
 }
