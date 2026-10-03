@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-10-03",
+      "publishedAt": "2026-10-03T09:35:17.388Z",
+      "key": "https://www.pravda.com.ua/news/2026/10/03/8056256/"
+    },
+    {
       "type": "places",
       "date": "2026-10-02",
       "publishedAt": "2026-10-02T14:15:05.494Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-14",
       "publishedAt": "2026-08-14T08:55:19.919Z",
       "key": "places-BALCONE COFFEE-Coffee ART-2026-08-14"
-    },
-    {
-      "type": "news",
-      "date": "2026-08-14",
-      "publishedAt": "2026-08-14T05:26:43.185Z",
-      "key": "https://www.pravda.com.ua/news/2026/08/14/8048615/"
     }
   ]
 }
