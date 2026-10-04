@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-10-04",
+      "publishedAt": "2026-10-04T10:20:52.677Z",
+      "key": "https://bigkyiv.com.ua/vchytelka-anglijskoyi-movy-z-kyyivshhyny-stala-najkrashhym-vchytelem-2026-roku/"
+    },
+    {
       "type": "places",
       "date": "2026-10-03",
       "publishedAt": "2026-10-03T12:48:06.171Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-15",
       "publishedAt": "2026-08-15T08:14:40.490Z",
       "key": "places-Coffee ART-ANMI SOUL-2026-08-15"
-    },
-    {
-      "type": "news",
-      "date": "2026-08-15",
-      "publishedAt": "2026-08-15T04:22:32.315Z",
-      "key": "https://bigkyiv.com.ua/iz-15-serpnya-chastkovo-obmezhyly-ruh-transportu-yevropejskoyu-ploshheyu/"
     }
   ]
 }
