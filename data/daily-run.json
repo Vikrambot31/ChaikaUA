@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-10-05",
+      "publishedAt": "2026-10-05T16:30:59.121Z",
+      "key": "places-White Rabbit Coffee and Friends-Chaykava-2026-10-05"
+    },
+    {
       "type": "news",
       "date": "2026-10-05",
       "publishedAt": "2026-10-05T11:04:37.690Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-17",
       "publishedAt": "2026-08-17T04:34:15.539Z",
       "key": "https://bigkyiv.com.ua/vulyczeyu-zolotoustivskoyu-do-kinczya-lita-obmezhat-ruh/"
-    },
-    {
-      "type": "places",
-      "date": "2026-08-16",
-      "publishedAt": "2026-08-16T08:14:34.897Z",
-      "key": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-08-16"
     }
   ]
 }
