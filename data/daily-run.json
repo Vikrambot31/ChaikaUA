@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-10-06",
+      "publishedAt": "2026-10-06T10:57:32.629Z",
+      "key": "https://bigkyiv.com.ua/kyyiv-i-oblast-perehodyat-na-grafiky-vidklyuchen-koly-ne-bude-svitla-6-zhovtnya/"
+    },
+    {
       "type": "places",
       "date": "2026-10-05",
       "publishedAt": "2026-10-05T16:30:59.121Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-17",
       "publishedAt": "2026-08-17T08:28:29.761Z",
       "key": "places-White Rabbit Coffee and Friends-Chaykava-2026-08-17"
-    },
-    {
-      "type": "news",
-      "date": "2026-08-17",
-      "publishedAt": "2026-08-17T04:34:15.539Z",
-      "key": "https://bigkyiv.com.ua/vulyczeyu-zolotoustivskoyu-do-kinczya-lita-obmezhat-ruh/"
     }
   ]
 }
