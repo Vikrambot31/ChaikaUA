@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Chaykava-NOVUS-2026-10-06",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Chaykava — вулиця Українського Відродження 🛒 NOVUS — вулиця Авіаконструктора Антонова #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-10-06T14:33:14.342Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/kyyiv-i-oblast-perehodyat-na-grafiky-vidklyuchen-koly-ne-bude-svitla-6-zhovtnya/",
     "title": "Київ і область переходять на графіки відключень: коли не буде світла 6 жовтня",
     "shortText": "6 жовтня в Ірпені діють графіки стабілізаційних відключень за командою Укренерго. Мешканці Чайки перебуватимуть без світла у призначений для своєї підчерги час — перевірте графік у додатку ДТЕК. #ЖКЧайка #Ірпінь #КиївськаОбласть #Енергозбереження",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-White Rabbit Coffee and Friends-Chaykava-2026-08-17",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ White Rabbit Coffee and Friends — вулиця Валерія Лобановського, 26 к2 ☕ Chaykava — вулиця Українського Відродження #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-08-17T08:28:29.760Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]

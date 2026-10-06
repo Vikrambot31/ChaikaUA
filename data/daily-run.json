@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-10-06",
+      "publishedAt": "2026-10-06T14:33:14.343Z",
+      "key": "places-Chaykava-NOVUS-2026-10-06"
+    },
+    {
       "type": "news",
       "date": "2026-10-06",
       "publishedAt": "2026-10-06T10:57:32.629Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-18",
       "publishedAt": "2026-08-18T04:28:31.610Z",
       "key": "https://www.pravda.com.ua/news/2026/08/18/8049088/"
-    },
-    {
-      "type": "places",
-      "date": "2026-08-17",
-      "publishedAt": "2026-08-17T08:28:29.761Z",
-      "key": "places-White Rabbit Coffee and Friends-Chaykava-2026-08-17"
     }
   ]
 }
