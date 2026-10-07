@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-10-07",
+      "publishedAt": "2026-10-07T14:50:04.379Z",
+      "key": "places-NOVUS-Grano Bakery-2026-10-07"
+    },
+    {
       "type": "news",
       "date": "2026-10-07",
       "publishedAt": "2026-10-07T10:46:00.105Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-19",
       "publishedAt": "2026-08-19T04:30:28.851Z",
       "key": "https://bigkyiv.com.ua/brytaniya-prodovzhyt-nadavaty-ukrayini-zbroyu-popry-pogrozy-rf/"
-    },
-    {
-      "type": "places",
-      "date": "2026-08-18",
-      "publishedAt": "2026-08-18T08:20:51.807Z",
-      "key": "places-Chaykava-NOVUS-2026-08-18"
     }
   ]
 }
