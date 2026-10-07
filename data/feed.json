@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://bigkyiv.com.ua/udary-po-prylukah-i-kremenchuku-15-zagyblyh-kilkist-postrazhdalyh-zrosla-do-83/",
+    "title": "Удари по Прилуках і Кременчуку: 15 загиблих, кількість постраждалих зросла до 83",
+    "shortText": "Російські удари по Прилуках і Кременчуку 7 жовтня: 15 загиблих, 83 постраждалих. Для мешканців Чайки це нагадування про важливість цивільного захисту і готовності до будь-яких ситуацій. #ЖКЧайка #Ірпінь #КиївськаОбласть #БезпекаУкраїни",
+    "sourceName": "bigkyiv.com.ua",
+    "sourceUrl": "https://bigkyiv.com.ua/udary-po-prylukah-i-kremenchuku-15-zagyblyh-kilkist-postrazhdalyh-zrosla-do-83/",
+    "publishedAt": "2026-10-07T10:46:00.104Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-Chaykava-NOVUS-2026-10-06",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ Chaykava — вулиця Українського Відродження 🛒 NOVUS — вулиця Авіаконструктора Антонова #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://www.pravda.com.ua/news/2026/08/18/8049088/",
-    "title": "На Київщині ППО працює по ворожих безпілотниках",
-    "shortText": "На Київщині 18 серпня ППО знищувала ворожих дронів. Мешканці Ірпеня можуть чути звуки роботи противітної оборони. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
-    "sourceName": "www.pravda.com.ua",
-    "sourceUrl": "https://www.pravda.com.ua/news/2026/08/18/8049088/",
-    "publishedAt": "2026-08-18T04:28:31.609Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]
