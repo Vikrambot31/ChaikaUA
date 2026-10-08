@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-10-08",
+      "publishedAt": "2026-10-08T11:04:46.960Z",
+      "key": "https://bigkyiv.com.ua/u-kramatorsku-vzhe-33-zagyblyh-vid-udaru-rf-po-rejsovomu-avtobusu/"
+    },
+    {
       "type": "places",
       "date": "2026-10-07",
       "publishedAt": "2026-10-07T14:50:04.379Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-19",
       "publishedAt": "2026-08-19T08:21:57.367Z",
       "key": "places-NOVUS-Grano Bakery-2026-08-19"
-    },
-    {
-      "type": "news",
-      "date": "2026-08-19",
-      "publishedAt": "2026-08-19T04:30:28.851Z",
-      "key": "https://bigkyiv.com.ua/brytaniya-prodovzhyt-nadavaty-ukrayini-zbroyu-popry-pogrozy-rf/"
     }
   ]
 }
