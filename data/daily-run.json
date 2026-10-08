@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-10-08",
+      "publishedAt": "2026-10-08T15:00:50.988Z",
+      "key": "places-Grano Bakery-Кав'ярня ХЛІБ та КАВА-2026-10-08"
+    },
+    {
       "type": "news",
       "date": "2026-10-08",
       "publishedAt": "2026-10-08T11:04:46.960Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-20",
       "publishedAt": "2026-08-20T04:29:52.522Z",
       "key": "https://www.pravda.com.ua/news/2026/08/20/8049465/"
-    },
-    {
-      "type": "places",
-      "date": "2026-08-19",
-      "publishedAt": "2026-08-19T08:21:57.367Z",
-      "key": "places-NOVUS-Grano Bakery-2026-08-19"
     }
   ]
 }
