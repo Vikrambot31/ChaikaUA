@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-10-09",
+      "publishedAt": "2026-10-09T14:45:05.176Z",
+      "key": "places-Кав'ярня ХЛІБ та КАВА-Мозаїка Espresso bar-2026-10-09"
+    },
+    {
       "type": "news",
       "date": "2026-10-09",
       "publishedAt": "2026-10-09T11:04:12.826Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-21",
       "publishedAt": "2026-08-21T04:31:09.923Z",
       "key": "https://bigkyiv.com.ua/u-kyyevi-vzhe-544-svitlofory-mozhut-praczyuvaty-pid-chas-vidklyuchen-svitla/"
-    },
-    {
-      "type": "places",
-      "date": "2026-08-20",
-      "publishedAt": "2026-08-20T08:22:43.162Z",
-      "key": "places-Grano Bakery-Кав'ярня ХЛІБ та КАВА-2026-08-20"
     }
   ]
 }
