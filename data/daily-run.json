@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T10:21:33.024Z",
+      "key": "https://bigkyiv.com.ua/suha-subota-z-osinnim-teplom-u-kyyevi-ochikuyetsya-do-19/"
+    },
+    {
       "type": "places",
       "date": "2026-10-09",
       "publishedAt": "2026-10-09T14:45:05.176Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-21",
       "publishedAt": "2026-08-21T08:24:09.663Z",
       "key": "places-Кав'ярня ХЛІБ та КАВА-Мозаїка Espresso bar-2026-08-21"
-    },
-    {
-      "type": "news",
-      "date": "2026-08-21",
-      "publishedAt": "2026-08-21T04:31:09.923Z",
-      "key": "https://bigkyiv.com.ua/u-kyyevi-vzhe-544-svitlofory-mozhut-praczyuvaty-pid-chas-vidklyuchen-svitla/"
     }
   ]
 }
