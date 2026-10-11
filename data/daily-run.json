@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-10-11",
+      "publishedAt": "2026-10-11T14:27:10.447Z",
+      "key": "places-#МОЖЕКАВИ?-Fora-2026-10-11"
+    },
+    {
       "type": "news",
       "date": "2026-10-11",
       "publishedAt": "2026-10-11T10:29:24.751Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-23",
       "publishedAt": "2026-08-23T04:29:53.109Z",
       "key": "https://bigkyiv.com.ua/rosijska-banderol-upala-u-bilorusi-zagalom-u-povitryanyj-prostir-zajshly-shhonajmenshe-12-bezpilotnykiv/"
-    },
-    {
-      "type": "places",
-      "date": "2026-08-22",
-      "publishedAt": "2026-08-22T08:14:55.237Z",
-      "key": "places-Мозаїка Espresso bar-#МОЖЕКАВИ?-2026-08-22"
     }
   ]
 }
