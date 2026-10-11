@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://bigkyiv.com.ua/nova-ataka-na-yandeks-vyklykala-masshtabnyj-zbij-u-roboti-rosijskyh-onlajn-servisiv/",
+    "title": "Нова атака на «Яндекс» викликала масштабний збій у роботі російських онлайн-сервісів",
+    "shortText": "У Володимирі атака на дата-центр «Яндекса» вимкнула електрику для тисяч людей. Для мешканців Чайки це означає стабільність інтернету та онлайн-сервісів, які залежать від російської інфраструктури. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
+    "sourceName": "bigkyiv.com.ua",
+    "sourceUrl": "https://bigkyiv.com.ua/nova-ataka-na-yandeks-vyklykala-masshtabnyj-zbij-u-roboti-rosijskyh-onlajn-servisiv/",
+    "publishedAt": "2026-10-11T10:29:24.751Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-Мозаїка Espresso bar-#МОЖЕКАВИ?-2026-10-10",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ Мозаїка Espresso bar — вулиця Валерія Лобановського ☕ #МОЖЕКАВИ? — вулиця Валерія Лобановського, 29 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/lvivski-likari-vryatuvaly-4-misyachnu-divchynku-u-yakoyi-tromby-perekryly-90-legenevoyi-arteriyi/",
-    "title": "Львівські лікарі врятували 4-місячну дівчинку, у якої тромби перекрили 90% легеневої артерії",
-    "shortText": "Львівські лікарі врятували 4-місячну дівчинку з тромбами у легеневій артерії без операції. Для ірпінян це нагадування про значення якісної медичної допомоги поблизу дому. #ЖКЧайка #Ірпінь #КиївськаОбласть #Медицина",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/lvivski-likari-vryatuvaly-4-misyachnu-divchynku-u-yakoyi-tromby-perekryly-90-legenevoyi-arteriyi/",
-    "publishedAt": "2026-08-22T04:25:51.643Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]

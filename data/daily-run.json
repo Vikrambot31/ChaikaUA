@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-10-11",
+      "publishedAt": "2026-10-11T10:29:24.751Z",
+      "key": "https://bigkyiv.com.ua/nova-ataka-na-yandeks-vyklykala-masshtabnyj-zbij-u-roboti-rosijskyh-onlajn-servisiv/"
+    },
+    {
       "type": "places",
       "date": "2026-10-10",
       "publishedAt": "2026-10-10T14:02:42.028Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-22",
       "publishedAt": "2026-08-22T08:14:55.237Z",
       "key": "places-Мозаїка Espresso bar-#МОЖЕКАВИ?-2026-08-22"
-    },
-    {
-      "type": "news",
-      "date": "2026-08-22",
-      "publishedAt": "2026-08-22T04:25:51.644Z",
-      "key": "https://bigkyiv.com.ua/lvivski-likari-vryatuvaly-4-misyachnu-divchynku-u-yakoyi-tromby-perekryly-90-legenevoyi-arteriyi/"
     }
   ]
 }
