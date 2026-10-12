@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-10-12",
+      "publishedAt": "2026-10-12T17:05:02.928Z",
+      "key": "places-Fora-Кав'ярня-кондитерська \"Гамак\"-2026-10-12"
+    },
+    {
       "type": "news",
       "date": "2026-10-12",
       "publishedAt": "2026-10-12T11:33:07.862Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-24",
       "publishedAt": "2026-08-24T04:37:57.142Z",
       "key": "https://bigkyiv.com.ua/u-darnyczkomu-rajoni-zamist-vyrvy-pislya-obstrilu-zyavylasya-nova-klumba/"
-    },
-    {
-      "type": "places",
-      "date": "2026-08-23",
-      "publishedAt": "2026-08-23T08:15:43.980Z",
-      "key": "places-#МОЖЕКАВИ?-Fora-2026-08-23"
     }
   ]
 }

@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Fora-Кав'ярня-кондитерська \"Гамак\"-2026-10-12",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "🛒 Fora — вулиця Грушевського, 12 ☕ Кав'ярня-кондитерська \"Гамак\" — вулиця Валерія Лобановського #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-10-12T17:05:02.927Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/vorog-prodovzhuye-obstrilyuvaty-kyyiv-ye-pryloty-na-darnyczi-ta-solomyanczi/",
     "title": "Ворог продовжує обстрілювати Київ: є прильоти на Дарниці та Солом’янці (оновлено)",
     "shortText": "У Києві продовжуються обстріли безпілотниками — є враження в районах Дарниці та Солом'янки. Для жителів Чайки це означає можливі затримки громадського транспорту та важливість дотримання правил безпеки. #ЖКЧайка #Ірпінь #КиївськаОбласть #БезпекаЖителів",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-#МОЖЕКАВИ?-Fora-2026-08-23",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ #МОЖЕКАВИ? — вулиця Валерія Лобановського, 29 🛒 Fora — вулиця Грушевського, 12 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-08-23T08:15:43.979Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
