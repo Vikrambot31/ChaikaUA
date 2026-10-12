@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-10-12",
+      "publishedAt": "2026-10-12T11:33:07.862Z",
+      "key": "https://bigkyiv.com.ua/vorog-prodovzhuye-obstrilyuvaty-kyyiv-ye-pryloty-na-darnyczi-ta-solomyanczi/"
+    },
+    {
       "type": "places",
       "date": "2026-10-11",
       "publishedAt": "2026-10-11T14:27:10.447Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-23",
       "publishedAt": "2026-08-23T08:15:43.980Z",
       "key": "places-#МОЖЕКАВИ?-Fora-2026-08-23"
-    },
-    {
-      "type": "news",
-      "date": "2026-08-23",
-      "publishedAt": "2026-08-23T04:29:53.109Z",
-      "key": "https://bigkyiv.com.ua/rosijska-banderol-upala-u-bilorusi-zagalom-u-povitryanyj-prostir-zajshly-shhonajmenshe-12-bezpilotnykiv/"
     }
   ]
 }
