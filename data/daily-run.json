@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-10-13",
+      "publishedAt": "2026-10-13T11:19:59.665Z",
+      "key": "https://bigkyiv.com.ua/pid-udarom-baza-iskanderiv-genshtab-povidomyv-pro-urazhennya-vijskovyh-obyektiv-rf/"
+    },
+    {
       "type": "places",
       "date": "2026-10-12",
       "publishedAt": "2026-10-12T17:05:02.928Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-24",
       "publishedAt": "2026-08-24T08:33:57.845Z",
       "key": "places-Fora-Кав'ярня-кондитерська \"Гамак\"-2026-08-24"
-    },
-    {
-      "type": "news",
-      "date": "2026-08-24",
-      "publishedAt": "2026-08-24T04:37:57.142Z",
-      "key": "https://bigkyiv.com.ua/u-darnyczkomu-rajoni-zamist-vyrvy-pislya-obstrilu-zyavylasya-nova-klumba/"
     }
   ]
 }
