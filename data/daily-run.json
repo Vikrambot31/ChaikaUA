@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-10-14",
+      "publishedAt": "2026-10-14T13:08:43.170Z",
+      "key": "places-BALCONE COFFEE-Coffee ART-2026-10-14"
+    },
+    {
       "type": "news",
       "date": "2026-10-14",
       "publishedAt": "2026-10-14T09:11:56.156Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-26",
       "publishedAt": "2026-08-26T04:33:02.209Z",
       "key": "https://bigkyiv.com.ua/u-kyyevi-sudytymut-shahraya-yakyj-pryvlasnyv-kvartyru-vydatnogo-hirurga-shalimova/"
-    },
-    {
-      "type": "places",
-      "date": "2026-08-25",
-      "publishedAt": "2026-08-25T08:27:46.316Z",
-      "key": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-08-25"
     }
   ]
 }
