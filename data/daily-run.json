@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-10-15",
+      "publishedAt": "2026-10-15T12:55:02.769Z",
+      "key": "places-Coffee ART-ANMI SOUL-2026-10-15"
+    },
+    {
       "type": "news",
       "date": "2026-10-15",
       "publishedAt": "2026-10-15T08:44:51.376Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-27",
       "publishedAt": "2026-08-27T14:54:40.383Z",
       "key": "https://bigkyiv.com.ua/na-kyyivshhyni-znyshheno-sklad-roshen-mozhlyvi-pereboyi-z-postachannyam-okremyh-tovariv/"
-    },
-    {
-      "type": "places",
-      "date": "2026-08-26",
-      "publishedAt": "2026-08-26T08:28:02.435Z",
-      "key": "places-BALCONE COFFEE-Coffee ART-2026-08-26"
     }
   ]
 }
