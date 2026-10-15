@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-10-15",
+      "publishedAt": "2026-10-15T08:44:51.376Z",
+      "key": "https://bigkyiv.com.ua/smertelna-avariya-stalasya-na-kyyivshhyni-tila-zagyblyh-dovelos-deblokuvaty/"
+    },
+    {
       "type": "places",
       "date": "2026-10-14",
       "publishedAt": "2026-10-14T13:08:43.170Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-26",
       "publishedAt": "2026-08-26T08:28:02.435Z",
       "key": "places-BALCONE COFFEE-Coffee ART-2026-08-26"
-    },
-    {
-      "type": "news",
-      "date": "2026-08-26",
-      "publishedAt": "2026-08-26T04:33:02.209Z",
-      "key": "https://bigkyiv.com.ua/u-kyyevi-sudytymut-shahraya-yakyj-pryvlasnyv-kvartyru-vydatnogo-hirurga-shalimova/"
     }
   ]
 }
