@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-10-16",
+      "publishedAt": "2026-10-16T12:47:08.392Z",
+      "key": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-10-16"
+    },
+    {
       "type": "news",
       "date": "2026-10-16",
       "publishedAt": "2026-10-16T08:40:04.416Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-28",
       "publishedAt": "2026-08-28T15:50:03.931Z",
       "key": "https://bigkyiv.com.ua/na-hmelnychchyni-agentku-fsb-zasudyly-do-15-rokiv-za-navedennya-rosijskyh-udariv/"
-    },
-    {
-      "type": "places",
-      "date": "2026-08-27",
-      "publishedAt": "2026-08-27T18:27:48.798Z",
-      "key": "places-Coffee ART-ANMI SOUL-2026-08-27"
     }
   ]
 }
