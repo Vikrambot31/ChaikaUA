@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-White Rabbit Coffee and Friends-Chaykava-2026-10-17",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ White Rabbit Coffee and Friends — вулиця Валерія Лобановського, 26 к2 ☕ Chaykava — вулиця Українського Відродження #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-10-17T11:48:09.010Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/do-40-godyn-na-kordoni-rosijski-ataky-spovilnyly-ruh-mizh-ukrayinoyu-ta-polshheyu/",
     "title": "До 40 годин на кордоні: російські атаки сповільнили рух між Україною та Польщею",
     "shortText": "На кордоні з Польщею чекають по 40 годин через повітряні тривоги. Для мешканців Чайки це означає затримки при виїзді та повернені додому через сусідню країну. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-08-28",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ ANMI SOUL — вулиця Валерія Лобановського, 18 ☕ White Rabbit Coffee and Friends — вулиця Валерія Лобановського, 26 к2 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-08-28T19:42:26.674Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
