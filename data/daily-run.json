@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-10-18",
+      "publishedAt": "2026-10-18T12:13:52.415Z",
+      "key": "places-Chaykava-NOVUS-2026-10-18"
+    },
+    {
       "type": "news",
       "date": "2026-10-18",
       "publishedAt": "2026-10-18T08:28:15.513Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-30",
       "publishedAt": "2026-08-30T09:38:59.594Z",
       "key": "https://bigkyiv.com.ua/pislya-tragediyi-v-buchanskomu-rajoni-minoborony-zaklykalo-provesty-audyt-skladiv-zbroyi/"
-    },
-    {
-      "type": "places",
-      "date": "2026-08-29",
-      "publishedAt": "2026-08-29T13:26:33.398Z",
-      "key": "places-White Rabbit Coffee and Friends-Chaykava-2026-08-29"
     }
   ]
 }
