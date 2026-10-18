@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-10-18",
+      "publishedAt": "2026-10-18T08:28:15.513Z",
+      "key": "https://bigkyiv.com.ua/u-kyyevi-ta-oblasti-tuman-ogolosheno-zhovtyj-riven-nebezpeky/"
+    },
+    {
       "type": "places",
       "date": "2026-10-17",
       "publishedAt": "2026-10-17T11:48:09.011Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-29",
       "publishedAt": "2026-08-29T13:26:33.398Z",
       "key": "places-White Rabbit Coffee and Friends-Chaykava-2026-08-29"
-    },
-    {
-      "type": "news",
-      "date": "2026-08-29",
-      "publishedAt": "2026-08-29T10:38:40.933Z",
-      "key": "https://bigkyiv.com.ua/u-seli-myla-pislya-udaru-rf-i-detonacziyi-zagynuly-27-lyudej/"
     }
   ]
 }
