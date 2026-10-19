@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-10-19",
+      "publishedAt": "2026-10-19T09:29:40.098Z",
+      "key": "https://bigkyiv.com.ua/vnaslidok-nichnoyi-rosijskoyi-raketnoyi-ataky-zaznala-poshkodzhen-lodova-arena-shalett/"
+    },
+    {
       "type": "places",
       "date": "2026-10-18",
       "publishedAt": "2026-10-18T12:13:52.415Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-30",
       "publishedAt": "2026-08-30T13:22:49.144Z",
       "key": "places-Chaykava-NOVUS-2026-08-30"
-    },
-    {
-      "type": "news",
-      "date": "2026-08-30",
-      "publishedAt": "2026-08-30T09:38:59.594Z",
-      "key": "https://bigkyiv.com.ua/pislya-tragediyi-v-buchanskomu-rajoni-minoborony-zaklykalo-provesty-audyt-skladiv-zbroyi/"
     }
   ]
 }
