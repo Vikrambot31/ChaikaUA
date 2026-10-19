@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-10-19",
+      "publishedAt": "2026-10-19T15:04:34.534Z",
+      "key": "places-NOVUS-Grano Bakery-2026-10-19"
+    },
+    {
       "type": "news",
       "date": "2026-10-19",
       "publishedAt": "2026-10-19T09:29:40.098Z",
@@ -593,12 +599,6 @@
       "date": "2026-08-31",
       "publishedAt": "2026-08-31T10:21:00.415Z",
       "key": "https://bigkyiv.com.ua/pidpysy-zbyrayut-zhvavo-v-ukrayini-stvoryly-petycziyu-pro-perehid-na-4-dennyj-robochyj-tyzhden/"
-    },
-    {
-      "type": "places",
-      "date": "2026-08-30",
-      "publishedAt": "2026-08-30T13:22:49.144Z",
-      "key": "places-Chaykava-NOVUS-2026-08-30"
     }
   ]
 }

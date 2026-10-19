@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-NOVUS-Grano Bakery-2026-10-19",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "🛒 NOVUS — вулиця Авіаконструктора Антонова 🛒 Grano Bakery — вулиця Валерія Лобановського, 35 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-10-19T15:04:34.534Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/vnaslidok-nichnoyi-rosijskoyi-raketnoyi-ataky-zaznala-poshkodzhen-lodova-arena-shalett/",
     "title": "Внаслідок нічної російської ракетної атаки зазнала пошкоджень льодова арена «Шалетт»",
     "shortText": "Льодова арена «Шалетт» у Києві постраждала від російської ракетної атаки. Для мешканців Чайки це означає, що й наша область залишається під загрозою, потрібна постійна готовність. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Chaykava-NOVUS-2026-08-30",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ Chaykava — вулиця Українського Відродження 🛒 NOVUS — вулиця Авіаконструктора Антонова #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-08-30T13:22:49.143Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
