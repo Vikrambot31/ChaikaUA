@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-10-20",
+      "publishedAt": "2026-10-20T13:06:04.218Z",
+      "key": "places-Grano Bakery-Кав'ярня ХЛІБ та КАВА-2026-10-20"
+    },
+    {
       "type": "news",
       "date": "2026-10-20",
       "publishedAt": "2026-10-20T09:02:54.838Z",
@@ -593,12 +599,6 @@
       "date": "2026-09-01",
       "publishedAt": "2026-09-01T09:04:25.640Z",
       "key": "https://bigkyiv.com.ua/rankova-ataka-na-kyyiv-ye-vluchannya-u-bagatopoverhivku-na-syrczi/"
-    },
-    {
-      "type": "places",
-      "date": "2026-08-31",
-      "publishedAt": "2026-08-31T15:35:29.308Z",
-      "key": "places-NOVUS-Grano Bakery-2026-08-31"
     }
   ]
 }
