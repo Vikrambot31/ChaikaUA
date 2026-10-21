@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-10-21",
+      "publishedAt": "2026-10-21T09:02:15.395Z",
+      "key": "https://bigkyiv.com.ua/budivlya-posolstva-bilorusi-zarostaye-buryanamy-komunalnyky-sudyatsya-cherez-borgy-za-opalennya/"
+    },
+    {
       "type": "places",
       "date": "2026-10-20",
       "publishedAt": "2026-10-20T13:06:04.218Z",
@@ -593,12 +599,6 @@
       "date": "2026-09-01",
       "publishedAt": "2026-09-01T12:50:35.547Z",
       "key": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-09-01"
-    },
-    {
-      "type": "news",
-      "date": "2026-09-01",
-      "publishedAt": "2026-09-01T09:04:25.640Z",
-      "key": "https://bigkyiv.com.ua/rankova-ataka-na-kyyiv-ye-vluchannya-u-bagatopoverhivku-na-syrczi/"
     }
   ]
 }
