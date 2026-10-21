@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Кав'ярня ХЛІБ та КАВА-Мозаїка Espresso bar-2026-10-21",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Кав'ярня ХЛІБ та КАВА — вулиця Валерія Лобановського, 18 ☕ Мозаїка Espresso bar — вулиця Валерія Лобановського #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-10-21T13:17:02.707Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/budivlya-posolstva-bilorusi-zarostaye-buryanamy-komunalnyky-sudyatsya-cherez-borgy-za-opalennya/",
     "title": "Будівля посольства Білорусі заростає бур’янами, комунальники судяться через борги за опалення",
     "shortText": "Посольство Білорусі в Києві заросло бур'янами та накопило борги за комунальні послуги. Для Ірпеня це нагадування про важливість сплати комунальних платежів вчасно, щоб уникнути таких проблем у своєму багатоквартирному будинку. #ЖКЧайка #Ірпінь #КиївськаОбласть #Комунальні",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-09-01",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ Кав'ярня-кондитерська \"Гамак\" — вулиця Валерія Лобановського ☕ BALCONE COFFEE — вулиця Валерія Лобановського, 26 к2 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-09-01T12:50:35.546Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]

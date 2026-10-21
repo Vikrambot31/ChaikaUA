@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-10-21",
+      "publishedAt": "2026-10-21T13:17:02.708Z",
+      "key": "places-Кав'ярня ХЛІБ та КАВА-Мозаїка Espresso bar-2026-10-21"
+    },
+    {
       "type": "news",
       "date": "2026-10-21",
       "publishedAt": "2026-10-21T09:02:15.395Z",
@@ -593,12 +599,6 @@
       "date": "2026-09-02",
       "publishedAt": "2026-09-02T08:17:57.154Z",
       "key": "https://bigkyiv.com.ua/bezpilotnyk-vluchyv-u-shestypoverhivku-u-shevchenkivskomu-rajoni/"
-    },
-    {
-      "type": "places",
-      "date": "2026-09-01",
-      "publishedAt": "2026-09-01T12:50:35.547Z",
-      "key": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-09-01"
     }
   ]
 }
