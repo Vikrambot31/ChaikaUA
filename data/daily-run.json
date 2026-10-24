@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-10-24",
+      "publishedAt": "2026-10-24T12:17:34.980Z",
+      "key": "places-Fora-Кав'ярня-кондитерська \"Гамак\"-2026-10-24"
+    },
+    {
       "type": "news",
       "date": "2026-10-24",
       "publishedAt": "2026-10-24T08:33:11.606Z",
@@ -593,12 +599,6 @@
       "date": "2026-09-04",
       "publishedAt": "2026-09-04T12:19:07.993Z",
       "key": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-09-04"
-    },
-    {
-      "type": "news",
-      "date": "2026-09-04",
-      "publishedAt": "2026-09-04T08:28:17.049Z",
-      "key": "https://bigkyiv.com.ua/5-tur-upl-bytva-karpat-ta-shahtarya-protystoyannya-moryakiv-proty-lelek-ta-inshi-intrygy-turu/"
     }
   ]
 }

@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Fora-Кав'ярня-кондитерська \"Гамак\"-2026-10-24",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "🛒 Fora — вулиця Грушевського, 12 ☕ Кав'ярня-кондитерська \"Гамак\" — вулиця Валерія Лобановського #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-10-24T12:17:34.980Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/zyma-zminyuye-pravyla-na-dorozi-shho-proponuye-lassa-dlya-sezonu-2026-2027/",
     "title": "Зима змінює правила на дорозі: що пропонує Lassa для сезону 2026–2027",
     "shortText": "Зима в Ірпені почнеться раніше — синоптики прогнозують перші морози вже в листопаді. Мешканцям Чайки варто перевірити стан шин авто та підготувати транспорт до ковзаних доріг. #ЖКЧайка #Ірпінь #КиївськаОбласть #БезпекаНаДорозі",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/5-tur-upl-bytva-karpat-ta-shahtarya-protystoyannya-moryakiv-proty-lelek-ta-inshi-intrygy-turu/",
-    "title": "5 тур УПЛ: битва «Карпат» та «Шахтаря», протистояння «моряків» проти «лелек» та інші інтриги туру",
-    "shortText": "УПЛ продовжує матчі незважаючи на атаки. П'ятий тур обіцяє топ-протистояння: «Карпати» проти «Шахтаря», «Динамо» проти ЛНЗ та інші інтриги. Мешканці Ірпеня мають чим зайнятися в вихідні. #ЖКЧайка #Ірпінь #КиївськаОбласть #УПЛ",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/5-tur-upl-bytva-karpat-ta-shahtarya-protystoyannya-moryakiv-proty-lelek-ta-inshi-intrygy-turu/",
-    "publishedAt": "2026-09-04T08:28:17.048Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]
