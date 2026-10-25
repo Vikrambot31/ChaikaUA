@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-10-25",
+      "publishedAt": "2026-10-25T12:48:59.617Z",
+      "key": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-10-25"
+    },
+    {
       "type": "news",
       "date": "2026-10-25",
       "publishedAt": "2026-10-25T08:52:18.885Z",
@@ -593,12 +599,6 @@
       "date": "2026-09-05",
       "publishedAt": "2026-09-05T11:26:35.940Z",
       "key": "places-White Rabbit Coffee and Friends-Chaykava-2026-09-05"
-    },
-    {
-      "type": "news",
-      "date": "2026-09-05",
-      "publishedAt": "2026-09-05T07:58:37.523Z",
-      "key": "https://www.pravda.com.ua/news/2026/09/05/8051982/"
     }
   ]
 }

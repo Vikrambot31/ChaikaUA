@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-10-25",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Кав'ярня-кондитерська \"Гамак\" — вулиця Валерія Лобановського ☕ BALCONE COFFEE — вулиця Валерія Лобановського, 26 к2 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-10-25T12:48:59.616Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/pomerla-zhurnalistka-bojova-medykynya-ta-veteranka-olena-shargovska-z-pozyvnym-dzhejn/",
     "title": "Померла журналістка, бойова медикиня та ветеранка Олена Шарговська з позивним «Джейн»",
     "shortText": "Померла журналістка та військова парамедикиня Олена Шарgovська з позивним «Джейн», яка рятувала поранених з 2015 року. Для нас — втрата тієї, хто захищав країну і передавав досвід іншим. #ЖКЧайка #Ірпінь #КиївськаОбласть #Пам'ять",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://www.pravda.com.ua/news/2026/09/05/8051982/",
-    "title": "Росіяни атакували багатоповерхівку в Борисполі: виникла пожежа, двоє потерпілих",
-    "shortText": "Росіяни атакували багатоповерхівку в Борисполі — загорілися квартира й дах. Бориспіль розташований неподалік, тому атаки на región збільшують ризики для мешканців Ірпеня. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
-    "sourceName": "www.pravda.com.ua",
-    "sourceUrl": "https://www.pravda.com.ua/news/2026/09/05/8051982/",
-    "publishedAt": "2026-09-05T07:58:37.522Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]
