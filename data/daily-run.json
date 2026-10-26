@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-10-26",
+      "publishedAt": "2026-10-26T09:33:55.983Z",
+      "key": "https://bigkyiv.com.ua/agent-rf-vstanovlyuvav-gps-mayachky-na-benzovozy-shhob-vyyavyty-koordynaty-naftobaz-ta-obstrilyaty-yih/"
+    },
+    {
       "type": "places",
       "date": "2026-10-25",
       "publishedAt": "2026-10-25T12:48:59.617Z",
@@ -593,12 +599,6 @@
       "date": "2026-09-06",
       "publishedAt": "2026-09-06T08:16:19.917Z",
       "key": "https://bigkyiv.com.ua/rosiyany-vbyly-dytynu-u-harkovi-na-hmelnychchyni-7-postrazhdalyh-na-kyyivshhyni-masshtabna-pozhezha/"
-    },
-    {
-      "type": "places",
-      "date": "2026-09-05",
-      "publishedAt": "2026-09-05T11:26:35.940Z",
-      "key": "places-White Rabbit Coffee and Friends-Chaykava-2026-09-05"
     }
   ]
 }
