@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-10-26",
+      "publishedAt": "2026-10-26T14:37:42.641Z",
+      "key": "places-BALCONE COFFEE-Coffee ART-2026-10-26"
+    },
+    {
       "type": "news",
       "date": "2026-10-26",
       "publishedAt": "2026-10-26T09:33:55.983Z",
@@ -593,12 +599,6 @@
       "date": "2026-09-06",
       "publishedAt": "2026-09-06T11:47:30.336Z",
       "key": "places-Chaykava-NOVUS-2026-09-06"
-    },
-    {
-      "type": "news",
-      "date": "2026-09-06",
-      "publishedAt": "2026-09-06T08:16:19.917Z",
-      "key": "https://bigkyiv.com.ua/rosiyany-vbyly-dytynu-u-harkovi-na-hmelnychchyni-7-postrazhdalyh-na-kyyivshhyni-masshtabna-pozhezha/"
     }
   ]
 }

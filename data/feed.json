@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-BALCONE COFFEE-Coffee ART-2026-10-26",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ BALCONE COFFEE — вулиця Валерія Лобановського, 26 к2 ☕ Coffee ART — вулиця Валерія Лобановського, 25 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-10-26T14:37:42.640Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/agent-rf-vstanovlyuvav-gps-mayachky-na-benzovozy-shhob-vyyavyty-koordynaty-naftobaz-ta-obstrilyaty-yih/",
     "title": "Агент РФ встановлював GPS-«маячки» на бензовози, щоб виявити координати нафтобаз та обстріляти їх",
     "shortText": "Контррозвідка запобігла атакам російського агента, який встановлював GPS-маячки на бензовози для виявлення нафтобаз. Для мешканців Чайки це означає вищий рівень безпеки та стабільність енергопостачання регіону. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/rosiyany-vbyly-dytynu-u-harkovi-na-hmelnychchyni-7-postrazhdalyh-na-kyyivshhyni-masshtabna-pozhezha/",
-    "title": "Росіяни вбили дитину у Харкові, на Хмельниччині – 7 постраждалих, на Київщині – масштабна пожежа",
-    "shortText": "На Харківщині російська атака знищила житловий дім, загинули троє людей, серед них дитина. Для мешканців Чайки це нагадування про важливість цивільного захисту та готовності до надзвичайних ситуацій. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/rosiyany-vbyly-dytynu-u-harkovi-na-hmelnychchyni-7-postrazhdalyh-na-kyyivshhyni-masshtabna-pozhezha/",
-    "publishedAt": "2026-09-06T08:16:19.916Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]
