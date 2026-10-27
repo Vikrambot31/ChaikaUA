@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Coffee ART-ANMI SOUL-2026-10-27",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Coffee ART — вулиця Валерія Лобановського, 25 ☕ ANMI SOUL — вулиця Валерія Лобановського, 18 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-10-27T13:41:52.191Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://www.pravda.com.ua/news/2026/10/27/8059879/",
     "title": "Зеленський: Росія вдарила 16 балістичними ракетами",
     "shortText": "Ночі на 27 жовтня Росія атакувала Україну 16 балістичними ракетами. Для мешканців Чайки це означає посилену готовність до можливих перебоїв електроенергії та необхідність дотримуватися правил безпеки. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/u-kyyevi-gotuyut-zapasy-produktiv-i-vody-na-vypadok-nadzvychajnyh-sytuaczij/",
-    "title": "У Києві готують запаси продуктів і води на випадок надзвичайних ситуацій",
-    "shortText": "У Києві створюють запаси продуктів і води на випадок надзвичайних ситуацій. Для мешканців Чайки це означає необхідність мати домашні запаси на 2–3 тижні. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/u-kyyevi-gotuyut-zapasy-produktiv-i-vody-na-vypadok-nadzvychajnyh-sytuaczij/",
-    "publishedAt": "2026-09-07T08:49:07.633Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]
