@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://www.pravda.com.ua/news/2026/10/27/8059879/",
+    "title": "Зеленський: Росія вдарила 16 балістичними ракетами",
+    "shortText": "Ночі на 27 жовтня Росія атакувала Україну 16 балістичними ракетами. Для мешканців Чайки це означає посилену готовність до можливих перебоїв електроенергії та необхідність дотримуватися правил безпеки. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
+    "sourceName": "www.pravda.com.ua",
+    "sourceUrl": "https://www.pravda.com.ua/news/2026/10/27/8059879/",
+    "publishedAt": "2026-10-27T09:30:32.273Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-BALCONE COFFEE-Coffee ART-2026-10-26",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ BALCONE COFFEE — вулиця Валерія Лобановського, 26 к2 ☕ Coffee ART — вулиця Валерія Лобановського, 25 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Chaykava-NOVUS-2026-09-06",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ Chaykava — вулиця Українського Відродження 🛒 NOVUS — вулиця Авіаконструктора Антонова #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-09-06T11:47:30.335Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
