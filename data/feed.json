@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://bigkyiv.com.ua/systemy-dlya-videonaglyadu-u-kyyevi-zakupyly-zi-zbytkamy-u-ponad-21-mln-grn/",
+    "title": "Системи для відеонагляду у Києві закупили зі збитками у понад 2,1 млн грн",
+    "shortText": "У Києві закупили камери відеоспостереження зі збитками понад 2,1 млн грн через тендер з одним учасником. Для мешканців Чайки це означає ризик неефективного використання бюджету на безпеку міста. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
+    "sourceName": "bigkyiv.com.ua",
+    "sourceUrl": "https://bigkyiv.com.ua/systemy-dlya-videonaglyadu-u-kyyevi-zakupyly-zi-zbytkamy-u-ponad-21-mln-grn/",
+    "publishedAt": "2026-10-28T10:15:05.974Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-Coffee ART-ANMI SOUL-2026-10-27",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ Coffee ART — вулиця Валерія Лобановського, 25 ☕ ANMI SOUL — вулиця Валерія Лобановського, 18 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-NOVUS-Grano Bakery-2026-09-07",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "🛒 NOVUS — вулиця Авіаконструктора Антонова 🛒 Grano Bakery — вулиця Валерія Лобановського, 35 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-09-07T13:44:51.680Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
