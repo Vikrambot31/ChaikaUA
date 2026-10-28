@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-10-28",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ ANMI SOUL — вулиця Валерія Лобановського, 18 ☕ White Rabbit Coffee and Friends — вулиця Валерія Лобановського, 26 к2 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-10-28T14:37:26.189Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/systemy-dlya-videonaglyadu-u-kyyevi-zakupyly-zi-zbytkamy-u-ponad-21-mln-grn/",
     "title": "Системи для відеонагляду у Києві закупили зі збитками у понад 2,1 млн грн",
     "shortText": "У Києві закупили камери відеоспостереження зі збитками понад 2,1 млн грн через тендер з одним учасником. Для мешканців Чайки це означає ризик неефективного використання бюджету на безпеку міста. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/u-kyyevi-vnaslidok-ataky-poshkodzheno-piv-sotni-obyektiv-na-7-lokacziyah-rozbyrayut-zavaly/",
-    "title": "У Києві внаслідок атаки пошкоджено пів сотні об’єктів, на 7 локаціях розбирають завали",
-    "shortText": "У Києві після масованої атаки пошкоджено понад 50 об'єктів, на семи локаціях розбирають завали. Для мешканців Чайки це означає можливі перебої з комунальними послугами й транспортом у регіоні. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/u-kyyevi-vnaslidok-ataky-poshkodzheno-piv-sotni-obyektiv-na-7-lokacziyah-rozbyrayut-zavaly/",
-    "publishedAt": "2026-09-08T08:29:14.820Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]

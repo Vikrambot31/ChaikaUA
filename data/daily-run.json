@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-10-28",
+      "publishedAt": "2026-10-28T14:37:26.190Z",
+      "key": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-10-28"
+    },
+    {
       "type": "news",
       "date": "2026-10-28",
       "publishedAt": "2026-10-28T10:15:05.975Z",
@@ -593,12 +599,6 @@
       "date": "2026-09-08",
       "publishedAt": "2026-09-08T12:20:37.386Z",
       "key": "places-Grano Bakery-Кав'ярня ХЛІБ та КАВА-2026-09-08"
-    },
-    {
-      "type": "news",
-      "date": "2026-09-08",
-      "publishedAt": "2026-09-08T08:29:14.821Z",
-      "key": "https://bigkyiv.com.ua/u-kyyevi-vnaslidok-ataky-poshkodzheno-piv-sotni-obyektiv-na-7-lokacziyah-rozbyrayut-zavaly/"
     }
   ]
 }
