@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://bigkyiv.com.ua/sbu-zatrymala-koryguvalnyka-rosijskyh-atak-po-kyyivskyh-tecz/",
+    "title": "СБУ затримала коригувальника російських атак по київських ТЕЦ",
+    "shortText": "СБУ затримала агента ФСБ на Київщині, який коригував удари по ТЕЦ регіону. Для мешканців Чайки це означає більшу безпеку енергосистеми та стабільність електропостачання. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
+    "sourceName": "bigkyiv.com.ua",
+    "sourceUrl": "https://bigkyiv.com.ua/sbu-zatrymala-koryguvalnyka-rosijskyh-atak-po-kyyivskyh-tecz/",
+    "publishedAt": "2026-10-29T10:39:10.032Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-10-28",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ ANMI SOUL — вулиця Валерія Лобановського, 18 ☕ White Rabbit Coffee and Friends — вулиця Валерія Лобановського, 26 к2 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Grano Bakery-Кав'ярня ХЛІБ та КАВА-2026-09-08",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "🛒 Grano Bakery — вулиця Валерія Лобановського, 35 ☕ Кав'ярня ХЛІБ та КАВА — вулиця Валерія Лобановського, 18 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-09-08T12:20:37.385Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
