@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-White Rabbit Coffee and Friends-Chaykava-2026-10-29",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ White Rabbit Coffee and Friends — вулиця Валерія Лобановського, 26 к2 ☕ Chaykava — вулиця Українського Відродження #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-10-29T14:43:04.928Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/sbu-zatrymala-koryguvalnyka-rosijskyh-atak-po-kyyivskyh-tecz/",
     "title": "СБУ затримала коригувальника російських атак по київських ТЕЦ",
     "shortText": "СБУ затримала агента ФСБ на Київщині, який коригував удари по ТЕЦ регіону. Для мешканців Чайки це означає більшу безпеку енергосистеми та стабільність електропостачання. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/na-vidnovlennya-ohmatdytu-pislya-vorozhogo-vluchannya-znadobylosya-dva-roky-ta-272-mln-grn/",
-    "title": "На відновлення «Охматдиту» після ворожого влучання знадобилося два роки та 272 млн грн",
-    "shortText": "На відновлення «Охматдиту» у Києві витратили 272 млн грн та два роки після ракетного удару. Для родин з Чайки це означає повернення якісної дитячої медичної допомоги поблизу. #ЖКЧайка #Ірпінь #КиївськаОбласть #Охматдит",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/na-vidnovlennya-ohmatdytu-pislya-vorozhogo-vluchannya-znadobylosya-dva-roky-ta-272-mln-grn/",
-    "publishedAt": "2026-09-09T08:31:51.295Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]
