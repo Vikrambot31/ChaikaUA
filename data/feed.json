@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://bigkyiv.com.ua/na-pravomu-berezi-kyyeva-grafiky-tymchasovo-ne-diyut-cherez-avariyu-na-poshkodzhenij-merezhi/",
+    "title": "На правому березі Києва графіки тимчасово не діють через аварію на пошкодженій мережі",
+    "shortText": "На правому березі Києва та в Бучанському районі тимчасово призупинені графіки відключень через аварію енергомережі. Мешканців Чайки можуть торкнутись перебої зі світлом у найближчі дні. #ЖКЧайка #Ірпінь #КиївськаОбласть #Енергопостачання",
+    "sourceName": "bigkyiv.com.ua",
+    "sourceUrl": "https://bigkyiv.com.ua/na-pravomu-berezi-kyyeva-grafiky-tymchasovo-ne-diyut-cherez-avariyu-na-poshkodzhenij-merezhi/",
+    "publishedAt": "2026-10-30T10:40:10.062Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-White Rabbit Coffee and Friends-Chaykava-2026-10-29",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ White Rabbit Coffee and Friends — вулиця Валерія Лобановського, 26 к2 ☕ Chaykava — вулиця Українського Відродження #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Кав'ярня ХЛІБ та КАВА-Мозаїка Espresso bar-2026-09-09",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ Кав'ярня ХЛІБ та КАВА — вулиця Валерія Лобановського, 18 ☕ Мозаїка Espresso bar — вулиця Валерія Лобановського #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-09-09T12:31:52.717Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
