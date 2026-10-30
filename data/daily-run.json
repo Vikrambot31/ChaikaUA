@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-10-30",
+      "publishedAt": "2026-10-30T14:39:05.092Z",
+      "key": "places-Chaykava-NOVUS-2026-10-30"
+    },
+    {
       "type": "news",
       "date": "2026-10-30",
       "publishedAt": "2026-10-30T10:40:10.063Z",
@@ -593,12 +599,6 @@
       "date": "2026-09-10",
       "publishedAt": "2026-09-10T12:25:43.280Z",
       "key": "places-Мозаїка Espresso bar-#МОЖЕКАВИ?-2026-09-10"
-    },
-    {
-      "type": "news",
-      "date": "2026-09-10",
-      "publishedAt": "2026-09-10T08:33:58.812Z",
-      "key": "https://bigkyiv.com.ua/povidomleno-pro-pidozru-posadovczyu-yakyj-vidpovidav-za-sklad-boyeprypasiv-u-selyshhi-myla/"
     }
   ]
 }
