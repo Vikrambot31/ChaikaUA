@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-10-31",
+      "publishedAt": "2026-10-31T10:05:38.982Z",
+      "key": "https://bigkyiv.com.ua/kyyiv-pislya-rosijskyh-atak-u-chastyni-rajoniv-tryvayut-tryvali-vidklyuchennya-svitla/"
+    },
+    {
       "type": "places",
       "date": "2026-10-30",
       "publishedAt": "2026-10-30T14:39:05.092Z",
@@ -593,12 +599,6 @@
       "date": "2026-09-11",
       "publishedAt": "2026-09-11T08:28:31.802Z",
       "key": "https://bigkyiv.com.ua/u-vyshgorodskomu-rajoni-vnaslidok-obstrilu-zagynula-zhinka/"
-    },
-    {
-      "type": "places",
-      "date": "2026-09-10",
-      "publishedAt": "2026-09-10T12:25:43.280Z",
-      "key": "places-Мозаїка Espresso bar-#МОЖЕКАВИ?-2026-09-10"
     }
   ]
 }

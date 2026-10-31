@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://bigkyiv.com.ua/kyyiv-pislya-rosijskyh-atak-u-chastyni-rajoniv-tryvayut-tryvali-vidklyuchennya-svitla/",
+    "title": "Київ після російських атак: у частині районів тривають тривалі відключення світла",
+    "shortText": "У Києві та області 31 жовтня — погодинні обмеження світла з 06:00 до 23:59. Мешканцям Чайки варто перевірити свій графік відключень та заздалегідь підготуватися. #ЖКЧайка #Ірпінь #КиївськаОбласть #Електропостачання",
+    "sourceName": "bigkyiv.com.ua",
+    "sourceUrl": "https://bigkyiv.com.ua/kyyiv-pislya-rosijskyh-atak-u-chastyni-rajoniv-tryvayut-tryvali-vidklyuchennya-svitla/",
+    "publishedAt": "2026-10-31T10:05:38.981Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-Chaykava-NOVUS-2026-10-30",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ Chaykava — вулиця Українського Відродження 🛒 NOVUS — вулиця Авіаконструктора Антонова #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Мозаїка Espresso bar-#МОЖЕКАВИ?-2026-09-10",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ Мозаїка Espresso bar — вулиця Валерія Лобановського ☕ #МОЖЕКАВИ? — вулиця Валерія Лобановського, 29 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-09-10T12:25:43.279Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
