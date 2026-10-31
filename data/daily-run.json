@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-10-31",
+      "publishedAt": "2026-10-31T13:57:54.227Z",
+      "key": "places-NOVUS-Grano Bakery-2026-10-31"
+    },
+    {
       "type": "news",
       "date": "2026-10-31",
       "publishedAt": "2026-10-31T10:05:38.982Z",
@@ -593,12 +599,6 @@
       "date": "2026-09-11",
       "publishedAt": "2026-09-11T12:24:10.109Z",
       "key": "places-#МОЖЕКАВИ?-Fora-2026-09-11"
-    },
-    {
-      "type": "news",
-      "date": "2026-09-11",
-      "publishedAt": "2026-09-11T08:28:31.802Z",
-      "key": "https://bigkyiv.com.ua/u-vyshgorodskomu-rajoni-vnaslidok-obstrilu-zagynula-zhinka/"
     }
   ]
 }
