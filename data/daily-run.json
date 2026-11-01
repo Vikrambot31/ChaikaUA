@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-11-01",
+      "publishedAt": "2026-11-01T10:57:26.602Z",
+      "key": "https://bigkyiv.com.ua/rosiya-vnochi-atakuvala-czyvilni-j-energetychni-obyekty-infrastruktury-ye-poraneni/"
+    },
+    {
       "type": "places",
       "date": "2026-10-31",
       "publishedAt": "2026-10-31T13:57:54.227Z",
@@ -593,12 +599,6 @@
       "date": "2026-09-12",
       "publishedAt": "2026-09-12T08:16:43.658Z",
       "key": "https://bigkyiv.com.ua/yak-praczyuvatymut-soczialni-zaklady-kyyeva-pid-chas-zhovtogo-ta-chervonogo-rivniv-zagrozy/"
-    },
-    {
-      "type": "places",
-      "date": "2026-09-11",
-      "publishedAt": "2026-09-11T12:24:10.109Z",
-      "key": "places-#МОЖЕКАВИ?-Fora-2026-09-11"
     }
   ]
 }
