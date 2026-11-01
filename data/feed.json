@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-11-01",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Кав'ярня-кондитерська \"Гамак\" — вулиця Валерія Лобановського ☕ BALCONE COFFEE — вулиця Валерія Лобановського, 26 к2 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-11-01T14:34:45.417Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/rosiya-vnochi-atakuvala-czyvilni-j-energetychni-obyekty-infrastruktury-ye-poraneni/",
     "title": "Росія вночі атакувала цивільні й енергетичні об’єкти інфраструктури, є поранені",
     "shortText": "Ночей атаками Росія знищує енергетичні об'єкти по всій Україні. Мешканці Чайки можуть очікувати перебоїв з електропостачанням і водопостачанням. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/yak-praczyuvatymut-soczialni-zaklady-kyyeva-pid-chas-zhovtogo-ta-chervonogo-rivniv-zagrozy/",
-    "title": "Як працюватимуть соціальні заклади Києва під час жовтого та червоного рівнів загрози",
-    "shortText": "Київ змінив порядок роботи соціальних закладів під час повітряних загроз. Для мешканців Чайки це означає зміну графіків відвідування лікарень, поліклінік та інших соцустанов в умовах жовтого і червоного рівнів. #ЖКЧайка #Ірпінь #КиївськаОбласть #ПовітрянаБезпека",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/yak-praczyuvatymut-soczialni-zaklady-kyyeva-pid-chas-zhovtogo-ta-chervonogo-rivniv-zagrozy/",
-    "publishedAt": "2026-09-12T08:16:43.657Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]

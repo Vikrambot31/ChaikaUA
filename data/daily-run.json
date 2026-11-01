@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-11-01",
+      "publishedAt": "2026-11-01T14:34:45.418Z",
+      "key": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-11-01"
+    },
+    {
       "type": "news",
       "date": "2026-11-01",
       "publishedAt": "2026-11-01T10:57:26.602Z",
@@ -593,12 +599,6 @@
       "date": "2026-09-12",
       "publishedAt": "2026-09-12T11:45:56.523Z",
       "key": "places-Fora-Кав'ярня-кондитерська \"Гамак\"-2026-09-12"
-    },
-    {
-      "type": "news",
-      "date": "2026-09-12",
-      "publishedAt": "2026-09-12T08:16:43.658Z",
-      "key": "https://bigkyiv.com.ua/yak-praczyuvatymut-soczialni-zaklady-kyyeva-pid-chas-zhovtogo-ta-chervonogo-rivniv-zagrozy/"
     }
   ]
 }
