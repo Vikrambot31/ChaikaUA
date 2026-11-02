@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-11-02",
+      "publishedAt": "2026-11-02T11:55:36.620Z",
+      "key": "https://bigkyiv.com.ua/koly-znykaye-gps-v-ukrayini-stvoryly-navigator-dlya-vodiyiv-shho-praczyuye-za-vlasnoyu-kartoyu-dorig-zi-smartfona/"
+    },
+    {
       "type": "places",
       "date": "2026-11-01",
       "publishedAt": "2026-11-01T14:34:45.418Z",
@@ -593,12 +599,6 @@
       "date": "2026-09-13",
       "publishedAt": "2026-09-13T08:41:17.722Z",
       "key": "https://bigkyiv.com.ua/vorog-dvichi-za-dvi-doby-atakuvav-odyn-iz-najbilshyh-farmskladiv-ukrayiny-ta-byv-po-terminalu-novoyi-poshty/"
-    },
-    {
-      "type": "places",
-      "date": "2026-09-12",
-      "publishedAt": "2026-09-12T11:45:56.523Z",
-      "key": "places-Fora-Кав'ярня-кондитерська \"Гамак\"-2026-09-12"
     }
   ]
 }
