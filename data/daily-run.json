@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-11-02",
+      "publishedAt": "2026-11-02T17:30:26.398Z",
+      "key": "places-BALCONE COFFEE-Coffee ART-2026-11-02"
+    },
+    {
       "type": "news",
       "date": "2026-11-02",
       "publishedAt": "2026-11-02T11:55:36.620Z",
@@ -593,12 +599,6 @@
       "date": "2026-09-13",
       "publishedAt": "2026-09-13T12:53:47.690Z",
       "key": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-09-13"
-    },
-    {
-      "type": "news",
-      "date": "2026-09-13",
-      "publishedAt": "2026-09-13T08:41:17.722Z",
-      "key": "https://bigkyiv.com.ua/vorog-dvichi-za-dvi-doby-atakuvav-odyn-iz-najbilshyh-farmskladiv-ukrayiny-ta-byv-po-terminalu-novoyi-poshty/"
     }
   ]
 }

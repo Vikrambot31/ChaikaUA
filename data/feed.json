@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-BALCONE COFFEE-Coffee ART-2026-11-02",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ BALCONE COFFEE — вулиця Валерія Лобановського, 26 к2 ☕ Coffee ART — вулиця Валерія Лобановського, 25 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-11-02T17:30:26.397Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/koly-znykaye-gps-v-ukrayini-stvoryly-navigator-dlya-vodiyiv-shho-praczyuye-za-vlasnoyu-kartoyu-dorig-zi-smartfona/",
     "title": "Коли зникає GPS: в Україні створили навігатор для водіїв, що працює за власною картою доріг зі смартфона",
     "shortText": "Українські розробники створили навігатор «Орієнтир», що працює без GPS-сигналу через датчики смартфона. Для мешканців Чайки це означає надійну навігацію по дорогах Ірпеня навіть при поганому сигналі. #ЖКЧайка #Ірпінь #КиївськаОбласть #Навігація",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/vorog-dvichi-za-dvi-doby-atakuvav-odyn-iz-najbilshyh-farmskladiv-ukrayiny-ta-byv-po-terminalu-novoyi-poshty/",
-    "title": "Ворог двічі за дві доби атакував один із найбільших фармскладів України та бив по терміналу “Нової пошти”",
-    "shortText": "Ворог атакував аптечні та логістичні центри в районі Ірпеня. Це може вплинути на доставку ліків і посилок до мешканців Чайки. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/vorog-dvichi-za-dvi-doby-atakuvav-odyn-iz-najbilshyh-farmskladiv-ukrayiny-ta-byv-po-terminalu-novoyi-poshty/",
-    "publishedAt": "2026-09-13T08:41:17.722Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]
