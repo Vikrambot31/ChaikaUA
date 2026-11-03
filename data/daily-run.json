@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-11-03",
+      "publishedAt": "2026-11-03T11:31:30.454Z",
+      "key": "https://bigkyiv.com.ua/poshkodzheno-koliyu-ta-vestybyul-u-kyyivskomu-metropoliteni-rozpovily-pro-plany-vidnovlennya-stancziyi-chernigivskoyi/"
+    },
+    {
       "type": "places",
       "date": "2026-11-02",
       "publishedAt": "2026-11-02T17:30:26.398Z",
@@ -593,12 +599,6 @@
       "date": "2026-09-14",
       "publishedAt": "2026-09-14T09:27:31.469Z",
       "key": "https://bigkyiv.com.ua/rosiya-gotuye-novu-hvylyu-udariv-po-ukrayini-ignat/"
-    },
-    {
-      "type": "places",
-      "date": "2026-09-13",
-      "publishedAt": "2026-09-13T12:53:47.690Z",
-      "key": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-09-13"
     }
   ]
 }
