@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Coffee ART-ANMI SOUL-2026-11-03",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Coffee ART — вулиця Валерія Лобановського, 25 ☕ ANMI SOUL — вулиця Валерія Лобановського, 18 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-11-03T15:32:51.565Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/poshkodzheno-koliyu-ta-vestybyul-u-kyyivskomu-metropoliteni-rozpovily-pro-plany-vidnovlennya-stancziyi-chernigivskoyi/",
     "title": "Пошкоджено колію та вестибюль: у Київському метрополітені розповіли про плани відновлення станції “Чернігівської”",
     "shortText": "На станції метро «Чернігівська» відновлюють вестибюль №2 після ракетного удару. Для ірпінців — затримки при поїздках до центру міста. #ЖКЧайка #Ірпінь #КиившаОбласть #Транспорт",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/rosiya-gotuye-novu-hvylyu-udariv-po-ukrayini-ignat/",
-    "title": "Росія готує нову хвилю ударів по Україні – Ігнат",
-    "shortText": "Російські військові готують нову хвилю ударів з кількох напрямків. Мешканцям Чайки варто бути уважнішими до повітряних сигналів і укриватися своєчасно. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/rosiya-gotuye-novu-hvylyu-udariv-po-ukrayini-ignat/",
-    "publishedAt": "2026-09-14T09:27:31.468Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]

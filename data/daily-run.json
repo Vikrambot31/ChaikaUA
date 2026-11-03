@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-11-03",
+      "publishedAt": "2026-11-03T15:32:51.566Z",
+      "key": "places-Coffee ART-ANMI SOUL-2026-11-03"
+    },
+    {
       "type": "news",
       "date": "2026-11-03",
       "publishedAt": "2026-11-03T11:31:30.454Z",
@@ -593,12 +599,6 @@
       "date": "2026-09-14",
       "publishedAt": "2026-09-14T14:30:51.183Z",
       "key": "places-BALCONE COFFEE-Coffee ART-2026-09-14"
-    },
-    {
-      "type": "news",
-      "date": "2026-09-14",
-      "publishedAt": "2026-09-14T09:27:31.469Z",
-      "key": "https://bigkyiv.com.ua/rosiya-gotuye-novu-hvylyu-udariv-po-ukrayini-ignat/"
     }
   ]
 }
