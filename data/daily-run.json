@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-11-04",
+      "publishedAt": "2026-11-04T11:47:14.494Z",
+      "key": "https://bigkyiv.com.ua/stabilizuvaty-sytuacziyu-ne-vdayetsya-u-kyyevi-diyut-ekstreni-vidklyuchennya-svitla/"
+    },
+    {
       "type": "places",
       "date": "2026-11-03",
       "publishedAt": "2026-11-03T15:32:51.566Z",
@@ -593,12 +599,6 @@
       "date": "2026-09-15",
       "publishedAt": "2026-09-15T09:06:56.179Z",
       "key": "https://bigkyiv.com.ua/perenesty-nomer-do-lifecell-mozhna-cherez-diyu-ne-vyhodyachy-z-domu/"
-    },
-    {
-      "type": "places",
-      "date": "2026-09-14",
-      "publishedAt": "2026-09-14T14:30:51.183Z",
-      "key": "places-BALCONE COFFEE-Coffee ART-2026-09-14"
     }
   ]
 }
