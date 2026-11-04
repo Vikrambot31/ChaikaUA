@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-11-04",
+      "publishedAt": "2026-11-04T15:49:29.220Z",
+      "key": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-11-04"
+    },
+    {
       "type": "news",
       "date": "2026-11-04",
       "publishedAt": "2026-11-04T11:47:14.494Z",
@@ -593,12 +599,6 @@
       "date": "2026-09-15",
       "publishedAt": "2026-09-15T12:56:37.916Z",
       "key": "places-Coffee ART-ANMI SOUL-2026-09-15"
-    },
-    {
-      "type": "news",
-      "date": "2026-09-15",
-      "publishedAt": "2026-09-15T09:06:56.179Z",
-      "key": "https://bigkyiv.com.ua/perenesty-nomer-do-lifecell-mozhna-cherez-diyu-ne-vyhodyachy-z-domu/"
     }
   ]
 }
