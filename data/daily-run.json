@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-11-05",
+      "publishedAt": "2026-11-05T15:52:17.592Z",
+      "key": "places-White Rabbit Coffee and Friends-Chaykava-2026-11-05"
+    },
+    {
       "type": "news",
       "date": "2026-11-05",
       "publishedAt": "2026-11-05T11:45:24.297Z",
@@ -593,12 +599,6 @@
       "date": "2026-09-16",
       "publishedAt": "2026-09-16T12:54:11.988Z",
       "key": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-09-16"
-    },
-    {
-      "type": "news",
-      "date": "2026-09-16",
-      "publishedAt": "2026-09-16T08:59:14.782Z",
-      "key": "https://bigkyiv.com.ua/v-obuhivskomu-rajoni-vnaslidok-ataky-poshkodzheno-budynok-ta-transport-ye-postrazhdalyj/"
     }
   ]
 }
