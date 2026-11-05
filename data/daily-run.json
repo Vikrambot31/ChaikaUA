@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-11-05",
+      "publishedAt": "2026-11-05T11:45:24.297Z",
+      "key": "https://bigkyiv.com.ua/vpav-na-dorogu-ta-potrapyv-pid-vantazhivku-policziya-rozsliduye-zagybel-cholovika-na-kyyivshhyni/"
+    },
+    {
       "type": "places",
       "date": "2026-11-04",
       "publishedAt": "2026-11-04T15:49:29.220Z",
@@ -593,12 +599,6 @@
       "date": "2026-09-16",
       "publishedAt": "2026-09-16T08:59:14.782Z",
       "key": "https://bigkyiv.com.ua/v-obuhivskomu-rajoni-vnaslidok-ataky-poshkodzheno-budynok-ta-transport-ye-postrazhdalyj/"
-    },
-    {
-      "type": "places",
-      "date": "2026-09-15",
-      "publishedAt": "2026-09-15T12:56:37.916Z",
-      "key": "places-Coffee ART-ANMI SOUL-2026-09-15"
     }
   ]
 }
