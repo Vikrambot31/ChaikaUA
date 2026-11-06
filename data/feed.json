@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://bigkyiv.com.ua/na-kyyivshhyni-derzhavi-povernuly-288-gektariv-lisu-vartistyu-ponad-31-mln-grn/",
+    "title": "На Київщині державі повернули 288 гектарів лісу вартістю понад 31 млн грн",
+    "shortText": "На Київщині повернули державі 288 гектарів лісу вартістю 31 млн грн. Для Ірпіня це означає чистіше повітря й збереження природи регіону на майбутнє. #ЖКЧайка #Ірпінь #КиївськаОбласть #Екологія",
+    "sourceName": "bigkyiv.com.ua",
+    "sourceUrl": "https://bigkyiv.com.ua/na-kyyivshhyni-derzhavi-povernuly-288-gektariv-lisu-vartistyu-ponad-31-mln-grn/",
+    "publishedAt": "2026-11-06T11:43:18.500Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-White Rabbit Coffee and Friends-Chaykava-2026-11-05",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ White Rabbit Coffee and Friends — вулиця Валерія Лобановського, 26 к2 ☕ Chaykava — вулиця Українського Відродження #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-09-16",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ ANMI SOUL — вулиця Валерія Лобановського, 18 ☕ White Rabbit Coffee and Friends — вулиця Валерія Лобановського, 26 к2 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-09-16T12:54:11.987Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
