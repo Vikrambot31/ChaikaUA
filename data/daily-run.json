@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-11-06",
+      "publishedAt": "2026-11-06T15:26:35.325Z",
+      "key": "places-Chaykava-NOVUS-2026-11-06"
+    },
+    {
       "type": "news",
       "date": "2026-11-06",
       "publishedAt": "2026-11-06T11:43:18.500Z",
@@ -593,12 +599,6 @@
       "date": "2026-09-17",
       "publishedAt": "2026-09-17T12:50:37.290Z",
       "key": "places-White Rabbit Coffee and Friends-Chaykava-2026-09-17"
-    },
-    {
-      "type": "news",
-      "date": "2026-09-17",
-      "publishedAt": "2026-09-17T09:05:19.323Z",
-      "key": "https://bigkyiv.com.ua/rosiya-atakuvala-zaliznyczyu-za-nich-111-raziv-zupynyaly-poyizdy-ye-vluchannya-u-vokzal-berestyna/"
     }
   ]
 }

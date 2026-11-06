@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Chaykava-NOVUS-2026-11-06",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Chaykava — вулиця Українського Відродження 🛒 NOVUS — вулиця Авіаконструктора Антонова #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-11-06T15:26:35.324Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/na-kyyivshhyni-derzhavi-povernuly-288-gektariv-lisu-vartistyu-ponad-31-mln-grn/",
     "title": "На Київщині державі повернули 288 гектарів лісу вартістю понад 31 млн грн",
     "shortText": "На Київщині повернули державі 288 гектарів лісу вартістю 31 млн грн. Для Ірпіня це означає чистіше повітря й збереження природи регіону на майбутнє. #ЖКЧайка #Ірпінь #КиївськаОбласть #Екологія",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/rosiya-atakuvala-zaliznyczyu-za-nich-111-raziv-zupynyaly-poyizdy-ye-vluchannya-u-vokzal-berestyna/",
-    "title": "Росія атакувала залізницю: за ніч 111 разів зупиняли поїзди, є влучання у вокзал Берестина",
-    "shortText": "Ночами росіяни атакують залізницю, вночі було 111 зупинок поїздів. Для мешканців Чайки це означає затримки при виїздах до Києва та інших міст. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/rosiya-atakuvala-zaliznyczyu-za-nich-111-raziv-zupynyaly-poyizdy-ye-vluchannya-u-vokzal-berestyna/",
-    "publishedAt": "2026-09-17T09:05:19.322Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]
