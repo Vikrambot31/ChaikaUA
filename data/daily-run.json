@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-11-07",
+      "publishedAt": "2026-11-07T10:50:02.449Z",
+      "key": "https://bigkyiv.com.ua/na-vinnychchyni-vnaslidok-rosijskoyi-ataky-poshkodzheno-budivlyu-dsns-ta-ryatuvalnu-tehniku-ye-postrazhdalyj/"
+    },
+    {
       "type": "places",
       "date": "2026-11-06",
       "publishedAt": "2026-11-06T15:26:35.325Z",
@@ -593,12 +599,6 @@
       "date": "2026-09-18",
       "publishedAt": "2026-09-18T08:39:28.152Z",
       "key": "https://bigkyiv.com.ua/tryvoga-ne-skasovuye-onlajn-urok-yak-praczyuyut-kyyivski-shkoly-v-umovah-tryvalyh-atak/"
-    },
-    {
-      "type": "places",
-      "date": "2026-09-17",
-      "publishedAt": "2026-09-17T12:50:37.290Z",
-      "key": "places-White Rabbit Coffee and Friends-Chaykava-2026-09-17"
     }
   ]
 }

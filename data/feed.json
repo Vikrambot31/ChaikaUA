@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://bigkyiv.com.ua/na-vinnychchyni-vnaslidok-rosijskoyi-ataky-poshkodzheno-budivlyu-dsns-ta-ryatuvalnu-tehniku-ye-postrazhdalyj/",
+    "title": "На Вінниччині внаслідок російської атаки пошкоджено будівлю ДСНС та рятувальну техніку: є постраждалий",
+    "shortText": "На Вінниччині російська атака пошкодила будівлю ДСНС та рятувальну техніку. Для мешканців Чайки це нагадування про важливість цивільного захисту та готовності до надзвичайних ситуацій. #ЖКЧайка #Ірпінь #КиївськаОбласть #БезпекаЖителів",
+    "sourceName": "bigkyiv.com.ua",
+    "sourceUrl": "https://bigkyiv.com.ua/na-vinnychchyni-vnaslidok-rosijskoyi-ataky-poshkodzheno-budivlyu-dsns-ta-ryatuvalnu-tehniku-ye-postrazhdalyj/",
+    "publishedAt": "2026-11-07T10:50:02.448Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-Chaykava-NOVUS-2026-11-06",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ Chaykava — вулиця Українського Відродження 🛒 NOVUS — вулиця Авіаконструктора Антонова #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-White Rabbit Coffee and Friends-Chaykava-2026-09-17",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ White Rabbit Coffee and Friends — вулиця Валерія Лобановського, 26 к2 ☕ Chaykava — вулиця Українського Відродження #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-09-17T12:50:37.289Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
