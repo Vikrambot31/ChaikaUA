@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-11-07",
+      "publishedAt": "2026-11-07T14:28:19.275Z",
+      "key": "places-NOVUS-Grano Bakery-2026-11-07"
+    },
+    {
       "type": "news",
       "date": "2026-11-07",
       "publishedAt": "2026-11-07T10:50:02.449Z",
@@ -593,12 +599,6 @@
       "date": "2026-09-18",
       "publishedAt": "2026-09-18T12:25:24.686Z",
       "key": "places-Chaykava-NOVUS-2026-09-18"
-    },
-    {
-      "type": "news",
-      "date": "2026-09-18",
-      "publishedAt": "2026-09-18T08:39:28.152Z",
-      "key": "https://bigkyiv.com.ua/tryvoga-ne-skasovuye-onlajn-urok-yak-praczyuyut-kyyivski-shkoly-v-umovah-tryvalyh-atak/"
     }
   ]
 }
