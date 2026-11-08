@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://bigkyiv.com.ua/vivat-zakryvaye-chastynu-knygaren-cherez-tryvali-povitryani-tryvogy/",
+    "title": "Vivat закриває частину книгарень через тривалі повітряні тривоги",
+    "shortText": "Видавництво Vivat закриває книгарні через повітряні тривоги. Для мешканців Чайки це означає обмежений доступ до нових книг та періодики в найближчих місяцях. #ЖКЧайка #Ірпінь #КиївськаОбласть #Культура",
+    "sourceName": "bigkyiv.com.ua",
+    "sourceUrl": "https://bigkyiv.com.ua/vivat-zakryvaye-chastynu-knygaren-cherez-tryvali-povitryani-tryvogy/",
+    "publishedAt": "2026-11-08T10:58:14.684Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-NOVUS-Grano Bakery-2026-11-07",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "🛒 NOVUS — вулиця Авіаконструктора Антонова 🛒 Grano Bakery — вулиця Валерія Лобановського, 35 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Chaykava-NOVUS-2026-09-18",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ Chaykava — вулиця Українського Відродження 🛒 NOVUS — вулиця Авіаконструктора Антонова #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-09-18T12:25:24.686Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
