@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Grano Bakery-Кав'ярня ХЛІБ та КАВА-2026-11-08",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "🛒 Grano Bakery — вулиця Валерія Лобановського, 35 ☕ Кав'ярня ХЛІБ та КАВА — вулиця Валерія Лобановського, 18 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-11-08T14:36:43.153Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/vivat-zakryvaye-chastynu-knygaren-cherez-tryvali-povitryani-tryvogy/",
     "title": "Vivat закриває частину книгарень через тривалі повітряні тривоги",
     "shortText": "Видавництво Vivat закриває книгарні через повітряні тривоги. Для мешканців Чайки це означає обмежений доступ до нових книг та періодики в найближчих місяцях. #ЖКЧайка #Ірпінь #КиївськаОбласть #Культура",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://www.pravda.com.ua/news/2026/09/19/8054172/",
-    "title": "У Києві вдруге за ніч оголошували тривогу через дронову небезпеку",
-    "shortText": "Ночі в Київській області знову проходять під звуки сирен — за ніч двічі оголошували тривогу через дронову небезпеку. Мешканцям Чайки важливо тримати під рукою засоби захисту й знати локацію укриттів. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
-    "sourceName": "www.pravda.com.ua",
-    "sourceUrl": "https://www.pravda.com.ua/news/2026/09/19/8054172/",
-    "publishedAt": "2026-09-19T08:26:41.892Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]
