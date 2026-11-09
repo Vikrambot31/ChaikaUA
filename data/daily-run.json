@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-11-09",
+      "publishedAt": "2026-11-09T12:24:58.030Z",
+      "key": "https://bigkyiv.com.ua/shlyager-roku-2026-zibrov-rotaru-kravchuk-ta-julik-vystupyly-na-velykomu-konczerti-v-kyyevi/"
+    },
+    {
       "type": "places",
       "date": "2026-11-08",
       "publishedAt": "2026-11-08T14:36:43.153Z",
@@ -593,12 +599,6 @@
       "date": "2026-09-20",
       "publishedAt": "2026-09-20T08:58:09.261Z",
       "key": "https://bigkyiv.com.ua/rosiyany-bily-po-zaliznyczi-na-vinnychchyni-po-ryatuvalnykah-u-zaporizhzhi-u-kramatorsku-gorily-kvartyry/"
-    },
-    {
-      "type": "places",
-      "date": "2026-09-19",
-      "publishedAt": "2026-09-19T12:06:42.643Z",
-      "key": "places-NOVUS-Grano Bakery-2026-09-19"
     }
   ]
 }
