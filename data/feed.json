@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Кав'ярня ХЛІБ та КАВА-Мозаїка Espresso bar-2026-11-09",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Кав'ярня ХЛІБ та КАВА — вулиця Валерія Лобановського, 18 ☕ Мозаїка Espresso bar — вулиця Валерія Лобановського #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-11-09T17:54:33.992Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/shlyager-roku-2026-zibrov-rotaru-kravchuk-ta-julik-vystupyly-na-velykomu-konczerti-v-kyyevi/",
     "title": "«Шлягер року – 2026»: Зібров, Ротару, Кравчук та JULIK виступили на великому концерті в Києві",
     "shortText": "У Палаці «Україна» пройшов концерт «Шлягер року – 2026» з Зібровим, Ротару та JULIK перед 2500 глядачами. Для мешканців Чайки це нагадування, що культурне життя Київа продовжується навіть у складні часи. #ЖКЧайка #Ірпінь #КиївськаОбласть #Культура",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/rosiyany-bily-po-zaliznyczi-na-vinnychchyni-po-ryatuvalnykah-u-zaporizhzhi-u-kramatorsku-gorily-kvartyry/",
-    "title": "Росіяни біли по залізниці на Вінниччині, по рятувальниках у Запоріжжі, у Краматорську горіли квартири",
-    "shortText": "Росія продовжує атакувати українські регіони — це загрожує мирному населенню й інфраструктурі по всій країні, включаючи Київщину. Мешканці Чайки мають бути готові до будь-яких сценаріїв і дотримуватися рекомендацій цивільної оборони. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/rosiyany-bily-po-zaliznyczi-na-vinnychchyni-po-ryatuvalnykah-u-zaporizhzhi-u-kramatorsku-gorily-kvartyry/",
-    "publishedAt": "2026-09-20T08:58:09.260Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]

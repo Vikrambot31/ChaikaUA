@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-11-09",
+      "publishedAt": "2026-11-09T17:54:33.992Z",
+      "key": "places-Кав'ярня ХЛІБ та КАВА-Мозаїка Espresso bar-2026-11-09"
+    },
+    {
       "type": "news",
       "date": "2026-11-09",
       "publishedAt": "2026-11-09T12:24:58.030Z",
@@ -593,12 +599,6 @@
       "date": "2026-09-20",
       "publishedAt": "2026-09-20T12:42:27.812Z",
       "key": "places-Grano Bakery-Кав'ярня ХЛІБ та КАВА-2026-09-20"
-    },
-    {
-      "type": "news",
-      "date": "2026-09-20",
-      "publishedAt": "2026-09-20T08:58:09.261Z",
-      "key": "https://bigkyiv.com.ua/rosiyany-bily-po-zaliznyczi-na-vinnychchyni-po-ryatuvalnykah-u-zaporizhzhi-u-kramatorsku-gorily-kvartyry/"
     }
   ]
 }
