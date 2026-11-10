@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://bigkyiv.com.ua/restoran-u-kyyevi-buv-ostannim-merezha-shvydkogo-harchuvannya-salateira-prypynyla-diyalnist/",
+    "title": "Ресторан у Києві був останнім: мережа швидкого харчування Salateira припинила діяльність",
+    "shortText": "Мережа Salateira закрила всі ресторани, включаючи флагман у River Mall. Для киян це означає пошук нових місць для здорового перекусу в центрі міста. #ЖКЧайка #Ірпінь #КиївськаОбласть #ресторани",
+    "sourceName": "bigkyiv.com.ua",
+    "sourceUrl": "https://bigkyiv.com.ua/restoran-u-kyyevi-buv-ostannim-merezha-shvydkogo-harchuvannya-salateira-prypynyla-diyalnist/",
+    "publishedAt": "2026-11-10T11:59:42.163Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-Кав'ярня ХЛІБ та КАВА-Мозаїка Espresso bar-2026-11-09",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ Кав'ярня ХЛІБ та КАВА — вулиця Валерія Лобановського, 18 ☕ Мозаїка Espresso bar — вулиця Валерія Лобановського #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Grano Bakery-Кав'ярня ХЛІБ та КАВА-2026-09-20",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "🛒 Grano Bakery — вулиця Валерія Лобановського, 35 ☕ Кав'ярня ХЛІБ та КАВА — вулиця Валерія Лобановського, 18 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-09-20T12:42:27.811Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
