@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Мозаїка Espresso bar-#МОЖЕКАВИ?-2026-11-10",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Мозаїка Espresso bar — вулиця Валерія Лобановського ☕ #МОЖЕКАВИ? — вулиця Валерія Лобановського, 29 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-11-10T15:53:30.704Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/restoran-u-kyyevi-buv-ostannim-merezha-shvydkogo-harchuvannya-salateira-prypynyla-diyalnist/",
     "title": "Ресторан у Києві був останнім: мережа швидкого харчування Salateira припинила діяльність",
     "shortText": "Мережа Salateira закрила всі ресторани, включаючи флагман у River Mall. Для киян це означає пошук нових місць для здорового перекусу в центрі міста. #ЖКЧайка #Ірпінь #КиївськаОбласть #ресторани",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/prev%ca%bcyu-7-go-turu-upl-duel-chempiona-ta-viczechempiona-a-takozh-bytva-moryakiv-proty-pyvovariv/",
-    "title": "Превʼю 7-го туру УПЛ: дуель чемпіона та віцечемпіона, а також битва «моряків» проти «пивоварів»",
-    "shortText": "Попри повітряні тривоги УПЛ продовжує 7-й тур: чемпіон зіграє з віцечемпіоном. Для мешканців Чайки це нагадування про те, як спорт об'єднує навіть у складні часи. #ЖКЧайка #Ірпінь #КиївськаОбласть #УПЛ",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/prev%ca%bcyu-7-go-turu-upl-duel-chempiona-ta-viczechempiona-a-takozh-bytva-moryakiv-proty-pyvovariv/",
-    "publishedAt": "2026-09-21T09:30:28.518Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]
