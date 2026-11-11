@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-11-11",
+      "publishedAt": "2026-11-11T15:40:31.209Z",
+      "key": "places-#МОЖЕКАВИ?-Fora-2026-11-11"
+    },
+    {
       "type": "news",
       "date": "2026-11-11",
       "publishedAt": "2026-11-11T11:37:52.252Z",
@@ -593,12 +599,6 @@
       "date": "2026-09-22",
       "publishedAt": "2026-09-22T12:53:30.771Z",
       "key": "places-Мозаїка Espresso bar-#МОЖЕКАВИ?-2026-09-22"
-    },
-    {
-      "type": "news",
-      "date": "2026-09-22",
-      "publishedAt": "2026-09-22T08:57:02.905Z",
-      "key": "https://www.pravda.com.ua/news/2026/09/22/8054565/"
     }
   ]
 }
