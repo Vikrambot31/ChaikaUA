@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-11-11",
+      "publishedAt": "2026-11-11T11:37:52.252Z",
+      "key": "https://bigkyiv.com.ua/metro-znovu-ne-yizdyt-cherez-pivdennyj-mist/"
+    },
+    {
       "type": "places",
       "date": "2026-11-10",
       "publishedAt": "2026-11-10T15:53:30.704Z",
@@ -593,12 +599,6 @@
       "date": "2026-09-22",
       "publishedAt": "2026-09-22T08:57:02.905Z",
       "key": "https://www.pravda.com.ua/news/2026/09/22/8054565/"
-    },
-    {
-      "type": "places",
-      "date": "2026-09-21",
-      "publishedAt": "2026-09-21T14:38:22.352Z",
-      "key": "places-Кав'ярня ХЛІБ та КАВА-Мозаїка Espresso bar-2026-09-21"
     }
   ]
 }

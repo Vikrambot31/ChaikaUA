@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://bigkyiv.com.ua/metro-znovu-ne-yizdyt-cherez-pivdennyj-mist/",
+    "title": "Метро знову не їздить через Південний міст",
+    "shortText": "Метро Києва знову не їздить через Південний міст. Для мешканців Чайки це ускладнює дорогу до центру міста та затримує комунікацію з столицею. #ЖКЧайка #Ірпінь #КиївськаОбласть #транспорт",
+    "sourceName": "bigkyiv.com.ua",
+    "sourceUrl": "https://bigkyiv.com.ua/metro-znovu-ne-yizdyt-cherez-pivdennyj-mist/",
+    "publishedAt": "2026-11-11T11:37:52.251Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-Мозаїка Espresso bar-#МОЖЕКАВИ?-2026-11-10",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ Мозаїка Espresso bar — вулиця Валерія Лобановського ☕ #МОЖЕКАВИ? — вулиця Валерія Лобановського, 29 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Кав'ярня ХЛІБ та КАВА-Мозаїка Espresso bar-2026-09-21",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ Кав'ярня ХЛІБ та КАВА — вулиця Валерія Лобановського, 18 ☕ Мозаїка Espresso bar — вулиця Валерія Лобановського #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-09-21T14:38:22.351Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
