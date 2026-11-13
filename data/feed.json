@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-11-13",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Кав'ярня-кондитерська \"Гамак\" — вулиця Валерія Лобановського ☕ BALCONE COFFEE — вулиця Валерія Лобановського, 26 к2 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-11-13T15:44:55.487Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/cherez-ataku-rosijskyh-droniv-povnistyu-zupynyv-robotu-kernel-zupynyaye-zavody-delta-villmar-v-krayini-ochikuyut-deficzyt-oliyi/",
     "title": "Через атаку російських дронів повністю зупинив роботу Кернел, не діють заводи Дельта Віллмар – в країні очікують дефіцит олії",
     "shortText": "Через атаки дронів зупинились великі олійні заводи — очікується дефіцит олії в магазинах. Для мешканців Чайки це означає подорожчання базових продуктів на полицях. #ЖКЧайка #Ірпінь #КиївськаОбласть #економіка",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/cherez-nichnu-ataku-zatrymuyutsya-piv-sotni-poyizdiv-deyaki-rejsy-zapiznyuyutsya-bilsh-nizh-na-7-godyn/",
-    "title": "Через нічну атаку затримуються пів сотні поїздів: деякі рейси запізнюються більш ніж на 7 годин",
-    "shortText": "Після масованої атаки 24 вересня половина поїздів в Україні запізнюються до 7 годин. Для мешканців Чайки це означає утруднення планування поїздок до Києва та інших міст. #ЖКЧайка #Ірпінь #КиївськаОбласть #транспорт",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/cherez-nichnu-ataku-zatrymuyutsya-piv-sotni-poyizdiv-deyaki-rejsy-zapiznyuyutsya-bilsh-nizh-na-7-godyn/",
-    "publishedAt": "2026-09-24T08:55:24.605Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]
