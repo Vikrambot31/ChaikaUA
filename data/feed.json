@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-BALCONE COFFEE-Coffee ART-2026-11-14",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ BALCONE COFFEE — вулиця Валерія Лобановського, 26 к2 ☕ Coffee ART — вулиця Валерія Лобановського, 25 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-11-14T14:35:50.284Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/cziny-na-zhytlo-u-2027-roczi-chy-dorozhchatymut-kvartyry/",
     "title": "Ціни на житло у 2027 році: чи дорожчатимуть квартири",
     "shortText": "У 2027 році девелопери планують збільшити собівартість будівництва на 15–20% через подорожчання матеріалів. Для мешканців Чайки це означає вищі ціни на квартири вже в наступному році. #ЖКЧайка #Ірпінь #КиївськаОбласть #Нерухомість",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://www.pravda.com.ua/news/2026/09/25/8054977/",
-    "title": "Нічні удари по Київщині: горіло підприємство, пошкоджено склади, будинки і авто",
-    "shortText": "Вночі російські ataky пошкодили будинки та авто на Київщині. Для мешканців Чайки це нагадує про важливість укриттів і готовності до небезпеки. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
-    "sourceName": "www.pravda.com.ua",
-    "sourceUrl": "https://www.pravda.com.ua/news/2026/09/25/8054977/",
-    "publishedAt": "2026-09-25T09:16:03.966Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]
