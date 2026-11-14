@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://bigkyiv.com.ua/cziny-na-zhytlo-u-2027-roczi-chy-dorozhchatymut-kvartyry/",
+    "title": "Ціни на житло у 2027 році: чи дорожчатимуть квартири",
+    "shortText": "У 2027 році девелопери планують збільшити собівартість будівництва на 15–20% через подорожчання матеріалів. Для мешканців Чайки це означає вищі ціни на квартири вже в наступному році. #ЖКЧайка #Ірпінь #КиївськаОбласть #Нерухомість",
+    "sourceName": "bigkyiv.com.ua",
+    "sourceUrl": "https://bigkyiv.com.ua/cziny-na-zhytlo-u-2027-roczi-chy-dorozhchatymut-kvartyry/",
+    "publishedAt": "2026-11-14T11:08:19.329Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-11-13",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ Кав'ярня-кондитерська \"Гамак\" — вулиця Валерія Лобановського ☕ BALCONE COFFEE — вулиця Валерія Лобановського, 26 к2 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Fora-Кав'ярня-кондитерська \"Гамак\"-2026-09-24",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "🛒 Fora — вулиця Грушевського, 12 ☕ Кав'ярня-кондитерська \"Гамак\" — вулиця Валерія Лобановського #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-09-24T12:57:52.871Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]

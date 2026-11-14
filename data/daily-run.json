@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-11-14",
+      "publishedAt": "2026-11-14T11:08:19.330Z",
+      "key": "https://bigkyiv.com.ua/cziny-na-zhytlo-u-2027-roczi-chy-dorozhchatymut-kvartyry/"
+    },
+    {
       "type": "places",
       "date": "2026-11-13",
       "publishedAt": "2026-11-13T15:44:55.488Z",
@@ -593,12 +599,6 @@
       "date": "2026-09-25",
       "publishedAt": "2026-09-25T09:16:03.967Z",
       "key": "https://www.pravda.com.ua/news/2026/09/25/8054977/"
-    },
-    {
-      "type": "places",
-      "date": "2026-09-24",
-      "publishedAt": "2026-09-24T12:57:52.872Z",
-      "key": "places-Fora-Кав'ярня-кондитерська \"Гамак\"-2026-09-24"
     }
   ]
 }
