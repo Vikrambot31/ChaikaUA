@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://bigkyiv.com.ua/sezonni-yarmarky-u-kyyevi-kudy-pity-na-zakupy-czogo-tyzhnya/",
+    "title": "Сезонні ярмарки у Києві: куди піти на закупи цього тижня",
+    "shortText": "Цього тижня в Києві працюють сезонні ярмарки з бюджетними продуктами. Мешканцям Чайки це дає змогу економити на закупах, їдучи 15–20 хвилин до міста. #ЖКЧайка #Ірпінь #КиївськаОбласть #ярмарки",
+    "sourceName": "bigkyiv.com.ua",
+    "sourceUrl": "https://bigkyiv.com.ua/sezonni-yarmarky-u-kyyevi-kudy-pity-na-zakupy-czogo-tyzhnya/",
+    "publishedAt": "2026-11-16T12:20:36.359Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-Coffee ART-ANMI SOUL-2026-11-15",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ Coffee ART — вулиця Валерія Лобановського, 25 ☕ ANMI SOUL — вулиця Валерія Лобановського, 18 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-BALCONE COFFEE-Coffee ART-2026-09-26",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ BALCONE COFFEE — вулиця Валерія Лобановського, 26 к2 ☕ Coffee ART — вулиця Валерія Лобановського, 25 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-09-26T12:31:54.970Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
