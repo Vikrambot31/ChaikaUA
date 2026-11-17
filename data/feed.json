@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://www.pravda.com.ua/news/2026/11/17/8063272/",
+    "title": "У Києві відновили рух метро між \"Осокорками\" і \"Червоним хутором\"",
+    "shortText": "У Києві відновили рух метро на зеленій лінії між «Осокорками» та «Червоним хутором». Для мешканців Чайки це скорочує час дороги до центру міста та розширює варіанти громадського транспорту. #ЖКЧайка #Ірпінь #КиївськаОбласть #Метро",
+    "sourceName": "www.pravda.com.ua",
+    "sourceUrl": "https://www.pravda.com.ua/news/2026/11/17/8063272/",
+    "publishedAt": "2026-11-17T12:41:07.310Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-11-16",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ ANMI SOUL — вулиця Валерія Лобановського, 18 ☕ White Rabbit Coffee and Friends — вулиця Валерія Лобановського, 26 к2 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-Coffee ART-ANMI SOUL-2026-09-27",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ Coffee ART — вулиця Валерія Лобановського, 25 ☕ ANMI SOUL — вулиця Валерія Лобановського, 18 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-09-27T13:22:17.220Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]

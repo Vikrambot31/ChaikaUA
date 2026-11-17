@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-11-17",
+      "publishedAt": "2026-11-17T12:41:07.311Z",
+      "key": "https://www.pravda.com.ua/news/2026/11/17/8063272/"
+    },
+    {
       "type": "places",
       "date": "2026-11-16",
       "publishedAt": "2026-11-16T17:36:38.853Z",
@@ -593,12 +599,6 @@
       "date": "2026-09-28",
       "publishedAt": "2026-09-28T10:23:20.020Z",
       "key": "https://www.pravda.com.ua/news/2026/09/28/8055370/"
-    },
-    {
-      "type": "places",
-      "date": "2026-09-27",
-      "publishedAt": "2026-09-27T13:22:17.221Z",
-      "key": "places-Coffee ART-ANMI SOUL-2026-09-27"
     }
   ]
 }
