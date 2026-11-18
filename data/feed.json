@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Chaykava-NOVUS-2026-11-18",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Chaykava — вулиця Українського Відродження 🛒 NOVUS — вулиця Авіаконструктора Антонова #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-11-18T16:46:38.155Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/na-pivnichnomu-ta-pivdennomu-mostah-vymknuly-kompleksy-avtofiksacziyi-porushen-pdr/",
     "title": "На Північному та Південному мостах вимкнули комплекси автофіксації порушень ПДР",
     "shortText": "На Північному та Південному мостах у Києві вимкнули комплекси автофіксації порушень ПДР. Мешканців Чайки це стосується — ці мости — головний маршрут до столиці. #ЖКЧайка #Ірпінь #КиївськаОбласть #дорожнаситуація",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/zminu-misczya-prozhyvannya-cherez-energetychni-nezruchnosti-rozglyadayut-ponad-40-ukrayincziv-opytuvannya/",
-    "title": "Зміну місця проживання через енергетичні незручності розглядають понад 40% українців – опитування",
-    "shortText": "У понад 40% українців виникають думки про переїзд через проблеми з енергопостачанням. У Чайці надійна робота комунальних систем — один із головних пріоритетів забудовника для вашого спокою й безпеки. #ЖКЧайка #Ірпінь #КиївськаОбласть #Комунальні",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/zminu-misczya-prozhyvannya-cherez-energetychni-nezruchnosti-rozglyadayut-ponad-40-ukrayincziv-opytuvannya/",
-    "publishedAt": "2026-09-29T10:18:19.012Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]

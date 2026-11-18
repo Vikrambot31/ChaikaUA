@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-11-18",
+      "publishedAt": "2026-11-18T16:46:38.156Z",
+      "key": "places-Chaykava-NOVUS-2026-11-18"
+    },
+    {
       "type": "news",
       "date": "2026-11-18",
       "publishedAt": "2026-11-18T12:32:42.975Z",
@@ -593,12 +599,6 @@
       "date": "2026-09-29",
       "publishedAt": "2026-09-29T14:25:00.109Z",
       "key": "places-White Rabbit Coffee and Friends-Chaykava-2026-09-29"
-    },
-    {
-      "type": "news",
-      "date": "2026-09-29",
-      "publishedAt": "2026-09-29T10:18:19.012Z",
-      "key": "https://bigkyiv.com.ua/zminu-misczya-prozhyvannya-cherez-energetychni-nezruchnosti-rozglyadayut-ponad-40-ukrayincziv-opytuvannya/"
     }
   ]
 }
