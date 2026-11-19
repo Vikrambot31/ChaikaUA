@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-NOVUS-Grano Bakery-2026-11-19",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "🛒 NOVUS — вулиця Авіаконструктора Антонова 🛒 Grano Bakery — вулиця Валерія Лобановського, 35 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-11-19T16:53:16.864Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/gromadskyj-transport-kyyeva-teper-mozhna-vidstezhuvaty-onlajn-navit-pid-chas-povitryanyh-tryvog/",
     "title": "Громадський транспорт Києва тепер можна відстежувати онлайн навіть під час повітряних тривог",
     "shortText": "У Києві запрацювала система онлайн-відстеження громадського транспорту, що працює навіть під час тривог. Для мешканців Чайки це означає надійний контроль маршрутів при поїздках до столиці незалежно від обстановки. #ЖКЧайка #Ірпінь #КиївськаОбласть #Транспорт",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/masova-avariya-stalasya-u-desnyanskomu-rajoni-ye-postrazhdali/",
-    "title": "Масова аварія сталася у Деснянському районі: є постраждалі",
-    "shortText": "Зранку на вулиці Пухівській у Деснянському районі сталася масова аварія. Для мешканців Чайки це нагадування про небезпеку на дорогах під час спішки та важливість дотримання швидкості. #ЖКЧайка #Ірпінь #КиївськаОбласть #безпека",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/masova-avariya-stalasya-u-desnyanskomu-rajoni-ye-postrazhdali/",
-    "publishedAt": "2026-09-30T10:11:48.277Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]

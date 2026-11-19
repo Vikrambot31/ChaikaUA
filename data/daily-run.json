@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-11-19",
+      "publishedAt": "2026-11-19T16:53:16.865Z",
+      "key": "places-NOVUS-Grano Bakery-2026-11-19"
+    },
+    {
       "type": "news",
       "date": "2026-11-19",
       "publishedAt": "2026-11-19T12:23:35.491Z",
@@ -593,12 +599,6 @@
       "date": "2026-09-30",
       "publishedAt": "2026-09-30T14:21:11.901Z",
       "key": "places-Chaykava-NOVUS-2026-09-30"
-    },
-    {
-      "type": "news",
-      "date": "2026-09-30",
-      "publishedAt": "2026-09-30T10:11:48.278Z",
-      "key": "https://bigkyiv.com.ua/masova-avariya-stalasya-u-desnyanskomu-rajoni-ye-postrazhdali/"
     }
   ]
 }
