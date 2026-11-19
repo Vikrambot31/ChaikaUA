@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://bigkyiv.com.ua/gromadskyj-transport-kyyeva-teper-mozhna-vidstezhuvaty-onlajn-navit-pid-chas-povitryanyh-tryvog/",
+    "title": "Громадський транспорт Києва тепер можна відстежувати онлайн навіть під час повітряних тривог",
+    "shortText": "У Києві запрацювала система онлайн-відстеження громадського транспорту, що працює навіть під час тривог. Для мешканців Чайки це означає надійний контроль маршрутів при поїздках до столиці незалежно від обстановки. #ЖКЧайка #Ірпінь #КиївськаОбласть #Транспорт",
+    "sourceName": "bigkyiv.com.ua",
+    "sourceUrl": "https://bigkyiv.com.ua/gromadskyj-transport-kyyeva-teper-mozhna-vidstezhuvaty-onlajn-navit-pid-chas-povitryanyh-tryvog/",
+    "publishedAt": "2026-11-19T12:23:35.490Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-Chaykava-NOVUS-2026-11-18",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ Chaykava — вулиця Українського Відродження 🛒 NOVUS — вулиця Авіаконструктора Антонова #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-White Rabbit Coffee and Friends-Chaykava-2026-09-29",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ White Rabbit Coffee and Friends — вулиця Валерія Лобановського, 26 к2 ☕ Chaykava — вулиця Українського Відродження #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-09-29T14:25:00.108Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]

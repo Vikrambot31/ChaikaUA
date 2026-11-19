@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-11-19",
+      "publishedAt": "2026-11-19T12:23:35.491Z",
+      "key": "https://bigkyiv.com.ua/gromadskyj-transport-kyyeva-teper-mozhna-vidstezhuvaty-onlajn-navit-pid-chas-povitryanyh-tryvog/"
+    },
+    {
       "type": "places",
       "date": "2026-11-18",
       "publishedAt": "2026-11-18T16:46:38.156Z",
@@ -593,12 +599,6 @@
       "date": "2026-09-30",
       "publishedAt": "2026-09-30T10:11:48.278Z",
       "key": "https://bigkyiv.com.ua/masova-avariya-stalasya-u-desnyanskomu-rajoni-ye-postrazhdali/"
-    },
-    {
-      "type": "places",
-      "date": "2026-09-29",
-      "publishedAt": "2026-09-29T14:25:00.109Z",
-      "key": "places-White Rabbit Coffee and Friends-Chaykava-2026-09-29"
     }
   ]
 }
