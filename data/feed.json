@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Grano Bakery-Кав'ярня ХЛІБ та КАВА-2026-11-20",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "🛒 Grano Bakery — вулиця Валерія Лобановського, 35 ☕ Кав'ярня ХЛІБ та КАВА — вулиця Валерія Лобановського, 18 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-11-20T16:28:09.901Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/muzhyky-staly-bezporadnymy-v-pobuti-majster-z-santehniky-ziznavsya-pro-zamovlennya-v-kyyevi-de-remont-tryvaye-sekundy/",
     "title": "“Мужики стали безпорадними в побуті” – майстер з сантехніки зізнався про замовлення в Києві, де ремонт триває секунди",
     "shortText": "У Києві попит на сантехніків виростає через те, що власники квартир не впоратися з елементарним ремонтом самі. Для мешканців Чайки це означає довші чекання майстра та вищі ціни на послуги. #ЖКЧайка #Ірпінь #КиївськаОбласть #Ремонт",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/dlya-sumshhyny-ta-harkivshhyny-zapustyly-spoluchennya-poyizd-avtobus/",
-    "title": "Для Сумщини та Харківщини запустили сполучення «поїзд + автобус»",
-    "shortText": "Сумщина та Харківщина запускають комбіноване сполучення «поїзд + автобус» — резервна схема, якщо рух поїздів обмежать через небезпеку. Для мешканців Чайки це означає більшу стійкість залізничного сполучення в регіоні. #ЖКЧайка #Ірпінь #КиївськаОбласть #Транспорт",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/dlya-sumshhyny-ta-harkivshhyny-zapustyly-spoluchennya-poyizd-avtobus/",
-    "publishedAt": "2026-10-01T10:38:29.924Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]

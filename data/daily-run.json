@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-11-20",
+      "publishedAt": "2026-11-20T16:28:09.901Z",
+      "key": "places-Grano Bakery-Кав'ярня ХЛІБ та КАВА-2026-11-20"
+    },
+    {
       "type": "news",
       "date": "2026-11-20",
       "publishedAt": "2026-11-20T12:24:03.135Z",
@@ -593,12 +599,6 @@
       "date": "2026-10-01",
       "publishedAt": "2026-10-01T14:53:09.758Z",
       "key": "places-Кав'ярня-кондитерська \"Гамак\"-BALCONE COFFEE-2026-10-01"
-    },
-    {
-      "type": "news",
-      "date": "2026-10-01",
-      "publishedAt": "2026-10-01T10:38:29.925Z",
-      "key": "https://bigkyiv.com.ua/dlya-sumshhyny-ta-harkivshhyny-zapustyly-spoluchennya-poyizd-avtobus/"
     }
   ]
 }
