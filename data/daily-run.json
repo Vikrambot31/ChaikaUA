@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-11-21",
+      "publishedAt": "2026-11-21T15:42:38.774Z",
+      "key": "places-Кав'ярня ХЛІБ та КАВА-Мозаїка Espresso bar-2026-11-21"
+    },
+    {
       "type": "news",
       "date": "2026-11-21",
       "publishedAt": "2026-11-21T11:57:59.433Z",
@@ -593,12 +599,6 @@
       "date": "2026-10-02",
       "publishedAt": "2026-10-02T14:15:05.494Z",
       "key": "places-BALCONE COFFEE-Coffee ART-2026-10-02"
-    },
-    {
-      "type": "news",
-      "date": "2026-10-02",
-      "publishedAt": "2026-10-02T10:13:41.960Z",
-      "key": "https://www.pravda.com.ua/news/2026/10/02/8056115/"
     }
   ]
 }
