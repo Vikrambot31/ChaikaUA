@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-#МОЖЕКАВИ?-Fora-2026-11-23",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ #МОЖЕКАВИ? — вулиця Валерія Лобановського, 29 🛒 Fora — вулиця Грушевського, 12 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-11-23T19:35:40.625Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/ulamky-rosijskyh-droniv-sprychynyly-zagorannya-avtivok-u-dvoh-rajonah-kyyeva-ye-postrazhdali/",
     "title": "Уламки російських дронів спричинили загорання автівок у двох районах Києва, є постраждалі",
     "shortText": "Росія продовжує атакувати Київ дронами — сьогодні горіли авто в Голосіївському та Шевченківському районах. Для мешканців Чайки це означає можливі перебої з електропостачанням та водопостачанням. #ЖКЧайка #Ірпінь #КиївськаОбласть #БезпекаМіста",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/vchytelka-anglijskoyi-movy-z-kyyivshhyny-stala-najkrashhym-vchytelem-2026-roku/",
-    "title": "Вчителька англійської мови з Київщини стала найкращим вчителем 2026 року",
-    "shortText": "Вчителька англійської з Київщини Світлана Меркулова отримала Global Teacher Prize Ukraine 2026 і 1 мільйон гривень. Для мешканців Чайки це приклад того, що якісна освіта починається з відданих педагогів. #ЖКЧайка #Ірпінь #КиївськаОбласть #Освіта",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/vchytelka-anglijskoyi-movy-z-kyyivshhyny-stala-najkrashhym-vchytelem-2026-roku/",
-    "publishedAt": "2026-10-04T10:20:52.675Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]
