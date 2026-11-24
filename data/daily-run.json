@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "news",
+      "date": "2026-11-24",
+      "publishedAt": "2026-11-24T14:28:29.515Z",
+      "key": "https://www.pravda.com.ua/news/2026/11/24/8064435/"
+    },
+    {
       "type": "places",
       "date": "2026-11-23",
       "publishedAt": "2026-11-23T19:35:40.626Z",
@@ -593,12 +599,6 @@
       "date": "2026-10-05",
       "publishedAt": "2026-10-05T11:04:37.690Z",
       "key": "https://bigkyiv.com.ua/na-81-mu-roczi-zhyttya-pomer-narodnyj-artyst-ukrayiny-oleg-shavarskyj/"
-    },
-    {
-      "type": "places",
-      "date": "2026-10-04",
-      "publishedAt": "2026-10-04T13:31:36.444Z",
-      "key": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-10-04"
     }
   ]
 }

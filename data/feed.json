@@ -1,5 +1,16 @@
 [
   {
+    "id": "https://www.pravda.com.ua/news/2026/11/24/8064435/",
+    "title": "Росіяни атакували Київ: у Голосіївському районі горять склади",
+    "shortText": "Росіяни атакували Київ, горять склади у Голосіївському районі. Для мешканців Чайки це означає можливі перебої з постачанням товарів та послуг. Слідкуйте за оновленнями та дотримуйтесь правил безпеки. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
+    "sourceName": "www.pravda.com.ua",
+    "sourceUrl": "https://www.pravda.com.ua/news/2026/11/24/8064435/",
+    "publishedAt": "2026-11-24T14:28:29.514Z",
+    "priority": "important",
+    "aiGenerated": true,
+    "postType": "news"
+  },
+  {
     "id": "places-#МОЖЕКАВИ?-Fora-2026-11-23",
     "title": "Два місця на Чайці, куди можна піти сьогодні",
     "shortText": "☕ #МОЖЕКАВИ? — вулиця Валерія Лобановського, 29 🛒 Fora — вулиця Грушевського, 12 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
@@ -1087,16 +1098,5 @@
     "priority": "important",
     "aiGenerated": true,
     "postType": "news"
-  },
-  {
-    "id": "places-ANMI SOUL-White Rabbit Coffee and Friends-2026-10-04",
-    "title": "Два місця на Чайці, куди можна піти сьогодні",
-    "shortText": "☕ ANMI SOUL — вулиця Валерія Лобановського, 18 ☕ White Rabbit Coffee and Friends — вулиця Валерія Лобановського, 26 к2 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
-    "sourceName": "ChaikaUA",
-    "sourceUrl": "https://chaika-ua.netlify.app",
-    "publishedAt": "2026-10-04T13:31:36.443Z",
-    "priority": "info",
-    "aiGenerated": true,
-    "postType": "places"
   }
 ]
