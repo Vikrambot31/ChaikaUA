@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-BALCONE COFFEE-Coffee ART-2026-11-26",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ BALCONE COFFEE — вулиця Валерія Лобановського, 26 к2 ☕ Coffee ART — вулиця Валерія Лобановського, 25 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-11-26T17:56:31.984Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/ukrayina-mozhe-otrymaty-do-20-vynyshhuvachiv-eurofighter-typhoon-vid-italiyi/",
     "title": "Україна може отримати до 20 винищувачів Eurofighter Typhoon від Італії",
     "shortText": "Україна може отримати до 20 винищувачів Eurofighter від Італії. Для мешканців Ірпені та Бучанського району це означає додаткову захист від повітряних атак. #ЖКЧайка #Ірпінь #КиївськаОбласть #Оборона",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/udary-po-prylukah-i-kremenchuku-15-zagyblyh-kilkist-postrazhdalyh-zrosla-do-83/",
-    "title": "Удари по Прилуках і Кременчуку: 15 загиблих, кількість постраждалих зросла до 83",
-    "shortText": "Російські удари по Прилуках і Кременчуку 7 жовтня: 15 загиблих, 83 постраждалих. Для мешканців Чайки це нагадування про важливість цивільного захисту і готовності до будь-яких ситуацій. #ЖКЧайка #Ірпінь #КиївськаОбласть #БезпекаУкраїни",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/udary-po-prylukah-i-kremenchuku-15-zagyblyh-kilkist-postrazhdalyh-zrosla-do-83/",
-    "publishedAt": "2026-10-07T10:46:00.104Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]

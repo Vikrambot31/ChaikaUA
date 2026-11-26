@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-11-26",
+      "publishedAt": "2026-11-26T17:56:31.985Z",
+      "key": "places-BALCONE COFFEE-Coffee ART-2026-11-26"
+    },
+    {
       "type": "news",
       "date": "2026-11-26",
       "publishedAt": "2026-11-26T13:27:12.273Z",
@@ -593,12 +599,6 @@
       "date": "2026-10-07",
       "publishedAt": "2026-10-07T14:50:04.379Z",
       "key": "places-NOVUS-Grano Bakery-2026-10-07"
-    },
-    {
-      "type": "news",
-      "date": "2026-10-07",
-      "publishedAt": "2026-10-07T10:46:00.105Z",
-      "key": "https://bigkyiv.com.ua/udary-po-prylukah-i-kremenchuku-15-zagyblyh-kilkist-postrazhdalyh-zrosla-do-83/"
     }
   ]
 }
