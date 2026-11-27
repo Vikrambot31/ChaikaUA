@@ -1,6 +1,12 @@
 {
   "runs": [
     {
+      "type": "places",
+      "date": "2026-11-27",
+      "publishedAt": "2026-11-27T17:41:47.886Z",
+      "key": "places-Coffee ART-ANMI SOUL-2026-11-27"
+    },
+    {
       "type": "news",
       "date": "2026-11-27",
       "publishedAt": "2026-11-27T13:23:29.739Z",
@@ -593,12 +599,6 @@
       "date": "2026-10-08",
       "publishedAt": "2026-10-08T15:00:50.988Z",
       "key": "places-Grano Bakery-Кав'ярня ХЛІБ та КАВА-2026-10-08"
-    },
-    {
-      "type": "news",
-      "date": "2026-10-08",
-      "publishedAt": "2026-10-08T11:04:46.960Z",
-      "key": "https://bigkyiv.com.ua/u-kramatorsku-vzhe-33-zagyblyh-vid-udaru-rf-po-rejsovomu-avtobusu/"
     }
   ]
 }

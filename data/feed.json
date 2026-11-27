@@ -1,5 +1,16 @@
 [
   {
+    "id": "places-Coffee ART-ANMI SOUL-2026-11-27",
+    "title": "Два місця на Чайці, куди можна піти сьогодні",
+    "shortText": "☕ Coffee ART — вулиця Валерія Лобановського, 25 ☕ ANMI SOUL — вулиця Валерія Лобановського, 18 #ЖКЧайка #Ірпінь #КиївськаОбласть #Місця",
+    "sourceName": "ChaikaUA",
+    "sourceUrl": "https://chaika-ua.netlify.app",
+    "publishedAt": "2026-11-27T17:41:47.885Z",
+    "priority": "info",
+    "aiGenerated": true,
+    "postType": "places"
+  },
+  {
     "id": "https://bigkyiv.com.ua/u-rizdvyanij-istoriyi-sherliz-z-legendarnym-orkestrom-naoni-zigrayut-oleksij-vertynskyj-ta-darya-petrozhyczka/",
     "title": "У різдвяній історії SHERLIZ з легендарним оркестром НАОНІ зіграють Олексій Вертинський та Дар’я Петрожицька",
     "shortText": "У Києві 25–26 грудня театр SHERLIZ з оркестром НАОНІ презентує оновлену «Скрудж: Різдвяну історію» зі зірковим складом. Мешканцям Чайки — чудова нагода вибратися на святковий концерт-виставу. #ЖКЧайка #Ірпінь #КиївськаОбласть #Культура",
@@ -1087,16 +1098,5 @@
     "priority": "info",
     "aiGenerated": true,
     "postType": "places"
-  },
-  {
-    "id": "https://bigkyiv.com.ua/u-kramatorsku-vzhe-33-zagyblyh-vid-udaru-rf-po-rejsovomu-avtobusu/",
-    "title": "У Краматорську вже 33 загиблих від удару РФ по рейсовому автобусу",
-    "shortText": "Удар по автобусу в Краматорську забрав 33 життя. Це нагадує мешканцям Ірпені про важливість безпеки при пересуванні та готовності до непередбачених ситуацій. #ЖКЧайка #Ірпінь #КиївськаОбласть #Безпека",
-    "sourceName": "bigkyiv.com.ua",
-    "sourceUrl": "https://bigkyiv.com.ua/u-kramatorsku-vzhe-33-zagyblyh-vid-udaru-rf-po-rejsovomu-avtobusu/",
-    "publishedAt": "2026-10-08T11:04:46.959Z",
-    "priority": "important",
-    "aiGenerated": true,
-    "postType": "news"
   }
 ]
